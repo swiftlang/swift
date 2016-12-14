@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -317,6 +317,8 @@ llvm::Type *SignatureExpansion::expandDirectResult() {
     return schema.getScalarResultType(IGM);
   }
   }
+
+  llvm_unreachable("Not a valid SILFunctionLanguage.");
 }
 
 static const clang::FieldDecl *
@@ -1187,8 +1189,8 @@ void CallEmission::emitToMemory(Address addr,
   CanType substResultType = substFnType->getSILResult().getSwiftRValueType();
 
   if (origResultType->hasTypeParameter())
-    origResultType = IGF.IGM.getContextArchetypes()
-      .substDependentType(origResultType)
+    origResultType = IGF.IGM.getGenericEnvironment()
+      ->mapTypeIntoContext(IGF.getSwiftModule(), origResultType)
       ->getCanonicalType();
 
   if (origResultType != substResultType) {

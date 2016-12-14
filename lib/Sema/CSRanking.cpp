@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -150,6 +150,8 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::TupleIndex:
     return x.getTupleIndex() == y.getTupleIndex();
   }
+
+  llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
 
 /// Compare two declarations to determine whether one is a witness of the other.
@@ -188,16 +190,16 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
   // Determine whether the type of the witness's context conforms to the
   // protocol.
   auto owningType
-    = potentialWitness->getDeclContext()->getDeclaredTypeInContext();
-  ProtocolConformance *conformance = nullptr;
-  if (!tc.conformsToProtocol(owningType, proto, dc,
-                             ConformanceCheckFlags::InExpression, &conformance) ||
-      !conformance)
+    = potentialWitness->getDeclContext()->getDeclaredInterfaceType();
+  auto conformance = tc.conformsToProtocol(owningType, proto, dc,
+                                           ConformanceCheckFlags::InExpression);
+  if (!conformance || conformance->isAbstract())
     return Comparison::Unordered;
 
   // If the witness and the potential witness are not the same, there's no
   // ordering here.
-  if (conformance->getWitness(req, &tc).getDecl() != potentialWitness)
+  if (conformance->getConcrete()->getWitness(req, &tc).getDecl()
+        != potentialWitness)
     return Comparison::Unordered;
 
   // We have a requirement/witness match.
@@ -248,8 +250,8 @@ static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
   if (!dc1->isTypeContext() || !dc2->isTypeContext())
     return SelfTypeRelationship::Unrelated;
 
-  Type type1 = dc1->getDeclaredTypeInContext();
-  Type type2 = dc2->getDeclaredTypeInContext();
+  Type type1 = dc1->getDeclaredInterfaceType();
+  Type type2 = dc2->getDeclaredInterfaceType();
 
   // If the types are equal, the answer is simple.
   if (type1->isEqual(type2))
@@ -390,7 +392,7 @@ static bool hasEmptyExistentialParameterMismatch(ValueDecl *decl1,
       return false;
     
     if (t2->isAnyExistentialType() && !t1->isAnyExistentialType())
-      return t2->isEmptyExistentialComposition();
+      return t2->isAny();
   }
   return false;
 }
@@ -875,8 +877,10 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
             
             // If both are convenience initializers, and the instance type of
             // one is a subtype of the other's, favor the subtype constructor.
-            auto resType1 = ctor1->getResultType();
-            auto resType2 = ctor2->getResultType();
+            auto resType1 = ArchetypeBuilder::mapTypeIntoContext(
+                ctor1, ctor1->getResultInterfaceType());
+            auto resType2 = ArchetypeBuilder::mapTypeIntoContext(
+                ctor2, ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {
               if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {
@@ -958,7 +962,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       auto check = [](const ValueDecl *VD) -> bool {
         if (!VD->getModuleContext()->isStdlibModule())
           return false;
-        auto fnTy = VD->getType()->castTo<AnyFunctionType>();
+        auto fnTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
         if (!fnTy->getResult()->getAnyOptionalObjectType())
           return false;
 

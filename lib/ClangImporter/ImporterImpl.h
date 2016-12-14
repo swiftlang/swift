@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -427,6 +427,11 @@ private:
     }
   };
 
+  /// A mapping from imported declarations to their "alternate" declarations,
+  /// for cases where a single Clang declaration is imported to two
+  /// different Swift declarations.
+  llvm::DenseMap<Decl *, TinyPtrVector<ValueDecl *>> AlternateDecls;
+
 public:
   /// \brief Keep track of enum constant values that have been imported.
   llvm::DenseMap<std::pair<const clang::EnumDecl *, llvm::APSInt>,
@@ -440,17 +445,21 @@ public:
                  ConstructorDecl *>
     Constructors;
 
-  /// A mapping from imported declarations to their "alternate" declarations,
-  /// for cases where a single Clang declaration is imported to two
-  /// different Swift declarations.
-  llvm::DenseMap<Decl *, ValueDecl *> AlternateDecls;
-
   /// Retrieve the alternative declaration for the given imported
   /// Swift declaration.
-  ValueDecl *getAlternateDecl(Decl *decl) {
+  ArrayRef<ValueDecl *> getAlternateDecls(Decl *decl) {
     auto known = AlternateDecls.find(decl);
-    if (known == AlternateDecls.end()) return nullptr;
+    if (known == AlternateDecls.end()) return {};
     return known->second;
+  }
+
+  /// Add an alternative decl
+  void addAlternateDecl(Decl *forDecl, ValueDecl *altDecl) {
+    auto &vec = AlternateDecls[forDecl];
+    for (auto alt : vec)
+      if (alt == altDecl)
+        return;
+    vec.push_back(altDecl);
   }
 
 private:
@@ -619,10 +628,9 @@ public:
   /// so it should not be used when referencing Clang symbols.
   ///
   /// \param D The Clang declaration whose name should be imported.
-  importer::ImportedName
-  importFullName(const clang::NamedDecl *D,
-                 importer::ImportNameOptions options = None) {
-    return getNameImporter().importName(D, options);
+  importer::ImportedName importFullName(const clang::NamedDecl *D,
+                                        importer::ImportNameVersion version) {
+    return getNameImporter().importName(D, version);
   }
 
   /// Print an imported name as a string suitable for the swift_name attribute,
@@ -721,9 +729,9 @@ public:
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
                            bool useSwift2Name, ProtocolDecl *proto);
 
-  /// \brief Utility function for building simple generic signatures.
-  std::pair<GenericSignature *, GenericEnvironment *>
-  buildGenericSignature(GenericParamList *genericParams, DeclContext *dc);
+  /// \brief Utility function for building simple generic environments.
+  GenericEnvironment *buildGenericEnvironment(GenericParamList *genericParams,
+                                              DeclContext *dc);
 
   /// \brief Import the given Clang declaration context into Swift.
   ///
@@ -1144,22 +1152,6 @@ public:
 };
 
 namespace importer {
-
-/// Add the given named declaration as an entry to the given Swift name
-/// lookup table, including any of its child entries.
-void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named,
-                           importer::NameImporter &);
-
-/// Add the macros from the given Clang preprocessor to the given
-/// Swift name lookup table.
-void addMacrosToLookupTable(clang::ASTContext &clangCtx,
-                            clang::Preprocessor &pp, SwiftLookupTable &table,
-                            ASTContext &SwiftContext);
-
-/// Finalize a lookup table, handling any as-yet-unresolved entries
-/// and emitting diagnostics if necessary.
-void finalizeLookupTable(clang::ASTContext &clangCtx, clang::Preprocessor &pp,
-                         SwiftLookupTable &table, ASTContext &SwiftContext);
 
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);

@@ -1,5 +1,5 @@
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
-// RUN: %target-swift-frontend -parse -verify %t_no_errors.swift
+// RUN: %target-swift-frontend -typecheck -verify %t_no_errors.swift
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVER_BASE_1 > %t.over.txt
 // RUN: %FileCheck %s -check-prefix=OVER_BASE_1 < %t.over.txt

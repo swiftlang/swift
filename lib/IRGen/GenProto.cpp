@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -212,7 +212,6 @@ void PolymorphicConvention::enumerateRequirements(const RequirementCallback &cal
       // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
-      case RequirementKind::WitnessMarker:
         continue;
 
       case RequirementKind::Conformance: {
@@ -922,7 +921,7 @@ static bool isDependentConformance(IRGenModule &IGM,
 
 /// Detail about how an object conforms to a protocol.
 class irgen::ConformanceInfo {
-  friend class ProtocolInfo;
+  friend ProtocolInfo;
 public:
   virtual ~ConformanceInfo() {}
   virtual llvm::Value *getTable(IRGenFunction &IGF,
@@ -996,7 +995,7 @@ namespace {
 
 /// Conformance info for a witness table that can be directly generated.
 class DirectConformanceInfo : public ConformanceInfo {
-  friend class ProtocolInfo;
+  friend ProtocolInfo;
 
   const NormalProtocolConformance *RootConformance;
 public:
@@ -1016,7 +1015,7 @@ public:
 
 /// Conformance info for a witness table that is (or may be) dependent.
 class AccessorConformanceInfo : public ConformanceInfo {
-  friend class ProtocolInfo;
+  friend ProtocolInfo;
 
   const NormalProtocolConformance *Conformance;
 public:
@@ -1816,6 +1815,8 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
     // Always carries polymorphic parameters for the Self type.
     return true;
   }
+
+  llvm_unreachable("Not a valid SILFunctionTypeRepresentation.");
 }
 
 static

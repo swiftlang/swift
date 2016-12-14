@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify -module-name main %s
+// RUN: %target-swift-frontend -typecheck -verify -module-name main %s
 
 // Tests for interaction between comments & operators from SE-0037
 // which defined comments to be whitespace for operator arity rules.

@@ -16,7 +16,7 @@ struct Val {
 // CHECK-LABEL: sil hidden @_TF8lifetime13local_valtypeFT_T_
 func local_valtype() {
     var b: Val
-    // CHECK: [[B:%[0-9]+]] = alloc_box $@box Val
+    // CHECK: [[B:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Val>
     // CHECK: destroy_value [[B]]
     // CHECK: return
 }
@@ -24,7 +24,7 @@ func local_valtype() {
 // CHECK-LABEL: sil hidden @_TF8lifetime20local_valtype_branch
 func local_valtype_branch(_ a: Bool) {
     var a = a
-    // CHECK: [[A:%[0-9]+]] = alloc_box $@box Bool
+    // CHECK: [[A:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
 
     if a { return }
     // CHECK: cond_br
@@ -32,7 +32,7 @@ func local_valtype_branch(_ a: Bool) {
     // CHECK: br [[EPILOG:bb[0-9]+]]
 
     var x:Int
-    // CHECK: [[X:%[0-9]+]] = alloc_box $@box Int
+    // CHECK: [[X:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
 
     if a { return }
     // CHECK: cond_br
@@ -55,7 +55,7 @@ func local_valtype_branch(_ a: Bool) {
         // CHECK: br [[EPILOG]]
 
         var y:Int
-        // CHECK: [[Y:%[0-9]+]] = alloc_box $@box Int
+        // CHECK: [[Y:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
 
         if a { break }
         // CHECK: cond_br
@@ -74,7 +74,7 @@ func local_valtype_branch(_ a: Bool) {
 
         if true {
             var z:Int
-            // CHECK: [[Z:%[0-9]+]] = alloc_box $@box Int
+            // CHECK: [[Z:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
 
             if a { break }
             // CHECK: cond_br
@@ -129,7 +129,7 @@ func reftype_return() -> Ref {
 func reftype_arg(_ a: Ref) {
     var a = a
     // CHECK: bb0([[A:%[0-9]+]] : $Ref):
-    // CHECK: [[AADDR:%[0-9]+]] = alloc_box $@box Ref
+    // CHECK: [[AADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Ref>
     // CHECK: [[PA:%[0-9]+]] = project_box [[AADDR]]
     // CHECK: [[A_COPY:%.*]] = copy_value [[A]]
     // CHECK: store [[A_COPY]] to [init] [[PA]]
@@ -151,7 +151,7 @@ func reftype_call_ignore_return() {
 // CHECK-LABEL: sil hidden @_TF8lifetime27reftype_call_store_to_localFT_T_
 func reftype_call_store_to_local() {
     var a = reftype_func()
-    // CHECK: [[A:%[0-9]+]] = alloc_box $@box Ref
+    // CHECK: [[A:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Ref>
     // CHECK-NEXT: [[PB:%.*]] = project_box [[A]]
     // CHECK: = function_ref @_TF8lifetime12reftype_funcFT_CS_3Ref : $@convention(thin) () -> @owned Ref
     // CHECK-NEXT: [[R:%[0-9]+]] = apply
@@ -178,7 +178,7 @@ func reftype_call_arg() {
 func reftype_call_with_arg(_ a: Ref) {
     var a = a
     // CHECK: bb0([[A1:%[0-9]+]] : $Ref):
-    // CHECK: [[AADDR:%[0-9]+]] = alloc_box $@box Ref
+    // CHECK: [[AADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Ref>
     // CHECK: [[PB:%.*]] = project_box [[AADDR]]
     // CHECK: [[A1_COPY:%.*]] = copy_value [[A1]]
     // CHECK: store [[A1_COPY]] to [init] [[PB]]
@@ -197,7 +197,7 @@ func reftype_call_with_arg(_ a: Ref) {
 func reftype_reassign(_ a: inout Ref, b: Ref) {
     var b = b
     // CHECK: bb0([[AADDR:%[0-9]+]] : $*Ref, [[B1:%[0-9]+]] : $Ref):
-    // CHECK: [[BADDR:%[0-9]+]] = alloc_box $@box Ref
+    // CHECK: [[BADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Ref>
     // CHECK: [[PBB:%.*]] = project_box [[BADDR]]
     a = b
     // CHECK: destroy_value
@@ -343,12 +343,12 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   var r = r
   var i = i
   var v = v
-  // CHECK: [[RADDR:%[0-9]+]] = alloc_box $@box RefWithProp
+  // CHECK: [[RADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <RefWithProp>
   // CHECK: [[PR:%[0-9]+]] = project_box [[RADDR]]
-  // CHECK: [[IADDR:%[0-9]+]] = alloc_box $@box Int
+  // CHECK: [[IADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   // CHECK: [[PI:%[0-9]+]] = project_box [[IADDR]]
   // CHECK: store %1 to [trivial] [[PI]]
-  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $@box Val
+  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Val>
   // CHECK: [[PV:%[0-9]+]] = project_box [[VADDR]]
 
   // -- Reference types need to be copy_valued as property method args.
@@ -437,7 +437,7 @@ class Foo<T> {
     // CHECK:   assign {{.*}} to [[THIS_Y_2]] : $*Ref
 
     // -- Then we create a box that we will use to perform a copy_addr into #Foo.x a bit later.
-    // CHECK:   [[CHIADDR:%[0-9]+]] = alloc_box $@box Int, var, name "chi"
+    // CHECK:   [[CHIADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>, var, name "chi"
     // CHECK:   [[PCHI:%[0-9]+]] = project_box [[CHIADDR]]
     // CHECK:   store [[CHI]] to [trivial] [[PCHI]]
 
@@ -445,7 +445,7 @@ class Foo<T> {
     // CHECK:   [[THIS_Z:%.*]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.z
     // CHECK:   copy_addr [take] {{.*}} to [[THIS_Z]]
 
-    // -- Then initialize #Foo.x using the earlier stored vlaue of CHI to THIS_Z.
+    // -- Then initialize #Foo.x using the earlier stored value of CHI to THIS_Z.
     x = chi
     // CHECK:   [[THIS_X:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.x
     // CHECK:   copy_addr [[PCHI]] to [[THIS_X]]
@@ -576,7 +576,7 @@ struct Bar {
   // CHECK-LABEL: sil hidden @_TFV8lifetime3BarC{{.*}}
   init() {
     // CHECK: bb0([[METATYPE:%[0-9]+]] : $@thin Bar.Type):
-    // CHECK: [[THISADDRBOX:%[0-9]+]] = alloc_box $@box Bar
+    // CHECK: [[THISADDRBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Bar>
     // CHECK: [[PB:%.*]] = project_box [[THISADDRBOX]]
     // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [rootself] [[PB]]
 
@@ -604,7 +604,7 @@ struct Bas<T> {
   init(yy:T) {
     // CHECK: bb0([[THISADDRPTR:%[0-9]+]] : $*Bas<T>, [[YYADDR:%[0-9]+]] : $*T, [[META:%[0-9]+]] : $@thin Bas<T>.Type):
     // CHECK: alloc_box
-    // CHECK: [[THISADDRBOX:%[0-9]+]] = alloc_box $@box Bas
+    // CHECK: [[THISADDRBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Bas<T>>
     // CHECK: [[PB:%.*]] = project_box [[THISADDRBOX]]
     // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [rootself] [[PB]]
 
@@ -634,14 +634,14 @@ class D : B {
   init(x: Int, y: Int) {
     var x = x
     var y = y
-    // CHECK: [[THISADDR1:%[0-9]+]] = alloc_box $@box D
+    // CHECK: [[THISADDR1:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <D>
     // CHECK: [[PTHIS:%[0-9]+]] = project_box [[THISADDR1]]
     // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [derivedself] [[PTHIS]]
     // CHECK: store [[THIS]] to [init] [[THISADDR]]
-    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $@box Int
+    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
     // CHECK: [[PX:%[0-9]+]] = project_box [[XADDR]]
     // CHECK: store [[X]] to [trivial] [[PX]]
-    // CHECK: [[YADDR:%[0-9]+]] = alloc_box $@box Int
+    // CHECK: [[YADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
     // CHECK: [[PY:%[0-9]+]] = project_box [[YADDR]]
     // CHECK: store [[Y]] to [trivial] [[PY]]
 
@@ -662,7 +662,7 @@ class D : B {
 // CHECK-LABEL: sil hidden @_TF8lifetime8downcast
 func downcast(_ b: B) {
   var b = b
-  // CHECK: [[BADDR:%[0-9]+]] = alloc_box $@box B
+  // CHECK: [[BADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <B>
   // CHECK: [[PB:%[0-9]+]] = project_box [[BADDR]]
   (b as! D).foo()
   // CHECK: [[B:%[0-9]+]] = load [copy] [[PB]]

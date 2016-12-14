@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -143,18 +143,7 @@ struct ilist_traits<::swift::SILCoverageMap> :
 public ilist_default_traits<::swift::SILCoverageMap> {
   typedef ::swift::SILCoverageMap SILCoverageMap;
 
-private:
-  mutable ilist_half_node<SILCoverageMap> Sentinel;
-
 public:
-  SILCoverageMap *createSentinel() const {
-    return static_cast<SILCoverageMap*>(&Sentinel);
-  }
-  void destroySentinel(SILCoverageMap *) const {}
-
-  SILCoverageMap *provideInitialHead() const { return createSentinel(); }
-  SILCoverageMap *ensureHead(SILCoverageMap*) const { return createSentinel(); }
-  static void noteHead(SILCoverageMap*, SILCoverageMap*) {}
   static void deleteNode(SILCoverageMap *VT) { VT->~SILCoverageMap(); }
 
 private:

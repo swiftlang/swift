@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -107,6 +107,9 @@ private:
   llvm::DenseMap<const NormalProtocolConformance *, NormalConformanceID>
     NormalConformances;
 
+  // A map from SILLayouts to their serialized IDs.
+  llvm::DenseMap<SILLayout *, SILLayoutID> SILLayouts;
+
 public:
   using DeclTableData = SmallVector<std::pair<uint8_t, DeclID>, 4>;
   /// The in-memory representation of what will eventually be an on-disk hash
@@ -144,6 +147,9 @@ private:
   /// NormalProtocolConformances that need to be serialized.
   std::queue<const NormalProtocolConformance *> NormalConformancesToWrite;
 
+  /// SILLayouts that need to be serialized.
+  std::queue<SILLayout *> SILLayoutsToWrite;
+
   /// All identifiers that need to be serialized.
   std::vector<Identifier> IdentifiersToWrite;
 
@@ -174,6 +180,10 @@ private:
   /// NormalConformanceID.
   std::vector<BitOffset> NormalConformanceOffsets;
 
+  /// The offset of each SILLayout in the bitstream, indexed by
+  /// SILLayoutID.
+  std::vector<BitOffset> SILLayoutOffsets;
+
   /// The decls that adopt compiler-known protocols.
   SmallVector<DeclID, 2> KnownProtocolAdopters[NumKnownProtocols];
 
@@ -188,6 +198,9 @@ private:
 
   /// The last assigned NormalConformanceID for decl contexts from this module.
   uint32_t /*NormalConformanceID*/ LastNormalConformanceID = 0;
+
+  /// The last assigned SILLayoutID for SIL layouts from this module.
+  uint32_t /*SILLayoutID*/ LastSILLayoutID = 0;
 
   /// The last assigned DeclID for types from this module.
   uint32_t /*TypeID*/ LastTypeID = 0;
@@ -216,6 +229,8 @@ private:
       return index_block::LOCAL_DECL_CONTEXT_OFFSETS;
     if (&values == &NormalConformanceOffsets)
       return index_block::NORMAL_CONFORMANCE_OFFSETS;
+    if (&values == &SILLayoutOffsets)
+      return index_block::SIL_LAYOUT_OFFSETS;
     llvm_unreachable("unknown offset kind");
   }
 
@@ -239,13 +254,14 @@ private:
   void writeParameterList(const ParameterList *PL);
 
   /// Writes the given pattern, recursively.
-  void writePattern(const Pattern *pattern);
+  void writePattern(const Pattern *pattern, DeclContext *owningDC);
 
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams);
 
   /// Writes a set of generic requirements.
-  void writeGenericRequirements(ArrayRef<Requirement> requirements);
+  void writeGenericRequirements(ArrayRef<Requirement> requirements,
+                                const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
@@ -391,6 +407,9 @@ public:
   NormalConformanceID addConformanceRef(
                         const NormalProtocolConformance *conformance);
 
+  /// Records the use of the given SILLayout.
+  SILLayoutID addSILLayoutRef(SILLayout *layout);
+
   /// Records the use of the given module.
   ///
   /// The module's name will be scheduled for serialization if necessary.
@@ -413,6 +432,9 @@ public:
   /// Write a normal protocol conformance.
   void writeNormalConformance(const NormalProtocolConformance *conformance);
 
+  /// Write a SILLayout.
+  void writeSILLayout(SILLayout *conformance);
+
   /// Writes a protocol conformance.
   ///
   /// \param genericEnv When provided, the generic environment that describes
@@ -430,8 +452,8 @@ public:
 
   /// Writes a generic environment.
   void writeGenericEnvironment(GenericEnvironment *env,
-                         const std::array<unsigned, 256> &abbrCodes);
-
+                               const std::array<unsigned, 256> &abbrCodes,
+                               bool SILMode);
 };
 } // end namespace serialization
 } // end namespace swift

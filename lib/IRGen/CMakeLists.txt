@@ -32,6 +32,7 @@ add_swift_library(swiftIRGen STATIC
   IRGen.cpp
   IRGenDebugInfo.cpp
   IRGenFunction.cpp
+  IRGenMangler.cpp
   IRGenModule.cpp
   IRGenSIL.cpp
   Linking.cpp

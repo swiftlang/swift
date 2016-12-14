@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-experimental-nested-generic-types
+// RUN: %target-typecheck-verify-swift
 
 struct MyType<TyA, TyB> { // expected-note {{declared here}}
   var a : TyA, b : TyB
@@ -31,7 +31,8 @@ typealias DS<T> = MyType<String, T>
 typealias BadA<T : Int> = MyType<String, T>  // expected-error {{inheritance from non-protocol, non-class type 'Int'}}
 
 typealias BadB<T where T == Int> = MyType<String, T>  // expected-error {{associated types may not have a generic parameter list}}
-// expected-error @-1 {{same-type requirement makes generic parameter 'T' non-generic}}
+// expected-error@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
+// expected-error@-2 {{same-type requirement makes generic parameter 'T' non-generic}}
 
 typealias BadC<T,T> = MyType<String, T>  // expected-error {{definition conflicts with previous value}}
 // expected-note @-1 {{previous definition of 'T' is here}}
@@ -209,8 +210,8 @@ func takesSugaredType1(m: ConcreteClass.TA<Float>) {
   takesUnsugaredType1(m: m)
 }
 
-// FIXME: Something is wrong with SpecializeExpr here
-let _ = ConcreteStruct.O<Int>(123) // expected-error {{cannot invoke value of type 'Optional<Int>.Type' with argument list '(Int)'}}
+let _ = ConcreteStruct.O(123)
+let _ = ConcreteStruct.O<Int>(123)
 
 // Qualified lookup of generic typealiases nested inside generic contexts
 

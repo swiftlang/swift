@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -81,7 +81,7 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
              Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->hasType()) {
+  if (protocol && !protocol->hasInterfaceType()) {
     validateDecl(protocol);
     if (protocol->isInvalid())
       return nullptr;
@@ -199,7 +199,7 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
 /// unambiguous name.
 Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
                                                 ConstructorDecl *ctor) {
-  Type argType = ctor->getArgumentType();
+  Type argType = ctor->getArgumentInterfaceType();
   auto argTuple = argType->getAs<TupleType>();
   if (!argTuple) return argType;
 
@@ -247,7 +247,7 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
         return Type();
       }
 
-      auto tyDecl = dyn_cast<TypeDecl>(results.front());
+      auto tyDecl = dyn_cast<NominalTypeDecl>(results.front());
       if (!tyDecl) {
         diagnose(SourceLoc(), diag::broken_bool);
         return Type();
@@ -366,7 +366,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   // If the extended type is generic or is a protocol. Clone or create
   // the generic parameters.
-  if (extendedNominal->getGenericParamsOfContext()) {
+  if (extendedNominal->isGenericContext()) {
     if (auto proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
       // For a protocol extension, build the generic parameter list.
       ED->setGenericParams(proto->createGenericParams(ED));
@@ -381,7 +381,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
   if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-    if (!extendedNominal->getGenericParamsOfContext()) {
+    if (!extendedNominal->isGenericContext()) {
       // Only generic and protocol types are permitted to have
       // trailing where clauses.
       TC.diagnose(ED, diag::extension_nongeneric_trailing_where, extendedType)
@@ -558,6 +558,12 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
+  // Resolve condition clauses so name binding can accurately track imports.
+  {
+    SharedTimer timer("Condition resolution");
+    performConditionResolution(SF);
+  }
+
   // Make sure that name binding has been completed before doing any type
   // checking.
   {
@@ -693,11 +699,12 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
-  return performTypeLocChecking(Ctx, T,
-                                /*isSILMode=*/false,
-                                /*isSILType=*/false,
-                                /*GenericEnv=*/nullptr,
-                                DC, ProduceDiagnostics);
+  return performTypeLocChecking(
+                            Ctx, T,
+                            /*isSILMode=*/false,
+                            /*isSILType=*/false,
+                            /*GenericEnv=*/DC->getGenericEnvironmentOfContext(),
+                            DC, ProduceDiagnostics);
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
@@ -715,27 +722,21 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (isSILType)
     options |= TR_SILType;
 
-  // FIXME: Get rid of PartialGenericTypeToArchetypeResolver
   GenericTypeToArchetypeResolver contextResolver(GenericEnv);
-  PartialGenericTypeToArchetypeResolver defaultResolver;
-
-  GenericTypeResolver *resolver =
-      (GenericEnv ? (GenericTypeResolver *) &contextResolver
-                  : (GenericTypeResolver *) &defaultResolver);
 
   if (ProduceDiagnostics) {
-    return TypeChecker(Ctx).validateType(T, DC, options, resolver);
+    return TypeChecker(Ctx).validateType(T, DC, options, &contextResolver);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    return TypeChecker(Ctx, Diags).validateType(T, DC, options, resolver);
+    return TypeChecker(Ctx, Diags).validateType(T, DC, options,
+                                                &contextResolver);
   }
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-std::pair<GenericSignature *, GenericEnvironment *>
-swift::handleSILGenericParams(ASTContext &Ctx,
-                              GenericParamList *genericParams,
+GenericEnvironment *
+swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
                               DeclContext *DC) {
   return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }

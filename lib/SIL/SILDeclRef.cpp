@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -576,7 +577,8 @@ static void mangleClangDecl(raw_ostream &buffer,
   importer->getMangledName(buffer, clangDecl);
 }
 
-static std::string mangleConstant(SILDeclRef c, SILDeclRef::ManglingKind Kind) {
+static std::string mangleConstantOld(SILDeclRef c,
+                                     SILDeclRef::ManglingKind Kind) {
   using namespace Mangle;
   Mangler mangler;
 
@@ -733,9 +735,143 @@ static std::string mangleConstant(SILDeclRef c, SILDeclRef::ManglingKind Kind) {
   llvm_unreachable("bad entity kind!");
 }
 
+static std::string mangleConstant(SILDeclRef c, SILDeclRef::ManglingKind Kind) {
+  using namespace NewMangling;
+  ASTMangler mangler;
+
+  // As a special case, Clang functions and globals don't get mangled at all.
+  if (c.hasDecl()) {
+    if (auto clangDecl = c.getDecl()->getClangDecl()) {
+      if (!c.isForeignToNativeThunk() && !c.isNativeToForeignThunk()
+          && !c.isCurried) {
+        if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
+          if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
+            std::string s(1, '\01');
+            s += asmLabel->getLabel();
+            return s;
+          } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>()) {
+            std::string storage;
+            llvm::raw_string_ostream SS(storage);
+            // FIXME: When we can import C++, use Clang's mangler all the time.
+            mangleClangDecl(SS, namedClangDecl,
+                            c.getDecl()->getASTContext());
+            return SS.str();
+          }
+          return namedClangDecl->getName();
+        }
+      }
+    }
+  }
+
+  ASTMangler::SymbolKind SKind = ASTMangler::SymbolKind::Default;
+  switch (Kind) {
+    case SILDeclRef::ManglingKind::Default:
+      if (c.isForeign) {
+        SKind = ASTMangler::SymbolKind::SwiftAsObjCThunk;
+      } else if (c.isDirectReference) {
+        SKind = ASTMangler::SymbolKind::DirectMethodReferenceThunk;
+      } else if (c.isForeignToNativeThunk()) {
+        SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
+      }
+      break;
+    case SILDeclRef::ManglingKind::VTableMethod:
+      SKind = ASTMangler::SymbolKind::VTableMethod;
+      break;
+    case SILDeclRef::ManglingKind::DynamicThunk:
+      SKind = ASTMangler::SymbolKind::DynamicThunk;
+      break;
+  }
+
+  switch (c.kind) {
+  case SILDeclRef::Kind::Func:
+    if (!c.hasDecl())
+      return mangler.mangleClosureEntity(c.getAbstractClosureExpr(), SKind);
+
+    // As a special case, functions can have manually mangled names.
+    // Use the SILGen name only for the original non-thunked, non-curried entry
+    // point.
+    if (auto NameA = c.getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
+      if (!c.isForeignToNativeThunk() && !c.isNativeToForeignThunk()
+          && !c.isCurried) {
+        return NameA->Name;
+      }
+      
+    // Use a given cdecl name for native-to-foreign thunks.
+    if (auto CDeclA = c.getDecl()->getAttrs().getAttribute<CDeclAttr>())
+      if (c.isNativeToForeignThunk()) {
+        return CDeclA->Name;
+      }
+
+    // Otherwise, fall through into the 'other decl' case.
+    SWIFT_FALLTHROUGH;
+
+  case SILDeclRef::Kind::EnumElement:
+    return mangler.mangleEntity(c.getDecl(), c.isCurried, SKind);
+
+  case SILDeclRef::Kind::Deallocator:
+    assert(!c.isCurried);
+    return mangler.mangleDestructorEntity(cast<DestructorDecl>(c.getDecl()),
+                                          /*isDeallocating*/ true,
+                                          SKind);
+
+  case SILDeclRef::Kind::Destroyer:
+    assert(!c.isCurried);
+    return mangler.mangleDestructorEntity(cast<DestructorDecl>(c.getDecl()),
+                                          /*isDeallocating*/ false,
+                                          SKind);
+
+  case SILDeclRef::Kind::Allocator:
+    return mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
+                                           /*allocating*/ true,
+                                           c.isCurried,
+                                           SKind);
+
+  case SILDeclRef::Kind::Initializer:
+    return mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
+                                           /*allocating*/ false,
+                                           c.isCurried,
+                                           SKind);
+
+  case SILDeclRef::Kind::IVarInitializer:
+  case SILDeclRef::Kind::IVarDestroyer:
+    assert(!c.isCurried);
+    return mangler.mangleIVarInitDestroyEntity(cast<ClassDecl>(c.getDecl()),
+                                  c.kind == SILDeclRef::Kind::IVarDestroyer,
+                                  SKind);
+
+  case SILDeclRef::Kind::GlobalAccessor:
+    assert(!c.isCurried);
+    return mangler.mangleAccessorEntity(AccessorKind::IsMutableAddressor,
+                                        AddressorKind::Unsafe,
+                                        c.getDecl(),
+                                        /*isStatic*/ false,
+                                        SKind);
+
+  case SILDeclRef::Kind::GlobalGetter:
+    assert(!c.isCurried);
+    return mangler.mangleGlobalGetterEntity(c.getDecl(), SKind);
+
+  case SILDeclRef::Kind::DefaultArgGenerator:
+    assert(!c.isCurried);
+    return mangler.mangleDefaultArgumentEntity(
+                                        cast<AbstractFunctionDecl>(c.getDecl()),
+                                        c.defaultArgIndex,
+                                        SKind);
+
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+    assert(!c.isCurried);
+    return mangler.mangleInitializerEntity(cast<VarDecl>(c.getDecl()), SKind);
+  }
+
+  llvm_unreachable("bad entity kind!");
+}
+
 std::string SILDeclRef::mangle(ManglingKind MKind) const {
-  return mangleConstant(*this, MKind);
- }
+  std::string Old = mangleConstantOld(*this, MKind);
+  std::string New = mangleConstant(*this, MKind);
+
+  return NewMangling::selectMangling(Old, New);
+}
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
   if (auto overridden = getOverridden()) {

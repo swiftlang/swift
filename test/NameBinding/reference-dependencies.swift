@@ -1,8 +1,12 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
 // RUN: %FileCheck %s < %t.swiftdeps
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
+
+// Check that the output is deterministic.
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
+// RUN: diff %t.swiftdeps %t-2.swiftdeps
 
 // CHECK-LABEL: {{^provides-top-level:$}}
 // CHECK-NEXT: "IntWrapper"
@@ -436,44 +440,40 @@ struct Sentinel2 {}
 // CHECK-DAG: - !private ["P4main13PrivateProto3", ""]
 
 // CHECK-LABEL: {{^depends-nominal:$}}
-// CHECK-DAG: - "V4main10IntWrapper"
-// CHECK-DAG: - "Ps10Comparable"
-// CHECK-DAG: - "C4main18ClassFromOtherFile"
-// CHECK-DAG: !private "Si"
-// CHECK-DAG: - "Ps25ExpressibleByFloatLiteral"
-// CHECK-DAG: !private "Ps33ExpressibleByUnicodeScalarLiteral"
-// CHECK-DAG: !private "Ps10Strideable"
-// CHECK-DAG: !private "Sa"
-// CHECK-DAG: - "Sb"
-// CHECK-DAG: !private "V4main17OtherFileIntArray"
-// CHECK-DAG: !private "V4main18OtherFileOuterType"
-// CHECK-DAG: !private "VV4main18OtherFileOuterType9InnerType"
-// CHECK-DAG: !private "VV4main26OtherFileSecretTypeWrapper10SecretType"
-// CHECK-DAG: !private "V4main25OtherFileProtoImplementor"
-// CHECK-DAG: !private "V4main26OtherFileProtoImplementor2"
-// CHECK-DAG: !private "Vs13EmptyIterator"
-// CHECK-DAG: - "O4main13OtherFileEnum"
-// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
-// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
-// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
-
-// CHECK-DAG: - "V4main23TopLevelForMemberLookup"
-
-// CHECK-DAG: - "V4main14TopLevelStruct"
-// CHECK-DAG: - "V4main15TopLevelStruct2"
-// CHECK-DAG: - "V4main15TopLevelStruct3"
-// CHECK-DAG: - "V4main15TopLevelStruct4"
-// CHECK-DAG: - "V4main15TopLevelStruct5"
-// CHECK-DAG: !private "V4main21PrivateTopLevelStruct"
-// CHECK-DAG: !private "V4main22PrivateTopLevelStruct2"
-// CHECK-DAG: !private "V4main22PrivateTopLevelStruct3"
-// CHECK-DAG: !private "V4main22PrivateTopLevelStruct4"
-
-// CHECK-DAG: - "P4main14TopLevelProto1"
-// CHECK-DAG: - "P4main14TopLevelProto2"
-// CHECK-DAG: !private "P4main13PrivateProto1"
-// CHECK-DAG: !private "P4main13PrivateProto2"
-// CHECK-DAG: !private "P4main13PrivateProto3"
+// We're checking order here to make sure the names are sorted.
+// CHECK: - !private "Sa"
+// CHECK: - "Sb"
+// CHECK: - "C4main18ClassFromOtherFile"
+// CHECK: - "Ps10Comparable"
+// CHECK: - !private "Vs13EmptyIterator"
+// CHECK: - "Ps25ExpressibleByFloatLiteral"
+// CHECK: - !private "Ps33ExpressibleByUnicodeScalarLiteral"
+// CHECK: - !private "VV4main18OtherFileOuterType9InnerType"
+// CHECK: - !private "Si"
+// CHECK: - "V4main10IntWrapper"
+// CHECK: - "O4main13OtherFileEnum"
+// CHECK: - !private "V4main20OtherFileEnumWrapper"
+// CHECK: - !private "V4main17OtherFileIntArray"
+// CHECK: - !private "V4main18OtherFileOuterType"
+// CHECK: - !private "V4main25OtherFileProtoImplementor"
+// CHECK: - !private "V4main26OtherFileProtoImplementor2"
+// CHECK: - !private "P4main13PrivateProto1"
+// CHECK: - !private "P4main13PrivateProto2"
+// CHECK: - !private "P4main13PrivateProto3"
+// CHECK: - !private "V4main21PrivateTopLevelStruct"
+// CHECK: - !private "V4main22PrivateTopLevelStruct2"
+// CHECK: - !private "V4main22PrivateTopLevelStruct3"
+// CHECK: - !private "V4main22PrivateTopLevelStruct4"
+// CHECK: - !private "VV4main26OtherFileSecretTypeWrapper10SecretType"
+// CHECK: - !private "Ps10Strideable"
+// CHECK: - "V4main23TopLevelForMemberLookup"
+// CHECK: - "P4main14TopLevelProto1"
+// CHECK: - "P4main14TopLevelProto2"
+// CHECK: - "V4main14TopLevelStruct"
+// CHECK: - "V4main15TopLevelStruct2"
+// CHECK: - "V4main15TopLevelStruct3"
+// CHECK: - "V4main15TopLevelStruct4"
+// CHECK: - "V4main15TopLevelStruct5"
 
 // String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: "String"

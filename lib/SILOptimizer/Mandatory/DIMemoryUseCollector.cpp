@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -57,11 +57,14 @@ static unsigned getElementCountRec(CanType T,
 DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
   MemoryInst = MI;
   // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst))
-    MemorySILType = ABI->getElementType();
-  else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst))
+  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
+    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
+           && "analyzing multi-field boxes not implemented");
+    MemorySILType =
+      ABI->getBoxType()->getFieldType(getFunction().getModule(), 0);
+  } else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
     MemorySILType = ASI->getElementType();
-  else {
+  } else {
     auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
     MemorySILType = MUI->getType().getObjectType();
 
@@ -562,13 +565,16 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
     if (isa<StrongReleaseInst>(User))
       continue;
 
-    if (isa<ProjectBoxInst>(User)) {
-      collectUses(User, 0);
+    if (auto project = dyn_cast<ProjectBoxInst>(User)) {
+      collectUses(User, project->getFieldIndex());
       continue;
     }
 
-    // Other uses of the container are considered escapes of the value.
-    addElementUses(0, ABI->getElementType(), User, DIUseKind::Escape);
+    // Other uses of the container are considered escapes of the values.
+    for (unsigned field : indices(ABI->getBoxType()->getLayout()->getFields()))
+      addElementUses(field,
+                     ABI->getBoxType()->getFieldType(ABI->getModule(), field),
+                     User, DIUseKind::Escape);
   }
 }
 
@@ -1144,7 +1150,7 @@ static bool isSelfInitUse(SILArgument *Arg) {
   // predecessor to the block, and the predecessor instruction is a try_apply
   // of a throwing delegated init.
   auto *BB = Arg->getParent();
-  auto *Pred = BB->getSinglePredecessor();
+  auto *Pred = BB->getSinglePredecessorBlock();
 
   // The two interesting cases are where self.init throws, in which case
   // the argument came from a try_apply, or if self.init is failable,

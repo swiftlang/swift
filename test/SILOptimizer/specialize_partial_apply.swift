@@ -18,8 +18,8 @@ struct MyError : Error {
 // args/result, which is expected in the returned closure.
 
 // CHECK-LABEL: sil shared [noinline] @_TTSg5Si___TF4test16generic_get_funcurFTxSb_Fxx : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSr5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericurfxx : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int
-// CHECK: [[PA:%[0-9]+]] = partial_apply [[F]](%1, %{{[0-9]+}}) : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSr5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericurfxx : $@convention(thin) (@in Int, Bool, @owned <τ_0_0> { var τ_0_0 } <Int>) -> @out Int
+// CHECK: [[PA:%[0-9]+]] = partial_apply [[F]](%1, %{{[0-9]+}}) : $@convention(thin) (@in Int, Bool, @owned <τ_0_0> { var τ_0_0 } <Int>) -> @out Int
 // CHECK: return [[PA]] : $@callee_owned (@in Int) -> @out Int
 @inline(never)
 func generic_get_func<T>(_ t1: T, _ b: Bool) -> (T) -> T {
@@ -168,11 +168,11 @@ func testit3_throwing(_ b: Bool) -> Int {
 	}
 }
 
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSr5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericurfxx : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int {
-// CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : $Bool, %3 : $@box Int):
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSr5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericurfxx : $@convention(thin) (@in Int, Bool, @owned <τ_0_0> { var τ_0_0 } <Int>) -> @out Int {
+// CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : $Bool, %3 : $<τ_0_0> { var τ_0_0 } <Int>):
 // CHECK: [[LD:%[0-9]+]] = load %1 : $*Int
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericurfxx : $@convention(thin) (Int, Bool, @owned @box Int) -> Int
-// CHECK: [[RET:%[0-9]+]] = apply [[F]]([[LD]], %2, %3) : $@convention(thin) (Int, Bool, @owned @box Int) -> Int
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericurfxx : $@convention(thin) (Int, Bool, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+// CHECK: [[RET:%[0-9]+]] = apply [[F]]([[LD]], %2, %3) : $@convention(thin) (Int, Bool, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
 // CHECK: store [[RET]] to %0 : $*Int
 // CHECK: return %{{[0-9]*}} : $()
 

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -780,3 +780,33 @@ void ide::collectModuleNames(StringRef SDKPath,
   }
 }
 
+DeclNameViewer::DeclNameViewer(StringRef Text) {
+  auto ArgStart = Text.find_first_of('(');
+  if (ArgStart == StringRef::npos) {
+    BaseName = Text;
+    return;
+  }
+  BaseName = Text.substr(0, ArgStart);
+  auto ArgEnd = Text.find_last_of(')');
+  assert(ArgEnd != StringRef::npos);
+  StringRef AllArgs = Text.substr(ArgStart + 1, ArgEnd - ArgStart - 1);
+  AllArgs.split(Labels, ":");
+  if (Labels.empty())
+    return;
+  assert(Labels.back().empty());
+  Labels.pop_back();
+}
+
+unsigned DeclNameViewer::commonPartsCount(DeclNameViewer &Other) const {
+  if (base() != Other.base())
+    return 0;
+  unsigned Result = 1;
+  unsigned Len = std::min(args().size(), Other.args().size());
+  for (unsigned I = 0; I < Len; ++ I) {
+    if (args()[I] == Other.args()[I])
+      Result ++;
+    else
+      return Result;
+  }
+  return Result;
+}

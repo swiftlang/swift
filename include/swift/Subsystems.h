@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -45,7 +45,6 @@ namespace swift {
   class FileUnit;
   class GenericEnvironment;
   class GenericParamList;
-  class GenericSignature;
   class IRGenOptions;
   class LangOptions;
   class ModuleDecl;
@@ -127,6 +126,15 @@ namespace swift {
                               bool KeepComments = true,
                               bool TokenizeInterpolatedString = true,
                               ArrayRef<Token> SplitTokens = ArrayRef<Token>());
+
+  /// Once parsing is complete, this walks the AST to resolve condition clauses
+  /// and other top-level validation.
+  void performConditionResolution(SourceFile &SF);
+
+  /// \brief Finish condition resolution for the bodies of function nodes that
+  /// were delayed during the first parsing pass.
+  void performDelayedConditionResolution(Decl *D, SourceFile &BSF,
+                                         SmallVectorImpl<Decl *> &ExtraTLCDs);
 
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.
@@ -210,10 +218,9 @@ namespace swift {
                               bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  std::pair<GenericSignature *, GenericEnvironment *>
-  handleSILGenericParams(ASTContext &Ctx,
-                         GenericParamList *genericParams,
-                         DeclContext *DC);
+  GenericEnvironment *handleSILGenericParams(ASTContext &Ctx,
+                                             GenericParamList *genericParams,
+                                             DeclContext *DC);
 
   /// Turn the given module into SIL IR.
   ///
@@ -252,13 +259,15 @@ namespace swift {
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   std::unique_ptr<llvm::Module>
-  performIRGeneration(IRGenOptions &Opts, ModuleDecl *M, SILModule *SILMod,
+  performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
+                      std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, llvm::LLVMContext &LLVMContext);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   std::unique_ptr<llvm::Module>
-  performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
+  performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
+                      std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, llvm::LLVMContext &LLVMContext,
                       unsigned StartElem = 0);
 

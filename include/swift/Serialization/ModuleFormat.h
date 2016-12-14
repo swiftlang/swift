@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 282; // Last change: @_inlineable
+const uint16_t VERSION_MINOR = 298; // Last change: Added {store,begin}_borrow
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -62,6 +62,8 @@ using DeclIDField = BCFixed<31>;
 // TypeID must be the same as DeclID because it is stored in the same way.
 using TypeID = DeclID;
 using TypeIDField = DeclIDField;
+
+using TypeIDWithBitField = BCFixed<32>;
 
 // IdentifierID must be the same as DeclID because it is stored in the same way.
 using IdentifierID = DeclID;
@@ -79,6 +81,10 @@ using NormalConformanceIDField = DeclIDField;
 // ModuleID must be the same as IdentifierID because it is stored the same way.
 using ModuleID = IdentifierID;
 using ModuleIDField = IdentifierIDField;
+
+// SILLayoutID must be the same as DeclID because it is stored in the same way.
+using SILLayoutID = DeclID;
+using SILLayoutIDField = DeclIDField;
 
 using BitOffset = PointerEmbeddedInt<unsigned, 31>;
 using BitOffsetField = BCFixed<31>;
@@ -236,9 +242,8 @@ static inline OperatorKind getStableFixity(DeclKind kind) {
 // VERSION_MAJOR.
 enum GenericRequirementKind : uint8_t {
   Conformance = 0,
-  SameType,
-  WitnessMarker,
-  Superclass
+  SameType    = 1,
+  Superclass  = 2,
 };
 using GenericRequirementKindField = BCFixed<2>;
 
@@ -554,11 +559,6 @@ namespace decls_block {
     BCVBR<4>     // index + 1, or zero if we have a generic type parameter decl
   >;
 
-  using AssociatedTypeTypeLayout = BCRecordLayout<
-    ASSOCIATED_TYPE_TYPE,
-    DeclIDField // associated type decl
-  >;
-
   using DependentMemberTypeLayout = BCRecordLayout<
     DEPENDENT_MEMBER_TYPE,
     TypeIDField,      // base type
@@ -625,9 +625,8 @@ namespace decls_block {
 
   using ArchetypeTypeLayout = BCRecordLayout<
     ARCHETYPE_TYPE,
-    IdentifierIDField,   // name
-    TypeIDField,         // index if primary, parent if non-primary
-    DeclIDField,         // associated type or protocol decl
+    TypeIDField,         // parent if non-primary
+    DeclIDField,         // associated type decl if non-primary, name if primary
     TypeIDField,         // superclass
     BCArray<DeclIDField> // conformances
     // Trailed by the nested types record.
@@ -653,20 +652,9 @@ namespace decls_block {
     BCArray<TypeIDField>
   >;
   
-  using ArchetypeNestedTypesAreArchetypesLayout = BCRecordLayout<
-    ARCHETYPE_NESTED_TYPES_ARE_ARCHETYPES,
-    BCArray<TypeIDField>
-  >;
-
   using ProtocolCompositionTypeLayout = BCRecordLayout<
     PROTOCOL_COMPOSITION_TYPE,
     BCArray<TypeIDField> // protocols
-  >;
-
-  using SubstitutedTypeLayout = BCRecordLayout<
-    SUBSTITUTED_TYPE,
-    TypeIDField, // original
-    TypeIDField  // substitution
   >;
 
   using BoundGenericTypeLayout = BCRecordLayout<
@@ -681,16 +669,6 @@ namespace decls_block {
     TypeIDField,  // replacement
     BCVBR<5>
     // Trailed by protocol conformance info (if any)
-  >;
-
-  using PolymorphicFunctionTypeLayout = BCRecordLayout<
-    POLYMORPHIC_FUNCTION_TYPE,
-    TypeIDField, // input
-    TypeIDField, // output
-    DeclIDField, // decl that owns the generic params
-    FunctionTypeRepresentationField, // representation
-    BCFixed<1>   // throws?
-    // Trailed by its generic parameters, if the owning decl ID is 0.
   >;
 
   using GenericFunctionTypeLayout = BCRecordLayout<
@@ -723,9 +701,18 @@ namespace decls_block {
     TypeIDField            // capture type
   >;
 
+  using SILLayoutLayout = BCRecordLayout<
+    SIL_LAYOUT,
+    BCFixed<31>,                // number of fields
+    BCArray<TypeIDWithBitField> // field types with mutability
+                                // followed by generic parameters
+                                // trailed by generic requirements, if any
+  >;
+
   using SILBoxTypeLayout = BCRecordLayout<
     SIL_BOX_TYPE,
-    TypeIDField            // capture type
+    SILLayoutIDField,    // layout
+    BCArray<TypeIDField> // generic arguments
   >;
 
   template <unsigned Code>
@@ -856,7 +843,6 @@ namespace decls_block {
     BCFixed<1>,  // stub implementation?
     BCFixed<1>,  // throws?
     CtorInitializerKindField,  // initializer kind
-    TypeIDField, // type (signature)
     TypeIDField, // type (interface)
     DeclIDField, // overridden decl
     AccessibilityKindField, // accessibility
@@ -875,7 +861,6 @@ namespace decls_block {
     BCFixed<1>,   // isLet?
     BCFixed<1>,   // HasNonPatternBindingInit?
     StorageKindField,   // StorageKind
-    TypeIDField,  // type
     TypeIDField,  // interface type
     DeclIDField,  // getter
     DeclIDField,  // setter
@@ -895,7 +880,6 @@ namespace decls_block {
     IdentifierIDField, // parameter name
     DeclContextIDField,  // context decl
     BCFixed<1>,   // isLet?
-    TypeIDField,  // type
     TypeIDField  // interface type
   >;
 
@@ -910,7 +894,6 @@ namespace decls_block {
     BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // throws?
     BCVBR<5>,     // number of parameter patterns
-    TypeIDField,  // type (signature)
     TypeIDField,  // interface type
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
@@ -968,7 +951,6 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclContextIDField,// context decl
     TypeIDField, // argument type
-    TypeIDField, // constructor type
     TypeIDField, // interface type
     BCFixed<1>,  // implicit?
     EnumElementRawValueKindField,  // raw value kind
@@ -982,8 +964,6 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     StorageKindField,   // StorageKind
-    TypeIDField, // subscript dummy type
-    TypeIDField, // element type
     TypeIDField, // interface type
     DeclIDField, // getter
     DeclIDField, // setter
@@ -1015,7 +995,6 @@ namespace decls_block {
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
-    TypeIDField, // type (signature)
     TypeIDField  // interface type
     // Trailed by a pattern for self.
   >;
@@ -1055,6 +1034,7 @@ namespace decls_block {
   using NamedPatternLayout = BCRecordLayout<
     NAMED_PATTERN,
     DeclIDField, // associated VarDecl
+    TypeIDField, // type
     BCFixed<1>   // implicit?
   >;
 
@@ -1070,12 +1050,6 @@ namespace decls_block {
     TypeIDField, // associated type
     BCFixed<1>   // implicit?
     // The sub-pattern trails the record.
-  >;
-
-  using IsPatternLayout = BCRecordLayout<
-    ISA_PATTERN,
-    TypeIDField, // type
-    BCFixed<1>   // implicit?
   >;
 
   using VarPatternLayout = BCRecordLayout<
@@ -1451,23 +1425,31 @@ namespace index_block {
     DECL_CONTEXT_OFFSETS,
     LOCAL_TYPE_DECLS,
     NORMAL_CONFORMANCE_OFFSETS,
+    SIL_LAYOUT_OFFSETS,
 
     PRECEDENCE_GROUPS,
+    
+    LastRecordKind = PRECEDENCE_GROUPS,
   };
+  
+  constexpr const unsigned RecordIDFieldWidth = 5;
+  static_assert(LastRecordKind < (1 << RecordIDFieldWidth),
+                "not enough bits for all record kinds");
+  using RecordIDField = BCFixed<RecordIDFieldWidth>;
 
   using OffsetsLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    RecordIDField, // record ID
     BCArray<BitOffsetField>
   >;
 
   using DeclListLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    RecordIDField, // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from identifier strings to decl kinds / decl IDs
   >;
 
   using GroupNamesLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    RecordIDField, // record ID
     BCBlob       // actual names
   >;
 

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -126,14 +126,9 @@ public:
     return SILType(T, SILValueCategory::Address);
   }
 
-  ///  Apply a substitution to the type to produce another lowered SIL type.
-  static SILType substType(SILModule &silModule, ModuleDecl *astModule,
-                           const TypeSubstitutionMap &subs, SILType SrcTy);
-
   ///  Apply a substitution to the function type.
   static CanSILFunctionType substFuncType(SILModule &silModule,
-                                          ModuleDecl *astModule,
-                                          const TypeSubstitutionMap &subs,
+                                          const SubstitutionMap &subs,
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics);
 
@@ -447,8 +442,7 @@ public:
   SILType substGenericArgs(SILModule &M,
                            ArrayRef<Substitution> Subs) const;
 
-  SILType subst(SILModule &silModule, ModuleDecl *astModule,
-                const TypeSubstitutionMap &subs) const;
+  SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
 
   /// If this is a specialized generic type, return all substitutions used to
   /// generate it.
@@ -540,7 +534,6 @@ template<> Can##ID##Type SILType::getAs<ID##Type>() const = delete;  \
 template<> Can##ID##Type SILType::castTo<ID##Type>() const = delete; \
 template<> bool SILType::is<ID##Type>() const = delete;
 NON_SIL_TYPE(Function)
-NON_SIL_TYPE(PolymorphicFunction)
 NON_SIL_TYPE(AnyFunction)
 NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE
@@ -589,15 +582,34 @@ inline SILType SILBlockStorageType::getCaptureAddressType() const {
   return SILType::getPrimitiveAddressType(getCaptureType());
 }
 
-inline SILType SILBoxType::getBoxedAddressType() const {
-  return SILType::getPrimitiveAddressType(getBoxedType());
-}
-
 /// The hash of a SILType is the hash of its opaque value.
 static inline llvm::hash_code hash_value(SILType V) {
   return llvm::hash_value(V.getOpaqueValue());
 }
-  
+
+inline CanType
+SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
+  auto fieldTy = getLayout()->getFields()[index].getLoweredType();
+  // Apply generic arguments if the layout is generic.
+  if (!getGenericArgs().empty()) {
+    auto substMap =
+     getLayout()->getGenericSignature()->getSubstitutionMap(getGenericArgs());
+    fieldTy = fieldTy.subst(substMap)->getCanonicalType();
+  }
+  return fieldTy;
+}
+
+inline SILType SILBoxType::getFieldType(SILModule &M, unsigned index) const {
+  return SILType::getPrimitiveAddressType(getFieldLoweredType(M, index));
+}
+
+inline SILType SILField::getAddressType() const {
+  return SILType::getPrimitiveAddressType(getLoweredType());
+}
+inline SILType SILField::getObjectType() const {
+  return SILType::getPrimitiveObjectType(getLoweredType());
+}
+
 } // end swift namespace
 
 namespace llvm {

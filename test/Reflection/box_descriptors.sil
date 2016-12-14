@@ -15,12 +15,12 @@ class C<T> {}
 
 sil_vtable C {}
 
-sil @make_some_boxes : $@convention(thin) <T> () -> (@box Int, @box (Int, Int), @box C<T>) {
-  %a = alloc_box $@box Int
-  %b = alloc_box $@box (Int, Int)
-  %c = alloc_box $@box C<T>
-  %result = tuple (%a : $@box Int, %b : $@box (Int, Int), %c : $@box C<T>)
-  return %result : $(@box Int, @box (Int, Int), @box C<T>)
+sil @make_some_boxes : $@convention(thin) <T> () -> (<τ_0_0> { var τ_0_0 } <Int>, <τ_0_0> { var τ_0_0 } <(Int, Int)>, <τ_0_0> { var τ_0_0 } <C<T>>) {
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
+  %c = alloc_box $<τ_0_0> { var τ_0_0 } <C<T>>
+  %result = tuple (%a : $<τ_0_0> { var τ_0_0 } <Int>, %b : $<τ_0_0> { var τ_0_0 } <(Int, Int)>, %c : $<τ_0_0> { var τ_0_0 } <C<T>>)
+  return %result : $(<τ_0_0> { var τ_0_0 } <Int>, <τ_0_0> { var τ_0_0 } <(Int, Int)>, <τ_0_0> { var τ_0_0 } <C<T>>)
 }
 
 // CHECK:      - Capture types:

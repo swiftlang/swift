@@ -1272,8 +1272,8 @@ class ParallelArrayDictionary : NSDictionary {
   }
 
   override init(
-    objects: UnsafePointer<AnyObject>,
-    forKeys keys: UnsafePointer<NSCopying>,
+    objects: UnsafePointer<AnyObject>?,
+    forKeys keys: UnsafePointer<NSCopying>?,
     count: Int) {
     super.init(objects: objects, forKeys: keys, count: count)
   }
@@ -1336,8 +1336,8 @@ class CustomImmutableNSDictionary : NSDictionary {
   }
 
   override init(
-    objects: UnsafePointer<AnyObject>,
-    forKeys keys: UnsafePointer<NSCopying>,
+    objects: UnsafePointer<AnyObject>?,
+    forKeys keys: UnsafePointer<NSCopying>?,
     count: Int) {
     expectUnreachable()
     super.init(objects: objects, forKeys: keys, count: count)
@@ -3483,8 +3483,8 @@ class MockDictionaryWithCustomCount : NSDictionary {
   }
 
   override init(
-    objects: UnsafePointer<AnyObject>,
-    forKeys keys: UnsafePointer<NSCopying>,
+    objects: UnsafePointer<AnyObject>?,
+    forKeys keys: UnsafePointer<NSCopying>?,
     count: Int) {
     expectUnreachable()
     super.init(objects: objects, forKeys: keys, count: count)

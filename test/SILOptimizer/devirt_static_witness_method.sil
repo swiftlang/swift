@@ -18,7 +18,7 @@ struct S<T> : CanAdd {
 func +<T>(lhs: S<T>, rhs: S<T>) -> S<T>
 
 
-sil hidden [transparent] [thunk] @operator_plus_static_non_generic_witness_for_S : $@convention(thin) <T> (@in S<T>, @in S<T>, @thick S<T>.Type) -> @out S<T> {
+sil hidden [transparent] [thunk] @operator_plus_static_non_generic_witness_for_S : $@convention(witness_method) <T> (@in S<T>, @in S<T>, @thick S<T>.Type) -> @out S<T> {
 bb0(%0 : $*S<T>, %1 : $*S<T>, %2 : $*S<T>, %3 : $@thick S<T>.Type) :
   %17 = tuple ()
   return %17 : $()

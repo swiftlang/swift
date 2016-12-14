@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -599,16 +599,15 @@ namespace {
 /// archetypes. Replace such types by performing type substitutions
 /// according to the provided type substitution map.
 static void updateBasicBlockArgTypes(SILBasicBlock *BB,
-                                     TypeSubstitutionMap &TypeSubstMap) {
+                                     const SubstitutionMap &TypeSubstMap) {
   // Check types of all BB arguments.
-  for (auto &Arg : BB->getBBArgs()) {
+  for (auto &Arg : BB->getArguments()) {
     if (!Arg->getType().getSwiftRValueType()->hasOpenedExistential())
       continue;
     // Type of this BB argument uses an opened existential.
     // Try to apply substitutions to it and if it produces a different type,
     // use this type as new type of the BB argument.
-    auto NewArgType = Arg->getType().subst(
-        BB->getModule(), BB->getModule().getSwiftModule(), TypeSubstMap);
+    auto NewArgType = Arg->getType().subst(BB->getModule(), TypeSubstMap);
     if (NewArgType == Arg->getType())
       continue;
     // Replace the type of this BB argument. The type of a BBArg
@@ -623,7 +622,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
     // Then replace all uses by an undef.
     Arg->replaceAllUsesWith(SILUndef::get(Arg->getType(), BB->getModule()));
     // Replace the type of the BB argument.
-    BB->replaceBBArg(Arg->getIndex(), NewArgType, Arg->getDecl());
+    BB->replaceArgument(Arg->getIndex(), NewArgType, Arg->getDecl());
     // Restore all uses to refer to the BB argument with updated type.
     for (auto ArgUse : OriginalArgUses) {
       ArgUse->set(Arg);
@@ -643,8 +642,8 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   llvm::SmallSetVector<SILInstruction *, 16> Candidates;
   auto OldOpenedArchetype = getOpenedArchetypeOf(Inst);
   auto NewOpenedArchetype = getOpenedArchetypeOf(dyn_cast<SILInstruction>(V));
-  TypeSubstitutionMap TypeSubstMap;
-  TypeSubstMap[OldOpenedArchetype.getPointer()] = NewOpenedArchetype;
+  SubstitutionMap TypeSubstMap;
+  TypeSubstMap.addSubstitution(OldOpenedArchetype, NewOpenedArchetype);
   // Collect all candidates that may contain opened archetypes
   // that need to be replaced.
   for (auto Use : Inst->getUses()) {
@@ -666,7 +665,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
     // those uses by the new opened archetype.
     auto Successors = User->getParent()->getSuccessorBlocks();
     for (auto Successor : Successors) {
-      if (Successor->bbarg_empty())
+      if (Successor->args_empty())
         continue;
       // If a BB has any arguments, update their types if necessary.
       updateBasicBlockArgTypes(Successor, TypeSubstMap);

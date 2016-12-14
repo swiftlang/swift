@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -180,6 +180,11 @@ static void checkForOutOfDateInputs(DiagnosticEngine &diags,
 static void writeCompilationRecord(StringRef path, StringRef argsHash,
                                    llvm::sys::TimeValue buildTime,
                                    const InputInfoMap &inputs) {
+  // Before writing to the dependencies file path, preserve any previous file
+  // that may have been there. No error handling -- this is just a nicety, it
+  // doesn't matter if it fails.
+  llvm::sys::fs::rename(path, path + "~");
+
   std::error_code error;
   llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
   if (out.has_error()) {
@@ -718,7 +723,7 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   SmallVector<const char *, 128> Argv;
   Argv.push_back(Cmd->getExecutable());
   Argv.append(Cmd->getArguments().begin(), Cmd->getArguments().end());
-  Argv.push_back(0);
+  Argv.push_back(nullptr);
 
   const char *ExecPath = Cmd->getExecutable();
   const char **argv = Argv.data();

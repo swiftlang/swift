@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -311,8 +311,10 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
     llvm::Value *spareIdx
       = emitGatherSpareBits(IGF, SpareBits, val, numOccupiedBits, 31);
     // Unbias by subtracting one.
+
+    uint64_t shifted = static_cast<uint64_t>(1) << numOccupiedBits;
     spareIdx = IGF.Builder.CreateSub(spareIdx,
-            llvm::ConstantInt::get(spareIdx->getType(), 1 << numOccupiedBits));
+            llvm::ConstantInt::get(spareIdx->getType(), shifted));
     idx = IGF.Builder.CreateOr(idx, spareIdx);
   }
   idx = IGF.Builder.CreateZExt(idx, IGF.IGM.Int32Ty);
@@ -676,15 +678,14 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
   Types.DependentCache.clear();
 }
 
-ArchetypeBuilder &TypeConverter::getArchetypes() {
+GenericEnvironment *TypeConverter::getGenericEnvironment() {
   auto moduleDecl = IGM.getSwiftModule();
   auto genericSig = IGM.getSILTypes().getCurGenericContext();
-  return *moduleDecl->getASTContext()
-      .getOrCreateArchetypeBuilder(genericSig, moduleDecl);
+  return genericSig->getCanonicalSignature().getGenericEnvironment(*moduleDecl);
 }
 
-ArchetypeBuilder &IRGenModule::getContextArchetypes() {
-  return Types.getArchetypes();
+GenericEnvironment *IRGenModule::getGenericEnvironment() {
+  return Types.getGenericEnvironment();
 }
 
 /// Add a temporary forward declaration for a type.  This will live
@@ -744,6 +745,8 @@ IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
   case ReferenceCounting::ObjC:
     llvm_unreachable("not implemented");
   }
+
+  llvm_unreachable("Not a valid ReferenceCounting.");
 }
 
 const LoadableTypeInfo &IRGenModule::getNativeObjectTypeInfo() {
@@ -1075,10 +1078,18 @@ static void profileArchetypeConstraints(
   for (auto proto : arch->getConformsTo()) {
     ID.AddPointer(proto);
   }
-  
+
+  // Skip nested types if this is an opened existential, since those
+  // won't resolve. Normally opened existentials cannot have nested
+  // types, but one case we missed compiled in Swift 3 so we support
+  // it here.
+  if (arch->getOpenedExistentialType()) {
+    return;
+  }
+
   // Recursively profile nested archetypes.
-  for (auto nested : arch->getNestedTypes()) {
-    profileArchetypeConstraints(nested.second.getValue(), ID, seen);
+  for (auto nested : arch->getAllNestedTypes()) {
+    profileArchetypeConstraints(nested.second, ID, seen);
   }
 }
 
@@ -1102,7 +1113,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   
   // Otherwise, use this archetype as the exemplar for future similar
   // archetypes.
-  Types.ExemplarArchetypeStorage.push_back({t});
+  Types.ExemplarArchetypeStorage.push_back(new ExemplarArchetype(t));
   Types.ExemplarArchetypes.InsertNode(&Types.ExemplarArchetypeStorage.back(),
                                       insertPos);
   return t;
@@ -1139,10 +1150,10 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   auto contextTy = canonicalTy;
   if (contextTy->hasTypeParameter()) {
     // The type we got should be lowered, so lower it like a SILType.
-    contextTy = getArchetypes().substDependentType(IGM.getSILModule(),
-                                   SILType::getPrimitiveAddressType(contextTy))
+    contextTy = getGenericEnvironment()->mapTypeIntoContext(
+                  IGM.getSILModule(),
+                  SILType::getPrimitiveAddressType(contextTy))
       .getSwiftRValueType();
-    
   }
   
   // Fold archetypes to unique exemplars. Any archetype with the same
@@ -1350,7 +1361,6 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::Tuple:
     return convertTupleType(cast<TupleType>(ty));
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:
     llvm_unreachable("AST FunctionTypes should be lowered by SILGen");
   case TypeKind::SILFunction:
@@ -1592,14 +1602,14 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
     llvm_unreachable("classes are always considered dependent for now");
 
   case DeclKind::Enum: {
-    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto type = decl->getDeclaredTypeInContext()->getCanonicalType();
     auto result = convertEnumType(key, type, cast<EnumDecl>(decl));
     overwriteForwardDecl(Cache, key, result);
     return result;
   }
 
   case DeclKind::Struct: {
-    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto type = decl->getDeclaredTypeInContext()->getCanonicalType();
     auto result = convertStructType(key, type, cast<StructDecl>(decl));
     overwriteForwardDecl(Cache, key, result);
     return result;
@@ -1817,6 +1827,8 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
   case ObjectReference:
     return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf);
   }
+
+  llvm_unreachable("Not a valid LocalSelfKind.");
 }
 
 void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,

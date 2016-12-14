@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // Swift Standard Prolog Library.
@@ -523,7 +523,33 @@ public func ^= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
 // Standard pattern matching forms
 //===----------------------------------------------------------------------===//
 
-// Equatable types can be matched in patterns by value equality.
+/// Returns a Boolean value indicating whether two arguments match by value
+/// equality.
+///
+/// The pattern-matching operator (`~=`) is used internally in `case`
+/// statements for pattern matching. When you match against an `Equatable`
+/// value in a `case` statement, this operator is called behind the scenes.
+///
+///     let weekday = 3
+///     let lunch: String
+///     switch weekday {
+///     case 3:
+///         lunch = "Taco Tuesday!"
+///     default:
+///         lunch = "Pizza again."
+///     }
+///     // lunch == "Taco Tuesday!"
+///
+/// In this example, the `case 3` expression uses this pattern-matching
+/// operator to test whether `weekday` is equal to the value `3`.
+///
+/// - Note: In most cases, you should use the equal-to operator (`==`) to test
+///   whether two instances are equal. The pattern-matching operator is
+///   primarily intended to enable `case` statement pattern matching.
+///
+/// - Parameters:
+///   - lhs: A value to compare.
+///   - rhs: Another value to compare.
 @_transparent
 public func ~= <T : Equatable>(a: T, b: T) -> Bool {
   return a == b
@@ -533,17 +559,17 @@ public func ~= <T : Equatable>(a: T, b: T) -> Bool {
 // Standard precedence groups
 //===----------------------------------------------------------------------===//
 
-precedencegroup FunctionArrowPrecedence {
-  associativity: right
-}
 precedencegroup AssignmentPrecedence {
   assignment: true
   associativity: right
-  higherThan: FunctionArrowPrecedence
+}
+precedencegroup FunctionArrowPrecedence {
+  associativity: right
+  higherThan: AssignmentPrecedence
 }
 precedencegroup TernaryPrecedence {
   associativity: right
-  higherThan: AssignmentPrecedence
+  higherThan: FunctionArrowPrecedence
 }
 precedencegroup DefaultPrecedence {
   higherThan: TernaryPrecedence

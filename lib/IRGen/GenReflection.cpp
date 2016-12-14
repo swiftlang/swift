@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -216,7 +216,16 @@ protected:
                             /*usePunyCode*/ true,
                             /*OptimizeProtocolNames*/ false);
     mangler.setModuleContext(ModuleContext);
-    mangler.mangleType(type, 0);
+    
+    // TODO: As a compatibility hack, mangle single-field boxes with the legacy
+    // mangling in reflection metadata.
+    auto boxTy = dyn_cast<SILBoxType>(type);
+    if (boxTy && boxTy->getLayout()->getFields().size() == 1) {
+      mangler.mangleLegacyBoxType(
+        boxTy->getFieldLoweredType(IGM.getSILModule(), 0));
+    } else {
+      mangler.mangleType(type, 0);
+    }
     auto mangledName = IGM.getAddrOfStringForTypeRef(mangler.finalize());
     addRelativeAddress(mangledName);
   }
@@ -555,6 +564,17 @@ void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
 void IRGenModule::emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl) {
   FixedTypeMetadataBuilder builder(*this, nominalDecl);
   builder.emit();
+}
+
+bool IRGenModule::shouldEmitOpaqueTypeMetadataRecord(
+    const NominalTypeDecl *nominalDecl) {
+  if (nominalDecl->getAttrs().hasAttribute<AlignmentAttr>()) {
+    auto &ti = getTypeInfoForUnlowered(nominalDecl->getDeclaredTypeInContext());
+    if (isa<FixedTypeInfo>(ti))
+      return true;
+  }
+
+  return false;
 }
 
 /// Builds a constant LLVM struct describing the layout of a fixed-size

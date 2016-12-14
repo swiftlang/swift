@@ -125,10 +125,10 @@ bb0(%0 : $AnyObject, %10: $Builtin.Int1):
   cond_br %10, lookup1, lookup2
 
 lookup1:
-  %1 = alloc_box $@box AnyObject
-  %1a = project_box %1 : $@box AnyObject, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
   store %0 to %1a : $*AnyObject
-  %3 = alloc_box $@box Optional<() -> ()>
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
   %4 = load %1a : $*AnyObject
   strong_retain %4 : $AnyObject
   %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
@@ -136,10 +136,10 @@ lookup1:
   dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
 
 lookup2:
-  %21 = alloc_box $@box AnyObject
-  %21a = project_box %21 : $@box AnyObject, 0
+  %21 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %21a = project_box %21 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
   store %0 to %21a : $*AnyObject
-  %23 = alloc_box $@box Optional<() -> ()>
+  %23 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
   %24 = load %21a : $*AnyObject
   strong_retain %24 : $AnyObject
   %26 = open_existential_ref %24 : $AnyObject to $@opened("12345678-89ab-cdef-0123-000000000000") AnyObject

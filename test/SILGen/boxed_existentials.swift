@@ -74,7 +74,7 @@ func test_property_of_lvalue(_ x: Error) -> String {
 
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPs5Error_SS :
 // CHECK:       bb0([[ARG:%.*]] : $Error):
-// CHECK:         [[VAR:%.*]] = alloc_box $@box Error
+// CHECK:         [[VAR:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Error>
 // CHECK:         [[PVAR:%.*]] = project_box [[VAR]]
 // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Error
 // CHECK:         store [[ARG_COPY]] to [init] [[PVAR]]
@@ -116,9 +116,9 @@ func plusOneError() -> Error { }
 func test_open_existential_semantics(_ guaranteed: Error,
                                      _ immediate: Error) {
   var immediate = immediate
-  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $@box Error
+  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Error>
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
-  // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box $@box Error
+  // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Error>
   // GUARANTEED: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
 
   // CHECK-NOT: copy_value %0
@@ -179,7 +179,7 @@ func test_open_existential_semantics(_ guaranteed: Error,
 // CHECK:       bb0([[OUT:%.*]] : $*Any, [[GUAR:%.*]] : $Error,
 func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
   var immediate = immediate
-  // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box $@box Error
+  // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Error>
   // CHECK:       [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
   if true {
     // CHECK-NOT: copy_value [[GUAR]]

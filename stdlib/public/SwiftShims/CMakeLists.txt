@@ -1,7 +1,6 @@
 set(sources
   AssertionReporting.h
   CoreFoundationShims.h
-  DispatchShims.h
   FoundationShims.h
   GlobalObjects.h
   HeapObject.h
@@ -15,6 +14,7 @@ set(sources
   UnicodeShims.h
   Visibility.h
 
+  DispatchOverlayShims.h
   ObjectiveCOverlayShims.h
   OSOverlayShims.h
   SafariServicesOverlayShims.h

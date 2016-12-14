@@ -9,6 +9,6 @@ markUsed(a+b)
 // CHECK: _main:
 // Verify that the top-level function (main) begins at line 0 and then
 // proceeds to line 6.
-// CHECK: .loc    {{[0-9]}} 0 {{[0-9]}} prologue_end
+// CHECK: .loc    {{[0-9]}} 0 {{[0-9]}} 
 // CHECK-NOT: .loc
-// CHECK: .loc    {{[0-9]}} 6 {{[0-9]}}
+// CHECK: .loc    {{[0-9]}} 6 {{[0-9]}} prologue_end

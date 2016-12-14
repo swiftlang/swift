@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -576,6 +576,10 @@ public:
   /// \param allowOverwrite - true if it's okay if an expression already
   ///   has an access kind
   void propagateLValueAccessKind(AccessKind accessKind,
+                                 llvm::function_ref<Type(Expr *)> getType
+                                   = [](Expr *E) -> Type {
+                                     return E->getType();
+                                 },
                                  bool allowOverwrite = false);
 
   /// Retrieves the declaration that is being referenced by this
@@ -748,10 +752,6 @@ public:
   CodeCompletionExpr(SourceRange Range, Type Ty = Type()) :
       Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
       Range(Range) {}
-
-  CodeCompletionExpr(CharSourceRange Range, Type Ty = Type()) :
-      Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
-      Range(SourceRange(Range.getStart(), Range.getEnd())) {}
 
   SourceRange getSourceRange() const { return Range; }
 

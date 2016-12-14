@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -367,18 +367,21 @@ public:
     auto &C = getASTContext();
 
     llvm::SmallString<16> NameStr = Name;
-    if (auto BuiltinIntTy =
-            dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
-      if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
-        NameStr += "_Word";
-      } else {
-        unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
-        NameStr += "_Int" + llvm::utostr(NumBits);
-      }
-    } else {
-      assert(OpdTy.getSwiftRValueType() == C.TheRawPointerType);
-      NameStr += "_RawPointer";
-    }
+    appendOperandTypeName(OpdTy, NameStr);
+    auto Ident = C.getIdentifier(NameStr);
+    return insert(BuiltinInst::create(getSILDebugLocation(Loc), Ident, ResultTy,
+                                      {}, Args, F));
+  }
+
+  // Create a binary function with the signature: OpdTy1, OpdTy2 -> ResultTy.
+  BuiltinInst *createBuiltinBinaryFunctionWithTwoOpTypes(
+      SILLocation Loc, StringRef Name, SILType OpdTy1, SILType OpdTy2,
+      SILType ResultTy, ArrayRef<SILValue> Args) {
+    auto &C = getASTContext();
+
+    llvm::SmallString<16> NameStr = Name;
+    appendOperandTypeName(OpdTy1, NameStr);
+    appendOperandTypeName(OpdTy2, NameStr);
     auto Ident = C.getIdentifier(NameStr);
     return insert(BuiltinInst::create(getSILDebugLocation(Loc), Ident,
                                       ResultTy, {}, Args, F));
@@ -485,6 +488,11 @@ public:
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
+  BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV) {
+    return insert(new (F.getModule())
+                      BeginBorrowInst(getSILDebugLocation(Loc), LV));
+  }
+
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
                          StoreOwnershipQualifier Qualifier) {
     assert((Qualifier != StoreOwnershipQualifier::Unqualified) ||
@@ -515,6 +523,12 @@ public:
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
     return insert(new (F.getModule())
                       AssignInst(getSILDebugLocation(Loc), Src, DestAddr));
+  }
+
+  StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
+                                     SILValue DestAddr) {
+    return insert(new (F.getModule())
+                      StoreBorrowInst(getSILDebugLocation(Loc), Src, DestAddr));
   }
 
   MarkUninitializedInst *
@@ -1236,16 +1250,10 @@ public:
     return insert(new (F.getModule()) DeallocPartialRefInst(
         getSILDebugLocation(Loc), operand, metatype));
   }
-  DeallocBoxInst *createDeallocBox(SILLocation Loc, SILType eltType,
+  DeallocBoxInst *createDeallocBox(SILLocation Loc,
                                    SILValue operand) {
     return insert(new (F.getModule()) DeallocBoxInst(
-        getSILDebugLocation(Loc), eltType, operand));
-  }
-  DeallocBoxInst *createDeallocBox(SILLocation Loc, SILValue operand) {
-    auto eltType =
-        operand->getType().castTo<SILBoxType>()->getBoxedAddressType();
-    return insert(new (F.getModule()) DeallocBoxInst(
-        getSILDebugLocation(Loc), eltType, operand));
+        getSILDebugLocation(Loc), operand));
   }
   DeallocExistentialBoxInst *createDeallocExistentialBox(SILLocation Loc,
                                                          CanType concreteType,
@@ -1273,7 +1281,7 @@ public:
   ProjectBoxInst *createProjectBox(SILLocation Loc, SILValue boxOperand,
                                    unsigned index) {
     auto boxTy = boxOperand->getType().castTo<SILBoxType>();
-    auto fieldTy = boxTy->getFieldType(index);
+    auto fieldTy = boxTy->getFieldType(getModule(), index);
 
     return insert(new (F.getModule()) ProjectBoxInst(
         getSILDebugLocation(Loc), boxOperand, index, fieldTy));
@@ -1634,6 +1642,21 @@ private:
       InsertedInstrs->push_back(TheInst);
 
     BB->insert(InsertPt, TheInst);
+  }
+
+  void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
+    if (auto BuiltinIntTy =
+            dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
+      if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
+        Name += "_Word";
+      } else {
+        unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
+        Name += "_Int" + llvm::utostr(NumBits);
+      }
+    } else {
+      assert(OpdTy.getSwiftRValueType() == getASTContext().TheRawPointerType);
+      Name += "_RawPointer";
+    }
   }
 };
 

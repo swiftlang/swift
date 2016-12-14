@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -183,7 +183,7 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   case DeclContextKind::ExtensionDecl: {
     Type Ty = cast<ExtensionDecl>(Context)->getExtendedType();
     TypeBase *Base = Ty->getCanonicalType().getPointer();
-    const NominalTypeDecl *ExtNominal = 0;
+    const NominalTypeDecl *ExtNominal = nullptr;
     switch (Base->getKind()) {
       default:
         llvm_unreachable("unhandled context kind in SILPrint!");
@@ -472,8 +472,8 @@ public:
 
   void print(const SILBasicBlock *BB) {
     // Output uses for BB arguments.
-    if (!BB->bbarg_empty()) {
-      for (auto I = BB->bbarg_begin(), E = BB->bbarg_end(); I != E; ++I) {
+    if (!BB->args_empty()) {
+      for (auto I = BB->args_begin(), E = BB->args_end(); I != E; ++I) {
         SILValue V = *I;
         if (V->use_empty())
           continue;
@@ -505,10 +505,11 @@ public:
 
     *this << getID(BB);
 
-    if (!BB->bbarg_empty()) {
+    if (!BB->args_empty()) {
       *this << '(';
-      for (auto I = BB->bbarg_begin(), E = BB->bbarg_end(); I != E; ++I) {
-        if (I != BB->bbarg_begin()) *this << ", ";
+      for (auto I = BB->args_begin(), E = BB->args_end(); I != E; ++I) {
+        if (I != BB->args_begin())
+          *this << ", ";
         *this << getIDAndType(*I);
       }
       *this << ')';
@@ -522,7 +523,7 @@ public:
       *this << "// Preds:";
 
       llvm::SmallVector<ID, 32> PredIDs;
-      for (auto *BBI : BB->getPreds())
+      for (auto *BBI : BB->getPredecessorBlocks())
         PredIDs.push_back(getID(BBI));
 
       // Display the pred ids sorted to give a stable use order in the printer's
@@ -1037,6 +1038,10 @@ public:
     *this << getIDAndType(LBI->getOperand());
   }
 
+  void visitBeginBorrowInst(BeginBorrowInst *LBI) {
+    *this << getIDAndType(LBI->getOperand());
+  }
+
   void printStoreOwnershipQualifier(StoreOwnershipQualifier Qualifier) {
     switch (Qualifier) {
     case StoreOwnershipQualifier::Unqualified:
@@ -1056,6 +1061,11 @@ public:
   void visitStoreInst(StoreInst *SI) {
     *this << getID(SI->getSrc()) << " to ";
     printStoreOwnershipQualifier(SI->getOwnershipQualifier());
+    *this << getIDAndType(SI->getDest());
+  }
+
+  void visitStoreBorrowInst(StoreBorrowInst *SI) {
+    *this << getID(SI->getSrc()) << " to ";
     *this << getIDAndType(SI->getDest());
   }
 
@@ -1683,7 +1693,7 @@ ID SILPrinter::getID(SILValue V) {
 
   // Lazily initialize the instruction -> ID mapping.
   if (ValueToIDMap.empty()) {
-    V->getParentBB()->getParent()->numberValues(ValueToIDMap);
+    V->getParentBlock()->getParent()->numberValues(ValueToIDMap);
   }
 
   ID R = { ID::SSAValue, ValueToIDMap[V] };

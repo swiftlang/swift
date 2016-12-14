@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -346,8 +346,7 @@ SILType SILType::substGenericArgs(SILModule &M,
   }
   assert(fnTy->isPolymorphic() && "Can only subst interface generic args on "
          "polymorphic function types.");
-  CanSILFunctionType canFnTy =
-    fnTy->substGenericArgs(M, M.getSwiftModule(), Subs);
+  CanSILFunctionType canFnTy = fnTy->substGenericArgs(M, Subs);
   return SILType::getPrimitiveObjectType(canFnTy);
 }
 
@@ -551,63 +550,3 @@ SILType::canUseExistentialRepresentation(SILModule &M,
   }
 }
 
-//
-// SILBoxType implementation
-//
-
-/// TODO: Transitional factory to present the single-type SILBoxType::get
-/// interface.
-CanSILBoxType SILBoxType::get(CanType boxedType) {
-  // TODO: SILBoxTypes should be keyed by layout and generic arguments instead
-  // of by a single boxed type.
-  ASTContext &ctx = boxedType->getASTContext();
-  auto &SILBoxTypes = ctx.getSILBoxTypes();
-  auto found = SILBoxTypes.find(boxedType);
-  if (found != SILBoxTypes.end())
-    return CanSILBoxType(found->second);
-  
-  // We know that we'll allocate the SILBoxType with a single substitution in
-  // this case.
-  void *mem = ctx.Allocate(totalSizeToAlloc<Substitution>(1),
-                           alignof(SILBoxType));
-  
-  auto singleGenericParamSignature = ctx.getSingleGenericParameterSignature();
-  auto boxTy = ::new (mem) SILBoxType(ctx,
-              SILLayout::get(ctx, singleGenericParamSignature,
-                             SILField(CanType(singleGenericParamSignature
-                                                ->getGenericParams()[0]),
-                             /*mutable*/ true)),
-              Substitution(boxedType, {}));
-  SILBoxTypes.insert({boxedType, boxTy});
-  return CanSILBoxType(boxTy);
-}
-
-SILBoxType::SILBoxType(ASTContext &C,
-                       SILLayout *Layout, ArrayRef<Substitution> Args)
-  : TypeBase(TypeKind::SILBox, &C,
-             getRecursivePropertiesFromSubstitutions(Args)),
-    Layout(Layout),
-    NumGenericArgs(Args.size())
-{
-  // Check that the generic args are reasonable for the box's signature.
-  assert((Layout->getGenericSignature()->getSubstitutionMap(Args), true));
-  auto paramsBuf = getTrailingObjects<Substitution>();
-  for (unsigned i = 0; i < NumGenericArgs; ++i)
-    ::new (paramsBuf + i) Substitution(Args[i]);
-}
-
-RecursiveTypeProperties SILBoxType::
-getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Params) {
-  RecursiveTypeProperties props;
-  for (auto &param : Params) {
-    props |= param.getReplacement()->getRecursiveProperties();
-  }
-  return props;
-}
-
-/// TODO: Transitional accessor for single-type boxes.
-CanType SILBoxType::getBoxedType() const {
-  assert(getLayout()->getFields().size() == 1
-         && "is not a single-field box");
-  return getFieldType(0).getSwiftRValueType();
-}

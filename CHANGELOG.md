@@ -20,6 +20,26 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* [SR-1446](https://bugs.swift.org/browse/SR-1446)
+
+  Nested types may now appear inside generic types, and nested types may have their own generic parameters:
+
+  ```swift
+  struct OuterNonGeneric {
+      struct InnerGeneric<T> {}
+  }
+
+  struct OuterGeneric<T> {
+      struct InnerNonGeneric {}
+
+      struct InnerGeneric<T> {}
+  }
+
+  extension OuterNonGeneric.InnerGeneric {}
+  extension OuterGeneric.InnerNonGeneric {}
+  extension OuterGeneric.InnerGeneric {}
+  ```
+
 * [SR-1009](https://bugs.swift.org/browse/SR-1009):
 
   Constrained extensions allow same-type constraints between generic parameters and concrete types. This enables you to create extensions, for example, on `Array` with `Int` elements:

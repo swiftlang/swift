@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -50,9 +50,15 @@ struct OwnershipModelEliminatorVisitor
   bool visitValueBase(ValueBase *V) { return false; }
   bool visitLoadInst(LoadInst *LI);
   bool visitStoreInst(StoreInst *SI);
+  bool visitStoreBorrowInst(StoreBorrowInst *SI);
   bool visitCopyValueInst(CopyValueInst *CVI);
   bool visitDestroyValueInst(DestroyValueInst *DVI);
   bool visitLoadBorrowInst(LoadBorrowInst *LBI);
+  bool visitBeginBorrowInst(BeginBorrowInst *BBI) {
+    BBI->replaceAllUsesWith(BBI->getOperand());
+    BBI->eraseFromParent();
+    return true;
+  }
   bool visitEndBorrowInst(EndBorrowInst *EBI) {
     EBI->eraseFromParent();
     return true;
@@ -89,6 +95,16 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
 
   B.emitStoreValueOperation(SI->getLoc(), SI->getSrc(), SI->getDest(),
                             SI->getOwnershipQualifier());
+
+  // Then remove the qualified store.
+  SI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitStoreBorrowInst(
+    StoreBorrowInst *SI) {
+  B.emitStoreValueOperation(SI->getLoc(), SI->getSrc(), SI->getDest(),
+                            StoreOwnershipQualifier::Init);
 
   // Then remove the qualified store.
   SI->eraseFromParent();

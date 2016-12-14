@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // Remove overflow checks that are guarded by control flow or other
@@ -578,8 +578,10 @@ public:
     //         \   |
     //          \  v
     //         [use(x)]
-    if (!TrueBB->getSinglePredecessor()) TrueBB = nullptr;
-    if (!FalseBB->getSinglePredecessor()) FalseBB = nullptr;
+    if (!TrueBB->getSinglePredecessorBlock())
+      TrueBB = nullptr;
+    if (!FalseBB->getSinglePredecessorBlock())
+      FalseBB = nullptr;
 
     // The relationship expressed in the builtin.
     ValueRelation Rel;

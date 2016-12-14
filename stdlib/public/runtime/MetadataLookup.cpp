@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -25,14 +25,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/StringExtras.h"
 #include "Private.h"
-
-#if defined(__APPLE__) && defined(__MACH__)
-#include <mach-o/dyld.h>
-#include <mach-o/getsect.h>
-#elif defined(__ELF__) || defined(__ANDROID__)
-#include <elf.h>
-#include <link.h>
-#endif
+#include "ImageInspection.h"
 
 using namespace swift;
 using namespace Demangle;
@@ -41,14 +34,6 @@ using namespace Demangle;
 #include <objc/runtime.h>
 #include <objc/message.h>
 #include <objc/objc.h>
-#endif
-
-#if defined(__APPLE__) && defined(__MACH__)
-#define SWIFT_TYPE_METADATA_SECTION "__swift2_types"
-#elif defined(__ELF__)
-#define SWIFT_TYPE_METADATA_SECTION ".swift2_type_metadata_start"
-#elif defined(__CYGWIN__) || defined(_MSC_VER)
-#define SWIFT_TYPE_METADATA_SECTION ".sw2tymd"
 #endif
 
 // Type Metadata Cache.
@@ -89,19 +74,6 @@ namespace {
   };
 }
 
-#if defined(__APPLE__) && defined(__MACH__)
-static void _initializeCallbacksToInspectDylib();
-#else
-namespace swift {
-  void _swift_initializeCallbacksToInspectDylib(
-    void (*fnAddImageBlock)(const uint8_t *, size_t),
-    const char *sectionName);
-}
-
-static void _addImageTypeMetadataRecordsBlock(const uint8_t *records,
-                                              size_t recordsSize);
-#endif
-
 struct TypeMetadataState {
   ConcurrentMap<TypeMetadataCacheEntry> Cache;
   std::vector<TypeMetadataSection> SectionsToScan;
@@ -109,13 +81,7 @@ struct TypeMetadataState {
 
   TypeMetadataState() {
     SectionsToScan.reserve(16);
-#if defined(__APPLE__) && defined(__MACH__)
-    _initializeCallbacksToInspectDylib();
-#else
-    _swift_initializeCallbacksToInspectDylib(
-      _addImageTypeMetadataRecordsBlock,
-      SWIFT_TYPE_METADATA_SECTION);
-#endif
+    initializeTypeMetadataRecordLookup();
   }
 
 };
@@ -130,53 +96,25 @@ _registerTypeMetadataRecords(TypeMetadataState &T,
   T.SectionsToScan.push_back(TypeMetadataSection{begin, end});
 }
 
-static void _addImageTypeMetadataRecordsBlock(const uint8_t *records,
-                                              size_t recordsSize) {
+void swift::addImageTypeMetadataRecordBlockCallback(const void *records,
+                                                    uintptr_t recordsSize) {
   assert(recordsSize % sizeof(TypeMetadataRecord) == 0
          && "weird-sized type metadata section?!");
 
   // If we have a section, enqueue the type metadata for lookup.
+  auto recordBytes = reinterpret_cast<const char *>(records);
   auto recordsBegin
     = reinterpret_cast<const TypeMetadataRecord*>(records);
   auto recordsEnd
-    = reinterpret_cast<const TypeMetadataRecord*>
-                                            (records + recordsSize);
+    = reinterpret_cast<const TypeMetadataRecord*>(recordBytes + recordsSize);
 
-  // type metadata cache should always be sufficiently initialized by this point.
+  // Type metadata cache should always be sufficiently initialized by this
+  // point. Attempting to go through get() may also lead to an infinite loop,
+  // since we register records during the initialization of
+  // TypeMetadataRecords.
   _registerTypeMetadataRecords(TypeMetadataRecords.unsafeGetAlreadyInitialized(),
                                recordsBegin, recordsEnd);
 }
-
-#if defined(__APPLE__) && defined(__MACH__)
-static void _addImageTypeMetadataRecords(const mach_header *mh,
-                                         intptr_t vmaddr_slide) {
-#ifdef __LP64__
-  using mach_header_platform = mach_header_64;
-  assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
-#else
-  using mach_header_platform = mach_header;
-#endif
-
-  // Look for a __swift2_types section.
-  unsigned long recordsSize;
-  const uint8_t *records =
-    getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
-                   SEG_TEXT, SWIFT_TYPE_METADATA_SECTION,
-                   &recordsSize);
-
-  if (!records)
-    return;
-
-  _addImageTypeMetadataRecordsBlock(records, recordsSize);
-}
-
-static void _initializeCallbacksToInspectDylib() {
-  // Install our dyld callback.
-  // Dyld will invoke this on our behalf for all images that have already
-  // been loaded.
-  _dyld_register_func_for_add_image(_addImageTypeMetadataRecords);
-}
-#endif
 
 void
 swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,

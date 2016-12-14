@@ -1738,3 +1738,13 @@ Enumerators:
   SwiftName: regularExpression
 - Name: NSStringEnumerationByLines
   SwiftName: byLines
+SwiftVersions:
+- Version: 3
+  Protocols:
+  - Name: NSFastEnumeration
+    Methods:
+    - Selector: 'countByEnumeratingWithState:objects:count:'
+      MethodKind: Instance
+      Parameters:
+      - Position: 1
+        Nullability: U

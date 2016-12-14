@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -253,7 +253,7 @@ RValue Transform::transform(RValue &&input,
     auto result = transform(std::move(input).getScalarValue(),
                             inputOrigType, inputSubstType,
                             outputOrigType, outputSubstType, ctxt);
-    return RValue(result, outputSubstType);
+    return RValue(SGF, Loc, outputSubstType, result);
   }
 
   // Okay, we have a tuple.  The output type will also be a tuple unless
@@ -317,7 +317,7 @@ RValue Transform::transform(RValue &&input,
     return RValue();
   }
 
-  return RValue(outputExpansion, outputTupleType);
+  return RValue::withPreExplodedElements(outputExpansion, outputTupleType);
 }
 
 // Single @objc protocol value metatypes can be converted to the ObjC
@@ -770,14 +770,15 @@ void SILGenFunction::collectThunkParams(SILLocation loc,
   // Add the indirect results.
   for (auto result : F.getLoweredFunctionType()->getIndirectResults()) {
     auto paramTy = F.mapTypeIntoContext(result.getSILType());
-    (void) new (SGM.M) SILArgument(F.begin(), paramTy);
+    SILArgument *arg = F.begin()->createArgument(paramTy);
+    (void)arg;
   }
 
   // Add the parameters.
   auto paramTypes = F.getLoweredFunctionType()->getParameters();
   for (auto param : paramTypes) {
     auto paramTy = F.mapTypeIntoContext(param.getSILType());
-    auto paramValue = new (SGM.M) SILArgument(F.begin(), paramTy);
+    auto paramValue = F.begin()->createArgument(paramTy);
     auto paramMV = manageParam(*this, loc, paramValue, param, allowPlusZero);
     params.push_back(paramMV);
   }
@@ -1388,7 +1389,7 @@ public:
             SmallVectorImpl<SILValue> &innerIndirectResultAddrs) {
     // Assert that the indirect results are set up like we expect.
     assert(innerIndirectResultAddrs.empty());
-    assert(Gen.F.begin()->bbarg_size() >= outerFnType->getNumIndirectResults());
+    assert(Gen.F.begin()->args_size() >= outerFnType->getNumIndirectResults());
 
     innerIndirectResultAddrs.reserve(innerFnType->getNumIndirectResults());
 
@@ -1494,7 +1495,8 @@ private:
 
     SILValue resultAddr;
     if (result.isIndirect()) {
-      resultAddr = Gen.F.begin()->getBBArg(data.NextOuterIndirectResultIndex++);
+      resultAddr =
+          Gen.F.begin()->getArgument(data.NextOuterIndirectResultIndex++);
     }
 
     return { result, resultAddr };
@@ -2341,10 +2343,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // Use the generic signature from the context if the thunk involves
   // generic parameters.
   CanGenericSignature genericSig;
-  GenericEnvironment *genericEnv = nullptr;
   if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
     genericSig = F.getLoweredFunctionType()->getGenericSignature();
-    genericEnv = F.getGenericEnvironment();
     auto subsArray = F.getForwardingSubstitutions();
     subs.append(subsArray.begin(), subsArray.end());
 
@@ -2674,7 +2674,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   if (auto *genericEnv = fd->getGenericEnvironment()) {
     F.setGenericEnvironment(genericEnv);
     subs = getForwardingSubstitutions();
-    fTy = fTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs);
+    fTy = fTy->substGenericArgs(SGM.M, subs);
 
     inputSubstType = cast<FunctionType>(
         cast<GenericFunctionType>(inputSubstType)
@@ -2868,8 +2868,7 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
   // the substituted signature of the witness.
   auto witnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
   if (!witnessSubs.empty())
-    witnessFTy = witnessFTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
-                                              witnessSubs);
+    witnessFTy = witnessFTy->substGenericArgs(SGM.M, witnessSubs);
 
   SmallVector<ManagedValue, 8> witnessParams;
 

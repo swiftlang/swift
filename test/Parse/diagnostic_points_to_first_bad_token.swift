@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -parse %s 2>&1 | %FileCheck -strict-whitespace %s
+// RUN: not %target-swift-frontend -typecheck %s 2>&1 | %FileCheck -strict-whitespace %s
 
 // Test the diagnostic option 'PointsToFirstBadToken'.
 

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Module.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTScope.h"
@@ -83,6 +84,7 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
       TAD->computeType();
+      TAD->setInterfaceType(MetatypeType::get(TAD->getAliasType(), Ctx));
       TAD->setAccessibility(Accessibility::Public);
       Entry = TAD;
     }
@@ -344,7 +346,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
     Flags({0, 0, 0}), DSOHandle(nullptr) {
   ctx.addDestructorCleanup(*this);
   setImplicit();
-  setType(ModuleType::get(this));
+  setInterfaceType(ModuleType::get(this));
   setAccessibility(Accessibility::Public);
 }
 
@@ -428,8 +430,8 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
       return VD->getModuleContext() == this;
     });
 
-    const DeclContext *accessScope = nominal->getFormalAccessScope();
-    if (accessScope && !accessScope->isModuleContext())
+    auto AS = nominal->getFormalAccessScope();
+    if (AS.isPrivate() || AS.isFileScope())
       alreadyInPrivateContext = true;
 
     break;
@@ -575,9 +577,8 @@ TypeBase::gatherAllSubstitutions(Module *module,
     return { };
 
   // If we already have a cached copy of the substitutions, return them.
-  auto *canon = getCanonicalType().getPointer();
-  const ASTContext &ctx = canon->getASTContext();
-  if (auto known = ctx.getSubstitutions(canon, gpContext))
+  const ASTContext &ctx = getASTContext();
+  if (auto known = ctx.getSubstitutions(this, gpContext))
     return *known;
 
   // Compute the set of substitutions.
@@ -585,25 +586,26 @@ TypeBase::gatherAllSubstitutions(Module *module,
 
   // The type itself contains substitutions up to the innermost
   // non-type context.
-  CanType parent(canon);
+  Type parent = this;
   ArrayRef<GenericTypeParamType *> genericParams =
     genericSig->getGenericParams();
   unsigned lastGenericIndex = genericParams.size();
   while (parent) {
-    if (auto boundGeneric = dyn_cast<BoundGenericType>(parent)) {
+    if (auto boundGeneric = parent->getAs<BoundGenericType>()) {
       unsigned index = lastGenericIndex - boundGeneric->getGenericArgs().size();
       for (Type arg : boundGeneric->getGenericArgs()) {
         auto paramTy = genericParams[index++];
-        substitutions[paramTy->getCanonicalType().getPointer()] = arg;
+        substitutions[
+          paramTy->getCanonicalType()->castTo<GenericTypeParamType>()] = arg;
       }
       lastGenericIndex -= boundGeneric->getGenericArgs().size();
 
-      parent = CanType(boundGeneric->getParent());
+      parent = boundGeneric->getParent();
       continue;
     }
 
-    if (auto nominal = dyn_cast<NominalType>(parent)) {
-      parent = CanType(nominal->getParent());
+    if (auto nominal = parent->getAs<NominalType>()) {
+      parent = nominal->getParent();
       continue;
     }
 
@@ -615,11 +617,14 @@ TypeBase::gatherAllSubstitutions(Module *module,
   auto *parentDC = gpContext;
   while (parentDC->isTypeContext())
     parentDC = parentDC->getParent();
-  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext())
-    for (auto pair : outerEnv->getInterfaceToArchetypeMap()) {
-      auto result = substitutions.insert(pair);
+  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext()) {
+    for (auto gp : outerEnv->getGenericParams()) {
+      auto result = substitutions.insert(
+                      {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
+                       outerEnv->mapTypeIntoContext(gp)});
       assert(result.second);
     }
+  }
 
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
@@ -649,16 +654,15 @@ TypeBase::gatherAllSubstitutions(Module *module,
 
   // Before recording substitutions, make sure we didn't end up doing it
   // recursively.
-  if (auto known = ctx.getSubstitutions(canon, gpContext))
+  if (auto known = ctx.getSubstitutions(this, gpContext))
     return *known;
 
   // Copy and record the substitutions.
-  bool hasTypeVariables = canon->hasTypeVariable();
   auto permanentSubs = ctx.AllocateCopy(result,
-                                        hasTypeVariables
+                                        hasTypeVariable()
                                           ? AllocationArena::ConstraintSolver
                                           : AllocationArena::Permanent);
-  ctx.setSubstitutions(canon, gpContext, permanentSubs);
+  ctx.setSubstitutions(this, gpContext, permanentSubs);
   return permanentSubs;
 }
 
@@ -870,7 +874,7 @@ namespace {
       return container.lookupPrecedenceGroup(name);
     }
   };
-}
+} // end anonymous namespace
 
 /// A helper class to sneak around C++ access control rules.
 class SourceFile::Impl {

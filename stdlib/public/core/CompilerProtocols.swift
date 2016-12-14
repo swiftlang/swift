@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // Intrinsic protocols shared with the compiler
@@ -194,10 +194,46 @@ public protocol _ExpressibleByBuiltinIntegerLiteral {
   init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
 }
 
-/// Conforming types can be initialized with integer literals.
+/// A type that can be initialized with an integer literal.
+///
+/// The standard library integer and floating-point types, such as `Int` and
+/// `Double`, conform to the `ExpressibleByIntegerLiteral` protocol. You can
+/// initialize a variable or constant of any of these types by assigning an
+/// integer literal.
+///
+///     // Type inferred as 'Int'
+///     let cookieCount = 12
+///
+///     // An array of 'Int'
+///     let chipsPerCookie = [21, 22, 25, 23, 24, 19]
+///
+///     // A floating-point value initialized using an integer literal
+///     let redPercentage: Double = 1
+///     // redPercentage == 1.0
+///
+/// Conforming to ExpressibleByIntegerLiteral
+/// =========================================
+///
+/// To add `ExpressibleByIntegerLiteral` conformance to your custom type,
+/// implement the required initializer.
 public protocol ExpressibleByIntegerLiteral {
+  /// A type that can represent an integer literal.
+  ///
+  /// The standard library integer and floating-point types are all valid types
+  /// for `IntegerLiteralType`.
   associatedtype IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral
-  /// Create an instance initialized to `value`.
+
+  /// Creates an instance initialized to the specified integer value.
+  ///
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using an integer literal. For example:
+  ///
+  ///     let x = 23
+  ///
+  /// In this example, the assignment to the `x` constant calls this integer
+  /// literal initializer behind the scenes.
+  ///
+  /// - Parameter value: The value to create.
   init(integerLiteral value: IntegerLiteralType)
 }
 
@@ -231,6 +267,16 @@ public protocol ExpressibleByFloatLiteral {
   associatedtype FloatLiteralType : _ExpressibleByBuiltinFloatLiteral
   
   /// Creates an instance initialized to the specified floating-point value.
+  ///
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using a floating-point literal. For example:
+  ///
+  ///     let x = 21.5
+  ///
+  /// In this example, the assignment to the `x` constant calls this
+  /// floating-point literal initializer behind the scenes.
+  ///
+  /// - Parameter value: The value to create.
   init(floatLiteral value: FloatLiteralType)
 }
 
@@ -260,7 +306,7 @@ public protocol ExpressibleByBooleanLiteral {
   ///
   ///     let twasBrillig = true
   ///
-  /// In this example, the assignments to the `twasBrillig` constant calls this
+  /// In this example, the assignment to the `twasBrillig` constant calls this
   /// Boolean literal initializer behind the scenes.
   ///
   /// - Parameter value: The value of the new instance.
@@ -296,6 +342,8 @@ public protocol ExpressibleByUnicodeScalarLiteral {
   associatedtype UnicodeScalarLiteralType : _ExpressibleByBuiltinUnicodeScalarLiteral
 
   /// Creates an instance initialized to the given value.
+  ///
+  /// - Parameter value: The value of the new instance.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
 }
 
@@ -342,6 +390,8 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
     : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
   
   /// Creates an instance initialized to the given value.
+  ///
+  /// - Parameter value: The value of the new instance.
   init(extendedGraphemeClusterLiteral value: ExtendedGraphemeClusterLiteralType)
 }
 
@@ -386,6 +436,8 @@ public protocol ExpressibleByStringLiteral
   associatedtype StringLiteralType : _ExpressibleByBuiltinStringLiteral
   
   /// Creates an instance initialized to the given string value.
+  ///
+  /// - Parameter value: The value of the new instance.
   init(stringLiteral value: StringLiteralType)
 }
 

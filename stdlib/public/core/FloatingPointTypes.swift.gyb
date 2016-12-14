@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -668,6 +668,7 @@ extension ${Self}: BinaryFloatingPoint {
   public var significandWidth: Int {
     let trailingZeros = significandBitPattern.countTrailingZeros
     if isNormal {
+      guard significandBitPattern != 0 else { return 0 }
       return ${Self}.significandBitCount - trailingZeros
     }
     if isSubnormal {
@@ -1056,9 +1057,10 @@ public postfix func -- (lhs: inout ${Self}) -> ${Self} {
 }
 
 extension ${Self} {
-  @available(*, unavailable, message: "Please use the `abs(_:)` free function")
+  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
+  @_transparent
   public static func abs(_ x: ${Self}) -> ${Self} {
-    fatalError("unavailable")
+    return x.magnitude
   }
 }
 

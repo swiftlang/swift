@@ -12,11 +12,11 @@ sil @makesInt : $@convention(thin) () -> Int
 // CHECK-LABEL: sil @use_before_init
 sil @use_before_init : $@convention(thin) () -> Int {
 bb0:
-  %0 = alloc_box $@box Int
-  %0a = project_box %0 : $@box Int, 0
+  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %1 = mark_uninitialized [var] %0a : $*Int // expected-note {{variable defined here}}
   %4 = load %1 : $*Int                // expected-error {{variable '<unknown>' used before being initialized}}
-  strong_release %0 : $@box Int
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Int>
   %9 = return %4 : $Int
 }
 
@@ -24,15 +24,15 @@ bb0:
 // CHECK-LABEL: @inout_uninit
 sil @inout_uninit : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_box $@box Int
-  %0a = project_box %0 : $@box Int, 0
+  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %1 = mark_uninitialized [var] %0a : $*Int // expected-note {{variable defined here}}
 
   %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
   %6 = apply %5(%1) : $@convention(thin) (@inout Int) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
 
   %t = tuple ()
-  strong_release %0 : $@box Int
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Int>
   return %t : $()
 }
 
@@ -49,8 +49,8 @@ bb0:
 // CHECK-LABEL: sil @used_by_inout
 sil @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
 bb0(%0 : $Int):
-  %91 = alloc_box $@box Int
-  %91a = project_box %91 : $@box Int, 0
+  %91 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %91a = project_box %91 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %1 = mark_uninitialized [var] %91a : $*Int
 
   %2 = store %0 to %1 : $*Int
@@ -59,7 +59,7 @@ bb0(%0 : $Int):
   %6 = apply %5(%1) : $@convention(thin) (@inout Int) -> ()
   %7 = load %1 : $*Int
   %8 = tuple (%3 : $Int, %7 : $Int)
-  strong_release %91 : $@box Int
+  strong_release %91 : $<τ_0_0> { var τ_0_0 } <Int>
   %11 = return %8 : $(Int, Int)
 }
 
@@ -76,15 +76,15 @@ sil @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
 // CHECK-LABEL: sil @call_struct_return_function
 sil @call_struct_return_function : $@convention(thin) () -> Int {
 bb0:
-  %0 = alloc_box $@box AddressOnlyStruct
-  %0a = project_box %0 : $@box AddressOnlyStruct, 0
+  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>
+  %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>, 0
   %1 = mark_uninitialized [var] %0a : $*AddressOnlyStruct
 
   %2 = function_ref @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
   %3 = apply %2(%1) : $@convention(thin) () -> @out AddressOnlyStruct
   %4 = struct_element_addr %1 : $*AddressOnlyStruct, #AddressOnlyStruct.b
   %5 = load %4 : $*Int
-  strong_release %0 : $@box AddressOnlyStruct
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>
   return %5 : $Int
 }
 
@@ -92,8 +92,8 @@ bb0:
 // CHECK-LABEL: sil @tuple_elements1
 sil @tuple_elements1 : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  %2 = alloc_box $@box (Int, Int)
-  %2a = project_box %2 : $@box (Int, Int), 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>, 0
   %3 = mark_uninitialized [var] %2a : $*(Int, Int) // expected-note {{variable defined here}}
   %4 = tuple_element_addr %3 : $*(Int, Int), 0
   %5 = tuple_element_addr %3 : $*(Int, Int), 1
@@ -101,7 +101,7 @@ bb0(%0 : $Int):
   %15 = tuple_element_addr %3 : $*(Int, Int), 1
   %16 = apply %14(%15) : $@convention(thin) (@inout Int) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
 
-  strong_release %2 : $@box (Int, Int)
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>
   %99 = tuple ()
   return %99 : $()
 }
@@ -109,8 +109,8 @@ bb0(%0 : $Int):
 // CHECK-LABEL: sil @tuple_elements2
 sil @tuple_elements2 : $@convention(thin) (Int) -> (Int, Int) {
 bb0(%0 : $Int):
-  %2 = alloc_box $@box (Int, Int)
-  %2a = project_box %2 : $@box (Int, Int), 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>, 0
   %3 = mark_uninitialized [var] %2a : $*(Int, Int) // expected-note {{variable defined here}}
   %18 = tuple_element_addr %3 : $*(Int, Int), 0
   store %0 to %18 : $*Int
@@ -118,7 +118,7 @@ bb0(%0 : $Int):
   %21 = tuple_extract %20 : $(Int, Int), 0
   %22 = tuple_extract %20 : $(Int, Int), 1
   %23 = tuple (%21 : $Int, %22 : $Int)
-  strong_release %2 : $@box (Int, Int)
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>
   return %23 : $(Int, Int)
 }
 
@@ -127,12 +127,12 @@ bb0(%0 : $Int):
 // CHECK-LABEL: sil @copy_addr1
 sil @copy_addr1 : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
-  %3 = alloc_box $@box T
-  %3a = project_box %3 : $@box T, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
   %4 = mark_uninitialized [var] %3a : $*T
   copy_addr [take] %1 to [initialization] %4 : $*T
   copy_addr %4 to [initialization] %0 : $*T
-  strong_release %3 : $@box T
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <T>
   %9 = tuple ()
   return %9 : $()
 }
@@ -140,33 +140,33 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK-LABEL: sil @copy_addr2
 sil @copy_addr2 : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
-  %3 = alloc_box $@box T
-  %3a = project_box %3 : $@box T, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
   %4 = mark_uninitialized [var] %3a : $*T // expected-note {{variable defined here}}
   copy_addr %4 to [initialization] %0 : $*T   // expected-error {{variable '<unknown>' used before being initialized}}
-  strong_release %3 : $@box T
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <T>
   %9 = tuple ()
   return %9 : $()
 }
 
 
 sil @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-sil @closure0 : $@convention(thin) (@owned @box Int) -> ()
+sil @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
 
 // CHECK-LABEL: sil @closure_test
 sil @closure_test : $@convention(thin) () -> () {
 bb0:
-  %1 = alloc_box $@box Int
-  %1a = project_box %1 : $@box Int, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %0 = mark_uninitialized [var] %1a : $*Int // expected-note {{variable defined here}}
 
   %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@convention(thin) (@owned @box Int) -> ()
-  strong_retain %1 : $@box Int
+  %6 = function_ref @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
+  strong_retain %1 : $<τ_0_0> { var τ_0_0 } <Int>
   mark_function_escape %0 : $*Int // expected-error {{variable '<unknown>' used by function definition before being initialized}}
-  %8 = partial_apply %6(%1) : $@convention(thin) (@owned @box Int) -> ()
+  %8 = partial_apply %6(%1) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
   %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
-  strong_release %1 : $@box Int
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <Int>
 
   %11 = tuple ()
   return %11 : $()
@@ -182,8 +182,8 @@ sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
 // CHECK-LABEL: sil @assign_test_trivial
 sil @assign_test_trivial : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
-  %7 = alloc_box $@box Int
-  %7a = project_box %7 : $@box Int, 0
+  %7 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %7a = project_box %7 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %1 = mark_uninitialized [var] %7a : $*Int
 
   // These assigns are a mix of init + store forms, but because Int is trivial,
@@ -193,7 +193,7 @@ bb0(%0 : $Int):
   assign %0 to %1 : $*Int
 
   %2 = load %1 : $*Int
-  strong_release %7 : $@box Int
+  strong_release %7 : $<τ_0_0> { var τ_0_0 } <Int>
 
   return %2 : $Int
 }
@@ -204,8 +204,8 @@ bb0:
   // Assignments of nontrivial types.  The first becomes an initialize (i.e.,
   // lone store), the second becomes an assignment (retain/release dance).
 
-  %b = alloc_box $@box SomeClass
-  %ba = project_box %b : $@box SomeClass, 0
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <SomeClass>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <SomeClass>, 0
   %c = mark_uninitialized [var] %ba : $*SomeClass
 
   %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
@@ -226,7 +226,7 @@ bb0:
 
   destroy_addr %c : $*SomeClass
   // CHECK-NEXT: destroy_addr
-  dealloc_box %b : $@box SomeClass
+  dealloc_box %b : $<τ_0_0> { var τ_0_0 } <SomeClass>
 
   %11 = tuple ()
   return %11 : $()
@@ -236,8 +236,8 @@ bb0:
 // CHECK-LABEL: sil @assign_test_addressonly
 sil @assign_test_addressonly : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
-  %b = alloc_box $@box T
-  %ba = project_box %b : $@box T, 0
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <T>, 0
   %2 = mark_uninitialized [var] %ba : $*T
 
   // CHECK: [[PB:%[0-9]+]] = project_box
@@ -254,7 +254,7 @@ bb0(%0 : $*T, %1 : $*T):
   copy_addr %2 to [initialization] %0 : $*T
   // CHECK-NEXT: copy_addr [[PB]] to [initialization] %0 : $*T
 
-  strong_release %b : $@box T
+  strong_release %b : $<τ_0_0> { var τ_0_0 } <T>
   // CHECK-NEXT: strong_release %2
   %9 = tuple ()
   return %9 : $()
@@ -266,8 +266,8 @@ bb0:
   // Assignments of weak pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
 
-  %b = alloc_box $@box @sil_weak Optional<SomeClass>
-  %ba = project_box %b : $@box @sil_weak Optional<SomeClass>, 0
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <@sil_weak Optional<SomeClass>>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <@sil_weak Optional<SomeClass>>, 0
   %c = mark_uninitialized [var] %ba : $*@sil_weak Optional<SomeClass> // expected-note {{variable defined here}}
 
   // Invalid load to keep the alloc_box around so we can check init semantics.
@@ -294,7 +294,7 @@ bb0:
   release_value %8 : $Optional<SomeClass>
   // CHECK-NEXT: release_value [[C2]]
 
-  strong_release %b : $@box @sil_weak Optional<SomeClass>
+  strong_release %b : $<τ_0_0> { var τ_0_0 } <@sil_weak Optional<SomeClass>>
 
   %11 = tuple ()
   return %11 : $()
@@ -306,8 +306,8 @@ bb0:
   // Assignments of unowned pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
 
-  %b = alloc_box $@box @sil_unowned SomeClass
-  %ba = project_box %b : $@box @sil_unowned SomeClass, 0
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <@sil_unowned SomeClass>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <@sil_unowned SomeClass>, 0
   %c = mark_uninitialized [var] %ba : $*@sil_unowned SomeClass
 
   %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
@@ -343,7 +343,7 @@ bb0:
   // CHECK-NEXT: strong_release [[C2]]
 
   destroy_addr %c : $*@sil_unowned SomeClass
-  dealloc_box %b : $@box @sil_unowned SomeClass
+  dealloc_box %b : $<τ_0_0> { var τ_0_0 } <@sil_unowned SomeClass>
 
   %11 = tuple ()
   return %11 : $()
@@ -358,13 +358,13 @@ struct ContainsNativeObject {
 
 sil @test_struct : $@convention(thin) (@inout ContainsNativeObject) -> () {
 bb0(%0 : $*ContainsNativeObject):
-  %b = alloc_box $@box ContainsNativeObject
-  %ba = project_box %b : $@box ContainsNativeObject, 0
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>, 0
   %c = mark_uninitialized [var] %ba : $*ContainsNativeObject
   %1 = load %0 : $*ContainsNativeObject
   assign %1 to %c : $*ContainsNativeObject
 
-  strong_release %b : $@box ContainsNativeObject
+  strong_release %b : $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>
   %x = tuple ()
   return %x : $()
 }
@@ -631,8 +631,8 @@ sil @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned Root
 
 sil @derived_test1 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : $DerivedClassWithIVars):
-  %1 = alloc_box $@box DerivedClassWithIVars
-  %1a = project_box %1 : $@box DerivedClassWithIVars, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
   %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
   store %0 to %3 : $*DerivedClassWithIVars
 
@@ -655,14 +655,14 @@ bb0(%0 : $DerivedClassWithIVars):
   assign %16 to %3 : $*DerivedClassWithIVars
   %18 = load %3 : $*DerivedClassWithIVars
   strong_retain %18 : $DerivedClassWithIVars
-  strong_release %1 : $@box DerivedClassWithIVars
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   return %18 : $DerivedClassWithIVars
 }
 
 sil @derived_test2 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : $DerivedClassWithIVars):
-  %1 = alloc_box $@box DerivedClassWithIVars
-  %1a = project_box %1 : $@box DerivedClassWithIVars, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
   %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
   store %0 to %3 : $*DerivedClassWithIVars
 
@@ -675,7 +675,7 @@ bb0(%0 : $DerivedClassWithIVars):
   assign %16 to %3 : $*DerivedClassWithIVars
   %18 = load %3 : $*DerivedClassWithIVars
   strong_retain %18 : $DerivedClassWithIVars
-  strong_release %1 : $@box DerivedClassWithIVars
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   return %18 : $DerivedClassWithIVars
 }
 
@@ -842,7 +842,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 
 // CHECK-LABEL: sil @test_delegating_box_release
 // CHECK: bb0(%0 : $RootClassWithNontrivialStoredProperties):
-// CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_box $@box RootClassWithNontrivialStoredProperties
+// CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
 // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[SELFBOX]]
 // CHECK-NEXT: store %0 to [[PB]]
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[PB]]
@@ -851,11 +851,11 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: dealloc_box [[SELFBOX]]
 sil @test_delegating_box_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $RootClassWithNontrivialStoredProperties):
-  %2 = alloc_box $@box RootClassWithNontrivialStoredProperties
-  %2a = project_box %2 : $@box RootClassWithNontrivialStoredProperties, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
   %4 = mark_uninitialized [delegatingself] %2a : $*RootClassWithNontrivialStoredProperties
   store %0 to %4 : $*RootClassWithNontrivialStoredProperties
-  strong_release %2 : $@box RootClassWithNontrivialStoredProperties
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
 
   %13 = tuple ()
   return %13 : $()
@@ -863,7 +863,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 
 // CHECK-LABEL: sil @test_delegating_rvalue_release
 // CHECK: bb0(%0 : $RootClassWithNontrivialStoredProperties):
-// CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_box $@box RootClassWithNontrivialStoredProperties
+// CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
 // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[SELFBOX]]
 // CHECK-NEXT: store %0 to [[PB]]
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[PB]]
@@ -875,13 +875,13 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 // CHECK-NEXT: dealloc_box [[SELFBOX]]
 sil @test_delegating_rvalue_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $RootClassWithNontrivialStoredProperties):
-  %2 = alloc_box $@box RootClassWithNontrivialStoredProperties
-  %2a = project_box %2 : $@box RootClassWithNontrivialStoredProperties, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
   %4 = mark_uninitialized [delegatingself] %2a : $*RootClassWithNontrivialStoredProperties
   store %0 to %4 : $*RootClassWithNontrivialStoredProperties
   %6 = load %4 : $*RootClassWithNontrivialStoredProperties
   strong_release %6 : $RootClassWithNontrivialStoredProperties
-  strong_release %2 : $@box RootClassWithNontrivialStoredProperties
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
 
   %13 = tuple ()
   return %13 : $()
@@ -912,8 +912,8 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // <rdar://problem/18199087> DI doesn't catch use of super properties lexically inside super.init call
 sil @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Int) -> @owned DerivedClassWithIVars {
 bb0(%0 : $DerivedClassWithIVars, %i : $Int):
-  %1 = alloc_box $@box DerivedClassWithIVars
-  %1a = project_box %1 : $@box DerivedClassWithIVars, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
   %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
   store %0 to %3 : $*DerivedClassWithIVars
 
@@ -941,7 +941,7 @@ bb0(%0 : $DerivedClassWithIVars, %i : $Int):
   assign %16 to %3 : $*DerivedClassWithIVars
   %18 = load %3 : $*DerivedClassWithIVars
   strong_retain %18 : $DerivedClassWithIVars
-  strong_release %1 : $@box DerivedClassWithIVars
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   return %18 : $DerivedClassWithIVars
 }
 

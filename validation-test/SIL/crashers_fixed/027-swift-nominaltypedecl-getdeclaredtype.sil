@@ -1,5 +1,5 @@
 // RUN: not %target-sil-opt %s
-// REQUIRES: asserts, OS=linux-gnu
+// REQUIRES: OS=linux-gnu
 bb0(@test_existential_metatype : $Int
 %0 to $@callee_owned (thin) -> ("01234567-cdef-> (thin) -> @owned @callee_owned (Int
 bb0:
@@ -7,7 +7,7 @@ import SwiftShims
 %0 : $@convention(thin) -> ()
 strong_retain %0 : $Beth
 %7, bb3
-%0 : $@box Int) : $@_TF6switch1aFT_T_ : $*Spoon
+%0 : $<τ_0_0> { var τ_0_0 } <Int>) : $@_TF6switch1aFT_T_ : $*Spoon
 bb0(%2 : $Builtin.FPIEEE64, 1) ()
 sil [fragile] @guaranteed A)) {
 }
@@ -18,7 +18,7 @@ br bb4
 @convention(thin) -> (Int, bb1, #Optional<Int) -> (thin) ()
 %0 : $Builtin.some!enumelt.Word) (thin) -> ()) (thin) ("01234567-> () (thin) -> Int) ()
 %6 = alloc_box $C
-%5 = function_ref @test_unreachable : $C, @owned @box M
+%5 = function_ref @test_unreachable : $C, @owned <τ_0_0> { var τ_0_0 } <M>
 bb2:
 %14 : $*Foo
 %1 = load_weak [fragile] @test_checked_cast_br_jump_threading_with_entry_bb_arguments : $@globalinit_func0 : $SomeSubclass
@@ -35,7 +35,7 @@ store %14 = tuple (thin) -> () (Builtin.Type)
 }
 store %1 = tuple () -000000000000") {
 bb0(thin) -> ()
-%8 : $*Builtin.some!enumelt: $@box Spoon
+%8 : $*Builtin.some!enumelt: $<τ_0_0> { var τ_0_0 } <Spoon>
 strong_retain %1 : $*M
 }
 }
@@ -55,7 +55,7 @@ init(@owned Optional<C>
 sil [fragile] @call_fn_pointer : $Builtin.Word)
 %6 : $@convention(@test1 : $Int) ClassBound, Float32) () -> Beth, bb2:
 %i") (thin) (Builtin.Type) ():
-%4 = alloc_stack $@box Builtin.RawPointer
+%4 = alloc_stack $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
 %0 = open_existential_box %1 : $@thick SomeClass
 strong_retain %6 = apply %8 = _ref @convention("once") (thin) P) (Builtin.Int32):
 %13 : $Foo.Int1

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -899,6 +899,13 @@ private:
   /// type in a disjunction constraint.
   llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
 
+  /// Maps expression types used within all portions of the constraint
+  /// system, instead of directly using the types on the expression
+  /// nodes themselves. This allows us to typecheck an expression and
+  /// run through various diagnostics passes without actually mutating
+  /// the types on the expression nodes.
+  llvm::DenseMap<Expr *, TypeBase *> ExprTypes;
+
   /// There can only be a single contextual type on the root of the expression
   /// being checked.  If specified, this holds its type along with the base
   /// expression, and the purpose of it.
@@ -1009,13 +1016,6 @@ private:
     /// \brief Whether to record failures or not.
     bool recordFixes = false;
 
-    /// The list of constraints that have been retired along the
-    /// current path.
-    ConstraintList retiredConstraints;
-
-    /// The current set of generated constraints.
-    SmallVector<Constraint *, 4> generatedConstraints;
-
     /// \brief The set of type variable bindings that have changed while
     /// processing this constraint system.
     SavedTypeVariableBindings savedBindings;
@@ -1032,9 +1032,160 @@ private:
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
+
+    /// \brief Register given scope to be tracked by the current solver state,
+    /// this helps to make sure that all of the retired/generated constraints
+    /// are dealt with correctly when the life time of the scope ends.
+    ///
+    /// \param scope The scope to associate with current solver state.
+    void registerScope(SolverScope *scope) {
+      scopes.insert({ scope, std::make_pair(retiredConstraints.begin(),
+                                            generatedConstraints.size()) });
+    }
+
+    /// \brief Check whether there are any retired constraints present.
+    bool hasRetiredConstraints() const {
+      return !retiredConstraints.empty();
+    }
+
+    /// \brief Mark given constraint as retired along current solver path.
+    ///
+    /// \param constraint The constraint to retire temporarily.
+    void retireConstraint(Constraint *constraint) {
+      retiredConstraints.push_front(constraint);
+    }
+
+    /// \brief Iterate over all of the retired constraints registered with
+    /// current solver state.
+    ///
+    /// \param processor The processor function to be applied to each of
+    /// the constraints retrieved.
+    void forEachRetired(std::function<void(Constraint &)> processor) {
+      for (auto &constraint : retiredConstraints)
+        processor(constraint);
+    }
+
+    /// \brief Add new "generated" constraint along the current solver path.
+    ///
+    /// \param constraint The newly generated constraint.
+    void addGeneratedConstraint(Constraint *constraint) {
+      generatedConstraints.push_back(constraint);
+    }
+
+    /// \brief Erase given constraint from the list of generated constraints
+    /// along the current solver path. Note that this operation doesn't
+    /// guarantee any ordering of the after it's application.
+    ///
+    /// \param constraint The constraint to erase.
+    void removeGeneratedConstraint(Constraint *constraint) {
+      size_t index = 0;
+      for (auto generated : generatedConstraints) {
+        if (generated == constraint) {
+          unsigned last = generatedConstraints.size() - 1;
+          auto lastConstraint = generatedConstraints[last];
+          if (lastConstraint == generated) {
+            generatedConstraints.pop_back();
+            break;
+          } else {
+            generatedConstraints[index] = lastConstraint;
+            generatedConstraints[last] = constraint;
+            generatedConstraints.pop_back();
+            break;
+          }
+        }
+        index++;
+      }
+    }
+
+    /// \brief Restore all of the retired/generated constraints to the state
+    /// before given scope. This is required because retired constraints have
+    /// to be re-introduced to the system in order of arrival (LIFO) and list
+    /// of the generated constraints has to be truncated back to the
+    /// original size.
+    ///
+    /// \param scope The solver scope to rollback.
+    void rollback(SolverScope *scope) {
+      auto entry = scopes.find(scope);
+      assert(entry != scopes.end() && "Unknown solver scope");
+
+      // Remove given scope from the circulation.
+      scopes.erase(scope);
+
+      // The position of last retired constraint before given scope.
+      ConstraintList::iterator lastRetiredPos;
+      // The original number of generated constraints before given scope.
+      unsigned numGenerated;
+
+      std::tie(lastRetiredPos, numGenerated) = entry->getSecond();
+
+      // Restore all of the retired constraints.
+      CS.InactiveConstraints.splice(CS.InactiveConstraints.end(),
+                                    retiredConstraints,
+                                    retiredConstraints.begin(), lastRetiredPos);
+
+      // And remove all of the generated constraints.
+      auto genStart = generatedConstraints.begin() + numGenerated,
+           genEnd = generatedConstraints.end();
+      for (auto genI = genStart; genI != genEnd; ++genI) {
+        CS.InactiveConstraints.erase(ConstraintList::iterator(*genI));
+      }
+
+      generatedConstraints.erase(genStart, genEnd);
+    }
+
+  private:
+    /// The list of constraints that have been retired along the
+    /// current path, this list is used in LIFO fasion when constaints
+    /// are added back to the circulation.
+    ConstraintList retiredConstraints;
+
+    /// The current set of generated constraints.
+    SmallVector<Constraint *, 4> generatedConstraints;
+
+    /// The collection which holds association between solver scope
+    /// and position of the last retired constraint and number of
+    /// constraints generated before registration of given scope,
+    /// this helps to rollback all of the constraints retired/generated
+    /// each of the registered scopes correct (LIFO) order.
+    llvm::SmallDenseMap<SolverScope *,
+                        std::pair<ConstraintList::iterator, unsigned>>
+        scopes;
+  };
+
+  class CacheExprTypes : public ASTWalker {
+    Expr *RootExpr;
+    ConstraintSystem &CS;
+    bool ExcludeRoot;
+
+  public:
+    CacheExprTypes(Expr *expr, ConstraintSystem &cs, bool excludeRoot)
+        : RootExpr(expr), CS(cs), ExcludeRoot(excludeRoot) {}
+
+    Expr *walkToExprPost(Expr *expr) override {
+      if (ExcludeRoot && expr == RootExpr)
+        return expr;
+
+      if (expr->getType())
+        CS.cacheType(expr);
+
+      return expr;
+    }
   };
 
 public:
+  /// Cache the types of the given expression and all subexpressions.
+  void cacheExprTypes(Expr *expr) {
+    bool excludeRoot = false;
+    expr->walk(CacheExprTypes(expr, *this, excludeRoot));
+  }
+
+  /// Cache the types of the expressions under the given expression
+  /// (but not the type of the given expression).
+  void cacheSubExprTypes(Expr *expr) {
+    bool excludeRoot = true;
+    expr->walk(CacheExprTypes(expr, *this, excludeRoot));
+  }
+
   /// \brief The current solver state.
   ///
   /// This will be non-null when we're actively solving the constraint
@@ -1085,12 +1236,6 @@ public:
 
     /// \brief The length of \c SavedBindings.
     unsigned numSavedBindings;
-
-    /// The length of generatedConstraints.
-    unsigned numGeneratedConstraints;
-
-    /// \brief The last retired constraint in the list.
-    ConstraintList::iterator firstRetired;
 
     /// \brief The length of \c ConstraintRestrictions.
     unsigned numConstraintRestrictions;
@@ -1178,7 +1323,7 @@ private:
   ///
   /// \returns null when we aren't currently solving the system.
   SavedTypeVariableBindings *getSavedBindings() const {
-    return solverState? &solverState->savedBindings : nullptr;
+    return solverState ? &solverState->savedBindings : nullptr;
   }
 
   /// Add a new type variable that was already created.
@@ -1216,7 +1361,52 @@ public:
   void setFavoredType(Expr *E, TypeBase *T) {
     this->FavoredTypes[E] = T;
   }
- 
+
+  /// Set the type in our type map for a given expression. The side
+  /// map is used throughout the expression type checker in order to
+  /// avoid mutating expressions until we know we have successfully
+  /// type-checked them.
+  void setType(Expr *E, Type T) {
+    assert(T && "Expected non-null type!");
+
+    // FIXME: Ideally this would be enabled but there are currently at
+    // least a few places where we set types to different values. We
+    // should track down and fix those places.
+
+    // assert((ExprTypes.find(E) == ExprTypes.end() ||
+    //         ExprTypes.find(E)->second->isEqual(T) ||
+    //         ExprTypes.find(E)->second->hasTypeVariable()) &&
+    //        "Expected type to be set exactly once!");
+
+    ExprTypes[E] = T.getPointer();
+
+    // FIXME: Temporary until all references to expression types are
+    //        updated.
+    E->setType(T);
+  }
+
+  /// Check to see if we have a type for an expression.
+  bool hasType(Expr *E) {
+    return ExprTypes.find(E) != ExprTypes.end();
+  }
+
+  /// Get the type for an expression.
+  Type getType(Expr *E) {
+    assert(hasType(E) && "Expected type to have been set!");
+    assert(ExprTypes[E]->isEqual(E->getType()) &&
+           "Expected type in map to be the same type in expression!");
+    return ExprTypes[E];
+  }
+
+  /// Cache the type of the expression argument and return that same
+  /// argument.
+  template <typename T>
+  T *cacheType(T *E) {
+    assert(E->getType() && "Expected a type!");
+    setType(E, E->getType());
+    return E;
+  }
+
   void setContextualType(Expr *E, TypeLoc T, ContextualTypePurpose purpose) {
     contextualTypeNode = E;
     contextualType = T;
@@ -1421,8 +1611,8 @@ public:
 
     // Record this as a newly-generated constraint.
     if (solverState) {
-      solverState->generatedConstraints.push_back(constraint);
-      solverState->retiredConstraints.push_back(constraint);
+      solverState->addGeneratedConstraint(constraint);
+      solverState->retireConstraint(constraint);
     }
   }
 
@@ -1437,13 +1627,16 @@ public:
 
     // Record this as a newly-generated constraint.
     if (solverState)
-      solverState->generatedConstraints.push_back(constraint);
+      solverState->addGeneratedConstraint(constraint);
   }
 
   /// \brief Remove an inactive constraint from the current constraint graph.
   void removeInactiveConstraint(Constraint *constraint) {
     CG.removeConstraint(constraint);
     InactiveConstraints.erase(constraint);
+
+    if (solverState)
+      solverState->retireConstraint(constraint);
   }
 
   /// Retrieve the list of inactive constraints.
@@ -1553,9 +1746,9 @@ public:
   void assignFixedType(TypeVariableType *typeVar, Type type,
                        bool updateState = true);
 
-  // \brief Set the TVO_MustBeMaterializable bit on all type variables
-  // necessary to ensure that the type in question is materializable in a
-  // viable solution.
+  /// \brief Set the TVO_MustBeMaterializable bit on all type variables
+  /// necessary to ensure that the type in question is materializable in a
+  /// viable solution.
   void setMustBeMaterializableRecursive(Type type);
   
   /// \brief Determine if the type in question is an Array<T>.
@@ -1571,12 +1764,22 @@ public:
   /// \brief Determine if the type in question is AnyHashable.
   bool isAnyHashableType(Type t);
 
+  /// Call Expr::propagateLValueAccessKind on the given expression,
+  /// using a custom accessor for the type on the expression which
+  /// reads the type from the ConstraintSystem expression type map.
+  void propagateLValueAccessKind(Expr *E,
+                                 AccessKind accessKind,
+                                 bool allowOverwrite = false);
+
 private:
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
 
 public:
+
+  /// \brief Coerce the given expression to an rvalue, if it isn't already.
+  Expr *coerceToRValue(Expr *expr);
 
   /// \brief "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
@@ -1729,8 +1932,7 @@ public:
   ArrayRef<typename std::iterator_traits<It>::value_type>
   allocateCopy(It start, It end) {
     typedef typename std::iterator_traits<It>::value_type T;
-    T *result = (T*)getAllocator().Allocate(sizeof(T)*(end-start),
-                                            __alignof__(T));
+    T *result = (T*)getAllocator().Allocate(sizeof(T)*(end-start), alignof(T));
     unsigned i;
     for (i = 0; start != end; ++start, ++i)
       new (result+i) T(*start);
@@ -2030,6 +2232,9 @@ private:
   SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
                                  ConstraintLocatorBuilder locator,
                                  bool isFavored);
+
+  /// \brief Collect the current inactive disjunction constraints.
+  void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
   /// \brief Solve the system of constraints after it has already been
   /// simplified.

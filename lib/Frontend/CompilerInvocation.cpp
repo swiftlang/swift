@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -76,6 +76,8 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
   case InputFileKind::IFK_LLVM_IR:
     llvm_unreachable("Trying to convert from unsupported InputFileKind");
   }
+
+  llvm_unreachable("Unhandled InputFileKind in switch.");
 }
 
 // This is a separate function so that it shows up in stack traces.
@@ -249,6 +251,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::EmitSIBGen;
     } else if (Opt.matches(OPT_parse)) {
       Action = FrontendOptions::Parse;
+    } else if (Opt.matches(OPT_typecheck)) {
+      Action = FrontendOptions::Typecheck;
     } else if (Opt.matches(OPT_dump_parse)) {
       Action = FrontendOptions::DumpParse;
     } else if (Opt.matches(OPT_dump_ast)) {
@@ -460,6 +464,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       break;
 
     case FrontendOptions::Parse:
+    case FrontendOptions::Typecheck:
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
@@ -661,6 +666,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
       return true;
     case FrontendOptions::Parse:
+    case FrontendOptions::Typecheck:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL:
@@ -688,6 +694,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
       return true;
     case FrontendOptions::Parse:
+    case FrontendOptions::Typecheck:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL:
@@ -706,6 +713,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     switch (Opts.RequestedAction) {
     case FrontendOptions::NoneAction:
     case FrontendOptions::Parse:
+    case FrontendOptions::Typecheck:
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
@@ -803,9 +811,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
-
-  Opts.EnableExperimentalNestedGenericTypes |=
-    Args.hasArg(OPT_enable_experimental_nested_generic_types);
 
   Opts.EnableClassResilience |=
     Args.hasArg(OPT_enable_class_resilience);
@@ -1031,7 +1036,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
 
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
-         "conflicting arguments; should of been caught by driver");
+         "conflicting arguments; should have been caught by driver");
 
   return false;
 }
@@ -1107,6 +1112,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       IRGenOpts.Optimize = true;
       Opts.Optimization = SILOptions::SILOptMode::Optimize;
     }
+  }
+
+  if (Args.getLastArg(OPT_AssumeSingleThreaded)) {
+    Opts.AssumeSingleThreaded = true;
   }
 
   // Parse the assert configuration identifier.

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -142,7 +142,7 @@ public:
   template <typename T>
   class Serialized {
   private:
-    using RawBitOffset = decltype(DeclTypeCursor.GetCurrentBitNo());
+    using RawBitOffset = uint64_t;
 
     using ImplTy = PointerUnion<T, serialization::BitOffset>;
     ImplTy Value;
@@ -250,6 +250,9 @@ private:
   /// Normal protocol conformances referenced by this module.
   std::vector<Serialized<NormalProtocolConformance *>> NormalConformances;
 
+  /// SILLayouts referenced by this module.
+  std::vector<Serialized<SILLayout *>> SILLayouts;
+
   /// Types referenced by this module.
   std::vector<Serialized<Type>> Types;
 
@@ -310,7 +313,10 @@ private:
   std::unique_ptr<GroupNameTable> GroupNamesMap;
   std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
 
-  struct {
+  /// Saved type substitution maps for lazily-created generic environments.
+  std::vector<std::unique_ptr<TypeSubstitutionMap>> GenericEnvironmentMaps;
+
+  struct ModuleBits {
     /// The decl ID of the main class in this module file, if it has one.
     unsigned EntryPointDeclID : 31;
 
@@ -336,7 +342,7 @@ private:
     // Explicitly pad out to the next word boundary.
     unsigned : 0;
   } Bits = {};
-  static_assert(sizeof(Bits) <= 8, "The bit set should be small");
+  static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
   void setStatus(Status status) {
     Bits.Status = static_cast<unsigned>(status);
@@ -425,7 +431,7 @@ private:
   /// Recursively reads a pattern from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a pattern, returns null.
-  Pattern *maybeReadPattern();
+  Pattern *maybeReadPattern(DeclContext *owningDC);
 
   ParameterList *readParameterList();
   
@@ -440,25 +446,38 @@ private:
                                      GenericParamList *outerParams = nullptr);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
-  void readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
+  void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
+                               llvm::BitstreamCursor &Cursor);
 
-  /// Reads a GenericEnvironment from \c DeclTypeCursor.
+  /// Allocate a lazy generic environment map for use with lazily deserialized
+  /// generic environments.
+  uint64_t allocateLazyGenericEnvironmentMap(TypeSubstitutionMap &&map);
+
+  /// Set up a lazy generic environment for the given type or extension.
+  void readLazyGenericEnvironment(
+              llvm::PointerUnion<GenericTypeDecl *, ExtensionDecl *> typeOrExt);
+
+  /// Read the generic signature and type substitution map for a
+  /// generic environment from \c Cursor.
+  std::pair<GenericSignature *, TypeSubstitutionMap>
+  readGenericEnvironmentPieces(llvm::BitstreamCursor &Cursor,
+                               Optional<ArrayRef<Requirement>> optRequirements
+                                 = None);
+
+  /// Reads a GenericEnvironment from \c Cursor.
   ///
-  /// Also returns the set of generic parameters read, in order, to help with
-  /// forming a GenericSignature.
+  /// The optional requirements are used to construct the signature without
+  /// attempting to deserialize any requirements, such as when reading SIL.
   GenericEnvironment *readGenericEnvironment(
-      SmallVectorImpl<GenericTypeParamType *> &paramTypes,
-      llvm::BitstreamCursor &Cursor);
+      llvm::BitstreamCursor &Cursor,
+      Optional<ArrayRef<Requirement>> optRequirements = None);
 
   /// Reads a GenericEnvironment followed by requirements from \c DeclTypeCursor.
   ///
-  /// Returns the GenericEnvironment and the signature formed from the
-  /// generic parameters of the environment, together with the
-  /// read requirements.
+  /// Returns the GenericEnvironment.
   ///
   /// Returns nullptr if there's no generic signature here.
-  std::pair<GenericSignature *, GenericEnvironment *>
-  maybeReadGenericSignature();
+  GenericEnvironment *maybeReadGenericEnvironment();
 
   /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
   ///
@@ -656,6 +675,9 @@ public:
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
+  GenericEnvironment *loadGenericEnvironment(const Decl *decl,
+                                             uint64_t contextData) override;
+
   Optional<StringRef> getGroupNameById(unsigned Id) const;
   Optional<StringRef> getSourceFileNameById(unsigned Id) const;
   Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
@@ -718,6 +740,9 @@ public:
   ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,
                                          GenericEnvironment *genericEnv =
                                            nullptr);
+  
+  /// Read a SILLayout from the given cursor.
+  SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
 
   /// Read the given normal conformance from the current module file.
   NormalProtocolConformance *

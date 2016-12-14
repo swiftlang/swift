@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,6 +23,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/DiagnosticConsumer.h"
@@ -95,6 +96,7 @@ enum class ActionType {
   GenerateModuleAPIDescription,
   DiffModuleAPI,
   ReconstructType,
+  Range,
 };
 
 class NullDebuggerClient : public DebuggerClient {
@@ -208,6 +210,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            clEnumValN(ActionType::PrintModuleGroups,
                       "print-module-groups",
                       "Print group names in a module"),
+           clEnumValN(ActionType::Range,
+                      "range",
+                      "Print information about a given range"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -522,6 +527,9 @@ DeclToPrint("decl-to-print",
 
 static llvm::cl::opt<std::string>
 LineColumnPair("pos", llvm::cl::desc("Line:Column pair"));
+
+static llvm::cl::opt<std::string>
+EndLineColumnPair("end-pos", llvm::cl::desc("Line:Column pair"));
 
 static llvm::cl::opt<std::string>
 USR("usr", llvm::cl::desc("USR"));
@@ -1540,7 +1548,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       std::string MangledName;
       {
         Mangle::Mangler Mangler(/*DWARFMangling*/ true);
-        Mangler.mangleTypeForDebugger(LTD->getDeclaredType(),
+        Mangler.mangleTypeForDebugger(LTD->getDeclaredInterfaceType(),
                                       LTD->getDeclContext());
         MangledName = Mangler.finalize();
       }
@@ -1578,7 +1586,8 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       while (node->getKind() != NodeKind::LocalDeclName)
         node = node->getChild(1); // local decl name
 
-      auto remangled = Demangle::mangleNode(typeNode);
+      auto remangled = Demangle::mangleNode(typeNode,
+                                            NewMangling::useNewMangling());
 
       auto LTD = M->lookupLocalType(remangled);
 
@@ -2615,6 +2624,48 @@ static int doReconstructType(const CompilerInvocation &InitInvok,
   return 0;
 }
 
+static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
+                            StringRef SourceFileName,
+                            StringRef StartPos,
+                            StringRef EndPos) {
+  auto StartOp = parseLineCol(StartPos);
+  auto EndOp = parseLineCol(EndPos);
+  if (!StartOp.hasValue() || !EndOp.hasValue())
+    return 1;
+  auto StartLineCol = StartOp.getValue();
+  auto EndLineCol = EndOp.getValue();
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(SourceFileName);
+  Invocation.getLangOptions().DisableAvailabilityChecking = false;
+
+  CompilerInstance CI;
+
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+  SourceFile *SF = nullptr;
+  for (auto Unit : CI.getMainModule()->getFiles()) {
+    SF = dyn_cast<SourceFile>(Unit);
+    if (SF)
+      break;
+  }
+  assert(SF && "no source file?");
+  assert(SF->getBufferID().hasValue() && "no buffer id?");
+  SourceManager &SM = SF->getASTContext().SourceMgr;
+  unsigned bufferID = SF->getBufferID().getValue();
+  SourceLoc StartLoc = SM.getLocForLineCol(bufferID, StartLineCol.first,
+                                           StartLineCol.second);
+  SourceLoc EndLoc = SM.getLocForLineCol(bufferID, EndLineCol.first,
+                                         EndLineCol.second);
+  RangeResolver Resolver(*SF, StartLoc, EndLoc);
+  ResolvedRangeInfo Result = Resolver.resolve();
+  Result.print(llvm::outs());
+  return 0;
+}
+
 static int doPrintUSRs(const CompilerInvocation &InitInvok,
                        StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
@@ -3025,6 +3076,11 @@ int main(int argc, char *argv[]) {
     break;
   case ActionType::ReconstructType:
     ExitCode = doReconstructType(InitInvok, options::SourceFilename);
+    break;
+  case ActionType::Range:
+    ExitCode = doPrintRangeInfo(InitInvok, options::SourceFilename,
+                                options::LineColumnPair,
+                                options::EndLineColumnPair);
     break;
   }
 

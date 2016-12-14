@@ -28,3 +28,5 @@ public protocol Prot3 { }
 public class C2 { }
 
 extension C2 : Prot3, Prot1, Prot2 { }
+
+public func globalFunc() {}

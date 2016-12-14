@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -251,7 +251,7 @@ void sourcekitd::initialize() {
   initializeTracing();
 
   assert(!GlobalConn);
-  GlobalConn = xpc_connection_create(SOURCEKIT_XPCSERVICE_IDENTIFIER, NULL);
+  GlobalConn = xpc_connection_create(SOURCEKIT_XPCSERVICE_IDENTIFIER, nullptr);
 
   xpc_connection_set_event_handler(GlobalConn, ^(xpc_object_t event) {
     xpc_type_t type = xpc_get_type(event);

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -1041,6 +1041,8 @@ llvm::Type *IRGenModule::getReferenceType(ReferenceCounting refcounting) {
   case ReferenceCounting::Error:
     return ErrorPtrTy;
   }
+
+  llvm_unreachable("Not a valid ReferenceCounting.");
 }
 
 #define DEFINE_BINARY_OPERATION(KIND, RESULT, TYPE1, TYPE2)                    \
@@ -1549,7 +1551,11 @@ public:
 
 const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // We can share a type info for all dynamic-sized heap metadata.
-  auto &eltTI = IGM.getTypeInfoForLowered(T->getBoxedType());
+  // TODO: Multi-field boxes
+  assert(T->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  auto &eltTI = IGM.getTypeInfoForLowered(
+    T->getFieldLoweredType(IGM.getSILModule(), 0));
   if (!eltTI.isFixedSize()) {
     if (!NonFixedBoxTI)
       NonFixedBoxTI = new NonFixedBoxTypeInfo(IGM);
@@ -1591,7 +1597,9 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // TODO: Other common shapes? Optional-of-Refcounted would be nice.
 
   // Produce a tailored box metadata for the type.
-  return new FixedBoxTypeInfo(IGM, T->getBoxedAddressType());
+  assert(T->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  return new FixedBoxTypeInfo(IGM, T->getFieldType(IGM.getSILModule(), 0));
 }
 
 OwnedAddress
@@ -1599,24 +1607,32 @@ irgen::emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
                        CanSILBoxType boxInterfaceType,
                        const llvm::Twine &name) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
+  assert(boxType->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
   return boxTI.allocate(IGF,
-                        boxType->getBoxedAddressType(),
-                        boxInterfaceType->getBoxedAddressType(),
-                        name);
+                      boxType->getFieldType(IGF.IGM.getSILModule(), 0),
+                      boxInterfaceType->getFieldType(IGF.IGM.getSILModule(), 0),
+                      name);
 }
 
 void irgen::emitDeallocateBox(IRGenFunction &IGF,
                               llvm::Value *box,
                               CanSILBoxType boxType) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
-  return boxTI.deallocate(IGF, box, boxType->getBoxedAddressType());
+  assert(boxType->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  return boxTI.deallocate(IGF, box,
+                          boxType->getFieldType(IGF.IGM.getSILModule(), 0));
 }
 
 Address irgen::emitProjectBox(IRGenFunction &IGF,
                               llvm::Value *box,
                               CanSILBoxType boxType) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
-  return boxTI.project(IGF, box, boxType->getBoxedAddressType());
+  assert(boxType->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  return boxTI.project(IGF, box,
+                       boxType->getFieldType(IGF.IGM.getSILModule(), 0));
 }
 
 #define DEFINE_VALUE_OP(ID)                                           \

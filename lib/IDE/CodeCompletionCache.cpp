@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/Basic/Cache.h"
 #include "llvm/ADT/APInt.h"
@@ -346,7 +358,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       if (R->getKind() == CodeCompletionResult::Declaration)
         LE.write(static_cast<uint8_t>(R->getAssociatedDeclKind()));
       else
-        LE.write(static_cast<uint8_t>(~0u));
+        LE.write(~static_cast<uint8_t>(0u));
       if (R->isOperator())
         LE.write(static_cast<uint8_t>(R->getOperatorKind()));
       else

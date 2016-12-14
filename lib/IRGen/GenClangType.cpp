@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -63,8 +63,8 @@ static CanType getNamedSwiftType(Module *stdlib, StringRef name) {
   // that's a real thing.
   if (results.size() == 1) {
     if (auto typeDecl = dyn_cast<TypeDecl>(results[0]))
-      if (typeDecl->hasType())
-        return typeDecl->getDeclaredType()->getCanonicalType();
+      if (typeDecl->hasInterfaceType())
+        return typeDecl->getDeclaredInterfaceType()->getCanonicalType();
   }
   return CanType();
 }
@@ -82,6 +82,8 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
     return context.SingletonId;
 #include "clang/Basic/OpenCLImageTypes.def"
   }
+
+  llvm_unreachable("Not a valid BuiltinType.");
 }
 
 static clang::CanQualType getClangSelectorType(
@@ -92,7 +94,7 @@ static clang::CanQualType getClangSelectorType(
 static clang::CanQualType getClangMetatypeType(
   const clang::ASTContext &clangCtx) {
   clang::QualType clangType =
-    clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinClassTy, 0, 0);
+      clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinClassTy, nullptr, 0);
   clangType = clangCtx.getObjCObjectPointerType(clangType);
   return clangCtx.getCanonicalType(clangType);
 }
@@ -100,7 +102,7 @@ static clang::CanQualType getClangMetatypeType(
 static clang::CanQualType getClangIdType(
   const clang::ASTContext &clangCtx) {
   clang::QualType clangType =
-    clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy, 0, 0);
+      clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy, nullptr, 0);
   clangType = clangCtx.getObjCObjectPointerType(clangType);
   return clangCtx.getCanonicalType(clangType);
 }
@@ -175,7 +177,8 @@ clang::CanQualType
 GenClangType::convertMemberType(NominalTypeDecl *DC, StringRef memberName) {
   auto memberTypeDecl = cast<TypeDecl>(
     DC->lookupDirect(IGM.Context.getIdentifier(memberName))[0]);
-  auto memberType = memberTypeDecl->getDeclaredType()->getCanonicalType();
+  auto memberType = memberTypeDecl->getDeclaredInterfaceType()
+      ->getCanonicalType();
   return Converter.convert(IGM, memberType);
 }
 
@@ -490,6 +493,8 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     return getCanonicalType(fnPtrTy);
   }
   }
+
+  llvm_unreachable("Not a valid StructKind.");
 }
 
 clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {

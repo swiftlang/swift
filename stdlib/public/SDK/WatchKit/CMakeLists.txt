@@ -8,4 +8,7 @@ add_swift_library(swiftWatchKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_
   SWIFT_MODULE_DEPENDS_WATCHOS Darwin CoreGraphics CoreLocation Dispatch Foundation HomeKit MapKit ObjectiveC SceneKit simd UIKit # auto-updated
   FRAMEWORK_DEPENDS_WEAK WatchKit
   SWIFT_COMPILE_FLAGS_WATCHOS -Xfrontend -disable-autolink-framework -Xfrontend CoreText
+
+  DEPLOYMENT_VERSION_IOS ${SWIFTLIB_DEPLOYMENT_VERSION_WATCHKIT_IOS}
+  DEPLOYMENT_VERSION_WATCHOS ${SWIFTLIB_DEPLOYMENT_VERSION_WATCHKIT_WATCHOS}
 )

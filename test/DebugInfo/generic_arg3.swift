@@ -4,7 +4,7 @@ func apply<Type>(_ T : Type, fn: (Type) -> Type) -> Type { return fn(T) }
 
 public func f<Type>(_ value : Type)
 {
-  // CHECK: define {{.*}}_TFF12generic_arg31furFxT_U_FQ_Q_
+  // CHECK: define {{.*}}_TFF12generic_arg31furFxT_U_Fxx
   // CHECK: store %swift.opaque* %1, %swift.opaque** %[[ALLOCA:.*]], align
   // CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %[[ALLOCA]],
   // CHECK-SAME:       metadata ![[ARG:.*]], metadata ![[EXPR:.*]])

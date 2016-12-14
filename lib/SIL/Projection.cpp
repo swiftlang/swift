@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -318,15 +318,16 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
   }
 
   if (auto Box = Ty.getAs<SILBoxType>()) {
-    Projection P(ProjectionKind::Box, (unsigned)0);
-    DEBUG(ProjectionPath X(Ty);
-          assert(X.getMostDerivedType(Mod) == Ty);
-          X.append(P);
-          assert(X.getMostDerivedType(Mod) == SILType::getPrimitiveAddressType(
-                                                Box->getBoxedType()));
-          X.verify(Mod););
-    (void) Box;
-    Out.push_back(P);
+    for (unsigned field : indices(Box->getLayout()->getFields())) {
+      Projection P(ProjectionKind::Box, field);
+      DEBUG(ProjectionPath X(Ty);
+            assert(X.getMostDerivedType(Mod) == Ty);
+            X.append(P);
+            assert(X.getMostDerivedType(Mod) == Box->getFieldType(Mod, field));
+            X.verify(Mod););
+      (void)Box;
+      Out.push_back(P);
+    }
     return;
   }
 }

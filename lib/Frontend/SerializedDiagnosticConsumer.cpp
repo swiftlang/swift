@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -145,7 +145,7 @@ public:
     // Write the generated bitstream to "Out".
     State->OS->write((char *)&State->Buffer.front(), State->Buffer.size());
     State->OS->flush();
-    State->OS.reset(0);
+    State->OS.reset(nullptr);
   }
 
   virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
@@ -266,6 +266,8 @@ static clang::serialized_diags::Level getDiagnosticLevel(DiagnosticKind Kind) {
   case DiagnosticKind::Warning:
     return clang::serialized_diags::Warning;
   }
+
+  llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
 void SerializedDiagnosticConsumer::emitPreamble() {
@@ -301,7 +303,7 @@ static void emitBlockID(unsigned ID, const char *Name,
   Stream.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETBID, Record);
 
   // Emit the block name if present.
-  if (Name == 0 || Name[0] == 0)
+  if (Name == nullptr || Name[0] == 0)
     return;
 
   Record.clear();

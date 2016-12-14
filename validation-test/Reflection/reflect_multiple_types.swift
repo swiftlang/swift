@@ -4,8 +4,8 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
-// FIXME(ABI): This test is too fragile while these type aren't ABI stable
-// REQUIRES: rdar29139967
+// FIXME: https://bugs.swift.org/browse/SR-2808
+// XFAIL: resilient_stdlib
 
 import SwiftReflectionTest
 import Foundation
@@ -115,15 +115,10 @@ reflect(object: obj)
 // CHECK-64: (class reflect_multiple_types.TestClass)
 
 // CHECK-64: Type info:
-// CHECK-64: (class_instance size=209 alignment=16 stride=224 num_extra_inhabitants=0
+// CHECK-64: (class_instance size=209 alignment=8 stride=216 num_extra_inhabitants=0
 // CHECK-64:   (field name=t00 offset=16
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
-// CHECK-64:       (field name=_buffer offset=0
-// CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
-// CHECK-64:           (field name=_storage offset=0
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
-// CHECK-64:               (field name=rawValue offset=0
-// CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))))))
+// (unstable implementation details omitted)
 // CHECK-64:   (field name=t01 offset=24
 // CHECK-64:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254
 // CHECK-64:       (field name=_value offset=0
@@ -142,12 +137,7 @@ reflect(object: obj)
 // CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))))
 // CHECK-64:   (field name=t03 offset=48
 // CHECK-64:     (struct size=9 alignment=8 stride=16 num_extra_inhabitants=0
-// CHECK-64:       (field name=_variantBuffer offset=0
-// CHECK-64:         (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0
-// CHECK-64:           (field name=native offset=0
-// CHECK-64:             (reference kind=strong refcounting=native))
-// CHECK-64:           (field name=cocoa offset=0
-// CHECK-64:             (reference kind=strong refcounting=native))))))
+// (unstable implementation details omitted)
 // CHECK-64:   (field name=t04 offset=64
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
 // CHECK-64:       (field name=_value offset=0
@@ -186,32 +176,10 @@ reflect(object: obj)
 // CHECK-64:     (reference kind=strong refcounting=unknown))
 // CHECK-64:   (field name=t15 offset=144
 // CHECK-64:     (struct size=9 alignment=8 stride=16 num_extra_inhabitants=0
-// CHECK-64:       (field name=_variantBuffer offset=0
-// CHECK-64:         (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0
-// CHECK-64:           (field name=native offset=0
-// CHECK-64:             (reference kind=strong refcounting=native))
-// CHECK-64:           (field name=cocoa offset=0
-// CHECK-64:             (reference kind=strong refcounting=native))))))
+// (unstable implementation details omitted)
 // CHECK-64:   (field name=t16 offset=160
 // CHECK-64:     (struct size=24 alignment=8 stride=24 num_extra_inhabitants=0
-// CHECK-64:       (field name=_core offset=0
-// CHECK-64:         (struct size=24 alignment=8 stride=24 num_extra_inhabitants=0
-// CHECK-64:           (field name=_baseAddress offset=0
-// CHECK-64:             (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-64:               (field name=some offset=0
-// CHECK-64:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
-// CHECK-64:                   (field name=_rawValue offset=0
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))))
-// CHECK-64:           (field name=_countAndFlags offset=8
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-64:               (field name=_value offset=0
-// CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
-// CHECK-64:           (field name=_owner offset=16
-// CHECK-64:             (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646
-// CHECK-64:               (field name=some offset=0
-// CHECK-64:                 (class_existential size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
-// CHECK-64:                   (field name=object offset=0
-// CHECK-64:                     (reference kind=strong refcounting=unknown))))))))))
+// (unstable implementation details omitted)
 // CHECK-64:   (field name=t17 offset=184
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
 // CHECK-64:       (field name=_value offset=0
@@ -239,15 +207,10 @@ reflect(object: obj)
 // CHECK-32: (class reflect_multiple_types.TestClass)
 
 // CHECK-32: Type info:
-// CHECK-32: (class_instance size=137 alignment=16 stride=144 num_extra_inhabitants=0
+// CHECK-32: (class_instance size=137 alignment=8 stride=144 num_extra_inhabitants=0
 // CHECK-32:   (field name=t00 offset=12
 // CHECK-32:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
-// CHECK-32:       (field name=_buffer offset=0
-// CHECK-32:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
-// CHECK-32:           (field name=_storage offset=0
-// CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
-// CHECK-32:               (field name=rawValue offset=0
-// CHECK-32:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))))))))
+// (unstable implementation details omitted)
 // CHECK-32:   (field name=t01 offset=16
 // CHECK-32:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254
 // CHECK-32:       (field name=_value offset=0
@@ -266,14 +229,7 @@ reflect(object: obj)
 // CHECK-32:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))))
 // CHECK-32:   (field name=t03 offset=32
 // CHECK-32:     (struct size=5 alignment=4 stride=8 num_extra_inhabitants=0
-// CHECK-32:       (field name=_variantBuffer offset=0
-// CHECK-32:         (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=0
-// CHECK-32:           (field name=native offset=0
-// CHECK-32:             (reference kind=strong refcounting=native))
-// CHECK-32:           (field name=cocoa offset=0
-// CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096
-// CHECK-32:               (field name=cocoaDictionary offset=0
-// CHECK-32:                 (reference kind=strong refcounting=unknown))))))))
+// (unstable implementation details omitted)
 // CHECK-32:   (field name=t04 offset=40
 // CHECK-32:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
 // CHECK-32:       (field name=_value offset=0
@@ -312,34 +268,10 @@ reflect(object: obj)
 // CHECK-32:     (reference kind=strong refcounting=unknown))
 // CHECK-32:   (field name=t15 offset=92
 // CHECK-32:     (struct size=5 alignment=4 stride=8 num_extra_inhabitants=0
-// CHECK-32:       (field name=_variantBuffer offset=0
-// CHECK-32:         (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=0
-// CHECK-32:           (field name=native offset=0
-// CHECK-32:             (reference kind=strong refcounting=native))
-// CHECK-32:           (field name=cocoa offset=0
-// CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096
-// CHECK-32:               (field name=cocoaSet offset=0
-// CHECK-32:                 (reference kind=strong refcounting=unknown))))))))
+// (unstable implementation details omitted)
 // CHECK-32:   (field name=t16 offset=100
 // CHECK-32:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=0
-// CHECK-32:       (field name=_core offset=0
-// CHECK-32:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=0
-// CHECK-32:           (field name=_baseAddress offset=0
-// CHECK-32:             (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=0
-// CHECK-32:               (field name=some offset=0
-// CHECK-32:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
-// CHECK-32:                   (field name=_rawValue offset=0
-// CHECK-32:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))))))
-// CHECK-32:           (field name=_countAndFlags offset=4
-// CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
-// CHECK-32:               (field name=_value offset=0
-// CHECK-32:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
-// CHECK-32:           (field name=_owner offset=8
-// CHECK-32:             (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095
-// CHECK-32:               (field name=some offset=0
-// CHECK-32:                 (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096
-// CHECK-32:                   (field name=object offset=0
-// CHECK-32:                     (reference kind=strong refcounting=unknown))))))))))
+// (unstable implementation details omitted)
 // CHECK-32:   (field name=t17 offset=112
 // CHECK-32:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-32:       (field name=_value offset=0

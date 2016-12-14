@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -603,4 +603,11 @@ SILTransform *swift::createDeadFunctionElimination() {
 
 SILTransform *swift::createExternalFunctionDefinitionsElimination() {
   return new SILExternalFuncDefinitionsElimination();
+}
+
+void swift::performSILDeadFunctionElimination(SILModule *M) {
+  SILPassManager PM(M);
+  llvm::SmallVector<PassKind, 1> Pass = {PassKind::DeadFunctionElimination};
+  PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
+      SILPassPipelinePlan::ExecutionKind::UntilFixPoint, Pass));
 }

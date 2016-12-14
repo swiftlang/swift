@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -145,10 +145,8 @@ protected:
     // Substitute opened existential types, if we have any.
     if (!OpenedExistentialSubs.empty()) {
       auto &F = getBuilder().getFunction();
-      Ty = SILType::substType(F.getModule(),
-                              F.getModule().getSwiftModule(),
-                              OpenedExistentialSubs,
-                              Ty);
+      Ty = Ty.subst(F.getModule(),
+                    OpenedExistentialSubs);
     }
 
     return Ty;
@@ -161,9 +159,7 @@ protected:
   CanType getASTTypeInClonedContext(CanType ty) {
     // Substitute opened existential types, if we have any.
     if (!OpenedExistentialSubs.empty()) {
-      auto &F = getBuilder().getFunction();
-      ty = ty.subst(F.getModule().getSwiftModule(), OpenedExistentialSubs,
-                    None)->getCanonicalType();
+      ty = ty.subst(OpenedExistentialSubs, None)->getCanonicalType();
     }
     return ty;
   }
@@ -234,7 +230,7 @@ public:
 
   // Register a re-mapping for opened existentials.
   void registerOpenedExistentialRemapping(ArchetypeType *From, CanType To) {
-    OpenedExistentialSubs[From] = To;
+    OpenedExistentialSubs.addSubstitution(CanType(From), To);
   }
 
 protected:
@@ -248,7 +244,7 @@ protected:
   // deterministic.
   llvm::MapVector<SILBasicBlock*, SILBasicBlock*> BBMap;
 
-  TypeSubstitutionMap OpenedExistentialSubs;
+  SubstitutionMap OpenedExistentialSubs;
   SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
   /// Set of basic blocks where unreachable was inserted.
@@ -379,7 +375,7 @@ SILCloner<ImplClass>::postProcess(SILInstruction *Orig,
   InstructionMap.insert(std::make_pair(Orig, Cloned));
 }
 
-// \brief Recursively visit a callee's BBs in depth-first preorder (only
+/// \brief Recursively visit a callee's BBs in depth-first preorder (only
 /// processing blocks on the first visit), mapping newly visited BBs to new BBs
 /// in the caller and cloning all instructions into the caller other than
 /// terminators which should be handled separately later by subclasses
@@ -397,12 +393,12 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
     // Only visit a successor that has not already been visited.
     if (BBI == BBMap.end()) {
       // Map the successor to a new BB.
-      auto MappedBB = new (F.getModule()) SILBasicBlock(&F);
+      auto *MappedBB = F.createBasicBlock();
       BBMap.insert(std::make_pair(Succ.getBB(), MappedBB));
       // Create new arguments for each of the original block's arguments.
-      for (auto &Arg : Succ.getBB()->getBBArgs()) {
+      for (auto &Arg : Succ.getBB()->getArguments()) {
         SILValue MappedArg =
-          new (F.getModule()) SILArgument(MappedBB, getOpType(Arg->getType()));
+            MappedBB->createArgument(getOpType(Arg->getType()));
 
         ValueMap.insert(std::make_pair(Arg, MappedArg));
       }
@@ -674,12 +670,29 @@ void SILCloner<ImplClass>::visitLoadBorrowInst(LoadBorrowInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitBeginBorrowInst(BeginBorrowInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+                getBuilder().createBeginBorrow(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitStoreInst(StoreInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createStore(getOpLocation(Inst->getLoc()),
                                                getOpValue(Inst->getSrc()),
                                                getOpValue(Inst->getDest()),
                                                Inst->getOwnershipQualifier()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitStoreBorrowInst(StoreBorrowInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+                getBuilder().createStoreBorrow(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getSrc()),
+                                               getOpValue(Inst->getDest())));
 }
 
 template <typename ImplClass>
@@ -1406,8 +1419,6 @@ SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst
   // Create a new archetype for this opened existential type.
   auto archetypeTy
     = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
-  assert(OpenedExistentialSubs.count(archetypeTy) == 0 && 
-         "Already substituted opened existential archetype?");
   registerOpenedExistentialRemapping(
       archetypeTy,
       ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
@@ -1700,7 +1711,6 @@ SILCloner<ImplClass>::visitDeallocBoxInst(DeallocBoxInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createDeallocBox(getOpLocation(Inst->getLoc()),
-                                  getOpType(Inst->getElementType()),
                                   getOpValue(Inst->getOperand())));
 }
 

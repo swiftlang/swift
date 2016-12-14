@@ -29,7 +29,6 @@ NODE_KIND(Getter)
 NODE_KIND(Setter)
 NODE_KIND(Var)
 NODE_KIND(TypeAlias)
-NODE_KIND(Nil)
 
 NODE_ANNOTATION(Added)
 NODE_ANNOTATION(Removed)
@@ -82,7 +81,6 @@ KNOWN_TYPE(ImplicitlyUnwrappedOptional)
 KNOWN_TYPE(Void)
 KNOWN_TYPE(Unmanaged)
 KNOWN_TYPE(Function)
-KNOWN_TYPE(PolymorphicFunction)
 
 #undef KNOWN_TYPE
 #undef KEY

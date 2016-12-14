@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -86,13 +86,6 @@ replaceSelfTypeForDynamicLookup(ASTContext &ctx,
                               ctx);
 }
 
-static Type getExistentialArchetype(SILValue existential) {
-  CanType ty = existential->getType().getSwiftRValueType();
-  if (ty->is<ArchetypeType>())
-    return ty;
-  return cast<ProtocolType>(ty)->getDecl()->getSelfTypeInContext();
-}
-
 /// Retrieve the type to use for a method found via dynamic lookup.
 static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
                                            SILValue proto,
@@ -103,7 +96,8 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
   // Determine the opaque 'self' parameter type.
   CanType selfTy;
   if (methodName.getDecl()->isInstanceMember()) {
-    selfTy = getExistentialArchetype(proto)->getCanonicalType();
+    selfTy = proto->getType().getSwiftRValueType();
+    assert(selfTy->is<ArchetypeType>() && "Dynamic lookup needs an archetype");
   } else {
     selfTy = proto->getType().getSwiftType();
   }
@@ -276,8 +270,7 @@ private:
                                           CanSILFunctionType origFnType) const {
     if (!HasSubstitutions) return origFnType;
     
-    return origFnType->substGenericArgs(SGM.M, SGM.SwiftModule,
-                                        Substitutions);
+    return origFnType->substGenericArgs(SGM.M, Substitutions);
   }
 
   /// Add the 'self' clause back to the substituted formal type of
@@ -684,7 +677,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                     LValue::forAddress(selfLV, AbstractionPattern(formalTy),
                                        formalTy));
     } else {
-      selfValue = ArgumentSource(loc, RValue(address, formalTy));
+      selfValue = ArgumentSource(loc, RValue(gen, loc, formalTy, address));
     }
   };
 
@@ -995,7 +988,8 @@ public:
             auto metatype = std::move(selfValue).getAsSingleValue(SGF);
             auto allocated = allocateObjCObject(metatype, loc);
             auto allocatedType = allocated.getType().getSwiftRValueType();
-            selfValue = ArgumentSource(loc, RValue(allocated, allocatedType));
+            selfValue = ArgumentSource(loc, RValue(SGF, loc,
+                                                   allocatedType, allocated));
           } else {
             // For non-Objective-C initializers, we have an allocating
             // initializer to call.
@@ -1684,7 +1678,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
   {
     B.emitBlock(errorBB);
     SILValue error =
-      errorBB->createBBArg(silFnType->getErrorResult().getSILType());
+        errorBB->createArgument(silFnType->getErrorResult().getSILType());
 
     B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
                     SGM.Types.getEmptyTupleType(), {}, {error});
@@ -1695,7 +1689,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
 
   // Enter the normal path.
   B.emitBlock(normalBB);
-  return normalBB->createBBArg(resultType);
+  return normalBB->createArgument(resultType);
 }
 
 static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
@@ -1774,7 +1768,7 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
 
   CanType ty =
     TupleType::get(TypeElts, SGF.getASTContext())->getCanonicalType();
-  return RValue(Elts, ty);
+  return RValue::withPreExplodedElements(Elts, ty);
 }
 
 /// Emit a raw apply operation, performing no additional lowering of
@@ -1839,7 +1833,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
   // Otherwise, we need to create a try_apply.
   } else {
     SILBasicBlock *normalBB = gen.createBasicBlock();
-    result = normalBB->createBBArg(resultType);
+    result = normalBB->createArgument(resultType);
 
     SILBasicBlock *errorBB =
       gen.getTryApplyErrorDest(loc, substFnType->getErrorResult(),
@@ -2272,6 +2266,52 @@ static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
   return false;
 }
 
+static ResultPlanPtr
+computeResultPlan(SILGenFunction *SGF, CanSILFunctionType substFnType,
+                  AbstractionPattern origResultType, CanType substResultType,
+                  const Optional<ForeignErrorConvention> &foreignError,
+                  SILFunctionTypeRepresentation rep, SILLocation loc,
+                  SGFContext evalContext,
+                  SmallVectorImpl<SILValue> &indirectResultAddrs) {
+  auto origResultTypeForPlan = origResultType;
+  auto substResultTypeForPlan = substResultType;
+  ArrayRef<SILResultInfo> allResults = substFnType->getAllResults();
+  SILResultInfo optResult;
+
+  // The plan needs to be built using the formal result type
+  // after foreign-error adjustment.
+  if (foreignError) {
+    switch (foreignError->getKind()) {
+    // These conventions make the formal result type ().
+    case ForeignErrorConvention::ZeroResult:
+    case ForeignErrorConvention::NonZeroResult:
+      assert(substResultType->isVoid());
+      allResults = {};
+      break;
+
+    // These conventions leave the formal result alone.
+    case ForeignErrorConvention::ZeroPreservedResult:
+    case ForeignErrorConvention::NonNilError:
+      break;
+
+    // This convention changes the formal result to the optional object
+    // type; we need to make our own make SILResultInfo array.
+    case ForeignErrorConvention::NilResult: {
+      assert(allResults.size() == 1);
+      SILType objectType =
+          allResults[0].getSILType().getAnyOptionalObjectType();
+      optResult = allResults[0].getWithType(objectType.getSwiftRValueType());
+      allResults = optResult;
+      break;
+    }
+    }
+  }
+
+  ResultPlanBuilder builder(*SGF, loc, allResults, rep, indirectResultAddrs);
+  return builder.build(evalContext.getEmitInto(), origResultTypeForPlan,
+                       substResultTypeForPlan);
+}
+
 /// Emit a function application, assuming that the arguments have been
 /// lowered appropriately for the abstraction level but that the
 /// result does need to be turned back into something matching a
@@ -2292,45 +2332,9 @@ RValue SILGenFunction::emitApply(
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
-  ResultPlanPtr resultPlan = [&]() -> ResultPlanPtr {
-    auto origResultTypeForPlan = origResultType;
-    auto substResultTypeForPlan = substResultType;
-    ArrayRef<SILResultInfo> allResults = substFnType->getAllResults();
-    SILResultInfo optResult;
-
-    // The plan needs to be built using the formal result type
-    // after foreign-error adjustment.
-    if (foreignError) {
-      switch (foreignError->getKind()) {
-      // These conventions make the formal result type ().
-      case ForeignErrorConvention::ZeroResult:
-      case ForeignErrorConvention::NonZeroResult:
-        assert(substResultType->isVoid());
-        allResults = {};
-        break;
-
-      // These conventions leave the formal result alone.
-      case ForeignErrorConvention::ZeroPreservedResult:
-      case ForeignErrorConvention::NonNilError:
-        break;
-
-      // This convention changes the formal result to the optional object
-      // type; we need to make our own make SILResultInfo array.
-      case ForeignErrorConvention::NilResult: {
-        assert(allResults.size() == 1);
-        SILType objectType =
-          allResults[0].getSILType().getAnyOptionalObjectType();
-        optResult = allResults[0].getWithType(objectType.getSwiftRValueType());
-        allResults = optResult;
-        break;
-      }
-      }
-    }
-
-    ResultPlanBuilder builder(*this, loc, allResults, rep, indirectResultAddrs);
-    return builder.build(evalContext.getEmitInto(),
-                         origResultTypeForPlan, substResultTypeForPlan);
-  }();
+  ResultPlanPtr resultPlan = computeResultPlan(
+      this, substFnType, origResultType, substResultType, foreignError, rep,
+      loc, evalContext, indirectResultAddrs);
 
   // If the function returns an inner pointer, we'll need to lifetime-extend
   // the 'self' parameter.
@@ -5218,7 +5222,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     SmallVector<ManagedValue, 4> Elts;
     std::move(setValue).getAll(Elts);
     std::move(subscripts).getAll(Elts);
-    setValue = RValue(Elts, accessType.getInput());
+    setValue = RValue::withPreExplodedElements(Elts, accessType.getInput());
   } else {
     setValue.rewriteType(accessType.getInput());
   }
@@ -5282,7 +5286,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
     if (subscripts) {
       std::move(subscripts).getAll(elts);
     }
-    return RValue(elts, accessType.getInput());
+    return RValue::withPreExplodedElements(elts, accessType.getInput());
   }();
   emission.addCallSite(loc, ArgumentSource(loc, std::move(args)), accessType);
   // (buffer, optionalCallback)
@@ -5531,8 +5535,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     auto dynamicMethodTy = getDynamicMethodLoweredType(*this, operand, member,
                                                        memberFnTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
-    SILValue memberArg = new (F.getModule()) SILArgument(hasMemberBB,
-                                                         loweredMethodTy);
+    SILValue memberArg = hasMemberBB->createArgument(loweredMethodTy);
 
     // Create the result value.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, operand,
@@ -5627,8 +5630,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto dynamicMethodTy = getDynamicMethodLoweredType(*this, base, member,
                                                        functionTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
-    SILValue memberArg = new (F.getModule()) SILArgument(hasMemberBB,
-                                                         loweredMethodTy);
+    SILValue memberArg = hasMemberBB->createArgument(loweredMethodTy);
     // Emit the application of 'self'.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, base,
                                               cast<FunctionType>(methodTy));

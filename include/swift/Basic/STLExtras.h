@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -186,6 +186,11 @@ inline void set_union_for_each(const Container1 &C1, const Container2 &C2,
 template <typename Iterator>
 inline Iterator next_or_end(Iterator it, Iterator end) {
   return (it == end) ? end : std::next(it);
+}
+
+template <typename Iterator>
+inline Iterator prev_or_begin(Iterator it, Iterator begin) {
+  return (it == begin) ? begin : std::prev(it);
 }
 
 /// @}

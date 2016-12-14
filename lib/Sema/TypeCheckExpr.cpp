@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -492,28 +492,20 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
 }
 
 Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
-  validateDecl(value);
 
   Type type;
-  if (wantInterfaceType)
+  if (wantInterfaceType) {
+    if (!value->hasInterfaceType())
+      validateDecl(value);
     type = value->getInterfaceType();
-  else
-    type = value->getType();
+  } else {
+    auto *var = cast<VarDecl>(value);
+    if (!var->hasType())
+      validateDecl(var);
+    type = var->getType();
+  }
 
-  // Uses of inout argument values are lvalues.
-  if (auto iot = type->getAs<InOutType>())
-    return iot->getObjectType();
-  
-  // Uses of values with lvalue type produce their rvalue.
-  if (auto LV = type->getAs<LValueType>())
-    return LV->getObjectType();
-
-  // Ignore 'unowned', 'weak' and @unmanaged qualification.
-  if (type->is<ReferenceStorageType>())
-    return type->getReferenceStorageReferent();
-
-  // No other transforms necessary.
-  return type;
+  return type->getLValueOrInOutObjectType()->getReferenceStorageReferent();
 }
 
 bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
@@ -605,6 +597,16 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
     }
   }
 
+  // If we're dealing with contextual types, and we referenced this type from
+  // a different context, map the type.
+  if (!wantInterfaceType && requestedType->hasArchetype()) {
+    auto valueDC = value->getDeclContext();
+    if (valueDC != UseDC) {
+      Type mapped = valueDC->mapTypeOutOfContext(requestedType);
+      requestedType = UseDC->mapTypeIntoContext(mapped);
+    }
+  }
+
   return requestedType;
 }
 
@@ -651,7 +653,10 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
   if (!TD)
     return Type();
   TC.validateDecl(TD);
-  return TD->getDeclaredType();
+
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(TD))
+    return NTD->getDeclaredType();
+  return cast<TypeAliasDecl>(TD)->getAliasType();
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {

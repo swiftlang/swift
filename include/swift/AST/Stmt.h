@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -667,11 +667,10 @@ struct IfConfigStmtClause {
   
   /// Elements inside the clause
   ArrayRef<ASTNode> Elements;
-  
-  /// True if this is the active clause of the #if block.  Since this is
-  /// evaluated at parse time, this is always known.
+
+  /// True if this is the active clause of the #if block.
   bool isActive;
-  
+
   IfConfigStmtClause(SourceLoc Loc, Expr *Cond,
                      ArrayRef<ASTNode> Elements, bool isActive)
     : Loc(Loc), Cond(Cond), Elements(Elements), isActive(isActive) {
@@ -686,6 +685,7 @@ class IfConfigStmt : public Stmt {
   ArrayRef<IfConfigStmtClause> Clauses;
   SourceLoc EndLoc;
   bool HadMissingEnd;
+  bool HasBeenResolved = false;
 
 public:
   IfConfigStmt(ArrayRef<IfConfigStmtClause> Clauses, SourceLoc EndLoc,
@@ -700,8 +700,11 @@ public:
 
   bool hadMissingEnd() const { return HadMissingEnd; }
 
-  const ArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
+  bool isResolved() { return HasBeenResolved; }
+  void setResolved() { HasBeenResolved = true; }
   
+  const ArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
+
   ArrayRef<ASTNode> getActiveClauseElements() const {
     for (auto &Clause : Clauses)
       if (Clause.isActive)

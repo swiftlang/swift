@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-stdlib
+// RUN: %target-typecheck-verify-swift -parse-stdlib
 
 // This file is for tests that used to cause the type checker to crash.
 

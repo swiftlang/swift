@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift %clang-importer-sdk
+// RUN: %target-typecheck-verify-swift %clang-importer-sdk
 
 // REQUIRES: OS=macosx
 

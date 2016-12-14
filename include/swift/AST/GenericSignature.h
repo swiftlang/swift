@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -30,71 +30,6 @@ class ProtocolConformanceRef;
 class ProtocolType;
 class Substitution;
 class SubstitutionMap;
-
-/// Iterator that walks the generic parameter types declared in a generic
-/// signature and their dependent members.
-class GenericSignatureWitnessIterator {
-  ArrayRef<Requirement> p;
-
-  void checkValid() const {
-    assert(!p.empty() &&
-           p.front().getKind() == RequirementKind::WitnessMarker);
-  }
-
-  bool shouldSkip() const {
-    return (!p.empty() &&
-            p.front().getKind() != RequirementKind::WitnessMarker);
-  }
-
-public:
-  GenericSignatureWitnessIterator() = default;
-  GenericSignatureWitnessIterator(ArrayRef<Requirement> requirements)
-      : p(requirements) {
-    while (shouldSkip()) { p = p.slice(1); }
-  }
-  
-  GenericSignatureWitnessIterator &operator++() {
-    checkValid();
-    do { p = p.slice(1); } while (shouldSkip());
-    return *this;
-  }
-  
-  GenericSignatureWitnessIterator operator++(int) {
-    auto copy = *this;
-    ++(*this);
-    return copy;
-  }
-  
-  Type operator*() const {
-    checkValid();
-    return p.front().getFirstType();
-  }
-  
-  Type operator->() const {
-    checkValid();
-    return p.front().getFirstType();
-  }
-  
-  bool operator==(const GenericSignatureWitnessIterator &o) {
-    return p.data() == o.p.data() && p.size() == o.p.size();
-  }
-  
-  bool operator!=(const GenericSignatureWitnessIterator &o) {
-    return p.data() != o.p.data() || p.size() != o.p.size();
-  }
-  
-  static GenericSignatureWitnessIterator emptyRange() {
-    return GenericSignatureWitnessIterator();
-  }
-  
-  // Allow the witness iterator to be used with a ranged for.
-  GenericSignatureWitnessIterator begin() const {
-    return *this;
-  }
-  GenericSignatureWitnessIterator end() const {
-    return GenericSignatureWitnessIterator({p.end(), p.end()});
-  }
-};
 
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
@@ -141,6 +76,8 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
 
   /// Retrieve the archetype builder for the given generic signature.
   ArchetypeBuilder *getArchetypeBuilder(ModuleDecl &mod);
+
+  friend class ArchetypeType;
 
 public:
   /// Create a new generic signature with the given type parameters and
@@ -192,7 +129,16 @@ public:
                           SubstitutionMap &subMap) const;
 
   using LookupConformanceFn =
-      llvm::function_ref<ProtocolConformanceRef(CanType, Type, ProtocolType *)>;
+      llvm::function_ref<ProtocolConformanceRef(CanType dependentType,
+                                              Type conformingReplacementType,
+                                              ProtocolType *conformedProtocol)>;
+
+  /// Build an array of substitutions from an interface type substitution map,
+  /// using the given function to look up conformances.
+  void getSubstitutions(ModuleDecl &mod,
+                        TypeSubstitutionFn substitution,
+                        LookupConformanceFn lookupConformance,
+                        SmallVectorImpl<Substitution> &result) const;
 
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
@@ -207,12 +153,22 @@ public:
                         const SubstitutionMap &subMap,
                         SmallVectorImpl<Substitution> &result) const;
 
-  /// Return a range that iterates through first all of the generic parameters
-  /// of the signature, followed by all of their recursive member types exposed
-  /// through protocol requirements.
-  GenericSignatureWitnessIterator getAllDependentTypes() const {
-    return GenericSignatureWitnessIterator(getRequirements());
-  }
+  /// Return a range that iterates through all of the types that require
+  /// substitution, which includes the generic parameter types as well as
+  /// other dependent types that require additional conformances.
+  SmallVector<Type, 4> getAllDependentTypes() const;
+
+  /// Enumerate all of the dependent types in the type signature that will
+  /// occur in substitution lists (in order), along with the set of
+  /// conformance requirements placed on that dependent type.
+  ///
+  /// \param fn Callback function that will receive each (type, requirements)
+  /// pair, in the order they occur within a list of substitutions. If this
+  /// returns \c true, the enumeration will be aborted.
+  ///
+  /// \returns true if any call to \c fn returned \c true, otherwise \c false.
+  bool enumeratePairedRequirements(
+         llvm::function_ref<bool(Type, ArrayRef<Requirement>)> fn) const;
 
   /// Determines whether this GenericSignature is canonical.
   bool isCanonical() const;

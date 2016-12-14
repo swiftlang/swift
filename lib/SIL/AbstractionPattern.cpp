@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -40,9 +40,12 @@ AbstractionPattern TypeConverter::getAbstractionPattern(AbstractStorageDecl *dec
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(SubscriptDecl *decl) {
-  // TODO: honor the declared type?
-  // TODO: use interface types
-  return AbstractionPattern(decl->getElementType());
+  CanGenericSignature genericSig;
+  if (auto sig = decl->getGenericSignatureOfContext())
+    genericSig = sig->getCanonicalSignature();
+  return AbstractionPattern(genericSig,
+                            decl->getElementInterfaceType()
+                                ->getCanonicalType());
 }
 
 AbstractionPattern

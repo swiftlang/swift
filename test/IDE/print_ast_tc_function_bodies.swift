@@ -1,5 +1,5 @@
 // This file should not have any syntax or type checker errors.
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false > %t.printed.txt
 // RUN: %FileCheck %s -strict-whitespace < %t.printed.txt

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // An inout parameter can be captured.
 func foo(x: inout Int) {

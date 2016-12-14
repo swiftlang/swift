@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -95,6 +95,7 @@ public:
   void mangleBoundGenericType(Type type);
   void mangleProtocolDecl(const ProtocolDecl *protocol);
   void mangleType(Type type, unsigned uncurryingLevel);
+  void mangleLegacyBoxType(CanType fieldType);
   void mangleDirectness(bool isIndirect);
   void mangleProtocolName(const ProtocolDecl *protocol);
   void mangleProtocolConformance(const ProtocolConformance *conformance);
@@ -142,6 +143,11 @@ public:
   void mangleIdentifier(StringRef ref,
                         OperatorFixity fixity = OperatorFixity::NotOperator,
                         bool isOperator=false);
+
+  /// This checks whether a given array of generic type parameters are in a
+  /// good order. Returns true on good order; false on malformed order.
+  static bool checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params);
+
 private:
   void mangleFunctionType(AnyFunctionType *fn, unsigned uncurryingLevel);
   void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);

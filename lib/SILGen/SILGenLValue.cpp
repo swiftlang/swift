@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -880,8 +880,8 @@ namespace {
           CanType type = subscripts.getType();
           SmallVector<ManagedValue, 4> values;
           std::move(subscripts).getAll(values);
-          subscripts = RValue(values, type);
-          borrowedSubscripts = RValue(values, type);
+          subscripts = RValue::withPreExplodedElements(values, type);
+          borrowedSubscripts = RValue::withPreExplodedElements(values, type);
           optSubscripts = &borrowedSubscripts;
         }
         return new GetterSetterComponent(decl, IsSuper, IsDirectAccessorUse,
@@ -957,8 +957,7 @@ namespace {
         auto rawPointerTy = SILType::getRawPointerType(ctx);
 
         // The callback is a BB argument from the switch_enum.
-        SILValue callback =
-          writebackBB->createBBArg(rawPointerTy);
+        SILValue callback = writebackBB->createArgument(rawPointerTy);
 
         // Cast the callback to the correct polymorphic function type.
         auto origCallbackFnType = gen.SGM.Types.getMaterializeForSetCallbackType(
@@ -967,7 +966,7 @@ namespace {
         callback = gen.B.createPointerToThinFunction(loc, callback, origCallbackType);
 
         auto substCallbackFnType = origCallbackFnType->substGenericArgs(
-            M, M.getSwiftModule(), substitutions);
+            M, substitutions);
         auto substCallbackType = SILType::getPrimitiveObjectType(substCallbackFnType);
         auto metatypeType = substCallbackFnType->getParameters().back().getSILType();
 
@@ -1582,9 +1581,7 @@ SILGenModule::getNonMemberVarDeclSubstitutions(VarDecl *var) {
   ArrayRef<Substitution> substitutions;
   auto *dc = var->getDeclContext();
   if (auto *genericEnv = dc->getGenericEnvironmentOfContext()) {
-    auto *genericSig = dc->getGenericSignatureOfContext();
-    substitutions = genericEnv->getForwardingSubstitutions(
-        SwiftModule, genericSig);
+    substitutions = genericEnv->getForwardingSubstitutions(SwiftModule);
   }
   return substitutions;
 }

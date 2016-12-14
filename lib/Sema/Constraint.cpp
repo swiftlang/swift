@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -184,6 +184,8 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::Disjunction:
     return createDisjunction(cs, getNestedConstraints(), getLocator());
   }
+
+  llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
 void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
@@ -244,7 +246,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     auto printDecl = [&] {
       auto decl = overload.getDecl();
       decl->dumpRef(Out);
-      Out << " : " << decl->getType();
+      Out << " : " << decl->getInterfaceType();
       if (!sm || !decl->getLoc().isValid()) return;
       Out << " at ";
       decl->getLoc().print(Out, *sm);
@@ -324,8 +326,15 @@ void Constraint::dump(ConstraintSystem *CS) const {
   // Print all type variables as $T0 instead of _ here.
   llvm::SaveAndRestore<bool> X(CS->getASTContext().LangOpts.
                                DebugConstraintSolver, true);
-  
+  // Disabled MSVC warning: only for use within the debugger
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4996)
+#endif
   dump(&CS->getASTContext().SourceMgr);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 }
 
 
@@ -417,6 +426,8 @@ StringRef Fix::getName(FixKind kind) {
   case FixKind::CoerceToCheckedCast:
     return "fix: as to as!";
   }
+
+  llvm_unreachable("Unhandled FixKind in switch.");
 }
 
 void Fix::print(llvm::raw_ostream &Out, ConstraintSystem *cs) const {

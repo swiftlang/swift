@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -831,13 +831,13 @@ public:
   std::vector<Decl*> Decls;
 
   /// The list of local type declarations in the source file.
-  TinyPtrVector<TypeDecl*> LocalTypeDecls;
+  llvm::SetVector<TypeDecl *> LocalTypeDecls;
 
   /// A set of special declaration attributes which require the
   /// Foundation module to be imported to work. If the foundation
   /// module is still not imported by the time type checking is
   /// complete, we diagnose.
-  std::map<DeclAttrKind, const DeclAttribute *> AttrsRequiringFoundation;
+  llvm::SetVector<const DeclAttribute *> AttrsRequiringFoundation;
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.

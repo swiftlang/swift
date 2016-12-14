@@ -1,5 +1,5 @@
 // This file should not have any syntax or type checker errors.
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // RUN: %target-swift-ide-test -print-types -source-filename %s -fully-qualified-types=false | %FileCheck %s -strict-whitespace
 // RUN: %target-swift-ide-test -print-types -source-filename %s -fully-qualified-types=true | %FileCheck %s -check-prefix=FULL -strict-whitespace

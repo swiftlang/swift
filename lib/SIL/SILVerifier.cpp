@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -62,7 +62,7 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
   if (auto *genericEnv = F->getGenericEnvironment())
-    if (genericEnv->getArchetypeToInterfaceMap().count(A))
+    if (genericEnv->containsPrimaryArchetype(A))
       return true;
 
   return false;
@@ -132,9 +132,6 @@ public:
   }
 #define require(condition, complaint) \
   _require(bool(condition), complaint ": " #condition)
-#define requireTrueAndSILOwnership(verifier, condition, complaint)             \
-  _require(!verifier->isSILOwnershipEnabled() || bool(condition),              \
-           complaint ": " #condition)
 
   template <class T> typename CanTypeWrapperTraits<T>::type
   _requireObjectType(SILType type, const Twine &valueDescription,
@@ -739,7 +736,7 @@ public:
             "callee of apply with substitutions must be polymorphic");
 
     // Apply the substitutions.
-    return fnTy->substGenericArgs(F.getModule(), M, subs);
+    return fnTy->substGenericArgs(F.getModule(), subs);
   }
 
   /// Check that for each opened archetype or dynamic self type in substitutions
@@ -872,9 +869,9 @@ public:
     auto substTy = AI->getSubstCalleeType();
 
     auto normalBB = AI->getNormalBB();
-    require(normalBB->bbarg_size() == 1,
+    require(normalBB->args_size() == 1,
             "normal destination of try_apply must take one argument");
-    requireSameType((*normalBB->bbarg_begin())->getType(),
+    requireSameType((*normalBB->args_begin())->getType(),
                     substTy->getSILResult(),
                     "normal destination of try_apply must take argument "
                     "of normal result type");
@@ -882,9 +879,9 @@ public:
     auto errorBB = AI->getErrorBB();
     require(substTy->hasErrorResult(),
             "try_apply must call function with error result");
-    require(errorBB->bbarg_size() == 1,
+    require(errorBB->args_size() == 1,
             "error destination of try_apply must take one argument");
-    requireSameType((*errorBB->bbarg_begin())->getType(),
+    requireSameType((*errorBB->args_begin())->getType(),
                     substTy->getErrorResult().getSILType(),
                     "error destination of try_apply must take argument "
                     "of error result type");
@@ -1290,7 +1287,6 @@ public:
     require(InitStorageTy,
             "mark_uninitialized initializer must be a function");
     auto SubstInitStorageTy = InitStorageTy->substGenericArgs(F.getModule(),
-                                             F.getModule().getSwiftModule(),
                                              MU->getInitStorageSubstitutions());
     // FIXME: Destructured value or results?
     require(SubstInitStorageTy->getAllResults().size() == 1,
@@ -1305,7 +1301,6 @@ public:
     require(SetterTy,
             "mark_uninitialized setter must be a function");
     auto SubstSetterTy = SetterTy->substGenericArgs(F.getModule(),
-                                               F.getModule().getSwiftModule(),
                                                MU->getSetterSubstitutions());
     require(SubstSetterTy->getParameters().size() == 2,
             "mark_uninitialized setter must have a value and self param");
@@ -1412,10 +1407,10 @@ public:
   void checkProjectBoxInst(ProjectBoxInst *I) {
     require(I->getOperand()->getType().isObject(),
             "project_box operand should be a value");
-    require(I->getOperand()->getType().is<SILBoxType>(),
-            "project_box operand should be a @box type");
-    require(I->getType() == I->getOperand()->getType().castTo<SILBoxType>()
-                             ->getBoxedAddressType(),
+    auto boxTy = I->getOperand()->getType().getAs<SILBoxType>();
+    require(boxTy, "project_box operand should be a @box type");
+    require(I->getType() == boxTy->getFieldType(F.getModule(),
+                                                I->getFieldIndex()),
             "project_box result should be address of boxed type");
   }
 
@@ -1581,26 +1576,22 @@ public:
   // Is a SIL type a potential lowering of a formal type?
   static bool isLoweringOf(SILType loweredType,
                            CanType formalType) {
+    
+    
     // Dynamic self has the same lowering as its contained type.
     if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
       formalType = CanType(dynamicSelf->getSelfType());
 
-    // Optional of dynamic self has the same lowering as its contained type.
-    OptionalTypeKind loweredOptionalKind;
-    OptionalTypeKind formalOptionalKind;
-
-    CanType loweredObjectType = loweredType.getSwiftRValueType()
-        .getAnyOptionalObjectType(loweredOptionalKind);
+    // Optional lowers its contained type. The difference between Optional
+    // and IUO is lowered away.
+    SILType loweredObjectType = loweredType
+        .getAnyOptionalObjectType();
     CanType formalObjectType = formalType
-        .getAnyOptionalObjectType(formalOptionalKind);
+        .getAnyOptionalObjectType();
 
-    if (loweredOptionalKind != OTK_None) {
-      if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalObjectType)) {
-        formalObjectType = dynamicSelf->getSelfType()->getCanonicalType();
-      }
-      return loweredOptionalKind == formalOptionalKind &&
-             isLoweringOf(SILType::getPrimitiveAddressType(loweredObjectType),
-                          formalObjectType);
+    if (loweredObjectType) {
+      return formalObjectType &&
+             isLoweringOf(loweredObjectType, formalObjectType);
     }
 
     // Metatypes preserve their instance type through lowering.
@@ -1731,26 +1722,21 @@ public:
   }
 
   void checkAllocBoxInst(AllocBoxInst *AI) {
-    // TODO: Allow the box to be typed, but for staging purposes, only require
-    // it when -sil-enable-typed-boxes is enabled.
     auto boxTy = AI->getType().getAs<SILBoxType>();
     require(boxTy, "alloc_box must have a @box type");
 
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
-    verifyOpenedArchetype(AI, AI->getElementType().getSwiftRValueType());
+    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields()))
+      verifyOpenedArchetype(AI,
+                   AI->getBoxType()->getFieldLoweredType(F.getModule(), field));
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {
-    // TODO: Allow the box to be typed, but for staging purposes, only require
-    // it when -sil-enable-typed-boxes is enabled.
     auto boxTy = DI->getOperand()->getType().getAs<SILBoxType>();
     require(boxTy, "operand must be a @box type");
     require(DI->getOperand()->getType().isObject(),
             "operand must be an object");
-    requireSameType(boxTy->getBoxedAddressType().getObjectType(),
-                    DI->getElementType().getObjectType(),
-                    "element type of dealloc_box must match box element type");
   }
 
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
@@ -1921,13 +1907,8 @@ public:
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
-    auto selfMarker
-      = methodType->getGenericSignature()->getRequirements()[0];
-    require(selfMarker.getKind() == RequirementKind::WitnessMarker
-            && selfMarker.getFirstType()->isEqual(selfGenericParam),
-            "method's Self parameter should appear first in requirements");
     auto selfRequirement
-      = methodType->getGenericSignature()->getRequirements()[1];
+      = methodType->getGenericSignature()->getRequirements()[0];
     require(selfRequirement.getKind() == RequirementKind::Conformance
             && selfRequirement.getFirstType()->isEqual(selfGenericParam)
             && selfRequirement.getSecondType()->getAs<ProtocolType>()
@@ -1972,9 +1953,8 @@ public:
 
     // Map interface types to archetypes.
     if (auto *env = constantInfo.GenericEnv) {
-      auto sig = constantInfo.SILFnType->getGenericSignature();
-      auto subs = env->getForwardingSubstitutions(M, sig);
-      methodTy = methodTy->substGenericArgs(F.getModule(), M, subs);
+      auto subs = env->getForwardingSubstitutions(M);
+      methodTy = methodTy->substGenericArgs(F.getModule(), subs);
     }
     assert(!methodTy->isPolymorphic());
 
@@ -2437,12 +2417,13 @@ public:
                       CBI->getCastType());
     verifyOpenedArchetype(CBI, CBI->getCastType().getSwiftRValueType());
 
-    require(CBI->getSuccessBB()->bbarg_size() == 1,
+    require(CBI->getSuccessBB()->args_size() == 1,
             "success dest of checked_cast_br must take one argument");
-    require(CBI->getSuccessBB()->bbarg_begin()[0]->getType()
-              == CBI->getCastType(),
-            "success dest block argument of checked_cast_br must match type of cast");
-    require(CBI->getFailureBB()->bbarg_empty(),
+    require(CBI->getSuccessBB()->args_begin()[0]->getType() ==
+                CBI->getCastType(),
+            "success dest block argument of checked_cast_br must match type of "
+            "cast");
+    require(CBI->getFailureBB()->args_empty(),
             "failure dest of checked_cast_br must take no arguments");
   }
 
@@ -2452,9 +2433,11 @@ public:
     require(CCABI->getDest()->getType().isAddress(),
             "checked_cast_addr_br dest must be an address");
 
-    require(CCABI->getSuccessBB()->bbarg_size() == 0,
+    require(
+        CCABI->getSuccessBB()->args_size() == 0,
         "success dest block of checked_cast_addr_br must not take an argument");
-    require(CCABI->getFailureBB()->bbarg_size() == 0,
+    require(
+        CCABI->getFailureBB()->args_size() == 0,
         "failure dest block of checked_cast_addr_br must not take an argument");
   }
 
@@ -2890,12 +2873,12 @@ public:
               "multiple switch_value cases for same value");
       cases.insert(value);
 
-      require(dest->bbarg_empty(),
+      require(dest->args_empty(),
               "switch_value case destination cannot take arguments");
     }
 
     if (SVI->hasDefault())
-      require(SVI->getDefaultBB()->bbarg_empty(),
+      require(SVI->getDefaultBB()->args_empty(),
               "switch_value default destination cannot take arguments");
   }
 
@@ -2979,22 +2962,22 @@ public:
       // The destination BB can take the argument payload, if any, as a BB
       // arguments, or it can ignore it and take no arguments.
       if (elt->hasArgumentType()) {
-        require(dest->getBBArgs().size() == 0
-                  || dest->getBBArgs().size() == 1,
+        require(dest->getArguments().size() == 0 ||
+                    dest->getArguments().size() == 1,
                 "switch_enum destination for case w/ args must take 0 or 1 "
                 "arguments");
 
-        if (dest->getBBArgs().size() == 1) {
+        if (dest->getArguments().size() == 1) {
           SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule());
-          SILType bbArgTy = dest->getBBArgs()[0]->getType();
+          SILType bbArgTy = dest->getArguments()[0]->getType();
           require(eltArgTy == bbArgTy,
                   "switch_enum destination bbarg must match case arg type");
-          require(!dest->getBBArgs()[0]->getType().isAddress(),
+          require(!dest->getArguments()[0]->getType().isAddress(),
                   "switch_enum destination bbarg type must not be an address");
         }
 
       } else {
-        require(dest->getBBArgs().size() == 0,
+        require(dest->getArguments().size() == 0,
                 "switch_enum destination for no-argument case must take no "
                 "arguments");
       }
@@ -3004,7 +2987,7 @@ public:
     require(unswitchedElts.empty() || SOI->hasDefault(),
             "nonexhaustive switch_enum must have a default destination");
     if (SOI->hasDefault())
-      require(SOI->getDefaultBB()->bbarg_empty(),
+      require(SOI->getDefaultBB()->args_empty(),
               "switch_enum default destination must take no arguments");
   }
 
@@ -3038,7 +3021,7 @@ public:
       unswitchedElts.erase(elt);
 
       // The destination BB must not have BB arguments.
-      require(dest->getBBArgs().size() == 0,
+      require(dest->getArguments().size() == 0,
               "switch_enum_addr destination must take no BB args");
     }
 
@@ -3047,7 +3030,7 @@ public:
             "nonexhaustive switch_enum_addr must have a default "
             "destination");
     if (SOI->hasDefault())
-      require(SOI->getDefaultBB()->bbarg_empty(),
+      require(SOI->getDefaultBB()->args_empty(),
               "switch_enum_addr default destination must take "
               "no arguments");
   }
@@ -3063,10 +3046,10 @@ public:
   }
 
   void checkBranchInst(BranchInst *BI) {
-    require(BI->getArgs().size() == BI->getDestBB()->bbarg_size(),
+    require(BI->getArgs().size() == BI->getDestBB()->args_size(),
             "branch has wrong number of arguments for dest bb");
     require(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
-                       BI->getDestBB()->bbarg_begin(),
+                       BI->getDestBB()->args_begin(),
                        [&](SILValue branchArg, SILArgument *bbArg) {
                          return verifyBranchArgs(branchArg, bbArg);
                        }),
@@ -3085,24 +3068,24 @@ public:
                                  CBI->getCondition()->getType().getASTContext()),
             "condition of conditional branch must have Int1 type");
 
-    require(CBI->getTrueArgs().size() == CBI->getTrueBB()->bbarg_size(),
+    require(CBI->getTrueArgs().size() == CBI->getTrueBB()->args_size(),
             "true branch has wrong number of arguments for dest bb");
     require(CBI->getTrueBB() != CBI->getFalseBB(),
             "identical destinations");
     require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
-                      CBI->getTrueBB()->bbarg_begin(),
-                      [&](SILValue branchArg, SILArgument *bbArg) {
-                        return verifyBranchArgs(branchArg, bbArg);
-                      }),
+                       CBI->getTrueBB()->args_begin(),
+                       [&](SILValue branchArg, SILArgument *bbArg) {
+                         return verifyBranchArgs(branchArg, bbArg);
+                       }),
             "true branch argument types do not match arguments for dest bb");
 
-    require(CBI->getFalseArgs().size() == CBI->getFalseBB()->bbarg_size(),
+    require(CBI->getFalseArgs().size() == CBI->getFalseBB()->args_size(),
             "false branch has wrong number of arguments for dest bb");
     require(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
-                      CBI->getFalseBB()->bbarg_begin(),
-                      [&](SILValue branchArg, SILArgument *bbArg) {
-                        return verifyBranchArgs(branchArg, bbArg);
-                      }),
+                       CBI->getFalseBB()->args_begin(),
+                       [&](SILValue branchArg, SILArgument *bbArg) {
+                         return verifyBranchArgs(branchArg, bbArg);
+                       }),
             "false branch argument types do not match arguments for dest bb");
   }
 
@@ -3119,10 +3102,10 @@ public:
     }
 
     // Check that the branch argument is of the expected dynamic method type.
-    require(DMBI->getHasMethodBB()->bbarg_size() == 1,
+    require(DMBI->getHasMethodBB()->args_size() == 1,
             "true bb for dynamic_method_br must take an argument");
-    
-    auto bbArgTy = DMBI->getHasMethodBB()->bbarg_begin()[0]->getType();
+
+    auto bbArgTy = DMBI->getHasMethodBB()->args_begin()[0]->getType();
     require(getDynamicMethodType(operandType, DMBI->getMember())
               .getSwiftRValueType()
               ->isBindableTo(bbArgTy.getSwiftRValueType(), nullptr),
@@ -3238,20 +3221,22 @@ public:
     SILFunctionType *ti = F.getLoweredFunctionType();
 
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
-          for (auto *arg : make_range(entry->bbarg_begin(), entry->bbarg_end()))
-            arg->getType().dump();
+          for (auto *arg
+               : make_range(entry->args_begin(), entry->args_end()))
+              arg->getType()
+                  .dump();
           llvm::dbgs() << "Input types for SIL function type ";
-          ti->print(llvm::dbgs());
-          llvm::dbgs() << ":\n";
-          for (auto input : ti->getParameters())
-            input.getSILType().dump(););
+          ti->print(llvm::dbgs()); llvm::dbgs() << ":\n";
+          for (auto input
+               : ti->getParameters()) input.getSILType()
+              .dump(););
 
-    require(entry->bbarg_size() ==
-              ti->getNumIndirectResults() + ti->getParameters().size(),
+    require(entry->args_size() ==
+                ti->getNumIndirectResults() + ti->getParameters().size(),
             "entry point has wrong number of arguments");
 
     bool matched = true;
-    auto argI = entry->bbarg_begin();
+    auto argI = entry->args_begin();
 
     auto check = [&](const char *what, SILType ty) {
       auto mappedTy = F.mapTypeIntoContext(ty);
@@ -3275,9 +3260,8 @@ public:
     require(matched, "entry point argument types do not match function type");
 
     // TBAA requirement for all address arguments.
-    require(std::equal(entry->bbarg_begin() + ti->getNumIndirectResults(),
-                       entry->bbarg_end(),
-                       ti->getParameters().begin(),
+    require(std::equal(entry->args_begin() + ti->getNumIndirectResults(),
+                       entry->args_end(), ti->getParameters().begin(),
                        [&](SILArgument *bbarg, SILParameterInfo paramInfo) {
                          if (!bbarg->getType().isAddress())
                            return true;
@@ -3406,7 +3390,7 @@ public:
       // And its destination block has more than one predecessor.
       SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
       assert(!DestBB->pred_empty() && "There should be a predecessor");
-      if (DestBB->getSinglePredecessor())
+      if (DestBB->getSinglePredecessorBlock())
         return false;
 
       return true;
@@ -3446,16 +3430,16 @@ public:
     // have this basic block in its predecessor/successor list.
     for (const auto *SuccBB : BB->getSuccessorBlocks()) {
       bool FoundSelfInSuccessor = false;
-      if (SuccBB->isPredecessor(BB)) {
+      if (SuccBB->isPredecessorBlock(BB)) {
         FoundSelfInSuccessor = true;
         break;
       }
       require(FoundSelfInSuccessor, "Must be a predecessor of each successor.");
     }
 
-    for (const SILBasicBlock *PredBB : BB->getPreds()) {
+    for (const SILBasicBlock *PredBB : BB->getPredecessorBlocks()) {
       bool FoundSelfInPredecessor = false;
-      if (PredBB->isSuccessor(BB)) {
+      if (PredBB->isSuccessorBlock(BB)) {
         FoundSelfInPredecessor = true;
         break;
       }

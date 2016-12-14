@@ -38,10 +38,10 @@ class InternalSub : InternalBase {
 
 // CHECK-LABEL: sil_vtable InternalSub {
 // CHECK-NEXT:  #InternalBase.method!1: _TFC21accessibility_vtables12InternalBaseP{{[0-9]+}}[[DISCRIMINATOR:_.+]]6method
-// CHECK-NEXT:  #InternalBase.init!initializer.1: _TFC21accessibility_vtables11InternalSubc
 // CHECK-NEXT:  #InternalBase.prop!getter.1: _TFC21accessibility_vtables11InternalSubg4propSi // accessibility_vtables.InternalSub.prop.getter : Swift.Int
 // CHECK-NEXT:  #InternalBase.prop!setter.1: _TFC21accessibility_vtables12InternalBases4propSi        // accessibility_vtables.InternalBase.prop.setter : Swift.Int
 // CHECK-NEXT:  #InternalBase.prop!materializeForSet.1: _TFC21accessibility_vtables12InternalBasem4propSi // accessibility_vtables.InternalBase.prop.materializeForSet : Swift.Int
+// CHECK-NEXT:  #InternalBase.init!initializer.1: _TFC21accessibility_vtables11InternalSubc
 // CHECK-NEXT:  #InternalSub.method!1: _TFC21accessibility_vtables11InternalSub6method
 // CHECK-NEXT:  #InternalSub.prop!setter.1: _TFC21accessibility_vtables11InternalSubs4propSi  // accessibility_vtables.InternalSub.prop.setter : Swift.Int
 // CHECK-NEXT:  #InternalSub.prop!materializeForSet.1: _TFC21accessibility_vtables11InternalSubm4propSi // accessibility_vtables.InternalSub.prop.materializeForSet : Swift.Int

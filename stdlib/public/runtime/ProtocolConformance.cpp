@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,23 +19,8 @@
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
+#include "ImageInspection.h"
 #include "Private.h"
-
-#if defined(__APPLE__) && defined(__MACH__)
-#include <mach-o/dyld.h>
-#include <mach-o/getsect.h>
-#elif defined(__ELF__) || defined(__ANDROID__)
-#include <elf.h>
-#include <link.h>
-#endif
-
-#if defined(_MSC_VER)
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
 
 using namespace swift;
 
@@ -49,11 +34,11 @@ static const char *class_getName(const ClassMetadata* type) {
 
 template<> void ProtocolConformanceRecord::dump() const {
   auto symbolName = [&](const void *addr) -> const char * {
-    Dl_info info;
-    int ok = dladdr(addr, &info);
+    SymbolInfo info;
+    int ok = lookupSymbol(addr, &info);
     if (!ok)
       return "<unknown addr>";
-    return info.dli_sname;
+    return info.symbolName;
   };
 
   switch (auto kind = getTypeKind()) {
@@ -146,14 +131,6 @@ const {
   }
 }
 
-#if defined(__APPLE__) && defined(__MACH__)
-#define SWIFT_PROTOCOL_CONFORMANCES_SECTION "__swift2_proto"
-#elif defined(__ELF__)
-#define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".swift2_protocol_conformances_start"
-#elif defined(__CYGWIN__) || defined(_MSC_VER)
-#define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".sw2prtc"
-#endif
-
 namespace {
   struct ConformanceSection {
     const ProtocolConformanceRecord *Begin, *End;
@@ -232,19 +209,6 @@ namespace {
 }
 
 // Conformance Cache.
-#if defined(__APPLE__) && defined(__MACH__)
-static void _initializeCallbacksToInspectDylib();
-#else
-namespace swift {
-  void _swift_initializeCallbacksToInspectDylib(
-    void (*fnAddImageBlock)(const uint8_t *, size_t),
-    const char *sectionName);
-}
-
-static void _addImageProtocolConformancesBlock(const uint8_t *conformances,
-                                               size_t conformancesSize);
-#endif
-
 struct ConformanceState {
   ConcurrentMap<ConformanceCacheEntry> Cache;
   std::vector<ConformanceSection> SectionsToScan;
@@ -252,13 +216,7 @@ struct ConformanceState {
   
   ConformanceState() {
     SectionsToScan.reserve(16);
-#if defined(__APPLE__) && defined(__MACH__)
-    _initializeCallbacksToInspectDylib();
-#else
-    _swift_initializeCallbacksToInspectDylib(
-      _addImageProtocolConformancesBlock,
-      SWIFT_PROTOCOL_CONFORMANCES_SECTION);
-#endif
+    initializeProtocolConformanceLookup();
   }
 
   void cacheSuccess(const void *type, const ProtocolDescriptor *proto,
@@ -300,17 +258,18 @@ _registerProtocolConformances(ConformanceState &C,
   C.SectionsToScan.push_back(ConformanceSection{begin, end});
 }
 
-static void _addImageProtocolConformancesBlock(const uint8_t *conformances,
-                                               size_t conformancesSize) {
+void swift::addImageProtocolConformanceBlockCallback(const void *conformances,
+                                                   uintptr_t conformancesSize) {
   assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0
          && "weird-sized conformances section?!");
 
   // If we have a section, enqueue the conformances for lookup.
+  auto conformanceBytes = reinterpret_cast<const char *>(conformances);
   auto recordsBegin
     = reinterpret_cast<const ProtocolConformanceRecord*>(conformances);
   auto recordsEnd
     = reinterpret_cast<const ProtocolConformanceRecord*>
-                                            (conformances + conformancesSize);
+                                          (conformanceBytes + conformancesSize);
   
   // Conformance cache should always be sufficiently initialized by this point.
   _registerProtocolConformances(Conformances.unsafeGetAlreadyInitialized(),

@@ -400,7 +400,7 @@ func tuple() -> (Int, Float) { return (1, 1.0) }
 // CHECK-LABEL: sil hidden @_TF11expressions13tuple_element
 func tuple_element(_ x: (Int, Float)) {
   var x = x
-  // CHECK: [[XADDR:%.*]] = alloc_box $@box (Int, Float)
+  // CHECK: [[XADDR:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Float)>
   // CHECK: [[PB:%.*]] = project_box [[XADDR]]
 
   int(x.0)
@@ -433,15 +433,15 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var y = y
   var z = z
   // CHECK: bb0({{.*}}):
-  // CHECK: [[AB:%[0-9]+]] = alloc_box $@box Bool
+  // CHECK: [[AB:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
   // CHECK: [[PBA:%.*]] = project_box [[AB]]
-  // CHECK: [[BB:%[0-9]+]] = alloc_box $@box Bool
+  // CHECK: [[BB:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
   // CHECK: [[PBB:%.*]] = project_box [[BB]]
-  // CHECK: [[XB:%[0-9]+]] = alloc_box $@box Int
+  // CHECK: [[XB:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   // CHECK: [[PBX:%.*]] = project_box [[XB]]
-  // CHECK: [[YB:%[0-9]+]] = alloc_box $@box Int
+  // CHECK: [[YB:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   // CHECK: [[PBY:%.*]] = project_box [[YB]]
-  // CHECK: [[ZB:%[0-9]+]] = alloc_box $@box Int
+  // CHECK: [[ZB:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   // CHECK: [[PBZ:%.*]] = project_box [[ZB]]
 
   return a

@@ -5,8 +5,8 @@
 ;; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 ;; Licensed under Apache License v2.0 with Runtime Library Exception
 ;;
-;; See http://swift.org/LICENSE.txt for license information
-;; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+;; See https://swift.org/LICENSE.txt for license information
+;; See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 ;;
 ;;===----------------------------------------------------------------------===;;
 
@@ -73,7 +73,7 @@
                   'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Borrowing
-   '("load_borrow" . font-lock-keyword-face)
+   `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow") 'words) . font-lock-keyword-face)
    '("\\(end_borrow\\) %[[:alnum:]] \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
 
    ;; SIL Instructions - Reference Counting.

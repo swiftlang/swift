@@ -54,7 +54,7 @@
 // CHECK-FOUNDATION: init(array: [Any])
 
 // Note: struct name matching; don't drop "With".
-// CHECK-FOUNDATION: class func withRange(_: NSRange) -> NSValue
+// CHECK-FOUNDATION: func withRange(_: NSRange) -> NSValue
 
 // Note: built-in types.
 // CHECK-FOUNDATION: func add(_: Double) -> NSNumber
@@ -78,7 +78,7 @@
 // CHECK-FOUNDATION: func someMethod(deprecatedOptions: NSDeprecatedOptions = [])
 
 // Note: class name matching; don't drop "With".
-// CHECK-FOUNDATION: class func withString(_: String!) -> Self!
+// CHECK-FOUNDATION: func withString(_: String!) -> Self!
 
 // Note: lowercasing enum constants.
 // CHECK-FOUNDATION: enum CountStyle : Int {
@@ -117,7 +117,7 @@
 // CHECK-FOUNDATION: func url(withAddedString: String) -> NSURL?
 
 // Note: NSCalendarUnits is not a set of "Options".
-// CHECK-FOUNDATION: class func forCalendarUnits(_: NSCalendar.Unit) -> String!
+// CHECK-FOUNDATION: func forCalendarUnits(_: NSCalendar.Unit) -> String!
 
 // Note: <property type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }

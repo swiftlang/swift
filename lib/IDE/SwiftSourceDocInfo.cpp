@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
@@ -13,6 +25,7 @@
 #include "clang/Basic/Module.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/Lexer.h"
+#include "clang/Basic/CharInfo.h"
 
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -174,6 +187,25 @@ bool SemaLocResolver::visitModuleReference(ModuleEntity Mod,
   return !tryResolve(Mod, Range.getStart());
 }
 
+void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
+  OS << "<Kind>";
+  switch (Kind) {
+  case RangeKind::SingleExpression: OS << "SingleExpression"; break;
+  case RangeKind::SingleDecl: OS << "SingleDecl"; break;
+  case RangeKind::MultiStatement: OS << "MultiStatement"; break;
+  case RangeKind::SingleStatement: OS << "SingleStatement"; break;
+  case RangeKind::Invalid: OS << "Invalid"; break;
+  }
+  OS << "</Kind>\n";
+
+  OS << "<Content>" << Content << "</Content>\n";
+  if (Ty) {
+    OS << "<Type>";
+    Ty->print(OS);
+    OS << "</Type>\n";
+  }
+}
+
 struct RangeResolver::Implementation {
   SourceFile &File;
 private:
@@ -214,14 +246,75 @@ private:
     }
   }
 
-public:
+  static SourceLoc getNonwhitespaceLocBefore(SourceManager &SM,
+                                             unsigned BufferID,
+                                             unsigned Offset) {
+    CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
+    StringRef Buffer = SM.extractText(entireRange);
+
+    const char *BufStart = Buffer.data();
+    if (Offset >= Buffer.size())
+      return SourceLoc();
+
+    for (unsigned Off = Offset; Off != 0; Off --) {
+      if (!clang::isWhitespace(*(BufStart + Off))) {
+        return SM.getLocForOffset(BufferID, Off);
+      }
+    }
+    return clang::isWhitespace(*BufStart) ? SourceLoc() :
+    SM.getLocForOffset(BufferID, 0);
+  }
+
+  static SourceLoc getNonwhitespaceLocAfter(SourceManager &SM,
+                                            unsigned BufferID,
+                                            unsigned Offset) {
+    CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
+    StringRef Buffer = SM.extractText(entireRange);
+
+    const char *BufStart = Buffer.data();
+    if (Offset >= Buffer.size())
+      return SourceLoc();
+
+    for (unsigned Off = Offset; Off < Buffer.size(); Off ++) {
+      if (!clang::isWhitespace(*(BufStart + Off))) {
+        return SM.getLocForOffset(BufferID, Off);
+      }
+    }
+    return SourceLoc();
+  }
+
   Implementation(SourceFile &File, SourceLoc Start, SourceLoc End) :
     File(File), Start(Start), End(End), Content(getContent()) {}
+
+public:
   bool hasResult() { return Result.hasValue(); }
   void enter(ASTNode Node) { ContextStack.emplace_back(Node); }
   void leave(ASTNode Node) {
     assert(ContextStack.back().Parent.getOpaqueValue() == Node.getOpaqueValue());
     ContextStack.pop_back();
+  }
+
+  static Implementation *createInstance(SourceFile &File, unsigned StartOff,
+                                        unsigned Length) {
+    SourceManager &SM = File.getASTContext().SourceMgr;
+    unsigned BufferId = File.getBufferID().getValue();
+    SourceLoc StartLoc = Implementation::getNonwhitespaceLocAfter(SM, BufferId,
+                                                                  StartOff);
+    SourceLoc EndLoc = Implementation::getNonwhitespaceLocBefore(SM, BufferId,
+                                                         StartOff + Length - 1);
+    StartLoc = Lexer::getLocForStartOfToken(SM, StartLoc);
+    EndLoc = Lexer::getLocForStartOfToken(SM, EndLoc);
+    return StartLoc.isInvalid() || EndLoc.isInvalid() ? nullptr :
+      new Implementation(File, StartLoc, EndLoc);
+  }
+
+  static Implementation *createInstance(SourceFile &File, SourceLoc Start,
+                                        SourceLoc End) {
+    SourceManager &SM = File.getASTContext().SourceMgr;
+    unsigned BufferId = File.getBufferID().getValue();
+    unsigned StartOff = SM.getLocOffsetInBuffer(Start, BufferId);
+    unsigned EndOff = SM.getLocOffsetInBuffer(End, BufferId);
+    return createInstance(File, StartOff, EndOff - StartOff);
   }
 
   void analyze(ASTNode Node) {
@@ -283,53 +376,58 @@ private:
 };
 
 RangeResolver::RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End) :
-  Impl(*new Implementation(File, Start, End)) {}
+  Impl(Implementation::createInstance(File, Start, End)) {}
 
-RangeResolver::~RangeResolver() { delete &Impl; }
+RangeResolver::RangeResolver(SourceFile &File, unsigned Offset, unsigned Length) :
+  Impl(Implementation::createInstance(File, Offset, Length)) {}
+
+RangeResolver::~RangeResolver() { if (Impl) delete Impl; }
 
 bool RangeResolver::walkToExprPre(Expr *E) {
-  if (!Impl.shouldEnter(E))
+  if (!Impl->shouldEnter(E))
     return false;
-  Impl.analyze(E);
-  Impl.enter(E);
+  Impl->analyze(E);
+  Impl->enter(E);
   return true;
 }
 
 bool RangeResolver::walkToStmtPre(Stmt *S) {
-  if (!Impl.shouldEnter(S))
+  if (!Impl->shouldEnter(S))
     return false;
-  Impl.analyze(S);
-  Impl.enter(S);
+  Impl->analyze(S);
+  Impl->enter(S);
   return true;
 };
 
 bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
-  if (!Impl.shouldEnter(D))
+  if (!Impl->shouldEnter(D))
     return false;
-  Impl.analyze(D);
-  Impl.enter(D);
+  Impl->analyze(D);
+  Impl->enter(D);
   return true;
 }
 
 bool RangeResolver::walkToExprPost(Expr *E) {
-  Impl.leave(E);
-  return !Impl.hasResult();
+  Impl->leave(E);
+  return !Impl->hasResult();
 }
 
 bool RangeResolver::walkToStmtPost(Stmt *S) {
-  Impl.leave(S);
-  return !Impl.hasResult();
+  Impl->leave(S);
+  return !Impl->hasResult();
 };
 
 bool RangeResolver::walkToDeclPost(Decl *D) {
-  Impl.leave(D);
-  return !Impl.hasResult();
+  Impl->leave(D);
+  return !Impl->hasResult();
 }
 
 ResolvedRangeInfo RangeResolver::resolve() {
-  Impl.enter(ASTNode());
-  walk(Impl.File);
-  return Impl.getResult();
+  if (!Impl)
+    return ResolvedRangeInfo();
+  Impl->enter(ASTNode());
+  walk(Impl->File);
+  return Impl->getResult();
 }
 
 void swift::ide::getLocationInfoForClangNode(ClangNode ClangNode,

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -362,7 +362,8 @@ public:
   template<typename StmtTy>
   bool typeCheckStmt(StmtTy *&S) {
     StmtTy *S2 = cast_or_null<StmtTy>(visit(S));
-    if (S2 == 0) return true;
+    if (S2 == nullptr)
+      return true;
     S = S2;
     performStmtDiagnostics(TC, S);
     return false;
@@ -638,22 +639,20 @@ public:
     VarDecl *generator;
     {
       Type sequenceType = sequence->getType();
-      ProtocolConformance *conformance = nullptr;
-      if (!TC.conformsToProtocol(sequenceType, sequenceProto, DC,
-                                 ConformanceCheckFlags::InExpression,
-                                 &conformance, sequence->getLoc()))
+      auto conformance =
+        TC.conformsToProtocol(sequenceType, sequenceProto, DC,
+                              ConformanceCheckFlags::InExpression,
+                              sequence->getLoc());
+      if (!conformance)
         return nullptr;
       
-      if (conformance && conformance->isInvalid())
-        return nullptr;
-
       generatorTy = TC.getWitnessType(sequenceType, sequenceProto,
-                                      conformance,
+                                      *conformance,
                                       TC.Context.Id_Iterator,
                                       diag::sequence_protocol_broken);
       
       Expr *getIterator
-        = TC.callWitness(sequence, DC, sequenceProto, conformance,
+        = TC.callWitness(sequence, DC, sequenceProto, *conformance,
                          TC.Context.Id_makeIterator,
                          {}, diag::sequence_protocol_broken);
       if (!getIterator) return nullptr;
@@ -666,6 +665,7 @@ public:
       generator = new (TC.Context)
         VarDecl(/*static*/ false, /*IsLet*/ false, S->getInLoc(),
                 TC.Context.getIdentifier(name), generatorTy, DC);
+      generator->setInterfaceType(DC->mapTypeOutOfContext(generatorTy));
       generator->setImplicit();
       
       // Create a pattern binding to initialize the generator.
@@ -687,14 +687,15 @@ public:
     // we'll use to drive the loop.
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
-    ProtocolConformance *genConformance = nullptr;
-    if (!TC.conformsToProtocol(generatorTy, generatorProto, DC,
-                               ConformanceCheckFlags::InExpression,
-                               &genConformance, sequence->getLoc()))
+    auto genConformance =
+      TC.conformsToProtocol(generatorTy, generatorProto, DC,
+                            ConformanceCheckFlags::InExpression,
+                            sequence->getLoc());
+    if (!genConformance)
       return nullptr;
     
     Type elementTy = TC.getWitnessType(generatorTy, generatorProto,
-                                       genConformance, TC.Context.Id_Element,
+                                       *genConformance, TC.Context.Id_Element,
                                        diag::iterator_protocol_broken);
     if (!elementTy)
       return nullptr;
@@ -704,7 +705,7 @@ public:
       = TC.callWitness(TC.buildCheckedRefExpr(generator, DC,
                                               DeclNameLoc(S->getInLoc()),
                                               /*implicit*/true),
-                       DC, generatorProto, genConformance,
+                       DC, generatorProto, *genConformance,
                        TC.Context.Id_next, {}, diag::iterator_protocol_broken);
     if (!iteratorNext) return nullptr;
     // Check that next() produces an Optional<T> value.
@@ -877,8 +878,7 @@ public:
             // If that failed, mark any variables binding pieces of the pattern
             // as invalid to silence follow-on errors.
             pattern->forEachVariable([&](VarDecl *VD) {
-              VD->overwriteType(ErrorType::get(TC.Context));
-              VD->setInvalid();
+              VD->markInvalid();
             });
           }
           labelItem.setPattern(pattern);
@@ -897,10 +897,8 @@ public:
                   if (!VD->getType()->isEqual(expected->getType())) {
                     TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
                                 VD->getType(), expected->getType());
-                    VD->overwriteType(ErrorType::get(TC.Context));
-                    VD->setInvalid();
-                    expected->overwriteType(ErrorType::get(TC.Context));
-                    expected->setInvalid();
+                    VD->markInvalid();
+                    expected->markInvalid();
                   }
                   return;
                 }
@@ -996,9 +994,8 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
       pattern->forEachVariable([&](VarDecl *var) {
-            var->overwriteType(ErrorType::get(Context));
-            var->setInvalid();
-        });
+        var->markInvalid();
+      });
     }
 
     S->setErrorPattern(pattern);
@@ -1237,6 +1234,9 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
 
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                                      SourceLoc EndTypeCheckLoc) {
+  if (!AFD->getBody())
+    return false;
+
   if (auto *FD = dyn_cast<FuncDecl>(AFD))
     return typeCheckFunctionBodyUntil(FD, EndTypeCheckLoc);
 
@@ -1323,8 +1323,8 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
   auto ctor = otherCtorRef->getDecl();
   if (!ctor->isDesignatedInit()) {
     if (!implicitlyGenerated) {
-      auto contextTy = fromCtor->getDeclContext()->getDeclaredTypeInContext();
-      if (auto classTy = contextTy->getClassOrBoundGenericClass()) {
+      auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
+      if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
         assert(classTy->getSuperclass());
         tc.diagnose(apply->getArg()->getLoc(), diag::chain_convenience_init,
                     classTy->getSuperclass());
@@ -1337,7 +1337,7 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
   // For an implicitly generated super.init() call, make sure there's
   // only one designated initializer.
   if (implicitlyGenerated) {
-    auto superclassTy = ctor->getExtensionType();
+    auto superclassTy = ctor->getDeclContext()->getDeclaredInterfaceType();
     auto lookupOptions = defaultConstructorLookupOptions;
     lookupOptions |= NameLookupFlags::KnownPrivate;
 
@@ -1405,9 +1405,9 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     return HadError;
 
   // Determine whether we need to introduce a super.init call.
-  auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
-    ->getNominalOrBoundGenericNominal();
-  ClassDecl *ClassD = dyn_cast<ClassDecl>(nominalDecl);
+  auto nominalDecl = ctor->getDeclContext()
+    ->getAsNominalTypeOrNominalTypeExtensionContext();
+  ClassDecl *ClassD = dyn_cast_or_null<ClassDecl>(nominalDecl);
   bool wantSuperInitCall = false;
   if (ClassD) {
     bool isDelegating = false;
@@ -1424,7 +1424,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       /// A convenience initializer cannot chain to a superclass constructor.
       if (ctor->isConvenienceInit()) {
         diagnose(initExpr->getLoc(), diag::delegating_convenience_super_init,
-                 ctor->getDeclContext()->getDeclaredTypeOfContext());
+                 ctor->getDeclContext()->getDeclaredInterfaceType());
       }
 
       SWIFT_FALLTHROUGH;
@@ -1442,7 +1442,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     if (ctor->isDesignatedInit() && ClassD && isDelegating) {
       diagnose(ctor->getLoc(),
                diag::delegating_designated_init,
-               ctor->getDeclContext()->getDeclaredTypeOfContext())
+               ctor->getDeclContext()->getDeclaredInterfaceType())
         .fixItInsert(ctor->getLoc(), "convenience ");
       diagnose(initExpr->getLoc(), diag::delegation_here);
       ctor->setInitKind(CtorInitializerKind::Convenience);
