@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -S -g -o - | %FileCheck %s
 
+// REQUIRES: SR-3421
 // XFAIL: linux
 
 func markUsed<T>(_ t: T) {}
