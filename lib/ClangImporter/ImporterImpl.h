@@ -260,6 +260,7 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   : public LazyMemberLoader
 {
   friend class ClangImporter;
+  using Version = importer::ImportNameVersion;
 
 public:
   Implementation(ASTContext &ctx, const ClangImporterOptions &opts);
@@ -271,6 +272,8 @@ public:
   const bool ImportForwardDeclarations;
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
+
+  const Version CurrentVersion;
 
   constexpr static const char * const moduleImportBufferName =
     "<swift-imported-modules>";
@@ -321,10 +324,7 @@ private:
 
 public:
   /// \brief Mapping of already-imported declarations.
-  ///
-  /// The "char" in the key is a "bool" in disguise that indicates whether this
-  /// is a Swift 2 name vs. a Swift 3 name.
-  llvm::DenseMap<std::pair<const clang::Decl *, char>, Decl *> ImportedDecls;
+  llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
 
   /// \brief The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
@@ -354,8 +354,8 @@ public:
 
   /// \brief Mapping of already-imported declarations from protocols, which
   /// can (and do) get replicated into classes.
-  llvm::DenseMap<std::tuple<const clang::Decl *, DeclContext *, char>, Decl *>
-    ImportedProtocolDecls;
+  llvm::DenseMap<std::tuple<const clang::Decl *, DeclContext *, Version>,
+                 Decl *> ImportedProtocolDecls;
 
   /// Mapping from identifiers to the set of macros that have that name along
   /// with their corresponding Swift declaration.
@@ -441,9 +441,9 @@ public:
 
   /// \brief Keep track of initializer declarations that correspond to
   /// imported methods.
-  llvm::DenseMap<std::tuple<const clang::ObjCMethodDecl *, DeclContext *, char>,
-                 ConstructorDecl *>
-    Constructors;
+  llvm::DenseMap<
+      std::tuple<const clang::ObjCMethodDecl *, DeclContext *, Version>,
+      ConstructorDecl *> Constructors;
 
   /// Retrieve the alternative declaration for the given imported
   /// Swift declaration.
@@ -629,7 +629,7 @@ public:
   ///
   /// \param D The Clang declaration whose name should be imported.
   importer::ImportedName importFullName(const clang::NamedDecl *D,
-                                        importer::ImportNameVersion version) {
+                                        Version version) {
     return getNameImporter().importName(D, version);
   }
 
@@ -687,15 +687,13 @@ public:
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
-  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, bool useSwift2Name);
+  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version);
 
-  Decl *importDeclImpl(const clang::NamedDecl *ClangDecl,
-                       bool useSwift2Name,
-                       bool &TypedefIsSuperfluous,
-                       bool &HadForwardDeclaration);
+  Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
+                       bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
 
   Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
-                               bool useSwift2Name,
+                               Version version,
                                bool SuperfluousTypedefsAreTransparent);
 
   /// \brief Same as \c importDeclReal, but for use inside importer
@@ -704,8 +702,8 @@ public:
   /// Unlike \c importDeclReal, this function for convenience transparently
   /// looks through superfluous typedefs and returns the imported underlying
   /// decl in that case.
-  Decl *importDecl(const clang::NamedDecl *ClangDecl, bool useSwift2Name) {
-    return importDeclAndCacheImpl(ClangDecl, useSwift2Name,
+  Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version) {
+    return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/true);
   }
 
@@ -715,8 +713,8 @@ public:
   ///
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
-  Decl *importDeclReal(const clang::NamedDecl *ClangDecl, bool useSwift2Name) {
-    return importDeclAndCacheImpl(ClangDecl, useSwift2Name,
+  Decl *importDeclReal(const clang::NamedDecl *ClangDecl, Version version) {
+    return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/false);
   }
 
@@ -727,7 +725,7 @@ public:
   /// \returns The imported declaration, or null if this declaration could not
   /// be represented in Swift.
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
-                           bool useSwift2Name, ProtocolDecl *proto);
+                           Version version, ProtocolDecl *proto);
 
   /// \brief Utility function for building simple generic environments.
   GenericEnvironment *buildGenericEnvironment(GenericParamList *genericParams,

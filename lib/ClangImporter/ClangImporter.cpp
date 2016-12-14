@@ -1218,6 +1218,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       ImportForwardDeclarations(opts.ImportForwardDeclarations),
       InferImportAsMember(opts.InferImportAsMember),
       DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
+      CurrentVersion(nameVersionFromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(nullptr), platformAvailability(ctx.LangOpts),
       nameImporter() {}
 
@@ -1722,7 +1723,7 @@ void ClangImporter::lookupBridgingHeaderDecls(
   for (auto *ClangD : Impl.BridgeHeaderTopLevelDecls) {
     if (filter(ClangD)) {
       if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
-        if (Decl *imported = Impl.importDeclReal(ND, /*useSwift2Name=*/false))
+        if (Decl *imported = Impl.importDeclReal(ND, Impl.CurrentVersion))
           receiver(imported);
       }
     }
@@ -1787,7 +1788,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
         continue;
       if (filter(ClangD)) {
         if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
-          if (Decl *imported = Impl.importDeclReal(ND, /*useSwift2Name=*/false))
+          if (Decl *imported = Impl.importDeclReal(ND, Impl.CurrentVersion))
             receiver(imported);
         }
       }
@@ -1892,7 +1893,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     // Add the extensions produced by importing categories.
     for (auto category : lookupTable->categories()) {
       if (auto extension = cast_or_null<ExtensionDecl>(
-                            owner.Impl.importDecl(category, false)))
+              owner.Impl.importDecl(category, owner.Impl.CurrentVersion)))
         results.push_back(extension);
     }
 
@@ -1903,7 +1904,8 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
       auto decl = entry.get<clang::NamedDecl *>();
-      auto importedDecl = owner.Impl.importDecl(decl, false);
+      auto importedDecl =
+          owner.Impl.importDecl(decl, owner.Impl.CurrentVersion);
       if (!importedDecl) continue;
 
       auto ext = dyn_cast<ExtensionDecl>(importedDecl->getDeclContext());
@@ -2035,7 +2037,7 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
     for (auto I = objcClass->visible_categories_begin(),
            E = objcClass->visible_categories_end();
          I != E; ++I) {
-      Impl.importDeclReal(*I, /*useSwift2Name=*/false);
+      Impl.importDeclReal(*I, Impl.CurrentVersion);
     }
   }
 
@@ -2096,7 +2098,7 @@ void ClangImporter::loadObjCMethods(
       continue;
 
     if (auto method = dyn_cast_or_null<AbstractFunctionDecl>(
-                        Impl.importDecl(objcMethod, false))) {
+                        Impl.importDecl(objcMethod, Impl.CurrentVersion))) {
       foundMethods.push_back(method);
     }
   }
@@ -2183,13 +2185,15 @@ void ClangModuleUnit::lookupObjCMethods(
     // If we found a property accessor, import the property.
     if (objcMethod->isPropertyAccessor())
       (void)owner.Impl.importDecl(objcMethod->findPropertyDecl(true),
-                                  false);
+                                  owner.Impl.CurrentVersion);
 
     // Import it.
     // FIXME: Retrying a failed import works around recursion bugs in the Clang
     // importer.
-    auto imported = owner.Impl.importDecl(objcMethod, false);
-    if (!imported) imported = owner.Impl.importDecl(objcMethod, false);
+    auto imported =
+        owner.Impl.importDecl(objcMethod, owner.Impl.CurrentVersion);
+    if (!imported)
+      imported = owner.Impl.importDecl(objcMethod, owner.Impl.CurrentVersion);
     if (!imported) continue;
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(imported))
@@ -2259,7 +2263,7 @@ std::string ClangImporter::getClangModuleHash() const {
 }
 
 Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
-  return Impl.importDeclCached(ClangDecl, /*useSwift2Name=*/false);
+  return Impl.importDeclCached(ClangDecl, Impl.CurrentVersion);
 }
 
 void ClangImporter::printStatistics() const {
@@ -2275,7 +2279,7 @@ void ClangImporter::verifyAllModules() {
   // more decls to be imported and modify the map while we are iterating it.
   SmallVector<Decl *, 8> Decls;
   for (auto &I : Impl.ImportedDecls)
-    if (!I.first.second)
+    if (I.first.second == Impl.CurrentVersion)
       if (Decl *D = I.second)
         Decls.push_back(D);
 
@@ -2559,7 +2563,7 @@ void ClangImporter::Implementation::lookupValue(
     // If it's a Clang declaration, try to import it.
     if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
       decl = cast_or_null<ValueDecl>(
-               importDeclReal(clangDecl->getMostRecentDecl(), false));
+          importDeclReal(clangDecl->getMostRecentDecl(), CurrentVersion));
       if (!decl) continue;
     } else {
       // Try to import a macro.
@@ -2597,9 +2601,8 @@ void ClangImporter::Implementation::lookupValue(
     // name.
     if (!anyMatching) {
       if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
-        if (auto swift2Decl = cast_or_null<ValueDecl>(
-                                importDeclReal(clangDecl->getMostRecentDecl(),
-                                               true))) {
+        if (auto swift2Decl = cast_or_null<ValueDecl>(importDeclReal(
+                clangDecl->getMostRecentDecl(), ImportNameVersion::Swift2))) {
           if (swift2Decl->getFullName().matchesRef(name) &&
               swift2Decl->getDeclContext()->isModuleScopeContext()) {
             consumer.foundDecl(swift2Decl,
@@ -2636,7 +2639,8 @@ void ClangImporter::Implementation::lookupObjCMembers(
     if (!isVisibleClangEntry(clangCtx, clangDecl)) continue;
 
     // Import the declaration.
-    auto decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl, false));
+    auto decl =
+        cast_or_null<ValueDecl>(importDeclReal(clangDecl, CurrentVersion));
     if (!decl)
       continue;
 
@@ -2659,7 +2663,7 @@ void ClangImporter::Implementation::lookupObjCMembers(
     // If we didn't find anything, try under the Swift 2 name.
     if (!matchedAny) {
       if (auto swift2Decl = cast_or_null<ValueDecl>(
-                              importDeclReal(clangDecl, true))) {
+                              importDeclReal(clangDecl, Version::Swift2))) {
         if (swift2Decl->getFullName().matchesRef(name)) {
           consumer.foundDecl(swift2Decl, DeclVisibilityKind::DynamicLookup);
         }

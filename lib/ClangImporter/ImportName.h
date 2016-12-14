@@ -58,7 +58,8 @@ enum class ImportNameVersion : unsigned {
 };
 enum { NumImportNameVersions = 4 };
 
-static const ImportNameVersion CurrentVersion = ImportNameVersion::Swift3;
+/// Map a language version into an import name version
+ImportNameVersion nameVersionFromOptions(const LangOptions &langOpts);
 
 /// Describes a name that was imported from Clang.
 class ImportedName {

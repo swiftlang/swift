@@ -52,6 +52,22 @@ using namespace importer;
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
+ImportNameVersion
+importer::nameVersionFromOptions(const LangOptions &langOpts) {
+  auto languageVersion = langOpts.EffectiveLanguageVersion;
+  switch (languageVersion[0]) {
+  default:
+    llvm_unreachable("unknown swift language version");
+  case 1:
+  case 2:
+    return ImportNameVersion::Swift2;
+  case 3:
+    return ImportNameVersion::Swift3;
+  case 4:
+    return ImportNameVersion::Swift4;
+  }
+}
+
 /// Determine whether the given Clang selector matches the given
 /// selector pieces.
 static bool isNonNullarySelector(clang::Selector selector,
