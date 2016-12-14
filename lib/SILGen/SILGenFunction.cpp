@@ -201,8 +201,7 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
   if (!subs.empty()) {
     // Specialize the generic method.
     methodTy = getLoweredLoadableType(
-                    methodTy.castTo<SILFunctionType>()
-                      ->substGenericArgs(SGM.M, SGM.SwiftModule, subs));
+            methodTy.castTo<SILFunctionType>()->substGenericArgs(SGM.M, subs));
   }
 
   return std::make_tuple(ManagedValue::forUnmanaged(methodValue),
@@ -390,9 +389,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   bool wasSpecialized = false;
   if (!subs.empty()) {
-    auto specialized = pft->substGenericArgs(F.getModule(),
-                                             F.getModule().getSwiftModule(),
-                                             subs);
+    auto specialized = pft->substGenericArgs(F.getModule(), subs);
     functionTy = SILType::getPrimitiveObjectType(specialized);
     wasSpecialized = true;
   }
@@ -839,8 +836,7 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
   // Forward archetypes and specialize if the function is generic.
   if (!subs.empty()) {
     auto toFnTy = toFn->getType().castTo<SILFunctionType>();
-    toTy = getLoweredLoadableType(
-              toFnTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs));
+    toTy = getLoweredLoadableType(toFnTy->substGenericArgs(SGM.M,  subs));
   }
 
   // Partially apply the next uncurry level and return the result closure.

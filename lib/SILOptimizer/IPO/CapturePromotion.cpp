@@ -432,7 +432,6 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
   computeNewArgInterfaceTypes(Orig, PromotableIndices, ClonedInterfaceArgTys);
 
-  Module *SM = M.getSwiftModule();
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
 
   // Create the thin function type for the cloned closure.
@@ -445,7 +444,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
                          OrigFTI->getOptionalErrorResult(),
                          M.getASTContext());
 
-  auto SubstTy = SILType::substFuncType(M, SM, InterfaceSubs.getMap(), ClonedTy,
+  auto SubstTy = SILType::substFuncType(M, InterfaceSubs, ClonedTy,
                                         /* dropGenerics = */ false);
   
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())

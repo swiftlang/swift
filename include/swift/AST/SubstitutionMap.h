@@ -67,6 +67,10 @@ public:
 
   void addParent(CanType type, CanType parent,
                  AssociatedTypeDecl *assocType);
+  
+  bool empty() const {
+    return subMap.empty();
+  }
 };
 
 } // end namespace swift

@@ -2341,11 +2341,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       return true;
     
     auto SubstInitStorageTy = InitStorageTy.castTo<SILFunctionType>()
-      ->substGenericArgs(B.getModule(), B.getModule().getSwiftModule(),
-                         InitStorageSubs);
+      ->substGenericArgs(B.getModule(), InitStorageSubs);
     auto SubstSetterTy = SetterTy.castTo<SILFunctionType>()
-      ->substGenericArgs(B.getModule(), B.getModule().getSwiftModule(),
-                         SetterSubs);
+      ->substGenericArgs(B.getModule(), SetterSubs);
     
     // Derive the storage type from the initStorage method.
     auto StorageTy = SILType::getPrimitiveAddressType(
@@ -3794,8 +3792,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   if (!subs.empty()) {
     auto silFnTy = FnTy.castTo<SILFunctionType>();
     substFTI
-      = silFnTy->substGenericArgs(SILMod, P.SF.getParentModule(),
-                                           subs);
+      = silFnTy->substGenericArgs(SILMod, subs);
     FnTy = SILType::getPrimitiveObjectType(substFTI);
   }
   
