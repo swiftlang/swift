@@ -213,17 +213,17 @@ DeclRefExpr *Expr::getMemberOperatorRef() {
 
 /// Propagate l-value use information to children.
 void Expr::propagateLValueAccessKind(AccessKind accessKind,
-                                     std::function<Type(Expr *)> getType,
+                                     llvm::function_ref<Type(Expr *)> getType,
                                      bool allowOverwrite) {
   /// A visitor class which walks an entire l-value expression.
   class PropagateAccessKind
        : public ExprVisitor<PropagateAccessKind, void, AccessKind> {
-    std::function<Type(Expr *)> GetType;
+    llvm::function_ref<Type(Expr *)> GetType;
 #ifndef NDEBUG
     bool AllowOverwrite;
 #endif
   public:
-    PropagateAccessKind(std::function<Type(Expr *)> getType,
+    PropagateAccessKind(llvm::function_ref<Type(Expr *)> getType,
                         bool allowOverwrite) : GetType(getType)
 #ifndef NDEBUG
                                                , AllowOverwrite(allowOverwrite)
