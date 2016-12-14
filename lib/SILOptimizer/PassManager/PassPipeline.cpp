@@ -79,7 +79,7 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::UntilFixPoint, "Guaranteed Passes");
+  P.startPipeline(ExecutionKind::OneIteration, "Guaranteed Passes");
   P.addCapturePromotion();
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
