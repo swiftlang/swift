@@ -23,6 +23,10 @@ namespace swift {
   class SILOptions;
   class SILTransform;
 
+  namespace irgen {
+    class IRGenModule;
+  }
+
   /// \brief Run all the SIL diagnostic passes on \p M.
   ///
   /// \returns true if the diagnostic passes produced an error

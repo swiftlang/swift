@@ -44,6 +44,8 @@ PASS(ABCOpt, "abcopts",
      "Optimization of array bounds checks")
 PASS(AllocBoxToStack, "allocbox-to-stack",
      "Promote heap allocations to stack allocations")
+IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
+           "Hoist generic alloc_stack instructions to the entry block")
 PASS(ArrayCountPropagation, "array-count-propagation",
      "Propagate the count of arrays")
 PASS(ArrayElementPropagation, "array-element-propagation",

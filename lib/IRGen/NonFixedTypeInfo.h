@@ -23,6 +23,7 @@
 #ifndef SWIFT_IRGEN_NONFIXEDTYPEINFO_H
 #define SWIFT_IRGEN_NONFIXEDTYPEINFO_H
 
+#include "Address.h"
 #include "GenOpaque.h"
 #include "IndirectTypeInfo.h"
 

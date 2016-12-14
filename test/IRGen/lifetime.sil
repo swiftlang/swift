@@ -38,10 +38,10 @@ bb0(%x : $*T):
 // CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align
 // CHECK-NEXT: [[DESTROY_FN:%.*]] = bitcast i8* [[T4]] to void ([[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* [[Y_TMP]], [[TYPE]]* %T)
-// CHECK-NEXT: [[YBUFLIFE:%.*]] = bitcast [[OPAQUE]]* [[Y_TMP]] to i8*
-// CHECK-NEXT: call void @llvm.lifetime.end({{(i32|i64)}} -1, i8* [[YBUFLIFE]])
 //   Destroy 'x'.
 // CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* [[X]], [[TYPE]]* %T)
+// CHECK-NEXT: [[YBUFLIFE:%.*]] = bitcast [[OPAQUE]]* [[Y_TMP]] to i8*
+// CHECK-NEXT: call void @llvm.lifetime.end({{(i32|i64)}} -1, i8* [[YBUFLIFE]])
 //   Return.
 // CHECK-NEXT: ret void
 

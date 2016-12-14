@@ -28,6 +28,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRGenPublic.h"
+#include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/LLVMPasses/Passes.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -631,8 +632,8 @@ void swift::irgen::deleteIRGenModule(
 static void runIRGenPreparePasses(SILModule &Module,
                                   irgen::IRGenModule &IRModule) {
   SILPassManager PM(&Module, &IRModule);
-  //PM.registerIRGenPass(swift::PassKind::YOURPASS,
-  //                     createYOURPASS());
+  PM.registerIRGenPass(swift::PassKind::AllocStackHoisting,
+                       createAllocStackHoisting());
   PM.executePassPipelinePlan(
       SILPassPipelinePlan::getIRGenPreparePassPipeline());
 }

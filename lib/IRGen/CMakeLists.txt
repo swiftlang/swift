@@ -1,4 +1,5 @@
 add_swift_library(swiftIRGen STATIC
+  AllocStackHoisting.cpp
   DebugTypeInfo.cpp
   EnumPayload.cpp
   ExtraInhabitants.cpp
