@@ -538,8 +538,9 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::BoundGenericEnum:
     case TypeKind::BoundGenericStruct:
       if (type->isSpecialized()) {
-        appendBoundGenericArgs(type);
         appendNominalType(type->getAnyNominal());
+        bool isFirstArgList = true;
+        appendBoundGenericArgs(type, isFirstArgList);
         return appendOperator("G");
       }
       appendNominalType(tybase->getAnyNominal());
@@ -765,25 +766,29 @@ void ASTMangler::bindGenericParameters(const DeclContext *DC) {
     bindGenericParameters(sig->getCanonicalSignature());
 }
 
-void ASTMangler::appendBoundGenericArgs(Type type) {
+void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
+  BoundGenericType *boundType = nullptr;
   if (auto *unboundType = type->getAs<UnboundGenericType>()) {
-    if (auto parent = unboundType->getParent())
-      appendBoundGenericArgs(parent);
-    return appendOperator("y");
+    if (Type parent = unboundType->getParent())
+      appendBoundGenericArgs(parent, isFirstArgList);
+  } else if (auto *nominalType = type->getAs<NominalType>()) {
+    if (Type parent = nominalType->getParent())
+      appendBoundGenericArgs(parent, isFirstArgList);
+  } else {
+    boundType = type->castTo<BoundGenericType>();
+    if (Type parent = boundType->getParent())
+      appendBoundGenericArgs(parent, isFirstArgList);
   }
-  if (auto *nominalType = type->getAs<NominalType>()) {
-    if (auto parent = nominalType->getParent())
-      appendBoundGenericArgs(parent);
-    return appendOperator("y");
+  if (isFirstArgList) {
+    appendOperator("y");
+    isFirstArgList = false;
+  } else {
+    appendOperator("_");
   }
-  auto *boundType = type->castTo<BoundGenericType>();
-  if (auto parent = boundType->getParent())
-    appendBoundGenericArgs(parent);
-
-  bool firstArg = true;
-  for (Type arg : boundType->getGenericArgs()) {
-    appendType(arg);
-    appendListSeparator(firstArg);
+  if (boundType) {
+    for (Type arg : boundType->getGenericArgs()) {
+      appendType(arg);
+    }
   }
 }
 
