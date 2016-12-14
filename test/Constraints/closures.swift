@@ -8,7 +8,7 @@ _ = myMap(intArray, { String($0) })
 _ = myMap(intArray, { x -> String in String(x) } )
 
 // Closures with too few parameters.
-func foo(_ x: ((Int, Int)) -> Int) {}
+func foo(_ x: (Int, Int) -> Int) {}
 foo({$0}) // expected-error{{cannot convert value of type '(Int, Int)' to closure result type 'Int'}}
 
 struct X {}
@@ -130,7 +130,7 @@ var _: (Int) -> Int = {a,b in 0}
 // expected-error @+1 {{contextual closure type '(Int) -> Int' expects 1 argument, but 3 were used in closure body}}
 var _: (Int) -> Int = {a,b,c in 0}
 
-var _: ((Int, Int)) -> Int = {a in 0}
+var _: (Int, Int) -> Int = {a in 0}
 
 // expected-error @+1 {{contextual closure type '(Int, Int, Int) -> Int' expects 3 arguments, but 2 were used in closure body}}
 var _: (Int, Int, Int) -> Int = {a, b in a+b}
@@ -202,7 +202,7 @@ func acceptNothingToInt (_: () -> Int) {}
 func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
   // expected-note@-1{{parameter 'ac1' is implicitly non-escaping because it was declared @autoclosure}}
   acceptNothingToInt({ac1($0)})
-  // expected-error@-1{{contextual closure type '() -> Int' expects 0 arguments, but 1 was used in closure body}}
+  // expected-error@-1{{cannot convert value of type '(_) -> Int' to expected argument type '() -> Int'}}
   // FIXME: expected-error@-2{{closure use of non-escaping parameter 'ac1' may allow it to escape}}
 }
 
@@ -322,8 +322,6 @@ func r20789423() {
   }
   
 }
-
-let f: (Int, Int) -> Void = { x in }  // expected-error {{contextual closure type specifies '(Int, Int)', but 1 was used in closure body, try adding extra parentheses around the single tuple argument}}
 
 // Make sure that behavior related to allowing trailing closures to match functions
 // with Any as a final parameter is the same after the changes made by SR-2505, namely:

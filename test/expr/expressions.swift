@@ -113,7 +113,7 @@ func funcdecl7(_ a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 }
 
 // Error recovery.
-func testfunc2 (_: (((), Int)) -> Int) -> Int {}
+func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
   testfunc2({ $0 + 1 }) // expected-error {{binary operator '+' cannot be applied to operands of type '((), Int)' and 'Int'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
