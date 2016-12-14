@@ -1078,8 +1078,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     
     auto SubstFnTy = SILType::getPrimitiveObjectType(
       FnTy.castTo<SILFunctionType>()
-        ->substGenericArgs(Builder.getModule(),
-                         Builder.getModule().getSwiftModule(), Substitutions));
+        ->substGenericArgs(Builder.getModule(), Substitutions));
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
     auto ArgTys = FTI->getParameterSILTypes();
 

@@ -707,15 +707,13 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
     // their parameter types.
     CanSILFunctionType SFT = FnTy->substGenericArgs(
                                         AI.getModule(),
-                                        AI.getModule().getSwiftModule(),
                                         Substitutions);
     NewSubstCalleeType = SILType::getPrimitiveObjectType(SFT);
   } else {
-    TypeSubstitutionMap TypeSubstitutions;
-    TypeSubstitutions[OpenedArchetype->castTo<ArchetypeType>()] = ConcreteType;
-    NewSubstCalleeType = SubstCalleeType.subst(AI.getModule(),
-                                               AI.getModule().getSwiftModule(),
-                                               TypeSubstitutions);
+    SubstitutionMap Subs;
+    Subs.addSubstitution(OpenedArchetype, ConcreteType);
+    Subs.addConformances(OpenedArchetype, Conformance);
+    NewSubstCalleeType = SubstCalleeType.subst(AI.getModule(), Subs);
   }
 
   FullApplySite NewAI;

@@ -34,7 +34,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                         ParameterConvention calleeConvention) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
-    FTI = FTI->substGenericArgs(M, M.getSwiftModule(), subs);
+    FTI = FTI->substGenericArgs(M, subs);
   
   assert(!FTI->isPolymorphic()
          && "must provide substitutions for generic partial_apply");

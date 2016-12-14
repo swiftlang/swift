@@ -88,8 +88,7 @@ public:
 
 protected:
   SILType remapType(SILType Ty) {
-    return SILType::substType(Original.getModule(), SwiftMod,
-                              SubsMap.getMap(), Ty);
+    return Ty.subst(Original.getModule(), SubsMap);
   }
 
   CanType remapASTType(CanType ty) {

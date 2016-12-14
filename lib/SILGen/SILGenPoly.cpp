@@ -2674,7 +2674,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   if (auto *genericEnv = fd->getGenericEnvironment()) {
     F.setGenericEnvironment(genericEnv);
     subs = getForwardingSubstitutions();
-    fTy = fTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs);
+    fTy = fTy->substGenericArgs(SGM.M, subs);
 
     inputSubstType = cast<FunctionType>(
         cast<GenericFunctionType>(inputSubstType)
@@ -2868,8 +2868,7 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
   // the substituted signature of the witness.
   auto witnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
   if (!witnessSubs.empty())
-    witnessFTy = witnessFTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
-                                              witnessSubs);
+    witnessFTy = witnessFTy->substGenericArgs(SGM.M, witnessSubs);
 
   SmallVector<ManagedValue, 8> witnessParams;
 

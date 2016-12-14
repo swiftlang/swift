@@ -89,9 +89,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
   }
 
   SILModule &M = OrigF->getModule();
-  Module *SM = M.getSwiftModule();
-
-  SubstitutedType = SILType::substFuncType(M, SM, InterfaceSubs.getMap(),
+  SubstitutedType = SILType::substFuncType(M, InterfaceSubs,
                                            OrigF->getLoweredFunctionType(),
                                            /*dropGenerics = */ true);
 
