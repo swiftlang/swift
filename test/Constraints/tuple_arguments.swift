@@ -1254,3 +1254,17 @@ do {
   let _: (Int, Int) -> () = { _ = ($0, $1) }
   let _: (Int, Int) -> () = { t, u in _ = (t, u) }
 }
+
+// rdar://problem/28952837 - argument labels ignored when calling function
+// with single 'Any' parameter
+func takesAny(_: Any) {}
+
+do {
+  let fn: (Any) -> () = { _ in }
+
+  fn(123)
+  fn(data: 123) // expected-error {{extraneous argument label 'data:' in call}}
+
+  takesAny(123)
+  takesAny(data: 123) // expected-error {{extraneous argument label 'data:' in call}}
+}
