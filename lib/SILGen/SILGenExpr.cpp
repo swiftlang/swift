@@ -443,7 +443,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   bool hasLocalCaptures = false;
   unsigned uncurryLevel = 0;
   if (auto *fd = dyn_cast<FuncDecl>(decl)) {
-    hasLocalCaptures = fd->getCaptureInfo().hasLocalCaptures();
+    hasLocalCaptures = SGM.M.Types.hasLoweredLocalCaptures(fd);
     if (hasLocalCaptures)
       ++uncurryLevel;
   }
