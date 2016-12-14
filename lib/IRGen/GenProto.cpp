@@ -2349,23 +2349,40 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
   }
 }
 
-static CanType getSubstSelfType(CanSILFunctionType substFnType) {
+static CanType getSubstSelfType(ModuleDecl *M,
+                                CanSILFunctionType origFnType,
+                                ArrayRef<Substitution> subs) {
   // Grab the apparent 'self' type.  If there isn't a 'self' type,
   // we're not going to try to access this anyway.
-  assert(!substFnType->getParameters().empty());
+  assert(!origFnType->getParameters().empty());
 
-  auto selfParam = substFnType->getParameters().back();
-  CanType substInputType = selfParam.getType();
+  auto selfParam = origFnType->getParameters().back();
+  CanType inputType = selfParam.getType();
   // If the parameter is a direct metatype parameter, this is a static method
   // of the instance type. We can assume this because:
   // - metatypes cannot directly conform to protocols
   // - even if they could, they would conform as a value type 'self' and thus
   //   be passed indirectly as an @in or @inout parameter.
-  if (auto meta = dyn_cast<MetatypeType>(substInputType)) {
+  if (auto meta = dyn_cast<MetatypeType>(inputType)) {
     if (!selfParam.isIndirect())
-      substInputType = meta.getInstanceType();
+      inputType = meta.getInstanceType();
   }
-  return substInputType;
+  
+  // Substitute the `self` type.
+  // FIXME: This has to be done as a formal AST type substitution rather than
+  // a SIL function type substitution, because some nominal types (viz
+  // Optional) have type lowering recursively applied to their type parameters.
+  // Substituting into the original lowered function type like this is still
+  // problematic if we ever allow methods or protocol conformances on structural
+  // types; we'd really need to separately record the formal Self type in the
+  // SIL function type to make that work, which could be managed by having a
+  // "substituted generic signature" concept.
+  if (!subs.empty()) {
+    auto subMap = origFnType->getGenericSignature()->getSubstitutionMap(subs);
+    inputType = inputType.subst(M, subMap, SubstOptions())->getCanonicalType();
+  }
+  
+  return inputType;
 }
 
 namespace {
@@ -2380,7 +2397,7 @@ namespace {
               WitnessMetadata *witnessMetadata, Explosion &out);
 
   private:
-    void emitEarlySources(CanSILFunctionType substFnType, Explosion &out) {
+    void emitEarlySources(ArrayRef<Substitution> subs, Explosion &out) {
       for (auto &source : getSources()) {
         switch (source.getKind()) {
         // Already accounted for in the parameters.
@@ -2390,7 +2407,8 @@ namespace {
 
         // Needs a special argument.
         case MetadataSource::Kind::GenericLValueMetadata: {
-          out.add(IGF.emitTypeMetadataRef(getSubstSelfType(substFnType)));
+          out.add(IGF.emitTypeMetadataRef(getSubstSelfType(IGF.getSwiftModule(),
+                                                           FnType, subs)));
           continue;
         }
 
@@ -2422,7 +2440,7 @@ void EmitPolymorphicArguments::emit(CanSILFunctionType substFnType,
                                     WitnessMetadata *witnessMetadata,
                                     Explosion &out) {
   // Add all the early sources.
-  emitEarlySources(substFnType, out);
+  emitEarlySources(subs, out);
 
   // For now, treat all archetypes independently.
   enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
@@ -2446,7 +2464,8 @@ void EmitPolymorphicArguments::emit(CanSILFunctionType substFnType,
 
     case MetadataSource::Kind::SelfMetadata: {
       assert(witnessMetadata && "no metadata structure for witness method");
-      auto self = IGF.emitTypeMetadataRef(getSubstSelfType(substFnType));
+      auto self = IGF.emitTypeMetadataRef(getSubstSelfType(IGF.getSwiftModule(),
+                                                           FnType, subs));
       witnessMetadata->SelfMetadata = self;
       continue;
     }
@@ -2506,11 +2525,13 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
       continue;
 
     case MetadataSource::Kind::GenericLValueMetadata:
-      bindings.addTypeMetadata(getSubstSelfType(substType));
+      bindings.addTypeMetadata(getSubstSelfType(IGM.getSwiftModule(),
+                                                origType, subs));
       continue;
 
     case MetadataSource::Kind::SelfMetadata:
-      bindings.addTypeMetadata(getSubstSelfType(substType));
+      bindings.addTypeMetadata(getSubstSelfType(IGM.getSwiftModule(),
+                                                origType, subs));
       continue;
 
     case MetadataSource::Kind::SelfWitnessTable:
