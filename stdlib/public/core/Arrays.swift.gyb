@@ -1210,6 +1210,54 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// greater than the requested capacity. Use the array's `capacity` property
   /// to determine the size of the new storage.
   ///
+  /// Preserving an Array's Geometric Growth Strategy
+  /// ===============================================
+  ///
+  /// If you implement an custom data structure backed by an array that grows
+  /// dynamically, naively calling the `reserveCapacity(_:)` method can lead
+  /// to lower than expected performance. Arrays need to follow a geometric
+  /// allocation pattern for appending elements to have amortized
+  /// constant-time performance. The `Array` type's `append(_:)` and
+  /// `append(contentsOf:)` methods take care of this detail for you, but
+  /// `reserveCapacity(_:)` allocates only as much space as you tell it to
+  /// (padded to a round value), and no more. This avoids over-allocation, but
+  /// can result in insertion not having amortized constant-time performance.
+  ///
+  /// The following code declares `values`, an array of integers, and the
+  /// `addTenQuadratic()` function, which adds ten more values to the `values`
+  /// array on each call.
+  ///
+  ///       var values: [Int] = [0, 1, 2, 3]
+  ///
+  ///       func addTenQuadratic() {
+  ///           let newCount = values.count + 10
+  ///           values.reserveCapacity(newCount)
+  ///           for n in values.count..<newCount {
+  ///               values.append(n)
+  ///           }
+  ///       }
+  ///
+  /// The call to `reserveCapacity(_:)` increases the `values` array's capacity
+  /// by exactly 10 elements on each pass through `addTenQuadratic()`, which
+  /// is linear growth. Instead of having constant time when averaged over
+  /// many calls, the function may decay to performance that is linear in
+  /// `values.count`. This is almost certainly not what you want.
+  ///
+  /// In cases like this, the simplest fix is often to simply remove the call
+  /// to `reserveCapacity(_:)`, and let the `append(_:)` method grow the array
+  /// for you.
+  ///
+  ///       func addTen() {
+  ///           let newCount = values.count + 10
+  ///           for n in values.count..<newCount {
+  ///               values.append(n)
+  ///           }
+  ///       }
+  ///
+  /// If you need more control over the capacity of your array, implement your
+  /// own geometric growth strategy, passing the size you compute to
+  /// `reserveCapacity(_:)`.
+  ///
   /// - Parameter minimumCapacity: The requested number of elements to store.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the array.

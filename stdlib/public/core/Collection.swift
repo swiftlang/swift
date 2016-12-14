@@ -90,15 +90,14 @@ public protocol _IndexableBase {
   subscript(position: Index) -> _Element { get }
 
   // WORKAROUND: rdar://25214066
-  /// A sequence that can represent a contiguous subrange of the collection's
+  /// A sequence that represents a contiguous subrange of the collection's
   /// elements.
   associatedtype SubSequence
 
   /// Accesses the subsequence bounded by the given range.
   ///
   /// - Parameter bounds: A range of the collection's indices. The upper and
-  ///   lower bounds of the `bounds` range must be valid indices of the
-  ///   collection.
+  ///   lower bounds of the range must be valid indices of the collection.
   ///
   /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
@@ -148,7 +147,7 @@ public protocol _IndexableBase {
 
   /// Returns the position immediately after the given index.
   ///
-  /// The successor of an index must be well-defined. For an index `i` into a
+  /// The successor of an index must be well defined. For an index `i` into a
   /// collection `c`, calling `c.index(after: i)` returns the same index every
   /// time.
   ///
@@ -174,7 +173,7 @@ public protocol _IndexableBase {
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
 public typealias Indexable = _Indexable
 public protocol _Indexable : _IndexableBase {
-  /// A type used to represent the number of steps between two indices, where
+  /// A type that represents the number of steps between two indices, where
   /// one value is reachable from the other.
   ///
   /// In Swift, *reachability* refers to the ability to produce one value from
@@ -191,8 +190,8 @@ public protocol _Indexable : _IndexableBase {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond `endIndex` or before
+  /// `startIndex` for this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -231,8 +230,8 @@ public protocol _Indexable : _IndexableBase {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
+  /// The value passed as `n` must not offset `i` beyond `endIndex` or
+  /// before `startIndex` for this collection, unless the index passed as
   /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
@@ -256,8 +255,8 @@ public protocol _Indexable : _IndexableBase {
 
   /// Offsets the given index by the specified distance.
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond `endIndex` or before
+  /// `startIndex` for this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -273,9 +272,9 @@ public protocol _Indexable : _IndexableBase {
   /// Offsets the given index by the specified distance, or so that it equals
   /// the given limiting index.
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
-  /// `limit` prevents offsetting beyond those bounds.
+  /// The value passed as `n` must not offset `i` beyond `endIndex` or before
+  /// `startIndex` for this collection, unless the index passed as `limit`
+  /// prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -546,7 +545,7 @@ public struct IndexingIterator<
 /// count the number of contained elements, accessing its `count` property is
 /// an O(*n*) operation.
 public protocol Collection : _Indexable, Sequence {
-  /// A type that can represent the number of steps between a pair of
+  /// A type that represents the number of steps between a pair of
   /// indices.
   associatedtype IndexDistance : SignedInteger = Int
 
@@ -554,7 +553,7 @@ public protocol Collection : _Indexable, Sequence {
   /// encapsulates its iteration state.
   ///
   /// By default, a collection conforms to the `Sequence` protocol by
-  /// supplying a `IndexingIterator` as its associated `Iterator`
+  /// supplying `IndexingIterator` as its associated `Iterator`
   /// type.
   associatedtype Iterator : IteratorProtocol = IndexingIterator<Self>
 
@@ -632,7 +631,7 @@ public protocol Collection : _Indexable, Sequence {
   /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
 
-  /// A type that can represent the indices that are valid for subscripting the
+  /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : _Indexable, Sequence = DefaultIndices<Self>
 
@@ -649,10 +648,10 @@ public protocol Collection : _Indexable, Sequence {
   /// order.
   ///
   /// A collection's `indices` property can hold a strong reference to the
-  /// collection itself, causing the collection to be non-uniquely referenced.
+  /// collection itself, causing the collection to be nonuniquely referenced.
   /// If you mutate the collection while iterating over its indices, a strong
-  /// reference can cause an unexpected copy of the collection. To avoid the
-  /// unexpected copy, use the `index(after:)` method starting with
+  /// reference can result in an unexpected copy of the collection. To avoid
+  /// the unexpected copy, use the `index(after:)` method starting with
   /// `startIndex` to produce indices instead.
   ///
   ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
@@ -802,8 +801,8 @@ public protocol Collection : _Indexable, Sequence {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond `endIndex` or before
+  /// `startIndex` for this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -842,9 +841,9 @@ public protocol Collection : _Indexable, Sequence {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
-  /// `limit` prevents offsetting beyond those bounds.
+  /// The value passed as `n` must not offset `i` beyond `endIndex` or before
+  /// `startIndex` for this collection, unless the index passed as `limit`
+  /// prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -941,8 +940,8 @@ extension _Indexable {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond `endIndex` or before
+  /// `startIndex` for this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -983,9 +982,9 @@ extension _Indexable {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
-  /// `limit` prevents offsetting beyond those bounds.
+  /// The value passed as `n` must not offset `i` beyond `endIndex` or before
+  /// `startIndex` for this collection, unless the index passed as `limit`
+  /// prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -1010,8 +1009,8 @@ extension _Indexable {
 
   /// Offsets the given index by the specified distance.
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond `endIndex` or before
+  /// `startIndex` for this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -1029,9 +1028,9 @@ extension _Indexable {
   /// Offsets the given index by the specified distance, or so that it equals
   /// the given limiting index.
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
-  /// `limit` prevents offsetting beyond those bounds.
+  /// The value passed as `n` must not offset `i` beyond `endIndex` or before
+  /// `startIndex` for this collection, unless the index passed as `limit`
+  /// prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.

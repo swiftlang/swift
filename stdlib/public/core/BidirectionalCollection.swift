@@ -92,7 +92,7 @@ public protocol BidirectionalCollection
   // types with where clauses.
   // associatedtype SubSequence : BidirectionalCollection
 
-  /// A type that can represent the indices that are valid for subscripting the
+  /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : _BidirectionalIndexable, Collection
     = DefaultBidirectionalIndices<Self>
