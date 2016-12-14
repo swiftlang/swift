@@ -549,7 +549,7 @@ do {
 }
 
 struct SubscriptTwo {
-  subscript(_ x: Int, _ y: Int) -> Int { get { return 0 } set { } } // expected-note 2 {{'subscript' declared here}}
+  subscript(_ x: Int, _ y: Int) -> Int { get { return 0 } set { } } // expected-note 3 {{'subscript' declared here}}
 }
 
 struct SubscriptTuple {
@@ -590,8 +590,7 @@ do {
   var s1 = SubscriptTwo()
   _ = s1[a, b]
   _ = s1[(a, b)] // expected-error {{missing argument for parameter #2 in call}}
-
-  // _ = s1[d] // FIXME: Crashes in Swift 3 mode
+  _ = s1[d] // expected-error {{missing argument for parameter #2 in call}}
 
   var s2 = SubscriptTuple()
   _ = s2[a, b] // expected-error {{extra argument in call}}}
@@ -1023,7 +1022,7 @@ do {
   var d = (a, b)
 
   var s1 = GenericSubscript<(Double, Double)>()
-  // _ = s1[a, b] // FIXME: Crashes in Swift 3 mode
+  _ = s1[a, b]
   _ = s1[(a, b)] // expected-error {{expression type '@lvalue Int' is ambiguous without more context}}
   _ = s1[d] // expected-error {{expression type '@lvalue Int' is ambiguous without more context}}
 

@@ -5051,7 +5051,13 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
               TC.Context.SourceMgr, FnExpr->getEndLoc());
         }
       } else {
-        llvm_unreachable("unexpected argument expression type");
+        // FIXME: Due to a quirk of CSApply, we can end up without a
+        // ParenExpr if the argument has an '@lvalue TupleType'.
+        assert((isa<TupleType>(ArgExpr->getType().getPointer()) ||
+                isa<ParenType>(ArgExpr->getType().getPointer())) &&
+                "unexpected argument expression type");
+        insertLoc = ArgExpr->getLoc();
+
         // Can't be TupleShuffleExpr because this argExpr is not yet resolved.
       }
 

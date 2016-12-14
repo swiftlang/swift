@@ -534,7 +534,7 @@ do {
 }
 
 struct SubscriptTwo {
-  subscript(_ x: Int, _ y: Int) -> Int { get { return 0 } set { } } // expected-note 4 {{'subscript' declared here}}
+  subscript(_ x: Int, _ y: Int) -> Int { get { return 0 } set { } } // expected-note 5 {{'subscript' declared here}}
 }
 
 struct SubscriptTuple {
@@ -575,9 +575,7 @@ do {
   var s1 = SubscriptTwo()
   _ = s1[a, b]
   _ = s1[(a, b)] // expected-error {{missing argument for parameter #2 in call}}
-
-  // FIXME: Crashes in CSDiag
-  // _ = s1[d]
+  _ = s1[d] // expected-error {{missing argument for parameter #2 in call}}
 
   var s2 = SubscriptTuple()
   _ = s2[a, b] // expected-error {{extra argument in call}}}

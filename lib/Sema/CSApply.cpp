@@ -4702,6 +4702,15 @@ Expr *ExprRewriter::coerceCallArguments(
     bool hasTrailingClosure,
     ConstraintLocatorBuilder locator) {
 
+  // Total hack: In Swift 3 mode, we can end up with an arity mismatch due to
+  // loss of ParenType sugar.
+  if (cs.getASTContext().isSwiftVersion3()) {
+    if (isa<TupleExpr>(arg))
+      if (auto *parenType = dyn_cast<ParenType>(paramType.getPointer()))
+        if (isa<TupleType>(parenType->getUnderlyingType().getPointer()))
+          paramType = parenType->getUnderlyingType();
+  }
+
   bool allParamsMatch = cs.getType(arg)->isEqual(paramType);
 
   // Find the callee declaration.
