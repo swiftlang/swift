@@ -54,8 +54,8 @@ public:
   /// scope.
   void addToScope(ValueDecl *D, Parser &TheParser);
 
-  bool isInactiveConfigBlock() const;
-
+  bool isStaticallyInactiveConfigBlock() const;
+  
   SavedScope saveCurrentScope();
 };
 
@@ -91,7 +91,7 @@ class SavedScope {
   ScopeInfo::ScopedHTDetachedScopeTy HTDetachedScope;
   unsigned Depth;
   ScopeKind Kind;
-  bool IsInactiveConfigBlock;
+  bool IsStaticallyInactiveConfigBlock;
 
   SavedScope() = delete;
   SavedScope(const SavedScope &) = delete;
@@ -103,9 +103,9 @@ public:
   ~SavedScope() = default;
 
   SavedScope(ScopeInfo::ScopedHTDetachedScopeTy &&HTDetachedScope,
-             unsigned Depth, ScopeKind Kind, bool IsInactiveConfigBlock)
+             unsigned Depth, ScopeKind Kind, bool IsStaticallyInactiveConfigBlock)
     : HTDetachedScope(std::move(HTDetachedScope)), Depth(Depth), Kind(Kind),
-      IsInactiveConfigBlock(IsInactiveConfigBlock) {}
+      IsStaticallyInactiveConfigBlock(IsStaticallyInactiveConfigBlock) {}
 };
 
 /// Scope - This class represents lexical scopes.  These objects are created
@@ -125,12 +125,13 @@ class Scope {
   unsigned PrevResolvableDepth;
   unsigned Depth;
   ScopeKind Kind;
-  bool IsInactiveConfigBlock;
+  bool IsStaticallyInactiveConfigBlock;
 
   /// \brief Save this scope so that it can be re-entered later.  Transfers the
   /// ownership of the scope frame to returned object.
   SavedScope saveScope() {
-    return SavedScope(HTScope.detach(), Depth, Kind, IsInactiveConfigBlock);
+    return SavedScope(HTScope.detach(), Depth, Kind,
+                      IsStaticallyInactiveConfigBlock);
   }
 
   unsigned getDepth() const {
@@ -141,7 +142,7 @@ class Scope {
 
 public:
   /// \brief Create a lexical scope of the specified kind.
-  Scope(Parser *P, ScopeKind SC, bool IsInactiveConfigBlock = false);
+  Scope(Parser *P, ScopeKind SC, bool IsStaticallyInactiveConfigBlock = false);
 
   /// \brief Re-enter the specified scope, transferring the ownership of the
   /// scope frame to the new object.
@@ -174,10 +175,15 @@ inline ValueDecl *ScopeInfo::lookupValueName(DeclName Name) {
   return Res.second;
 }
 
-inline bool ScopeInfo::isInactiveConfigBlock() const {
-  if (!CurScope)
-    return false;
-  return CurScope->IsInactiveConfigBlock;
+inline bool ScopeInfo::isStaticallyInactiveConfigBlock() const {
+  auto scope = CurScope;
+  while (scope) {
+    if (scope->IsStaticallyInactiveConfigBlock) {
+      return true;
+    }
+    scope = scope->PrevScope;
+  }
+  return false;
 }
 
 inline SavedScope ScopeInfo::saveCurrentScope() {

@@ -1334,7 +1334,8 @@ ERROR(unsupported_conditional_compilation_binary_expression,none,
 ERROR(unsupported_conditional_compilation_unary_expression,none,
       "expected unary '!' expression", ())
 ERROR(unsupported_platform_condition_expression,none,
-      "unexpected platform condition (expected 'os', 'arch', or 'swift')",
+      "unexpected platform condition "
+      "(expected 'canImport', 'os', 'arch', or 'swift')",
       ())
 ERROR(platform_condition_expected_one_argument,none,
       "expected only one argument to platform condition",
