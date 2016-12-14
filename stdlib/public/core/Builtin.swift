@@ -79,14 +79,35 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
   return Int8(Builtin.canBeClass(T.self))
 }
 
-/// Returns the bits of `x`, interpreted as having type `U`.
+/// Returns the bits of the given instance, interpreted as having the specified
+/// type.
 ///
-/// - Warning: Breaks the guarantees of Swift's type system; use
-///   with extreme care.  There's almost always a better way to do
-///   anything.
+/// Only use this function to convert the instance passed as `x` to a
+/// layout-compatible type when the conversion is not possible through other
+/// means.
 ///
+/// - To convert an integer value from one type to another, use an initializer
+///   or the `numericCast(_:)` function.
+/// - To perform a bitwise conversion of an integer value to a different type,
+///   use an `init(bitPattern:)` or `init(truncatingBitPattern:)` initializer.
+/// - To convert between a pointer and an integer value with that bit pattern,
+///   or vice versa, use the `init(bitPattern:)` initializer for the
+///   destination type.
+/// - To perform a reference cast, use the casting operators (`as`, `as!`, or
+///   `as?`) or the `unsafeDowncast(_:to:)` function. Do not use
+///   `unsafeBitCast(_:to:)` with class or pointer types; doing so may
+///   introduce undefined behavior.
+///
+/// - Warning: Calling this function breaks the guarantees of Swift's type
+///   system; use with extreme care.
+///
+/// - Parameters:
+///   - x: The instance to cast to `type`.
+///   - type: The type to cast `x` to. `type` and the type of `x` must have the
+///     same size of memory representation and compatible memory layout.
+/// - Returns: A new instance of type `U`, cast from `x`.
 @_transparent
-public func unsafeBitCast<T, U>(_ x: T, to: U.Type) -> U {
+public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
     "can't unsafeBitCast between types of different sizes")
   return Builtin.reinterpretCast(x)
