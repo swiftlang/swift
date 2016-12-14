@@ -37,8 +37,8 @@ extension def_enum.TrafficLight : Error {}
 
 extension def_enum.Term : Error {}
 
-// CHECK-NORMAL-LABEL: define hidden i64 @_TFO12enum_derived7Phantomg8rawValueVs5Int64(i1, %swift.type* nocapture readnone %T) local_unnamed_addr #1
-// CHECK-TESTABLE-LABEL: define{{( protected)?}} i64 @_TFO12enum_derived7Phantomg8rawValueVs5Int64(i1, %swift.type* nocapture readnone %T) #1
+// CHECK-NORMAL-LABEL: define hidden i64 @_TFO12enum_derived7Phantomg8rawValueVs5Int64(i1, %swift.type* nocapture readnone %T) local_unnamed_addr #0
+// CHECK-TESTABLE-LABEL: define{{( protected)?}} i64 @_TFO12enum_derived7Phantomg8rawValueVs5Int64(i1, %swift.type* nocapture readnone %T) #0
 
 enum Phantom<T> : Int64 {
   case Up
