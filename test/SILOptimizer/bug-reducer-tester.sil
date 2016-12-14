@@ -6,6 +6,8 @@
 // enable testing if a suffix needing a prefix case.
 // RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-target-func='partial_apply_callee'
 
+// REQUIRES: asserts
+
 sil_stage canonical
 
 // CHECK-LABEL: sil @target_func : $@convention(thin) () -> () {
