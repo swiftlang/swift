@@ -31,6 +31,14 @@ static_assert(sizeof(SILValue) == sizeof(uintptr_t),
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
 
+void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
+  assert(this != RHS && "Cannot RAUW a value with itself");
+  while (!use_empty()) {
+    Operand *Op = *use_begin();
+    Op->set(RHS);
+  }
+}
+
 SILBasicBlock *ValueBase::getParentBlock() const {
   auto *NonConstThis = const_cast<ValueBase *>(this);
   if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
