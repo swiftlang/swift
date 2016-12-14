@@ -151,7 +151,7 @@ SwiftVersion("swift-version",
 namespace {
 
 template<typename T>
-bool contains(std::vector<T> container, T instance) {
+bool contains(std::vector<T*> &container, T *instance) {
   return std::find(container.begin(), container.end(), instance) != container.end();
 }
 
@@ -1619,8 +1619,9 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
   NodeVector AddedMatched;
 
   void handleUnmatch(NodeVector &Matched, NodeVector &All, bool Left) {
-    for (auto A : SDKNodeVectorViewer(All,
-                            [&](SDKNode *N) { return !contains(Matched, N);})) {
+    for (auto A : All) {
+      if (contains(Matched, A))
+        continue;
       if (Left)
         Listener.foundRemoveAddMatch(A, nullptr);
       else
