@@ -389,6 +389,11 @@ static const char *getMetatypeRepresentationOp(MetatypeRepresentation Rep) {
   }
 }
 
+static bool isStdlibType(const NominalTypeDecl *decl) {
+  DeclContext *dc = decl->getDeclContext();
+  return dc->isModuleScopeContext() && dc->getParentModule()->isStdlibModule();
+}
+
 /// Mangle a type into the buffer.
 ///
 void ASTMangler::appendType(Type type) {
@@ -538,7 +543,15 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::BoundGenericEnum:
     case TypeKind::BoundGenericStruct:
       if (type->isSpecialized()) {
-        appendNominalType(type->getAnyNominal());
+        NominalTypeDecl *NDecl = type->getAnyNominal();
+        if (isStdlibType(NDecl) && NDecl->getName().str() == "Optional") {
+          auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
+          assert(GenArgs.size() == 1);
+          appendType(GenArgs[0]);
+          return appendOperator("Sg");
+        }
+
+        appendNominalType(NDecl);
         bool isFirstArgList = true;
         appendBoundGenericArgs(type, isFirstArgList);
         return appendOperator("G");
@@ -1509,8 +1522,7 @@ void ASTMangler::appendDeclType(const ValueDecl *decl) {
 
 bool ASTMangler::tryAppendStandardSubstitution(const NominalTypeDecl *decl) {
   // Bail out if our parent isn't the swift standard library.
-  DeclContext *dc = decl->getDeclContext();
-  if (!dc->isModuleScopeContext() || !dc->getParentModule()->isStdlibModule())
+  if (!isStdlibType(decl))
     return false;
 
   StringRef name = decl->getName().str();

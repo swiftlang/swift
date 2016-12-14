@@ -529,6 +529,16 @@ void Remangler::mangleBoundGenericClass(Node *node) {
 }
 
 void Remangler::mangleBoundGenericEnum(Node *node) {
+  Node *Enum = node->getChild(0).get()->getChild(0).get();
+  assert(Enum->getKind() == Node::Kind::Enum);
+  Node *Mod = Enum->getChild(0).get();
+  Node *Id = Enum->getChild(1).get();
+  if (Mod->getKind() == Node::Kind::Module && Mod->getText() == STDLIB_NAME &&
+      Id->getKind() == Node::Kind::Identifier && Id->getText() == "Optional") {
+    mangleSingleChildNode(node->getChild(1).get());
+    Buffer << "Sg";
+    return;
+  }
   mangleAnyNominalType(node);
 }
 

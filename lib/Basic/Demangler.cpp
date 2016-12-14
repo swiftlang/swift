@@ -337,6 +337,10 @@ NodePointer Demangler::demangleKnownType() {
       return createSwiftType(Node::Kind::Structure, "String");
     case 'u':
       return createSwiftType(Node::Kind::Structure, "UInt");
+    case 'g':
+      return createType(createWithChildren(Node::Kind::BoundGenericEnum,
+              createSwiftType(Node::Kind::Enum, "Optional"),
+              createWithChild(Node::Kind::TypeList, popNode(Node::Kind::Type))));
     default:
       return nullptr;
   }
