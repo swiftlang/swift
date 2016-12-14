@@ -238,11 +238,11 @@ def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[FrontendOption]>,
   HelpText<"Suppress all warnings">;
 
 def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[FrontendOption]>,
   HelpText<"Treat warnings as errors">;
 
 def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
