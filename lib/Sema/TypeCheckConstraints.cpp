@@ -1500,24 +1500,6 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
          convertType.getType()->hasUnresolvedType())) {
       convertType = TypeLoc();
       convertTypePurpose = CTP_Unused;
-    } else if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-      auto *P = closure->getParameters();
-      
-      if (P->size() == 1 && convertType.getType()->is<FunctionType>()) {
-        auto hintFnType = convertType.getType()->castTo<FunctionType>();
-        auto hintFnInputType = hintFnType->getInput();
-        
-        // Cannot use hintFnInputType->is<TupleType>() since it would desugar ParenType
-        if (isa<TupleType>(hintFnInputType.getPointer())) {
-          TupleType *tupleTy = hintFnInputType->castTo<TupleType>();
-          
-          if (tupleTy->getNumElements() >= 2) {
-            diagnose(P->getStartLoc(), diag::closure_argument_list_single_tuple,
-                     hintFnInputType, P->size(), P->size() > 1);
-            return true;
-          }
-        }
-      }
     }
   }
 
