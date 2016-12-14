@@ -116,6 +116,11 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
   LLVM IR
     See `IR`.
 
+  lvalue
+    Pronounced "L-value". Refers to an expression that can be assigned to or
+    passed ``inout``. The term originally comes from C; the "L" refers to the
+    "l"eft side of an assignment operator. See also `rvalue`.
+
   main module
     The module for the file or files currently being compiled.
 
@@ -214,10 +219,11 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     behavior of the compiler--it is not just a general statement that the code
     needs to be improved.
 
-    It's suspected that this term was originally "quality of life", written as
+    It's possible that this term was originally "quality of life", written as
     "Qol", referring to the experience of end users. At some point along its
     history, the lowercase "L" was misinterpreted as an uppercase "i", and a
-    new meaning derived. Swift inherited this term from LLVM.
+    new meaning derived. Swift inherited this term from LLVM, which got it from
+    GCC.
 
   Radar
     `Apple's bug-tracking system`__, or an issue reported on that system.
@@ -237,6 +243,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     Code that implements a language's dynamic features that aren't just
     compiled down to plain instructions. For example, Swift's runtime library
     includes support for dynamic casting and for the Mirror-based reflection.
+
+  rvalue
+    Pronounced "R-value". Represents an expression that can be used as a value;
+    in Swift this is nearly every expression, so we don't use the term very
+    often. The term originally comes from C; the "R" refers to the "r"ight side
+    of an assignment operator. Contrast with `lvalue`.
 
   script mode
     The parsing mode that allows top-level imperative code in a source file.
@@ -262,6 +274,13 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     "Standard library". Sometimes this just means the "Swift" module (also
     known as "swiftCore"); sometimes it means everything in the stdlib/
     directory. Pronounced "stid-lib" or "ess-tee-dee-lib".
+
+  thunk
+    In the Swift compiler, a synthesized function whose only purpose is to
+    perform some kind of adjustment in order to call another function. For
+    example, Objective-C and Swift have different calling conventions, so the
+    Swift compiler generates a thunk for use in Objective-C that calls through
+    to the real Swift implementation.
 
   trap
     A deterministic runtime failure. Can be used as both as a noun ("Using an
