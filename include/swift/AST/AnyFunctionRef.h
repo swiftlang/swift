@@ -162,6 +162,16 @@ public:
     }
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
+  
+  GenericEnvironment *getGenericEnvironment() const {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->getGenericEnvironment();
+    }
+    if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      return ce->getGenericEnvironmentOfContext();
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
 };
 
 } // namespace swift

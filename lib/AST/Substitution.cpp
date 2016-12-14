@@ -83,8 +83,9 @@ Substitution Substitution::subst(Module *module,
     Optional<ProtocolConformanceRef> conformance;
 
     // If the original type was an archetype, check the conformance map.
-    if (auto replacementArch = Replacement->getAs<ArchetypeType>()) {
-      conformance = conformances(CanType(replacementArch),
+    if (Replacement->is<SubstitutableType>()
+        || Replacement->is<DependentMemberType>()) {
+      conformance = conformances(Replacement->getCanonicalType(),
                                  substReplacement,
                                  proto->getDeclaredType());
     }
@@ -111,7 +112,7 @@ Substitution Substitution::subst(Module *module,
 
   ArrayRef<ProtocolConformanceRef> substConfs;
   if (conformancesChanged)
-    substConfs = module->getASTContext().AllocateCopy(substConformances);
+    substConfs = Replacement->getASTContext().AllocateCopy(substConformances);
   else
     substConfs = Conformance;
 

@@ -401,10 +401,11 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     // LValues are captured as a retained @box that owns
     // the captured value.
     auto type = getVarTypeInCaptureContext();
-    SILType ty = gen.getLoweredType(type).getAddressType();
-    SILType boxTy = SILType::getPrimitiveObjectType(
-      SILBoxType::get(ty.getSwiftRValueType()));
-    SILValue box = gen.F.begin()->createArgument(boxTy, VD);
+    auto boxTy = gen.SGM.Types.getContextBoxTypeForCapture(VD,
+                               gen.getLoweredType(type).getSwiftRValueType(),
+                               gen.F.getGenericEnvironment(), /*mutable*/ true);
+    SILValue box = gen.F.begin()
+      ->createArgument(SILType::getPrimitiveObjectType(boxTy), VD);
     SILValue addr = gen.B.createProjectBox(VD, box, 0);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     gen.B.createDebugValueAddr(Loc, addr, {/*Constant*/false, ArgNo});

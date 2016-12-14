@@ -2922,6 +2922,26 @@ static Type substType(Type derivedType,
            "should not be doing AST type-substitution on a lowered SIL type;"
            "use SILType::subst");
 
+    // Special-case handle SILBoxTypes; we want to structurally substitute the
+    // substitutions.
+    if (auto boxTy = dyn_cast<SILBoxType>(type.getPointer())) {
+      if (boxTy->getGenericArgs().empty())
+        return boxTy;
+      
+      SmallVector<Substitution, 4> substArgs;
+      for (auto &arg : boxTy->getGenericArgs()) {
+        substArgs.push_back(arg.subst(nullptr, substitutions,
+                                      lookupConformances));
+      }
+      for (auto &arg : substArgs) {
+        arg = Substitution(arg.getReplacement()->getCanonicalType(),
+                           arg.getConformances());
+      }
+      return SILBoxType::get(boxTy->getASTContext(),
+                             boxTy->getLayout(),
+                             substArgs);
+    }
+    
     // We only substitute for substitutable types and dependent member types.
     
     // For dependent member types, we may need to look up the member if the
@@ -3245,47 +3265,17 @@ case TypeKind::Id:
   }
 
   case TypeKind::SILBox: {
+#ifndef NDEBUG
+    // This interface isn't suitable for updating the substitution map in a
+    // generic SILBox.
     auto boxTy = cast<SILBoxType>(base);
-    // Nothing to do for an unparameterized box layout.
-    if (boxTy->getGenericArgs().empty())
-      return boxTy;
-    
-    SmallVector<Substitution, 4> transArgs;
-    bool didChange = false;
-    for (auto &arg : boxTy->getGenericArgs()) {
-      auto transReplacement = arg.getReplacement().transform(fn);
-      if (!transReplacement)
-        return Type();
-      auto canReplacement = transReplacement->getCanonicalType();
-      if (canReplacement != CanType(arg.getReplacement())) {
-        // FIXME: We need to update the substitution conformances for the
-        // transformed type in the general case. For now, only handle
-        // transformations between generic types with abstract conformances.
-        assert((arg.getConformances().empty()
-                || (std::all_of(arg.getConformances().begin(),
-                                arg.getConformances().end(),
-                                [](ProtocolConformanceRef conformance) -> bool {
-                                  return conformance.isAbstract();
-                                })
-                    && (canReplacement->is<SubstitutableType>()
-                        || canReplacement->is<DependentMemberType>()
-                        || canReplacement->is<GenericTypeParamType>())))
-               && "transforming concrete conformance not implemented");
-        transArgs.push_back(Substitution(canReplacement,
-                                         arg.getConformances()));
-        didChange = true;
-      } else {
-        transArgs.push_back(arg);
-      }
-    }
-    if (!didChange)
-      return boxTy;
-    
-    return SILBoxType::get(boxTy->getASTContext(),
-                           boxTy->getLayout(),
-                           transArgs);
+    for (auto &arg : boxTy->getGenericArgs())
+      assert(arg.getReplacement()->isEqual(arg.getReplacement().transform(fn))
+             && "SILBoxType can't be transformed");
+#endif
+    return base;
   }
-
+  
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
