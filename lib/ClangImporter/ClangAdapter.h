@@ -24,6 +24,8 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "clang/Basic/Specifiers.h"
 
+#include "ImportName.h"
+
 namespace clang {
 class ASTContext;
 class Decl;
@@ -77,7 +79,13 @@ OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
 
 /// Find the swift_newtype attribute on the given typedef, if present.
 clang::SwiftNewtypeAttr *getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
-                                             bool useSwift2Name);
+                                             ImportNameVersion version);
+// TODO: remove once we've plumbed versions through everything else
+static inline clang::SwiftNewtypeAttr *
+getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl, bool useSwift2Name) {
+  return getSwiftNewtypeAttr(decl, useSwift2Name ? ImportNameVersion::Swift2
+                                                 : CurrentVersion);
+}
 
 /// Retrieve a bit vector containing the non-null argument
 /// annotations for the given declaration.
@@ -92,7 +100,15 @@ bool isNSNotificationGlobal(const clang::NamedDecl *);
 // swift_newtype), return it, otherwise null
 clang::TypedefNameDecl *findSwiftNewtype(const clang::NamedDecl *decl,
                                          clang::Sema &clangSema,
-                                         bool useSwift2Name);
+                                         ImportNameVersion version);
+// TODO: remove once we've plumbed versions through everything else
+static inline clang::TypedefNameDecl *
+findSwiftNewtype(const clang::NamedDecl *decl, clang::Sema &clangSema,
+                 bool useSwift2Name) {
+  return findSwiftNewtype(decl, clangSema, useSwift2Name
+                                               ? ImportNameVersion::Swift2
+                                               : CurrentVersion);
+}
 
 /// Whether the passed type is NSString *
 bool isNSString(const clang::Type *);
