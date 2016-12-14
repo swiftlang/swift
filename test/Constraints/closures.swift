@@ -349,6 +349,9 @@ class C_SR_2505 : P_SR_2505 {
   }
 
   func call(_ c: C_SR_2505) -> Bool {
+    // Note: no diagnostic about capturing 'self', because this is a
+    // non-escaping closure -- that's how we know we have selected
+    // test(it:) and not test(_)
     return c.test { o in test(o) }
   }
 }

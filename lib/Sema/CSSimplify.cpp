@@ -623,6 +623,26 @@ static ConstraintSystem::SolutionKind
 matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
                    Type argType, Type paramType,
                    ConstraintLocatorBuilder locator) {
+
+  if (paramType->isAny()) {
+    if (argType->is<InOutType>())
+      return ConstraintSystem::SolutionKind::Error;
+
+    // If the param type is Any, the function can only have one argument.
+    // Check if exactly one argument was passed to this function, otherwise
+    // we obviously have a mismatch.
+    if (auto tupleArgType = dyn_cast<TupleType>(argType.getPointer())) {
+      // Total hack: In Swift 3 mode, argument labels are ignored when calling
+      // function type with a single Any parameter.
+      if (tupleArgType->getNumElements() != 1 ||
+          (!cs.getASTContext().isSwiftVersion3() &&
+           tupleArgType->getElement(0).hasName())) {
+        return ConstraintSystem::SolutionKind::Error;
+      }
+    }
+    return ConstraintSystem::SolutionKind::Solved;
+  }
+
   // Extract the parameters.
   ValueDecl *callee;
   unsigned calleeLevel;
@@ -643,16 +663,6 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
                                       cs.shouldAttemptFixes(), listener,
                                       parameterBindings))
     return ConstraintSystem::SolutionKind::Error;
-
-  // In the empty existential parameter case,
-  // it's sufficient to simply match call arguments.
-  if (paramType->isAny()) {
-    // Argument of the existential type can't be inout.
-    if (argType->is<InOutType>())
-      return ConstraintSystem::SolutionKind::Error;
-
-    return ConstraintSystem::SolutionKind::Solved;
-  }
 
   // Check the argument types for each of the parameters.
   ConstraintSystem::TypeMatchOptions subflags =
