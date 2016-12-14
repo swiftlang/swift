@@ -4482,14 +4482,13 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   }
 
   internal mutating func nativeRemoveAll() {
-    // FIXME(performance): if the buffer is non-uniquely referenced, we
-    // shouldn't be copying the elements into new buffer and then immediately
-    // deleting the elements. We should detect that the buffer is not uniquely
-    // referenced and allocate new empty buffer of appropriate capacity.
+    if !isUniquelyReferenced() {
+        asNative = NativeBuffer(minimumCapacity: asNative.capacity)
+        return
+    }
 
-    // We have already checked for the empty dictionary case, so we will always
-    // mutating the dictionary buffer.  Request unique buffer.
-    _ = ensureUniqueNativeBuffer(asNative.capacity)
+    // We have already checked for the empty dictionary case and unique
+    // reference, so we will always mutate the dictionary buffer.
     var nativeBuffer = asNative
 
     for b in 0..<nativeBuffer.capacity {
