@@ -29,6 +29,7 @@ typedef struct {
 
 #include <type_traits>
 #include <atomic>
+#include <stddef.h>
 #include <stdint.h>
 #include <assert.h>
 
