@@ -197,7 +197,7 @@ public:
   }
 
   /// Map a contextual type to an interface type.
-  Type mapTypeOutOfContext(ModuleDecl *M, Type type) const;
+  Type mapTypeOutOfContext(Type type) const;
 
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(ModuleDecl *M, Type type) const;

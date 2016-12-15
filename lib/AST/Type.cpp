@@ -2892,6 +2892,16 @@ LookUpConformanceInSubstitutionMap::operator()(CanType dependentType,
   return Subs.lookupConformance(dependentType, conformedProtocol->getDecl());
 }
 
+Optional<ProtocolConformanceRef>
+MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
+                                       Type conformingReplacementType,
+                                       ProtocolType *conformedProtocol) const {
+  assert((conformingReplacementType->is<SubstitutableType>()
+          || conformingReplacementType->is<DependentMemberType>())
+         && "replacement requires looking up a concrete conformance");
+  return ProtocolConformanceRef(conformedProtocol->getDecl());
+}
+
 Type DependentMemberType::substBaseType(ModuleDecl *module,
                                         Type substBase,
                                         LazyResolver *resolver) {

@@ -142,9 +142,9 @@ bool GenericEnvironment::containsPrimaryArchetype(
                        QueryArchetypeToInterfaceSubstitutions(this)(archetype));
 }
 
-Type GenericEnvironment::mapTypeOutOfContext(ModuleDecl *M, Type type) const {
+Type GenericEnvironment::mapTypeOutOfContext(Type type) const {
   type = type.subst(QueryArchetypeToInterfaceSubstitutions(this),
-                    LookUpConformanceInModule(M),
+                    MakeAbstractConformanceForGenericType(),
                     SubstFlags::AllowLoweredTypes);
   assert(!type->hasArchetype() && "not fully substituted");
   return type;
