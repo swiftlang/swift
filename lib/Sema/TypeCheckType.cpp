@@ -660,16 +660,18 @@ Type TypeChecker::applyUnboundGenericArguments(
     auto result = checkGenericArguments(
         dc, loc, noteLoc, UGT, genericSig,
         substitutions, unsatisfiedDependency);
-    switch (result) {
-    case CheckGenericArgsResult::Success:
-      break;
-    case CheckGenericArgsResult::Error:
-      return ErrorType::get(Context);
-    case CheckGenericArgsResult::Unsatisfied:
-      return Type();
-    }
 
-    useObjectiveCBridgeableConformancesOfArgs(dc, BGT);
+    // Unsatisfied dependency case.
+    if (result.first)
+      return Type();
+
+    // Failure case.
+    if (!result.second)
+      return ErrorType::get(Context);
+
+    if (useObjectiveCBridgeableConformancesOfArgs(dc, BGT,
+                                                  unsatisfiedDependency))
+        return Type();
   }
 
   return BGT;
@@ -720,7 +722,8 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
   Type type =
-      TC.resolveTypeInContext(typeDecl, dc, options, generic, resolver);
+      TC.resolveTypeInContext(typeDecl, dc, options, generic, resolver,
+                              unsatisfiedDependency);
 
   // FIXME: Defensive check that shouldn't be needed, but prevents a
   // huge number of crashes on ill-formed code.

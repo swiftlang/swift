@@ -909,7 +909,7 @@ static std::string gatherGenericParamBindingsText(
   return result.str().str();
 }
 
-TypeChecker::CheckGenericArgsResult
+std::pair<bool, bool>
 TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                                    SourceLoc noteLoc,
                                    Type owner,
@@ -936,24 +936,24 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
 
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
-      if (auto *classDecl = firstType->getClassOrBoundGenericClass()) {
-        // If we have a callback to report dependencies, do so.
-        // FIXME: Woefully inadequate.
-        if (unsatisfiedDependency &&
-            (*unsatisfiedDependency)(requestTypeCheckSuperclass(classDecl)))
-          return CheckGenericArgsResult::Unsatisfied;
-      }
-
       // Protocol conformance requirements.
       auto proto = secondType->castTo<ProtocolType>();
       // FIXME: This should track whether this should result in a private
       // or non-private dependency.
       // FIXME: Do we really need "used" at this point?
       // FIXME: Poor location information. How much better can we do here?
-      if (!conformsToProtocol(firstType, proto->getDecl(), dc,
-                              ConformanceCheckFlags::Used, loc)) {
-        return CheckGenericArgsResult::Error;
-      }
+      auto result = conformsToProtocol(
+          firstType, proto->getDecl(), dc,
+          ConformanceCheckFlags::Used, loc,
+          unsatisfiedDependency);
+
+      // Unsatisfied dependency case.
+      if (result.first)
+        return std::make_pair(true, false);
+
+      // Conformance check failure case.
+      if (!result.second)
+        return std::make_pair(false, false);
 
       continue;
     }
@@ -970,7 +970,7 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                  gatherGenericParamBindingsText(
                    {req.getFirstType(), req.getSecondType()},
                    genericSig, substitutions));
-        return CheckGenericArgsResult::Error;
+        return std::make_pair(false, false);
       }
       continue;
 
@@ -984,13 +984,13 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                  gatherGenericParamBindingsText(
                    {req.getFirstType(), req.getSecondType()},
                    genericSig, substitutions));
-        return CheckGenericArgsResult::Error;
+        return std::make_pair(false, false);
       }
       continue;
     }
   }
 
-  return CheckGenericArgsResult::Success;
+  return std::make_pair(false, true);
 }
 
 Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,

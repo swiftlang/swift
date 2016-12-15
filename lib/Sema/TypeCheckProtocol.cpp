@@ -4605,31 +4605,77 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
   return lookupResult;
 }
 
+std::pair<bool, Optional<ProtocolConformanceRef>>
+TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
+                                DeclContext *DC,
+                                ConformanceCheckOptions options,
+                                SourceLoc ComplainLoc,
+                                UnsatisfiedDependency *unsatisfiedDependency) {
+  // If we have a callback to report dependencies, do so.
+  // FIXME: Woefully inadequate.
+  if (unsatisfiedDependency) {
+    if (auto *classDecl = dyn_cast_or_null<ClassDecl>(T->getAnyNominal())) {
+      if ((*unsatisfiedDependency)(requestTypeCheckSuperclass(classDecl)))
+        return std::make_pair(true, None);
+    }
+
+    SmallVector<ProtocolDecl *, 2> protos;
+    if (T->isExistentialType(protos)) {
+      bool anyUnsatisfied = false;
+      for (auto *proto : protos) {
+        if ((*unsatisfiedDependency)(requestInheritedProtocols(proto)))
+          anyUnsatisfied = true;
+      }
+      if (anyUnsatisfied)
+        return std::make_pair(true, None);
+    }
+  }
+
+  // Just punt to the older conformsToProtocol() and hope it doesn't
+  // recurse.
+  auto conformance = conformsToProtocol(T, Proto, DC, options, ComplainLoc);
+  return std::make_pair(false, conformance);
+}
+
 /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
 ///
 /// These conformances might not appear in any substitution lists produced
 /// by Sema, since bridging is done at the SILGen level, so we have to
 /// force them here to ensure SILGen can find them.
-void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
-                                                      Type type) {
+bool TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
+                                                      Type type,
+                                 UnsatisfiedDependency *unsatisfiedDependency) {
   class Walker : public TypeWalker {
     TypeChecker &TC;
     DeclContext *DC;
     ProtocolDecl *Proto;
+    UnsatisfiedDependency *Callback;
 
   public:
-    Walker(TypeChecker &tc, DeclContext *dc, ProtocolDecl *proto)
-      : TC(tc), DC(dc), Proto(proto) { }
+    bool WasUnsatisfied;
+
+    Walker(TypeChecker &tc, DeclContext *dc, ProtocolDecl *proto,
+           UnsatisfiedDependency *unsatisfiedDependency)
+      : TC(tc), DC(dc), Proto(proto),
+        Callback(unsatisfiedDependency),
+        WasUnsatisfied(false) { }
 
     Action walkToTypePre(Type ty) override {
-      ConformanceCheckOptions options = ConformanceCheckFlags::InExpression
-          | ConformanceCheckFlags::Used
-          | ConformanceCheckFlags::SuppressDependencyTracking;
+      ConformanceCheckOptions options =
+          (ConformanceCheckFlags::InExpression |
+           ConformanceCheckFlags::Used |
+           ConformanceCheckFlags::SuppressDependencyTracking);
 
       // If we have a nominal type, "use" its conformance to
       // _ObjectiveCBridgeable if it has one.
       if (auto *nominalDecl = ty->getAnyNominal()) {
-        (void)TC.conformsToProtocol(ty, Proto, DC, options);
+        auto result = TC.conformsToProtocol(ty, Proto, DC, options,
+                                            /*ComplainLoc=*/SourceLoc(),
+                                            Callback);
+
+        WasUnsatisfied |= result.first;
+        if (WasUnsatisfied)
+          return Action::Stop;
 
         // Set and Dictionary bridging also requires the conformance
         // of the key type to Hashable.
@@ -4641,7 +4687,14 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
               auto keyType = args[0];
               auto *hashableProto =
                 TC.Context.getProtocol(KnownProtocolKind::Hashable);
-              (void)TC.conformsToProtocol(keyType, hashableProto, DC, options);
+
+              auto result = TC.conformsToProtocol(
+                  keyType, hashableProto, DC, options,
+                  /*ComplainLoc=*/SourceLoc(), Callback);
+
+              WasUnsatisfied |= result.first;
+              if (WasUnsatisfied)
+                return Action::Stop;
             }
           }
         }
@@ -4653,28 +4706,48 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
 
   auto proto = getProtocol(SourceLoc(),
                            KnownProtocolKind::ObjectiveCBridgeable);
-  if (!proto) return;
+  if (!proto) return false;
 
-  type.walk(Walker(*this, dc, proto));
+  Walker walker(*this, dc, proto, unsatisfiedDependency);
+  type.walk(walker);
+  assert(!walker.WasUnsatisfied || unsatisfiedDependency);
+  return walker.WasUnsatisfied;
 }
 
-void TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
-       DeclContext *dc, BoundGenericType *bound) {
+bool TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
+       DeclContext *dc, BoundGenericType *bound,
+       UnsatisfiedDependency *unsatisfiedDependency) {
   auto proto = getProtocol(SourceLoc(),
                            KnownProtocolKind::ObjectiveCBridgeable);
-  if (!proto) return;
+  if (!proto) return false;
 
   // Check whether the bound generic type itself is bridged to
   // Objective-C.
-  ConformanceCheckOptions options = ConformanceCheckFlags::InExpression
-    | ConformanceCheckFlags::SuppressDependencyTracking;
-  if (!conformsToProtocol(bound->getDecl()->getDeclaredType(), proto, dc,
-                          options))
-    return;
+  ConformanceCheckOptions options =
+    (ConformanceCheckFlags::InExpression |
+     ConformanceCheckFlags::SuppressDependencyTracking);
+  auto result = conformsToProtocol(
+      bound->getDecl()->getDeclaredType(), proto, dc,
+      options, /*ComplainLoc=*/SourceLoc(),
+      unsatisfiedDependency);
+
+  // Unsatisfied dependency case.
+  if (result.first)
+    return true;
+
+  // Failure case.
+  if (!result.second)
+    return false;
+
+  bool anyUnsatisfied = false;
 
   // Mark the conformances within the arguments.
-  for (auto arg : bound->getGenericArgs())
-    useObjectiveCBridgeableConformances(dc, arg);
+  for (auto arg : bound->getGenericArgs()) {
+    anyUnsatisfied |= useObjectiveCBridgeableConformances(
+        dc, arg, unsatisfiedDependency);
+  }
+
+  return anyUnsatisfied;
 }
 
 void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
