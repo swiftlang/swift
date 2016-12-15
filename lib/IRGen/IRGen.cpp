@@ -351,7 +351,7 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
                         llvm::GlobalVariable *HashGlobal,
                         llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
-                        version::Version const& effectiveLanguageVersion,
+                        const version::Version &effectiveLanguageVersion,
                         StringRef OutputFilename) {
   if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an

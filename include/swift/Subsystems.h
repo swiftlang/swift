@@ -285,12 +285,21 @@ namespace swift {
 
   /// Run the LLVM passes. In multi-threaded compilation this will be done for
   /// multiple LLVM modules in parallel.
+  /// \param Diags may be null if LLVM code gen diagnostics are not required.
+  /// \param DiagMutex may also be null if a mutex around \p Diags is not
+  ///                  required.
+  /// \param HashGlobal used with incremental LLVMCodeGen to know if a module
+  ///                   was already compiled, may be null if not desired.
+  /// \param Module LLVM module to code gen, required.
+  /// \param TargetMachine target of code gen, required.
+  /// \param effectiveLanguageVersion version of the language, effectively.
+  /// \param OutputFilename Filename for output.
   bool performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
                    llvm::sys::Mutex *DiagMutex,
                    llvm::GlobalVariable *HashGlobal,
                    llvm::Module *Module,
                    llvm::TargetMachine *TargetMachine,
-                   version::Version const& effectiveLanguageVersion,
+                   const version::Version &effectiveLanguageVersion,
                    StringRef OutputFilename);
 
   /// Creates a TargetMachine from the IRGen opts and AST Context.

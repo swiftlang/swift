@@ -324,6 +324,8 @@ static void debugFailWithCrash() {
 }
 
 /// Performs the compile requested by the user.
+/// \param Instance Will be reset after performIRGeneration when the verifier
+///                 mode is NoVerify.
 /// \returns true on error
 static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
                            CompilerInvocation &Invocation,
@@ -731,7 +733,8 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   bool HadError = Instance->getASTContext().hadError();
   
   // If the AST Context has no errors but no IRModule is available,
-  // parallelIRGen happened correctly.
+  // parallelIRGen happened correctly, since parallel IRGen produces multiple
+  // modules.
   if (!IRModule) {
     return HadError;
   }
@@ -749,7 +752,7 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
     Instance.reset();
   }
   
-  // Now that we have an IR Module, hand it over to performLLVM.
+  // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(IRGenOpts, &Diags, nullptr, HashGlobal, IRModule.get(),
                   TargetMachine.get(), EffectiveLanguageVersion,
                   opts.getSingleOutputFilename()) || HadError;
