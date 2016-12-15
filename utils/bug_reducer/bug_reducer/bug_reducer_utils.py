@@ -20,6 +20,12 @@ def br_call(args, dry_run=DRY_RUN, echo=ECHO_CALLS):
         return subprocess.call(args, stdout=open('/dev/null'))
 
 
+# We use this since our squelching of stderr can hide missing file errors.
+def sanity_check_file_exists(f):
+    if not os.access(f, os.F_OK):
+        raise RuntimeError('Error! Could not find file: ' + f)
+
+
 class SwiftTools(object):
     """A utility class that enables users to easily find sil-tools without needing
 to constantly reform paths to the build directory. Also provides safety by
@@ -129,6 +135,7 @@ class SILConstantInputToolInvoker(SILToolInvoker):
         # First emit an initial *.sib file. This ensures no matter if we have a
         # *.swiftmodule, *.sil, or *.sib file, we are always using *.sib.
         self.input_file = initial_input_file
+        sanity_check_file_exists(initial_input_file)
 
     def _invoke(self, input_file, passes, output_filename):
         raise RuntimeError('Abstract method')
@@ -159,6 +166,7 @@ class SILOptInvoker(SILConstantInputToolInvoker):
 
     def _cmdline(self, input_file, passes, output_file='-'):
         base_args = self.base_args
+        sanity_check_file_exists(input_file)
         base_args.extend([input_file, '-o', output_file])
         base_args.extend(self.extra_args)
         base_args.extend(passes)
@@ -186,6 +194,8 @@ class SILFuncExtractorInvoker(SILConstantInputToolInvoker):
         return self.tools.sil_func_extractor
 
     def _cmdline(self, input_file, funclist_path, output_file='-', invert=False):
+        sanity_check_file_exists(input_file)
+        sanity_check_file_exists(funclist_path)
         assert(isinstance(funclist_path, str))
         base_args = self.base_args
         base_args.extend([input_file, '-o', output_file,
@@ -221,6 +231,7 @@ class SILNMInvoker(SILToolInvoker):
         return self.tools.sil_nm
 
     def get_symbols(self, input_file):
+        sanity_check_file_exists(input_file)
         cmdline = self.base_args
         cmdline.append(input_file)
         output = subprocess.check_output(cmdline)
