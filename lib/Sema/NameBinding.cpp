@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Parse/Parser.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"

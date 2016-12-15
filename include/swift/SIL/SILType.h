@@ -126,14 +126,9 @@ public:
     return SILType(T, SILValueCategory::Address);
   }
 
-  ///  Apply a substitution to the type to produce another lowered SIL type.
-  static SILType substType(SILModule &silModule, ModuleDecl *astModule,
-                           const TypeSubstitutionMap &subs, SILType SrcTy);
-
   ///  Apply a substitution to the function type.
   static CanSILFunctionType substFuncType(SILModule &silModule,
-                                          ModuleDecl *astModule,
-                                          const TypeSubstitutionMap &subs,
+                                          const SubstitutionMap &subs,
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics);
 
@@ -447,8 +442,7 @@ public:
   SILType substGenericArgs(SILModule &M,
                            ArrayRef<Substitution> Subs) const;
 
-  SILType subst(SILModule &silModule, ModuleDecl *astModule,
-                const TypeSubstitutionMap &subs) const;
+  SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
 
   /// If this is a specialized generic type, return all substitutions used to
   /// generate it.

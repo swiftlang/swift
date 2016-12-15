@@ -91,16 +91,6 @@ struct String {
     : String(ptr, strlen(ptr))
   {}
 
-  /// Create a Swift String from two concatenated nul-terminated strings.
-  explicit String(const char *ptr1, const char *ptr2) {
-    size_t len1 = strlen(ptr1);
-    size_t len2 = strlen(ptr2);
-    char *concatenated = static_cast<char *>(malloc(len1 + len2));
-    memcpy(concatenated, ptr1, len1);
-    memcpy(concatenated + len1, ptr2, len2);
-    swift_stringFromUTF8InRawMemory(this, concatenated, len1 + len2);
-    free(concatenated);
-  }
 #if SWIFT_OBJC_INTEROP
   explicit String(NSString *s)
     // FIXME: Use the usual NSString bridging entry point.

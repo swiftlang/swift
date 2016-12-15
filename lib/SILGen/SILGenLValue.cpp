@@ -966,7 +966,7 @@ namespace {
         callback = gen.B.createPointerToThinFunction(loc, callback, origCallbackType);
 
         auto substCallbackFnType = origCallbackFnType->substGenericArgs(
-            M, M.getSwiftModule(), substitutions);
+            M, substitutions);
         auto substCallbackType = SILType::getPrimitiveObjectType(substCallbackFnType);
         auto metatypeType = substCallbackFnType->getParameters().back().getSILType();
 

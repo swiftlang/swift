@@ -832,9 +832,13 @@ func foo1255_2() -> Int {
 
 // SR-2505: "Call arguments did not match up" assertion
 
+// Here we're simulating the busted Swift 3 behavior -- see
+// test/Constraints/diagnostics_swift4.swift for the correct
+// behavior.
+
 func sr_2505(_ a: Any) {} // expected-note {{}}
 sr_2505()          // expected-error {{missing argument for parameter #1 in call}}
-sr_2505(a: 1)      // expected-error {{extraneous argument label 'a:' in call}}
+sr_2505(a: 1)      // FIXME: emit a warning saying this becomes an error in Swift 4
 sr_2505(1, 2)      // expected-error {{extra argument in call}}
 sr_2505(a: 1, 2)   // expected-error {{extra argument in call}}
 
@@ -854,7 +858,8 @@ extension C_2505 {
 class C2_2505: P_2505 {
 }
 
-let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{argument labels '(arg:)' do not match any available overloads}} expected-note {{overloads for 'C_2505' exist}}
+// FIXME: emit a warning saying this becomes an error in Swift 4
+let c_2505 = C_2505(arg: [C2_2505()])
 
 // Diagnostic message for initialization with binary operations as right side
 let foo1255_3: String = 1 + 2 + 3 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}

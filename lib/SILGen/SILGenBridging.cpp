@@ -147,8 +147,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
 
   // Substitute into the witness function type.
   if (!substitutions.empty())
-    witnessFnTy = witnessFnTy->substGenericArgs(gen.SGM.M, gen.SGM.SwiftModule,
-                                                substitutions);
+    witnessFnTy = witnessFnTy->substGenericArgs(gen.SGM.M, substitutions);
 
   // If the Objective-C value isn't optional, wrap it in an optional.
   Type objcValueType = objcValue.getType().getSwiftRValueType();
@@ -896,10 +895,10 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   auto subs = gen.F.getForwardingSubstitutions();
 
   auto objcInfo = gen.SGM.Types.getConstantInfo(thunk);
-  auto objcFnTy = objcInfo.SILFnType->substGenericArgs(gen.SGM.M, mod, subs);
+  auto objcFnTy = objcInfo.SILFnType->substGenericArgs(gen.SGM.M, subs);
 
   auto swiftInfo = gen.SGM.Types.getConstantInfo(native);
-  auto swiftFnTy = swiftInfo.SILFnType->substGenericArgs(gen.SGM.M, mod, subs);
+  auto swiftFnTy = swiftInfo.SILFnType->substGenericArgs(gen.SGM.M, subs);
 
   // We must have the same context archetypes as the unthunked function.
   assert(objcInfo.GenericEnv == swiftInfo.GenericEnv);
@@ -1005,8 +1004,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   SILDeclRef native = thunk.asForeign(false);
   auto nativeInfo = getConstantInfo(native);
   auto subs = F.getForwardingSubstitutions();
-  auto substTy = nativeInfo.SILFnType->substGenericArgs(
-    SGM.M, SGM.M.getSwiftModule(), subs);
+  auto substTy = nativeInfo.SILFnType->substGenericArgs(SGM.M, subs);
   SILType substSILTy = SILType::getPrimitiveObjectType(substTy);
   
   // Use the same generic environment as the native entry point.
@@ -1328,7 +1326,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
                                            foreignCI);
 
     auto fnType = fn->getType().castTo<SILFunctionType>();
-    fnType = fnType->substGenericArgs(SGM.M, SGM.SwiftModule, subs);
+    fnType = fnType->substGenericArgs(SGM.M, subs);
 
     auto substResultTy =
         ArchetypeBuilder::mapTypeIntoContext(fd, nativeFormalResultTy)

@@ -270,8 +270,7 @@ private:
                                           CanSILFunctionType origFnType) const {
     if (!HasSubstitutions) return origFnType;
     
-    return origFnType->substGenericArgs(SGM.M, SGM.SwiftModule,
-                                        Substitutions);
+    return origFnType->substGenericArgs(SGM.M, Substitutions);
   }
 
   /// Add the 'self' clause back to the substituted formal type of

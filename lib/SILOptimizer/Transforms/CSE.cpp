@@ -599,7 +599,7 @@ namespace {
 /// archetypes. Replace such types by performing type substitutions
 /// according to the provided type substitution map.
 static void updateBasicBlockArgTypes(SILBasicBlock *BB,
-                                     TypeSubstitutionMap &TypeSubstMap) {
+                                     const SubstitutionMap &TypeSubstMap) {
   // Check types of all BB arguments.
   for (auto &Arg : BB->getArguments()) {
     if (!Arg->getType().getSwiftRValueType()->hasOpenedExistential())
@@ -607,8 +607,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
     // Type of this BB argument uses an opened existential.
     // Try to apply substitutions to it and if it produces a different type,
     // use this type as new type of the BB argument.
-    auto NewArgType = Arg->getType().subst(
-        BB->getModule(), BB->getModule().getSwiftModule(), TypeSubstMap);
+    auto NewArgType = Arg->getType().subst(BB->getModule(), TypeSubstMap);
     if (NewArgType == Arg->getType())
       continue;
     // Replace the type of this BB argument. The type of a BBArg
@@ -643,9 +642,8 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   llvm::SmallSetVector<SILInstruction *, 16> Candidates;
   auto OldOpenedArchetype = getOpenedArchetypeOf(Inst);
   auto NewOpenedArchetype = getOpenedArchetypeOf(dyn_cast<SILInstruction>(V));
-  TypeSubstitutionMap TypeSubstMap;
-  TypeSubstMap[OldOpenedArchetype->castTo<ArchetypeType>()] =
-    NewOpenedArchetype;
+  SubstitutionMap TypeSubstMap;
+  TypeSubstMap.addSubstitution(OldOpenedArchetype, NewOpenedArchetype);
   // Collect all candidates that may contain opened archetypes
   // that need to be replaced.
   for (auto Use : Inst->getUses()) {

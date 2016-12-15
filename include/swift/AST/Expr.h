@@ -576,7 +576,7 @@ public:
   /// \param allowOverwrite - true if it's okay if an expression already
   ///   has an access kind
   void propagateLValueAccessKind(AccessKind accessKind,
-                                 std::function<Type(Expr *)> getType
+                                 llvm::function_ref<Type(Expr *)> getType
                                    = [](Expr *E) -> Type {
                                      return E->getType();
                                  },

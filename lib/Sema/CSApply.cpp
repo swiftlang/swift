@@ -4702,6 +4702,36 @@ Expr *ExprRewriter::coerceCallArguments(
     bool hasTrailingClosure,
     ConstraintLocatorBuilder locator) {
 
+  // Local function to produce a locator to refer to the ith element of the
+  // argument tuple.
+  auto getArgLocator = [&](unsigned argIdx, unsigned paramIdx)
+                         -> ConstraintLocatorBuilder {
+    return locator.withPathElement(
+             LocatorPathElt::getApplyArgToParam(argIdx, paramIdx));
+  };
+
+  bool matchCanFail = false;
+
+  // If you value your sanity, ignore the body of this 'if' statement.
+  if (cs.getASTContext().isSwiftVersion3()) {
+    // Total hack: In Swift 3 mode, we can end up with an arity mismatch due to
+    // loss of ParenType sugar.
+    if (isa<TupleExpr>(arg))
+      if (auto *parenType = dyn_cast<ParenType>(paramType.getPointer()))
+        if (isa<TupleType>(parenType->getUnderlyingType().getPointer()))
+          paramType = parenType->getUnderlyingType();
+
+    // Total hack: In Swift 3 mode, argument labels are ignored when calling
+    // function type with a single Any parameter.
+    if (paramType->isAny()) {
+      if (auto tupleArgType = dyn_cast<TupleType>(arg->getType().getPointer())) {
+        if (tupleArgType->getNumElements() == 1) {
+          matchCanFail = true;
+        }
+      }
+    }
+  }
+
   bool allParamsMatch = cs.getType(arg)->isEqual(paramType);
 
   // Find the callee declaration.
@@ -4769,7 +4799,8 @@ Expr *ExprRewriter::coerceCallArguments(
                                                 hasTrailingClosure,
                                                 /*allowFixes=*/false, listener,
                                                 parameterBindings);
-  assert(!failed && "Call arguments did not match up?");
+
+  assert((matchCanFail || !failed) && "Call arguments did not match up?");
   (void)failed;
 
   // We should either have parentheses or a tuple.
@@ -4799,14 +4830,6 @@ Expr *ExprRewriter::coerceCallArguments(
 
     assert(i == 0 && "Scalar only has a single argument");
     return Identifier();
-  };
-
-  // Local function to produce a locator to refer to the ith element of the
-  // argument tuple.
-  auto getArgLocator = [&](unsigned argIdx, unsigned paramIdx)
-                         -> ConstraintLocatorBuilder {
-    return locator.withPathElement(
-             LocatorPathElt::getApplyArgToParam(argIdx, paramIdx));
   };
 
   auto &tc = getConstraintSystem().getTypeChecker();

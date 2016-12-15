@@ -127,6 +127,15 @@ namespace swift {
                               bool TokenizeInterpolatedString = true,
                               ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
+  /// Once parsing is complete, this walks the AST to resolve condition clauses
+  /// and other top-level validation.
+  void performConditionResolution(SourceFile &SF);
+
+  /// \brief Finish condition resolution for the bodies of function nodes that
+  /// were delayed during the first parsing pass.
+  void performDelayedConditionResolution(Decl *D, SourceFile &BSF,
+                                         SmallVectorImpl<Decl *> &ExtraTLCDs);
+
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.
   ///

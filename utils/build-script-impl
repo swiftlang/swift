@@ -63,7 +63,7 @@ KNOWN_SETTINGS=(
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
     swift-tools-enable-lto      ""               "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime. Must be set to one of 'thin' or 'full'"
     llvm-enable-lto             ""               "Must be set to one of 'thin' or 'full'"
-    llvm-enable-modules         "1"              "enable building llvm using modules"
+    llvm-enable-modules         "0"              "enable building llvm using modules"
     swift-tools-num-parallel-lto-link-jobs ""    "The number of parallel link jobs to use when compiling swift tools"
     llvm-num-parallel-lto-link-jobs ""           "The number of parallel link jobs to use when compiling llvm"
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"

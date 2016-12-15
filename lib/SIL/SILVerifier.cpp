@@ -736,7 +736,7 @@ public:
             "callee of apply with substitutions must be polymorphic");
 
     // Apply the substitutions.
-    return fnTy->substGenericArgs(F.getModule(), M, subs);
+    return fnTy->substGenericArgs(F.getModule(), subs);
   }
 
   /// Check that for each opened archetype or dynamic self type in substitutions
@@ -1287,7 +1287,6 @@ public:
     require(InitStorageTy,
             "mark_uninitialized initializer must be a function");
     auto SubstInitStorageTy = InitStorageTy->substGenericArgs(F.getModule(),
-                                             F.getModule().getSwiftModule(),
                                              MU->getInitStorageSubstitutions());
     // FIXME: Destructured value or results?
     require(SubstInitStorageTy->getAllResults().size() == 1,
@@ -1302,7 +1301,6 @@ public:
     require(SetterTy,
             "mark_uninitialized setter must be a function");
     auto SubstSetterTy = SetterTy->substGenericArgs(F.getModule(),
-                                               F.getModule().getSwiftModule(),
                                                MU->getSetterSubstitutions());
     require(SubstSetterTy->getParameters().size() == 2,
             "mark_uninitialized setter must have a value and self param");
@@ -1956,7 +1954,7 @@ public:
     // Map interface types to archetypes.
     if (auto *env = constantInfo.GenericEnv) {
       auto subs = env->getForwardingSubstitutions(M);
-      methodTy = methodTy->substGenericArgs(F.getModule(), M, subs);
+      methodTy = methodTy->substGenericArgs(F.getModule(), subs);
     }
     assert(!methodTy->isPolymorphic());
 

@@ -776,9 +776,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
                                                    ClonedFn);
   CanSILFunctionType CanFnTy = ClonedFn->getLoweredFunctionType();
   auto const &Subs = PartialApply->getSubstitutions();
-  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M,
-                                                             M.getSwiftModule(),
-                                                             Subs);
+  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M, Subs);
   return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
                                  SILType::getPrimitiveObjectType(SubstCalleeTy),
                                     PartialApply->getSubstitutions(), Args,
