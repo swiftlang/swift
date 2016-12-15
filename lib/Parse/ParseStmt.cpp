@@ -1417,6 +1417,14 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
         return recoverWithCond(Status, Condition);
     }
 
+    if (Tok.is(tok::kw_else)) {
+      SourceLoc ElseLoc = Tok.getLoc();
+      diagnose(ElseLoc, diag::unexpected_else_after_if);
+      diagnose(ElseLoc, diag::suggest_removing_else)
+        .fixItRemove(ElseLoc);
+      consumeToken(tok::kw_else);
+    }
+
     NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
     Status |= NormalBody;
     if (NormalBody.isNull())

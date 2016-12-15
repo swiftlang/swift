@@ -862,6 +862,10 @@ ERROR(expected_lbrace_after_if,PointsToFirstBadToken,
       "expected '{' after 'if' condition", ())
 ERROR(expected_lbrace_after_else,PointsToFirstBadToken,
       "expected '{' after 'else'", ())
+ERROR(unexpected_else_after_if,none,
+      "unexpected 'else' immediately following 'if' condition", ())
+NOTE(suggest_removing_else,none,
+     "remove 'else' to execute the braced block of statements when the condition is true", ())
 
 // Guard Statement
 ERROR(expected_condition_guard,PointsToFirstBadToken,
