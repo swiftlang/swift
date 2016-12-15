@@ -807,6 +807,9 @@ public:
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitRetainValueInst(RetainValueInst *i);
   void visitCopyValueInst(CopyValueInst *i);
+  void visitCopyUnownedValueInst(CopyUnownedValueInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitReleaseValueInst(ReleaseValueInst *i);
   void visitDestroyValueInst(DestroyValueInst *i);
   void visitAutoreleaseValueInst(AutoreleaseValueInst *i);

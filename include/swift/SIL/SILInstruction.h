@@ -4245,6 +4245,16 @@ class CopyValueInst : public UnaryInstructionBase<ValueKind::CopyValueInst> {
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
+class CopyUnownedValueInst
+    : public UnaryInstructionBase<ValueKind::CopyUnownedValueInst> {
+  friend class SILBuilder;
+
+  CopyUnownedValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                       SILModule &M)
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().getReferentType(M)) {}
+};
+
 class DestroyValueInst
     : public UnaryInstructionBase<ValueKind::DestroyValueInst> {
   friend class SILBuilder;
