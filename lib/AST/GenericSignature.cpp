@@ -306,7 +306,8 @@ getSubstitutions(ModuleDecl &mod,
     auto &ctx = getASTContext();
 
     // Compute the replacement type.
-    Type currentReplacement = depTy.subst(&mod, subs);
+    Type currentReplacement = depTy.subst(subs,
+                                          LookUpConformanceInModule(&mod));
     if (!currentReplacement)
       currentReplacement = ErrorType::get(depTy);
 
