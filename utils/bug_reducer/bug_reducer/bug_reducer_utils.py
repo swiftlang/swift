@@ -50,7 +50,7 @@ runtime error if the tool does not exist"""
     def sil_func_extractor(self):
         """Return the path to sil-func-extractor in the specified swift build
 directory. Throws a runtime error if the tool does not exist."""
-        return self._get_tool('sil-opt')
+        return self._get_tool('sil-func-extractor')
 
     @property
     def sil_passpipeline_dumper(self):
