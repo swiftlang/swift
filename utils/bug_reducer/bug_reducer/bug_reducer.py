@@ -2,6 +2,8 @@
 
 import argparse
 
+import func_bug_reducer
+
 import opt_bug_reducer
 
 import random_bug_finder
@@ -22,6 +24,7 @@ A program for reducing sib/sil crashers""")
 
     add_subparser(subparsers, opt_bug_reducer, 'opt')
     add_subparser(subparsers, random_bug_finder, 'random-search')
+    add_subparser(subparsers, func_bug_reducer, 'func')
 
     args = parser.parse_args()
     args.func(args)

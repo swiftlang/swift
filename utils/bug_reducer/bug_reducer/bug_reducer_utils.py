@@ -1,16 +1,20 @@
 
-import json
 import os
 import subprocess
 
 DRY_RUN = False
+SQUELCH_STDERR = True
 
-
-def br_call(args):
-    if DRY_RUN:
-        print('DRY RUN: ' + ' '.join(args))
+def br_call(args, dry_run=DRY_RUN):
+    if dry_run:
+        print('DRY RUN BRCALL: ' + ' '.join(args))
         return 0
-    return subprocess.call(args, stdout=open('/dev/null'), stderr=open('/dev/null'))
+    if SQUELCH_STDERR:
+        return subprocess.call(args, stdout=open('/dev/null'),
+                               stderr=open('/dev/null'))
+    else:
+        # Useful for debugging.
+        return subprocess.call(args, stdout=open('/dev/null'))
 
 
 class SwiftTools(object):
@@ -166,3 +170,58 @@ class SILOptInvoker(SILConstantInputToolInvoker):
 
     def cmdline_with_passlist(self, passes):
         return self._cmdline(self.input_file, passes)
+
+
+class SILFuncExtractorInvoker(SILConstantInputToolInvoker):
+
+    def __init__(self, config, tools, input_file):
+        SILConstantInputToolInvoker.__init__(self, config, tools, input_file,
+                                             [])
+
+    @property
+    def tool(self):
+        return self.tools.sil_func_extractor
+
+    def _cmdline(self, input_file, funclist_path, output_file='-', invert=False):
+        assert(isinstance(funclist_path, str))
+        base_args = self.base_args
+        base_args.extend([input_file, '-o', output_file,
+                          '-func-file=%s' % funclist_path])
+        if invert:
+            base_args.append('-invert')
+        return base_args
+
+    def _invoke(self, input_file, funclist_path, output_filename, invert=False):
+        assert(isinstance(funclist_path, str))
+        cmdline = self._cmdline(input_file, funclist_path, output_filename,
+                                invert)
+        return br_call(cmdline)
+
+    def invoke_with_functions(self, funclist_path, output_filename, invert=False):
+        assert(isinstance(funclist_path, str))
+        return self._invoke(self.input_file, funclist_path, output_filename,
+                            invert)
+
+    def cmdline_with_functions(self, funclist_path, invert=False):
+        assert(isinstance(funclist_path, str))
+        return self._cmdline(self.input_file, funclist_path, invert)
+
+
+class SILNMInvoker(SILToolInvoker):
+
+    def __init__(self, config, tools):
+        self.tools = tools
+        SILToolInvoker.__init__(self, config)
+
+    @property
+    def tool(self):
+        return self.tools.sil_nm
+
+    def get_symbols(self, input_file):
+        cmdline = self.base_args
+        cmdline.append(input_file)
+        output = subprocess.check_output(cmdline)
+        for l in output.split("\n")[:-1]:
+            t = tuple(l.split(" "))
+            assert(len(t) == 2)
+            yield t
