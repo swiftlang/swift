@@ -154,7 +154,7 @@ bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
 
   // If the SILModule does not have the VTable, attempt to deserialize the
   // VTable. If we fail to do that as well, bail.
-  if (!Vtbl || !(Vtbl = Loader->lookupVTable(D->getName())))
+  if (!Vtbl || !(Vtbl = Loader->lookupVTable(D->getIdentifier())))
     return false;
 
   // Ok we found our VTable. Visit each function referenced by the VTable. If

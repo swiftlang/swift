@@ -772,7 +772,7 @@ public:
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, Type T) override {
-    if (isa<VarDecl>(D) && D->hasName() && D->getName().str() == "self")
+    if (isa<VarDecl>(D) && D->hasName() && D->getBaseName() == "self")
       return true;
 
     // Do not annotate references to unavailable decls.

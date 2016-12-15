@@ -298,7 +298,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   // in the future.  However, if this is a direct reference to a decl (e.g. "x")
   // then don't create a repl metavariable.
   if (VarDecl *d = getObviousDeclFromExpr(E)) {
-    generatePrintOfExpression(d->getName().str(), E);
+    generatePrintOfExpression(d->getBaseName().str(), E);
     return;
   }
 
@@ -334,7 +334,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   // Finally, print the variable's value.
   E = TC.buildCheckedRefExpr(vd, &SF, DeclNameLoc(E->getStartLoc()),
                              /*Implicit=*/true);
-  generatePrintOfExpression(vd->getName().str(), E);
+  generatePrintOfExpression(vd->getBaseName().str(), E);
 }
 
 /// processREPLTopLevelPatternBinding - When we see a new PatternBinding parsed

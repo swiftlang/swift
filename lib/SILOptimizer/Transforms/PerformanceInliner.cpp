@@ -398,7 +398,7 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   // Do not inline @_semantics functions when compiling the stdlib,
   // because they need to be preserved, so that the optimizer
   // can properly optimize a user code later.
-  auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();
+  auto ModuleName = Callee->getModule().getSwiftModule()->getIdentifier().str();
   if (Callee->hasSemanticsAttrThatStartsWith("array.") &&
       (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT))
     return false;

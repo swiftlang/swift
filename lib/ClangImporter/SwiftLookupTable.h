@@ -65,12 +65,9 @@ private:
   union {
     const clang::DeclContext *DC;
     const clang::TypedefNameDecl *Typedef;
-    struct {
-      const char *Data;
-    } Unresolved;
+    DeclName Unresolved;
   };
   Kind TheKind;
-  unsigned UnresolvedLength;
   
 public:
   EffectiveClangContext() : TheKind(DeclContext) {
@@ -103,9 +100,8 @@ public:
     Typedef = typedefName->getCanonicalDecl();
   }
 
-  EffectiveClangContext(StringRef unresolved) : TheKind(UnresolvedContext) {
-    Unresolved.Data = unresolved.data();
-    UnresolvedLength = unresolved.size();
+  EffectiveClangContext(DeclName unresolved) : TheKind(UnresolvedContext) {
+    Unresolved = unresolved;
   }
 
   /// Determine whether this effective Clang context was set.
@@ -128,9 +124,9 @@ public:
   }
 
   /// Retrieve the unresolved context name.
-  StringRef getUnresolvedName() const {
+  DeclName getUnresolvedName() const {
     assert(getKind() == UnresolvedContext);
-    return StringRef(Unresolved.Data, UnresolvedLength);
+    return Unresolved;
   }
 };
 static_assert(sizeof(EffectiveClangContext) <= 2 * sizeof(void *),
@@ -266,7 +262,7 @@ public:
 private:
   /// A table mapping from the base name of Swift entities to all of
   /// the C entities that have that name, in all contexts.
-  llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>> LookupTable;
+  llvm::DenseMap<DeclName, SmallVector<FullTableEntry, 2>> LookupTable;
 
   /// The list of Objective-C categories and extensions.
   llvm::SmallVector<clang::ObjCCategoryDecl *, 4> Categories;
@@ -290,8 +286,8 @@ private:
   friend class SwiftLookupTableWriter;
 
   /// Find or create the table entry for the given base name. 
-  llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>>::iterator
-  findOrCreate(StringRef baseName);
+  llvm::DenseMap<DeclName, SmallVector<FullTableEntry, 2>>::iterator
+  findOrCreate(DeclName baseName);
 
   /// Add the given entry to the list of entries, if it's not already
   /// present.
@@ -350,7 +346,7 @@ private:
   /// entities should reside. This may be None to indicate that
   /// all results from all contexts should be produced.
   SmallVector<SingleEntry, 4>
-  lookup(StringRef baseName, llvm::Optional<StoredContext> searchContext);
+  lookup(DeclName baseName, llvm::Optional<StoredContext> searchContext);
 
   /// Retrieve the set of global declarations that are going to be
   /// imported as members into the given context.
@@ -359,7 +355,7 @@ private:
 public:
   /// Lookup an unresolved context name and resolve it to a Clang
   /// named declaration.
-  clang::NamedDecl *resolveContext(StringRef unresolvedName);
+  clang::NamedDecl *resolveContext(DeclName unresolvedName);
 
   /// Lookup the set of entities with the given base name.
   ///
@@ -370,14 +366,14 @@ public:
   /// entities should reside. This may be None to indicate that
   /// all results from all contexts should be produced.
   SmallVector<SingleEntry, 4>
-  lookup(StringRef baseName, EffectiveClangContext searchContext);
+  lookup(DeclName baseName, EffectiveClangContext searchContext);
 
   /// Retrieve the set of base names that are stored in the lookup table.
-  SmallVector<StringRef, 4> allBaseNames();
+  SmallVector<DeclName, 4> allBaseNames(ASTContext &ctx);
 
   /// Lookup Objective-C members with the given base name, regardless
   /// of context.
-  SmallVector<clang::NamedDecl *, 4> lookupObjCMembers(StringRef baseName);
+  SmallVector<clang::NamedDecl *, 4> lookupObjCMembers(DeclName baseName);
 
   /// Retrieve the set of Objective-C categories and extensions.
   ArrayRef<clang::ObjCCategoryDecl *> categories();
@@ -392,7 +388,7 @@ public:
   SmallVector<SingleEntry, 4> allGlobalsAsMembers();
 
   /// Deserialize all entries.
-  void deserializeAll();
+  void deserializeAll(ASTContext &ctx);
 
   /// Dump the internal representation of this lookup table.
   void dump() const;

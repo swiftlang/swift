@@ -270,7 +270,7 @@ GenericParamList *cloneGenericParams(ASTContext &ctx,
   SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
   for (auto fromGP : *fromParams) {
     // Create the new generic parameter.
-    auto toGP = new (ctx) GenericTypeParamDecl(dc, fromGP->getName(),
+    auto toGP = new (ctx) GenericTypeParamDecl(dc, fromGP->getIdentifier(),
                                                SourceLoc(),
                                                fromGP->getDepth(),
                                                fromGP->getIndex());
@@ -346,7 +346,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // Cannot extend a bound generic type.
   if (extendedType->isSpecialized() && extendedType->getAnyNominal()) {
     TC.diagnose(ED->getLoc(), diag::extension_specialization,
-                extendedType->getAnyNominal()->getName())
+                extendedType->getAnyNominal()->getBaseName())
       .highlight(ED->getExtendedTypeLoc().getSourceRange());
     ED->setInvalid();
     ED->getExtendedTypeLoc().setInvalidType(TC.Context);
@@ -876,7 +876,7 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
                                               LookupTypeResult &lookup) {
   if (auto moduleTy = baseTy->getAs<ModuleType>()) {
     diagnose(nameLoc, diag::ambiguous_module_type, name,
-             moduleTy->getModule()->getName())
+             moduleTy->getModule()->getIdentifier())
       .highlight(baseRange);
   } else {
     diagnose(nameLoc, diag::ambiguous_member_type, name, baseTy)
@@ -2308,7 +2308,7 @@ void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
 void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
   if (!hasEnabledForbiddenTypecheckPrefix())
     return;
-  checkForForbiddenPrefix(E->getName().getBaseName());
+  checkForForbiddenPrefix(E->getName().getIdentifier());
 }
 
 void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {

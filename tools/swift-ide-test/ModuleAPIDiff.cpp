@@ -717,7 +717,7 @@ public:
 
   sma::NestedDecls &&takeNestedDecls() { return std::move(Result); }
 
-  sma::Identifier convertToIdentifier(Identifier I) const {
+  sma::Identifier convertToIdentifier(DeclName I) const {
     return sma::Identifier{I.str().str()};
   }
 
@@ -783,7 +783,7 @@ public:
 
   void visitStructDecl(StructDecl *SD) {
     auto ResultSD = std::make_shared<sma::StructDecl>();
-    ResultSD->Name = convertToIdentifier(SD->getName());
+    ResultSD->Name = convertToIdentifier(SD->getBaseName());
     ResultSD->TheGenericSignature =
         convertToGenericSignature(SD->getGenericSignature());
     ResultSD->ConformsToProtocols = collectProtocolConformances(SD);
@@ -795,7 +795,7 @@ public:
 
   void visitEnumDecl(EnumDecl *ED) {
     auto ResultED = std::make_shared<sma::EnumDecl>();
-    ResultED->Name = convertToIdentifier(ED->getName());
+    ResultED->Name = convertToIdentifier(ED->getBaseName());
     ResultED->TheGenericSignature =
         convertToGenericSignature(ED->getGenericSignature());
     ResultED->RawType = convertToOptionalTypeName(ED->getRawType());
@@ -808,7 +808,7 @@ public:
 
   void visitClassDecl(ClassDecl *CD) {
     auto ResultCD = std::make_shared<sma::ClassDecl>();
-    ResultCD->Name = convertToIdentifier(CD->getName());
+    ResultCD->Name = convertToIdentifier(CD->getBaseName());
     ResultCD->TheGenericSignature =
         convertToGenericSignature(CD->getGenericSignature());
     ResultCD->Superclass = convertToOptionalTypeName(CD->getSuperclass());
@@ -821,7 +821,7 @@ public:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     auto ResultPD = std::make_shared<sma::ProtocolDecl>();
-    ResultPD->Name = convertToIdentifier(PD->getName());
+    ResultPD->Name = convertToIdentifier(PD->getBaseName());
     ResultPD->ConformsToProtocols = collectProtocolConformances(PD);
     // FIXME
     // ResultPD->Attributes = ?;
@@ -831,7 +831,7 @@ public:
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     auto ResultTD = std::make_shared<sma::TypealiasDecl>();
-    ResultTD->Name = convertToIdentifier(TAD->getName());
+    ResultTD->Name = convertToIdentifier(TAD->getBaseName());
     ResultTD->Type = convertToTypeName(TAD->getUnderlyingType());
     // FIXME
     // ResultTD->Attributes = ?;
@@ -840,7 +840,7 @@ public:
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *ATD) {
     auto ResultATD = std::make_shared<sma::AssociatedTypeDecl>();
-    ResultATD->Name = convertToIdentifier(ATD->getName());
+    ResultATD->Name = convertToIdentifier(ATD->getBaseName());
     ResultATD->Superclass = convertToOptionalTypeName(ATD->getSuperclass());
     ResultATD->DefaultDefinition =
         convertToOptionalTypeName(ATD->getDefaultDefinitionType());
@@ -884,7 +884,7 @@ std::shared_ptr<sma::Module> createSMAModel(Module *M) {
   }
 
   auto ResultM = std::make_shared<sma::Module>();
-  ResultM->Name = Generator.convertToIdentifier(M->getName());
+  ResultM->Name = Generator.convertToIdentifier(M->getBaseName());
 
   // FIXME:
   // ResultM->ExportedModules = ?;

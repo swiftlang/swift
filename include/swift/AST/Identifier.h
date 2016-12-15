@@ -276,13 +276,26 @@ public:
   /// Retrieve the 'base' name, i.e., the name that follows the introducer,
   /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in
   /// 'var bar: Int'.
-  Identifier getBaseName() const {
+  Identifier getIdentifier() const {
     if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return compound->BaseName;
     
     return SimpleOrCompound.get<IdentifierAndCompound>().getPointer();
   }
 
+  /// Retrieve the 'base' name, i.e., the name that follows the introducer,
+  /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in
+  /// 'var bar: Int'.
+  DeclName getBaseName() const {
+    DeclName base;
+    if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>()) {
+     base = compound->BaseName;
+    } else {
+      base = SimpleOrCompound.get<IdentifierAndCompound>().getPointer();
+    }
+    return base;
+  }
+  
   /// Retrieve the names of the arguments, if there are any.
   ArrayRef<Identifier> getArgumentNames() const {
     if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
@@ -316,18 +329,22 @@ public:
   /// True if this name is a simple one-component name identical to the
   /// given identifier.
   bool isSimpleName(Identifier name) const {
-    return isSimpleName() && getBaseName() == name;
+    return isSimpleName() && getIdentifier() == name;
   }
   
   /// True if this name is a simple one-component name equal to the
   /// given string.
   bool isSimpleName(StringRef name) const {
-    return isSimpleName() && getBaseName().str().equals(name);
+    return isSimpleName() && getIdentifier().str().equals(name);
+  }
+  
+  bool isEditorPlaceholder() const {
+    return isSimpleName() && getIdentifier().isEditorPlaceholder();
   }
   
   /// True if this name is an operator.
   bool isOperator() const {
-    return getBaseName().isOperator();
+    return getIdentifier().isOperator();
   }
   
   /// True if this name should be found by a decl ref or member ref under the
@@ -386,6 +403,14 @@ public:
     return lhs.compare(rhs) >= 0;
   }
 
+  bool operator ==(StringRef other) {
+    return getBaseName().isSimpleName(other);
+  }
+  
+  bool operator !=(StringRef other) {
+    return !getBaseName().isSimpleName(other);
+  }
+  
   void *getOpaqueValue() const { return SimpleOrCompound.getOpaqueValue(); }
   static DeclName getFromOpaqueValue(void *p) { return DeclName(p); }
 
@@ -395,6 +420,16 @@ public:
   StringRef getString(llvm::SmallVectorImpl<char> &scratch,
                       bool skipEmptyArgumentNames = false) const;
 
+  /// Return the string representation of the name
+  StringRef str() const {
+    return getIdentifier().str();
+  }
+  
+  /// Return the string representation of the name used for serialization
+  StringRef serializationString() const {
+    return getIdentifier().str();
+  }
+  
   /// Print the representation of this declaration name to the given
   /// stream.
   ///

@@ -963,19 +963,21 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         return;
       
       for (auto repeat : repeatedDecls)
-        if (repeat->getName() == VD->getName())
+        if (repeat->getBaseName() == VD->getBaseName())
           P.addToScope(VD); // will diagnose a duplicate declaration
 
       bool found = false;
       for (auto previous : boundDecls) {
-        if (previous->hasName() && previous->getName() == VD->getName()) {
+        if (previous->hasName() &&
+              previous->getBaseName() == VD->getBaseName()) {
           found = true;
           break;
         }
       }
       if (!found) {
         // Diagnose a declaration that doesn't match a previous pattern.
-        P.diagnose(VD->getLoc(), diag::extra_var_in_multiple_pattern_list, VD->getName());
+        P.diagnose(VD->getLoc(), diag::extra_var_in_multiple_pattern_list,
+                   VD->getBaseName());
         status.setIsParseError();
       }
       repeatedDecls.push_back(VD);
@@ -984,14 +986,16 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     for (auto previous : boundDecls) {
       bool found = false;
       for (auto repeat : repeatedDecls) {
-        if (previous->hasName() && previous->getName() == repeat->getName()) {
+        if (previous->hasName() &&
+            previous->getBaseName() == repeat->getBaseName()) {
           found = true;
           break;
         }
       }
       if (!found) {
         // Diagnose a previous declaration that is missing in this pattern.
-        P.diagnose(previous->getLoc(), diag::extra_var_in_multiple_pattern_list, previous->getName());
+        P.diagnose(previous->getLoc(), diag::extra_var_in_multiple_pattern_list,
+                   previous->getBaseName());
         status.setIsParseError();
       }
     }
@@ -1587,19 +1591,19 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
 
     while (iOperand < numElements) {
       auto *UDREOp = cast<UnresolvedDeclRefExpr>(elements[iOperator]);
-      auto name = UDREOp->getName().getBaseName().str();
+      auto name = UDREOp->getName().getBaseName();
 
-      if (name.equals("||") || name.equals("&&")) {
+      if (name == "||" || name == "&&") {
         auto rhs = classifyConditionalCompilationExpr(elements[iOperand],
                                                       Context, D, fullCheck);
 
-        if (name.equals("||")) {
+        if (name == "||") {
           result = disjoin(result, rhs);
           if (result.getValueOr(true))
             break;
         }
 
-        if (name.equals("&&")) {
+        if (name == "&&") {
           result = conjoin(result, rhs);
           if (!result.getValueOr(false))
             break;
@@ -1639,7 +1643,7 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
   if (auto *PUE = dyn_cast<PrefixUnaryExpr>(condition)) {
     // If the PUE is not a negation expression, return false
     auto name =
-      cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().getBaseName().str();
+      cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().getBaseName();
     if (name != "!") {
       D.diagnose(PUE->getLoc(),
                  diag::unsupported_conditional_compilation_unary_expression);
@@ -1672,18 +1676,15 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
       return None;
     }
 
-    if (!fnName.equals("arch") && !fnName.equals("os") &&
-        !fnName.equals("_endian") &&
-        !fnName.equals("_runtime") &&
-        !fnName.equals("swift") &&
-        !fnName.equals("_compiler_version") &&
-        !fnName.equals("canImport")) {
+    if (fnName != "arch" && fnName != "os" && fnName != "_endian" &&
+        fnName != "_runtime" && fnName != "swift" &&
+        fnName != "_compiler_version" && fnName != "canImport") {
       D.diagnose(CE->getLoc(),
                  diag::unsupported_platform_condition_expression);
       return None;
     }
 
-    if (fnName.equals("_compiler_version")) {
+    if (fnName == "_compiler_version") {
       if (auto SLE = dyn_cast<StringLiteralExpr>(PE->getSubExpr())) {
         if (SLE->getValue().empty()) {
           D.diagnose(CE->getLoc(), diag::empty_version_string);
@@ -1702,7 +1703,7 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
                    "string literal");
         return None;
       }
-    } else if (fnName.equals("swift")) {
+    } else if (fnName == "swift") {
       auto PUE = dyn_cast<PrefixUnaryExpr>(PE->getSubExpr());
       if (!PUE) {
         D.diagnose(PE->getSubExpr()->getLoc(),
@@ -1728,7 +1729,7 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
       if (!versionRequirement.hasValue())
         return None;
 
-      if (!prefix->getName().getBaseName().str().equals(">=")) {
+      if (prefix->getName().getBaseName() != ">=") {
         D.diagnose(PUE->getFn()->getLoc(),
                    diag::unexpected_version_comparison_operator)
           .fixItReplace(PUE->getFn()->getLoc(), ">=");
@@ -1745,13 +1746,13 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
       if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(PE->getSubExpr())) {
         // The sub expression should be an UnresolvedDeclRefExpr (we won't
         // tolerate extra parens).
-        auto argumentIdent = UDRE->getName().getBaseName();
-        auto argument = argumentIdent.str();
+        auto argumentName = UDRE->getName().getBaseName();
+        auto argument = argumentName.str();
 
         // Error for values that don't make sense if there's a clear definition
         // of the possible values (as there is for _runtime).
-        if (fnName.equals("_runtime")) {
-          if (!argument.equals("_ObjC") && !argument.equals("_Native")) {
+        if (fnName == "_runtime") {
+          if (argumentName != "_ObjC" && argumentName != "_Native") {
             D.diagnose(CE->getLoc(),
                        diag::unsupported_platform_runtime_condition_argument);
             return None;
@@ -1781,8 +1782,9 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
           if (!fullCheck) {
             return None;
           }
+          auto moduleIdent = argumentName.getIdentifier();
           return
-            Context.getModule({ { argumentIdent, UDRE->getLoc() } }) != nullptr;
+            Context.getModule({ {moduleIdent , UDRE->getLoc() } }) != nullptr;
         }
 
         if (!fullCheck) {

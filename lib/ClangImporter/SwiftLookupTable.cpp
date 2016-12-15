@@ -179,12 +179,12 @@ public:
   clang::serialization::ModuleFile &getModuleFile() { return ModuleFile; }
 
   /// Retrieve the set of base names that are stored in the on-disk hash table.
-  SmallVector<StringRef, 4> getBaseNames();
+  SmallVector<DeclName, 4> getBaseNames(ASTContext &ctx);
 
   /// Retrieve the set of entries associated with the given base name.
   ///
   /// \returns true if we found anything, false otherwise.
-  bool lookup(StringRef baseName,
+  bool lookup(DeclName baseName,
               SmallVectorImpl<SwiftLookupTable::FullTableEntry> &entries);
 
   /// Retrieve the declaration IDs of the categories.
@@ -303,7 +303,7 @@ SwiftLookupTable::translateContext(EffectiveClangContext context) {
 
 /// Lookup an unresolved context name and resolve it to a Clang
 /// declaration context or typedef name.
-clang::NamedDecl *SwiftLookupTable::resolveContext(StringRef unresolvedName) {
+clang::NamedDecl *SwiftLookupTable::resolveContext(DeclName unresolvedName) {
   // Look for a context with the given Swift name.
   for (auto entry : lookup(unresolvedName, 
                            std::make_pair(ContextKind::TranslationUnit,
@@ -493,7 +493,7 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   }
 
   // Find the list of entries for this base name.
-  auto &entries = LookupTable[name.getBaseName().str()];
+  auto &entries = LookupTable[name.getBaseName()];
   auto decl = newEntry.dyn_cast<clang::NamedDecl *>();
   auto macro = newEntry.dyn_cast<clang::MacroInfo *>();
   for (auto &entry : entries) {
@@ -514,10 +514,10 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   entries.push_back(entry);
 }
 
-auto SwiftLookupTable::findOrCreate(StringRef baseName) 
-  -> llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>>::iterator {
+auto SwiftLookupTable::findOrCreate(DeclName baseName)
+  -> llvm::DenseMap<DeclName, SmallVector<FullTableEntry, 2>>::iterator {
   // If there is no base name, there is nothing to find.
-  if (baseName.empty()) return LookupTable.end();
+  if (!baseName) return LookupTable.end();
 
   // Find entries for this base name.
   auto known = LookupTable.find(baseName);
@@ -539,7 +539,7 @@ auto SwiftLookupTable::findOrCreate(StringRef baseName)
 }
 
 SmallVector<SwiftLookupTable::SingleEntry, 4>
-SwiftLookupTable::lookup(StringRef baseName,
+SwiftLookupTable::lookup(DeclName baseName,
                          llvm::Optional<StoredContext> searchContext) {
   SmallVector<SwiftLookupTable::SingleEntry, 4> result;
 
@@ -628,7 +628,7 @@ SwiftLookupTable::allGlobalsAsMembers() {
 }
 
 SmallVector<SwiftLookupTable::SingleEntry, 4>
-SwiftLookupTable::lookup(StringRef baseName,
+SwiftLookupTable::lookup(DeclName baseName,
                          EffectiveClangContext searchContext) {
   // Translate context.
   Optional<StoredContext> context;
@@ -640,12 +640,12 @@ SwiftLookupTable::lookup(StringRef baseName,
   return lookup(baseName, context);
 }
 
-SmallVector<StringRef, 4> SwiftLookupTable::allBaseNames() {
+SmallVector<DeclName, 4> SwiftLookupTable::allBaseNames(ASTContext &ctx) {
   // If we have a reader, enumerate its base names.
-  if (Reader) return Reader->getBaseNames();
+  if (Reader) return Reader->getBaseNames(ctx);
 
   // Otherwise, walk the lookup table.
-  SmallVector<StringRef, 4> result;
+  SmallVector<DeclName, 4> result;
   for (const auto &entry : LookupTable) {
     result.push_back(entry.first);
   }
@@ -653,7 +653,7 @@ SmallVector<StringRef, 4> SwiftLookupTable::allBaseNames() {
 }
 
 SmallVector<clang::NamedDecl *, 4>
-SwiftLookupTable::lookupObjCMembers(StringRef baseName) {
+SwiftLookupTable::lookupObjCMembers(DeclName baseName) {
   SmallVector<clang::NamedDecl *, 4> result;
 
   // Find the lookup table entry for this base name.
@@ -752,10 +752,10 @@ static void printName(clang::NamedDecl *named, llvm::raw_ostream &out) {
   }
 }
 
-void SwiftLookupTable::deserializeAll() {
+void SwiftLookupTable::deserializeAll(ASTContext &ctx) {
   if (!Reader) return;
 
-  for (auto baseName : Reader->getBaseNames()) {
+  for (auto baseName : Reader->getBaseNames(ctx)) {
     (void)lookup(baseName, None);
   }
 
@@ -799,7 +799,7 @@ static void printStoredEntry(const SwiftLookupTable *table, uintptr_t entry,
 
 void SwiftLookupTable::dump() const {
   // Dump the base name -> full table entry mappings.
-  SmallVector<StringRef, 4> baseNames;
+  SmallVector<DeclName, 4> baseNames;
   for (const auto &entry : LookupTable) {
     baseNames.push_back(entry.first);
   }
@@ -913,7 +913,7 @@ namespace {
     clang::ASTWriter &Writer;
 
   public:
-    using key_type = StringRef;
+    using key_type = DeclName;
     using key_type_ref = key_type;
     using data_type = SmallVector<SwiftLookupTable::FullTableEntry, 2>;
     using data_type_ref = data_type &;
@@ -927,14 +927,14 @@ namespace {
     }
 
     hash_value_type ComputeHash(key_type_ref key) {
-      return llvm::HashString(key);
+      return llvm::HashString(key.serializationString());
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
       // The length of the key.
-      uint32_t keyLength = key.size();
+      uint32_t keyLength = key.serializationString().size();
 
       // # of entries
       uint32_t dataLength = sizeof(uint16_t);
@@ -962,7 +962,7 @@ namespace {
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      out << key;
+      out << key.serializationString();
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
@@ -1083,7 +1083,7 @@ void SwiftLookupTableWriter::writeExtensionContents(
   SmallVector<uint64_t, 64> ScratchRecord;
 
   // First, gather the sorted list of base names.
-  SmallVector<StringRef, 2> baseNames;
+  SmallVector<DeclName, 2> baseNames;
   for (const auto &entry : table.LookupTable)
     baseNames.push_back(entry.first);
   llvm::array_pod_sort(baseNames.begin(), baseNames.end());
@@ -1441,22 +1441,22 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
 
 }
 
-SmallVector<StringRef, 4> SwiftLookupTableReader::getBaseNames() {
+SmallVector<DeclName, 4> SwiftLookupTableReader::getBaseNames(ASTContext &ctx) {
   auto table = static_cast<SerializedBaseNameToEntitiesTable*>(SerializedTable);
-  SmallVector<StringRef, 4> results;
+  SmallVector<DeclName, 4> results;
   for (auto key : table->keys()) {
-    results.push_back(key);
+    results.push_back(DeclName(ctx.getIdentifier(key)));
   }
   return results;
 }
 
 bool SwiftLookupTableReader::lookup(
-       StringRef baseName,
+       DeclName baseName,
        SmallVectorImpl<SwiftLookupTable::FullTableEntry> &entries) {
   auto table = static_cast<SerializedBaseNameToEntitiesTable*>(SerializedTable);
 
   // Look for an entry with this base name.
-  auto known = table->find(baseName);
+  auto known = table->find(baseName.serializationString());
   if (known == table->end()) return false;
 
   // Grab the results.

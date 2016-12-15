@@ -71,7 +71,7 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   // The Builtin module cannot be explicitly imported unless we're a .sil file
   // or in the REPL.
   if ((SF.Kind == SourceFileKind::SIL || SF.Kind == SourceFileKind::REPL) &&
-      moduleID.first == Context.TheBuiltinModule->getName())
+      moduleID.first == Context.TheBuiltinModule->getIdentifier())
     return Context.TheBuiltinModule;
 
   // If the imported module name is the same as the current module,
@@ -80,7 +80,7 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   //
   // FIXME: We'd like to only use this in SIL mode, but unfortunately we use it
   // for our fake overlays as well.
-  if (moduleID.first == SF.getParentModule()->getName() &&
+  if (moduleID.first == SF.getParentModule()->getIdentifier() &&
       modulePath.size() == 1) {
     if (auto importer = Context.getClangModuleLoader())
       return importer->loadModule(moduleID.second, modulePath);
@@ -152,7 +152,8 @@ static bool shouldImportSelfImportClang(const ImportDecl *ID,
 void NameBinder::addImport(
     SmallVectorImpl<std::pair<ImportedModule, ImportOptions>> &imports,
     ImportDecl *ID) {
-  if (ID->getModulePath().front().first == SF.getParentModule()->getName() &&
+  if (ID->getModulePath().front().first ==
+        SF.getParentModule()->getIdentifier() &&
       ID->getModulePath().size() == 1 && !shouldImportSelfImportClang(ID, SF)) {
     // If the imported module name is the same as the current module,
     // produce a diagnostic.
@@ -205,7 +206,7 @@ void NameBinder::addImport(
   if (testableAttr && !topLevelModule->isTestingEnabled() &&
       Context.LangOpts.EnableTestableAttrRequiresTestableModule) {
     diagnose(ID->getModulePath().front().second, diag::module_not_testable,
-             topLevelModule->getName());
+             topLevelModule->getIdentifier());
     testableAttr->setInvalid();
   }
 
@@ -247,7 +248,7 @@ void NameBinder::addImport(
     if (!actualKind.hasValue()) {
       // FIXME: print entire module name?
       diagnose(ID, diag::ambiguous_decl_in_module,
-               declPath.front().first, M->getName());
+               declPath.front().first, M->getIdentifier());
       for (auto next : decls)
         diagnose(next, diag::found_candidate);
 

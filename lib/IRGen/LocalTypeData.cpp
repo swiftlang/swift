@@ -432,7 +432,7 @@ void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
     out << ")";
   } else if (isAbstractProtocolConformance()) {
     out << "AbstractConformance("
-        << getAbstractProtocolConformance()->getName()
+        << getAbstractProtocolConformance()->getBaseName()
         << ")";
   } else if (Value == TypeMetadata) {
     out << "TypeMetadata";

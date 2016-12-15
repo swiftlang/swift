@@ -4480,7 +4480,8 @@ namespace {
             consumedArgs.push_back(arg.forward(gen));
           }
           auto resultVal =
-            gen.B.createBuiltin(uncurriedLoc.getValue(), builtinName,
+            gen.B.createBuiltin(uncurriedLoc.getValue(),
+                                builtinName.getIdentifier(),
                                 substFnType->getSILResult(),
                                 callee.getSubstitutions(),
                                 consumedArgs);

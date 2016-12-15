@@ -991,11 +991,11 @@ int ProtocolType::compareProtocols(ProtocolDecl * const* PP1,
   Module *M2 = P2->getParentModule();
 
   // Try ordering based on module name, first.
-  if (int result = M1->getName().str().compare(M2->getName().str()))
+  if (int result = M1->getIdentifier().str().compare(M2->getIdentifier().str()))
     return result;
 
   // Order based on protocol name.
-  return P1->getName().str().compare(P2->getName().str());
+  return P1->getBaseName().compare(P2->getBaseName());
 }
 
 bool ProtocolType::visitAllProtocols(
@@ -1388,7 +1388,7 @@ unsigned GenericTypeParamType::getIndex() const {
 Identifier GenericTypeParamType::getName() const {
   // Use the declaration name if we still have that sugar.
   if (auto decl = getDecl())
-    return decl->getName();
+    return decl->getIdentifier();
   
   // Otherwise, we're canonical. Produce an anonymous '<tau>_n_n' name.
   assert(isCanonical());
@@ -2587,8 +2587,8 @@ void ArchetypeType::populateNestedTypes() const {
                                   [&](ProtocolDecl *proto) -> bool {
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        if (knownNestedTypes.insert(assocType->getName()).second)
-          nestedTypes.push_back({ assocType->getName(), Type() });
+        if (knownNestedTypes.insert(assocType->getIdentifier()).second)
+          nestedTypes.push_back({ assocType->getIdentifier(), Type() });
       }
     }
 
@@ -2684,7 +2684,7 @@ static void collectFullName(const ArchetypeType *Archetype,
 
 Identifier ArchetypeType::getName() const {
   if (auto assocType = getAssocType())
-    return assocType->getName();
+    return assocType->getIdentifier();
 
   return AssocTypeOrName.get<Identifier>();
 }
@@ -3139,7 +3139,7 @@ Identifier DependentMemberType::getName() const {
   if (NameOrAssocType.is<Identifier>())
     return NameOrAssocType.get<Identifier>();
 
-  return NameOrAssocType.get<AssociatedTypeDecl *>()->getName();
+  return NameOrAssocType.get<AssociatedTypeDecl *>()->getIdentifier();
 }
 
 static bool transformSILResult(SILResultInfo &result, bool &changed,

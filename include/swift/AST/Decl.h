@@ -2022,13 +2022,12 @@ public:
   }
 
   bool hasName() const { return bool(Name); }
-  /// TODO: Rename to getSimpleName?
-  Identifier getName() const { return Name.getBaseName(); }
+  
   bool isOperator() const { return Name.isOperator(); }
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    return hasName() ? getName().str() : "_";
+    return hasName() ? getBaseName().str() : "_";
   }
 
   /// Retrieve the full name of the declaration.
@@ -2243,6 +2242,10 @@ protected:
   }
 
 public:
+  Identifier getIdentifier() const {
+    return getBaseName().getIdentifier();
+  }
+  
   /// The type of this declaration's values. For the type of the
   /// declaration itself, use getInterfaceType(), which returns a
   /// metatype.
@@ -4150,7 +4153,7 @@ protected:
   llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
   VarDecl(DeclKind Kind, bool IsStatic, bool IsLet, SourceLoc NameLoc,
-          Identifier Name, Type Ty, DeclContext *DC)
+          DeclName Name, Type Ty, DeclContext *DC)
     : AbstractStorageDecl(Kind, DC, Name, NameLoc) 
   {
     VarDeclBits.IsUserAccessible = true;
@@ -4170,7 +4173,7 @@ protected:
   Type computeTypeInContextSlow() const;
 
 public:
-  VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
+  VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, DeclName Name,
           Type Ty, DeclContext *DC)
     : VarDecl(DeclKind::Var, IsStatic, IsLet, NameLoc, Name, Ty, DC) { }
 
@@ -4360,6 +4363,12 @@ public:
   /// Intentionally not defined as a typical copy constructor to avoid
   /// accidental copies.
   ParamDecl(ParamDecl *PD);
+  
+  /// Retrieve the identifier for the name of this parameter
+  Identifier getIdentifier() const {
+    // ParamDecls can't carry a special DeclName
+    return getBaseName().getIdentifier();
+  }
   
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const { return ArgumentName; }
@@ -5334,6 +5343,10 @@ public:
   {
     EnumElementDeclBits.Recursiveness =
         static_cast<unsigned>(ElementRecursiveness::NotRecursive);
+  }
+  
+  Identifier getIdentifier() {
+    return getBaseName().getIdentifier();
   }
 
   /// \returns false if there was an error during the computation rendering the

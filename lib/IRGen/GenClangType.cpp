@@ -200,7 +200,7 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   auto &ctx = IGM.getClangASTContext();
 
   auto swiftDecl = type->getDecl();
-  StringRef name = swiftDecl->getName().str();
+  StringRef name = swiftDecl->getBaseName().str();
 
   // We assume that the importer translates all of the following types
   // directly to structs in the standard library.
@@ -358,7 +358,8 @@ clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
   // Single protocol -> id<Proto>
   if (proto->isObjC()) {
     auto &clangCtx = getClangASTContext();
-    clang::IdentifierInfo *name = &clangCtx.Idents.get(proto->getName().get());
+    clang::IdentifierInfo *name = &clangCtx.Idents.get(
+                                    proto->getBaseName().str());
     auto *PDecl = clang::ObjCProtocolDecl::Create(
                     const_cast<clang::ASTContext &>(clangCtx),
                     clangCtx.getTranslationUnitDecl(), name,
@@ -395,7 +396,7 @@ clang::CanQualType GenClangType::visitClassType(CanClassType type) {
   auto swiftDecl = type->getDecl();
   if (swiftDecl->isObjC()) {
     clang::IdentifierInfo *ForwardClassId =
-      &clangCtx.Idents.get(swiftDecl->getName().get());
+      &clangCtx.Idents.get(swiftDecl->getBaseName().str());
     auto *CDecl = clang::ObjCInterfaceDecl::Create(
                           clangCtx, clangCtx.getTranslationUnitDecl(),
                           clang::SourceLocation(), ForwardClassId,
@@ -443,7 +444,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     AutoreleasingUnsafeMutablePointer,
     Unmanaged,
     CFunctionPointer,
-  } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
+  } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getBaseName().str())
     .Case("UnsafeMutablePointer", StructKind::UnsafeMutablePointer)
     .Case("UnsafePointer", StructKind::UnsafePointer)
     .Case(

@@ -467,12 +467,12 @@ StringRef IRGenDebugInfo::getName(const FuncDecl &FD) {
       }
 
       SmallVector<char, 64> Buf;
-      StringRef Name = (VD->getName().str() + Twine(Kind)).toStringRef(Buf);
+      StringRef Name = (VD->getBaseName().str() + Twine(Kind)).toStringRef(Buf);
       return BumpAllocatedString(Name);
     }
 
   if (FD.hasName())
-    return FD.getName().str();
+    return FD.getBaseName().str();
 
   return StringRef();
 }
@@ -556,7 +556,7 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     auto File = getOrCreateFile(Loc.Filename);
     auto Line = Loc.Line;
     auto FwdDecl = DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, NTD->getName().str(),
+        llvm::dwarf::DW_TAG_structure_type, NTD->getBaseName().str(),
         getOrCreateContext(DC->getParent()), File, Line,
         llvm::dwarf::DW_LANG_Swift, 0, 0);
     ReplaceMap.emplace_back(
@@ -747,7 +747,8 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 
   swift::Module *M = IGM.Context.getModule(D->getModulePath());
   if (!M &&
-      D->getModulePath()[0].first == IGM.Context.TheBuiltinModule->getName())
+      D->getModulePath()[0].first ==
+      IGM.Context.TheBuiltinModule->getIdentifier())
     M = IGM.Context.TheBuiltinModule;
   if (!M) {
     assert(M && "Could not find module for import decl.");
@@ -763,7 +764,7 @@ IRGenDebugInfo::getOrCreateModule(ModuleDecl::ImportedModule M) {
   const char *fn = getFilenameFromDC(M.second);
   StringRef Path(fn ? fn : "");
   if (M.first.empty()) {
-    StringRef Name = M.second->getName().str();
+    StringRef Name = M.second->getIdentifier().str();
     return getOrCreateModule(Name, TheCU, Name, Path);
   }
 
@@ -1032,7 +1033,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(
 
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
-    return BumpAllocatedString(DbgTy.getDecl()->getName().str());
+    return BumpAllocatedString(DbgTy.getDecl()->getBaseName().str());
 
   Mangle::Mangler M(/* DWARF */ true);
   M.mangleTypeForDebugger(DbgTy.getType(), DbgTy.getDeclContext());
@@ -1087,7 +1088,7 @@ IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
         IGM.getTypeInfoForUnlowered(IGM.getSILTypes().getAbstractionPattern(VD),
                                     memberTy),
         nullptr);
-    Elements.push_back(createMemberType(DbgTy, VD->getName().str(),
+    Elements.push_back(createMemberType(DbgTy, VD->getBaseName().str(),
                                         OffsetInBits, Scope, File, Flags));
   }
   if (OffsetInBits > SizeInBits)
@@ -1100,7 +1101,7 @@ llvm::DICompositeType *IRGenDebugInfo::createStructType(
     llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
     unsigned SizeInBits, unsigned AlignInBits, unsigned Flags,
     llvm::DIType *DerivedFrom, unsigned RuntimeLang, StringRef UniqueID) {
-  StringRef Name = Decl->getName().str();
+  StringRef Name = Decl->getBaseName().str();
 
   // Forward declare this first because types may be recursive.
   auto FwdDecl = llvm::TempDIType(
@@ -1161,8 +1162,8 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
       ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.StorageType, 0, 1, ED);
     }
     unsigned Offset = 0;
-    auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
-                                Scope, File, Flags);
+    auto MTy = createMemberType(ElemDbgTy, ElemDecl->getIdentifier().str(),
+                                Offset, Scope, File, Flags);
     Elements.push_back(MTy);
   }
   return DBuilder.getOrCreateArray(Elements);
@@ -1187,8 +1188,8 @@ llvm::DICompositeType *IRGenDebugInfo::createEnumType(
   DITypeCache[DbgTy.getType()] = TH;
 
   auto DITy = DBuilder.createUnionType(
-      Scope, Decl->getName().str(), File, Line, SizeInBits, AlignInBits, Flags,
-      getEnumElements(DbgTy, Decl, Scope, File, Flags),
+      Scope, Decl->getBaseName().str(), File, Line, SizeInBits, AlignInBits,
+      Flags, getEnumElements(DbgTy, Decl, Scope, File, Flags),
       llvm::dwarf::DW_LANG_Swift, MangledName);
 
   DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
@@ -1459,7 +1460,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                               nullptr, // DerivedFrom
                               llvm::dwarf::DW_LANG_Swift, MangledName);
     else
-      return createOpaqueStruct(Scope, Decl->getName().str(), File, L.Line,
+      return createOpaqueStruct(Scope, Decl->getBaseName().str(), File, L.Line,
                                 SizeInBits, AlignInBits, Flags, MangledName);
   }
 
@@ -1649,7 +1650,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       return createEnumType(DbgTy, Decl, MangledName, Scope, File, L.Line,
                             Flags);
     else
-      return createOpaqueStruct(Scope, Decl->getName().str(), File, L.Line,
+      return createOpaqueStruct(Scope, Decl->getBaseName().str(), File, L.Line,
                                 SizeInBits, AlignInBits, Flags, MangledName);
   }
 
@@ -1662,7 +1663,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       return createEnumType(DbgTy, Decl, MangledName, Scope, File, L.Line,
                             Flags);
     else
-      return createOpaqueStruct(Scope, Decl->getName().str(), File, L.Line,
+      return createOpaqueStruct(Scope, Decl->getBaseName().str(), File, L.Line,
                                 SizeInBits, AlignInBits, Flags, MangledName);
   }
 

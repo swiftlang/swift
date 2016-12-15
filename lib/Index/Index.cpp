@@ -470,8 +470,8 @@ bool IndexSwiftASTWalker::visitImports(
       Hash = HashOS.str();
     }
 
-    if (!IdxConsumer.startDependency(ImportKind, Mod->getName().str(), Path,
-                                     Mod->isSystemModule(), Hash))
+    if (!IdxConsumer.startDependency(ImportKind, Mod->getIdentifier().str(),
+                                     Path, Mod->isSystemModule(), Hash))
       return false;
     if (ImportKind != SymbolKind::ClangModule)
       if (!visitImports(*Mod, Visited))
@@ -865,7 +865,7 @@ static bool isTestCandidate(ValueDecl *D) {
     return false;
 
   // 6. ...and starts with "test".
-  if (FD->getName().str().startswith("test"))
+  if (FD->getBaseName().str().startswith("test"))
     return true;
 
   return false;
@@ -1008,7 +1008,7 @@ void IndexSwiftASTWalker::getRecursiveModuleImports(
       if (M->getModuleFilename().empty()) {
         std::string Info = "swift::Module with empty file name!! \nDetails: \n";
         Info += "  name: ";
-        Info += M->getName().get();
+        Info += M->getIdentifier().get();
         Info += "\n";
 
         auto Files = M->getFiles();

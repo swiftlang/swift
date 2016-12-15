@@ -504,12 +504,12 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   auto genericArgs = generic->getGenericArgs();
   auto genericParams = genericDecl->getGenericParams();
   if (genericParams->size() != genericArgs.size()) {
-    diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
+    diagnose(loc, diag::type_parameter_count_mismatch, decl->getBaseName(),
              genericParams->size(), genericArgs.size(),
              genericArgs.size() < genericParams->size())
         .highlight(generic->getAngleBrackets());
     diagnose(decl, diag::generic_type_declared_here,
-             decl->getName());
+             decl->getBaseName());
     return ErrorType::get(Context);
   }
 
@@ -534,7 +534,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   // FIXME: More principled handling of circularity.
   if (!genericDecl->getGenericSignature()) {
     diagnose(loc, diag::recursive_type_reference,
-             genericDecl->getName());
+             genericDecl->getBaseName());
     diagnose(genericDecl, diag::type_declared_here);
     return ErrorType::get(Context);
   }
@@ -673,7 +673,7 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
     }
   }
   tc.diagnose(unbound->getDecl()->getLoc(), diag::generic_type_declared_here,
-              unbound->getDecl()->getName());
+              unbound->getDecl()->getBaseName());
 }
 
 /// \brief Returns a valid type or ErrorType in case of an error.
@@ -697,7 +697,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   // FIXME: More principled handling of circularity.
   if (!typeDecl->hasInterfaceType()) {
     TC.diagnose(loc, diag::recursive_type_reference,
-                typeDecl->getName());
+                typeDecl->getBaseName());
     TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
     return ErrorType::get(TC.Context);
   }
@@ -770,9 +770,9 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
         return type;
 
       // Produce a Fix-It replacing 'Self' with the nominal type name.
-      tc.diagnose(comp->getIdLoc(), diag::self_in_nominal, nominal->getName())
-        .fixItReplace(comp->getIdLoc(), nominal->getName().str());
-      comp->overwriteIdentifier(nominal->getName());
+      tc.diagnose(comp->getIdLoc(), diag::self_in_nominal, nominal->getBaseName())
+        .fixItReplace(comp->getIdLoc(), nominal->getBaseName().str());
+      comp->overwriteIdentifier(nominal->getIdentifier());
       comp->setValue(nominal);
       return type;
     }
@@ -870,7 +870,8 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
   // Lookup into a type.
   if (auto moduleType = parentType->getAs<ModuleType>()) {
     tc.diagnose(comp->getIdLoc(), diag::no_module_type,
-                comp->getIdentifier(), moduleType->getModule()->getName());
+                comp->getIdentifier(),
+                moduleType->getModule()->getIdentifier());
   } else {
     // Situation where class tries to inherit from itself, such
     // would produce an assertion when trying to lookup members of the class.
@@ -1408,7 +1409,7 @@ Type TypeChecker::resolveIdentifierType(
 
   if (auto moduleTy = result->getAs<ModuleType>()) {
     if (diagnoseErrors) {
-      auto moduleName = moduleTy->getModule()->getName();
+      auto moduleName = moduleTy->getModule()->getIdentifier();
       diagnose(Components.back()->getIdLoc(),
                diag::use_undeclared_type, moduleName);
       diagnose(Components.back()->getIdLoc(),
@@ -3141,7 +3142,7 @@ static bool checkObjCInForeignClassContext(TypeChecker &TC,
     if (Diagnose) {
       TC.diagnose(VD, diag::objc_in_objc_runtime_visible,
                   VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
-                  clas->getName());
+                  clas->getBaseName());
       describeObjCReason(TC, VD, Reason);
     }
     break;
@@ -3732,7 +3733,7 @@ public:
     if (auto proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
       if (!proto->existentialTypeSupported(&TC)) {
         TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
-                    proto->getName());
+                    proto->getBaseName());
         T->setInvalid();
       }
     } else if (auto alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
@@ -3749,7 +3750,7 @@ public:
               continue;
             
             TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
-                        proto->getName());
+                        proto->getBaseName());
             T->setInvalid();
           }
         }

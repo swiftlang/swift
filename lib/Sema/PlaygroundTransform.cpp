@@ -391,7 +391,7 @@ public:
     ValueDecl *VD = nullptr;
     std::tie(RE, VD) = digForVariable(E);
     if (VD) {
-      return VD->getName().str();
+      return VD->getBaseName().str();
     } else {
       return std::string("");
     }
@@ -760,7 +760,8 @@ public:
                                 true, // implicit
                                 AccessSemantics::Ordinary,
                                 Type()),
-      VD->getSourceRange(), VD->getName().str().str().c_str());
+                                VD->getSourceRange(),
+                                VD->getBaseName().str().str().c_str());
   }
 
   Added<Stmt *> logDeclOrMemberRef(Added<Expr *> RE) {
@@ -778,7 +779,8 @@ public:
                                   true, // implicit
                                   AccessSemantics::Ordinary,
                                   Type()),
-        DRE->getSourceRange(), VD->getName().str().str().c_str());
+                                  DRE->getSourceRange(),
+                                  VD->getBaseName().str().str().c_str());
     } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(*RE)) {
       Expr *B = MRE->getBase();
       ConcreteDeclRef M = MRE->getMember();
@@ -796,7 +798,8 @@ public:
                                     DeclNameLoc(),
                                     true, // implicit
                                     AccessSemantics::Ordinary),
-        MRE->getSourceRange(), M.getDecl()->getName().str().str().c_str());
+                                    MRE->getSourceRange(),
+                                    M.getDecl()->getBaseName().str());
     } else {
       return nullptr;
     }
@@ -928,8 +931,7 @@ public:
   }
 
   Added<Stmt *> buildLoggerCall(Added<Expr *> E, SourceRange SR,
-    const char *Name) {
-    assert(Name);
+    StringRef Name) {
     std::string *NameInContext = Context.AllocateObjectCopy(std::string(Name));
     
     Expr *NameExpr = new (Context) StringLiteralExpr(NameInContext->c_str(),

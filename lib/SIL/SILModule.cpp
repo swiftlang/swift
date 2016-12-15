@@ -438,9 +438,9 @@ const IntrinsicInfo &SILModule::getIntrinsicInfo(Identifier ID) {
   return Info;
 }
 
-const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
+const BuiltinInfo &SILModule::getBuiltinInfo(DeclName Name) {
   unsigned OldSize = BuiltinIDCache.size();
-  BuiltinInfo &Info = BuiltinIDCache[ID];
+  BuiltinInfo &Info = BuiltinIDCache[Name];
 
   // If the element was is in the cache, return it.
   if (OldSize == BuiltinIDCache.size())
@@ -449,7 +449,7 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
   // Otherwise, lookup the ID and Type and store them in the map.
   // Find the matching ID.
   StringRef OperationName =
-    getBuiltinBaseName(getASTContext(), ID.str(), Info.Types);
+    getBuiltinBaseName(getASTContext(), Name.str(), Info.Types);
 
   // Several operation names have suffixes and don't match the name from
   // Builtins.def, so handle those first.
@@ -692,7 +692,7 @@ SILModule::lookUpFunctionInDefaultWitnessTable(const ProtocolDecl *Protocol,
   // together serialized SIL emitted by each translation unit.
   if (!Ret) {
     DEBUG(llvm::dbgs() << "        Failed speculative lookup of default "
-          "witness for " << Protocol->getName() << " ";
+          "witness for " << Protocol->getBaseName() << " ";
           Requirement.dump());
     return std::make_pair(nullptr, nullptr);
   }

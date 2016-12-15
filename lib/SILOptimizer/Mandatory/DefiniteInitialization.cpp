@@ -1089,15 +1089,15 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     // about the method.  The magic numbers used by the diagnostic are:
     // 0 -> method, 1 -> property, 2 -> subscript, 3 -> operator.
     unsigned Case = ~0;
-    Identifier MethodName;
+    DeclName MethodName;
     if (FD && FD->isAccessor()) {
-      MethodName = FD->getAccessorStorageDecl()->getName();
+      MethodName = FD->getAccessorStorageDecl()->getBaseName();
       Case = isa<SubscriptDecl>(FD->getAccessorStorageDecl()) ? 2 : 1;
     } else if (FD && FD->isOperator()) {
-      MethodName = FD->getName();
+      MethodName = FD->getBaseName();
       Case = 3;
     } else if (FD && FD->isInstanceMember()) {
-      MethodName = FD->getName();
+      MethodName = FD->getBaseName();
       Case = 0;
     }
     
@@ -1242,7 +1242,7 @@ void LifetimeChecker::diagnoseRefElementAddr(RefElementAddrInst *REI) {
                : BeforeSelfInit);
   diagnose(Module, REI->getLoc(),
            diag::self_use_before_fully_init,
-           REI->getField()->getName(), true, Kind);
+           REI->getField()->getBaseName(), true, Kind);
 }
 
 bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
@@ -1369,11 +1369,11 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
   if (Method) {
     if (!shouldEmitError(Inst)) return true;
 
-    Identifier Name;
+    DeclName Name;
     if (Method->isAccessor())
-      Name = Method->getAccessorStorageDecl()->getName();
+      Name = Method->getAccessorStorageDecl()->getBaseName();
     else
-      Name = Method->getName();
+      Name = Method->getBaseName();
 
     // If this is a use of self before super.init was called, emit a diagnostic
     // about *that* instead of about individual properties not being

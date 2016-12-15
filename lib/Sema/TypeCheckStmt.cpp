@@ -249,7 +249,7 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
   if (!ME)
     return;
   ValueDecl *VD = ME->getMember().getDecl();
-  if (!VD || VD->getName() != Ctx.Id_rawValue)
+  if (!VD || VD->getBaseName() != Ctx.Id_rawValue)
     return;
   MemberRefExpr *BME = dyn_cast<MemberRefExpr>(ME->getBase());
   if (!BME)
@@ -893,7 +893,8 @@ public:
               if (!VD->hasName())
                 return;
               for (auto expected : Vars) {
-                if (expected->hasName() && expected->getName() == VD->getName()) {
+                if (expected->hasName() &&
+                      expected->getBaseName() == VD->getBaseName()) {
                   if (!VD->getType()->isEqual(expected->getType())) {
                     TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
                                 VD->getType(), expected->getType());

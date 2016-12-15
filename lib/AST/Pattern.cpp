@@ -326,14 +326,14 @@ void *Pattern::operator new(size_t numBytes, const ASTContext &C) {
 /// Find the name directly bound by this pattern.  When used as a
 /// tuple element in a function signature, such names become part of
 /// the type.
-Identifier Pattern::getBoundName() const {
+DeclName Pattern::getBoundName() const {
   if (auto *NP = dyn_cast<NamedPattern>(getSemanticsProvidingPattern()))
     return NP->getBoundName();
   return Identifier();
 }
 
-Identifier NamedPattern::getBoundName() const {
-  return Var->getName();
+DeclName NamedPattern::getBoundName() const {
+  return Var->getBaseName();
 }
 
 
@@ -360,7 +360,7 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
   assert(lp.isValid() == rp.isValid());
 
   if (elements.size() == 1 &&
-      elements[0].getPattern()->getBoundName().empty()) {
+      !elements[0].getPattern()->getBoundName()) {
     auto &first = const_cast<TuplePatternElt&>(elements.front());
     return new (C) ParenPattern(lp, first.getPattern(), rp, implicit);
   }

@@ -1213,7 +1213,7 @@ createInPlaceMetadataInitializationFunction(IRGenModule &IGM,
   llvm::Function *fn = llvm::Function::Create(fnTy,
                                        llvm::GlobalValue::PrivateLinkage,
                                        Twine("initialize_metadata_")
-                                           + type->getDecl()->getName().str(),
+                                         + type->getDecl()->getBaseName().str(),
                                        &IGM.Module);
   fn->setAttributes(IGM.constructInitialAttributes());
   
@@ -2372,7 +2372,7 @@ namespace {
       llvm::raw_svector_ostream os(out);
       
       for (ValueDecl *prop : fields) {
-        os << prop->getName().str() << '\0';
+        os << prop->getBaseName() << '\0';
         ++numFields;
       }
       // The final null terminator is provided by getAddrOfGlobalString.
@@ -2395,7 +2395,7 @@ namespace {
                                         /*vararg*/ false);
     auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
                                      llvm::Twine("get_field_types_")
-                                       + type->getName().str(),
+                                       + type->getBaseName().str(),
                                      IGM.getModule());
     fn->setAttributes(IGM.constructInitialAttributes());
 
@@ -2741,7 +2741,7 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
                                          llvm::GlobalValue::PrivateLinkage,
                                          nullVector,
                                          llvm::Twine("field_type_vector_")
-                                           + type->getName().str());
+                                           + type->getBaseName().str());
   // For a generic type, use a slot we saved in the generic metadata pattern
   // immediately after the metadata object itself, which should be
   // instantiated with every generic metadata instance.
@@ -2928,7 +2928,7 @@ namespace {
       llvm::Function *f = llvm::Function::Create(ty,
                                            llvm::GlobalValue::PrivateLinkage,
                                            llvm::Twine("create_generic_metadata_")
-                                               + Target->getName().str(),
+                                               + Target->getBaseName().str(),
                                            &IGM.Module);
       f->setAttributes(IGM.constructInitialAttributes());
       
@@ -5300,7 +5300,7 @@ namespace {
       llvm::Function *fn = llvm::Function::Create(fnTy,
                                            llvm::GlobalValue::PrivateLinkage,
                                            Twine("initialize_metadata_")
-                                             + type->getDecl()->getName().str(),
+                                             + type->getDecl()->getBaseName().str(),
                                            &IGM.Module);
       fn->setAttributes(IGM.constructInitialAttributes());
       

@@ -1031,7 +1031,7 @@ static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
     auto DM = FD->getFullName();
 
-    Result.append(DM.getBaseName().empty() ? "_" : DM.getBaseName().str());
+    Result.append(DM.getBaseName() ? DM.getBaseName().str() : "_");
     Result.append("(");
     for (auto Arg : DM.getArgumentNames()) {
       Result.append(Arg.empty() ? "_" : Arg.str());
@@ -1081,10 +1081,10 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty) :
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
-    Name(VD->hasName() ? VD->getName().str() : Ctx.buffer("_")),
+    Name(VD->hasName() ? VD->getBaseName().str() : Ctx.buffer("_")),
     PrintedName(getPrintedName(Ctx, VD)), DKind(VD->getKind()),
     USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
-    ModuleName(VD->getModuleContext()->getName().str()),
+    ModuleName(VD->getModuleContext()->getIdentifier().str()),
     IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
     IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
     Ownership(getOwnership(VD)) {
@@ -1191,7 +1191,7 @@ static bool shouldIgnore(Decl *D) {
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     if (VD->isOperator())
       return true;
-    if (VD->getName().empty())
+    if (!VD->getBaseName())
       return true;
     switch (VD->getFormalAccess()) {
     case Accessibility::Internal:
@@ -3391,7 +3391,7 @@ static int dumpSwiftModules(const CompilerInvocation &InitInvok,
       if (auto VD = dyn_cast<ValueDecl>(D))
         Collector.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
     }
-    std::string Path = getDumpFilePath(OutputDir, M->getName().str());
+    std::string Path = getDumpFilePath(OutputDir, M->getIdentifier().str());
     Collector.serialize(Path);
     if (options::Verbose)
       llvm::errs() << "Dumped to "<< Path << "\n";

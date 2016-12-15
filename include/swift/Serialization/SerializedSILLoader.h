@@ -96,7 +96,7 @@ public:
   bool hasSILFunction(StringRef Name, SILLinkage linkage = SILLinkage::Private);
   SILVTable *lookupVTable(Identifier Name);
   SILVTable *lookupVTable(const ClassDecl *C) {
-    return lookupVTable(C->getName());
+    return lookupVTable(C->getIdentifier());
   }
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
   SILDefaultWitnessTable *lookupDefaultWitnessTable(SILDefaultWitnessTable *C);

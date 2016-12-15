@@ -2119,7 +2119,8 @@ void SILGenFunction::usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt
       if (!VD->hasName())
         return;
       for (auto expected : Vars) {
-        if (expected->hasName() && expected->getName() == VD->getName()) {
+        if (expected->hasName() &&
+              expected->getBaseName() == VD->getBaseName()) {
           auto swap = VarLocs[expected];
           VarLocs[expected] = VarLocs[VD];
           VarLocs[VD] = swap;
@@ -2178,7 +2179,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         if (!expected->hasName())
         continue;
         for (auto var : Vars) {
-          if (var->hasName() && var->getName() == expected->getName()) {
+          if (var->hasName() && var->getBaseName() == expected->getBaseName()) {
             auto value = VarLocs[var].value;
             
             for (auto cmv : argArray) {
