@@ -576,16 +576,6 @@ class FormatWalker : public SourceEntityWalker {
       }
 
       if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(Node.dyn_cast<Decl*>())) {
-
-        // Generic type params are siblings to align.
-        if (auto GPL = AFD->getGenericParams()) {
-          const auto Params = GPL->getParams();
-          for (unsigned I = 0, N = Params.size(); I < N; I++) {
-            addPair(Params[I]->getEndLoc(), FindAlignLoc(Params[I]->getStartLoc()),
-                    tok::comma);
-          }
-        }
-
         // Function parameters are siblings.
         for (auto P : AFD->getParameterLists()) {
           for (ParamDecl* param : *P) {
