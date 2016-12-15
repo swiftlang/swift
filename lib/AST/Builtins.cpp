@@ -153,6 +153,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                                       Identifier(), SourceLoc(),
                                       Identifier(), argType,
                                       DC);
+    PD->setInterfaceType(argType);
     PD->setImplicit();
     params.push_back(PD);
   }
@@ -204,10 +205,13 @@ getBuiltinGenericFunction(Identifier Id,
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
   SmallVector<ParamDecl*, 4> params;
-  for (auto paramType : ArgBodyTypes) {
+  for (unsigned i = 0, e = ArgParamTypes.size(); i < e; i++) {
+    auto paramType = ArgBodyTypes[i];
+    auto paramIfaceType = ArgParamTypes[i].getType();
     auto PD = new (Context) ParamDecl(/*IsLet*/true, SourceLoc(), SourceLoc(),
                                       Identifier(), SourceLoc(),
                                       Identifier(), paramType, DC);
+    PD->setInterfaceType(paramIfaceType);
     PD->setImplicit();
     params.push_back(PD);
   }

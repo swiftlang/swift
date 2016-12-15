@@ -4359,9 +4359,7 @@ public:
       }
     }
 
-    if (!badType) {
-      badType = semaFuncParamPatterns(FD, resolver);
-    }
+    badType |= semaFuncParamPatterns(FD, resolver);
 
     FD->setIsBeingTypeChecked(false);
 
@@ -7059,7 +7057,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Var:
   case DeclKind::Param: {
     auto VD = cast<VarDecl>(D);
-    if (!VD->hasType()) {
+    if (!VD->hasInterfaceType()) {
       if (VD->isSelfParameter()) {
         if (!VD->hasInterfaceType()) {
           VD->setInterfaceType(ErrorType::get(Context));

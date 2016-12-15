@@ -3943,7 +3943,7 @@ static bool isIntegralType(Type type) {
       return false;
 
     // Check whether it has integer type.
-    return singleVar->getType()->is<BuiltinIntegerType>();
+    return singleVar->getInterfaceType()->is<BuiltinIntegerType>();
   }
 
   return false;
@@ -4161,7 +4161,7 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
   for (auto paramList : paramLists) {
     if (Index < paramList->size()) {
       auto param = paramList->get(Index);
-      return { param->getDefaultArgumentKind(), param->getType() };
+      return { param->getDefaultArgumentKind(), param->getInterfaceType() };
     }
     
     Index -= paramList->size();
@@ -4552,7 +4552,7 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   if (params->size() != 1)
     return false;
 
-  return params->get(0)->getType()->isVoid();
+  return params->get(0)->getInterfaceType()->isVoid();
 }
 
 DestructorDecl::DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,

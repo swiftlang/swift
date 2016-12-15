@@ -4120,8 +4120,9 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   }
 
   // Convert the literal to the appropriate type.
+  auto defArgType = ownerFn->mapTypeIntoContext(defArg.second);
   bool invalid = tc.typeCheckExpression(init, dc, 
-                                        TypeLoc::withoutLoc(defArg.second),
+                                        TypeLoc::withoutLoc(defArgType),
                                         CTP_CannotFail);
   assert(!invalid && "conversion cannot fail");
   (void)invalid;

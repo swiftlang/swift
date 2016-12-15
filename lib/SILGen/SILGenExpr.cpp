@@ -2355,8 +2355,9 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Computed properties of non-optional reference type that were imported from
   // Objective-C.
   if (auto var = dyn_cast<VarDecl>(decl)) {
-    assert((isVerbatimNullableTypeInC(M, var->getType()->getReferenceStorageReferent())
-            || var->getType()->getReferenceStorageReferent()->hasArchetype())
+    auto type = var->getInterfaceType();
+    assert((type->hasTypeParameter()
+            || isVerbatimNullableTypeInC(M, type->getReferenceStorageReferent()))
            && "property's result type is not nullable?!");
     return var->hasClangNode();
   }
@@ -3344,6 +3345,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
 
     LValueTypeData unownedTypeData(
       AbstractionPattern(
+        typeData.OrigFormalType.getGenericSignature(),
         CanUnmanagedStorageType::get(typeData.OrigFormalType.getType())),
       CanUnmanagedStorageType::get(typeData.SubstFormalType),
       rvalueType);

@@ -94,23 +94,22 @@ DebugTypeInfo::DebugTypeInfo(VarDecl *Decl, swift::Type Ty,
     : DeclCtx(Decl->getDeclContext()) {
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
-  CanType DeclType = Decl->getType()->getCanonicalType();
-  CanType RealType = Ty.getCanonicalTypeOrNull();
+  auto DeclType = (Decl->hasType()
+                   ? Decl->getType()
+                   : DeclCtx->mapTypeIntoContext(Decl->getInterfaceType()));
+  auto RealType = Ty;
   if (Unwrap) {
-    DeclType = DeclType.getLValueOrInOutObjectType();
-    RealType = RealType.getLValueOrInOutObjectType();
+    DeclType = DeclType->getInOutObjectType();
+    RealType = RealType->getInOutObjectType();
   }
 
-  // Desugar for comparison.
-  DeclType = DeclType->getDesugaredType()->getCanonicalType();
   // DynamicSelfType is also sugar as far as debug info is concerned.
-  if (auto DynSelfTy = dyn_cast<DynamicSelfType>(DeclType))
-    DeclType = DynSelfTy->getSelfType()->getCanonicalType();
-  RealType = RealType->getDesugaredType()->getCanonicalType();
+  auto DeclSelfType = DeclType;
+  if (auto DynSelfTy = DeclType->getAs<DynamicSelfType>())
+    DeclSelfType = DynSelfTy->getSelfType();
 
-  if ((DeclType == RealType) || isa<AnyFunctionType>(DeclType))
-    Type = Unwrap ? Decl->getType()->getLValueOrInOutObjectType().getPointer()
-                  : Decl->getType().getPointer();
+  if (DeclSelfType->isEqual(RealType) || DeclType->getAs<FunctionType>())
+    Type = DeclType.getPointer();
   else
     Type = RealType.getPointer();
 
@@ -123,8 +122,11 @@ DebugTypeInfo::DebugTypeInfo(VarDecl *Decl, swift::Type Ty,
       align(align) {
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
-  if (Decl->getType().getCanonicalTypeOrNull() == Ty.getCanonicalTypeOrNull())
-    Type = Decl->getType().getPointer();
+  auto DeclType = (Decl->hasType()
+                   ? Decl->getType()
+                   : DeclCtx->mapTypeIntoContext(Decl->getInterfaceType()));
+  if (Ty && Decl->getInterfaceType()->isEqual(Ty))
+    Type = DeclType.getPointer();
   else
     Type = Ty.getPointer();
 }

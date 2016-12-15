@@ -98,7 +98,7 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
     paramInfos.back().Label = param->getArgumentName();
     paramInfos.back().HasDefaultArgument = param->isDefaultArgument();
     paramInfos.back().parameterFlags = ParameterTypeFlags::fromParameterType(
-        param->getType(), param->isVariadic());
+        param->getInterfaceType(), param->isVariadic());
   }
 
   MatchCallArgumentListener listener;

@@ -1083,7 +1083,7 @@ IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
     auto memberTy =
         BaseTy->getTypeOfMember(IGM.getSwiftModule(), VD, nullptr);
     DebugTypeInfo DbgTy(
-        VD->getType(),
+        VD->getInterfaceType(),
         IGM.getTypeInfoForUnlowered(IGM.getSILTypes().getAbstractionPattern(VD),
                                     memberTy),
         nullptr);

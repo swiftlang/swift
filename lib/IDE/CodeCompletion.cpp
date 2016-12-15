@@ -2069,7 +2069,7 @@ public:
         Builder.addComma();
       NeedComma = true;
 
-      Type type = param->getType();
+      Type type = param->getInterfaceType();
       if (param->isVariadic())
         type = ParamDecl::getVarargBaseTy(type);
 

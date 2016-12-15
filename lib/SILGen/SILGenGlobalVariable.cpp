@@ -108,7 +108,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
     // FIXME: It'd be nice if the result of the accessor was natively an
     // address.
     addr = B.createPointerToAddress(
-      loc, addr, getLoweredType(var->getType()).getAddressType(),
+      loc, addr, getLoweredType(var->getInterfaceType()).getAddressType(),
       /*isStrict*/ true);
     return ManagedValue::forLValue(addr);
   }
@@ -320,7 +320,7 @@ void SILGenFunction::emitGlobalGetter(VarDecl *global,
   auto *silG = SGM.getSILGlobalVariable(global, NotForDefinition);
   SILValue addr = B.createGlobalAddr(global, silG);
 
-  auto refType = global->getType()->getCanonicalType();
+  auto refType = global->getInterfaceType()->getCanonicalType();
   ManagedValue value = emitLoad(global, addr, getTypeLowering(refType),
                                 SGFContext(), IsNotTake);
   SILValue result = value.forward(*this);

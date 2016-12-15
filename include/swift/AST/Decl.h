@@ -4414,7 +4414,7 @@ public:
   /// type wrapping it.
   Type getVarargBaseTy() const {
     assert(isVariadic());
-    return getVarargBaseTy(getType());
+    return getVarargBaseTy(getInterfaceType());
   }
   
   SourceRange getSourceRange() const;

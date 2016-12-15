@@ -392,7 +392,7 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
       return nullptr;
     
     Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
-    if (param->getType()->is<InOutType>())
+    if (param->getInterfaceType()->is<InOutType>())
       ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*implicit=*/true);
     args.push_back(ref);
     
@@ -409,9 +409,6 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
   return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
                            SourceLoc(), false, IsImplicit);
 }
-
-
-
 
 
 /// Build a reference to the subscript index variables for this subscript
@@ -2034,29 +2031,29 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   //
   // We might have to apply substitutions, if for example we have a declaration
   // like 'class A : B<Int>'.
-  if (superclassDecl->isGenericContext()) {
-    if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
-      auto *moduleDecl = classDecl->getParentModule();
-      auto subs = superclassTyInContext->gatherAllSubstitutions(
-          moduleDecl, nullptr, nullptr);
-      auto subsMap = superclassSig->getSubstitutionMap(subs);
+  if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
+    auto *moduleDecl = classDecl->getParentModule();
+    auto subs = superclassTyInContext->gatherAllSubstitutions(
+        moduleDecl, nullptr, nullptr);
+    auto subsMap = superclassSig->getSubstitutionMap(subs);
 
-      for (auto *decl : *bodyParams) {
-        // Map the parameter type to an interface type written in terms of
-        // the superclass generic signature.
-        auto paramTy = ArchetypeBuilder::mapTypeOutOfContext(
-            superclassDecl, decl->getType());
+    for (auto *decl : *bodyParams) {
+      auto paramTy = decl->getInterfaceType();
 
-        // Apply the superclass substitutions to produce a contextual
-        // type in terms of the derived class archetypes.
-        auto paramSubstTy = paramTy.subst(subsMap, SubstOptions());
-        decl->setType(paramSubstTy);
+      // Apply the superclass substitutions to produce a contextual
+      // type in terms of the derived class archetypes.
+      auto paramSubstTy = paramTy.subst(subsMap, SubstOptions());
+      decl->setType(paramSubstTy);
 
-        // Map it to an interface type in terms of the derived class
-        // generic signature.
-        decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
-            classDecl, paramSubstTy));
-      }
+      // Map it to an interface type in terms of the derived class
+      // generic signature.
+      decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
+          classDecl, paramSubstTy));
+    }
+  } else {
+    for (auto *decl : *bodyParams) {
+      if (!decl->hasType())
+        decl->setType(classDecl->mapTypeIntoContext(decl->getInterfaceType()));
     }
   }
 

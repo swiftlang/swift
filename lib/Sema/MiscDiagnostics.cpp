@@ -1296,7 +1296,8 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     SourceRange typeRange = var->getTypeSourceRangeForDiagnostics();
     auto *baseVar = cast<VarDecl>(base);
-    return checkType(var->getType(), baseVar->getType(), typeRange);
+    return checkType(var->getInterfaceType(), baseVar->getInterfaceType(),
+                     typeRange);
   }
 
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {

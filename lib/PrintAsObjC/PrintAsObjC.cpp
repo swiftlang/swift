@@ -365,7 +365,7 @@ private:
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
-      print(param->getType(), OTK_None, Identifier(), IsFunctionParam);
+      print(param->getInterfaceType(), OTK_None, Identifier(), IsFunctionParam);
     }
     os << ")";
 
@@ -579,7 +579,7 @@ private:
     auto params = FD->getParameterLists().back();
     interleave(*params,
                [&](const ParamDecl *param) {
-                 print(param->getType(), OTK_None, param->getName(),
+                 print(param->getInterfaceType(), OTK_None, param->getName(),
                        IsFunctionParam);
                },
                [&]{ os << ", "; });
@@ -662,7 +662,7 @@ private:
     // We treat "unowned" as "assign" (even though it's more like
     // "safe_unretained") because we want people to think twice about
     // allowing that object to disappear.
-    Type ty = VD->getType();
+    Type ty = VD->getInterfaceType();
     if (auto weakTy = ty->getAs<WeakStorageType>()) {
       auto innerTy = weakTy->getReferentType()->getAnyOptionalObjectType();
       auto innerClass = innerTy->getClassOrBoundGenericClass();
