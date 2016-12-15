@@ -11,10 +11,8 @@
 # ==----------------------------------------------------------------------===#
 
 
-import json
 import os
 import platform
-import random
 import re
 import shutil
 import subprocess
@@ -25,8 +23,8 @@ import bug_reducer.bug_reducer_utils as bug_reducer_utils
 
 
 @unittest.skipUnless(platform.system() == 'Darwin',
-                     'opt_bug_reducer is only available on Darwin for now')
-class OptBugReducerTestCase(unittest.TestCase):
+                     'func_bug_reducer is only available on Darwin for now')
+class FuncBugReducerTestCase(unittest.TestCase):
 
     def setUp(self):
         self.file_dir = os.path.dirname(os.path.abspath(__file__))
@@ -45,16 +43,7 @@ class OptBugReducerTestCase(unittest.TestCase):
                                             '--toolchain', 'Default',
                                             '--show-sdk-path']).strip("\n")
         self.tools = bug_reducer_utils.SwiftTools(self.build_dir)
-        json_data = json.loads(subprocess.check_output(
-            [self.tools.sil_passpipeline_dumper, '-Performance']))
-        self.passes = []
-        for y in (x[2:] for x in json_data):
-            for z in y:
-                self.passes.append('--pass=-' + z[1])
-        random.seed(0xf487c07f)
-        random.shuffle(self.passes)
-        self.passes.insert(random.randint(0, len(self.passes)),
-                           '--pass=-bug-reducer-tester')
+        self.passes = ['--pass=-bug-reducer-tester']
 
         if os.access(self.tmp_dir, os.F_OK):
             shutil.rmtree(self.tmp_dir)
@@ -71,6 +60,7 @@ class OptBugReducerTestCase(unittest.TestCase):
 
     def run_swiftc_command(self, name):
         input_file_path = self._get_test_file_path(name)
+        sib_path = self._get_sib_file_path(input_file_path)
         args = [self.tools.swiftc,
                 '-module-cache-path', self.module_cache,
                 '-sdk', self.sdk,
@@ -78,78 +68,31 @@ class OptBugReducerTestCase(unittest.TestCase):
                 '-module-name', name,
                 '-emit-sib',
                 '-resource-dir', os.path.join(self.build_dir, 'lib', 'swift'),
-                '-o', self._get_sib_file_path(input_file_path),
+                '-o', sib_path,
                 input_file_path]
-        subprocess.call(args)
+        return subprocess.check_call(args)
 
     def test_basic(self):
         name = 'testbasic'
-        self.run_swiftc_command(name)
+        result_code = self.run_swiftc_command(name)
+        assert result_code == 0, "Failed initial compilation"
         args = [
             self.reducer,
-            'opt',
+            'func',
             self.build_dir,
             self._get_sib_file_path(self._get_test_file_path(name)),
             '--sdk=%s' % self.sdk,
             '--module-cache=%s' % self.module_cache,
             '--module-name=%s' % name,
             '--work-dir=%s' % self.tmp_dir,
-            '--extra-arg=-bug-reducer-tester-target-func=test_target'
+            '--extra-silopt-arg=-bug-reducer-tester-target-func=__TF_test_target'
         ]
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")
-        self.assertTrue('*** Found miscompiling passes!' in output)
-        self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
-        re_end = 'testoptbugreducer_testbasic_initial'
-        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
-        output_matches = [1 for o in output if output_file_re.match(o) is not None]
-        self.assertEquals(sum(output_matches), 1)
-
-    def test_suffix_in_need_of_prefix(self):
-        name = 'testsuffixinneedofprefix'
-        self.run_swiftc_command(name)
-        args = [
-            self.reducer,
-            'opt',
-            self.build_dir,
-            self._get_sib_file_path(self._get_test_file_path(name)),
-            '--sdk=%s' % self.sdk,
-            '--module-cache=%s' % self.module_cache,
-            '--module-name=%s' % name,
-            '--work-dir=%s' % self.tmp_dir,
-            '--extra-arg=-bug-reducer-tester-target-func=closure_test_target'
-        ]
-        args.extend(self.passes)
-        output = subprocess.check_output(args).split("\n")
-        self.assertTrue('*** Found miscompiling passes!' in output)
-        self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
-        re_end = 'testoptbugreducer_testsuffixinneedofprefix_initial'
-        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
-        output_matches = [1 for o in output if output_file_re.match(o) is not None]
-        self.assertEquals(sum(output_matches), 0)
-
-    def test_reduce_function(self):
-        name = 'testreducefunction'
-        self.run_swiftc_command(name)
-        args = [
-            self.reducer,
-            'opt',
-            self.build_dir,
-            self._get_sib_file_path(self._get_test_file_path(name)),
-            '--sdk=%s' % self.sdk,
-            '--module-cache=%s' % self.module_cache,
-            '--module-name=%s' % name,
-            '--work-dir=%s' % self.tmp_dir,
-            '--extra-arg=-bug-reducer-tester-target-func=__TF_test_target',
-            '--reduce-sil'
-        ]
-        args.extend(self.passes)
-        output = subprocess.check_output(args).split("\n")
-        self.assertTrue('*** Found miscompiling passes!' in output)
-        self.assertTrue('*** Final Functions: _TF18testreducefunction6foo413FT_T_')
-        self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
-        re_end = 'testoptbugreducer_testreducefunction_initial_'
-        re_end += 'a490c440d7e84b77e5b134720b298d2c.sib'
+        self.assertTrue("*** Successfully Reduced file!" in output)
+        self.assertTrue("*** Final Functions: _TF9testbasic6foo413FT_T_")
+        re_end = 'testfuncbugreducer_testbasic_'
+        re_end += 'c36efe1eb0993b53c570bfed38933af8.sib'
         output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
         output_matches = [1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 1)
