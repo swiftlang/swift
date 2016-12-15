@@ -2897,30 +2897,6 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 
 //===--- end of FIXME(integers) -------------------------------------------===//
 
-//===----------------------------------------------------------------------===//
-// FIXME(integers): short term solution until the overload resolution is fast
-// with the generic arithmetic operators.
-
-#if false
-extension ${Self} {
-// Operations with potentially-static overflow checking
-//
-// FIXME: must use condfail in these operators, rather than
-// overflowChecked, pending <rdar://problem/16271923> so that we don't
-// foil static checking for numeric overflows.
-% for op in ['+', '*', '-', '/', '%']:
-  @available(swift, obsoleted: 4.0)
-  @_transparent
-  public static func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-    var lhs = lhs
-    lhs ${op}= rhs
-    return lhs
-  }
-% end
-}
-#endif
-//===--- end of FIXME(integers) -------------------------------------------===//
-
 % end # end of concrete FixedWidthInteger section
 
 
@@ -2965,15 +2941,6 @@ internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
   return lhs - rhs
 #else
   return lhs &- rhs
-#endif
-}
-
-// FIXME(integers): switch to using `FixedWidthInteger.unsafeMultiplied(by:)`
-internal func _unsafeMultiply(_ lhs: Int, _ rhs: Int) -> Int {
-#if INTERNAL_CHECKS_ENABLED
-  return lhs * rhs
-#else
-  return lhs &* rhs
 #endif
 }
 
