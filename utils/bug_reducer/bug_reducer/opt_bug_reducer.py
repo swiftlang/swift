@@ -90,6 +90,7 @@ def pass_bug_reducer(args):
     """Given a path to a sib file with canonical sil, attempt to find a perturbed
 list of passes that the perf pipeline"""
     tools = bug_reducer_utils.SwiftTools(args.swift_build_dir)
+    config = bug_reducer_utils.SILToolInvokerConfig(args)
 
     passes = []
     if args.pass_list is None:
@@ -103,7 +104,9 @@ list of passes that the perf pipeline"""
     extra_args = []
     if args.extra_args is not None:
         extra_args = args.extra_args
-    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(args, tools, extra_args)
+    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(config, tools,
+                                                      args.input_file,
+                                                      extra_args)
 
     # Make sure that the base case /does/ crash.
     filename = sil_opt_invoker.get_suffixed_filename('base_case')

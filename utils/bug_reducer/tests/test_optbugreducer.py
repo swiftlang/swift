@@ -33,7 +33,12 @@ class OptBugReducerTestCase(unittest.TestCase):
         self.reducer = os.path.join(os.path.dirname(self.file_dir),
                                     'bug_reducer', 'bug_reducer.py')
         self.build_dir = os.path.abspath(os.environ['BUGREDUCE_TEST_SWIFT_OBJ_ROOT'])
-        self.tmp_dir = os.path.abspath(os.environ['BUGREDUCE_TEST_TMP_DIR'])
+
+        (root, _) = os.path.splitext(os.path.abspath(__file__))
+        self.root_basename = ''.join(os.path.basename(root).split('_'))
+        self.tmp_dir = os.path.join(os.path.abspath(os.environ['BUGREDUCE_TEST_TMP_DIR']),
+                                    self.root_basename)
+        subprocess.call(['mkdir', '-p', self.tmp_dir])
 
         self.module_cache = os.path.join(self.tmp_dir, 'module_cache')
         self.sdk = subprocess.check_output(['xcrun', '--sdk', 'macosx',
@@ -57,10 +62,8 @@ class OptBugReducerTestCase(unittest.TestCase):
         os.makedirs(self.module_cache)
 
     def _get_test_file_path(self, module_name):
-        (root, _) = os.path.splitext(os.path.abspath(__file__))
-        root_basename = ''.join(os.path.basename(root).split('_'))
         return os.path.join(self.file_dir,
-                            '{}_{}.swift'.format(root_basename, module_name))
+                            '{}_{}.swift'.format(self.root_basename, module_name))
 
     def _get_sib_file_path(self, filename):
         (root, ext) = os.path.splitext(filename)

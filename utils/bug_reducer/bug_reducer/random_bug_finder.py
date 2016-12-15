@@ -11,13 +11,15 @@ def random_bug_finder(args):
     """Given a path to a sib file with canonical sil, attempt to find a perturbed
 list of passes that the perf pipeline"""
     tools = bug_reducer_utils.SwiftTools(args.swift_build_dir)
+    config = bug_reducer_utils.SILToolInvokerConfig(args)
 
     json_data = json.loads(subprocess.check_output(
         [tools.sil_passpipeline_dumper, '-Performance']))
     passes = sum((p[2:] for p in json_data), [])
     passes = ['-' + x[1] for x in passes]
 
-    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(args, tools)
+    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(config, tools,
+                                                      args.input_file)
 
     # Make sure that the base case /does/ crash.
     max_count = args.max_count

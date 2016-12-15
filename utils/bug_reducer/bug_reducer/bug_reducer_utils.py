@@ -67,51 +67,88 @@ def maybe_abspath(x):
     return os.path.abspath(x)
 
 
-class SILOptInvoker(object):
+class SILToolInvokerConfig(object):
 
-    def __init__(self, args, tools, extra_args):
-        self.tools = tools
+    def __init__(self, args):
         self.module_cache = args.module_cache
         self.sdk = args.sdk
         self.target = args.target
         self.resource_dir = maybe_abspath(args.resource_dir)
         self.work_dir = maybe_abspath(args.work_dir)
         self.module_name = args.module_name
+
+
+class SILToolInvoker(object):
+
+    def __init__(self, config, extra_args=None):
+        self.config = config
         self.extra_args = extra_args
 
+    @property
+    def base_args(self):
+        x = [self.tool]
+        if self.config.sdk is not None:
+            x.append("-sdk=%s" % self.config.sdk)
+        if self.config.target is not None:
+            x.append("-target=%s" % self.config.target)
+        if self.config.resource_dir is not None:
+            x.append("-resource-dir=%s" % self.config.resource_dir)
+        if self.config.module_cache is not None:
+            x.append("-module-cache-path=%s" % self.config.module_cache)
+        if self.config.module_name is not None:
+            x.append("-module-name=%s" % self.config.module_name)
+        return x
+
+    @property
+    def tool(self):
+        raise RuntimeError('Abstract Method')
+
+
+class SILConstantInputToolInvoker(SILToolInvoker):
+
+    def __init__(self, config, tools, initial_input_file, extra_args):
+        SILToolInvoker.__init__(self, config, extra_args)
+        self.tools = tools
+
         # Start by creating our workdir if necessary
-        subprocess.check_call(["mkdir", "-p", self.work_dir])
+        subprocess.check_call(["mkdir", "-p", self.config.work_dir])
 
         # Then copy our input file into the work dir
-        base_input_file = os.path.basename(args.input_file)
+        base_input_file = os.path.basename(initial_input_file)
         (base, ext) = os.path.splitext(base_input_file)
         self.base_input_file_stem = base
         self.base_input_file_ext = ".sib"
 
         # First emit an initial *.sib file. This ensures no matter if we have a
         # *.swiftmodule, *.sil, or *.sib file, we are always using *.sib.
-        self.input_file = self.get_suffixed_filename('initial')
-        self._invoke(args.input_file, [], self.input_file)
+        self.input_file = initial_input_file
+
+    def _invoke(self, input_file, passes, output_filename):
+        raise RuntimeError('Abstract method')
+
+    @property
+    def base_args(self):
+        base_args = SILToolInvoker.base_args.fget(self)
+        base_args.append('-emit-sib')
+        return base_args
 
     def get_suffixed_filename(self, suffix):
         basename = self.base_input_file_stem + '_' + suffix
         basename += self.base_input_file_ext
-        return os.path.join(self.work_dir, basename)
+        return os.path.join(self.config.work_dir, basename)
+
+
+class SILOptInvoker(SILConstantInputToolInvoker):
+
+    def __init__(self, config, tools, input_file, extra_args):
+        SILConstantInputToolInvoker.__init__(self, config, tools, input_file,
+                                             extra_args)
+        self.input_file = self.get_suffixed_filename('initial')
+        self._invoke(input_file, [], self.input_file)
 
     @property
-    def base_args(self):
-        x = [self.tools.sil_opt, "-emit-sib"]
-        if self.sdk is not None:
-            x.append("-sdk=%s" % self.sdk)
-        if self.target is not None:
-            x.append("-target=%s" % self.target)
-        if self.resource_dir is not None:
-            x.append("-resource-dir=%s" % self.resource_dir)
-        if self.module_cache is not None:
-            x.append("-module-cache-path=%s" % self.module_cache)
-        if self.module_name is not None:
-            x.append("-module-name=%s" % self.module_name)
-        return x
+    def tool(self):
+        return self.tools.sil_opt
 
     def _cmdline(self, input_file, passes, output_file='-'):
         base_args = self.base_args
