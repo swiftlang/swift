@@ -41,3 +41,6 @@ Func Set.remove(at:) has 1st parameter type change from SetIndex<Element> to Set
 /* Function type change */
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has 3rd parameter type change from (UnsafeMutablePointer<T>) throws -> Result to (UnsafePointer<T>) throws -> Result
 
+/* Fixed Intents API */
+Constructor INSetClimateSettingsInCarIntent.init(enableFan:enableAirConditioner:enableClimateControl:enableAutoMode:airCirculationMode:fanSpeedIndex:fanSpeedPercentage:relativeFanSpeedSetting:temperature:relativeTemperatureSetting:climateZone:) has 7th parameter type change from Int? to Double?
+Var INSetClimateSettingsInCarIntent.fanSpeedPercentage has declared type change from Int? to Double?
