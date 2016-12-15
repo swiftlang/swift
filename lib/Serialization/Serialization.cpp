@@ -863,8 +863,8 @@ void Serializer::writePattern(const Pattern *pattern, DeclContext *owningDC) {
     // If we have an owning context and a contextual type, map out to an
     // interface type.
     if (owningDC && type->hasArchetype()) {
-      type = owningDC->getGenericEnvironmentOfContext()->mapTypeOutOfContext(
-                                             owningDC->getParentModule(), type);
+      type = owningDC->getGenericEnvironmentOfContext()
+                     ->mapTypeOutOfContext(type);
     }
 
     return type;
@@ -1260,7 +1260,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
     auto type = conf->getType();
     if (genericEnv)
-      type = genericEnv->mapTypeOutOfContext(const_cast<ModuleDecl *>(M), type);
+      type = genericEnv->mapTypeOutOfContext(type);
     SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
                                                      abbrCode,
                                                      addTypeRef(type),
@@ -1278,7 +1278,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
 
     auto type = conf->getType();
     if (genericEnv)
-      type = genericEnv->mapTypeOutOfContext(const_cast<ModuleDecl *>(M), type);
+      type = genericEnv->mapTypeOutOfContext(type);
 
     InheritedProtocolConformanceLayout::emitRecord(
       Out, ScratchRecord, abbrCode, addTypeRef(type));
@@ -1318,8 +1318,7 @@ Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
     auto replacementType = sub.getReplacement();
     if (genericEnv) {
       replacementType =
-        genericEnv->mapTypeOutOfContext(const_cast<ModuleDecl *>(M),
-                                        replacementType);
+        genericEnv->mapTypeOutOfContext(replacementType);
     }
 
     BoundGenericSubstitutionLayout::emitRecord(
@@ -2359,9 +2358,7 @@ void Serializer::writeDecl(const Decl *D) {
       underlying = typeAlias->getUnderlyingType();
       if (underlying->hasArchetype()) {
         auto genericEnv = typeAlias->getGenericEnvironmentOfContext();
-        underlying = genericEnv->mapTypeOutOfContext(
-                                                typeAlias->getModuleContext(),
-                                                underlying);
+        underlying = genericEnv->mapTypeOutOfContext(underlying);
       }
     }
 

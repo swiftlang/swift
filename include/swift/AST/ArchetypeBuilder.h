@@ -315,8 +315,7 @@ public:
   static Type mapTypeOutOfContext(const DeclContext *dc, Type type);
 
   /// Map a contextual type to an interface type.
-  static Type mapTypeOutOfContext(ModuleDecl *M,
-                                  GenericEnvironment *genericEnv,
+  static Type mapTypeOutOfContext(GenericEnvironment *genericEnv,
                                   Type type);
 
   /// \brief Dump all of the requirements, both specified and inferred.

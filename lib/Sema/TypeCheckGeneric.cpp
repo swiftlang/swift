@@ -138,10 +138,8 @@ void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type)
   // When type checking functions, the CompleteGenericTypeResolver sets
   // the interface type.
   if (!decl->hasInterfaceType())
-    decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
-        decl->getDeclContext()->getParentModule(),
-        GenericEnv,
-        type));
+    decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(GenericEnv,
+                                                                 type));
 }
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(

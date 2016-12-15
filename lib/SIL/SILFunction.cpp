@@ -277,8 +277,7 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
 }
 
 Type SILFunction::mapTypeOutOfContext(Type type) const {
-  return ArchetypeBuilder::mapTypeOutOfContext(getModule().getSwiftModule(),
-                                               getGenericEnvironment(),
+  return ArchetypeBuilder::mapTypeOutOfContext(getGenericEnvironment(),
                                                type);
 }
 

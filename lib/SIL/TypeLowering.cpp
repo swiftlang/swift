@@ -1591,7 +1591,6 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   if (auto genTy = funcInfo.FormalInterfaceType->getAs<GenericFunctionType>()) {
     sig = genTy->getGenericSignature()->getCanonicalSignature();
     resultTy = ArchetypeBuilder::mapTypeOutOfContext(
-        TC.M.getSwiftModule(),
         funcInfo.GenericEnv,
         resultTy)->getCanonicalType();
   }

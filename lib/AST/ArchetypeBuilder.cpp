@@ -423,8 +423,7 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
 
         // Map the type out of its context.
         if (auto genericEnv = alias->getGenericEnvironmentOfContext()) {
-          type = genericEnv->mapTypeOutOfContext(alias->getModuleContext(),
-                                                 type);
+          type = genericEnv->mapTypeOutOfContext(type);
         }
 
         if (auto existingPA = builder.resolveArchetype(type)) {
@@ -688,8 +687,7 @@ void ArchetypeType::resolveNestedType(
   auto &builder = *genericEnv->getArchetypeBuilder();
 
   Type interfaceType =
-    genericEnv->mapTypeOutOfContext(&builder.getModule(),
-                                    const_cast<ArchetypeType *>(this));
+    genericEnv->mapTypeOutOfContext(const_cast<ArchetypeType *>(this));
   auto parentPA = builder.resolveArchetype(interfaceType);
   auto memberPA = parentPA->getNestedType(nested.first, builder);
   auto result = memberPA->getTypeInContext(builder, genericEnv);
@@ -1975,14 +1973,12 @@ Type ArchetypeBuilder::mapTypeIntoContext(ModuleDecl *M,
 
 Type
 ArchetypeBuilder::mapTypeOutOfContext(const DeclContext *dc, Type type) {
-  return mapTypeOutOfContext(dc->getParentModule(),
-                             dc->getGenericEnvironmentOfContext(),
+  return mapTypeOutOfContext(dc->getGenericEnvironmentOfContext(),
                              type);
 }
 
 Type
-ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
-                                      GenericEnvironment *env,
+ArchetypeBuilder::mapTypeOutOfContext(GenericEnvironment *env,
                                       Type type) {
   auto canType = type->getCanonicalType();
   assert(!canType->hasTypeParameter() && "already have an interface type");
@@ -1991,7 +1987,7 @@ ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
 
   assert(env && "dependent type in non-generic context");
 
-  return env->mapTypeOutOfContext(M, type);
+  return env->mapTypeOutOfContext(type);
 }
 
 void ArchetypeBuilder::addGenericSignature(GenericSignature *sig) {
