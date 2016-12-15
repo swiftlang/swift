@@ -19,14 +19,17 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/Version.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Mutex.h"
 
 #include <memory>
 
 namespace llvm {
+  class GlobalVariable;
   class MemoryBuffer;
   class Module;
   class TargetOptions;
@@ -249,18 +252,22 @@ namespace swift {
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
+  /// If you set an outModuleHash, then you need to call performLLVM.
   std::unique_ptr<llvm::Module>
   performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
                       std::unique_ptr<SILModule> SILMod,
-                      StringRef ModuleName, llvm::LLVMContext &LLVMContext);
+                      StringRef ModuleName, llvm::LLVMContext &LLVMContext,
+                      llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
+  /// If you set an outModuleHash, then you need to call performLLVM.
   std::unique_ptr<llvm::Module>
   performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, llvm::LLVMContext &LLVMContext,
-                      unsigned StartElem = 0);
+                      unsigned StartElem = 0,
+                      llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This does not cause the module to be
@@ -275,6 +282,20 @@ namespace swift {
   /// Turn the given LLVM module into native code and return true on error.
   bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
                    llvm::Module *Module);
+
+  /// Run the LLVM passes. In multi-threaded compilation this will be done for
+  /// multiple LLVM modules in parallel.
+  bool performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
+                   llvm::sys::Mutex *DiagMutex,
+                   llvm::GlobalVariable *HashGlobal,
+                   llvm::Module *Module,
+                   llvm::TargetMachine *TargetMachine,
+                   version::Version const& effectiveLanguageVersion,
+                   StringRef OutputFilename);
+
+  /// Creates a TargetMachine from the IRGen opts and AST Context.
+  std::unique_ptr<llvm::TargetMachine>
+  createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx);
 
   /// A convenience wrapper for Parser functionality.
   class ParserUnit {
