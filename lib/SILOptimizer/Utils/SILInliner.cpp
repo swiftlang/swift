@@ -326,6 +326,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::CopyAddrInst:
     case ValueKind::RetainValueInst:
     case ValueKind::CopyValueInst:
+    case ValueKind::CopyUnownedValueInst:
     case ValueKind::DeallocBoxInst:
     case ValueKind::DeallocExistentialBoxInst:
     case ValueKind::DeallocRefInst:

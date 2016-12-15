@@ -245,6 +245,7 @@ struct OwnershipQualifiedKindVisitor : SILInstructionVisitor<OwnershipQualifiedK
   QUALIFIED_INST(EndBorrowInst)
   QUALIFIED_INST(LoadBorrowInst)
   QUALIFIED_INST(CopyValueInst)
+  QUALIFIED_INST(CopyUnownedValueInst)
   QUALIFIED_INST(DestroyValueInst)
 #undef QUALIFIED_INST
 

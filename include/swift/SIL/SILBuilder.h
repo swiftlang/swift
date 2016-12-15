@@ -808,6 +808,12 @@ public:
                       CopyValueInst(getSILDebugLocation(Loc), operand));
   }
 
+  CopyUnownedValueInst *createCopyUnownedValue(SILLocation Loc,
+                                               SILValue operand) {
+    return insert(new (F.getModule()) CopyUnownedValueInst(
+        getSILDebugLocation(Loc), operand, getModule()));
+  }
+
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
     return insert(new (F.getModule())
                       DestroyValueInst(getSILDebugLocation(Loc), operand));

@@ -477,6 +477,10 @@ public:
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }
 
+  /// Returns the underlying referent SILType of an @sil_unowned or @sil_weak
+  /// Type.
+  SILType getReferentType(SILModule &M) const;
+
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(*this);

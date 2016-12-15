@@ -1352,6 +1352,16 @@ public:
             "ownership");
   }
 
+  void checkCopyUnownedValueInst(CopyUnownedValueInst *I) {
+    auto unownedType = requireObjectType(UnownedStorageType, I->getOperand(),
+                                         "Operand of unowned_retain");
+    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
+            "unowned_retain requires unowned type to be loadable");
+    require(F.hasQualifiedOwnership(),
+            "copy_unowned_value is only valid in functions with qualified "
+            "ownership");
+  }
+
   void checkDestroyValueInst(DestroyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");

@@ -148,6 +148,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(MarkDependenceInst, SILInstruction, mark_dependence, None, DoesNotRelease)
   INST(CopyBlockInst, SILInstruction, copy_block, MayHaveSideEffects, DoesNotRelease)
   INST(CopyValueInst, SILInstruction, copy_value, MayHaveSideEffects, DoesNotRelease)
+  INST(CopyUnownedValueInst, SILInstruction, copy_unowned_value, MayHaveSideEffects, DoesNotRelease)
   INST(DestroyValueInst, SILInstruction, destroy_value, MayHaveSideEffects, MayRelease)
 
   // IsUnique does not actually write to memory but should be modeled

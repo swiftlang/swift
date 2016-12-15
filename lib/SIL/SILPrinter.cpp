@@ -1283,6 +1283,10 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitCopyUnownedValueInst(CopyUnownedValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitDestroyValueInst(DestroyValueInst *I) {
     *this << getIDAndType(I->getOperand());
   }
