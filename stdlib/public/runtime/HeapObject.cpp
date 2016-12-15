@@ -680,8 +680,6 @@ void swift::swift_deallocObject(HeapObject *object,
   // Some allocations passed to swift_deallocObject() are not compatible
   // with swift_unownedRelease() because they do not have ClassMetadata.
 
-  // FIXME: reexamine and repair this optimization
-
   if (object->refCounts.canBeFreedNow()) {
     // object state DEINITING -> DEAD
     SWIFT_RT_ENTRY_CALL(swift_slowDealloc)

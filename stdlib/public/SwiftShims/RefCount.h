@@ -963,7 +963,6 @@ class RefCounts {
             bits.getIsDeiniting() &&
             bits.getStrongExtraRefCount() == 0 &&
             bits.getUnownedRefCount() == 1);
-    // FIXME: make sure no-assert build optimizes this
   }
 
   private:
