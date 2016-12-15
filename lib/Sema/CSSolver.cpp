@@ -80,7 +80,9 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
 
       // Look for a literal-conformance constraint on the type variable.
       SmallVector<Constraint *, 8> constraints;
-      cs.getConstraintGraph().gatherConstraints(bindingTypeVar, constraints);
+      cs.getConstraintGraph().gatherConstraints(
+                              bindingTypeVar, constraints,
+                              ConstraintGraph::GatheringKind::EquivalenceClass);
       for (auto constraint : constraints) {
         if (constraint->getKind() == ConstraintKind::LiteralConformsTo &&
             constraint->getProtocol()->isSpecificProtocol(
@@ -769,7 +771,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   // Gather the constraints associated with this type variable.
   SmallVector<Constraint *, 8> constraints;
   llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
-  cs.getConstraintGraph().gatherConstraints(typeVar, constraints);
+  cs.getConstraintGraph().gatherConstraints(
+                              typeVar, constraints,
+                              ConstraintGraph::GatheringKind::EquivalenceClass);
 
   PotentialBindings result;
   Optional<unsigned> lastSupertypeIndex;
