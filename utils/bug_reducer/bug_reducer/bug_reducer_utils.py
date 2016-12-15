@@ -69,7 +69,7 @@ def maybe_abspath(x):
 
 class SILOptInvoker(object):
 
-    def __init__(self, args, tools, early_passes, extra_args):
+    def __init__(self, args, tools, extra_args):
         self.tools = tools
         self.module_cache = args.module_cache
         self.sdk = args.sdk
@@ -90,15 +90,8 @@ class SILOptInvoker(object):
 
         # First emit an initial *.sib file. This ensures no matter if we have a
         # *.swiftmodule, *.sil, or *.sib file, we are always using *.sib.
-        self._invoke(args.input_file, [],
-                     self.get_suffixed_filename('initial'))
-        self.input_file = self.get_suffixed_filename('initial+early')
-
-        # Finally, run the initial sil-opt invocation running the
-        # early-passes. We will not run them again.
-        self._invoke(self.get_suffixed_filename('initial'),
-                     early_passes,
-                     self.input_file)
+        self.input_file = self.get_suffixed_filename('initial')
+        self._invoke(args.input_file, [], self.input_file)
 
     def get_suffixed_filename(self, suffix):
         basename = self.base_input_file_stem + '_' + suffix
@@ -136,26 +129,3 @@ class SILOptInvoker(object):
 
     def cmdline_with_passlist(self, passes):
         return self._cmdline(self.input_file, passes)
-
-
-def get_silopt_invoker(args):
-    tools = SwiftTools(args.swift_build_dir)
-
-    passes = []
-    if len(args.pass_list) == 0:
-        json_data = json.loads(subprocess.check_output(
-            [tools.sil_passpipeline_dumper, '-Performance']))
-        passes = sum((p[2:] for p in json_data if p[0] != 'EarlyModulePasses'), [])
-        passes = ['-' + x[1] for x in passes]
-    else:
-        passes = ['-' + x for x in args.pass_list]
-
-    # We assume we have an early module passes that runs until fix point and
-    # that is strictly not what is causing the issue.
-    #
-    # Everything else runs one iteration.
-    early_module_passes = [p[2:] for p in json_data
-                           if p[0] == 'EarlyModulePasses'][0]
-    early_module_passes = ['-' + x[1] for x in early_module_passes]
-
-    return SILOptInvoker(args, tools, early_module_passes)
