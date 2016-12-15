@@ -84,7 +84,8 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///
 /// Only use this function to convert the instance passed as `x` to a
 /// layout-compatible type when the conversion is not possible through other
-/// means.
+/// means. Common conversions that are supported by the standard library
+/// include the following:
 ///
 /// - To convert an integer value from one type to another, use an initializer
 ///   or the `numericCast(_:)` function.

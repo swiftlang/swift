@@ -42,13 +42,12 @@
 public enum MemoryLayout<T> {
   /// The contiguous memory footprint of `T`, in bytes.
   ///
-  /// A type's size does not include any dynamically allocated or remote
+  /// A type's size does not include any dynamically allocated or out of line
   /// storage. In particular, `MemoryLayout<T>.size`, when `T` is a class
   /// type, is the same regardless of how many stored properties `T` has.
   ///
   /// When allocating memory for multiple instances of `T` using an unsafe
-  /// pointer, use a multiple of the type's `stride` property instead of its
-  /// `size`.
+  /// pointer, use a multiple of the type's stride instead of its size.
   ///
   /// - SeeAlso: `stride`
   @_transparent
@@ -81,10 +80,10 @@ public enum MemoryLayout<T> {
 extension MemoryLayout {
   /// Returns the contiguous memory footprint of the given instance.
   ///
-  /// The result does not include any dynamically allocated or remote
-  /// storage. In particular, `MemoryLayout.size(ofValue: x)`, when `x` is an
-  /// instance of a class `C`, is the same regardless of how many stored
-  /// properties `C` has.
+  /// The result does not include any dynamically allocated or out of line
+  /// storage. In particular, pointers and class instances all have the same
+  /// contiguous memory footprint, regardless of the size of the referenced
+  /// data.
   ///
   /// When you have a type instead of an instance, use the
   /// `MemoryLayout<T>.size` static property instead.
