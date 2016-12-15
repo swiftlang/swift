@@ -3428,31 +3428,6 @@ void VarDecl::setType(Type t) {
     setInvalid();
 }
 
-Type VarDecl::computeTypeInContextSlow() const {
-  Type contextType = getInterfaceType();
-  if (!contextType) return Type();
-
-  // If we have a type parameter, we need to map into this context.
-  if (contextType->hasTypeParameter()) {
-    auto genericEnv =
-      getInnermostDeclContext()->getGenericEnvironmentOfContext();
-
-    // FIXME: Hack to degrade somewhat gracefully when we don't have a generic
-    // environment yet. We return an interface type, but at least we don't
-    // record it.
-    if (!genericEnv)
-      return contextType;
-
-    contextType = genericEnv->mapTypeIntoContext(getModuleContext(),
-                                                 contextType);
-  }
-
-  typeInContext = contextType;
-  if (typeInContext->hasError())
-    const_cast<VarDecl *>(this)->setInvalid();
-  return typeInContext;
-}
-
 void VarDecl::markInvalid() {
   auto &Ctx = getASTContext();
   setType(ErrorType::get(Ctx));
