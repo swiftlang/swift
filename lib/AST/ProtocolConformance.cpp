@@ -463,8 +463,9 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
 }
 
 ProtocolConformance *ProtocolConformance::subst(Module *module,
-                                      Type substType,
-                                      const SubstitutionMap &subMap) const {
+                                       Type substType,
+                                       TypeSubstitutionFn subs,
+                                       LookupConformanceFn conformances) const {
   if (getType()->isEqual(substType))
     return const_cast<ProtocolConformance *>(this);
   
@@ -491,7 +492,8 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
     ProtocolConformance *newBase;
     if (inheritedConformance->getType()->isSpecialized()) {
-      newBase = inheritedConformance->subst(module, substType, subMap);
+      newBase = inheritedConformance->subst(module, substType,
+                                            subs, conformances);
     } else {
       newBase = inheritedConformance;
     }
@@ -505,7 +507,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
     SmallVector<Substitution, 8> newSubs;
     newSubs.reserve(spec->getGenericSubstitutions().size());
     for (auto &sub : spec->getGenericSubstitutions())
-      newSubs.push_back(sub.subst(module, subMap));
+      newSubs.push_back(sub.subst(module, subs, conformances));
     
     auto ctxNewSubs = module->getASTContext().AllocateCopy(newSubs);
     
@@ -539,7 +541,9 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
 
     auto subMap = env->getSubstitutionMap(conformingModule, subs);
 
-    auto r = inherited->subst(conformingModule, getType(), subMap);
+    auto r = inherited->subst(conformingModule, getType(),
+                              QueryTypeSubstitutionMap{subMap.getMap()},
+                              LookUpConformanceInSubstitutionMap(subMap));
     assert(getType()->isEqual(r->getType())
            && "substitution didn't produce conformance for same type?!");
     return r;
