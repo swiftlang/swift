@@ -315,9 +315,10 @@ getSubstitutions(ModuleDecl &mod,
     for (auto req: reqs) {
       assert(req.getKind() == RequirementKind::Conformance);
       auto protoType = req.getSecondType()->castTo<ProtocolType>();
+      // TODO: Error handling for failed conformance lookup.
       currentConformances.push_back(
-        lookupConformance(depTy->getCanonicalType(), currentReplacement,
-                          protoType));
+        *lookupConformance(depTy->getCanonicalType(), currentReplacement,
+                           protoType));
     }
 
     // Add it to the final substitution list.
@@ -336,9 +337,9 @@ getSubstitutions(ModuleDecl &mod,
                  SmallVectorImpl<Substitution> &result) const {
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
-          -> ProtocolConformanceRef {
-    return *subMap.lookupConformance(original, protoType->getDecl());
-  };
+      -> Optional<ProtocolConformanceRef> {
+        return subMap.lookupConformance(original, protoType->getDecl());
+      };
 
   getSubstitutions(mod, subMap.getMap(), lookupConformanceFn, result);
 }
