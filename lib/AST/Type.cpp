@@ -2765,13 +2765,18 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 
 FunctionType *
 GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
-  auto params = getGenericParams();
-  (void)params;
-  
   auto subs = getGenericSignature()->getSubstitutionMap(args);
 
   Type input = getInput().subst(subs);
   Type result = getResult().subst(subs);
+  return FunctionType::get(input, result, getExtInfo());
+}
+
+FunctionType *
+GenericFunctionType::substGenericArgs(TypeSubstitutionFn subs,
+                                      LookupConformanceFn conformances) {
+  Type input = getInput().subst(subs, conformances);
+  Type result = getResult().subst(subs, conformances);
   return FunctionType::get(input, result, getExtInfo());
 }
 
