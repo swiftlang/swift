@@ -366,6 +366,19 @@ namespace {
     Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy,
                                          ConstraintLocatorBuilder locator);
 
+    /// \brief Build a collection upcast expression.
+    ///
+    /// \param bridged Whether this is a bridging conversion, meaning that the
+    /// element types themselves are bridged (vs. simply coerced).
+    Expr *buildCollectionUpcastExpr(Expr *expr, Type toType,
+                                    bool bridged,
+                                    ConstraintLocatorBuilder locator);
+
+    /// Build the expression that performs a bridging operation from the
+    /// given expression to the given \c toType.
+    Expr *buildObjCBridgeExpr(Expr *expr, Type toType,
+                              ConstraintLocatorBuilder locator);
+
   public:
     /// \brief Build a reference to the given declaration.
     Expr *buildDeclRef(ValueDecl *decl, DeclNameLoc loc, Type openedType,
@@ -2950,6 +2963,7 @@ namespace {
         // Invalid type check.
         return nullptr;
       case CheckedCastKind::Coercion:
+      case CheckedCastKind::BridgingCast:
         // Check is trivially true.
         tc.diagnose(expr->getLoc(), diag::isa_is_always_true, "is");
         expr->setCastKind(castKind);
@@ -3014,13 +3028,40 @@ namespace {
       return expr;
     }
 
+    /// The kind of cast we're working with for handling optional bindings.
+    enum class OptionalBindingsCastKind {
+      /// An explicit bridging conversion, spelled "as".
+      Bridged,
+      /// A forced cast, spelled "as!".
+      Forced,
+      /// A conditional cast, spelled "as?".
+      Conditional,
+    };
+
     /// Handle optional operands and results in an explicit cast.
     Expr *handleOptionalBindings(ExplicitCastExpr *cast, 
                                  Type finalResultType,
-                                 bool conditionalCast) {
+                                 OptionalBindingsCastKind castKind) {
       auto &tc = cs.getTypeChecker();
 
-      unsigned destExtraOptionals = conditionalCast ? 1 : 0;
+      unsigned destExtraOptionals;
+      bool forceExtraSourceOptionals;
+      switch (castKind) {
+      case OptionalBindingsCastKind::Bridged:
+        destExtraOptionals = 0;
+        forceExtraSourceOptionals = true;
+        break;
+
+      case OptionalBindingsCastKind::Forced:
+        destExtraOptionals = 0;
+        forceExtraSourceOptionals = true;
+        break;
+
+      case OptionalBindingsCastKind::Conditional:
+        destExtraOptionals = 1;
+        forceExtraSourceOptionals = false;
+        break;
+      }
 
       // FIXME: some of this work needs to be delayed until runtime to
       // properly account for archetypes dynamically being optional
@@ -3036,9 +3077,19 @@ namespace {
       auto destValueType
         = finalResultType->lookThroughAllAnyOptionalTypes(destOptionals);
 
+      // When performing a bridging operation, if the destination value type
+      // is 'AnyObject', leave any extra optionals on the source in place.
+      if (castKind == OptionalBindingsCastKind::Bridged &&
+          srcOptionals.size() > destOptionals.size() &&
+          destValueType->isAnyObject()) {
+        srcType = srcOptionals[destOptionals.size()];
+        srcOptionals.erase(srcOptionals.begin() + destOptionals.size(),
+                           srcOptionals.end());
+      }
+
       // Complain about conditional casts to foreign class types; they can't
       // actually be conditionally checked.
-      if (conditionalCast) {
+      if (castKind == OptionalBindingsCastKind::Conditional) {
         auto destObjectType = destValueType;
         if (auto metaTy = destObjectType->getAs<MetatypeType>())
           destObjectType = metaTy->getInstanceType();
@@ -3064,7 +3115,7 @@ namespace {
       // If this is a conditional cast, the result type will always
       // have at least one level of optional, which should become the
       // type of the checked-cast expression.
-      if (conditionalCast) {
+      if (castKind == OptionalBindingsCastKind::Conditional) {
         assert(!destOptionals.empty() &&
                "result of checked cast is not an optional type");
         cs.setType(cast, destOptionals.back());
@@ -3099,7 +3150,7 @@ namespace {
         unsigned depth = failureDepth;
         if (i >= numRequiredOptionals) {
           depth -= (i - numRequiredOptionals) + 1;
-        } else if (!conditionalCast) {
+        } else if (forceExtraSourceOptionals) {
           // For a forced cast, force the required optionals.
           subExpr = new (tc.Context) ForceValueExpr(subExpr, fakeQuestionLoc);
           cs.setType(subExpr, valueType);
@@ -3120,7 +3171,7 @@ namespace {
       Expr *result = cast;
 
       if (destOptionals.size() > destExtraOptionals) {
-        if (conditionalCast) {
+        if (castKind == OptionalBindingsCastKind::Conditional) {
           // If the innermost cast fails, the entire expression fails.  To
           // get this behavior, we have to bind and then re-inject the result.
           // (SILGen should know how to peephole this.)
@@ -3143,7 +3194,7 @@ namespace {
         }
 
       // Otherwise, we just need to capture the failure-depth binding.
-      } else if (conditionalCast) {
+      } else if (!forceExtraSourceOptionals) {
         result =
           cs.cacheType(new (tc.Context) OptionalEvaluationExpr(result,
                                                               finalResultType));
@@ -3153,34 +3204,59 @@ namespace {
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {
+      return visitCoerceExpr(expr, None);
+    }
+
+    Expr *visitCoerceExpr(CoerceExpr *expr, Optional<unsigned> choice) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
       checkForImportedUsedConformances(toType);
 
-      // Determine whether we performed a coercion or downcast.
-      if (cs.shouldAttemptFixes()) {
-        auto locator = cs.getConstraintLocator(expr);
-        unsigned choice = solution.getDisjunctionChoice(locator);
-        (void) choice;
-        assert(choice == 0 &&
-          "checked cast branch of disjunction should have resulted in Fix");
+      auto &tc = cs.getTypeChecker();
+
+      // Turn the subexpression into an rvalue.
+      if (auto rvalueSub = cs.coerceToRValue(expr->getSubExpr()))
+        expr->setSubExpr(rvalueSub);
+      else
+        return nullptr;
+
+      // If we weren't explicitly told by the caller which disjunction choice,
+      // get it from the solution to determine whether we've picked a coercion
+      // or a bridging conversion.
+      auto locator = cs.getConstraintLocator(expr);
+      if (!choice) {
+        choice = solution.getDisjunctionChoice(locator);
       }
 
-      auto &tc = cs.getTypeChecker();
-      auto sub = cs.coerceToRValue(expr->getSubExpr());
+      // Handle the coercion/bridging of the underlying subexpression, where
+      // optionality has been removed.
+      if (*choice == 0) {
+        // Convert the subexpression.
+        Expr *sub = expr->getSubExpr();
+        if (tc.convertToType(sub, toType, cs.DC))
+          return nullptr;
 
-      // The subexpression is always an rvalue.
-      if (!sub)
+        expr->setSubExpr(sub);
+        cs.setType(expr, toType);
+        return expr;
+      }
+
+      // Bridging conversion.
+      assert(*choice == 1 && "should be bridging");
+
+      // Handle optional bindings.
+      Expr *result = handleOptionalBindings(expr, toType,
+                                            OptionalBindingsCastKind::Bridged);
+      if (!result)
         return nullptr;
 
-      // Convert the subexpression.
-      if (tc.convertToType(sub, toType, cs.DC))
-        return nullptr;
-
+      Expr *sub = expr->getSubExpr();
+      Type toInstanceType = toType->lookThroughAllAnyOptionalTypes();
+      sub = buildObjCBridgeExpr(sub, toInstanceType, locator);
+      if (!sub) return nullptr;
       expr->setSubExpr(sub);
-      cs.setType(expr, toType);
-      return expr;
+      return result;
     }
 
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
@@ -3211,7 +3287,8 @@ namespace {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
         return nullptr;
-      case CheckedCastKind::Coercion: {
+      case CheckedCastKind::Coercion:
+      case CheckedCastKind::BridgingCast: {
         if (SuppressDiagnostics)
           return nullptr;
 
@@ -3227,18 +3304,13 @@ namespace {
                           "as");
         }
 
-        // Convert the subexpression.
-        bool failed = tc.convertToType(sub, toType, cs.DC);
-        (void)failed;
-        assert(!failed && "Not convertible?");
-
         // Transmute the checked cast into a coercion expression.
-        Expr *result = new (tc.Context) CoerceExpr(sub, expr->getLoc(),
+        auto *result = new (tc.Context) CoerceExpr(sub, expr->getLoc(),
                                                    expr->getCastTypeLoc());
-
-        // The result type is the type we're converting to.
         cs.setType(result, toType);
-        return result;
+        unsigned disjunctionChoice =
+          (castKind == CheckedCastKind::Coercion ? 0 : 1);
+        return visitCoerceExpr(result, disjunctionChoice);
       }
 
       // Valid casts.
@@ -3252,7 +3324,7 @@ namespace {
       }
       
       return handleOptionalBindings(expr, simplifyType(cs.getType(expr)),
-                                    /*conditionalCast=*/false);
+                                    OptionalBindingsCastKind::Forced);
     }
 
     Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
@@ -3283,24 +3355,24 @@ namespace {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
         return nullptr;
-      case CheckedCastKind::Coercion: {
+      case CheckedCastKind::Coercion:
+      case CheckedCastKind::BridgingCast: {
         if (SuppressDiagnostics)
           return nullptr;
 
         tc.diagnose(expr->getLoc(), diag::conditional_downcast_coercion,
                     cs.getType(sub), toType);
 
-        // Convert the subexpression.
-        bool failed = tc.convertToType(sub, toType, cs.DC);
-        (void)failed;
-        assert(!failed && "Not convertible?");
 
         // Transmute the checked cast into a coercion expression.
-        Expr *result = new (tc.Context) CoerceExpr(sub, expr->getLoc(),
+        auto *coerce = new (tc.Context) CoerceExpr(sub, expr->getLoc(),
                                                    expr->getCastTypeLoc());
-
-        // The result type is the type we're converting to.
-        cs.setType(result, toType);
+        cs.setType(coerce, toType);
+        unsigned disjunctionChoice =
+          (castKind == CheckedCastKind::Coercion ? 0 : 1);
+        Expr *result = visitCoerceExpr(coerce, disjunctionChoice);
+        if (!result)
+          return nullptr;
 
         // Wrap the result in an optional.
         return cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(
@@ -3319,7 +3391,7 @@ namespace {
       }
       
       return handleOptionalBindings(expr, simplifyType(cs.getType(expr)),
-                                    /*conditionalCast=*/true);
+                                    OptionalBindingsCastKind::Conditional);
     }
 
     Expr *visitAssignExpr(AssignExpr *expr) {
@@ -5201,6 +5273,7 @@ buildElementConversion(ExprRewriter &rewriter,
                        SourceLoc srcLoc,
                        Type srcCollectionType,
                        Type destCollectionType,
+                       bool bridged,
                        ConstraintLocatorBuilder locator,
                        unsigned typeArgIndex) {
   // We don't need this stuff unless we've got generalized casts.
@@ -5210,15 +5283,86 @@ buildElementConversion(ExprRewriter &rewriter,
                                     ->getGenericArgs()[typeArgIndex];
 
   // Build the conversion.
-  ASTContext &ctx = rewriter.getConstraintSystem().getASTContext();
+  auto &cs = rewriter.getConstraintSystem();
+  ASTContext &ctx = cs.getASTContext();
   auto opaque =
     rewriter.cs.cacheType(new (ctx) OpaqueValueExpr(srcLoc, srcType));
-  auto conversion =
-    rewriter.coerceToType(opaque, destType,
+  Expr *conversion = nullptr;
+
+  auto &tc = rewriter.getConstraintSystem().getTypeChecker();
+  if (bridged &&
+      tc.typeCheckCheckedCast(srcType, destType, cs.DC, SourceLoc(),
+                              SourceRange(), SourceRange(), nullptr,
+                              /*suppressDiagnostics=*/true)
+        != CheckedCastKind::Coercion) {
+    conversion = rewriter.buildObjCBridgeExpr(opaque, destType,
            locator.withPathElement(
              ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)));
+  }
+
+  if (!conversion) {
+    conversion = rewriter.coerceToType(opaque, destType,
+           locator.withPathElement(
+             ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)));
+  }
 
   return { opaque, conversion };
+}
+
+Expr *ExprRewriter::buildCollectionUpcastExpr(Expr *expr, Type toType,
+                                              bool bridged,
+                                              ConstraintLocatorBuilder locator) {
+  ASTContext &ctx = cs.getASTContext();
+  // Build the first value conversion.
+  auto conv = buildElementConversion(*this, expr->getLoc(), cs.getType(expr),
+                                     toType, bridged, locator, 0);
+
+  // For single-parameter collections, form the upcast.
+  if (ConstraintSystem::isArrayType(toType) ||
+      ConstraintSystem::isSetType(toType)) {
+    return cs.cacheType(
+              new (ctx) CollectionUpcastConversionExpr(expr, toType, {}, conv));
+  }
+
+  assert(ConstraintSystem::isDictionaryType(toType) &&
+         "Unhandled collection upcast");
+
+  // Build the second value conversion.
+  auto conv2 = buildElementConversion(*this, expr->getLoc(), cs.getType(expr),
+                                      toType, bridged, locator, 1);
+
+  return cs.cacheType(
+           new (ctx) CollectionUpcastConversionExpr(expr, toType, conv, conv2));
+
+}
+
+Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
+                                        ConstraintLocatorBuilder locator) {
+  Type fromType = cs.getType(expr);
+
+  // Bridged collection casts always succeed, so we treat them as
+  // collection "upcasts".
+  if ((ConstraintSystem::isArrayType(fromType) &&
+       ConstraintSystem::isArrayType(toType)) ||
+      (ConstraintSystem::isDictionaryType(fromType) &&
+       ConstraintSystem::isDictionaryType(toType)) ||
+      (ConstraintSystem::isSetType(fromType) &&
+       ConstraintSystem::isSetType(toType))) {
+    return buildCollectionUpcastExpr(expr, toType, /*bridged=*/true, locator);
+  }
+
+  // Bridging from a Swift type to an Objective-C class type.
+  if (toType->isBridgeableObjectType()) {
+    // Bridging to Objective-C.
+    Expr *objcExpr = bridgeToObjectiveC(expr);
+    if (!objcExpr)
+      return nullptr;
+
+    return coerceToType(objcExpr, toType, locator);
+  }
+
+  // Bridging from an Objective-C class type to a Swift type.
+  return forceBridgeFromObjectiveC(expr, toType);
 }
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
@@ -5379,14 +5523,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       // Build the value conversion.
-      auto conv = buildElementConversion(*this, expr->getLoc(), cs.getType(expr),
-                                         toType, locator, 0);
-
-      // Form the upcast.
-      return
-        cs.cacheType(
-            new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
-                                                            {}, conv));
+      return buildCollectionUpcastExpr(expr, toType, /*bridged=*/false,
+                                       locator);
     }
 
     case ConversionRestrictionKind::HashableToAnyHashable: {
@@ -5418,19 +5556,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
       }
 
-      // Build the key and value conversions.
-      auto keyConv = buildElementConversion(
-          *this, expr->getLoc(), cs.getType(expr), toType, locator, 0);
-      auto valueConv = buildElementConversion(
-          *this, expr->getLoc(), cs.getType(expr), toType, locator, 1);
-
-      // If the source key and value types are object types, this is an upcast.
-      // Otherwise, it's bridged.
-      Type sourceKey, sourceValue;
-      std::tie(sourceKey, sourceValue) = *cs.isDictionaryType(cs.getType(expr));
-
-      return cs.cacheType(new (tc.Context) CollectionUpcastConversionExpr(
-          expr, toType, keyConv, valueConv));
+      // Build the value conversion.
+      return buildCollectionUpcastExpr(expr, toType, /*bridged=*/false,
+                                       locator);
     }
 
     case ConversionRestrictionKind::SetUpcast: {
@@ -5441,11 +5569,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       // Build the value conversion.
-      auto conv = buildElementConversion(*this, expr->getLoc(), cs.getType(expr),
-                                         toType, locator, 0);
-
-      return cs.cacheType(new (tc.Context) CollectionUpcastConversionExpr(
-          expr, toType, {}, conv));
+      return buildCollectionUpcastExpr(expr, toType, /*bridged=*/false, locator);
     }
 
     case ConversionRestrictionKind::InoutToPointer: {
@@ -5532,17 +5656,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Non-optional to non-optional.
       return cs.cacheType(new (tc.Context) PointerToPointerExpr(expr, toType));
     }
-
-    case ConversionRestrictionKind::BridgeToObjC: {
-      Expr *objcExpr = bridgeToObjectiveC(expr);
-      if (!objcExpr)
-        return nullptr;
-
-      return coerceToType(objcExpr, toType, locator);
-    }
-    
-    case ConversionRestrictionKind::BridgeFromObjC:
-      return forceBridgeFromObjectiveC(expr, toType);
 
     case ConversionRestrictionKind::CFTollFreeBridgeToObjC: {
       auto foreignClass = fromType->getClassOrBoundGenericClass();
@@ -6806,6 +6919,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
         // Fix didn't work, let diagnoseFailureForExpr handle this.
         return false;
       case CheckedCastKind::Coercion:
+      case CheckedCastKind::BridgingCast:
         llvm_unreachable("Coercions handled in other disjunction branch");
 
       // Valid casts.

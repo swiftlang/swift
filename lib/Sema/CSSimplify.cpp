@@ -678,7 +678,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
     break;
 
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Bind:
@@ -802,7 +802,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ArgumentConversion:
-  case ConstraintKind::ExplicitConversion:
   case ConstraintKind::Conversion:
     subKind = ConstraintKind::Conversion;
     break;
@@ -824,6 +823,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::BridgingConversion:
     llvm_unreachable("Not a conversion");
   }
 
@@ -933,7 +933,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
 
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
@@ -997,7 +997,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
@@ -1017,6 +1016,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::BridgingConversion:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -1197,23 +1197,6 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
     return true;
   
   return false;
-}
-
-/// Determine whether the given type is a value type to which we can bridge a
-/// value of its corresponding class type, such as 'String' bridging from
-/// NSString.
-static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
-                                   Type type) {
-  ASTContext &ctx = tc.Context;
-  auto objcType = ctx.getBridgedToObjC(dc, type);
-  if (!objcType)
-    return false;
-
-  auto objcClass = objcType->getClassOrBoundGenericClass();
-  if (!objcClass)
-    return false;
-
-  return true;
 }
 
 ConstraintSystem::SolutionKind
@@ -1433,7 +1416,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       SWIFT_FALLTHROUGH;
 
     case ConstraintKind::Subtype:
-    case ConstraintKind::ExplicitConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
@@ -1449,6 +1431,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::BindOverload:
+    case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::Defaultable:
@@ -1820,61 +1803,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                           locator.withPathElement(ConstraintLocator::Load));
     }
 
-    // Explicit bridging from a value type to an Objective-C class type.
-    if (kind == ConstraintKind::ExplicitConversion) {
-      if (type1->isPotentiallyBridgedValueType() &&
-          type1->getAnyNominal() 
-            != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
-          !flags.contains(TMF_ApplyingOperatorParameter)) {
-        
-        auto isBridgeableTargetType = type2->isBridgeableObjectType();
-        
-        // Allow bridged conversions to CVarArg through NSObject.
-        if (!isBridgeableTargetType && type2->isExistentialType()) {
-          if (auto nominalType = type2->getAs<NominalType>())
-            isBridgeableTargetType = nominalType->getDecl()->getName() ==
-                                        TC.Context.Id_CVarArg;
-        }
-        
-        // Check whether the source type is bridged to an Objective-C
-        // class type. This conversion is implicit unless the bridged
-        // value type is Error; this special rule is a subset of
-        // SE-0072 that breaks an implicit conversion cycle between
-        // NSError and Error.
-        if (isBridgeableTargetType) {
-          Type bridgedValueType;
-          if (TC.Context.getBridgedToObjC(DC, type1, &bridgedValueType)) {
-            if ((kind >= ConstraintKind::ExplicitConversion ||
-                 bridgedValueType->getAnyNominal() !=
-                   TC.Context.getErrorDecl()))
-              conversionsOrFixes.push_back(
-                ConversionRestrictionKind::BridgeToObjC);
-          }
-        }
-      }
-
-      // Anything can be explicitly converted to AnyObject using the universal
-      // bridging conversion.
-      if (auto protoType2 = type2->getAs<ProtocolType>()) {
-        if (TC.Context.LangOpts.EnableObjCInterop
-            && protoType2->getDecl()
-              == TC.Context.getProtocol(KnownProtocolKind::AnyObject)
-            && !type1->mayHaveSuperclass()
-            && !type1->isClassExistentialType())
-          conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeToObjC);
-      }
-
-      // Bridging from an Objective-C class type to a value type.
-      // Note that specifically require a class or class-constrained archetype
-      // here, because archetypes cannot be bridged.
-      if (type1->mayHaveSuperclass() && type2->isPotentiallyBridgedValueType() &&
-          type2->getAnyNominal() 
-            != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
-          allowsBridgingFromObjC(TC, DC, type2)) {
-        conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
-      }
-    }
-    
     // Pointer arguments can be converted from pointer-compatible types.
     if (kind >= ConstraintKind::ArgumentConversion) {
       Type unwrappedType2 = type2;
@@ -2651,6 +2579,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
 
   case CheckedCastKind::Coercion:
+  case CheckedCastKind::BridgingCast:
   case CheckedCastKind::Unresolved:
     llvm_unreachable("Not a valid result");
   }
@@ -3418,6 +3347,207 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyBridgingConstraint(Type type1,
+                                             Type type2,
+                                             TypeMatchOptions flags,
+                                             ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+
+  /// Form an unresolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::BridgingConversion, type1,
+                           type2, DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+    
+    return SolutionKind::Unsolved;
+  };
+
+  // Local function to look through optional types. It produces the
+  // fully-unwrapped type and a count of the total # of optional types that were
+  // unwrapped.
+  auto unwrapType = [&](Type type) -> std::pair<Type, unsigned> {
+    unsigned count = 0;
+    while (Type objectType = type->getAnyOptionalObjectType()) {
+      ++count;
+
+      TypeMatchOptions unusedOptions;
+      type = getFixedTypeRecursive(objectType, unusedOptions, /*wantRValue=*/true);
+    }
+
+    return { type, count };
+  };
+
+  type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
+  type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
+
+  if (type1->isTypeVariableOrMember() || type2->isTypeVariableOrMember())
+    return formUnsolved();
+
+  Type unwrappedFromType;
+  unsigned numFromOptionals;
+  std::tie(unwrappedFromType, numFromOptionals) = unwrapType(type1);
+
+  Type unwrappedToType;
+  unsigned numToOptionals;
+  std::tie(unwrappedToType, numToOptionals) = unwrapType(type2);
+
+  if (unwrappedFromType->isTypeVariableOrMember() ||
+      unwrappedToType->isTypeVariableOrMember())
+    return formUnsolved();
+
+  // Update the score.
+  increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
+  if (worseThanBestSolution()) {
+    return SolutionKind::Error;
+  }
+
+  // Anything can be explicitly converted to AnyObject using the universal
+  // bridging conversion. We allow this so long as we have at least as many
+  // optionals in the source as in the destination.
+  if (unwrappedToType->isAnyObject() && numFromOptionals >= numToOptionals) {
+    return SolutionKind::Solved;
+  }
+
+  // Unwrap one extra level of implicitly-unwrapped optional on the source,
+  // if needed.
+  if (numFromOptionals == numToOptionals + 1 &&
+      !type1->getImplicitlyUnwrappedOptionalObjectType().isNull()) {
+    --numFromOptionals;
+    increaseScore(SK_ForceUnchecked);
+    if (worseThanBestSolution()) {
+      return SolutionKind::Error;
+    }
+  }
+
+  // # of optionals must match for bridging conversions.
+  if (numToOptionals != numFromOptionals) {
+    return SolutionKind::Error;
+  }
+
+  // Explicit bridging from a value type to an Objective-C class type.
+  if (unwrappedFromType->isPotentiallyBridgedValueType() &&
+      unwrappedFromType->getAnyNominal()
+        != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
+      !flags.contains(TMF_ApplyingOperatorParameter) &&
+      unwrappedToType->isBridgeableObjectType()) {
+    if (Type classType = TC.Context.getBridgedToObjC(DC, unwrappedFromType)) {
+      return matchTypes(classType, unwrappedToType, ConstraintKind::Subtype, subflags,
+                        locator);
+    }
+  }
+
+  // Bridging from an Objective-C class type to a value type.
+  // Note that specifically require a class or class-constrained archetype
+  // here, because archetypes cannot be bridged.
+  if (unwrappedFromType->mayHaveSuperclass() &&
+      unwrappedToType->isPotentiallyBridgedValueType() &&
+      unwrappedToType->getAnyNominal()
+        != TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
+    Type bridgedValueType;
+    if (auto objcClass = TC.Context.getBridgedToObjC(DC, unwrappedToType,
+                                                     &bridgedValueType)) {
+      // If the bridged value type is generic, the generic arguments
+      // must either match or be bridged.
+      // FIXME: This should be an associated type of the protocol.
+      if (auto fromBGT = unwrappedToType->getAs<BoundGenericType>()) {
+        if (fromBGT->getDecl() == TC.Context.getArrayDecl()) {
+          // [AnyObject]
+          addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
+                        TC.Context.getProtocol(KnownProtocolKind::AnyObject)
+                          ->getDeclaredType(),
+                        getConstraintLocator(
+                          locator.withPathElement(
+                                       LocatorPathElt::getGenericArgument(0))));
+        } else if (fromBGT->getDecl() == TC.Context.getDictionaryDecl()) {
+          // [NSObject : AnyObject]
+          auto NSObjectType = TC.getNSObjectType(DC);
+          if (!NSObjectType) {
+            // Not a bridging case. Should we detect this earlier?
+            return SolutionKind::Error;
+          }
+
+          addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
+                        NSObjectType,
+                        getConstraintLocator(
+                          locator.withPathElement(
+                            LocatorPathElt::getGenericArgument(0))));
+
+          addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[1],
+                        TC.Context.getProtocol(KnownProtocolKind::AnyObject)
+                          ->getDeclaredType(),
+                        getConstraintLocator(
+                          locator.withPathElement(
+                            LocatorPathElt::getGenericArgument(1))));
+        } else if (fromBGT->getDecl() == TC.Context.getSetDecl()) {
+          auto NSObjectType = TC.getNSObjectType(DC);
+          if (!NSObjectType) {
+            // Not a bridging case. Should we detect this earlier?
+            return SolutionKind::Error;
+          }
+          addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
+                        NSObjectType,
+                        getConstraintLocator(
+                          locator.withPathElement(
+                            LocatorPathElt::getGenericArgument(0))));
+        } else {
+          // Nothing special to do; matchTypes will match generic arguments.
+        }
+      }
+
+      // Make sure we have the bridged value type.
+      if (matchTypes(unwrappedToType, bridgedValueType, ConstraintKind::Equal,
+                     subflags, locator)
+            == ConstraintSystem::SolutionKind::Error)
+        return SolutionKind::Error;
+
+      return matchTypes(unwrappedFromType, objcClass, ConstraintKind::Subtype,
+                        subflags, locator);
+    }
+  }
+
+  // Bridging the elements of an array.
+  if (auto fromElement = isArrayType(unwrappedFromType)) {
+    if (auto toElement = isArrayType(unwrappedToType)) {
+      return simplifyBridgingConstraint(
+                                      *fromElement, *toElement, subflags,
+                                      locator.withPathElement(
+                                        LocatorPathElt::getGenericArgument(0)));
+    }
+  }
+
+  // Bridging the keys/values of a dictionary.
+  if (auto fromKeyValue = isDictionaryType(unwrappedFromType)) {
+    if (auto toKeyValue = isDictionaryType(unwrappedToType)) {
+      addExplicitConversionConstraint(fromKeyValue->first, toKeyValue->first,
+                                      /*allowFixes=*/false,
+                                      locator.withPathElement(
+                                        LocatorPathElt::getGenericArgument(0)));
+      addExplicitConversionConstraint(fromKeyValue->second, toKeyValue->second,
+                                      /*allowFixes=*/false,
+                                      locator.withPathElement(
+                                        LocatorPathElt::getGenericArgument(0)));
+      return SolutionKind::Solved;
+    }
+  }
+
+  // Bridging the elements of a set.
+  if (auto fromElement = isSetType(unwrappedFromType)) {
+    if (auto toElement = isSetType(unwrappedToType)) {
+      return simplifyBridgingConstraint(
+                                      *fromElement, *toElement, subflags,
+                                      locator.withPathElement(
+                                        LocatorPathElt::getGenericArgument(0)));
+    }
+  }
+
+  return SolutionKind::Error;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(
                                            Type type1,
                                            Type type2,
@@ -3893,96 +4023,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       locator);
   }
 
-  // T bridges to C and C < U ===> T <c U
-  case ConversionRestrictionKind::BridgeToObjC: {
-    auto objcClass = TC.Context.getBridgedToObjC(DC, type1);
-    // If the type doesn't bridge any other way, we can still go straight to
-    // AnyObject by universal bridging.
-    if (!objcClass) {
-      assert(TC.Context.LangOpts.EnableObjCInterop
-             && "should only happen in Objective-C mode");
-      objcClass = TC.Context.getProtocol(KnownProtocolKind::AnyObject)
-        ->getDeclaredType();
-    }
-
-    addContextualScore();
-    increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
-    if (worseThanBestSolution()) {
-      return SolutionKind::Error;
-    }
-
-    return matchTypes(objcClass, type2, ConstraintKind::Subtype, subflags,
-                      locator);
-  }
-
-  // U bridges to C and T < C ===> T <c U
-  case ConversionRestrictionKind::BridgeFromObjC: {
-    Type bridgedValueType;
-    auto objcClass = TC.Context.getBridgedToObjC(DC, type2, &bridgedValueType);
-    assert(objcClass && "type is not bridged to Objective-C?");
-    addContextualScore();
-    increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
-    if (worseThanBestSolution()) {
-      return SolutionKind::Error;
-    }
-
-    // If the bridged value type is generic, the generic arguments
-    // must either match or be bridged.
-    // FIXME: This should be an associated type of the protocol.
-    if (auto bgt1 = type2->getAs<BoundGenericType>()) {
-      if (bgt1->getDecl() == TC.Context.getArrayDecl()) {
-        // [AnyObject]
-        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[0],
-                      TC.Context.getProtocol(KnownProtocolKind::AnyObject)
-                        ->getDeclaredType(),
-                      getConstraintLocator(
-                        locator.withPathElement(
-                          LocatorPathElt::getGenericArgument(0))));
-      } else if (bgt1->getDecl() == TC.Context.getDictionaryDecl()) {
-        // [NSObject : AnyObject]
-        auto NSObjectType = TC.getNSObjectType(DC);
-        if (!NSObjectType) {
-          // Not a bridging case. Should we detect this earlier?
-          return SolutionKind::Error;
-        }
-
-        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[0],
-                      NSObjectType,
-                      getConstraintLocator(
-                        locator.withPathElement(
-                          LocatorPathElt::getGenericArgument(0))));
-
-        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[1],
-                      TC.Context.getProtocol(KnownProtocolKind::AnyObject)
-                        ->getDeclaredType(),
-                      getConstraintLocator(
-                        locator.withPathElement(
-                          LocatorPathElt::getGenericArgument(1))));
-      } else if (bgt1->getDecl() == TC.Context.getSetDecl()) {
-        auto NSObjectType = TC.getNSObjectType(DC);
-        if (!NSObjectType) {
-          // Not a bridging case. Should we detect this earlier?
-          return SolutionKind::Error;
-        }
-        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[0],
-                      NSObjectType,
-                      getConstraintLocator(
-                        locator.withPathElement(
-                          LocatorPathElt::getGenericArgument(0))));
-      } else {
-        // Nothing special to do; matchTypes will match generic arguments.
-      }
-    }
-
-    // Make sure we have the bridged value type.
-    if (matchTypes(type2, bridgedValueType, ConstraintKind::Equal, subflags,
-                   locator) == ConstraintSystem::SolutionKind::Error)
-      return ConstraintSystem::SolutionKind::Error;
-
-    return matchTypes(type1, objcClass, ConstraintKind::Subtype, subflags,
-                      locator);
-  }
-
   // T' < U and T a toll-free-bridged to T' ===> T' <c U
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC: {
     increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
@@ -4121,12 +4161,14 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
     return matchTypes(first, second, kind, subflags, locator);
+
+  case ConstraintKind::BridgingConversion:
+    return simplifyBridgingConstraint(first, second, subflags, locator);
 
   case ConstraintKind::ApplicableFunction:
     return simplifyApplicableFnConstraint(first, second, subflags, locator);
@@ -4183,6 +4225,46 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
   }
 }
 
+void ConstraintSystem::addExplicitConversionConstraint(
+                                           Type fromType, Type toType,
+                                           bool allowFixes,
+                                           ConstraintLocatorBuilder locator) {
+  SmallVector<Constraint *, 3> constraints;
+
+  auto locatorPtr = getConstraintLocator(locator);
+
+  // Coercion (the common case).
+  Constraint *coerceConstraint =
+    Constraint::create(*this, ConstraintKind::Conversion,
+                       fromType, toType, DeclName(),
+                       FunctionRefKind::Compound,
+                       locatorPtr);
+  coerceConstraint->setFavored();
+  constraints.push_back(coerceConstraint);
+
+  // Bridging.
+  if (getASTContext().LangOpts.EnableObjCInterop) {
+    // The source type can be explicitly converted to the destination type.
+    Constraint *bridgingConstraint =
+      Constraint::create(*this, ConstraintKind::BridgingConversion,
+                         fromType, toType, DeclName(),
+                         FunctionRefKind::Compound,
+                         locatorPtr);
+    constraints.push_back(bridgingConstraint);
+  }
+
+  if (allowFixes && shouldAttemptFixes()) {
+    Constraint *downcastConstraint =
+      Constraint::createFixed(*this, ConstraintKind::CheckedCast,
+                              FixKind::CoerceToCheckedCast, fromType,
+                              toType, locatorPtr);
+    constraints.push_back(downcastConstraint);
+  }
+
+  addDisjunctionConstraint(constraints, locator,
+                           allowFixes ? RememberChoice : ForgetChoice);
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   switch (constraint.getKind()) {
@@ -4192,7 +4274,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
@@ -4220,6 +4301,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
                       matchKind, None, constraint.getLocator());
   }
+
+  case ConstraintKind::BridgingConversion:
+    return simplifyBridgingConstraint(constraint.getFirstType(),
+                                      constraint.getSecondType(),
+                                      None, constraint.getLocator());
 
   case ConstraintKind::ApplicableFunction:
     return simplifyApplicableFnConstraint(constraint.getFirstType(),

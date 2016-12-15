@@ -56,7 +56,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
@@ -153,7 +153,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
@@ -224,7 +224,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::BindToPointerType: Out << " bind to pointer "; break;
   case ConstraintKind::Subtype: Out << " subtype "; break;
   case ConstraintKind::Conversion: Out << " conv "; break;
-  case ConstraintKind::ExplicitConversion: Out << " expl conv "; break;
+  case ConstraintKind::BridgingConversion: Out << " bridging conv "; break;
   case ConstraintKind::ArgumentConversion: Out << " arg conv "; break;
   case ConstraintKind::ArgumentTupleConversion:
       Out << " arg tuple conv "; break;
@@ -386,10 +386,6 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[dictionary-upcast]";
   case ConversionRestrictionKind::SetUpcast:
     return "[set-upcast]";
-  case ConversionRestrictionKind::BridgeToObjC:
-    return "[bridge-to-objc]";
-  case ConversionRestrictionKind::BridgeFromObjC:
-    return "[bridge-from-objc]";
   case ConversionRestrictionKind::HashableToAnyHashable:
     return "[hashable-to-anyhashable]";
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
@@ -461,7 +457,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
