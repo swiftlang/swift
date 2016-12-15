@@ -1930,7 +1930,8 @@ void SameNameNodeMatcher::match() {
       Added.push_back(R);
     }
   }
-  RemovedAddedNodeMatcher(Removed, Added, Listener).match();
+  RemovedAddedNodeMatcher RAMatcher(Removed, Added, Listener);
+  RAMatcher.match();
 }
 
 // The recursive version of sequential matcher. We do not only match two vectors
@@ -2094,7 +2095,8 @@ public:
       // type decls that are identical. If the matched nodes are both type decls,
       // remove the contained function decls that are identical.
       removeCommonChildren(Left, Right);
-      SameNameNodeMatcher(Left->getChildren(), Right->getChildren(), *this).match();
+      SameNameNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(), *this);
+      SNMatcher.match();
       break;
     }
 
@@ -2108,8 +2110,9 @@ public:
     case SDKNodeKind::TypeNameAlias: {
       // If matched nodes are both function/var/TypeAlias decls, mapping their
       // parameters sequentially.
-      SequentialNodeMatcher(Left->getChildren(),
-                            Right->getChildren(), *this).match();
+      SequentialNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(),
+                                      *this);
+      SNMatcher.match();
       break;
     }
 
@@ -3203,7 +3206,9 @@ struct RenameDetectorForMemberDiff : public MatchedNodeListener {
   void workOn(NodePtr Left, NodePtr Right) {
     if (Left->getKind() == Right->getKind() &&
         Left->getKind() == SDKNodeKind::TypeDecl) {
-      SameNameNodeMatcher(Left->getChildren(), Right->getChildren(), *this).match();
+      SameNameNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(),
+                                    *this);
+      SNMatcher.match();
     }
   }
 };
