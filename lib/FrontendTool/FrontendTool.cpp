@@ -325,7 +325,7 @@ static void debugFailWithCrash() {
 
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
-///                 mode is NoVerify.
+///                 mode is NoVerify and there were no errors.
 /// \returns true on error
 static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
                            CompilerInvocation &Invocation,
