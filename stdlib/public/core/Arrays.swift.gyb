@@ -1215,7 +1215,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ///
   /// If you implement an custom data structure backed by an array that grows
   /// dynamically, naively calling the `reserveCapacity(_:)` method can lead
-  /// to lower than expected performance. Arrays need to follow a geometric
+  /// to worse than expected performance. Arrays need to follow a geometric
   /// allocation pattern for appending elements to have amortized
   /// constant-time performance. The `Array` type's `append(_:)` and
   /// `append(contentsOf:)` methods take care of this detail for you, but
@@ -1229,6 +1229,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ///
   ///       var values: [Int] = [0, 1, 2, 3]
   ///
+  ///       // Don't use 'reserveCapacity(_:)' like this
   ///       func addTenQuadratic() {
   ///           let newCount = values.count + 10
   ///           values.reserveCapacity(newCount)
