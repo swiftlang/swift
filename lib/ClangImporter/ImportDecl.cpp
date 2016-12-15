@@ -3672,11 +3672,6 @@ namespace {
                             const DeclContext *dc, T *&swiftDecl) {
       if (!importer::hasNativeSwiftDecl(decl))
         return false;
-      if (auto *nameAttr = decl->template getAttr<clang::SwiftNameAttr>()) {
-        StringRef customName = nameAttr->getName();
-        if (Lexer::isIdentifier(customName))
-          name = Impl.SwiftContext.getIdentifier(customName);
-      }
       auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
       swiftDecl = resolveSwiftDecl<T>(decl, name, wrapperUnit);
       return true;
