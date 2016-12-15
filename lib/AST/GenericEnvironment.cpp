@@ -143,7 +143,8 @@ bool GenericEnvironment::containsPrimaryArchetype(
 }
 
 Type GenericEnvironment::mapTypeOutOfContext(ModuleDecl *M, Type type) const {
-  type = type.subst(M, QueryArchetypeToInterfaceSubstitutions(this),
+  type = type.subst(QueryArchetypeToInterfaceSubstitutions(this),
+                    LookUpConformanceInModule(M),
                     SubstFlags::AllowLoweredTypes);
   assert(!type->hasArchetype() && "not fully substituted");
   return type;
@@ -249,7 +250,8 @@ Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
 }
 
 Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
-  Type result = type.subst(M, QueryInterfaceTypeSubstitutions(this),
+  Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
+                           LookUpConformanceInModule(M),
                            (SubstFlags::AllowLoweredTypes|
                             SubstFlags::UseErrorType));
   assert((!result->hasTypeParameter() || result->hasError()) &&
@@ -303,7 +305,8 @@ getSubstitutionMap(ModuleDecl *mod,
   for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
 
     // Map the interface type to a context type.
-    auto contextTy = depTy.subst(mod, QueryInterfaceTypeSubstitutions(this),
+    auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
+                                 LookUpConformanceInModule(mod),
                                  SubstOptions());
     auto *archetype = contextTy->castTo<ArchetypeType>();
 
