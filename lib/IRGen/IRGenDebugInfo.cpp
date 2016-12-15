@@ -1112,8 +1112,7 @@ llvm::DICompositeType *IRGenDebugInfo::createStructType(
   if (UniqueID.empty())
     assert(!Name.empty() && "no mangled name and no human readable name given");
   else
-    assert(UniqueID.size() > 2 &&
-           (UniqueID.startswith("_T") ||
+    assert((UniqueID.startswith("_T") ||
               UniqueID.startswith(MANGLING_PREFIX_STR)) &&
            "UID is not a mangled name");
 #endif

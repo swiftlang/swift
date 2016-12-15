@@ -16,11 +16,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/DemangleWrappers.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "swift/SwiftDemangle/SwiftDemangle.h"
 
 /// \returns true if \p MangledName starts with Swift prefix, "_T".
 static bool isSwiftPrefixed(const char *MangledName) {
-  return (MangledName[0] == '_' && MangledName[1] == 'T');
+  return MangledName[0] == '_' &&
+         (MangledName[1] == 'T' || MangledName[1] == MANGLING_PREFIX_STR[1]);
 }
 
 static size_t swift_demangle_getDemangledName_Options(const char *MangledName,
