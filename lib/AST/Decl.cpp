@@ -622,8 +622,8 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
     return ImportKind::Struct;
 
   case DeclKind::TypeAlias: {
-    Type underlyingTy = cast<TypeAliasDecl>(VD)->getUnderlyingType();
-    return getBestImportKind(underlyingTy->getAnyNominal());
+    Type type = cast<TypeAliasDecl>(VD)->getDeclaredInterfaceType();
+    return getBestImportKind(type->getAnyNominal());
   }
 
   case DeclKind::Func:
@@ -1907,7 +1907,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
     return NTD->getDeclaredInterfaceType();
 
   Type interfaceType = getInterfaceType();
-  if (interfaceType.isNull() || interfaceType->hasError())
+  if (interfaceType.isNull() || interfaceType->is<ErrorType>())
     return interfaceType;
 
   if (isa<ModuleDecl>(this))
@@ -2191,23 +2191,44 @@ void GenericTypeDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
 }
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                             SourceLoc NameLoc, TypeLoc UnderlyingTy,
-                             GenericParamList *GenericParams, DeclContext *DC)
+                             SourceLoc NameLoc, GenericParamList *GenericParams,
+                             DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    AliasTy(nullptr), TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy) {
-  TypeAliasDeclBits.HasInterfaceUnderlyingType = false;
-}
-
-void TypeAliasDecl::computeType() {
-  ASTContext &Ctx = getASTContext();
-  assert(!AliasTy && "already called computeType()");
-  AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
+    TypeAliasLoc(TypeAliasLoc) {
+  TypeAliasDeclBits.HasCompletedValidation = false;
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
   if (UnderlyingTy.hasLocation())
     return { TypeAliasLoc, UnderlyingTy.getSourceRange().End };
   return { TypeAliasLoc, getNameLoc() };
+}
+
+void TypeAliasDecl::setUnderlyingType(Type underlying) {
+  setHasCompletedValidation();
+
+  // lldb creates global typealiases containing archetypes
+  // sometimes...
+  if (underlying->hasArchetype() && isGenericContext())
+    underlying = mapTypeOutOfContext(underlying);
+  UnderlyingTy.setType(underlying);
+
+  // Create a NameAliasType which will resolve to the underlying type.
+  ASTContext &Ctx = getASTContext();
+  auto aliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
+  aliasTy->setRecursiveProperties(getUnderlyingTypeLoc().getType()
+      ->getRecursiveProperties());
+
+  // Set the interface type of this declaration.
+  setInterfaceType(MetatypeType::get(aliasTy, Ctx));
+}
+
+UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
+  assert(getGenericParams());
+  return UnboundGenericType::get(
+      const_cast<TypeAliasDecl *>(this),
+      getDeclContext()->getDeclaredTypeOfContext(),
+      getASTContext());
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
@@ -2221,22 +2242,6 @@ Type AbstractTypeParamDecl::getSuperclass() const {
 
   // FIXME: Assert that this is never queried.
   return nullptr;
-}
-
-Type TypeAliasDecl::computeUnderlyingContextType() const {
-  Type type = UnderlyingTy.getType();
-  if (auto genericEnv = getGenericEnvironmentOfContext()) {
-    type = genericEnv->mapTypeIntoContext(getParentModule(), type);
-    UnderlyingTy.setType(type);
-  }
-
-  return type;
-}
-
-void TypeAliasDecl::setDeserializedUnderlyingType(Type underlying) {
-  UnderlyingTy.setType(underlying);
-  if (underlying->hasTypeParameter())
-    TypeAliasDeclBits.HasInterfaceUnderlyingType = true;
 }
 
 ArrayRef<ProtocolDecl *>

@@ -656,7 +656,7 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
 
   if (auto *NTD = dyn_cast<NominalTypeDecl>(TD))
     return NTD->getDeclaredType();
-  return cast<TypeAliasDecl>(TD)->getAliasType();
+  return cast<TypeAliasDecl>(TD)->getDeclaredInterfaceType();
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
@@ -759,7 +759,7 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     // the name of the typealias itself anywhere.
     if (type && *type) {
       if (auto typeAlias = dyn_cast<NameAliasType>(type->getPointer()))
-        *type = typeAlias->getDecl()->getUnderlyingType();
+        *type = typeAlias->getSinglyDesugaredType();
     }
   }
 

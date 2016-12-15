@@ -3858,44 +3858,26 @@ public:
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessibility(TAD);
     if (!IsSecondPass) {
-      if (!TAD->getAliasType())
+      if (!TAD->hasCompletedValidation())
         TC.validateDecl(TAD);
       
       TypeResolutionOptions options;
       if (TAD->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
 
-      if (TAD->getDeclContext()->isModuleScopeContext()) {
+      if (TAD->getDeclContext()->isModuleScopeContext() &&
+          TAD->getGenericParams() == nullptr) {
         IterativeTypeChecker ITC(TC);
         ITC.satisfy(requestResolveTypeDecl(TAD));
       } else {
         bool invalid = false;
         if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD, options)) {
           TAD->setInvalid();
-          TAD->setInterfaceType(ErrorType::get(TC.Context));
           TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
           invalid = true;
         }
 
-        // We create TypeAliasTypes with invalid underlying types, so we
-        // need to propagate recursive properties now.
-        TAD->getAliasType()->setRecursiveProperties(
-                         TAD->getUnderlyingType()->getRecursiveProperties());
-
-        if (!invalid) {
-          // Map the alias type out of context; if it is not dependent,
-          // we'll keep the sugar.
-          Type interfaceTy = TAD->getAliasType();
-
-          // lldb creates global typealiases containing archetypes
-          // sometimes...
-          if (TAD->getUnderlyingType()->hasArchetype() &&
-              TAD->isGenericContext()) {
-            interfaceTy = TAD->mapTypeOutOfContext(interfaceTy);
-          }
-
-          TAD->setInterfaceType(MetatypeType::get(interfaceTy, TC.Context));
-        }
+        TAD->setUnderlyingType(TAD->getUnderlyingTypeLoc().getType());
       }
     }
 
@@ -6930,13 +6912,13 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     auto typeAlias = cast<TypeAliasDecl>(D);
     
     // Compute the declared type.
-    if (typeAlias->getAliasType()) {
+    if (typeAlias->hasCompletedValidation()) {
       
-      // If we have are recursing into validation and already have a type set...
-      // but also don't have the underlying type computed, then we are
-      // recursing into interface validation while checking the body of the
-      // type.  Reject this with a circularity diagnostic.
-      if (!typeAlias->hasUnderlyingType()) {
+      // If we have are recursing into validation but also don't have the
+      // underlying type computed, then we are recursing into interface
+      // validation while checking the body of the type.  Reject this
+      // with a circularity diagnostic.
+      if (!typeAlias->hasInterfaceType()) {
         diagnose(typeAlias->getLoc(), diag::circular_type_alias,
                  typeAlias->getName());
         typeAlias->getUnderlyingTypeLoc().setInvalidType(Context);
@@ -6945,7 +6927,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       }
       return;
     }
-    typeAlias->computeType();
+    typeAlias->setHasCompletedValidation();
 
     // Check generic parameters, if needed.
     validateGenericTypeSignature(typeAlias);

@@ -2355,14 +2355,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(typeAlias->getDeclContext());
 
-    Type underlying;
-    if (typeAlias->hasUnderlyingType()) {
-      underlying = typeAlias->getUnderlyingType();
-      if (underlying->hasArchetype()) {
-        auto genericEnv = typeAlias->getGenericEnvironmentOfContext();
-        underlying = genericEnv->mapTypeOutOfContext(underlying);
-      }
-    }
+    auto underlying = typeAlias->getUnderlyingTypeLoc().getType();
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(typeAlias->getFormalAccess());

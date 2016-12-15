@@ -854,7 +854,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     TypeAliasDecl *decl = NameAliasTy->getDecl();
     if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
       // It's not possible to mangle the context of the builtin module.
-      return mangleType(decl->getUnderlyingType(), uncurryLevel);
+      return mangleType(NameAliasTy->getSinglyDesugaredType(), uncurryLevel);
     }
     
     Buffer << "a";

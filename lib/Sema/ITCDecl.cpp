@@ -307,10 +307,9 @@ void IterativeTypeChecker::processResolveTypeDecl(
        TypeDecl *typeDecl,
        UnsatisfiedDependency unsatisfiedDependency) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    if (typeAliasDecl->getDeclContext()->isModuleScopeContext()) {
-      // FIXME: This is silly.
-      if (!typeAliasDecl->getAliasType())
-        typeAliasDecl->computeType();
+    if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
+        typeAliasDecl->getGenericParams() == nullptr) {
+      typeAliasDecl->setHasCompletedValidation();
       
       TypeResolutionOptions options;
       if (typeAliasDecl->getFormalAccess() <= Accessibility::FilePrivate)
@@ -322,30 +321,12 @@ void IterativeTypeChecker::processResolveTypeDecl(
       if (TC.validateType(typeAliasDecl->getUnderlyingTypeLoc(), typeAliasDecl,
                           options, &resolver, &unsatisfiedDependency)) {
         typeAliasDecl->setInvalid();
-        typeAliasDecl->setInterfaceType(ErrorType::get(getASTContext()));
         typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
       }
 
       if (typeAliasDecl->getUnderlyingTypeLoc().wasValidated()) {
-        // We create TypeAliasTypes with invalid underlying types, so we
-        // need to propagate recursive properties now.
-        typeAliasDecl->getAliasType()->setRecursiveProperties(
-                  typeAliasDecl->getUnderlyingType()->getRecursiveProperties());
-
-        // Map the alias type out of context; if it is not dependent,
-        // we'll keep the sugar.
-        Type interfaceTy = typeAliasDecl->getAliasType();
-
-        // lldb creates global typealiases containing archetypes
-        // sometimes...
-        if (typeAliasDecl->getUnderlyingType()->hasArchetype() &&
-            typeAliasDecl->isGenericContext()) {
-          interfaceTy = typeAliasDecl->mapTypeOutOfContext(interfaceTy);
-        }
-
-        typeAliasDecl->setInterfaceType(
-            MetatypeType::get(interfaceTy,
-                              typeDecl->getASTContext()));
+        typeAliasDecl->setUnderlyingType(
+            typeAliasDecl->getUnderlyingTypeLoc().getType());
       }
 
       return;

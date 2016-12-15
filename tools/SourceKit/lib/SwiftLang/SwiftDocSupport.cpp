@@ -477,11 +477,11 @@ static void reportRelated(ASTContext &Ctx,
 
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
 
-    // If underlying type exists, report the inheritance and conformance of the
-    // underlying type.
-    auto Ty = TAD->getUnderlyingType();
-    if (Ty) {
-      if (auto NM = Ty->getCanonicalType()->getAnyNominal()) {
+    if (TAD->hasInterfaceType()) {
+      // If underlying type exists, report the inheritance and conformance of the
+      // underlying type.
+      auto Ty = TAD->getDeclaredInterfaceType();
+      if (auto NM = Ty->getAnyNominal()) {
         passInherits(NM->getInherited(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                      Consumer);

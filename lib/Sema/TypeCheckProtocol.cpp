@@ -2260,17 +2260,10 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     auto aliasDecl = new (TC.Context) TypeAliasDecl(SourceLoc(),
                                                     assocType->getName(),
                                                     SourceLoc(),
-                                                    TypeLoc::withoutLoc(type),
                                                     /*genericparams*/nullptr, 
                                                     DC);
     aliasDecl->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
-    aliasDecl->computeType();
-
-    aliasDecl->getAliasType()->setRecursiveProperties(
-        type->getRecursiveProperties());
-
-    auto interfaceTy = DC->mapTypeOutOfContext(aliasDecl->getAliasType());
-    aliasDecl->setInterfaceType(MetatypeType::get(interfaceTy));
+    aliasDecl->setUnderlyingType(type);
 
     aliasDecl->setImplicit();
     if (type->hasError())

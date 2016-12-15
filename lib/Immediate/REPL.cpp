@@ -1061,7 +1061,9 @@ public:
               
             if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
               if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-                TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
+                TypeDecl *origTypeDecl = typeAliasDecl
+                  ->getDeclaredInterfaceType()
+                  ->getDesugaredType()
                   ->getNominalOrBoundGenericNominal();
                 if (origTypeDecl) {
                   printOrDumpDecl(origTypeDecl, doPrint);

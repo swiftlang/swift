@@ -454,7 +454,7 @@ void ASTMangler::appendType(Type type) {
       TypeAliasDecl *decl = NameAliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
         // It's not possible to mangle the context of the builtin module.
-        return appendType(decl->getUnderlyingType());
+        return appendType(decl->getDeclaredInterfaceType());
       }
 
       // For the DWARF output we want to mangle the type alias + context,

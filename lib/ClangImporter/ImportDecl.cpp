@@ -1929,13 +1929,9 @@ namespace {
                             Impl.importSourceLoc(Decl->getLocStart()),
                             Name,
                             Impl.importSourceLoc(Decl->getLocation()),
-                            TypeLoc::withoutLoc(
-                              underlying->getDeclaredInterfaceType()),
                             /*genericparams*/nullptr, DC);
-              typealias->computeType();
-              typealias->setInterfaceType(
-                  MetatypeType::get(typealias->getAliasType(),
-                                    Impl.SwiftContext));
+              typealias->setUnderlyingType(
+                  underlying->getDeclaredInterfaceType());
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -1957,13 +1953,9 @@ namespace {
                             Impl.importSourceLoc(Decl->getLocStart()),
                             Name,
                             Impl.importSourceLoc(Decl->getLocation()),
-                            TypeLoc::withoutLoc(
-                              proto->getDeclaredInterfaceType()),
                             /*genericparams*/nullptr, DC);
-              typealias->computeType();
-              typealias->setInterfaceType(
-                  MetatypeType::get(typealias->getAliasType(),
-                                    Impl.SwiftContext));
+              typealias->setUnderlyingType(
+                  proto->getDeclaredInterfaceType());
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -2030,12 +2022,8 @@ namespace {
                                       Impl.importSourceLoc(Decl->getLocStart()),
                                       Name,
                                       Loc,
-                                      TypeLoc::withoutLoc(SwiftType),
                                       /*genericparams*/nullptr, DC);
-      Result->computeType();
-      Result->setInterfaceType(
-          MetatypeType::get(Result->getAliasType(),
-                            Impl.SwiftContext));
+      Result->setUnderlyingType(SwiftType);
 
       // Make Objective-C's 'id' unavailable.
       if (Impl.SwiftContext.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
@@ -2302,13 +2290,8 @@ namespace {
           //   public typealias ErrorType
           auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                          decl, Accessibility::Public, loc, C.Id_ErrorType, loc,
-                         TypeLoc::withoutLoc(
-                           errorWrapper->getDeclaredInterfaceType()),
-                         /*genericSignature=*/nullptr, enumDecl);
-          alias->computeType();
-          alias->setInterfaceType(
-              MetatypeType::get(alias->getAliasType(),
-                                Impl.SwiftContext));
+                         /*genericparams=*/nullptr, enumDecl);
+          alias->setUnderlyingType(errorWrapper->getDeclaredInterfaceType());
           enumDecl->addMember(alias);
 
           // Add the 'Code' enum to the error wrapper.
@@ -4188,14 +4171,9 @@ namespace {
                     Impl.importSourceLoc(decl->getLocStart()),
                     name,
                     Impl.importSourceLoc(decl->getLocation()),
-                    TypeLoc::withoutLoc(typeDecl->getDeclaredInterfaceType()),
                     /*genericparams=*/nullptr, dc);
 
-      typealias->computeType();
-      typealias->setInterfaceType(
-          MetatypeType::get(typealias->getAliasType(),
-                            Impl.SwiftContext));
-
+      typealias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
       return typealias;
     }
 
@@ -4430,11 +4408,8 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
       decl, Accessibility::Public, Impl.importSourceLoc(decl->getLocStart()),
       swift2Name.getDeclName().getBaseName(),
       Impl.importSourceLoc(decl->getLocation()),
-      TypeLoc::withoutLoc(underlyingType), genericParams, dc);
-  alias->computeType();
-  alias->setInterfaceType(
-      MetatypeType::get(alias->getAliasType(),
-                        Impl.SwiftContext));
+      genericParams, dc);
+  alias->setUnderlyingType(underlyingType);
   alias->setGenericEnvironment(genericEnv);
 
   // Record that this is the Swift 2 version of this declaration.

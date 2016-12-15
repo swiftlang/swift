@@ -1034,7 +1034,7 @@ ConstraintSystem::getTypeOfMemberReference(
   // protocols.
   if (auto *alias = dyn_cast<TypeAliasDecl>(value)) {
     if (baseObjTy->isExistentialType()) {
-      auto memberTy = alias->getUnderlyingType();
+      auto memberTy = alias->getDeclaredInterfaceType();
       auto openedType = FunctionType::get(baseObjTy, memberTy);
       return { openedType, memberTy };
     }

@@ -68,7 +68,7 @@ DebugTypeInfo::DebugTypeInfo(TypeDecl *Decl, const TypeInfo &Info)
     : DeclCtx(Decl->getDeclContext()) {
   // Use the sugared version of the type, if there is one.
   if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
-    Type = AliasDecl->getAliasType();
+    Type = AliasDecl->getDeclaredInterfaceType().getPointer();
   else
     Type = Decl->getInterfaceType().getPointer();
 
@@ -81,7 +81,7 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageTy, Size size,
       align(align) {
   // Use the sugared version of the type, if there is one.
   if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
-    Type = AliasDecl->getAliasType();
+    Type = AliasDecl->getDeclaredInterfaceType().getPointer();
   else
     Type = Decl->getInterfaceType().getPointer();
 

@@ -7072,7 +7072,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
     if (auto *nominal = dyn_cast<NominalTypeDecl>(FoundDecl))
       type = nominal->getDeclaredType();
     else if (auto *typeAlias = dyn_cast<TypeAliasDecl>(FoundDecl))
-      type = typeAlias->getAliasType();
+      type = typeAlias->getUnboundGenericType();
     else
       type = FoundDecl->getDeclaredInterfaceType();
     tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype, type);
