@@ -17,9 +17,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 #      swiftStdlibUnittest${SWIFT_PRIMARY_VARIANT_SUFFIX}
 #      )
   elseif(SWIFT_HOST_VARIANT STREQUAL "linux")
-    find_library(ATOMIC_LIBRARY atomic)
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
-      ${ATOMIC_LIBRARY}
+      "atomic"
       )
   elseif(SWIFT_HOST_VARIANT STREQUAL "freebsd")
     find_library(EXECINFO_LIBRARY execinfo)
