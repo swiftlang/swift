@@ -80,13 +80,11 @@ class OptBugReducerTestCase(unittest.TestCase):
                 '-resource-dir', os.path.join(self.build_dir, 'lib', 'swift'),
                 '-o', self._get_sib_file_path(input_file_path),
                 input_file_path]
-        #print ' '.join(args)
-        return subprocess.check_call(args)
+        subprocess.call(args)
 
     def test_basic(self):
         name = 'testbasic'
-        result_code = self.run_swiftc_command(name)
-        assert result_code == 0, "Failed initial compilation"
+        self.run_swiftc_command(name)
         args = [
             self.reducer,
             'opt',
@@ -109,8 +107,7 @@ class OptBugReducerTestCase(unittest.TestCase):
 
     def test_suffix_in_need_of_prefix(self):
         name = 'testsuffixinneedofprefix'
-        result_code = self.run_swiftc_command(name)
-        assert result_code == 0, "Failed initial compilation"
+        self.run_swiftc_command(name)
         args = [
             self.reducer,
             'opt',
@@ -130,6 +127,32 @@ class OptBugReducerTestCase(unittest.TestCase):
         output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
         output_matches = [1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 0)
+
+    def test_reduce_function(self):
+        name = 'testreducefunction'
+        self.run_swiftc_command(name)
+        args = [
+            self.reducer,
+            'opt',
+            self.build_dir,
+            self._get_sib_file_path(self._get_test_file_path(name)),
+            '--sdk=%s' % self.sdk,
+            '--module-cache=%s' % self.module_cache,
+            '--module-name=%s' % name,
+            '--work-dir=%s' % self.tmp_dir,
+            '--extra-arg=-bug-reducer-tester-target-func=__TF_test_target',
+            '--reduce-sil'
+        ]
+        args.extend(self.passes)
+        output = subprocess.check_output(args).split("\n")
+        self.assertTrue('*** Found miscompiling passes!' in output)
+        self.assertTrue('*** Final Functions: _TF18testreducefunction6foo413FT_T_')
+        self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
+        re_end = 'testoptbugreducer_testreducefunction_initial_'
+        re_end += 'a490c440d7e84b77e5b134720b298d2c.sib'
+        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
+        output_matches = [1 for o in output if output_file_re.match(o) is not None]
+        self.assertEquals(sum(output_matches), 1)
 
 
 if __name__ == '__main__':

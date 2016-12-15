@@ -102,7 +102,25 @@ def get_functionnames_from_file(nm, filename):
         return None
 
 
-def function_bug_reducer(args):
+def function_bug_reducer(input_file, nm, sil_opt_invoker, sil_extract_invoker,
+                         pass_list):
+    functions = [s[1] for s in nm.get_symbols(input_file) if s[0] == 'F']
+
+    print("Base case crashes! Trying to reduce *.sib file")
+
+    # Otherwise, reduce the list of pases that cause the optimzier to crash.
+    r = ReduceMiscompilingFunctions(functions, sil_extract_invoker,
+                                    OptimizerTester(sil_opt_invoker,
+                                                    pass_list))
+    if not r.reduce_list():
+        print("Failed to find miscompiling pass list!")
+    cmdline = sil_opt_invoker.cmdline_with_passlist(pass_list)
+    print("*** Successfully Reduced file!")
+    print("*** Final File: %s" % sil_opt_invoker.input_file)
+    print("*** Final Functions: %s" % (' '.join(r.target_list)))
+    print("*** Repro command line: %s" % (' '.join(cmdline)))
+
+def invoke_function_bug_reducer(args):
     """Given a path to a sib file with canonical sil, attempt to find a perturbed
 list of function given a specific pass that causes the perf pipeline to crash
     """
@@ -111,7 +129,6 @@ list of function given a specific pass that causes the perf pipeline to crash
     nm = bug_reducer_utils.SILNMInvoker(config, tools)
 
     input_file = args.input_file
-    functions = [s[1] for s in nm.get_symbols(input_file) if s[0] == 'F']
     extra_args = args.extra_args
     sil_opt_invoker = bug_reducer_utils.SILOptInvoker(config, tools,
                                                       input_file,
@@ -125,27 +142,16 @@ list of function given a specific pass that causes the perf pipeline to crash
         print("Success with PassList: %s" % (' '.join(args.pass_list)))
         return
 
-    print("Base case crashes! Trying to reduce *.sib file")
     sil_extract_invoker = bug_reducer_utils.SILFuncExtractorInvoker(config,
                                                                     tools,
                                                                     input_file)
 
-    # Otherwise, reduce the list of pases that cause the optimzier to crash.
-    r = ReduceMiscompilingFunctions(functions, sil_extract_invoker,
-                                    OptimizerTester(sil_opt_invoker,
-                                                    args.pass_list))
-    if not r.reduce_list():
-        print("Failed to find miscompiling pass list!")
-    cmdline = sil_opt_invoker.cmdline_with_passlist(args.pass_list)
-    print("*** Successfully Reduced file!")
-    print("*** Final File: %s" % sil_opt_invoker.input_file)
-    print("*** Final Functions: %s" % (' '.join(r.target_list)))
-    print("*** Repro command line: %s" % (' '.join(cmdline)))
-
+    function_bug_reducer(input_file, nm, sil_opt_invoker, sil_extract_invoker,
+                         args.pass_list)
 
 def add_parser_arguments(parser):
     """Add parser arguments for func_bug_reducer"""
-    parser.set_defaults(func=function_bug_reducer)
+    parser.set_defaults(func=invoke_function_bug_reducer)
     parser.add_argument('input_file', help='The input file to optimize')
     parser.add_argument('--module-cache', help='The module cache to use')
     parser.add_argument('--sdk', help='The sdk to pass to sil-func-extractor')

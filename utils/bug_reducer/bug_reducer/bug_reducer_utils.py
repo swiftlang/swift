@@ -4,10 +4,13 @@ import subprocess
 
 DRY_RUN = False
 SQUELCH_STDERR = True
+ECHO_CALLS = False
 
-def br_call(args, dry_run=DRY_RUN):
+
+def br_call(args, dry_run=DRY_RUN, echo=ECHO_CALLS):
+    if dry_run or echo:
+        print('BRCALL: ' + ' '.join(args))
     if dry_run:
-        print('DRY RUN BRCALL: ' + ' '.join(args))
         return 0
     if SQUELCH_STDERR:
         return subprocess.call(args, stdout=open('/dev/null'),
