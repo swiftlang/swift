@@ -162,19 +162,29 @@ func pointerProperties(_ obj: PointerWrapper) {
   obj.idPtr = nil as AutoreleasingUnsafeMutablePointer?
 }
 
+// CHECK-LABEL: define hidden void @_TF7objc_ir16strangeSelectorsFCSo13SwiftNameTestT_(%CSo13SwiftNameTest*) {{.*}} {
+func strangeSelectors(_ obj: SwiftNameTest) {
+  // CHECK: load i8*, i8** @"\01L_selector(:b:)"
+  obj.empty(a: 0, b: 0)
+}
+
 // CHECK-LABEL: define hidden void @_TF7objc_ir20customFactoryMethodsFT_T_() {{.*}} {
 func customFactoryMethods() {
   // CHECK: call %CSo13SwiftNameTest* @_TTOFCSo13SwiftNameTestCfT10dummyParamT__S_
   // CHECK: call %CSo13SwiftNameTest* @_TTOFCSo13SwiftNameTestCfT2ccGSqP___S_
+  // CHECK: call %CSo13SwiftNameTest* @_TTOFCSo13SwiftNameTestCfT5emptyVs5Int32_S_
   _ = SwiftNameTest(dummyParam: ())
   _ = SwiftNameTest(cc: nil)
+  _ = SwiftNameTest(empty: 0)
 
   // CHECK: load i8*, i8** @"\01L_selector(testZ)"
   // CHECK: load i8*, i8** @"\01L_selector(testY:)"
   // CHECK: load i8*, i8** @"\01L_selector(testX:xx:)"
+  // CHECK: load i8*, i8** @"\01L_selector(::)"
   _ = SwiftNameTest.zz()
   _ = SwiftNameTest.yy(aa: nil)
   _ = SwiftNameTest.xx(nil, bb: nil)
+  _ = SwiftNameTest.empty(1, 2)
 
   do {
     // CHECK: call %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfzT5errorT__S_

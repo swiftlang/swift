@@ -530,6 +530,8 @@ matchFactoryAsInitName(const clang::ObjCMethodDecl *method) {
   // See if we can match the class name to the beginning of the first
   // selector piece.
   auto firstPiece = method->getSelector().getNameForSlot(0);
+  if (firstPiece.empty())
+    return None;
   StringRef firstArgLabel = matchLeadingTypeName(firstPiece,
                                                  objcClass->getName());
   if (firstArgLabel.size() == firstPiece.size())
@@ -1337,6 +1339,15 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   case clang::DeclarationName::ObjCOneArgSelector:
   case clang::DeclarationName::ObjCZeroArgSelector: {
     auto objcMethod = cast<clang::ObjCMethodDecl>(D);
+
+    // Map the Objective-C selector directly.
+    auto selector = D->getDeclName().getObjCSelector();
+    baseName = selector.getNameForSlot(0);
+
+    // We don't support methods with empty first selector pieces.
+    if (baseName.empty())
+      return ImportedName();
+
     isInitializer = shouldImportAsInitializer(objcMethod, initializerPrefixLen,
                                               result.info.initKind);
 
@@ -1347,12 +1358,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       isInitializer = false;
     }
 
-    // Map the Objective-C selector directly.
-    auto selector = D->getDeclName().getObjCSelector();
     if (isInitializer)
       baseName = "init";
-    else
-      baseName = selector.getNameForSlot(0);
 
     // Get the parameters.
     params = {objcMethod->param_begin(), objcMethod->param_end()};
