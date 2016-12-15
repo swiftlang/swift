@@ -164,7 +164,7 @@ extension ${Self} {
     if let value = _parseAsciiAs${'' if signed else 'U'}Int${int_max_bits}(
       text.utf16, radix, ${'' if signed else 'U'}Int${int_max_bits}(${Self}.max)) {
       self.init(
-        ${'' if Self in ('Int64', 'UInt64') else 'truncatingBitPattern:'} value)
+        ${'' if Self in ('Int64', 'UInt64') else 'extendingOrTruncating:'} value)
     }
     else {
       return nil

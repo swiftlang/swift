@@ -251,7 +251,7 @@ public struct Character :
       // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
       return UTF8.CodeUnit(
-        truncatingBitPattern: data >> (UInt64(position) &* 8))
+        extendingOrTruncating: data &>> (UInt64(position) &* 8))
     }
 
     internal struct Iterator : IteratorProtocol {
@@ -260,7 +260,7 @@ public struct Character :
       }
 
       internal mutating func next() -> UInt8? {
-        let result = UInt8(truncatingBitPattern: _data)
+        let result = UInt8(extendingOrTruncating: _data)
         if result == 0xFF {
           return nil
         }
@@ -291,8 +291,8 @@ public struct Character :
       self.count = UInt16(count)
       var u16: UInt64 = 0
       let output: (UTF16.CodeUnit) -> Void = {
-        u16 = u16 << 16
-        u16 = u16 | UInt64($0)
+        u16 = u16 &<< 16
+        u16 = u16 | UInt64(extendingOrTruncating: $0)
       }
       _ = transcode(
         _SmallUTF8(u8).makeIterator(),
@@ -327,8 +327,8 @@ public struct Character :
       _sanityCheck(position < Int(count))
       // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
-      return UTF16.CodeUnit(truncatingBitPattern:
-        data >> ((UInt64(count) &- UInt64(position) &- 1) &* 16))
+      return UTF16.CodeUnit(extendingOrTruncating:
+        data &>> ((UInt64(count) &- UInt64(position) &- 1) &* 16))
     }
 
     var count: UInt16

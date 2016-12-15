@@ -639,7 +639,7 @@ extension _StringCore : RangeReplaceableCollection {
       if _fastPath(elementWidth == 1) {
         var dst = rangeStart.assumingMemoryBound(to: UTF8.CodeUnit.self)
         for u in newElements {
-          dst.pointee = UInt8(truncatingBitPattern: u)
+          dst.pointee = UInt8(extendingOrTruncating: u)
           dst += 1
         }
       }
