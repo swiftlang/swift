@@ -891,7 +891,6 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
                               Optional<ForeignErrorConvention> &foreignError) {
   SILDeclRef native = thunk.asForeign(false);
 
-  auto mod = gen.SGM.M.getSwiftModule();
   auto subs = gen.F.getForwardingSubstitutions();
 
   auto objcInfo = gen.SGM.Types.getConstantInfo(thunk);
