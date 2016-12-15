@@ -45,22 +45,6 @@ template void RefCounts<InlineRefCountBits>::incrementNonAtomicSlow(InlineRefCou
 template void RefCounts<SideTableRefCountBits>::incrementNonAtomicSlow(SideTableRefCountBits oldbits, uint32_t n);
 
 template <typename RefCountBits>
-bool RefCounts<RefCountBits>::tryIncrementAndPinSlow() {
-  abort();
-}
-template bool RefCounts<InlineRefCountBits>::tryIncrementAndPinSlow();
-template bool RefCounts<SideTableRefCountBits>::tryIncrementAndPinSlow();
-
-template <typename RefCountBits>
-bool RefCounts<RefCountBits>::tryIncrementAndPinNonAtomicSlow() {
-  abort();
-}
-template bool RefCounts<InlineRefCountBits>::tryIncrementAndPinNonAtomicSlow();
-template bool RefCounts<SideTableRefCountBits>::tryIncrementAndPinNonAtomicSlow();
-
-
-// SideTableRefCountBits specialization intentionally does not exist.
-template <typename RefCountBits>
 bool RefCounts<RefCountBits>::tryIncrementSlow(RefCountBits oldbits) {
   if (oldbits.hasSideTable())
     return oldbits.getSideTable()->tryIncrement();
@@ -69,6 +53,24 @@ bool RefCounts<RefCountBits>::tryIncrementSlow(RefCountBits oldbits) {
 }
 template bool RefCounts<InlineRefCountBits>::tryIncrementSlow(InlineRefCountBits oldbits);
 template bool RefCounts<SideTableRefCountBits>::tryIncrementSlow(SideTableRefCountBits oldbits);
+
+template <typename RefCountBits>
+bool RefCounts<RefCountBits>::tryIncrementAndPinSlow(RefCountBits oldbits) {
+  if (oldbits.hasSideTable())
+    return oldbits.getSideTable()->tryIncrementAndPin();
+  else
+    swift::swift_abortRetainOverflow();
+}
+template bool RefCounts<InlineRefCountBits>::tryIncrementAndPinSlow(InlineRefCountBits oldbits);
+template bool RefCounts<SideTableRefCountBits>::tryIncrementAndPinSlow(SideTableRefCountBits oldbits);
+
+template <typename RefCountBits>
+bool RefCounts<RefCountBits>::tryIncrementAndPinNonAtomicSlow(RefCountBits oldbits) {
+  // No nonatomic implementation provided.
+  return tryIncrementAndPinSlow(oldbits);
+}
+template bool RefCounts<InlineRefCountBits>::tryIncrementAndPinNonAtomicSlow(InlineRefCountBits oldbits);
+template bool RefCounts<SideTableRefCountBits>::tryIncrementAndPinNonAtomicSlow(SideTableRefCountBits oldbits);
 
 
 // Return an object's side table, allocating it if necessary.

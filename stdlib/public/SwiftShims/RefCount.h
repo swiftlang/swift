@@ -736,10 +736,10 @@ class RefCounts {
   void incrementNonAtomicSlow(RefCountBits oldbits, uint32_t inc);
 
   LLVM_ATTRIBUTE_NOINLINE
-  bool tryIncrementAndPinSlow();
+  bool tryIncrementAndPinSlow(RefCountBits oldbits);
 
   LLVM_ATTRIBUTE_NOINLINE
-  bool tryIncrementAndPinNonAtomicSlow();
+  bool tryIncrementAndPinNonAtomicSlow(RefCountBits);
 
   LLVM_ATTRIBUTE_NOINLINE
   bool tryIncrementSlow(RefCountBits oldbits);
@@ -818,25 +818,26 @@ class RefCounts {
       newbits.setIsPinned(true);
       bool fast = newbits.incrementStrongExtraRefCount(1);
       if (!fast)
-        return tryIncrementAndPinSlow();
+        return tryIncrementAndPinSlow(oldbits);
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
     return true;
   }
 
   bool tryIncrementAndPinNonAtomic() {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
 
     // If the flag is already set, just fail.
-    if (!bits.hasSideTable() && bits.getIsPinned())
+    if (!oldbits.hasSideTable() && oldbits.getIsPinned())
       return false;
 
     // Try to simultaneously set the flag and increment the reference count.
-    bits.setIsPinned(true);
-    bool fast = bits.incrementStrongExtraRefCount(1);
+    auto newbits = oldbits;
+    newbits.setIsPinned(true);
+    bool fast = newbits.incrementStrongExtraRefCount(1);
     if (!fast)
-      return tryIncrementAndPinNonAtomicSlow();
-    refCounts.store(bits, std::memory_order_relaxed);
+      return tryIncrementAndPinNonAtomicSlow(oldbits);
+    refCounts.store(newbits, std::memory_order_relaxed);
     return true;
   }
 
@@ -938,7 +939,13 @@ class RefCounts {
     //   return false;
     
     assert(!bits.getIsDeiniting());
-    return bits.isUniquelyReferencedOrPinned();
+
+    // bits.isUniquelyReferencedOrPinned() also checks the side table bit
+    // and this path is optimized better if we don't check it here first.
+    if (bits.isUniquelyReferencedOrPinned()) return true;
+    if (!bits.hasSideTable())
+      return false;
+    return bits.getSideTable()->isUniquelyReferencedOrPinned();
   }
 
   // Return true if the object has started deiniting.
@@ -1231,8 +1238,16 @@ class HeapObjectSideTableEntry {
     return refCounts.tryIncrement();
   }
 
+  bool tryIncrementAndPin() {
+    return refCounts.tryIncrementAndPin();
+  }
+
   uint32_t getCount() const {
     return refCounts.getCount();
+  }
+
+  bool isUniquelyReferencedOrPinned() const {
+    return refCounts.isUniquelyReferencedOrPinned();
   }
 
   // UNOWNED
