@@ -277,9 +277,9 @@ ArrayRef<Substitution>
 GenericEnvironment::getForwardingSubstitutions(ModuleDecl *M) const {
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
-          -> ProtocolConformanceRef {
-    return ProtocolConformanceRef(protoType->getDecl());
-  };
+      -> Optional<ProtocolConformanceRef> {
+        return ProtocolConformanceRef(protoType->getDecl());
+      };
 
   SmallVector<Substitution, 4> result;
   getGenericSignature()->getSubstitutions(*M,

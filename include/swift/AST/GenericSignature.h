@@ -129,9 +129,10 @@ public:
                           SubstitutionMap &subMap) const;
 
   using LookupConformanceFn =
-      llvm::function_ref<ProtocolConformanceRef(CanType dependentType,
-                                              Type conformingReplacementType,
-                                              ProtocolType *conformedProtocol)>;
+      llvm::function_ref<auto(CanType dependentType,
+                              Type conformingReplacementType,
+                              ProtocolType *conformedProtocol)
+                         -> Optional<ProtocolConformanceRef>>;
 
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.

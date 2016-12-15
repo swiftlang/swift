@@ -108,20 +108,18 @@ Type Solution::computeSubstitutions(
 
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
-          -> ProtocolConformanceRef {
+          -> Optional<ProtocolConformanceRef> {
     if (replacement->hasError() ||
         isOpenedAnyObject(replacement) ||
         replacement->is<GenericTypeParamType>()) {
       return ProtocolConformanceRef(protoType->getDecl());
     }
 
-    auto conformance = tc.conformsToProtocol(
-                         replacement,
-                         protoType->getDecl(),
-                         getConstraintSystem().DC,
-                         (ConformanceCheckFlags::InExpression|
-                          ConformanceCheckFlags::Used));
-    return *conformance;
+    return tc.conformsToProtocol(replacement,
+                                 protoType->getDecl(),
+                                 getConstraintSystem().DC,
+                                 (ConformanceCheckFlags::InExpression|
+                                  ConformanceCheckFlags::Used));
   };
 
   sig->getSubstitutions(*mod, subs, lookupConformanceFn, result);

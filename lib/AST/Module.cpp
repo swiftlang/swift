@@ -628,24 +628,25 @@ TypeBase::gatherAllSubstitutions(Module *module,
 
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
-          -> ProtocolConformanceRef {
-
-    auto *proto = protoType->getDecl();
-
-    // If the type is a type variable or is dependent, just fill in empty
-    // conformances.
-    if (replacement->isTypeVariableOrMember() ||
-        replacement->isTypeParameter())
-      return ProtocolConformanceRef(proto);
-
-    // Otherwise, find the conformance.
-    auto conforms = module->lookupConformance(replacement, proto, resolver);
-    if (conforms)
-      return *conforms;
-
-    // FIXME: Should we ever end up here?
-    return ProtocolConformanceRef(proto);
-  };
+      -> Optional<ProtocolConformanceRef> {
+        auto *proto = protoType->getDecl();
+        
+        // If the type is a type variable or is dependent, just fill in empty
+        // conformances.
+        if (replacement->isTypeVariableOrMember() ||
+            replacement->isTypeParameter())
+          return ProtocolConformanceRef(proto);
+        
+        // Otherwise, try to find the conformance.
+        auto conforms = module->lookupConformance(replacement, proto, resolver);
+        if (conforms)
+          return *conforms;
+        
+        // FIXME: Should we ever end up here?
+        // We should return None and let getSubstitutions handle the error
+        // if we do.
+        return ProtocolConformanceRef(proto);
+      };
 
   SmallVector<Substitution, 4> result;
   genericSig->getSubstitutions(*module, substitutions,
