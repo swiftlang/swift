@@ -58,6 +58,9 @@ enum class ImportNameVersion : unsigned {
 };
 enum { NumImportNameVersions = 4 };
 
+/// Map a language version into an import name version
+ImportNameVersion nameVersionFromOptions(const LangOptions &langOpts);
+
 /// Describes a name that was imported from Clang.
 class ImportedName {
   friend class NameImporter;
@@ -209,20 +212,6 @@ public:
 /// in "Notification", or it there would be nothing left.
 StringRef stripNotification(StringRef name);
 
-// TODO: I'd like to remove the following
-/// Flags that control the import of names in importFullName.
-enum class ImportNameFlags {
-  /// Suppress the factory-method-as-initializer transformation.
-  SuppressFactoryMethodAsInit = 0x01,
-
-  /// Produce the Swift 2 name of the given entity.
-  Swift2Name = 0x02,
-};
-enum { NumImportNameFlags = 2 };
-
-/// Options that control the import of names in importFullName.
-typedef OptionSet<ImportNameFlags> ImportNameOptions;
-
 /// Class to determine the Swift name of foreign entities. Currently fairly
 /// stateless and borrows from the ClangImporter::Implementation, but in the
 /// future will be more self-contained and encapsulated.
@@ -238,7 +227,7 @@ class NameImporter {
 
   // TODO: remove when we drop the options (i.e. import all names)
   using CacheKeyType =
-      std::pair<const clang::NamedDecl *, unsigned>;
+      std::pair<const clang::NamedDecl *, ImportNameVersion>;
 
   /// Cache for repeated calls
   llvm::DenseMap<CacheKeyType, ImportedName> importNameCache;
@@ -312,13 +301,34 @@ private:
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,
-                                                  ImportNameOptions options);
+                                                  ImportNameVersion version);
 
   ImportedName importNameImpl(const clang::NamedDecl *,
-                              ImportNameOptions options);
+                              ImportNameVersion version);
 };
 
 }
+}
+
+namespace llvm {
+// Provide DenseMapInfo for ImportNameVersion.
+template <> struct DenseMapInfo<swift::importer::ImportNameVersion> {
+  using ImportNameVersion = swift::importer::ImportNameVersion;
+  using DMIU = DenseMapInfo<unsigned>;
+  static inline ImportNameVersion getEmptyKey() {
+    return (ImportNameVersion)DMIU::getEmptyKey();
+  }
+  static inline ImportNameVersion getTombstoneKey() {
+    return (ImportNameVersion)DMIU::getTombstoneKey();
+  }
+  static unsigned getHashValue(const ImportNameVersion &Val) {
+    return DMIU::getHashValue((unsigned)Val);
+  }
+  static bool isEqual(const ImportNameVersion &LHS,
+                      const ImportNameVersion &RHS) {
+    return LHS == RHS;
+  }
+};
 }
 
 #endif
