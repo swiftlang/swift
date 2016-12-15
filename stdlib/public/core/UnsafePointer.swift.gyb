@@ -873,6 +873,13 @@ extension ${Self} : CustomPlaygroundQuickLookable {
 extension ${Self} {
   // - Note: Strideable's implementation is potentially less efficient and cannot
   //   handle misaligned pointers.
+  /// Returns a Boolean value indicating whether two pointers are equal.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
+  ///   otherwise, `false`.
   @_transparent
   public static func == (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
@@ -882,6 +889,14 @@ extension ${Self} {
   // cannot handle misaligned pointers.
   //
   // - Note: This is an unsigned comparison unlike Strideable's implementation.
+  /// Returns a Boolean value indicating whether the first pointer references
+  /// an earlier memory location than the second pointer.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` references a memory address earlier than
+  ///   `rhs`; otherwise, `false`.
   @_transparent
   public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
     return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
@@ -891,25 +906,78 @@ extension ${Self} {
   //   with Strideable. However, optimizer improvements are needed
   //   before they can be removed without affecting performance.
 
-  /// - Precondition: The result is within bounds of the same allocation.
+  /// Creates a new pointer, offset from a pointer by a specified number of
+  /// instances of the pointer's `Pointee` type.
+  ///
+  /// You use the addition operator (`+`) to advance a pointer by a number of
+  /// contiguous instances. The resulting pointer must be within the bounds of
+  /// the same allocation as `lhs`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
+  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  /// - Returns: A pointer offset from `lhs` by `rhs` instances of the
+  ///   `Pointee` type.
+  ///
+  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func + (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
     return ${Self}(Builtin.gep_Word(
       lhs._rawValue, rhs._builtinWordValue, Pointee.self))
   }
 
-  /// - Precondition: The result is within the bounds of the same allocation.
+  /// Creates a new pointer, offset from a pointer by a specified number of
+  /// instances of the pointer's `Pointee` type.
+  ///
+  /// You use the addition operator (`+`) to advance a pointer by a number of
+  /// contiguous instances. The resulting pointer must be within the bounds of
+  /// the same allocation as `rhs`.
+  ///
+  /// - Parameters:
+  ///   - lhs: The number of strides of the pointer's `Pointee` type to offset
+  ///     `rhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  ///   - rhs: A pointer.
+  /// - Returns: A pointer offset from `rhs` by `lhs` instances of the
+  ///   `Pointee` type.
+  ///
+  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func + (lhs: Int, rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
     return rhs + lhs
   }
 
-  /// - Precondition: The result is within the bounds of the same allocation.
+  /// Creates a new pointer, offset backward from a pointer by a specified
+  /// number of instances of the pointer's `Pointee` type.
+  ///
+  /// You use the subtraction operator (`-`) to shift a pointer backward by a
+  /// number of contiguous instances. The resulting pointer must be within the
+  /// bounds of the same allocation as `lhs`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
+  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  /// - Returns: A pointer offset backward from `lhs` by `rhs` instances of
+  ///   the `Pointee` type.
+  ///
+  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func - (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
     return lhs + -rhs
   }
 
+  /// Returns the distance between two pointers, counted as instances of the
+  /// pointers' `Pointee` type.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: The distance from `lhs` to `rhs`, in strides of the pointer's
+  ///   `Pointee` type. To access the stride, use
+  ///   `MemoryLayout<Pointee>.stride`.
+  ///
+  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func - (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
     return
@@ -918,13 +986,37 @@ extension ${Self} {
       / MemoryLayout<Pointee>.stride
   }
 
-  /// - Precondition: The result is within the bounds of the same allocation.
+  /// Advances a pointer by a specified number of instances of the pointer's
+  /// `Pointee` type.
+  ///
+  /// You use the addition assignment operator (`+=`) to advance a pointer by a
+  /// number of contiguous instances. The resulting pointer must be within the
+  /// bounds of the same allocation as `rhs`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer to advance in place.
+  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
+  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  ///
+  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func += (lhs: inout ${Self}<Pointee>, rhs: Int) {
     lhs = lhs + rhs
   }
 
-  /// - Precondition: The result is within the bounds of the same allocation.
+  /// Shifts a pointer backward by a specified number of instances of the
+  /// pointer's `Pointee` type.
+  ///
+  /// You use the subtraction assignment operator (`-=`) to shift a pointer
+  /// backward by a number of contiguous instances. The resulting pointer must
+  /// be within the bounds of the same allocation as `rhs`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer to advance in place.
+  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
+  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  ///
+  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func -= (lhs: inout ${Self}<Pointee>, rhs: Int) {
     lhs = lhs - rhs
