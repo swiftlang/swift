@@ -33,6 +33,7 @@ fi
     cat >$OUTPUTFILE <<EOF
 -ldl
 -lpthread
+-latomic
 -lswiftCore
 -lswiftImageInspectionShared
 $ICU_LIBS
