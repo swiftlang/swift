@@ -39,6 +39,14 @@ struct _SwiftEmptyArrayStorage {
 extern SWIFT_RUNTIME_STDLIB_INTERFACE
 struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
+struct _SwiftHashingSecretKey {
+  __swift_uint64_t key0;
+  __swift_uint64_t key1;
+};
+
+extern SWIFT_RUNTIME_STDLIB_INTERFACE
+struct _SwiftHashingSecretKey _swift_stdlib_Hashing_secretKey;
+
 extern SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride;
 

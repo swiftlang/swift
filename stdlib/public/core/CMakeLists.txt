@@ -96,6 +96,7 @@ set(SWIFTLIB_ESSENTIAL
   REPL.swift
   Reverse.swift
   Runtime.swift.gyb
+  SipHash.swift.gyb
   Sequence.swift
   SequenceAlgorithms.swift.gyb
   SequenceWrapper.swift
@@ -112,6 +113,7 @@ set(SWIFTLIB_ESSENTIAL
   StringBuffer.swift
   StringComparable.swift
   StringCore.swift
+  StringHashable.swift
   StringInterpolation.swift.gyb
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb

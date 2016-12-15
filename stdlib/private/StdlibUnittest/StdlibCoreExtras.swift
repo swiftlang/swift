@@ -232,3 +232,16 @@ public func forAllPermutations<S : Sequence>(
     return ()
   }
 }
+
+public func cartesianProduct<C1 : Collection, C2 : Collection>(
+  _ c1: C1, _ c2: C2
+) -> [(C1.Iterator.Element, C2.Iterator.Element)] {
+  var result: [(C1.Iterator.Element, C2.Iterator.Element)] = []
+  for e1 in c1 {
+    for e2 in c2 {
+      result.append((e1, e2))
+    }
+  }
+  return result
+}
+

@@ -35,16 +35,17 @@ extension _StringCore {
   func _encodeSomeUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(i <= count)
 
-    if _fastPath(elementWidth == 1) {
+    if let asciiBuffer = self.asciiBuffer {
       // How many UTF-16 code units might we use before we've filled up
       // our _UTF8Chunk with UTF-8 code units?
-      let utf16Count = Swift.min(MemoryLayout<_UTF8Chunk>.size, count - i)
+      let utf16Count =
+        Swift.min(MemoryLayout<_UTF8Chunk>.size, asciiBuffer.count - i)
 
       var result: _UTF8Chunk = ~0 // Start with all bits set
 
       _memcpy(
         dest: UnsafeMutableRawPointer(Builtin.addressof(&result)),
-        src: startASCII + i,
+        src: asciiBuffer.baseAddress! + i,
         size: numericCast(utf16Count))
 
       // Convert the _UTF8Chunk into host endianness.
@@ -379,10 +380,6 @@ extension String {
     }
   }
 
-  public var _contiguousUTF8: UnsafeMutablePointer<UTF8.CodeUnit>? {
-    return _core.elementWidth == 1 ? _core.startASCII : nil
-  }
-
   /// A contiguously stored null-terminated UTF-8 representation of the string.
   ///
   /// To access the underlying memory, invoke `withUnsafeBufferPointer` on the
@@ -410,9 +407,10 @@ extension String {
   internal func _withUnsafeBufferPointerToUTF8<R>(
     _ body: (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
   ) rethrows -> R {
-    let ptr = _contiguousUTF8
-    if ptr != nil {
-      return try body(UnsafeBufferPointer(start: ptr, count: _core.count))
+    if let asciiBuffer = self._core.asciiBuffer {
+      return try body(UnsafeBufferPointer(
+        start: asciiBuffer.baseAddress,
+        count: asciiBuffer.count))
     }
     var nullTerminatedUTF8 = ContiguousArray<UTF8.CodeUnit>()
     nullTerminatedUTF8.reserveCapacity(utf8.count + 1)

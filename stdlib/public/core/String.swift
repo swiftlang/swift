@@ -528,52 +528,6 @@ extension String {
   }
 }
 
-#if _runtime(_ObjC)
-@_silgen_name("swift_stdlib_NSStringHashValue")
-func _stdlib_NSStringHashValue(_ str: AnyObject, _ isASCII: Bool) -> Int
-
-@_silgen_name("swift_stdlib_NSStringHashValuePointer")
-func _stdlib_NSStringHashValuePointer(_ str: OpaquePointer, _ isASCII: Bool) -> Int
-#endif
-
-extension String : Hashable {
-  /// The string's hash value.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  public var hashValue: Int {
-#if _runtime(_ObjC)
-    // Mix random bits into NSString's hash so that clients don't rely on
-    // Swift.String.hashValue and NSString.hash being the same.
-#if arch(i386) || arch(arm)
-    let hashOffset = Int(bitPattern: 0x88dd_cc21)
-#else
-    let hashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
-#endif
-    // If we have a contiguous string then we can use the stack optimization.
-    let core = self._core
-    let isASCII = core.isASCII
-    if core.hasContiguousStorage {
-      let stackAllocated = _NSContiguousString(core)
-      return hashOffset ^ stackAllocated._unsafeWithNotEscapedSelfPointer {
-        return _stdlib_NSStringHashValuePointer($0, isASCII)
-      }
-    } else {
-      let cocoaString = unsafeBitCast(
-        self._bridgeToObjectiveCImpl(), to: _NSStringCore.self)
-      return hashOffset ^ _stdlib_NSStringHashValue(cocoaString, isASCII)
-    }
-#else
-    if self._core.isASCII {
-      return _swift_stdlib_unicode_hash_ascii(
-        _core.startASCII, Int32(_core.count))
-    } else {
-      return _swift_stdlib_unicode_hash(_core.startUTF16, Int32(_core.count))
-    }
-#endif
-  }
-}
-
 extension String {
   @effects(readonly)
   @_semantics("string.concat")
@@ -772,9 +726,9 @@ extension String {
   ///
   /// - Complexity: O(*n*)
   public func lowercased() -> String {
-    if self._core.isASCII {
-      let count = self._core.count
-      let source = self._core.startASCII
+    if let asciiBuffer = self._core.asciiBuffer {
+      let count = asciiBuffer.count
+      let source = asciiBuffer.baseAddress!
       let buffer = _StringBuffer(
         capacity: count, initialSize: count, elementWidth: 1)
       let dest = buffer.start
@@ -822,9 +776,9 @@ extension String {
   ///
   /// - Complexity: O(*n*)
   public func uppercased() -> String {
-    if self._core.isASCII {
-      let count = self._core.count
-      let source = self._core.startASCII
+    if let asciiBuffer = self._core.asciiBuffer {
+      let count = asciiBuffer.count
+      let source = asciiBuffer.baseAddress!
       let buffer = _StringBuffer(
         capacity: count, initialSize: count, elementWidth: 1)
       let dest = buffer.start

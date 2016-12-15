@@ -240,6 +240,13 @@ public struct _StringCore {
     return _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self)
   }
 
+  public var asciiBuffer: UnsafeMutableBufferPointer<UTF8.CodeUnit>? {
+    if elementWidth != 1 {
+      return nil
+    }
+    return UnsafeMutableBufferPointer(start: startASCII, count: count)
+  }
+
   /// the native _StringBuffer, if any, or `nil`.
   public var nativeBuffer: _StringBuffer? {
     if !hasCocoaBuffer {
