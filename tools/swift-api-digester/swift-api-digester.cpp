@@ -151,7 +151,7 @@ SwiftVersion("swift-version",
 namespace {
 
 template<typename T>
-bool contains(std::vector<T> container, T instance) {
+bool contains(std::vector<T*> &container, T *instance) {
   return std::find(container.begin(), container.end(), instance) != container.end();
 }
 
@@ -1619,8 +1619,9 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
   NodeVector AddedMatched;
 
   void handleUnmatch(NodeVector &Matched, NodeVector &All, bool Left) {
-    for (auto A : SDKNodeVectorViewer(All,
-                            [&](SDKNode *N) { return !contains(Matched, N);})) {
+    for (auto A : All) {
+      if (contains(Matched, A))
+        continue;
       if (Left)
         Listener.foundRemoveAddMatch(A, nullptr);
       else
@@ -1804,14 +1805,14 @@ public:
     NodeVector RenameRight;
 
 
-    for (auto Remain : SDKNodeVectorViewer(Removed, [&](SDKNode *N)
-                                 { return !contains(RemovedMatched, N); })) {
-      RenameLeft.push_back(Remain);
+    for (auto Remain : Removed) {
+      if (!contains(RemovedMatched, Remain))
+        RenameLeft.push_back(Remain);
     }
 
-    for (auto Remain : SDKNodeVectorViewer(Added, [&](SDKNode *N)
-                                      { return !contains(AddedMatched, N); })) {
-      RenameRight.push_back(Remain);
+    for (auto Remain : Added) {
+      if (!contains(AddedMatched, Remain))
+        RenameRight.push_back(Remain);
     }
 
     BestMatchMatcher RenameMatcher(RenameLeft, RenameRight, isRename,
@@ -1929,7 +1930,8 @@ void SameNameNodeMatcher::match() {
       Added.push_back(R);
     }
   }
-  RemovedAddedNodeMatcher(Removed, Added, Listener).match();
+  RemovedAddedNodeMatcher RAMatcher(Removed, Added, Listener);
+  RAMatcher.match();
 }
 
 // The recursive version of sequential matcher. We do not only match two vectors
@@ -2093,7 +2095,8 @@ public:
       // type decls that are identical. If the matched nodes are both type decls,
       // remove the contained function decls that are identical.
       removeCommonChildren(Left, Right);
-      SameNameNodeMatcher(Left->getChildren(), Right->getChildren(), *this).match();
+      SameNameNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(), *this);
+      SNMatcher.match();
       break;
     }
 
@@ -2107,8 +2110,9 @@ public:
     case SDKNodeKind::TypeNameAlias: {
       // If matched nodes are both function/var/TypeAlias decls, mapping their
       // parameters sequentially.
-      SequentialNodeMatcher(Left->getChildren(),
-                            Right->getChildren(), *this).match();
+      SequentialNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(),
+                                      *this);
+      SNMatcher.match();
       break;
     }
 
@@ -3202,7 +3206,9 @@ struct RenameDetectorForMemberDiff : public MatchedNodeListener {
   void workOn(NodePtr Left, NodePtr Right) {
     if (Left->getKind() == Right->getKind() &&
         Left->getKind() == SDKNodeKind::TypeDecl) {
-      SameNameNodeMatcher(Left->getChildren(), Right->getChildren(), *this).match();
+      SameNameNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(),
+                                    *this);
+      SNMatcher.match();
     }
   }
 };
