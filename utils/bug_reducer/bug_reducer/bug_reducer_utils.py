@@ -136,26 +136,3 @@ class SILOptInvoker(object):
 
     def cmdline_with_passlist(self, passes):
         return self._cmdline(self.input_file, passes)
-
-
-def get_silopt_invoker(args):
-    tools = SwiftTools(args.swift_build_dir)
-
-    passes = []
-    if len(args.pass_list) == 0:
-        json_data = json.loads(subprocess.check_output(
-            [tools.sil_passpipeline_dumper, '-Performance']))
-        passes = sum((p[2:] for p in json_data if p[0] != 'EarlyModulePasses'), [])
-        passes = ['-' + x[1] for x in passes]
-    else:
-        passes = ['-' + x for x in args.pass_list]
-
-    # We assume we have an early module passes that runs until fix point and
-    # that is strictly not what is causing the issue.
-    #
-    # Everything else runs one iteration.
-    early_module_passes = [p[2:] for p in json_data
-                           if p[0] == 'EarlyModulePasses'][0]
-    early_module_passes = ['-' + x[1] for x in early_module_passes]
-
-    return SILOptInvoker(args, tools, early_module_passes)
