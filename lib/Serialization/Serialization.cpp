@@ -341,6 +341,8 @@ TypeID Serializer::addTypeRef(Type ty) {
   if (!ty)
     return 0;
 
+  assert(!ty->hasError() && "Serializing error type");
+
   auto &id = DeclAndTypeIDs[ty];
   if (id.first != 0)
     return id.first;
