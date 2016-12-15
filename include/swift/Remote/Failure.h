@@ -21,6 +21,7 @@
 #include "swift/Remote/RemoteAddress.h"
 
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <cassert>
 #include <string>
 #include <cstring>
@@ -107,6 +108,8 @@ private:
     case Kind::KIND: return TEXT;
 #include "swift/Remote/FailureKinds.def"    
     }
+
+    llvm_unreachable("Unhandled FailureKind in switch.");
   }
 
   union ArgStorage {

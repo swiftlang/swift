@@ -854,6 +854,10 @@ namespace {
               ->getForwardingSubstitutions(M);
           entityType = GFT->substGenericArgs(subs);
         } else {
+          if (auto objType =
+                  entityType->getImplicitlyUnwrappedOptionalObjectType())
+            entityType = objType;
+
           entityType = DC->mapTypeIntoContext(entityType);
         }
       }
@@ -5047,7 +5051,13 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
               TC.Context.SourceMgr, FnExpr->getEndLoc());
         }
       } else {
-        llvm_unreachable("unexpected argument expression type");
+        // FIXME: Due to a quirk of CSApply, we can end up without a
+        // ParenExpr if the argument has an '@lvalue TupleType'.
+        assert((isa<TupleType>(ArgExpr->getType().getPointer()) ||
+                isa<ParenType>(ArgExpr->getType().getPointer())) &&
+                "unexpected argument expression type");
+        insertLoc = ArgExpr->getLoc();
+
         // Can't be TupleShuffleExpr because this argExpr is not yet resolved.
       }
 
@@ -5620,7 +5630,14 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       callExpr->setFn(operatorRef);
   };
 
-  auto fnType = fnExpr->getType()->getRValueType();
+  auto getFuncType = [](Type type) -> Type {
+    auto fnType = type->getRValueType();
+    if (auto objectType = fnType->getImplicitlyUnwrappedOptionalObjectType())
+      return objectType;
+    return fnType;
+  };
+
+  auto fnType = getFuncType(fnExpr->getType());
 
   // If we have a contextual type, and if we have an ambiguously typed function
   // result from our previous check, we re-type-check it using this contextual
@@ -5631,9 +5648,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // produce better diagnostics below by diagnosing this here rather than trying
   // to peel apart the failed conversion to function type.
   if (CS->getContextualType() &&
-      (isUnresolvedOrTypeVarType(fnExpr->getType()) ||
-       (fnExpr->getType()->is<AnyFunctionType>() &&
-        fnExpr->getType()->hasUnresolvedType()))) {
+      (isUnresolvedOrTypeVarType(fnType) ||
+       (fnType->is<AnyFunctionType>() && fnType->hasUnresolvedType()))) {
     // FIXME: Prevent typeCheckChildIndependently from transforming expressions,
     // because if we try to typecheck OSR expression with contextual type,
     // it'll end up converting it into DeclRefExpr based on contextual info,
@@ -5650,7 +5666,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
           &listener);
 
       if (type.hasValue())
-        fnType = type.getValue()->getRValueType();
+        fnType = getFuncType(type.getValue());
     } else {
       fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
                                            CTP_CalleeResult, TCC_ForceRecheck,
@@ -5658,7 +5674,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       if (!fnExpr)
         return true;
 
-      fnType = fnExpr->getType()->getRValueType();
+      fnType = getFuncType(fnExpr->getType());
     }
   }
 
@@ -7051,10 +7067,14 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
 
   auto &tc = cs.getTypeChecker();
   if (FoundDecl) {
-    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype,
-                isa<NominalTypeDecl>(FoundDecl)
-                    ? cast<NominalTypeDecl>(FoundDecl)->getDeclaredType()
-                    : FoundDecl->getDeclaredInterfaceType());
+    Type type;
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(FoundDecl))
+      type = nominal->getDeclaredType();
+    else if (auto *typeAlias = dyn_cast<TypeAliasDecl>(FoundDecl))
+      type = typeAlias->getAliasType();
+    else
+      type = FoundDecl->getDeclaredInterfaceType();
+    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype, type);
   }
 
   if (FoundGenericTypeBase && !isa<GenericIdentTypeRepr>(FoundGenericTypeBase)){

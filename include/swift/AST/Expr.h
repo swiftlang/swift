@@ -576,6 +576,10 @@ public:
   /// \param allowOverwrite - true if it's okay if an expression already
   ///   has an access kind
   void propagateLValueAccessKind(AccessKind accessKind,
+                                 llvm::function_ref<Type(Expr *)> getType
+                                   = [](Expr *E) -> Type {
+                                     return E->getType();
+                                 },
                                  bool allowOverwrite = false);
 
   /// Retrieves the declaration that is being referenced by this

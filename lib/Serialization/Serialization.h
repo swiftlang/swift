@@ -254,7 +254,7 @@ private:
   void writeParameterList(const ParameterList *PL);
 
   /// Writes the given pattern, recursively.
-  void writePattern(const Pattern *pattern);
+  void writePattern(const Pattern *pattern, DeclContext *owningDC);
 
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams);

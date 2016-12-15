@@ -447,24 +447,20 @@ ${orderingExplanation}
     by areInIncreasingOrder:
       (${IElement}, ${IElement}) -> Bool
   ) {
-    typealias EscapingBinaryPredicate =
-      (Iterator.Element, Iterator.Element) -> Bool
-    let escapableIsOrderedBefore =
-      unsafeBitCast(areInIncreasingOrder, to: EscapingBinaryPredicate.self)
 
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      bufferPointer.sort(by: escapableIsOrderedBefore)
+      bufferPointer.sort(by: areInIncreasingOrder)
       return ()
     }
     if didSortUnsafeBuffer == nil {
       _introSort(
         &self,
         subRange: startIndex..<endIndex,
-        by: escapableIsOrderedBefore)
+        by: areInIncreasingOrder)
     }
   }
 }

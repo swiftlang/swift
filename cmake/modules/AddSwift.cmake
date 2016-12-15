@@ -132,6 +132,7 @@ function(_add_variant_c_compile_link_flags)
   if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
     list(APPEND result "-DLLVM_ON_WIN32")
     list(APPEND result "-D_CRT_SECURE_NO_WARNINGS")
+    list(APPEND result "-D_CRT_NONSTDC_NO_WARNINGS")
     # TODO(compnerd) handle /MT
     list(APPEND result "-D_DLL")
     list(APPEND result "-fms-compatibility-version=1900")
@@ -772,12 +773,10 @@ function(_add_swift_library_single target name)
 
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
     if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "")
-      set_property(TARGET "${target}" APPEND_STRING
-          PROPERTY INCLUDE_DIRECTORIES "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}")
+      target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}")
     endif()
     if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "")
-      set_property(TARGET "${target}" APPEND_STRING
-          PROPERTY INCLUDE_DIRECTORIES "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}")
+      target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}")
     endif()
   endif()
 

@@ -67,15 +67,11 @@ namespace {
                        }) == Result.end())
         return;
 
-      bool anyRemoved = false;
-
       // Remove any overridden declarations from the found-declarations set.
-      if (removeOverriddenDecls(FoundDecls))
-        anyRemoved = true;
+      removeOverriddenDecls(FoundDecls);
 
       // Remove any shadowed declarations from the found-declarations set.
-      if (removeShadowedDecls(FoundDecls, DC->getParentModule(), &TC))
-        anyRemoved = true;
+      removeShadowedDecls(FoundDecls, DC->getParentModule(), &TC);
 
       // Filter out those results that have been removed from the
       // found-declarations set.

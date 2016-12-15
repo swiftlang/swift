@@ -39,6 +39,7 @@ class SwiftGizmo : A {
   @NSManaged var nonobjc_var: SwiftProto?
 
   @NSManaged class var d: Int = 4  // expected-error {{@NSManaged only allowed on an instance property or method}}
+  // expected-error@-1 {{class stored properties not supported in classes; did you mean 'static'?}}
 
   @NSManaged var e: Int { return 4 } // expected-error {{@NSManaged not allowed on computed properties}}
 

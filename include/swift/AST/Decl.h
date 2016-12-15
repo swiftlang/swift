@@ -400,10 +400,29 @@ class alignas(1 << DeclAlignInBits) Decl {
 
   enum { NumTypeDeclBits = NumValueDeclBits + 1 };
   static_assert(NumTypeDeclBits <= 32, "fits in an unsigned");
-  
+
+  class GenericTypeDeclBitfields {
+    friend class GenericTypeDecl;
+    unsigned : NumTypeDeclBits;
+  };
+
+  enum { NumGenericTypeDeclBits = NumTypeDeclBits };
+  static_assert(NumGenericTypeDeclBits <= 32, "fits in an unsigned");
+
+  class TypeAliasDeclBitfields {
+    friend class TypeAliasDecl;
+    unsigned : NumGenericTypeDeclBits;
+
+    /// Whether the underlying type is an interface type that will be lazily
+    /// resolved to a context type.
+    unsigned HasInterfaceUnderlyingType : 1;
+  };
+  enum { NumTypeAliasDeclBits = NumGenericTypeDeclBits + 1 };
+  static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
+
   class NominalTypeDeclBitFields {
     friend class NominalTypeDecl;
-    unsigned : NumTypeDeclBits;
+    unsigned : NumGenericTypeDeclBits;
     
     /// Whether or not the nominal type decl has delayed protocol or member
     /// declarations.
@@ -412,8 +431,18 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     unsigned AddedImplicitInitializers : 1;
+
+    /// \brief Whether or not this declaration has a failable initializer member,
+    /// and whether or not we've actually searched for one.
+    unsigned HasFailableInits : 1;
+
+    /// Whether we have already searched for failable initializers.
+    unsigned SearchedForFailableInits : 1;
+
+    /// Whether there is are lazily-loaded conformances for this nominal type.
+    unsigned HasLazyConformances : 1;
   };
-  enum { NumNominalTypeDeclBits = NumTypeDeclBits + 2 };
+  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 5 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -438,14 +467,10 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether the existential of this protocol can be represented.
     unsigned ExistentialTypeSupported : 1;
 
-    /// If this is a compiler-known protocol, this will be a KnownProtocolKind
-    /// value, plus one. Otherwise, it will be 0.
-    unsigned KnownProtocol : 6;
-
     /// The stage of the circularity check for this protocol.
     unsigned Circularity : 2;
   };
-  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 14 };
+  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 8 };
   static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
 
   class ClassDeclBitfields {
@@ -547,9 +572,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// default, and 'private' is never used. 0 represents an uncomputed value.
     unsigned DefaultAndMaxAccessLevel : 3;
 
-    /// Whether there is an active conformance loader for this
-    /// extension.
-    unsigned HaveConformanceLoader : 1;
+    /// Whether there is are lazily-loaded conformances for this extension.
+    unsigned HasLazyConformances : 1;
   };
   enum { NumExtensionDeclBits = NumDeclBits + 6 };
   static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
@@ -566,6 +590,8 @@ protected:
     FuncDeclBitfields FuncDeclBits;
     ConstructorDeclBitfields ConstructorDeclBits;
     TypeDeclBitfields TypeDeclBits;
+    GenericTypeDeclBitfields GenericTypeDeclBits;
+    TypeAliasDeclBitfields TypeAliasDeclBits;
     NominalTypeDeclBitFields NominalTypeDeclBits;
     ProtocolDeclBitfields ProtocolDeclBits;
     ClassDeclBitfields ClassDeclBits;
@@ -1369,11 +1395,12 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// The generic parameters of the extension.
   GenericParamList *GenericParams = nullptr;
 
-  /// \brief The generic context of this extension.
+  /// The generic signature or environment of this extension.
   ///
-  /// This is the mapping between interface types and archetypes for the
-  /// generic parameters of this extension.
-  GenericEnvironment *GenericEnv = nullptr;
+  /// When this extension stores only a signature, the generic environment
+  /// will be lazily loaded.
+  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+    GenericSigOrEnv;
 
   MutableArrayRef<TypeLoc> Inherited;
 
@@ -1408,7 +1435,7 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// same operation. The caller is responsible for loading the
   /// conformances.
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoader() {
-    if (!ExtensionDeclBits.HaveConformanceLoader)
+    if (!ExtensionDeclBits.HasLazyConformances)
       return { nullptr, 0 };
 
     return takeConformanceLoaderSlow();
@@ -1416,6 +1443,9 @@ class ExtensionDecl final : public Decl, public DeclContext,
 
   /// Slow path for \c takeConformanceLoader().
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
+
+  /// Lazily populate the generic environment.
+  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
 
 public:
   using Decl::getASTContext;
@@ -1454,25 +1484,53 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
-  /// Retrieve the generic signature for this extension.
-  GenericSignature *getGenericSignature() const {
-    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
+  /// Retrieve the generic requirements.
+  ArrayRef<Requirement> getGenericRequirements() const {
+    if (auto sig = getGenericSignature())
+      return sig->getRequirements();
+    else
+      return { };
   }
 
-  /// Retrieve the generic context for this extension.
-  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+  /// Retrieve the generic signature for this type.
+  GenericSignature *getGenericSignature() const {
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv->getGenericSignature();
+
+    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return genericSig;
+
+    return nullptr;
+  }
+
+  /// Retrieve the generic context for this type.
+  GenericEnvironment *getGenericEnvironment() const {
+    // Fast case: we already have a generic environment.
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv;
+
+    // If we only have a generic signature, build the generic environment.
+    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return getLazyGenericEnvironmentSlow();
+
+    return nullptr;
+  }
+
+  /// Set a lazy generic environment.
+  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                 GenericSignature *genericSig,
+                                 uint64_t genericEnvData);
 
   /// Set the generic context of this extension.
-  void setGenericEnvironment(GenericEnvironment *env) {
-    assert(!GenericEnv && "Already have generic context");
-    GenericEnv = env;
-
-    if (GenericEnv)
-      GenericEnv->setOwningDeclContext(this);
+  void setGenericEnvironment(GenericEnvironment *genericEnv) {
+    assert((GenericSigOrEnv.isNull() ||
+            getGenericSignature()->getCanonicalSignature() ==
+              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+           "set a generic environment with a different generic signature");
+    this->GenericSigOrEnv = genericEnv;
+    if (genericEnv)
+      genericEnv->setOwningDeclContext(this);
   }
-
-  /// Retrieve the generic requirements.
-  ArrayRef<Requirement> getGenericRequirements() const;
 
   /// Retrieve the type being extended.
   Type getExtendedType() const { return ExtendedType.getType(); }
@@ -1552,10 +1610,6 @@ public:
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
   DeclRange getMembers() const;
-  void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
-  bool hasLazyMembers() const {
-    return IterableDeclContext::isLazy();
-  }
 
   /// Determine whether this is a constrained extension, which adds additional
   /// requirements beyond those of the nominal type.
@@ -1875,8 +1929,7 @@ struct IfConfigDeclClause {
 
   ArrayRef<Decl*> Members;
 
-  /// True if this is the active clause of the #if block.  Since this is
-  /// evaluated at parse time, this is always known.
+  /// True if this is the active clause of the #if block.
   bool isActive;
 
   IfConfigDeclClause(SourceLoc Loc, Expr *Cond, ArrayRef<Decl*> Members,
@@ -1896,13 +1949,13 @@ class IfConfigDecl : public Decl {
   ArrayRef<IfConfigDeclClause> Clauses;
   SourceLoc EndLoc;
   bool HadMissingEnd;
+  bool HasBeenResolved = false;
 public:
   
   IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigDeclClause> Clauses,
                SourceLoc EndLoc, bool HadMissingEnd)
-    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc),
-      HadMissingEnd(HadMissingEnd) {
-  }
+    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses),
+      EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
 
   ArrayRef<IfConfigDeclClause> getClauses() const { return Clauses; }
 
@@ -1912,11 +1965,15 @@ public:
       if (Clause.isActive) return &Clause;
     return nullptr;
   }
+
   const ArrayRef<Decl*> getActiveMembers() const {
     if (auto *Clause = getActiveClause())
       return Clause->Members;
     return {};
   }
+
+  bool isResolved() const { return HasBeenResolved; }
+  void setResolved() { HasBeenResolved = true; }
   
   SourceLoc getEndLoc() const { return EndLoc; }
   SourceLoc getLoc() const { return Clauses[0].Loc; }
@@ -2219,16 +2276,20 @@ public:
 class GenericTypeDecl : public TypeDecl, public DeclContext {
   GenericParamList *GenericParams = nullptr;
 
-  /// \brief The generic context of this type.
+  /// The generic signature or environment of this type.
   ///
-  /// This is the mapping between interface types and archetypes for the
-  /// generic parameters of this type.
-  GenericEnvironment *GenericEnv = nullptr;
+  /// When this function stores only a signature, the generic environment
+  /// will be lazily loaded.
+  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+    GenericSigOrEnv;
 
   /// \brief Whether or not the generic signature of the type declaration is
   /// currently being validated.
   // TODO: Merge into GenericSig bits.
   unsigned ValidatingGenericSignature = false;
+
+  /// Lazily populate the generic environment.
+  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
 
 public:
   GenericTypeDecl(DeclKind K, DeclContext *DC,
@@ -2258,11 +2319,30 @@ public:
       return { };
   }
 
-  /// Retrieve the generic signature.
+  /// Retrieve the generic signature for this type.
   GenericSignature *getGenericSignature() const {
-    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv->getGenericSignature();
+
+    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return genericSig;
+
+    return nullptr;
   }
-  
+
+  /// Retrieve the generic context for this type.
+  GenericEnvironment *getGenericEnvironment() const {
+    // Fast case: we already have a generic environment.
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv;
+
+    // If we only have a generic signature, build the generic environment.
+    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return getLazyGenericEnvironmentSlow();
+
+    return nullptr;
+  }
+
   void setIsValidatingGenericSignature(bool validating=true) {
     ValidatingGenericSignature = validating;
   }
@@ -2271,16 +2351,21 @@ public:
     return ValidatingGenericSignature;
   }
 
-  /// Retrieve the generic context for this type.
-  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+  /// Set a lazy generic environment.
+  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                 GenericSignature *genericSig,
+                                 uint64_t genericEnvData);
 
-  /// Set the generic context of this type.
-  void setGenericEnvironment(GenericEnvironment *env) {
-    assert(!this->GenericEnv && "already have generic context?");
-    this->GenericEnv = env;
+  /// Set the generic context of this function.
+  void setGenericEnvironment(GenericEnvironment *genericEnv) {
+    assert((GenericSigOrEnv.isNull() ||
+            getGenericSignature()->getCanonicalSignature() ==
+              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+           "set a generic environment with a different generic signature");
+    this->GenericSigOrEnv = genericEnv;
 
-    if (GenericEnv)
-      GenericEnv->setOwningDeclContext(this);
+    if (genericEnv)
+      genericEnv->setOwningDeclContext(this);
   }
 
   // Resolve ambiguity due to multiple base classes.
@@ -2310,7 +2395,9 @@ class TypeAliasDecl : public GenericTypeDecl {
   mutable NameAliasType *AliasTy;
 
   SourceLoc TypeAliasLoc;           // The location of the 'typealias' keyword
-  TypeLoc UnderlyingTy;
+  mutable TypeLoc UnderlyingTy;
+
+  Type computeUnderlyingContextType() const;
 
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
@@ -2323,6 +2410,9 @@ public:
   /// getUnderlyingType - Returns the underlying type, which is
   /// assumed to have been set.
   Type getUnderlyingType() const {
+    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
+      return computeUnderlyingContextType();
+
     assert(!UnderlyingTy.getType().isNull() &&
            "getting invalid underlying type");
     return UnderlyingTy.getType();
@@ -2333,10 +2423,25 @@ public:
   void computeType();
 
   /// \brief Determine whether this type alias has an underlying type.
-  bool hasUnderlyingType() const { return !UnderlyingTy.getType().isNull(); }
+  bool hasUnderlyingType() const {
+    return !UnderlyingTy.getType().isNull();
+  }
 
-  TypeLoc &getUnderlyingTypeLoc() { return UnderlyingTy; }
-  const TypeLoc &getUnderlyingTypeLoc() const { return UnderlyingTy; }
+  TypeLoc &getUnderlyingTypeLoc() {
+    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
+      (void)computeUnderlyingContextType();
+
+    return UnderlyingTy;
+  }
+  const TypeLoc &getUnderlyingTypeLoc() const {
+    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
+      (void)computeUnderlyingContextType();
+
+    return UnderlyingTy;
+  }
+
+  /// Set the underlying type after deserialization.
+  void setDeserializedUnderlyingType(Type type);
 
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType() const { return AliasTy; }
@@ -2543,17 +2648,8 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   ExtensionDecl *LastExtension = nullptr;
 
   /// \brief The generation at which we last loaded extensions.
-  unsigned ExtensionGeneration: 29;
+  unsigned ExtensionGeneration;
   
-  /// \brief Whether or not this declaration has a failable initializer member,
-  /// and whether or not we've actually searched for one.
-  unsigned HasFailableInits : 1;
-  unsigned SearchedForFailableInits : 1;
-
-  /// Whether there is an active conformance loader for this
-  /// nominal type.
-  unsigned HaveConformanceLoader : 1;
-
   /// Prepare to traverse the list of extensions.
   void prepareExtensions();
 
@@ -2561,7 +2657,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   /// same operation. The caller is responsible for loading the
   /// conformances.
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoader() {
-    if (!HaveConformanceLoader)
+    if (!NominalTypeDeclBits.HasLazyConformances)
       return { nullptr, 0 };
 
     return takeConformanceLoaderSlow();
@@ -2623,14 +2719,16 @@ protected:
     NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
-    SearchedForFailableInits = false;
-    HasFailableInits = false;
-    HaveConformanceLoader = false;
+    NominalTypeDeclBits.SearchedForFailableInits = false;
+    NominalTypeDeclBits.HasFailableInits = false;
+    NominalTypeDeclBits.HasLazyConformances = false;
   }
 
   friend class ProtocolType;
 
 public:
+  using GenericTypeDecl::getASTContext;
+
   DeclRange getMembers() const;
   SourceRange getBraces() const { return Braces; }
   
@@ -2650,11 +2748,6 @@ public:
   /// module?
   bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
 
-  void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
-  bool hasLazyMembers() const {
-    return IterableDeclContext::isLazy();
-  }
-  
   /// \brief Returns true if this decl contains delayed value or protocol
   /// declarations.
   bool hasDelayedMembers() const {
@@ -2677,15 +2770,17 @@ public:
     NominalTypeDeclBits.AddedImplicitInitializers = true;
   }
               
-  bool getHasFailableInits() { return HasFailableInits; }
+  bool getHasFailableInits() const {
+    return NominalTypeDeclBits.HasFailableInits;
+  }
   void setHasFailableInits(bool failable = true) {
-    HasFailableInits = failable;
+    NominalTypeDeclBits.HasFailableInits = failable;
   }
   void setSearchedForFailableInits(bool searched = true) {
-    SearchedForFailableInits = searched;
+    NominalTypeDeclBits.SearchedForFailableInits = searched;
   }
-  bool getSearchedForFailableInits() {
-    return SearchedForFailableInits;
+  bool getSearchedForFailableInits() const {
+    return NominalTypeDeclBits.SearchedForFailableInits;
   }
 
   /// Compute the type of this nominal type.
@@ -3277,6 +3372,10 @@ class ProtocolDecl : public NominalTypeDecl {
   /// Whether we have already set the list of inherited protocols.
   unsigned InheritedProtocolsSet : 1;
 
+  /// If this is a compiler-known protocol, this will be a KnownProtocolKind
+  /// value, plus one. Otherwise, it will be 0.
+  unsigned KnownProtocol : 6;
+
   bool requiresClassSlow();
 
   bool existentialConformsToSelfSlow();
@@ -3316,9 +3415,9 @@ public:
 
   /// Specify that this protocol is class-bounded, e.g., because it was
   /// annotated with the 'class' keyword.
-  void setRequiresClass() {
+  void setRequiresClass(bool requiresClass = true) {
     ProtocolDeclBits.RequiresClassValid = true;
-    ProtocolDeclBits.RequiresClass = true;
+    ProtocolDeclBits.RequiresClass = requiresClass;
   }
 
   /// Determine whether an existential conforming to this protocol can be
@@ -3369,9 +3468,9 @@ public:
   ///
   /// Note that this is only valid after type-checking.
   Optional<KnownProtocolKind> getKnownProtocolKind() const {
-    if (ProtocolDeclBits.KnownProtocol == 0)
+    if (KnownProtocol == 0)
       return None;
-    return static_cast<KnownProtocolKind>(ProtocolDeclBits.KnownProtocol - 1);
+    return static_cast<KnownProtocolKind>(KnownProtocol - 1);
   }
 
   /// Check whether this protocol is of a specific, known protocol kind.
@@ -3386,7 +3485,7 @@ public:
   void setKnownProtocolKind(KnownProtocolKind kind) {
     assert((!getKnownProtocolKind() || *getKnownProtocolKind() == kind) &&
            "can't reset known protocol kind");
-    ProtocolDeclBits.KnownProtocol = static_cast<unsigned>(kind) + 1;
+    KnownProtocol = static_cast<unsigned>(kind) + 1;
     assert(getKnownProtocolKind() && *getKnownProtocolKind() == kind &&
            "not enough bits");
   }
@@ -4065,7 +4164,10 @@ protected:
   /// This is the type specified, including location information.
   TypeLoc typeLoc;
 
-  Type typeInContext;
+  mutable Type typeInContext;
+
+  /// Compute the type in context from the interface type.
+  Type computeTypeInContextSlow() const;
 
 public:
   VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
@@ -4086,13 +4188,17 @@ public:
   TypeLoc getTypeLoc() const { return typeLoc; }
 
   bool hasType() const {
-    return !!typeInContext;
+    // We have a type if either the type has been computed already or if
+    // this is a deserialized declaration with an interface type.
+    return typeInContext ||
+      (hasInterfaceType() && !getDeclContext()->getParentSourceFile());
   }
 
   /// Get the type of the variable within its context. If the context is generic,
   /// this will use archetypes.
   Type getType() const {
-    assert(typeInContext && "No context type set yet");
+    if (!typeInContext)
+      return computeTypeInContextSlow();
     return typeInContext;
   }
 
@@ -4514,7 +4620,13 @@ protected:
   };
 
   GenericParamList *GenericParams;
-  GenericEnvironment *GenericEnv;
+
+  /// The generic signature or environment of this function.
+  ///
+  /// When this function stores only a signature, the generic environment
+  /// will be lazily loaded.
+  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+    GenericSigOrEnv;
 
   CaptureInfo Captures;
 
@@ -4529,8 +4641,7 @@ protected:
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), GenericParams(nullptr), GenericEnv(nullptr),
-        ThrowsLoc(ThrowsLoc) {
+        Body(nullptr), GenericParams(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
@@ -4547,26 +4658,53 @@ protected:
 
   void setGenericParams(GenericParamList *GenericParams);
 
-public:
+  /// Lazily populate the generic environment.
+  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
 
+public:
   /// \brief Should this declaration be treated as if annotated with transparent
   /// attribute.
   bool isTransparent() const;
 
+  /// Retrieve the generic signature for this function.
   GenericSignature *getGenericSignature() const {
-    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv->getGenericSignature();
+
+    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return genericSig;
+
+    return nullptr;
   }
 
   /// Retrieve the generic context for this function.
-  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+  GenericEnvironment *getGenericEnvironment() const {
+    // Fast case: we already have a generic environment.
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv;
+
+    // If we only have a generic signature, build the generic environment.
+    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return getLazyGenericEnvironmentSlow();
+
+    return nullptr;
+  }
+
+  /// Set a lazy generic environment.
+  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                 GenericSignature *genericSig,
+                                 uint64_t genericEnvData);
 
   /// Set the generic context of this function.
-  void setGenericEnvironment(GenericEnvironment *GenericEnv) {
-    assert(!this->GenericEnv && "already have generic context?");
-    this->GenericEnv = GenericEnv;
+  void setGenericEnvironment(GenericEnvironment *genericEnv) {
+    assert((GenericSigOrEnv.isNull() ||
+            getGenericSignature()->getCanonicalSignature() ==
+              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+           "set a generic environment with a different generic signature");
+    this->GenericSigOrEnv = genericEnv;
 
-    if (GenericEnv)
-      GenericEnv->setOwningDeclContext(this);
+    if (genericEnv)
+      genericEnv->setOwningDeclContext(this);
   }
 
   // Expose our import as member status
@@ -5951,13 +6089,6 @@ inline bool ValueDecl::isImportAsMember() const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return func->isImportAsMember();
   return false;
-}
-
-inline ArrayRef<Requirement> ExtensionDecl::getGenericRequirements() const {
-  if (auto sig = getGenericSignature())
-    return sig->getRequirements();
-  else
-    return { };
 }
 
 inline bool Decl::isPotentiallyOverridable() const {

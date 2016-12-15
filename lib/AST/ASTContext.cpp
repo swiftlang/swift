@@ -204,9 +204,8 @@ struct ASTContext::Implementation {
                  std::vector<ASTContext::DelayedConformanceDiag>>
     DelayedConformanceDiags;
 
-  /// Conformance loaders for declarations that have them.
-  llvm::DenseMap<Decl *, std::pair<LazyMemberLoader *, uint64_t>>
-    ConformanceLoaders;
+  /// Stores information about lazy deserialization of various declarations.
+  llvm::DenseMap<const Decl *, LazyContextData *> LazyContexts;
 
   /// Stored archetype builders for canonical generic signatures.
   llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
@@ -1465,21 +1464,69 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   return result;
 }
 
-void ASTContext::recordConformanceLoader(Decl *decl, LazyMemberLoader *resolver,
-                                         uint64_t contextData) {
-  assert(Impl.ConformanceLoaders.count(decl) == 0 &&
-         "already recorded conformance loader");
-  Impl.ConformanceLoaders[decl] = { resolver, contextData };
+LazyContextData *ASTContext::getOrCreateLazyContextData(
+                                                const Decl *decl,
+                                                LazyMemberLoader *lazyLoader) {
+  auto known = Impl.LazyContexts.find(decl);
+  if (known != Impl.LazyContexts.end()) {
+    // Make sure we didn't provide an incompatible lazy loader.
+    assert(!lazyLoader || lazyLoader == known->second->loader);
+    return known->second;
+  }
+
+  // Create new lazy iterable context data with the given loader.
+  assert(lazyLoader && "Queried lazy data for non-lazy iterable context");
+  if (isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl)) {
+    auto *contextData = Allocate<LazyIterableDeclContextData>();
+    contextData->loader = lazyLoader;
+    Impl.LazyContexts[decl] = contextData;
+    return contextData;
+  }
+
+  // Create new lazy generic type data with the given loader.
+  if (isa<GenericTypeDecl>(decl)) {
+    auto *contextData = Allocate<LazyGenericTypeData>();
+    contextData->loader = lazyLoader;
+    Impl.LazyContexts[decl] = contextData;
+    return contextData;
+  }
+
+  // Create new lazy function context data with the given loader.
+  if (isa<AbstractFunctionDecl>(decl)) {
+    auto *contextData = Allocate<LazyAbstractFunctionData>();
+    contextData->loader = lazyLoader;
+    Impl.LazyContexts[decl] = contextData;
+    return contextData;
+  }
+
+  llvm_unreachable("unhandled lazy context");
 }
 
-std::pair<LazyMemberLoader *, uint64_t> ASTContext::takeConformanceLoader(
-                                          Decl *decl) {
-  auto known = Impl.ConformanceLoaders.find(decl);
-  auto result = known->second;
-  Impl.ConformanceLoaders.erase(known);
-  return result;
+LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
+                                            const IterableDeclContext *idc,
+                                            LazyMemberLoader *lazyLoader) {
+  if (auto ext = dyn_cast<ExtensionDecl>(idc)) {
+    return (LazyIterableDeclContextData *)getOrCreateLazyContextData(
+                                                              ext, lazyLoader);
+  }
+
+  auto nominal = cast<NominalTypeDecl>(idc);
+  return (LazyIterableDeclContextData *)getOrCreateLazyContextData(nominal,
+                                                                   lazyLoader);
 }
 
+LazyAbstractFunctionData *ASTContext::getOrCreateLazyFunctionContextData(
+                                               const AbstractFunctionDecl *func,
+                                               LazyMemberLoader *lazyLoader) {
+  return (LazyAbstractFunctionData *)getOrCreateLazyContextData(func,
+                                                                lazyLoader);
+}
+
+LazyGenericTypeData *ASTContext::getOrCreateLazyGenericTypeData(
+                                               const GenericTypeDecl *type,
+                                               LazyMemberLoader *lazyLoader) {
+  return (LazyGenericTypeData *)getOrCreateLazyContextData(type, lazyLoader);
+}
 void ASTContext::addDelayedConformanceDiag(
        NormalProtocolConformance *conformance,
        DelayedConformanceDiag fn) {
@@ -1830,18 +1877,11 @@ void ASTContext::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
   if (ImportsFoundationModule)
     return;
 
-  for (auto &Attr : SF.AttrsRequiringFoundation) {
-    // If we've already diagnosed this attribute, keep going.
-    if (!Attr.second)
-      continue;
-
-    Diags.diagnose(Attr.second->getLocation(),
+  for (auto Attr : SF.AttrsRequiringFoundation) {
+    Diags.diagnose(Attr->getLocation(),
                    diag::attr_used_without_required_module,
-                   Attr.second, Id_Foundation)
-      .highlight(Attr.second->getRangeWithAt());
-
-    // Don't diagnose this again.
-    Attr.second = nullptr;
+                   Attr, Id_Foundation)
+      .highlight(Attr->getRangeWithAt());
   }
 }
 

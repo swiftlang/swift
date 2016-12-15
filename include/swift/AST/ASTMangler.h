@@ -113,7 +113,7 @@ public:
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
 
-  std::string mangleType(Type decl, const DeclContext *DC);
+  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
   std::string mangleTypeAsUSR(Type type);
 
@@ -217,6 +217,8 @@ protected:
   void appendEntity(const ValueDecl *decl);
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
+
+  static bool checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params);
 };
 
 } // end namespace NewMangling

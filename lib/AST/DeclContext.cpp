@@ -834,10 +834,20 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   return Depth + 1;
 }
 
+ASTContext &IterableDeclContext::getASTContext() const {
+  switch (getIterableContextKind()) {
+  case IterableDeclContextKind::NominalTypeDecl:
+    return cast<NominalTypeDecl>(this)->getASTContext();
+
+  case IterableDeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(this)->getASTContext();
+  }
+}
+
 DeclRange IterableDeclContext::getMembers() const {
   loadAllMembers();
 
-  return DeclRange(FirstDecl, nullptr);
+  return DeclRange(FirstDeclAndLazyMembers.getPointer(), nullptr);
 }
 
 /// Add a member to this context.
@@ -847,8 +857,6 @@ void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
 
   // Notify our parent declaration that we have added the member, which can
   // be used to update the lookup tables.
-  // FIXME: If only we had the notion of a "searchable" declaration
-  // context...
   switch (getIterableContextKind()) {
   case IterableDeclContextKind::NominalTypeDecl: {
     auto nominal = cast<NominalTypeDecl>(this);
@@ -887,28 +895,33 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint) const {
     last->NextDecl = member;
     assert(last != member && "Simple cycle in decl list");
   } else {
-    FirstDecl = member;
+    FirstDeclAndLazyMembers.setPointer(member);
   }
   LastDeclAndKind.setPointer(member);
 }
 
-void IterableDeclContext::setLoader(LazyMemberLoader *loader, 
-                                    uint64_t contextData) {
-  LazyLoader = loader;
-  LazyLoaderContextData = contextData;
+void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
+                                          uint64_t contextData) {
+  assert(!hasLazyMembers() && "already have lazy members");
+
+  ASTContext &ctx = getASTContext();
+  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, loader);
+  FirstDeclAndLazyMembers.setInt(true);
+  contextInfo->memberData = contextData;
 
   ++NumLazyIterableDeclContexts;
   ++NumUnloadedLazyIterableDeclContexts;
 }
 
 void IterableDeclContext::loadAllMembers() const {
-  if (!isLazy())
+  if (!hasLazyMembers())
     return;
 
   // Don't try to load all members re-entrant-ly.
-  auto resolver = getLoader();
-  auto contextData = getLoaderContextData();
-  LazyLoader = nullptr;
+  ASTContext &ctx = getASTContext();
+  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
+                                                            /*loader=*/nullptr);
+  FirstDeclAndLazyMembers.setInt(false);
 
   const Decl *container = nullptr;
   switch (getIterableContextKind()) {
@@ -921,7 +934,8 @@ void IterableDeclContext::loadAllMembers() const {
     break;
   }
 
-  resolver->loadAllMembers(const_cast< Decl *>(container), contextData);
+  contextInfo->loader->loadAllMembers(const_cast<Decl *>(container),
+                                      contextInfo->memberData);
 
   --NumUnloadedLazyIterableDeclContexts;
 }

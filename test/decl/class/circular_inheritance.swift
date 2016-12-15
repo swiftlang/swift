@@ -10,7 +10,8 @@ protocol P : P {} // expected-error{{circular protocol inheritance P}}
 class Isomorphism : Automorphism { }
 class Automorphism : Automorphism { } // expected-error{{circular class inheritance Automorphism}}
 
-let _ = A()
+// FIXME: Useless error
+let _ = A() // expected-error{{'A' cannot be constructed because it has no accessible initializers}}
 
 // This should probably be made to work, but for now test that it produces a crappy
 // diagnostic instead of crashing

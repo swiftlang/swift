@@ -269,10 +269,14 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   DeclContext *DC;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     DC = nominal;
-    options |= TR_GenericSignature | TR_InheritanceClause;
+    options |= (TR_GenericSignature |
+                TR_InheritanceClause |
+                TR_AllowUnavailableProtocol);
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     DC = ext;
-    options |= TR_GenericSignature | TR_InheritanceClause;
+    options |= (TR_GenericSignature |
+                TR_InheritanceClause |
+                TR_AllowUnavailableProtocol);
   } else if (isa<GenericTypeParamDecl>(decl)) {
     // For generic parameters, we want name lookup to look at just the
     // signature of the enclosing entity.
@@ -295,9 +299,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   }
 
   // Establish a default generic type resolver.
-  auto genericEnv =
-    decl->getInnermostDeclContext()->getGenericEnvironmentOfContext();
-  GenericTypeToArchetypeResolver defaultResolver(genericEnv);
+  GenericTypeToArchetypeResolver defaultResolver(decl->getInnermostDeclContext());
   if (!resolver)
     resolver = &defaultResolver;
 
@@ -556,8 +558,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   // Set the superclass.
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     classDecl->setSuperclass(superclassTy);
-    if (superclassTy)
-      resolveImplicitConstructors(superclassTy->getClassOrBoundGenericClass());
   } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
     enumDecl->setRawType(superclassTy);
   } else {
@@ -1137,6 +1137,7 @@ static void recordSelfContextType(AbstractFunctionDecl *func) {
 namespace {
 
 class AccessScopeChecker {
+  ASTContext &Context;
   const SourceFile *File;
   TypeChecker::TypeAccessScopeCacheMap &Cache;
 
@@ -1145,7 +1146,9 @@ protected:
 
   AccessScopeChecker(const DeclContext *useDC,
                      decltype(TypeChecker::TypeAccessScopeCache) &caches)
-      : File(useDC->getParentSourceFile()), Cache(caches[File]),
+      : Context(useDC->getASTContext()),
+        File(useDC->getParentSourceFile()),
+        Cache(caches[File]),
         Scope(AccessScope::getPublic()) {}
 
   bool visitDecl(ValueDecl *VD) {
@@ -1158,6 +1161,12 @@ protected:
       if (isa<AssociatedTypeDecl>(VD))
         return true;
     }
+
+    // Simulation for Swift 3 bug.
+    if (isa<TypeAliasDecl>(VD) &&
+        VD->getInterfaceType()->hasTypeParameter() &&
+        Context.isSwiftVersion3())
+      return true;
 
     auto cached = Cache.find(VD);
     if (cached != Cache.end()) {
@@ -3484,8 +3493,7 @@ public:
       }
     }
 
-    if ((IsSecondPass && !IsFirstPass) ||
-        decl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    if (IsSecondPass && !IsFirstPass) {
       TC.checkUnsupportedProtocolType(decl);
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         TC.checkDeclCircularity(nominal);
@@ -3600,15 +3608,6 @@ public:
     if (VD->getStorageKind() == VarDecl::ComputedWithMutableAddress &&
         !VD->getSetter()->getBody()) {
       synthesizeSetterForMutableAddressedStorage(VD, TC);
-    }
-
-    // Synthesize materializeForSet in non-protocol contexts.
-    if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
-      if (!isa<ProtocolDecl>(VD->getDeclContext())) {
-        synthesizeMaterializeForSet(materializeForSet, VD, TC);
-        TC.typeCheckDecl(materializeForSet, true);
-        TC.typeCheckDecl(materializeForSet, false);
-      }
     }
 
     // Typecheck any accessors that were previously synthesized
@@ -3824,16 +3823,15 @@ public:
       markAsObjC(TC, SD, isObjC);
     }
 
-    // If this variable is marked final and has a getter or setter, mark the
+    if (SD->hasAccessorFunctions())
+      maybeAddMaterializeForSet(SD, TC);
+
+    // If this subscript is marked final and has a getter or setter, mark the
     // getter and setter as final as well.
     if (SD->isFinal()) {
       makeFinal(TC.Context, SD->getGetter());
       makeFinal(TC.Context, SD->getSetter());
       makeFinal(TC.Context, SD->getMaterializeForSetFunc());
-    }
-
-    if (SD->hasAccessorFunctions()) {
-      maybeAddMaterializeForSet(SD, TC);
     }
 
     // Make sure the getter and setter have valid types, since they will be
@@ -3842,6 +3840,8 @@ public:
       TC.validateDecl(getter);
     if (auto setter = SD->getSetter())
       TC.validateDecl(setter);
+    if (auto materializeForSet = SD->getMaterializeForSetFunc())
+      TC.validateDecl(materializeForSet);
 
     // If this is a get+mutableAddress property, synthesize the setter body.
     if (SD->getStorageKind() == SubscriptDecl::ComputedWithMutableAddress &&
@@ -3850,15 +3850,6 @@ public:
     }
 
     inferDynamic(TC.Context, SD);
-
-    // Synthesize materializeForSet in non-protocol contexts.
-    if (auto materializeForSet = SD->getMaterializeForSetFunc()) {
-      if (!isa<ProtocolDecl>(dc)) {
-        synthesizeMaterializeForSet(materializeForSet, SD, TC);
-        TC.typeCheckDecl(materializeForSet, true);
-        TC.typeCheckDecl(materializeForSet, false);
-      }
-    }
 
     TC.checkDeclAttributes(SD);
   }
@@ -3871,40 +3862,40 @@ public:
         TC.validateDecl(TAD);
       
       TypeResolutionOptions options;
-      if (!TAD->getDeclContext()->isTypeContext())
-        options |= TR_GlobalTypeAlias;
       if (TAD->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
 
-      bool invalid = false;
       if (TAD->getDeclContext()->isModuleScopeContext()) {
         IterativeTypeChecker ITC(TC);
         ITC.satisfy(requestResolveTypeDecl(TAD));
-      } else if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD, options)) {
-        TAD->setInvalid();
-        TAD->setInterfaceType(ErrorType::get(TC.Context));
-        TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
-        invalid = true;
-      }
-
-      // We create TypeAliasTypes with invalid underlying types, so we
-      // need to propagate recursive properties now.
-      TAD->getAliasType()->setRecursiveProperties(
-                       TAD->getUnderlyingType()->getRecursiveProperties());
-
-      if (!invalid) {
-        // Map the alias type out of context; if it is not dependent,
-        // we'll keep the sugar.
-        Type interfaceTy = TAD->getAliasType();
-
-        // lldb creates global typealiases containing archetypes
-        // sometimes...
-        if (TAD->getUnderlyingType()->hasArchetype() &&
-            TAD->isGenericContext()) {
-          interfaceTy = ArchetypeBuilder::mapTypeOutOfContext(TAD, interfaceTy);
+      } else {
+        bool invalid = false;
+        if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD, options)) {
+          TAD->setInvalid();
+          TAD->setInterfaceType(ErrorType::get(TC.Context));
+          TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
+          invalid = true;
         }
 
-        TAD->setInterfaceType(MetatypeType::get(interfaceTy, TC.Context));
+        // We create TypeAliasTypes with invalid underlying types, so we
+        // need to propagate recursive properties now.
+        TAD->getAliasType()->setRecursiveProperties(
+                         TAD->getUnderlyingType()->getRecursiveProperties());
+
+        if (!invalid) {
+          // Map the alias type out of context; if it is not dependent,
+          // we'll keep the sugar.
+          Type interfaceTy = TAD->getAliasType();
+
+          // lldb creates global typealiases containing archetypes
+          // sometimes...
+          if (TAD->getUnderlyingType()->hasArchetype() &&
+              TAD->isGenericContext()) {
+            interfaceTy = TAD->mapTypeOutOfContext(interfaceTy);
+          }
+
+          TAD->setInterfaceType(MetatypeType::get(interfaceTy, TC.Context));
+        }
       }
     }
 
@@ -4290,8 +4281,10 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, PD);
-      for (auto member : PD->getMembers())
+      for (auto member : PD->getMembers()) {
+        TC.checkUnsupportedProtocolType(member);
         checkAccessibility(TC, member);
+      }
       TC.checkInheritanceClause(PD);
       return;
     }
@@ -4539,7 +4532,12 @@ public:
     auto typeRepr = func->getBodyResultTypeLoc().getTypeRepr();
     if (!typeRepr)
       return false;
-      
+
+    // 'Self' on a property accessor is not dynamic 'Self'...even on a read-only
+    // property. We could implement it as such in the future.
+    if (func->isAccessor())
+      return false;
+
     return checkDynamicSelfReturn(func, typeRepr, 0);
   }
 
@@ -6106,9 +6104,7 @@ public:
       overridingASD->setOverriddenDecl(baseASD);
 
       // Make sure we get consistent overrides for the accessors as well.
-      if (!baseASD->hasAccessorFunctions())
-        addTrivialAccessorsToStorage(baseASD, TC);
-      maybeAddMaterializeForSet(overridingASD, TC);
+      assert(baseASD->hasAccessorFunctions());
 
       auto recordAccessorOverride = [&](AccessorKind kind) {
         // We need the same accessor on both.
@@ -6954,11 +6950,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     typeAlias->computeType();
 
     // Check generic parameters, if needed.
-    if (auto gp = typeAlias->getGenericParams()) {
-      gp->setOuterParameters(
-                     typeAlias->getDeclContext()->getGenericParamsOfContext());
-    }
-
     validateGenericTypeSignature(typeAlias);
     
     // Otherwise, perform the heavy lifting now.
@@ -6975,11 +6966,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     nominal->computeType();
 
     // Check generic parameters, if needed.
-    if (auto gp = nominal->getGenericParams()) {
-      gp->setOuterParameters(
-        nominal->getDeclContext()->getGenericParamsOfContext());
-    }
-
     validateGenericTypeSignature(nominal);
 
     checkInheritanceClause(D);
@@ -7032,9 +7018,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     (void) gp;
 
     validateGenericTypeSignature(proto);
-
-    assert(gp->getOuterParameters() ==
-           proto->getDeclContext()->getGenericParamsOfContext());
 
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
@@ -7117,17 +7100,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                isa<TopLevelCodeDecl>(D->getDeclContext()));
         VD->markInvalid();
       }
-
-      // Make sure the getter and setter have valid types, since they will be
-      // used by SILGen for any accesses to this variable.
-      if (auto getter = VD->getGetter())
-        validateDecl(getter);
-      if (auto setter = VD->getSetter())
-        validateDecl(setter);
     }
-
-    // Synthesize accessors as necessary.
-    maybeAddAccessorsToVariable(VD, *this);
 
     if (!VD->didEarlyAttrValidation()) {
       checkDeclAttributesEarly(VD);
@@ -7190,6 +7163,20 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         }
       }
 
+      // Synthesize accessors as necessary.
+      maybeAddAccessorsToVariable(VD, *this);
+
+      if (VD->hasAccessorFunctions())
+        maybeAddMaterializeForSet(VD, *this);
+
+      // Make sure the getter and setter have valid types, since they will be
+      // used by SILGen for any accesses to this variable.
+      if (auto getter = VD->getGetter())
+        validateDecl(getter);
+      if (auto setter = VD->getSetter())
+        validateDecl(setter);
+      if (auto materializeForSet = VD->getMaterializeForSetFunc())
+        validateDecl(materializeForSet);
 
       // If this variable is marked final and has a getter or setter, mark the
       // getter and setter as final as well.
@@ -7201,10 +7188,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         makeDynamic(Context, VD->getGetter());
         makeDynamic(Context, VD->getSetter());
         // Skip materializeForSet -- it won't be used with a dynamic property.
-      }
-
-      if (VD->hasAccessorFunctions()) {
-        maybeAddMaterializeForSet(VD, *this);
       }
     }
 
@@ -7415,11 +7398,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
     tc.checkGenericParamList(nullptr, gpList, nullptr, &archetypeResolver);
   });
 
-  // FIXME: The canonical type here is a workaround because having
-  // SubstitutedType with archetypes breaks deserialization.
   Type extContextType =
-    env->mapTypeIntoContext(ext->getModuleContext(), extInterfaceType)
-      ->getCanonicalType();
+    env->mapTypeIntoContext(ext->getModuleContext(), extInterfaceType);
   return { env, extContextType };
 }
 
@@ -7890,10 +7870,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // for all of the superclass's designated initializers.
   // FIXME: Currently skipping generic classes.
   auto classDecl = cast<ClassDecl>(decl);
-  assert(!classDecl->hasSuperclass() ||
-         classDecl->getSuperclass()->getAnyNominal()->isInvalid() ||
-         classDecl->getSuperclass()->getAnyNominal()
-           ->addedImplicitInitializers());
   if (classDecl->hasSuperclass()) {
     bool canInheritInitializers = !FoundDesignatedInit;
 
@@ -7905,6 +7881,11 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     auto superclassTy = classDecl->getSuperclass();
+    auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
+    assert(superclassDecl && "Superclass of class is not a class?");
+    if (!superclassDecl->addedImplicitInitializers())
+      addImplicitConstructors(superclassDecl);
+
     auto ctors = lookupConstructors(classDecl, superclassTy,
                                     NameLookupFlags::IgnoreAccessibility);
 

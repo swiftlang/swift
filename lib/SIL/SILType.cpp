@@ -346,8 +346,7 @@ SILType SILType::substGenericArgs(SILModule &M,
   }
   assert(fnTy->isPolymorphic() && "Can only subst interface generic args on "
          "polymorphic function types.");
-  CanSILFunctionType canFnTy =
-    fnTy->substGenericArgs(M, M.getSwiftModule(), Subs);
+  CanSILFunctionType canFnTy = fnTy->substGenericArgs(M, Subs);
   return SILType::getPrimitiveObjectType(canFnTy);
 }
 

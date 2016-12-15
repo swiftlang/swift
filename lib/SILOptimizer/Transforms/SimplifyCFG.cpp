@@ -1947,14 +1947,14 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
                         CalleeType.getSwiftRValueType());
     if (TargetFnTy->isPolymorphic()) {
       TargetFnTy = TargetFnTy->substGenericArgs(TAI->getModule(),
-          TAI->getModule().getSwiftModule(), TAI->getSubstitutions());
+                                                TAI->getSubstitutions());
     }
 
     auto OrigFnTy = dyn_cast<SILFunctionType>(
         TAI->getCallee()->getType().getSwiftRValueType());
     if (OrigFnTy->isPolymorphic()) {
       OrigFnTy = OrigFnTy->substGenericArgs(TAI->getModule(),
-          TAI->getModule().getSwiftModule(), TAI->getSubstitutions());
+                                            TAI->getSubstitutions());
     }
 
     unsigned numArgs = TAI->getNumArguments();

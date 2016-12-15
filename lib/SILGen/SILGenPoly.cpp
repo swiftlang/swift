@@ -2343,10 +2343,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // Use the generic signature from the context if the thunk involves
   // generic parameters.
   CanGenericSignature genericSig;
-  GenericEnvironment *genericEnv = nullptr;
   if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
     genericSig = F.getLoweredFunctionType()->getGenericSignature();
-    genericEnv = F.getGenericEnvironment();
     auto subsArray = F.getForwardingSubstitutions();
     subs.append(subsArray.begin(), subsArray.end());
 
@@ -2676,7 +2674,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   if (auto *genericEnv = fd->getGenericEnvironment()) {
     F.setGenericEnvironment(genericEnv);
     subs = getForwardingSubstitutions();
-    fTy = fTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs);
+    fTy = fTy->substGenericArgs(SGM.M, subs);
 
     inputSubstType = cast<FunctionType>(
         cast<GenericFunctionType>(inputSubstType)
@@ -2870,8 +2868,7 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
   // the substituted signature of the witness.
   auto witnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
   if (!witnessSubs.empty())
-    witnessFTy = witnessFTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
-                                              witnessSubs);
+    witnessFTy = witnessFTy->substGenericArgs(SGM.M, witnessSubs);
 
   SmallVector<ManagedValue, 8> witnessParams;
 

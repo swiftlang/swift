@@ -205,7 +205,7 @@ reportNow(uint32_t flags, const char *message)
   write(STDERR_FILENO, message, strlen(message));
 #endif
 #ifdef __APPLE__
-  asl_log(NULL, NULL, ASL_LEVEL_ERR, "%s", message);
+  asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #endif
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   if (flags & FatalErrorFlags::ReportBacktrace) {

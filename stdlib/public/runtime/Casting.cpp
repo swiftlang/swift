@@ -67,27 +67,25 @@ extern "C" const void *swift_dynamicCastObjCProtocolConditional(
 static void _buildNameForMetadata(const Metadata *type,
                                   bool qualified,
                                   std::string &result) {
+#if SWIFT_OBJC_INTEROP
   if (type->getKind() == MetadataKind::Class) {
     auto classType = static_cast<const ClassMetadata *>(type);
-#if SWIFT_OBJC_INTEROP
     // Look through artificial subclasses.
     while (classType->isTypeMetadata() && classType->isArtificialSubclass())
       classType = classType->SuperClass;
-    
+
     // Ask the Objective-C runtime to name ObjC classes.
     if (!classType->isTypeMetadata()) {
       result += class_getName(classType);
       return;
     }
-#endif
   } else if (type->getKind() == MetadataKind::ObjCClassWrapper) {
-#if SWIFT_OBJC_INTEROP
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
     const char *className = class_getName((Class)objcWrapper->Class);
     result = className;
     return;
-#endif
   }
+#endif
 
   // Use the remangler to generate a mangled name from the type metadata.
   auto demangling = _swift_buildDemanglingForMetadata(type);

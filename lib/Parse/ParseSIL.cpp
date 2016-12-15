@@ -1957,6 +1957,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
    break;
  }
 
+ case ValueKind::BeginBorrowInst: {
+   SourceLoc AddrLoc;
+
+   if (parseTypedValueRef(Val, AddrLoc, B) || parseSILDebugLocation(InstLoc, B))
+     return true;
+
+   ResultVal = B.createBeginBorrow(InstLoc, Val);
+   break;
+ }
+
  case ValueKind::LoadUnownedInst:
  case ValueKind::LoadWeakInst: {
    bool isTake = false;
@@ -2331,11 +2341,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       return true;
     
     auto SubstInitStorageTy = InitStorageTy.castTo<SILFunctionType>()
-      ->substGenericArgs(B.getModule(), B.getModule().getSwiftModule(),
-                         InitStorageSubs);
+      ->substGenericArgs(B.getModule(), InitStorageSubs);
     auto SubstSetterTy = SetterTy.castTo<SILFunctionType>()
-      ->substGenericArgs(B.getModule(), B.getModule().getSwiftModule(),
-                         SetterSubs);
+      ->substGenericArgs(B.getModule(), SetterSubs);
     
     // Derive the storage type from the initStorage method.
     auto StorageTy = SILType::getPrimitiveAddressType(
@@ -2438,6 +2446,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     break;
   }
 
+  case ValueKind::StoreBorrowInst:
   case ValueKind::AssignInst:
   case ValueKind::StoreUnownedInst:
   case ValueKind::StoreWeakInst: {
@@ -2466,6 +2475,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       P.diagnose(addrLoc, diag::sil_operand_not_address,
                  "destination", OpcodeName);
       return true;
+    }
+
+    if (Opcode == ValueKind::StoreBorrowInst) {
+      SILType valueTy = addrVal->getType().getObjectType();
+      ResultVal = B.createStoreBorrow(
+          InstLoc, getLocalValue(from, valueTy, InstLoc, B), addrVal);
+      break;
     }
 
     if (Opcode == ValueKind::StoreUnownedInst) {
@@ -3776,8 +3792,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   if (!subs.empty()) {
     auto silFnTy = FnTy.castTo<SILFunctionType>();
     substFTI
-      = silFnTy->substGenericArgs(SILMod, P.SF.getParentModule(),
-                                           subs);
+      = silFnTy->substGenericArgs(SILMod, subs);
     FnTy = SILType::getPrimitiveObjectType(substFTI);
   }
   

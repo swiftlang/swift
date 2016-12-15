@@ -1078,8 +1078,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     
     auto SubstFnTy = SILType::getPrimitiveObjectType(
       FnTy.castTo<SILFunctionType>()
-        ->substGenericArgs(Builder.getModule(),
-                         Builder.getModule().getSwiftModule(), Substitutions));
+        ->substGenericArgs(Builder.getModule(), Substitutions));
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
     auto ArgTys = FTI->getParameterSILTypes();
 
@@ -1312,6 +1311,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(CopyBlock)
   UNARY_INSTRUCTION(LoadBorrow)
+  UNARY_INSTRUCTION(BeginBorrow)
   REFCOUNTING_INSTRUCTION(StrongPin)
   REFCOUNTING_INSTRUCTION(StrongUnpin)
   REFCOUNTING_INSTRUCTION(StrongRetain)
@@ -1365,6 +1365,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Qualifier = StoreOwnershipQualifier(Attr);
     ResultVal = Builder.createStore(Loc, getLocalValue(ValID, ValType),
                                     getLocalValue(ValID2, addrType), Qualifier);
+    break;
+  }
+  case ValueKind::StoreBorrowInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
+    SILType ValType = addrType.getObjectType();
+    ResultVal = Builder.createStoreBorrow(Loc, getLocalValue(ValID, ValType),
+                                          getLocalValue(ValID2, addrType));
     break;
   }
   case ValueKind::EndBorrowInst: {

@@ -586,7 +586,9 @@ SILValue swift::ArraySemanticsCall::getInitializationCount() const {
 
   if (getKind() == ArrayCallKind::kArrayInit &&
       SemanticsCall->getNumArguments() == 3)
-    return SemanticsCall->getArgument(0);
+    // Repeated-value array initializer. Arguments are the value to
+    // repeat, the count, and the value's type.
+    return SemanticsCall->getArgument(1);
 
   return SILValue();
 }

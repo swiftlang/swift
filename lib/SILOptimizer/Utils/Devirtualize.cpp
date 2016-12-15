@@ -573,8 +573,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
     getSubstitutionsForCallee(Mod, GenCalleeType,
                               ClassOrMetatypeType.getSwiftRValueType(),
                               AI, Subs);
-    SubstCalleeType =
-        GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
+    SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Subs);
   }
 
   // Check if the optimizer knows how to cast the return type.
@@ -609,7 +608,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
                             AI, Subs);
   CanSILFunctionType SubstCalleeType = GenCalleeType;
   if (GenCalleeType->isPolymorphic())
-    SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
+    SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Subs);
 
   SILBuilderWithScope B(AI.getInstruction());
   FunctionRefInst *FRI = B.createFunctionRef(AI.getLoc(), F);
@@ -1020,8 +1019,7 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.
   auto CalleeCanType = F->getLoweredFunctionType();
-  auto SubstCalleeCanType = CalleeCanType->substGenericArgs(
-    Module, Module.getSwiftModule(), NewSubs);
+  auto SubstCalleeCanType = CalleeCanType->substGenericArgs(Module, NewSubs);
 
   // Bail if some of the arguments cannot be converted into
   // types required by the found devirtualized method.

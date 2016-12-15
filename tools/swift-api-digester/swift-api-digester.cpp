@@ -151,7 +151,7 @@ SwiftVersion("swift-version",
 namespace {
 
 template<typename T>
-bool contains(std::vector<T> container, T instance) {
+bool contains(std::vector<T*> &container, T *instance) {
   return std::find(container.begin(), container.end(), instance) != container.end();
 }
 
@@ -233,6 +233,8 @@ static StringRef getKeyContent(SDKContext &Ctx, KeyKind Kind) {
 #define KEY(NAME) case KeyKind::KK_##NAME: return Ctx.buffer(#NAME);
 #include "DigesterEnums.def"
   }
+
+  llvm_unreachable("Unhandled KeyKind in switch.");
 }
 
 // The node kind appearing in the tree that describes the content of the SDK
@@ -278,6 +280,8 @@ static raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value) {
 #define DECL(X, PARENT) case DeclKind::X: return Out << #X;
 #include "swift/AST/DeclNodes.def"
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 struct SDKNodeInitInfo {
@@ -645,6 +649,8 @@ bool SDKNodeDecl::classof(const SDKNode *N) {
     case SDKNodeKind::TypeNameAlias:
       return false;
   }
+
+  llvm_unreachable("Unhandled SDKNodeKind in switch.");
 }
 
 void SDKNodeDecl::addDeclAttribute(SDKDeclAttrKind DAKind) {
@@ -939,6 +945,8 @@ bool SDKNode::operator==(const SDKNode &Other) const {
         hasSameChildren(Other);
     }
   }
+
+  llvm_unreachable("Unhanlded SDKNodeKind in switch.");
 }
 
 // The pretty printer of a tree of SDKNode
@@ -1611,8 +1619,9 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
   NodeVector AddedMatched;
 
   void handleUnmatch(NodeVector &Matched, NodeVector &All, bool Left) {
-    for (auto A : SDKNodeVectorViewer(All,
-                            [&](SDKNode *N) { return !contains(Matched, N);})) {
+    for (auto A : All) {
+      if (contains(Matched, A))
+        continue;
       if (Left)
         Listener.foundRemoveAddMatch(A, nullptr);
       else
@@ -1796,14 +1805,14 @@ public:
     NodeVector RenameRight;
 
 
-    for (auto Remain : SDKNodeVectorViewer(Removed, [&](SDKNode *N)
-                                 { return !contains(RemovedMatched, N); })) {
-      RenameLeft.push_back(Remain);
+    for (auto Remain : Removed) {
+      if (!contains(RemovedMatched, Remain))
+        RenameLeft.push_back(Remain);
     }
 
-    for (auto Remain : SDKNodeVectorViewer(Added, [&](SDKNode *N)
-                                      { return !contains(AddedMatched, N); })) {
-      RenameRight.push_back(Remain);
+    for (auto Remain : Added) {
+      if (!contains(AddedMatched, Remain))
+        RenameRight.push_back(Remain);
     }
 
     BestMatchMatcher RenameMatcher(RenameLeft, RenameRight, isRename,
@@ -1921,7 +1930,8 @@ void SameNameNodeMatcher::match() {
       Added.push_back(R);
     }
   }
-  RemovedAddedNodeMatcher(Removed, Added, Listener).match();
+  RemovedAddedNodeMatcher RAMatcher(Removed, Added, Listener);
+  RAMatcher.match();
 }
 
 // The recursive version of sequential matcher. We do not only match two vectors
@@ -2085,7 +2095,8 @@ public:
       // type decls that are identical. If the matched nodes are both type decls,
       // remove the contained function decls that are identical.
       removeCommonChildren(Left, Right);
-      SameNameNodeMatcher(Left->getChildren(), Right->getChildren(), *this).match();
+      SameNameNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(), *this);
+      SNMatcher.match();
       break;
     }
 
@@ -2099,8 +2110,9 @@ public:
     case SDKNodeKind::TypeNameAlias: {
       // If matched nodes are both function/var/TypeAlias decls, mapping their
       // parameters sequentially.
-      SequentialNodeMatcher(Left->getChildren(),
-                            Right->getChildren(), *this).match();
+      SequentialNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(),
+                                      *this);
+      SNMatcher.match();
       break;
     }
 
@@ -2984,6 +2996,8 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       case Ownership::Unowned:   return Ctx.buffer("unowned");
       case Ownership::Unmanaged: return Ctx.buffer("unowned(unsafe)");
       }
+
+      llvm_unreachable("Unhandled Ownership in switch.");
     };
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
     AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
@@ -3192,7 +3206,9 @@ struct RenameDetectorForMemberDiff : public MatchedNodeListener {
   void workOn(NodePtr Left, NodePtr Right) {
     if (Left->getKind() == Right->getKind() &&
         Left->getKind() == SDKNodeKind::TypeDecl) {
-      SameNameNodeMatcher(Left->getChildren(), Right->getChildren(), *this).match();
+      SameNameNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(),
+                                    *this);
+      SNMatcher.match();
     }
   }
 };

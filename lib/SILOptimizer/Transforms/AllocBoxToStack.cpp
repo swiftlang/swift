@@ -410,8 +410,8 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
   auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(),
-                                          ABI->getBoxType()->getFieldType(0),
-                                          ABI->getVarInfo());
+                          ABI->getBoxType()->getFieldType(ABI->getModule(), 0),
+                          ABI->getVarInfo());
 
   // Replace all uses of the address of the box's contained value with
   // the address of the stack location.
@@ -436,7 +436,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "promoting multi-field box not implemented");
   auto &Lowering = ABI->getModule()
-    .getTypeLowering(ABI->getBoxType()->getFieldType(0));
+    .getTypeLowering(ABI->getBoxType()->getFieldType(ABI->getModule(), 0));
   auto Loc = CleanupLocation::get(ABI->getLoc());
 
   // For non-trivial types, insert destroys for each final release-like
@@ -553,7 +553,7 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
       auto boxTy = param.getType()->castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented");
-      auto paramTy = boxTy->getFieldType(0);
+      auto paramTy = boxTy->getFieldType(Orig->getModule(), 0);
       auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
                                   ParameterConvention::Indirect_InoutAliasable);
       ClonedInterfaceArgTys.push_back(promotedParam);
@@ -611,7 +611,7 @@ PromotedParamCloner::populateCloned() {
       auto boxTy = (*I)->getType().castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting multi-field boxes not implemented yet");
-      auto promotedTy = boxTy->getFieldType(0);
+      auto promotedTy = boxTy->getFieldType(Cloned->getModule(), 0);
       auto *promotedArg =
           ClonedEntryBB->createArgument(promotedTy, (*I)->getDecl());
       PromotedParameters.insert(*I);
@@ -776,9 +776,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
                                                    ClonedFn);
   CanSILFunctionType CanFnTy = ClonedFn->getLoweredFunctionType();
   auto const &Subs = PartialApply->getSubstitutions();
-  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M,
-                                                             M.getSwiftModule(),
-                                                             Subs);
+  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M, Subs);
   return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
                                  SILType::getPrimitiveObjectType(SubstCalleeTy),
                                     PartialApply->getSubstitutions(), Args,

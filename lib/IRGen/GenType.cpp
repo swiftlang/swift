@@ -1078,7 +1078,15 @@ static void profileArchetypeConstraints(
   for (auto proto : arch->getConformsTo()) {
     ID.AddPointer(proto);
   }
-  
+
+  // Skip nested types if this is an opened existential, since those
+  // won't resolve. Normally opened existentials cannot have nested
+  // types, but one case we missed compiled in Swift 3 so we support
+  // it here.
+  if (arch->getOpenedExistentialType()) {
+    return;
+  }
+
   // Recursively profile nested archetypes.
   for (auto nested : arch->getAllNestedTypes()) {
     profileArchetypeConstraints(nested.second, ID, seen);

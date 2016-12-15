@@ -858,7 +858,13 @@ public:
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
   
   void visitFixLifetimeInst(FixLifetimeInst *i);
+  void visitBeginBorrowInst(BeginBorrowInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitEndBorrowInst(EndBorrowInst *i) {
+    llvm_unreachable("unimplemented");
+  }
+  void visitStoreBorrowInst(StoreBorrowInst *i) {
     llvm_unreachable("unimplemented");
   }
   void visitMarkDependenceInst(MarkDependenceInst *i);
@@ -3648,7 +3654,8 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   assert(i->getBoxType()->getLayout()->getFields().size() == 1
          && "multi field boxes not implemented yet");
-  const TypeInfo &type = getTypeInfo(i->getBoxType()->getFieldType(0));
+  const TypeInfo &type = getTypeInfo(i->getBoxType()
+                                      ->getFieldType(IGM.getSILModule(), 0));
 
   // Derive name from SIL location.
   VarDecl *Decl = i->getDecl();
@@ -3680,8 +3687,9 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
     assert(i->getBoxType()->getLayout()->getFields().size() == 1
            && "box for a local variable should only have one field");
-    DebugTypeInfo DbgTy(Decl, i->getBoxType()->getFieldType(0).getSwiftType(),
-                        type, false);
+    DebugTypeInfo DbgTy(Decl,
+            i->getBoxType()->getFieldType(IGM.getSILModule(), 0).getSwiftType(),
+            type, false);
     IGM.DebugInfo->emitVariableDeclaration(
         Builder,
         emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),

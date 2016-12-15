@@ -150,8 +150,7 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
          "dealloc of generic class is not polymorphic or vice versa");
 
   if (DeallocType->isPolymorphic())
-    DeallocType = DeallocType->substGenericArgs(M, M.getSwiftModule(),
-                                              AllocSubsts);
+    DeallocType = DeallocType->substGenericArgs(M, AllocSubsts);
 
   SILType ReturnType = DeallocType->getSILResult();
   SILType DeallocSILType = SILType::getPrimitiveObjectType(DeallocType);

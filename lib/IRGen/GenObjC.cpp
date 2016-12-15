@@ -30,6 +30,7 @@
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
+#include "swift/Basic/ManglingMacros.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -763,7 +764,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   // FIXME: Maybe cache the thunk by function and closure types?
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
-                           "_TPAo", &IGM.Module);
+                           MANGLE_AS_STRING(OBJC_PARTIAL_APPLY_THUNK_SYM),
+                           &IGM.Module);
 
   auto initialAttrs = IGM.constructInitialAttributes();
   // Merge initialAttrs with attrs.
