@@ -94,3 +94,19 @@ func performPerOS() -> Int {
   return performFoo(withX: value, andY: value)
 }
 #endif
+
+let osName: String = {
+#if os(iOS)
+  return "iOS"
+#elseif os(watchOS)
+  return "watchOS"
+#elseif os(tvOS)
+  return "tvOS"
+#elseif os(OSX)
+  return "OS X"
+#elseif os(Linux)
+  return "Linux"
+#else
+  return "Unknown"
+#endif
+}()

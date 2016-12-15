@@ -282,6 +282,14 @@ namespace {
         for (auto condition : configsToResolve) {
           R.resolveClausesAndInsertMembers(IDC, condition);
         }
+      } else if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+        PBD->walk(R.NDF);
+        for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
+          if (auto e = PBD->getInit(i)) {
+            PBD->setInit(i,
+                         e->walk(const_cast<ASTWalker&>(R.getClosureFinder())));
+          }
+        }
       }
       return true;
     }
