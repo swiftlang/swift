@@ -88,12 +88,12 @@ public struct Character :
     var shift: UInt64 = 0
 
     let output: (UTF8.CodeUnit) -> Void = {
-      asInt |= UInt64($0) << shift
+      asInt |= UInt64($0) &<< shift
       shift += 8
     }
 
     UTF8.encode(scalar, into: output)
-    asInt |= (~0) << shift
+    asInt |= (~0) &<< shift
     _representation = .small(Builtin.trunc_Int64_Int63(asInt._value))
   }
 
@@ -202,13 +202,13 @@ public struct Character :
       if (value & mask) == mask {
         return i
       }
-      mask <<= 8
+      mask &<<= 8
     }
     return 8
   }
 
   static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
-    return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
+    return UInt64(Builtin.zext_Int63_Int64(value)) | (1 &<< 63)
   }
 
   internal struct _SmallUTF8 : RandomAccessCollection {
@@ -264,7 +264,7 @@ public struct Character :
         if result == 0xFF {
           return nil
         }
-        _data = (_data >> 8) | 0xFF00_0000_0000_0000
+        _data = (_data &>> 8) | 0xFF00_0000_0000_0000
         return result
       }
 

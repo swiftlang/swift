@@ -145,23 +145,23 @@ extension ${Self}: BinaryFloatingPoint {
   //  Implementation details.
   @_versioned
   static var _infinityExponent: UInt {
-    @inline(__always) get { return 1 << UInt(exponentBitCount) - 1 }
+    @inline(__always) get { return 1 &<< UInt(exponentBitCount) - 1 }
   }
 
   static var _exponentBias: UInt {
-    @inline(__always) get { return _infinityExponent >> 1 }
+    @inline(__always) get { return _infinityExponent &>> 1 }
   }
 
   static var _significandMask: ${RawSignificand} {
     @inline(__always) get {
-      return 1 << ${RawSignificand}(significandBitCount) - 1
+      return 1 &<< ${RawSignificand}(significandBitCount) - 1
     }
   }
 
   @_versioned
   static var _quietNaNMask: ${RawSignificand} {
     @inline(__always) get {
-      return 1 << ${RawSignificand}(significandBitCount - 1)
+      return 1 &<< ${RawSignificand}(significandBitCount - 1)
     }
   }
 
@@ -201,14 +201,14 @@ extension ${Self}: BinaryFloatingPoint {
 
   public var sign: FloatingPointSign {
     let shift = ${Self}.significandBitCount + ${Self}.exponentBitCount
-    return FloatingPointSign(rawValue: Int(bitPattern >> ${RawSignificand}(shift)))!
+    return FloatingPointSign(rawValue: Int(bitPattern &>> ${RawSignificand}(shift)))!
   }
 
   @available(*, unavailable, renamed: "sign")
   public var isSignMinus: Bool { Builtin.unreachable() }
 
   public var exponentBitPattern: UInt {
-    return UInt(bitPattern >> UInt${bits}(${Self}.significandBitCount)) &
+    return UInt(bitPattern &>> UInt${bits}(${Self}.significandBitCount)) &
       ${Self}._infinityExponent
   }
 
@@ -226,8 +226,8 @@ extension ${Self}: BinaryFloatingPoint {
     let significand = UInt${bits}(
       significandBitPattern & ${Self}._significandMask)
     self.init(bitPattern:
-      sign << UInt${bits}(signShift) |
-      exponent << UInt${bits}(${Self}.significandBitCount) |
+      sign &<< UInt${bits}(signShift) |
+      exponent &<< UInt${bits}(${Self}.significandBitCount) |
       significand)
   }
 
@@ -241,7 +241,7 @@ extension ${Self}: BinaryFloatingPoint {
     var signAndExponent: UInt16
     var _padding: (UInt16, UInt16, UInt16) = (0, 0, 0)
     var sign: FloatingPointSign {
-      return FloatingPointSign(rawValue: Int(signAndExponent >> 15))!
+      return FloatingPointSign(rawValue: Int(signAndExponent &>> 15))!
     }
     var exponentBitPattern: UInt { return UInt(signAndExponent) & 0x7fff }
     init(explicitSignificand: UInt64, signAndExponent: UInt16) {
@@ -259,7 +259,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   static var _explicitBitMask: UInt64 {
-    @inline(__always) get { return 1 << 63 }
+    @inline(__always) get { return 1 &<< 63 }
   }
 
   public var exponentBitPattern: UInt {
@@ -376,7 +376,7 @@ extension ${Self}: BinaryFloatingPoint {
       let ulpShift = ${RawSignificand}(exponentBitPattern - 1)
       return ${Self}(sign: .plus,
         exponentBitPattern: 0,
-        significandBitPattern: 1 << ulpShift)
+        significandBitPattern: 1 &<< ulpShift)
     }
     return ${Self}(sign: .plus,
       exponentBitPattern: 0,
@@ -419,7 +419,7 @@ extension ${Self}: BinaryFloatingPoint {
       let shift = ${Self}.significandBitCount - significandBitPattern.signBitIndex
       return ${Self}(sign: .plus,
         exponentBitPattern: ${Self}._exponentBias,
-        significandBitPattern: significandBitPattern << ${RawSignificand}(shift))
+        significandBitPattern: significandBitPattern &<< ${RawSignificand}(shift))
     }
     // zero or infinity.
     return ${Self}(sign: .plus,
@@ -478,10 +478,10 @@ extension ${Self}: BinaryFloatingPoint {
   ///     a quiet NaN.
   public init(nan payload: RawSignificand, signaling: Bool) {
     // We use significandBitCount - 2 bits for NaN payload.
-    _precondition(payload < (${Self}._quietNaNMask >> 1),
+    _precondition(payload < (${Self}._quietNaNMask &>> 1),
       "NaN payload is not encodable.")
     var significand = payload
-    significand |= ${Self}._quietNaNMask >> (signaling ? 1 : 0)
+    significand |= ${Self}._quietNaNMask &>> (signaling ? 1 : 0)
     self.init(sign: .plus,
               exponentBitPattern: ${Self}._infinityExponent,
               significandBitPattern: significand)
@@ -665,7 +665,7 @@ extension ${Self}: BinaryFloatingPoint {
     // For subnormals, we isolate the leading significand bit.
     let index = significandBitPattern.signBitIndex
     return ${Self}(sign: sign, exponentBitPattern: 0,
-      significandBitPattern: 1 << RawSignificand(index))
+      significandBitPattern: 1 &<< RawSignificand(index))
   }
 
   public var significandWidth: Int {

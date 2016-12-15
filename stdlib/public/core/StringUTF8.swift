@@ -260,7 +260,7 @@ extension String {
       /// Consume a byte of the given buffer: shift out the low byte
       /// and put FF in the high byte
       internal static func _nextBuffer(after thisBuffer: Buffer) -> Buffer {
-        return (thisBuffer >> 8) | _bufferHiByte
+        return (thisBuffer &>> 8) | _bufferHiByte
       }
 
       /// The position of `self`, rounded up to the nearest unicode
@@ -312,7 +312,7 @@ extension String {
       
       // Map the high nibble of the current code unit into the
       // amount by which to increment the UTF-16 index.
-      let increment = (u16Increments &>> numericCast(hiNibble << 1)) & 0x3
+      let increment = (u16Increments &>> numericCast(hiNibble &<< 1)) & 0x3
       let nextCoreIndex = i._coreIndex &+ increment
       let nextBuffer = Index._nextBuffer(after: i._buffer)
 
