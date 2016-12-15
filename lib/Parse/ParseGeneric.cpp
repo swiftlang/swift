@@ -135,15 +135,8 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     RAngleLoc = skipUntilGreaterInTypeList();
   }
 
-  if (GenericParams.empty() || Invalid) {
-    // FIXME: We should really return the generic parameter list here,
-    // even if some generic parameters were invalid, since we rely on
-    // decl->setGenericParams() to re-parent the GenericTypeParamDecls
-    // into the right DeclContext.
-    for (auto Param : GenericParams)
-      Param->setInvalid();
+  if (GenericParams.empty())
     return nullptr;
-  }
 
   return makeParserResult(GenericParamList::create(Context, LAngleLoc,
                                                    GenericParams, WhereLoc,
