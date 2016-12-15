@@ -92,35 +92,25 @@ list of passes that the perf pipeline"""
     tools = bug_reducer_utils.SwiftTools(args.swift_build_dir)
 
     passes = []
-    early_module_passes = []
     if args.pass_list is None:
         json_data = json.loads(subprocess.check_output(
             [tools.sil_passpipeline_dumper, '-Performance']))
-        passes = sum((p[2:] for p in json_data if p[0] != 'EarlyModulePasses'), [])
+        passes = sum((p[2:] for p in json_data), [])
         passes = ['-' + x[1] for x in passes]
-        # We assume we have an early module passes that runs until fix point and
-        # that is strictly not what is causing the issue.
-        #
-        # Everything else runs one iteration.
-        early_module_passes = [p[2:] for p in json_data
-                               if p[0] == 'EarlyModulePasses'][0]
-        early_module_passes = ['-' + x[1] for x in early_module_passes]
     else:
         passes = ['-' + x for x in args.pass_list]
 
     extra_args = []
     if args.extra_args is not None:
         extra_args = args.extra_args
-    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(args, tools,
-                                                      early_module_passes,
-                                                      extra_args)
+    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(args, tools, extra_args)
 
     # Make sure that the base case /does/ crash.
     filename = sil_opt_invoker.get_suffixed_filename('base_case')
     result = sil_opt_invoker.invoke_with_passlist(passes, filename)
     # If we succeed, there is no further work to do.
     if result == 0:
-        print("Success with PassList: %s" % (' '.join(passes)))
+        print("Success with base case: %s" % (' '.join(passes)))
         return
 
     # Otherwise, reduce the list of pases that cause the optimzier to crash.

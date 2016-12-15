@@ -7,10 +7,6 @@ import sys
 import bug_reducer_utils
 
 
-def construct_pipeline(p):
-    return (p[0], {'execution_kind': p[1], 'passes': p[2:]})
-
-
 def random_bug_finder(args):
     """Given a path to a sib file with canonical sil, attempt to find a perturbed
 list of passes that the perf pipeline"""
@@ -18,19 +14,10 @@ list of passes that the perf pipeline"""
 
     json_data = json.loads(subprocess.check_output(
         [tools.sil_passpipeline_dumper, '-Performance']))
-    passes = sum((p[2:] for p in json_data if p[0] != 'EarlyModulePasses'), [])
+    passes = sum((p[2:] for p in json_data), [])
     passes = ['-' + x[1] for x in passes]
 
-    # We assume we have an early module passes that runs until fix point and
-    # that is strictly not what is causing the issue.
-    #
-    # Everything else runs one iteration.
-    early_module_passes = [p[2:] for p in json_data
-                           if p[0] == 'EarlyModulePasses'][0]
-    early_module_passes = ['-' + x[1] for x in early_module_passes]
-
-    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(args, tools,
-                                                      early_module_passes)
+    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(args, tools)
 
     # Make sure that the base case /does/ crash.
     max_count = args.max_count

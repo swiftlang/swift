@@ -69,7 +69,7 @@ def maybe_abspath(x):
 
 class SILOptInvoker(object):
 
-    def __init__(self, args, tools, early_passes, extra_args):
+    def __init__(self, args, tools, extra_args):
         self.tools = tools
         self.module_cache = args.module_cache
         self.sdk = args.sdk
@@ -90,15 +90,8 @@ class SILOptInvoker(object):
 
         # First emit an initial *.sib file. This ensures no matter if we have a
         # *.swiftmodule, *.sil, or *.sib file, we are always using *.sib.
-        self._invoke(args.input_file, [],
-                     self.get_suffixed_filename('initial'))
-        self.input_file = self.get_suffixed_filename('initial+early')
-
-        # Finally, run the initial sil-opt invocation running the
-        # early-passes. We will not run them again.
-        self._invoke(self.get_suffixed_filename('initial'),
-                     early_passes,
-                     self.input_file)
+        self.input_file = self.get_suffixed_filename('initial')
+        self._invoke(args.input_file, [], self.input_file)
 
     def get_suffixed_filename(self, suffix):
         basename = self.base_input_file_stem + '_' + suffix
