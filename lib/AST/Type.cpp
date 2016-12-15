@@ -2880,14 +2880,6 @@ static Type getMemberForBaseType(ConformanceSource conformances,
     return witness;
   }
 
-  // FIXME: This is a fallback. We want the above, conformance-based
-  // result to be the only viable path.
-  if (resolver && conformances.is<ModuleDecl *>()) {
-    if (auto result = resolver->resolveMemberType(
-                        conformances.get<ModuleDecl *>(), substBase, name))
-      return result;
-  }
-
   return failed();
 }
 
