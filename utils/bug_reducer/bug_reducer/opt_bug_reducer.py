@@ -88,7 +88,44 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
         return (TESTRESULT_NOFAILURE, prefix, suffix)
 
 
-def pass_bug_reducer(args):
+def pass_bug_reducer(tools, config, passes, sil_opt_invoker, reduce_sil):
+    # Make sure that the base case /does/ crash.
+    filename = sil_opt_invoker.get_suffixed_filename('base_case')
+    result = sil_opt_invoker.invoke_with_passlist(passes, filename)
+    # If we succeed, there is no further work to do.
+    if result == 0:
+        print("Success with base case: %s" % (' '.join(passes)))
+        return True
+    print("Base case crashes! First trying to reduce the pass list!")
+
+    # Otherwise, reduce the list of passes that cause the optimizer to crash.
+    r = ReduceMiscompilingPasses(passes, sil_opt_invoker)
+    if not r.reduce_list():
+        print("Failed to find miscompiling pass list!")
+
+    cmdline = sil_opt_invoker.cmdline_with_passlist(r.target_list)
+    print("*** Found miscompiling passes!")
+    print("*** Final File: %s" % sil_opt_invoker.input_file)
+    print("*** Final Passes: %s" % (' '.join(r.target_list)))
+    print("*** Repro command line: %s" % (' '.join(cmdline)))
+    if not reduce_sil:
+        return False
+
+    print("*** User requested that we try to reduce SIL. Lets try.")
+    input_file = sil_opt_invoker.input_file
+    nm = bug_reducer_utils.SILNMInvoker(config, tools)
+    sil_extract_invoker = bug_reducer_utils.SILFuncExtractorInvoker(config,
+                                                                    tools,
+                                                                    input_file)
+
+    func_bug_reducer.function_bug_reducer(input_file, nm, sil_opt_invoker,
+                                          sil_extract_invoker,
+                                          r.target_list)
+    print("*** Final Passes: %s" % (' '.join(r.target_list)))
+    return False
+
+
+def invoke_pass_bug_reducer(args):
     """Given a path to a sib file with canonical sil, attempt to find a perturbed
 list of passes that the perf pipeline"""
     tools = bug_reducer_utils.SwiftTools(args.swift_build_dir)
@@ -109,45 +146,12 @@ list of passes that the perf pipeline"""
     sil_opt_invoker = bug_reducer_utils.SILOptInvoker(config, tools,
                                                       args.input_file,
                                                       extra_args)
-
-    # Make sure that the base case /does/ crash.
-    filename = sil_opt_invoker.get_suffixed_filename('base_case')
-    result = sil_opt_invoker.invoke_with_passlist(passes, filename)
-    # If we succeed, there is no further work to do.
-    if result == 0:
-        print("Success with base case: %s" % (' '.join(passes)))
-        return
-    print("Base case crashes! First trying to reduce the pass list!")
-
-    # Otherwise, reduce the list of passes that cause the optimizer to crash.
-    r = ReduceMiscompilingPasses(passes, sil_opt_invoker)
-    if not r.reduce_list():
-        print("Failed to find miscompiling pass list!")
-
-    cmdline = sil_opt_invoker.cmdline_with_passlist(r.target_list)
-    print("*** Found miscompiling passes!")
-    print("*** Final File: %s" % sil_opt_invoker.input_file)
-    print("*** Final Passes: %s" % (' '.join(r.target_list)))
-    print("*** Repro command line: %s" % (' '.join(cmdline)))
-    if not args.reduce_sil:
-        return
-
-    print("*** User requested that we try to reduce SIL. Lets try.")
-    input_file = sil_opt_invoker.input_file
-    nm = bug_reducer_utils.SILNMInvoker(config, tools)
-    sil_extract_invoker = bug_reducer_utils.SILFuncExtractorInvoker(config,
-                                                                    tools,
-                                                                    input_file)
-
-    func_bug_reducer.function_bug_reducer(input_file, nm, sil_opt_invoker,
-                                          sil_extract_invoker,
-                                          r.target_list)
-    print("*** Final Passes: %s" % (' '.join(r.target_list)))
+    pass_bug_reducer(tools, config, passes, sil_opt_invoker, args.reduce_sil)
 
 
 def add_parser_arguments(parser):
     """Add parser arguments for opt_bug_reducer"""
-    parser.set_defaults(func=pass_bug_reducer)
+    parser.set_defaults(func=invoke_pass_bug_reducer)
     parser.add_argument('input_file', help='The input file to optimize')
     parser.add_argument('--module-cache', help='The module cache to use')
     parser.add_argument('--sdk', help='The sdk to pass to sil-opt')
