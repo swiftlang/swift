@@ -196,7 +196,9 @@ private:
   NodePointer popTypeList();
   NodePointer popProtocol();
   NodePointer demangleBoundGenericType();
-  NodePointer demangleBoundGenericArgs(NodePointer nominalType);
+  NodePointer demangleBoundGenericArgs(NodePointer nominalType,
+                                    const std::vector<NodePointer> &TypeLists,
+                                    size_t TypeListIdx);
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention();
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
