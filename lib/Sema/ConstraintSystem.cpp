@@ -160,7 +160,8 @@ void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Gather the constraints affected by a change to this type variable.
   SmallVector<Constraint *, 8> constraints;
-  CG.gatherConstraints(typeVar, constraints);
+  CG.gatherConstraints(typeVar, constraints,
+                       ConstraintGraph::GatheringKind::AllMentions);
 
   // Add any constraints that aren't already active to the worklist.
   for (auto constraint : constraints) {

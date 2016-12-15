@@ -405,3 +405,14 @@ func testFixItNested() {
 func occursCheck26845038(a: [Int]) {
   _ = Array(a)[0]
 }
+
+// rdar://problem/29633747
+extension Array where Element: Hashable {
+    public func trimmed(_ elements: [Element]) -> SubSequence {
+        return []
+    }
+}
+
+func rdar29633747(characters: String.CharacterView) {
+  let _ = Array(characters).trimmed(["("])
+}

@@ -7254,7 +7254,9 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
     unsigned numConstraints = 0;
     {
       llvm::SmallVector<Constraint *, 2> constraints;
-      CS->getConstraintGraph().gatherConstraints(tv, constraints);
+      CS->getConstraintGraph().gatherConstraints(
+                             tv, constraints,
+                             ConstraintGraph::GatheringKind::EquivalenceClass);
 
       for (auto constraint : constraints) {
         // We are not interested in ConformsTo constraints because
