@@ -413,18 +413,13 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         // Resolve this nested type to this type alias.
         pa = new PotentialArchetype(this, alias);
         
-        if (!alias->hasUnderlyingType())
+        if (!alias->hasInterfaceType())
           builder.getLazyResolver()->resolveDeclSignature(alias);
-        if (!alias->hasUnderlyingType())
+        if (!alias->hasInterfaceType())
           continue;
 
-        auto type = alias->getUnderlyingType();
+        auto type = alias->getDeclaredInterfaceType();
         SmallVector<Identifier, 4> identifiers;
-
-        // Map the type out of its context.
-        if (auto genericEnv = alias->getGenericEnvironmentOfContext()) {
-          type = genericEnv->mapTypeOutOfContext(type);
-        }
 
         if (auto existingPA = builder.resolveArchetype(type)) {
           builder.addSameTypeRequirementBetweenArchetypes(pa, existingPA,

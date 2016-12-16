@@ -460,8 +460,8 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       OS << " type='";
-      if (TAD->hasUnderlyingType())
-        OS << TAD->getUnderlyingType().getString();
+      if (TAD->getUnderlyingTypeLoc().getType())
+        OS << TAD->getUnderlyingTypeLoc().getType().getString();
       else
         OS << "<<<unresolved>>>";
       printInherited(TAD->getInherited());

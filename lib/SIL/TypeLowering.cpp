@@ -1582,26 +1582,34 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      AbstractFunctionDecl *AFD,
                                                      unsigned DefaultArgIndex,
                                                      ASTContext &context) {
-  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second->getCanonicalType();
+  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second;
   assert(resultTy && "Didn't find default argument?");
-  
+
+  // The result type might be written in terms of type parameters
+  // that have been made fully concrete.
+  CanType canResultTy;
+  if (auto *sig = AFD->getGenericSignature())
+    canResultTy = sig->getCanonicalTypeInContext(resultTy,
+                                                 *TC.M.getSwiftModule());
+  else
+    canResultTy = resultTy->getCanonicalType();
+
   // Get the generic signature from the surrounding context.
   auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
   CanGenericSignature sig;
-  if (auto genTy = funcInfo.FormalInterfaceType->getAs<GenericFunctionType>()) {
+  if (auto genTy = funcInfo.FormalInterfaceType->getAs<GenericFunctionType>())
     sig = genTy->getGenericSignature()->getCanonicalSignature();
-    resultTy = ArchetypeBuilder::mapTypeOutOfContext(
-        funcInfo.GenericEnv,
-        resultTy)->getCanonicalType();
+
+  if (sig) {
+    return cast<GenericFunctionType>(
+        GenericFunctionType::get(sig,
+                                 TupleType::getEmpty(context),
+                                 canResultTy,
+                                 AnyFunctionType::ExtInfo())
+            ->getCanonicalType());
   }
   
-  if (sig)
-    return CanGenericFunctionType::get(sig,
-                                       TupleType::getEmpty(context),
-                                       resultTy,
-                                       AnyFunctionType::ExtInfo());
-  
-  return CanFunctionType::get(TupleType::getEmpty(context), resultTy);
+  return CanFunctionType::get(TupleType::getEmpty(context), canResultTy);
 }
 
 /// Get the type of a stored property initializer, () -> T.

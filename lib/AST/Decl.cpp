@@ -622,8 +622,8 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
     return ImportKind::Struct;
 
   case DeclKind::TypeAlias: {
-    Type underlyingTy = cast<TypeAliasDecl>(VD)->getUnderlyingType();
-    return getBestImportKind(underlyingTy->getAnyNominal());
+    Type type = cast<TypeAliasDecl>(VD)->getDeclaredInterfaceType();
+    return getBestImportKind(type->getAnyNominal());
   }
 
   case DeclKind::Func:
@@ -1907,7 +1907,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
     return NTD->getDeclaredInterfaceType();
 
   Type interfaceType = getInterfaceType();
-  if (interfaceType.isNull() || interfaceType->hasError())
+  if (interfaceType.isNull() || interfaceType->is<ErrorType>())
     return interfaceType;
 
   if (isa<ModuleDecl>(this))
@@ -2191,23 +2191,44 @@ void GenericTypeDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
 }
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                             SourceLoc NameLoc, TypeLoc UnderlyingTy,
-                             GenericParamList *GenericParams, DeclContext *DC)
+                             SourceLoc NameLoc, GenericParamList *GenericParams,
+                             DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    AliasTy(nullptr), TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy) {
-  TypeAliasDeclBits.HasInterfaceUnderlyingType = false;
-}
-
-void TypeAliasDecl::computeType() {
-  ASTContext &Ctx = getASTContext();
-  assert(!AliasTy && "already called computeType()");
-  AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
+    TypeAliasLoc(TypeAliasLoc) {
+  TypeAliasDeclBits.HasCompletedValidation = false;
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
   if (UnderlyingTy.hasLocation())
     return { TypeAliasLoc, UnderlyingTy.getSourceRange().End };
   return { TypeAliasLoc, getNameLoc() };
+}
+
+void TypeAliasDecl::setUnderlyingType(Type underlying) {
+  setHasCompletedValidation();
+
+  // lldb creates global typealiases containing archetypes
+  // sometimes...
+  if (underlying->hasArchetype() && isGenericContext())
+    underlying = mapTypeOutOfContext(underlying);
+  UnderlyingTy.setType(underlying);
+
+  // Create a NameAliasType which will resolve to the underlying type.
+  ASTContext &Ctx = getASTContext();
+  auto aliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
+  aliasTy->setRecursiveProperties(getUnderlyingTypeLoc().getType()
+      ->getRecursiveProperties());
+
+  // Set the interface type of this declaration.
+  setInterfaceType(MetatypeType::get(aliasTy, Ctx));
+}
+
+UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
+  assert(getGenericParams());
+  return UnboundGenericType::get(
+      const_cast<TypeAliasDecl *>(this),
+      getDeclContext()->getDeclaredTypeOfContext(),
+      getASTContext());
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
@@ -2221,22 +2242,6 @@ Type AbstractTypeParamDecl::getSuperclass() const {
 
   // FIXME: Assert that this is never queried.
   return nullptr;
-}
-
-Type TypeAliasDecl::computeUnderlyingContextType() const {
-  Type type = UnderlyingTy.getType();
-  if (auto genericEnv = getGenericEnvironmentOfContext()) {
-    type = genericEnv->mapTypeIntoContext(getParentModule(), type);
-    UnderlyingTy.setType(type);
-  }
-
-  return type;
-}
-
-void TypeAliasDecl::setDeserializedUnderlyingType(Type underlying) {
-  UnderlyingTy.setType(underlying);
-  if (underlying->hasTypeParameter())
-    TypeAliasDeclBits.HasInterfaceUnderlyingType = true;
 }
 
 ArrayRef<ProtocolDecl *>
@@ -3428,31 +3433,6 @@ void VarDecl::setType(Type t) {
     setInvalid();
 }
 
-Type VarDecl::computeTypeInContextSlow() const {
-  Type contextType = getInterfaceType();
-  if (!contextType) return Type();
-
-  // If we have a type parameter, we need to map into this context.
-  if (contextType->hasTypeParameter()) {
-    auto genericEnv =
-      getInnermostDeclContext()->getGenericEnvironmentOfContext();
-
-    // FIXME: Hack to degrade somewhat gracefully when we don't have a generic
-    // environment yet. We return an interface type, but at least we don't
-    // record it.
-    if (!genericEnv)
-      return contextType;
-
-    contextType = genericEnv->mapTypeIntoContext(getModuleContext(),
-                                                 contextType);
-  }
-
-  typeInContext = contextType;
-  if (typeInContext->hasError())
-    const_cast<VarDecl *>(this)->setInvalid();
-  return typeInContext;
-}
-
 void VarDecl::markInvalid() {
   auto &Ctx = getASTContext();
   setType(ErrorType::get(Ctx));
@@ -3943,7 +3923,7 @@ static bool isIntegralType(Type type) {
       return false;
 
     // Check whether it has integer type.
-    return singleVar->getType()->is<BuiltinIntegerType>();
+    return singleVar->getInterfaceType()->is<BuiltinIntegerType>();
   }
 
   return false;
@@ -4161,7 +4141,7 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
   for (auto paramList : paramLists) {
     if (Index < paramList->size()) {
       auto param = paramList->get(Index);
-      return { param->getDefaultArgumentKind(), param->getType() };
+      return { param->getDefaultArgumentKind(), param->getInterfaceType() };
     }
     
     Index -= paramList->size();
@@ -4552,7 +4532,7 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   if (params->size() != 1)
     return false;
 
-  return params->get(0)->getType()->isVoid();
+  return params->get(0)->getInterfaceType()->isVoid();
 }
 
 DestructorDecl::DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,

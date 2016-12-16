@@ -356,7 +356,7 @@ static Type getTypeAtIndex(const ParameterList *params, size_t index) {
     if (param->isVariadic())
       return param->getVarargBaseTy();
   
-    return param->getType();
+    return param->getInterfaceType();
   }
   
   /// FIXME: This looks completely wrong for varargs within a parameter list.

@@ -1943,8 +1943,8 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
 
       if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
         if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-          TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
-            ->getNominalOrBoundGenericNominal();
+          TypeDecl *origTypeDecl = typeAliasDecl->getDeclaredInterfaceType()
+            ->getAnyNominal();
           if (origTypeDecl) {
             origTypeDecl->print(*Printer, Options);
             typeDecl = origTypeDecl;

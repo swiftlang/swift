@@ -1730,13 +1730,13 @@ namespace {
         }
       }
       if (!MaxIntegerTypeDecl ||
-          !MaxIntegerTypeDecl->hasUnderlyingType() ||
-          !MaxIntegerTypeDecl->getUnderlyingType()->is<BuiltinIntegerType>()) {
+          !MaxIntegerTypeDecl->hasInterfaceType() ||
+          !MaxIntegerTypeDecl->getDeclaredInterfaceType()->is<BuiltinIntegerType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinIntegerType_found);
         return nullptr;
       }
       tc.validateDecl(MaxIntegerTypeDecl);
-      auto maxType = MaxIntegerTypeDecl->getUnderlyingType();
+      auto maxType = MaxIntegerTypeDecl->getUnderlyingTypeLoc().getType();
 
       DeclName initName(tc.Context, tc.Context.Id_init,
                         { tc.Context.Id_integerLiteral });
@@ -1823,13 +1823,13 @@ namespace {
           MaxFloatTypeDecl = dyn_cast<TypeAliasDecl>(lookupResults.front());
       }
       if (!MaxFloatTypeDecl ||
-          !MaxFloatTypeDecl->hasUnderlyingType() ||
-          !MaxFloatTypeDecl->getUnderlyingType()->is<BuiltinFloatType>()) {
+          !MaxFloatTypeDecl->hasInterfaceType() ||
+          !MaxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
         return nullptr;
       }
       tc.validateDecl(MaxFloatTypeDecl);
-      auto maxType = MaxFloatTypeDecl->getUnderlyingType();
+      auto maxType = MaxFloatTypeDecl->getUnderlyingTypeLoc().getType();
 
       DeclName initName(tc.Context, tc.Context.Id_init,
                         { tc.Context.Id_floatLiteral });
@@ -4120,8 +4120,9 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   }
 
   // Convert the literal to the appropriate type.
+  auto defArgType = ownerFn->mapTypeIntoContext(defArg.second);
   bool invalid = tc.typeCheckExpression(init, dc, 
-                                        TypeLoc::withoutLoc(defArg.second),
+                                        TypeLoc::withoutLoc(defArgType),
                                         CTP_CannotFail);
   assert(!invalid && "conversion cannot fail");
   (void)invalid;

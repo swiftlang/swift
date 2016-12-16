@@ -2321,16 +2321,17 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return declOrOffset;
 
     auto alias = createDecl<TypeAliasDecl>(SourceLoc(), getIdentifier(nameID),
-                                           SourceLoc(), TypeLoc(),
-                                           genericParams, DC);
+                                           SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 
+    // FIXME: Do we need to read a GenericEnvironment even if we don't
+    // have our own generic parameters? The typealias might itself be in
+    // generic context.
     if (genericParams) {
       readLazyGenericEnvironment(alias);
     }
 
-    alias->setDeserializedUnderlyingType(getType(underlyingTypeID));
-    alias->computeType();
+    alias->setUnderlyingType(getType(underlyingTypeID));
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       alias->setAccessibility(*accessLevel);
@@ -3505,7 +3506,7 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
 
-    typeOrOffset = alias->getAliasType();
+    typeOrOffset = alias->getDeclaredInterfaceType();
     break;
   }
 

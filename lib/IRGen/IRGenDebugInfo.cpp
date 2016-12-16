@@ -820,9 +820,8 @@ TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
   if (!MetadataTypeDecl) {
     MetadataTypeDecl = new (IGM.Context) TypeAliasDecl(
         SourceLoc(), IGM.Context.getIdentifier("$swift.type"), SourceLoc(),
-        TypeLoc::withoutLoc(IGM.Context.TheRawPointerType),
         /*genericparams*/nullptr, IGM.Context.TheBuiltinModule);
-    MetadataTypeDecl->computeType();
+    MetadataTypeDecl->setUnderlyingType(IGM.Context.TheRawPointerType);
   }
   return MetadataTypeDecl;
 }
@@ -1083,7 +1082,7 @@ IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
     auto memberTy =
         BaseTy->getTypeOfMember(IGM.getSwiftModule(), VD, nullptr);
     DebugTypeInfo DbgTy(
-        VD->getType(),
+        VD->getInterfaceType(),
         IGM.getTypeInfoForUnlowered(IGM.getSILTypes().getAbstractionPattern(VD),
                                     memberTy),
         nullptr);
@@ -1696,7 +1695,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto *NameAliasTy = cast<NameAliasType>(BaseTy);
     auto *Decl = NameAliasTy->getDecl();
     auto L = getDebugLoc(SM, Decl);
-    auto AliasedTy = Decl->getUnderlyingType();
+    auto AliasedTy = NameAliasTy->getSinglyDesugaredType();
     auto File = getOrCreateFile(L.Filename);
     // For NameAlias types, the DeclContext for the aliasED type is
     // in the decl of the alias type.

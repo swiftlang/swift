@@ -341,6 +341,8 @@ TypeID Serializer::addTypeRef(Type ty) {
   if (!ty)
     return 0;
 
+  assert(!ty->hasError() && "Serializing error type");
+
   auto &id = DeclAndTypeIDs[ty];
   if (id.first != 0)
     return id.first;
@@ -2353,14 +2355,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(typeAlias->getDeclContext());
 
-    Type underlying;
-    if (typeAlias->hasUnderlyingType()) {
-      underlying = typeAlias->getUnderlyingType();
-      if (underlying->hasArchetype()) {
-        auto genericEnv = typeAlias->getGenericEnvironmentOfContext();
-        underlying = genericEnv->mapTypeOutOfContext(underlying);
-      }
-    }
+    auto underlying = typeAlias->getUnderlyingTypeLoc().getType();
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(typeAlias->getFormalAccess());

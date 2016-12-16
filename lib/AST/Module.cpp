@@ -80,11 +80,9 @@ void BuiltinUnit::LookupCache::lookupValue(
   if (!Entry) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
       auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
-                                          TypeLoc::withoutLoc(Ty),
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
-      TAD->computeType();
-      TAD->setInterfaceType(MetatypeType::get(TAD->getAliasType(), Ctx));
+      TAD->setUnderlyingType(Ty);
       TAD->setAccessibility(Accessibility::Public);
       Entry = TAD;
     }

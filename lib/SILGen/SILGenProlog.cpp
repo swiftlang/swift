@@ -338,7 +338,10 @@ static void makeArgument(Type ty, ParamDecl *decl,
 void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
                                      SmallVectorImpl<SILValue> &parameters) {
   for (auto param : *params) {
-    makeArgument(param->getType(), param, parameters, *this);
+    Type type = (param->hasType()
+                 ? param->getType()
+                 : F.mapTypeIntoContext(param->getInterfaceType()));
+    makeArgument(type, param, parameters, *this);
   }
 }
 
@@ -458,14 +461,16 @@ static void emitIndirectResultParameters(SILGenFunction &gen, Type resultType,
   }
 
   // If the return type is address-only, emit the indirect return argument.
-  const TypeLowering &resultTI = gen.getTypeLowering(resultType);
+  const TypeLowering &resultTI = gen.getTypeLowering(
+      DC->mapTypeIntoContext(resultType));
   if (!resultTI.isReturnedIndirectly()) return;
 
   auto &ctx = gen.getASTContext();
   auto var = new (ctx) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
-                                 ctx.getIdentifier("$return_value"), resultType,
+                                 ctx.getIdentifier("$return_value"), Type(),
                                  DC);
+  var->setInterfaceType(resultType);
 
   auto *arg = gen.F.begin()->createArgument(resultTI.getLoweredType(), var);
   (void)arg;
