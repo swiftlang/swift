@@ -3134,7 +3134,7 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   SmallVector<Type, 3> TypeScratch;
 
   // Prepare type substitution map.
-  TypeSubstitutionMap Substitutions = BaseTy->getMemberSubstitutions(ED);
+  TypeSubstitutionMap Substitutions = BaseTy->getContextSubstitutions(ED);
   auto resolveType = [&](Type Ty) {
     return Ty.subst(DC.getParentModule(), Substitutions);
   };

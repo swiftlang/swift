@@ -3053,7 +3053,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
 
   // Retrieve the set of substitutions to be applied to the witness.
   Type model = conformance->getType();
-  TypeSubstitutionMap substitutions = model->getMemberSubstitutions(
+  TypeSubstitutionMap substitutions = model->getContextSubstitutions(
                                         witness->getInnermostDeclContext());
   if (substitutions.empty())
     return witness->getInterfaceType();

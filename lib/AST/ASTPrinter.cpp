@@ -227,7 +227,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     // declaration.
     TypeSubstitutionMap subMap;
     if (!BaseType->isAnyExistentialType())
-      subMap = BaseType->getMemberSubstitutions(Ext);
+      subMap = BaseType->getContextSubstitutions(Ext);
     auto *M = DC->getParentModule();
 
     assert(Ext->getGenericSignature() && "No generic signature.");
@@ -867,7 +867,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
         DC = Current->getDeclContext();
 
       // Get the substitutions from our base type.
-      auto subMap = CurrentType->getMemberSubstitutions(DC);
+      auto subMap = CurrentType->getContextSubstitutions(DC);
       auto *M = DC->getParentModule();
       T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
     }
@@ -1265,7 +1265,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
   if (CurrentType) {
     if (!CurrentType->isAnyExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
-      subMap = CurrentType->getMemberSubstitutions(DC);
+      subMap = CurrentType->getContextSubstitutions(DC);
       M = DC->getParentModule();
     }
   }

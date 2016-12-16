@@ -655,7 +655,7 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     // Collect the complete set of generic arguments.
     assert(genericSig != nullptr);
-    auto substitutions = BGT->getMemberSubstitutions(BGT->getDecl());
+    auto substitutions = BGT->getContextSubstitutions(BGT->getDecl());
 
     auto result = checkGenericArguments(
         dc, loc, noteLoc, UGT, genericSig,

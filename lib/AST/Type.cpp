@@ -3031,7 +3031,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
   llvm_unreachable("no inheritance relationship between given classes");
 }
 
-TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
+TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
 
   // Ignore lvalues in the base type.
   Type baseTy(getRValueType());
@@ -3110,25 +3110,47 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   return substitutions;
 }
 
+TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
+  auto *memberDC = member->getDeclContext();
+
+  TypeSubstitutionMap substitutions;
+
+  // If the member is not part of a type, there's nothing to substitute.
+  if (!memberDC->isTypeContext())
+    return substitutions;
+
+  // Compute the set of member substitutions to apply.
+  substitutions = getContextSubstitutions(memberDC);
+
+  // If the member itself is generic, preserve its generic parameters.
+  // We need this since code completion and diagnostics want to be able
+  // to call getTypeOfMember() with functions and nested types.
+  if (isa<AbstractFunctionDecl>(member) ||
+      isa<GenericTypeDecl>(member)) {
+    auto *innerDC = member->getInnermostDeclContext();
+    if (innerDC->isInnermostContextGeneric()) {
+      auto *sig = innerDC->getGenericSignatureOfContext();
+      for (auto param : sig->getInnermostGenericParams()) {
+        auto *genericParam = param->getCanonicalType()
+            ->castTo<GenericTypeParamType>();
+        substitutions[genericParam] = param;
+      }
+    }
+  }
+
+  return substitutions;
+}
+
 Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
                                LazyResolver *resolver, Type memberType) {
   // If no member type was provided, use the member's type.
   if (!memberType)
     memberType = member->getInterfaceType();
 
-  return getTypeOfMember(module, memberType, member->getDeclContext());
-}
-
-Type TypeBase::getTypeOfMember(Module *module, Type memberType,
-                               const DeclContext *memberDC) {
   assert(memberType);
 
-  // If the member is not part of a type, there's nothing to substitute.
-  if (!memberDC->isTypeContext())
-    return memberType;
-
   // Compute the set of member substitutions to apply.
-  auto substitutions = getMemberSubstitutions(memberDC);
+  auto substitutions = getMemberSubstitutions(member);
   if (substitutions.empty())
     return memberType;
 
@@ -3143,7 +3165,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *decl,
   auto *DC = parentDecl->getDeclContext();
   auto superclass = getSuperclassForDecl(
       DC->getAsClassOrClassExtensionContext(), resolver);
-  auto subs = superclass->getMemberSubstitutions(DC);
+  auto subs = superclass->getContextSubstitutions(DC);
 
   if (auto *parentFunc = dyn_cast<AbstractFunctionDecl>(parentDecl)) {
     if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
