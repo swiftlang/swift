@@ -100,10 +100,9 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
   CacheEntry *best = nullptr;
   Optional<unsigned> bestCost;
 
-  CacheEntry *next = chain.Root, *nextPrev = nullptr;
+  CacheEntry *next = chain.Root;
   while (next) {
     CacheEntry *cur = next;
-    nextPrev = cur;
     next = cur->getNext();
 
     // Ignore abstract entries if so requested.
