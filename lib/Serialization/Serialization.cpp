@@ -1142,41 +1142,34 @@ void Serializer::writeNormalConformance(
       // If there is no witness, we're done.
       if (!witness.getDecl()) return;
 
-      // If no substitution is required, all of the data structures are of
-      // length zero.
-      if (!witness.requiresSubstitution()) {
-        data.push_back(0); // generic parameters
-        data.push_back(0); // requirement-to-synthetic map
-        data.push_back(0); // witness substitutions
-        return;
-      }
-
-      if (auto genericSig = witness.getSyntheticSignature()) {
+      if (auto genericSig = witness.requiresSubstitution() 
+                              ? witness.getSyntheticSignature()
+                              : nullptr) {
         // Generic parameters.
         data.push_back(genericSig->getGenericParams().size());
         for (auto gp : genericSig->getGenericParams())
           data.push_back(addTypeRef(gp));
+
+        // Mapping from the requirement's interface types to the interface
+        // types of the synthetic environment.
+        auto reqSignature =
+          req->getInnermostDeclContext()->getGenericSignatureOfContext();
+        const auto &reqToSyntheticMap = witness.getRequirementToSyntheticMap();
+        for (auto reqGP : reqSignature->getGenericParams()) {
+          auto canonicalGP =
+            cast<GenericTypeParamType>(reqGP->getCanonicalType());
+          data.push_back(
+            addTypeRef(Type(canonicalGP).subst(reqToSyntheticMap)));
+          auto conformances = reqToSyntheticMap.getConformances(canonicalGP);
+          data.push_back(conformances.size());
+          // Conformances come at the end.
+        }
 
         // Requirements come at the end.
       } else {
         data.push_back(0);
       }
 
-      // Mapping from the requirement's interface types to the interface
-      // types of the synthetic environment.
-      // FIXME: non-deterministic ordering
-      const auto &reqToSyntheticMap =
-        witness.getRequirementToSyntheticMap().getMap();
-      data.push_back(reqToSyntheticMap.size());
-      for (const auto &entry : reqToSyntheticMap) {
-        data.push_back(addTypeRef(entry.first));
-        data.push_back(addTypeRef(entry.second));
-        auto conformances =
-          witness.getRequirementToSyntheticMap().getConformances(
-                                             entry.first->getCanonicalType());
-        data.push_back(conformances.size());
-        // Conformances come at the end.
-      }
       data.push_back(witness.getSubstitutions().size());
       ++numValueWitnesses;
   });
@@ -1212,29 +1205,35 @@ void Serializer::writeNormalConformance(
   conformance->forEachValueWitness(nullptr,
                                    [&](ValueDecl *req, Witness witness) {
    // Bail out early for simple witnesses.
-   if (!witness.getDecl() || !witness.requiresSubstitution()) return;
+   if (!witness.getDecl()) return;
 
-   // Write the generic requirements of the synthetic environment.
-   if (auto genericSig = witness.getSyntheticSignature())
+   if (auto genericSig = witness.requiresSubstitution() 
+                           ? witness.getSyntheticSignature()
+                           : nullptr) {
+     // Write the generic requirements of the synthetic environment.
      writeGenericRequirements(genericSig->getRequirements(),
                               DeclTypeAbbrCodes);
 
-   // Write conformances for the requirement-to-synthetic environment map.
-   const auto &reqToSyntheticMap =
-     witness.getRequirementToSyntheticMap().getMap();
-   for (const auto &entry : reqToSyntheticMap) {
-     auto conformances =
-       witness.getRequirementToSyntheticMap().getConformances(
-                                              entry.first->getCanonicalType());
-     for (auto conformance : conformances) {
-       writeConformance(conformance, DeclTypeAbbrCodes);
+     // Write conformances for the requirement-to-synthetic environment map.
+     auto reqSignature =
+       req->getInnermostDeclContext()->getGenericSignatureOfContext();
+     const auto &reqToSyntheticMap = witness.getRequirementToSyntheticMap();
+     for (auto reqGP : reqSignature->getGenericParams()) {
+       auto canonicalGP =
+         cast<GenericTypeParamType>(reqGP->getCanonicalType());
+       auto conformances = reqToSyntheticMap.getConformances(canonicalGP);
+       for (auto conformance : conformances) {
+         writeConformance(conformance, DeclTypeAbbrCodes);
+       }
      }
    }
 
    // Write the witness substitutions.
    writeSubstitutions(witness.getSubstitutions(),
                       DeclTypeAbbrCodes,
-                      witness.getSyntheticEnvironment());
+                      witness.requiresSubstitution()
+                        ? witness.getSyntheticEnvironment()
+                        : nullptr);
   });
 
   conformance->forEachTypeWitness(/*resolver=*/nullptr,

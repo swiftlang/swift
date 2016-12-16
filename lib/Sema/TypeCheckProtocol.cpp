@@ -1062,10 +1062,6 @@ RequirementEnvironment::RequirementEnvironment(
     allGenericParams.push_back(substGenericParam);
     builder.addGenericParameter(substGenericParam);
 
-    // If the generic parameter and its substitution are equivalent, there's
-    // nothing more to do.
-    if (genericParam->isEqual(substGenericParam)) continue;
-
     // Create a substitution from the requirement's generic parameter to the
     // generic parameter known to the builder.
     reqToSyntheticEnvMap.addSubstitution(genericParam->getCanonicalType(),
