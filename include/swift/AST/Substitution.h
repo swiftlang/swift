@@ -59,6 +59,9 @@ public:
   /// conformances.
   Substitution subst(ModuleDecl *module,
                      const SubstitutionMap &subMap) const;
+  Substitution subst(ModuleDecl *module,
+                     TypeSubstitutionFn subs,
+                     LookupConformanceFn conformances) const;
 
 private:
   friend class ProtocolConformance;
