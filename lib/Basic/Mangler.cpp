@@ -269,6 +269,11 @@ void NewMangling::printManglingStats() {
 }
 
 void Mangler::beginMangling() {
+  Storage.clear();
+  Substitutions.clear();
+  StringSubstitutions.clear();
+  lastSubstIdx = -2;
+  Words.clear();
   Buffer << MANGLING_PREFIX_STR;
 }
 

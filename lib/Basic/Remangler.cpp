@@ -860,6 +860,11 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
       }
     }
     mangle(Child.get());
+
+    if (Child->getKind() == Node::Kind::SpecializationPassID &&
+        node->hasIndex()) {
+      Buffer << node->getIndex();
+    }
   }
   if (!returnValMangled)
     Buffer << "_n";

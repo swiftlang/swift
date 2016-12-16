@@ -150,7 +150,7 @@ public:
   void setArgumentBoxToStack(unsigned ArgNo);
   void setReturnValueOwnedToUnowned();
 
-  std::string mangle();
+  std::string mangle(int UniqueID = 0);
   
 private:
   void mangleConstantProp(LiteralInst *LI);
