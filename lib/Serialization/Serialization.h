@@ -103,6 +103,10 @@ private:
   /// A map from generic parameter lists to the decls they come from.
   llvm::DenseMap<const GenericParamList *, const Decl *> GenericContexts;
 
+  /// A map from generic environments to their serialized IDs.
+  llvm::DenseMap<const GenericEnvironment *, GenericEnvironmentID>
+    GenericEnvironmentIDs;
+
   // A map from NormalProtocolConformances to their serialized IDs.
   llvm::DenseMap<const NormalProtocolConformance *, NormalConformanceID>
     NormalConformances;
@@ -144,6 +148,9 @@ private:
   /// Local DeclContexts that need to be serialized.
   std::queue<const DeclContext*> LocalDeclContextsToWrite;
 
+  /// Generic environments that need to be serialized.
+  std::queue<const GenericEnvironment*> GenericEnvironmentsToWrite;
+
   /// NormalProtocolConformances that need to be serialized.
   std::queue<const NormalProtocolConformance *> NormalConformancesToWrite;
 
@@ -175,6 +182,10 @@ private:
   /// The offset of each Identifier in the identifier data block, indexed by
   /// IdentifierID.
   std::vector<CharOffset> IdentifierOffsets;
+
+  /// The offset of each GenericEnvironment in the bitstream, indexed by
+  /// GenericEnvironmentID.
+  std::vector<BitOffset> GenericEnvironmentOffsets;
 
   /// The offset of each NormalProtocolConformance in the bitstream, indexed by
   /// NormalConformanceID.
@@ -212,6 +223,10 @@ private:
   uint32_t /*IdentifierID*/ LastIdentifierID =
       serialization::NUM_SPECIAL_MODULES - 1;
 
+  /// The last assigned GenericEnvironmentID for generic environments from this
+  /// module.
+  uint32_t /*GenericEnvironmentID*/ LastGenericEnvironmentID = 0;
+
   /// Returns the record code for serializing the given vector of offsets.
   ///
   /// This allows the offset-serialization code to be generic over all kinds
@@ -227,6 +242,8 @@ private:
       return index_block::DECL_CONTEXT_OFFSETS;
     if (&values == &LocalDeclContextOffsets)
       return index_block::LOCAL_DECL_CONTEXT_OFFSETS;
+    if (&values == &GenericEnvironmentOffsets)
+      return index_block::GENERIC_ENVIRONMENT_OFFSETS;
     if (&values == &NormalConformanceOffsets)
       return index_block::NORMAL_CONFORMANCE_OFFSETS;
     if (&values == &SILLayoutOffsets)
@@ -398,6 +415,11 @@ public:
   /// The DeclContext will be scheduled for serialization if necessary.
   DeclContextID addLocalDeclContextRef(const DeclContext *DC);
 
+  /// Records the use of the given generic environment.
+  ///
+  /// The GenericEnvironment will be scheduled for serialization if necessary.
+  GenericEnvironmentID addGenericEnvironmentRef(const GenericEnvironment *env);
+
   /// Records the use of the given normal protocol conformance.
   ///
   /// The normal protocol conformance will be scheduled for
@@ -451,7 +473,7 @@ public:
                         GenericEnvironment *genericEnv = nullptr);
 
   /// Writes a generic environment.
-  void writeGenericEnvironment(GenericEnvironment *env,
+  void writeGenericEnvironment(const GenericEnvironment *env,
                                const std::array<unsigned, 256> &abbrCodes,
                                bool SILMode);
 };

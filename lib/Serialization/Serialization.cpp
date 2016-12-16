@@ -279,6 +279,19 @@ DeclID Serializer::addLocalDeclContextRef(const DeclContext *DC) {
   return id;
 }
 
+GenericEnvironmentID Serializer::addGenericEnvironmentRef(
+                                                const GenericEnvironment *env) {
+  if (!env) return 0;
+
+  auto &id = GenericEnvironmentIDs[env];
+  if (id != 0)
+    return id;
+
+  id = ++LastGenericEnvironmentID;
+  GenericEnvironmentsToWrite.push(env);
+  return id;
+}
+
 DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   switch (DC->getContextKind()) {
   case DeclContextKind::Module:
@@ -485,8 +498,10 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, OBJC_METHODS);
   BLOCK_RECORD(index_block, ENTRY_POINT);
   BLOCK_RECORD(index_block, LOCAL_DECL_CONTEXT_OFFSETS);
+  BLOCK_RECORD(index_block, GENERIC_ENVIRONMENT_OFFSETS);
   BLOCK_RECORD(index_block, DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
+  BLOCK_RECORD(index_block, GENERIC_ENVIRONMENT_OFFSETS);
   BLOCK_RECORD(index_block, NORMAL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
@@ -541,8 +556,6 @@ void Serializer::writeBlockInfoBlock() {
                               decls_block::GENERIC_PARAM);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::GENERIC_REQUIREMENT);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::GENERIC_ENVIRONMENT);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::SIL_GENERIC_ENVIRONMENT);
 
@@ -999,38 +1012,58 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
 }
 
 void Serializer::writeGenericEnvironment(
-    GenericEnvironment *env, const std::array<unsigned, 256> &abbrCodes,
-    bool SILMode) {
+       const GenericEnvironment *env,
+       const std::array<unsigned, 256> &abbrCodes,
+       bool SILMode) {
   using namespace decls_block;
+
+  // Record the offset of this generic environment.
+  if (!SILMode) {
+    auto id = GenericEnvironmentIDs[env];
+    assert(id != 0 && "generic environment not referenced properly");
+    (void)id;
+
+    assert((id - 1) == GenericEnvironmentOffsets.size());
+    GenericEnvironmentOffsets.push_back(Out.GetCurrentBitNo());
+  }
 
   if (env == nullptr)
     return;
 
+  // Record the generic parameters.
+  SmallVector<uint64_t, 4> rawParamIDs;
   for (auto *paramTy : env->getGenericParams()) {
-    auto contextTy = env->mapTypeIntoContext(paramTy);
     auto *decl = paramTy->getDecl();
 
-    if (decl && decl->getDeclContext()->isModuleScopeContext()) {
-      auto envAbbrCode = abbrCodes[SILGenericEnvironmentLayout::Code];
-      auto nameID = addIdentifierRef(decl->getName());
-      SILGenericEnvironmentLayout::emitRecord(
-        Out, ScratchRecord, envAbbrCode,
-        nameID,
-        addTypeRef(paramTy->getCanonicalType()),
-        addTypeRef(contextTy));
-    } else {
-      auto envAbbrCode = abbrCodes[GenericEnvironmentLayout::Code];
-      GenericEnvironmentLayout::emitRecord(
-        Out, ScratchRecord, envAbbrCode,
-        addTypeRef(paramTy),
-        addTypeRef(contextTy));
+    // In SIL mode, add the name and canonicalize the parameter type.
+    if (SILMode) {
+      if (decl)
+        rawParamIDs.push_back(addIdentifierRef(decl->getName()));
+      else
+        rawParamIDs.push_back(addIdentifierRef(Identifier()));
+
+      paramTy = paramTy->getCanonicalType()->castTo<GenericTypeParamType>();
     }
+
+    rawParamIDs.push_back(addTypeRef(paramTy));
+    rawParamIDs.push_back(addTypeRef(env->mapTypeIntoContext(paramTy)));
   }
 
-  if (!SILMode) {
-    writeGenericRequirements(env->getGenericSignature()->getRequirements(),
-                             abbrCodes);
+  if (SILMode) {
+    assert(&abbrCodes != &DeclTypeAbbrCodes);
+    auto envAbbrCode = abbrCodes[SILGenericEnvironmentLayout::Code];
+    SILGenericEnvironmentLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
+                                            rawParamIDs);
+    return;
   }
+
+  assert(&abbrCodes == &DeclTypeAbbrCodes);
+  auto envAbbrCode = abbrCodes[GenericEnvironmentLayout::Code];
+  GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
+                                       rawParamIDs);
+
+  writeGenericRequirements(env->getGenericSignature()->getRequirements(),
+                           abbrCodes);
 }
 
 void Serializer::writeSILLayout(SILLayout *layout) {
@@ -2223,6 +2256,8 @@ void Serializer::writeDecl(const Decl *D) {
                                 addTypeRef(baseTy),
                                 contextID,
                                 extension->isImplicit(),
+                                addGenericEnvironmentRef(
+                                           extension->getGenericEnvironment()),
                                 conformances.size(),
                                 inheritedTypes);
 
@@ -2233,11 +2268,8 @@ void Serializer::writeDecl(const Decl *D) {
     }
 
     writeGenericParams(extension->getGenericParams());
-    writeGenericEnvironment(extension->getGenericEnvironment(),
-                            DeclTypeAbbrCodes, false);
     writeMembers(extension->getMembers(), isClassExtension);
     writeConformances(conformances, DeclTypeAbbrCodes);
-
     break;
   }
 
@@ -2367,10 +2399,10 @@ void Serializer::writeDecl(const Decl *D) {
                                 addTypeRef(underlying),
                                 addTypeRef(typeAlias->getInterfaceType()),
                                 typeAlias->isImplicit(),
+                                addGenericEnvironmentRef(
+                                             typeAlias->getGenericEnvironment()),
                                 rawAccessLevel);
     writeGenericParams(typeAlias->getGenericParams());
-    writeGenericEnvironment(typeAlias->getGenericEnvironment(),
-                            DeclTypeAbbrCodes, false);
     break;
   }
 
@@ -2433,14 +2465,14 @@ void Serializer::writeDecl(const Decl *D) {
                              addIdentifierRef(theStruct->getName()),
                              contextID,
                              theStruct->isImplicit(),
+                             addGenericEnvironmentRef(
+                                            theStruct->getGenericEnvironment()),
                              rawAccessLevel,
                              conformances.size(),
                              inheritedTypes);
 
 
     writeGenericParams(theStruct->getGenericParams());
-    writeGenericEnvironment(theStruct->getGenericEnvironment(),
-                            DeclTypeAbbrCodes, false);
     writeMembers(theStruct->getMembers(), false);
     writeConformances(conformances, DeclTypeAbbrCodes);
     break;
@@ -2468,14 +2500,14 @@ void Serializer::writeDecl(const Decl *D) {
                             addIdentifierRef(theEnum->getName()),
                             contextID,
                             theEnum->isImplicit(),
+                            addGenericEnvironmentRef(
+                                             theEnum->getGenericEnvironment()),
                             addTypeRef(theEnum->getRawType()),
                             rawAccessLevel,
                             conformances.size(),
                             inheritedTypes);
 
     writeGenericParams(theEnum->getGenericParams());
-    writeGenericEnvironment(theEnum->getGenericEnvironment(), DeclTypeAbbrCodes,
-                            false);
     writeMembers(theEnum->getMembers(), false);
     writeConformances(conformances, DeclTypeAbbrCodes);
     break;
@@ -2506,14 +2538,14 @@ void Serializer::writeDecl(const Decl *D) {
                             theClass->isImplicit(),
                             theClass->isObjC(),
                             theClass->requiresStoredPropertyInits(),
+                            addGenericEnvironmentRef(
+                                             theClass->getGenericEnvironment()),
                             addTypeRef(theClass->getSuperclass()),
                             rawAccessLevel,
                             conformances.size(),
                             inheritedTypes);
 
     writeGenericParams(theClass->getGenericParams());
-    writeGenericEnvironment(theClass->getGenericEnvironment(),
-                            DeclTypeAbbrCodes, false);
     writeMembers(theClass->getMembers(), true);
     writeConformances(conformances, DeclTypeAbbrCodes);
     break;
@@ -2544,13 +2576,13 @@ void Serializer::writeDecl(const Decl *D) {
                                const_cast<ProtocolDecl *>(proto)
                                  ->requiresClass(),
                                proto->isObjC(),
+                               addGenericEnvironmentRef(
+                                                proto->getGenericEnvironment()),
                                rawAccessLevel,
                                numProtocols,
                                protocolsAndInherited);
 
     writeGenericParams(proto->getGenericParams());
-    writeGenericEnvironment(proto->getGenericEnvironment(), DeclTypeAbbrCodes,
-                            false);
     writeMembers(proto->getMembers(), true);
     writeDefaultWitnessTable(proto, DeclTypeAbbrCodes);
     break;
@@ -2631,12 +2663,15 @@ void Serializer::writeDecl(const Decl *D) {
                            contextID,
                            fn->isImplicit(),
                            fn->isStatic(),
-                           uint8_t(getStableStaticSpelling(fn->getStaticSpelling())),
+                           uint8_t(
+                             getStableStaticSpelling(fn->getStaticSpelling())),
                            fn->isObjC(),
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
                            fn->hasThrows(),
                            fn->getParameterLists().size(),
+                           addGenericEnvironmentRef(
+                                                  fn->getGenericEnvironment()),
                            addTypeRef(fn->getInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
@@ -2647,8 +2682,6 @@ void Serializer::writeDecl(const Decl *D) {
                            nameComponents);
 
     writeGenericParams(fn->getGenericParams());
-    writeGenericEnvironment(fn->getGenericEnvironment(), DeclTypeAbbrCodes,
-                            false);
 
     // Write the body parameters.
     for (auto pattern : fn->getParameterLists())
@@ -2756,15 +2789,14 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->hasThrows(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
+                                  addGenericEnvironmentRef(
+                                                 ctor->getGenericEnvironment()),
                                   addTypeRef(ctor->getInterfaceType()),
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   nameComponents);
 
     writeGenericParams(ctor->getGenericParams());
-    writeGenericEnvironment(ctor->getGenericEnvironment(), DeclTypeAbbrCodes,
-                            false);
-
     assert(ctor->getParameterLists().size() == 2);
     // Why is this writing out the param list for self?
     for (auto paramList : ctor->getParameterLists())
@@ -2785,6 +2817,8 @@ void Serializer::writeDecl(const Decl *D) {
                                  contextID,
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
+                                 addGenericEnvironmentRef(
+                                                dtor->getGenericEnvironment()),
                                  addTypeRef(dtor->getInterfaceType()));
     assert(dtor->getParameterLists().size() == 1);
     // Why is this writing out the param list for self?
@@ -3444,6 +3478,12 @@ void Serializer::writeAllDeclsAndTypes() {
       writeDeclContext(next);
     }
 
+    while (!GenericEnvironmentsToWrite.empty()) {
+      auto next = GenericEnvironmentsToWrite.front();
+      GenericEnvironmentsToWrite.pop();
+      writeGenericEnvironment(next, DeclTypeAbbrCodes, /*SILMode=*/false);
+    }
+
     while (!NormalConformancesToWrite.empty()) {
       auto next = NormalConformancesToWrite.front();
       NormalConformancesToWrite.pop();
@@ -3458,8 +3498,9 @@ void Serializer::writeAllDeclsAndTypes() {
   } while (!DeclsAndTypesToWrite.empty() ||
            !LocalDeclContextsToWrite.empty() ||
            !DeclContextsToWrite.empty() ||
-           !NormalConformancesToWrite.empty() ||
-           !SILLayoutsToWrite.empty());
+           !SILLayoutsToWrite.empty() ||
+           !GenericEnvironmentsToWrite.empty() ||
+           !NormalConformancesToWrite.empty());
 }
 
 void Serializer::writeAllIdentifiers() {
@@ -4144,6 +4185,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, IdentifierOffsets);
     writeOffsets(Offsets, DeclContextOffsets);
     writeOffsets(Offsets, LocalDeclContextOffsets);
+    writeOffsets(Offsets, GenericEnvironmentOffsets);
     writeOffsets(Offsets, NormalConformanceOffsets);
     writeOffsets(Offsets, SILLayoutOffsets);
 

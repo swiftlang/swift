@@ -912,156 +912,215 @@ void ModuleFile::readGenericRequirements(
   }
 }
 
-uint64_t ModuleFile::allocateLazyGenericEnvironmentMap(
-                                                   TypeSubstitutionMap &&map) {
-  auto storedGenericEnvMap = new TypeSubstitutionMap(std::move(map));
-  GenericEnvironmentMaps.push_back(
-                    std::unique_ptr<TypeSubstitutionMap>(storedGenericEnvMap));
-  return reinterpret_cast<uint64_t>(storedGenericEnvMap);
-}
+void ModuleFile::configureGenericEnvironment(
+             llvm::PointerUnion3<GenericTypeDecl *, ExtensionDecl *,
+                                 AbstractFunctionDecl *> genericDecl,
+             serialization::GenericEnvironmentID envID) {
+  if (envID == 0) return;
 
-void ModuleFile::readLazyGenericEnvironment(
-            llvm::PointerUnion<GenericTypeDecl *, ExtensionDecl *> typeOrExt) {
-  // Read the generic environment.
-  GenericSignature *genericSig;
-  TypeSubstitutionMap genericEnvMap;
-  std::tie(genericSig, genericEnvMap) =
-    readGenericEnvironmentPieces(DeclTypeCursor);
+  auto sigOrEnv = getGenericSignatureOrEnvironment(envID);
 
-  // Set up the lazy generic environment.
-  if (genericSig) {
-    auto lazyMap = allocateLazyGenericEnvironmentMap(std::move(genericEnvMap));
-    if (auto type = typeOrExt.dyn_cast<GenericTypeDecl *>()) {
-      type->setLazyGenericEnvironment(this, genericSig, lazyMap);
+  // If we just have a generic signature, set up lazy generic environment
+  // creation.
+  if (auto genericSig = sigOrEnv.dyn_cast<GenericSignature *>()) {
+    if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
+      type->setLazyGenericEnvironment(this, genericSig, envID);
+    } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
+      func->setLazyGenericEnvironment(this, genericSig, envID);
     } else {
-      auto ext = typeOrExt.get<ExtensionDecl *>();
-      ext->setLazyGenericEnvironment(this, genericSig, lazyMap);
+      auto ext = genericDecl.get<ExtensionDecl *>();
+      ext->setLazyGenericEnvironment(this, genericSig, envID);
     }
+
+    return;
+  }
+
+  // If we have a full generic environment, it's because it happened to be
+  // deserialized already. Record it directly.
+  if (auto genericEnv = sigOrEnv.dyn_cast<GenericEnvironment *>()) {
+    if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
+      type->setGenericEnvironment(genericEnv);
+    } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
+      func->setGenericEnvironment(genericEnv);
+    } else {
+      auto ext = genericDecl.get<ExtensionDecl *>();
+      ext->setGenericEnvironment(genericEnv);
+    }
+
+    return;
   }
 }
 
-std::pair<GenericSignature *, TypeSubstitutionMap>
-ModuleFile::readGenericEnvironmentPieces(
-                             llvm::BitstreamCursor &Cursor,
-                             Optional<ArrayRef<Requirement>> optRequirements) {
-
+llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+ModuleFile::readGenericSignatureOrEnvironment(
+                        llvm::BitstreamCursor &cursor,
+                        bool wantEnvironment,
+                        Optional<ArrayRef<Requirement>> optRequirements) {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
   SmallVector<GenericTypeParamType *, 4> paramTypes;
   StringRef blobData;
 
-  TypeSubstitutionMap interfaceToArchetypeMap;
+  // Make sure we give the caller the requested type.
+  llvm::PointerUnion<GenericSignature *, GenericEnvironment *> emptyResult;
+  if (wantEnvironment)
+    emptyResult = static_cast<GenericEnvironment *>(nullptr);
 
+  TypeSubstitutionMap interfaceToArchetypeMap;
   {
     // we only want to be tracking the offset for this part of the function,
     // since loading the generic signature (a) may read the record we reject,
     // and (b) shouldn't have its progress erased. (That function also does its
     // own internal tracking.)
-    BCOffsetRAII lastRecordOffset(Cursor);
+    BCOffsetRAII lastRecordOffset(cursor);
 
-    while (true) {
-      lastRecordOffset.reset();
-      bool shouldContinue = true;
+    auto entry = cursor.advance(AF_DontPopBlockAtEnd);
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      return emptyResult;
 
-      auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
-      if (entry.Kind != llvm::BitstreamEntry::Record)
-        break;
-
-      scratch.clear();
-      unsigned recordID = Cursor.readRecord(entry.ID, scratch, &blobData);
-      switch (recordID) {
+    unsigned recordID = cursor.readRecord(entry.ID, scratch, &blobData);
+    switch (recordID) {
     case GENERIC_ENVIRONMENT: {
-      uint64_t rawTypeIDs[2];
-      GenericEnvironmentLayout::readRecord(scratch,
-                                           rawTypeIDs[0], rawTypeIDs[1]);
+      lastRecordOffset.reset();
 
-      auto paramTy = getType(rawTypeIDs[0])->castTo<GenericTypeParamType>();
-      auto contextTy = getType(rawTypeIDs[1]);
+      ArrayRef<uint64_t> rawParamIDs;
+      GenericEnvironmentLayout::readRecord(scratch, rawParamIDs);
 
-      auto result = interfaceToArchetypeMap.insert(
-        std::make_pair(paramTy, contextTy));
-
-      assert(result.second);
-      paramTypes.push_back(paramTy);
-      break;
-    }
-    case SIL_GENERIC_ENVIRONMENT: {
-      uint64_t rawTypeIDs[2];
-      IdentifierID IID;
-      SILGenericEnvironmentLayout::readRecord(scratch, IID,
-                                              rawTypeIDs[0], rawTypeIDs[1]);
-
-      auto paramTy = getType(rawTypeIDs[0])->castTo<GenericTypeParamType>();
-      auto contextTy = getType(rawTypeIDs[1]);
-
-      // Cons up a sugared type for this generic parameter
-      Identifier name = getIdentifier(IID);
-      auto paramDecl = createDecl<GenericTypeParamDecl>(getAssociatedModule(),
-                                                        name,
-                                                        SourceLoc(),
-                                                        paramTy->getDepth(),
-                                                        paramTy->getIndex());
-      paramTy = paramDecl->getDeclaredInterfaceType()
-        ->castTo<GenericTypeParamType>();
-
-      auto result = interfaceToArchetypeMap.insert(
-        std::make_pair(paramTy, contextTy));
-
-      assert(result.second);
-      paramTypes.push_back(paramTy);
-      break;
-    }
-    default:
-      // This record is not part of the GenericEnvironment.
-      shouldContinue = false;
-      break;
+      if (rawParamIDs.size() % 2 != 0) {
+        error();
+        return emptyResult;
       }
 
-      if (!shouldContinue)
-        break;
+      for (unsigned i = 0, n = rawParamIDs.size(); i != n; i += 2) {
+        auto paramTy = getType(rawParamIDs[i])->castTo<GenericTypeParamType>();
+        paramTypes.push_back(paramTy);
+
+        if (wantEnvironment) {
+          auto contextTy = getType(rawParamIDs[i+1]);
+
+          auto result = interfaceToArchetypeMap.insert(
+                                              std::make_pair(paramTy, contextTy));
+          assert(result.second);
+        }
+      }
+      break;
+    }
+
+    case SIL_GENERIC_ENVIRONMENT: {
+      ArrayRef<uint64_t> rawParamIDs;
+      SILGenericEnvironmentLayout::readRecord(scratch, rawParamIDs);
+      lastRecordOffset.reset();
+
+      if (rawParamIDs.size() % 3 != 0) {
+        error();
+        return emptyResult;
+      }
+
+      for (unsigned i = 0, n = rawParamIDs.size(); i != n; i += 3) {
+        Identifier name = getIdentifier(rawParamIDs[i]);
+        auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
+
+        auto paramDecl = createDecl<GenericTypeParamDecl>(getAssociatedModule(),
+                                                          name,
+                                                          SourceLoc(),
+                                                          paramTy->getDepth(),
+                                                          paramTy->getIndex());
+        paramTy = paramDecl->getDeclaredInterfaceType()
+                   ->castTo<GenericTypeParamType>();
+
+        paramTypes.push_back(paramTy);
+
+        if (wantEnvironment) {
+          auto contextTy = getType(rawParamIDs[i+2]);
+
+          auto result = interfaceToArchetypeMap.insert(
+                                              std::make_pair(paramTy, contextTy));
+          assert(result.second);
+        }
+      }
+      break;
+    }
+
+    default:
+      return emptyResult;
     }
   }
 
-  if (paramTypes.empty())
-    return { nullptr, TypeSubstitutionMap() };
-
-  ArrayRef<Requirement> requirements;
-  SmallVector<Requirement, 4> stackRequirements;
-  if (optRequirements) {
-    requirements = optRequirements.getValue();
-  } else {
-    // Read the generic requirements.
-    readGenericRequirements(stackRequirements, Cursor);
-    requirements = stackRequirements;
+  if (paramTypes.empty()) {
+    return emptyResult;
   }
 
-  // We need to construct a new signature (even if the caller has one), so that
-  // the sugar for the parameters is stored. Without this, generic types cannot
-  // round-trip via textual SIL.
+  // Read the generic requirements.
+  ArrayRef<Requirement> requirements;
+  SmallVector<Requirement, 4> requirementsVec;
+  if (optRequirements) {
+    requirements = *optRequirements;
+  } else {
+    readGenericRequirements(requirementsVec, cursor);
+    requirements = requirementsVec;
+  }
+
+  // Construct the generic signature from the loaded parameters and
+  // requirements.
   auto signature = GenericSignature::get(paramTypes, requirements);
 
-  assert(!interfaceToArchetypeMap.empty() &&
-         "no archetypes in generic function?");
-  return { signature, std::move(interfaceToArchetypeMap) };
+  // If the caller didn't want the full environment, we're done.
+  if (!wantEnvironment) return signature;
+
+  // Create the generic requirement.
+  return GenericEnvironment::get(signature, interfaceToArchetypeMap);
 }
 
-GenericEnvironment *ModuleFile::readGenericEnvironment(
-    llvm::BitstreamCursor &Cursor,
-    Optional<ArrayRef<Requirement>> optRequirements) {
-  // Read the separate parts of the generic environment.
-  GenericSignature *genericSig;
-  TypeSubstitutionMap interfaceToArchetypeMap;
-  std::tie(genericSig, interfaceToArchetypeMap) =
-    readGenericEnvironmentPieces(Cursor, optRequirements);
+llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+ModuleFile::getGenericSignatureOrEnvironment(
+                                         serialization::GenericEnvironmentID ID,
+                                         bool wantEnvironment) {
+  // Zero is a sentinel for having no generic environment.
+  if (ID == 0) {
+    // Make sure we give the caller the requested type.
+    llvm::PointerUnion<GenericSignature *, GenericEnvironment *> result;
+    if (wantEnvironment)
+      result = static_cast<GenericEnvironment *>(nullptr);
 
-  if (!genericSig) return nullptr;
+    return result;
+  }
 
-  return GenericEnvironment::get(genericSig, interfaceToArchetypeMap);
+  assert(ID <= GenericEnvironments.size() && "invalid GenericEnvironment ID");
+  auto &envOrOffset = GenericEnvironments[ID-1];
+
+  // If we've already deserialized this generic environment, return it.
+  if (envOrOffset.isComplete()) {
+    return envOrOffset.get();
+  }
+
+  // Read the generic environment.
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(envOrOffset);
+
+  auto result = readGenericSignatureOrEnvironment(DeclTypeCursor,
+                                                  wantEnvironment,
+                                                  None);
+  if (result.isNull()) {
+    envOrOffset = nullptr;
+    return envOrOffset.get();
+  }
+
+  if (auto signature = result.dyn_cast<GenericSignature *>()) {
+    assert(!wantEnvironment && "Reader should have produced the environment");
+    return signature;
+  }
+
+  auto genericEnv = result.get<GenericEnvironment *>();
+  envOrOffset = genericEnv;
+  return genericEnv;
 }
 
-GenericEnvironment *ModuleFile::maybeReadGenericEnvironment() {
-  return readGenericEnvironment(DeclTypeCursor);
+GenericEnvironment *ModuleFile::getGenericEnvironment(
+                                       serialization::GenericEnvironmentID ID) {
+  return getGenericSignatureOrEnvironment(ID, /*wantEnvironment=*/true)
+           .get<GenericEnvironment *>();
+;
 }
 
 bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
@@ -2308,11 +2367,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     TypeID underlyingTypeID, interfaceTypeID;
     bool isImplicit;
+    GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
 
     decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
                                              underlyingTypeID, interfaceTypeID,
-                                             isImplicit, rawAccessLevel);
+                                             isImplicit, genericEnvID,
+                                             rawAccessLevel);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
 
@@ -2324,12 +2385,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                            SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 
-    // FIXME: Do we need to read a GenericEnvironment even if we don't
-    // have our own generic parameters? The typealias might itself be in
-    // generic context.
-    if (genericParams) {
-      readLazyGenericEnvironment(alias);
-    }
+    configureGenericEnvironment(alias, genericEnvID);
 
     alias->setUnderlyingType(getType(underlyingTypeID));
 
@@ -2423,12 +2479,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit;
+    GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
     unsigned numConformances;
     ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
-                                          isImplicit, rawAccessLevel,
+                                          isImplicit, genericEnvID,
+                                          rawAccessLevel,
                                           numConformances,
                                           rawInheritedIDs);
 
@@ -2445,6 +2503,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                             DC);
     declOrOffset = theStruct;
 
+    // Read the generic environment.
+    configureGenericEnvironment(theStruct, genericEnvID);
+
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       theStruct->setAccessibility(*accessLevel);
     } else {
@@ -2454,9 +2515,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       theStruct->setImplicit();
-
-    // Read the generic environment.
-    readLazyGenericEnvironment(theStruct);
 
     theStruct->computeType();
 
@@ -2476,6 +2534,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     uint8_t rawFailability;
     bool isImplicit, isObjC, hasStubImplementation, throws;
+    GenericEnvironmentID genericEnvID;
     uint8_t storedInitKind, rawAccessLevel;
     TypeID interfaceID;
     DeclID overriddenID;
@@ -2485,7 +2544,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                rawFailability, isImplicit, 
                                                isObjC, hasStubImplementation,
                                                throws, storedInitKind,
-                                               interfaceID,
+                                               genericEnvID, interfaceID,
                                                overriddenID, rawAccessLevel,
                                                argNameIDs);
     auto parent = getDeclContext(contextID);
@@ -2495,12 +2554,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto *genericParams = maybeReadGenericParams(parent);
     if (declOrOffset.isComplete())
       return declOrOffset;
-
-    // Read the generic environment.
-    GenericSignature *genericSig;
-    TypeSubstitutionMap genericEnvMap;
-    std::tie(genericSig, genericEnvMap) =
-      readGenericEnvironmentPieces(DeclTypeCursor);
 
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -2520,6 +2573,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                   genericParams, parent);
     declOrOffset = ctor;
 
+    configureGenericEnvironment(ctor, genericEnvID);
+
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       ctor->setAccessibility(*accessLevel);
     } else {
@@ -2536,13 +2591,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto interfaceType = getType(interfaceID);
     ctor->setInterfaceType(interfaceType);
-
-    // If there is a generic environment, lazily wire it up.
-    if (genericSig) {
-      ctor->setLazyGenericEnvironment(
-                  this, genericSig,
-                  allocateLazyGenericEnvironmentMap(std::move(genericEnvMap)));
-    }
 
     // Set the initializer interface type of the constructor.
     auto allocType = ctor->getInterfaceType();
@@ -2667,6 +2715,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     uint8_t rawStaticSpelling, rawAccessLevel, rawAddressorKind;
     bool isObjC, isMutating, hasDynamicSelf, throws;
     unsigned numParamPatterns;
+    GenericEnvironmentID genericEnvID;
     TypeID interfaceTypeID;
     DeclID associatedDeclID;
     DeclID overriddenID;
@@ -2677,7 +2726,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
                                         isStatic, rawStaticSpelling, isObjC,
                                         isMutating, hasDynamicSelf, throws,
-                                        numParamPatterns,
+                                        numParamPatterns, genericEnvID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID, accessorStorageDeclID,
                                         hasCompoundName, rawAddressorKind,
@@ -2696,12 +2745,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // reference generic parameters, and we want them to have a dummy
     // DeclContext for now.
     GenericParamList *genericParams = maybeReadGenericParams(DC);
-
-    // Read the generic environment.
-    GenericSignature *genericSig;
-    TypeSubstitutionMap genericEnvMap;
-    std::tie(genericSig, genericEnvMap) =
-      readGenericEnvironmentPieces(DeclTypeCursor);
 
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
     if (!staticSpelling.hasValue()) {
@@ -2728,6 +2771,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         numParamPatterns, DC);
     fn->setEarlyAttrValidation();
     declOrOffset = fn;
+
+    configureGenericEnvironment(fn, genericEnvID);
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       fn->setAccessibility(*accessLevel);
@@ -2760,13 +2805,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // Set the interface type.
     auto interfaceType = getType(interfaceTypeID);
     fn->setInterfaceType(interfaceType);
-
-    // If there is a generic environment, lazily wire it up.
-    if (genericSig) {
-      fn->setLazyGenericEnvironment(
-                  this, genericSig,
-                  allocateLazyGenericEnvironmentMap(std::move(genericEnvMap)));
-    }
 
     SmallVector<ParameterList*, 2> paramLists;
     for (unsigned i = 0, e = numParamPatterns; i != e; ++i)
@@ -2847,13 +2885,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC;
+    GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
     unsigned numProtocols;
     ArrayRef<uint64_t> rawProtocolAndInheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
-                                            rawAccessLevel,
+                                            genericEnvID, rawAccessLevel,
                                             numProtocols,
                                             rawProtocolAndInheritedIDs);
 
@@ -2864,6 +2903,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto proto = createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(),
                                           getIdentifier(nameID), None);
     declOrOffset = proto;
+
+    configureGenericEnvironment(proto, genericEnvID);
 
     proto->setRequiresClass(isClassBounded);
     
@@ -2885,9 +2926,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (auto genericParams = maybeReadGenericParams(DC))
       proto->setGenericParams(genericParams);
-
-    // Read the generic environment.
-    readLazyGenericEnvironment(proto);
 
     if (isImplicit)
       proto->setImplicit();
@@ -3025,6 +3063,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isObjC, requiresStoredPropertyInits;
+    GenericEnvironmentID genericEnvID;
     TypeID superclassID;
     uint8_t rawAccessLevel;
     unsigned numConformances;
@@ -3032,8 +3071,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          requiresStoredPropertyInits,
-                                         superclassID, rawAccessLevel,
-                                         numConformances,
+                                         genericEnvID, superclassID,
+                                         rawAccessLevel, numConformances,
                                          rawInheritedIDs);
 
     auto DC = getDeclContext(contextID);
@@ -3048,6 +3087,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                           SourceLoc(), None, genericParams, DC);
     declOrOffset = theClass;
 
+    configureGenericEnvironment(theClass, genericEnvID);
+
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       theClass->setAccessibility(*accessLevel);
     } else {
@@ -3061,9 +3102,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theClass->setSuperclass(getType(superclassID));
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
-
-    // Read the generic environment.
-    readLazyGenericEnvironment(theClass);
 
     theClass->computeType();
 
@@ -3085,13 +3123,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit;
+    GenericEnvironmentID genericEnvID;
     TypeID rawTypeID;
     uint8_t rawAccessLevel;
     unsigned numConformances;
     ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::EnumLayout::readRecord(scratch, nameID, contextID,
-                                        isImplicit, rawTypeID, rawAccessLevel,
+                                        isImplicit, genericEnvID, rawTypeID,
+                                        rawAccessLevel,
                                         numConformances, rawInheritedIDs);
 
     auto DC = getDeclContext(contextID);
@@ -3107,6 +3147,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     declOrOffset = theEnum;
 
+    configureGenericEnvironment(theEnum, genericEnvID);
+
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       theEnum->setAccessibility(*accessLevel);
     } else {
@@ -3117,9 +3159,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setRawType(getType(rawTypeID));
-
-    // Read the generic environment.
-    readLazyGenericEnvironment(theEnum);
 
     theEnum->computeType();
 
@@ -3262,27 +3301,32 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     TypeID baseID;
     DeclContextID contextID;
     bool isImplicit;
+    GenericEnvironmentID genericEnvID;
     unsigned numConformances;
     ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ExtensionLayout::readRecord(scratch, baseID, contextID,
-                                             isImplicit, numConformances,
-                                             rawInheritedIDs);
+                                             isImplicit, genericEnvID,
+                                             numConformances, rawInheritedIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto baseTy = getType(baseID);
-    if (declOrOffset.isComplete())
-      return declOrOffset;
-
-    auto nominal = baseTy->getAnyNominal();
-    auto extension = ExtensionDecl::create(ctx, SourceLoc(),
-                                           TypeLoc::withoutLoc(baseTy), { },
+    auto extension = ExtensionDecl::create(ctx, SourceLoc(), TypeLoc(), { },
                                            DC, nullptr);
     extension->setEarlyAttrValidation();
     declOrOffset = extension;
+
+    // Generic parameters.
+    GenericParamList *genericParams = maybeReadGenericParams(DC);
+    extension->setGenericParams(genericParams);
+
+    configureGenericEnvironment(extension, genericEnvID);
+
+    auto baseTy = getType(baseID);
+    auto nominal = baseTy->getAnyNominal();
+    extension->getExtendedTypeLoc().setType(baseTy);
 
     if (isImplicit)
       extension->setImplicit();
@@ -3294,12 +3338,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     });
     extension->setInherited(inheritedTypes);
     extension->setCheckedInheritanceClause();
-
-    // Generic parameters.
-    GenericParamList *genericParams = maybeReadGenericParams(DC);
-    extension->setGenericParams(genericParams);
-
-    readLazyGenericEnvironment(extension);
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
@@ -3317,10 +3355,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::DESTRUCTOR_DECL: {
     DeclContextID contextID;
     bool isImplicit, isObjC;
+    GenericEnvironmentID genericEnvID;
     TypeID interfaceID;
 
     decls_block::DestructorLayout::readRecord(scratch, contextID,
                                               isImplicit, isObjC,
+                                              genericEnvID,
                                               interfaceID);
 
     DeclContext *DC = getDeclContext(contextID);
@@ -3330,6 +3370,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto dtor = createDecl<DestructorDecl>(ctx.Id_deinit, SourceLoc(),
                                            /*selfpat*/nullptr, DC);
     declOrOffset = dtor;
+
+    configureGenericEnvironment(dtor, genericEnvID);
 
     dtor->setAccessibility(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
                                     Accessibility::Internal));
@@ -3341,10 +3383,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto interfaceType = getType(interfaceID);
     dtor->setInterfaceType(interfaceType);
-
-    if (auto genericSig = DC->getGenericSignatureOfContext()) {
-      dtor->setLazyGenericEnvironment(this, genericSig, /*contextData=*/1);
-    }
 
     if (isImplicit)
       dtor->setImplicit();
@@ -4368,31 +4406,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
 GenericEnvironment *ModuleFile::loadGenericEnvironment(const Decl *decl,
                                                        uint64_t contextData) {
-  // Destructors always inherit the generic environment of their context, so
-  // return that directly.
-  if (auto dtor = dyn_cast<DestructorDecl>(decl)) {
-    assert(contextData == 1 && "Not the expected generic environment");
-    return dtor->getDeclContext()->getGenericEnvironmentOfContext();
-  }
-
-  // Dig out the pieces needed to load a generic environment.
-  auto interfaceToArchetypes =
-    reinterpret_cast<TypeSubstitutionMap *>(contextData);
-
-  GenericSignature *genericSig;
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-    genericSig = func->getGenericSignature();
-  else if (auto type = dyn_cast<GenericTypeDecl>(decl))
-    genericSig = type->getGenericSignature();
-  else if (auto ext = dyn_cast<ExtensionDecl>(decl))
-    genericSig = ext->getGenericSignature();
-  else
-    llvm_unreachable("Cannot lazily deserialize generic environment");
-
-  auto genericEnv = GenericEnvironment::get(genericSig, *interfaceToArchetypes);
-  
-  interfaceToArchetypes->clear();
-  return genericEnv;
+  return getGenericEnvironment(contextData);
 }
 
 static Optional<ForeignErrorConvention::Kind>

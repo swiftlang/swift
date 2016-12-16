@@ -493,9 +493,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly) {
     auto signature = fn->getLoweredFunctionType()->getGenericSignature();
-    genericEnv = MF->readGenericEnvironment(
-        SILCursor,
-        signature ? signature->getRequirements() : ArrayRef<Requirement>());
+    genericEnv = MF->readGenericSignatureOrEnvironment(
+                    SILCursor,
+                    /*wantEnvironment=*/true,
+                    signature ? signature->getRequirements()
+                              : ArrayRef<Requirement>())
+                  .get<GenericEnvironment *>();
   }
 
   // If the next entry is the end of the block, then this function has
