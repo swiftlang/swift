@@ -1029,7 +1029,7 @@ public:
   /// Revert the dependent types within the given generic parameter list.
   void revertGenericParamList(GenericParamList *genericParams);
 
-  /// Construct a new generic environonment for the given declaration context.
+  /// Construct a new generic environment for the given declaration context.
   ///
   /// \param genericParams The generic parameters to validate.
   ///
@@ -1052,7 +1052,7 @@ public:
                         llvm::function_ref<void(ArchetypeBuilder &)>
                           inferRequirements);
 
-  /// Construct a new generic environonment for the given declaration context.
+  /// Construct a new generic environment for the given declaration context.
   ///
   /// \param genericParams The generic parameters to validate.
   ///

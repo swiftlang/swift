@@ -1135,7 +1135,7 @@ private:
 
   private:
     /// The list of constraints that have been retired along the
-    /// current path, this list is used in LIFO fasion when constaints
+    /// current path, this list is used in LIFO fashion when constraints
     /// are added back to the circulation.
     ConstraintList retiredConstraints;
 

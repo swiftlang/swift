@@ -4051,7 +4051,7 @@ public:
     return OverriddenDecl;
   }
   void setOverriddenDecl(AbstractStorageDecl *over) {
-    // FIXME: Hack due to broken class circulatity checking.
+    // FIXME: Hack due to broken class circularity checking.
     if (over == this) return;
     OverriddenDecl = over;
     over->setIsOverridden();
@@ -5168,7 +5168,7 @@ public:
     return OverriddenOrBehaviorParamDecl.dyn_cast<FuncDecl *>();
   }
   void setOverriddenDecl(FuncDecl *over) {
-    // FIXME: Hack due to broken class circulatity checking.
+    // FIXME: Hack due to broken class circularity checking.
     if (over == this) return;
 
     // A function cannot be an override if it is also a derived global decl
@@ -5598,7 +5598,7 @@ public:
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(ConstructorDecl *over) {
-    // FIXME: Hack due to broken class circulatity checking.
+    // FIXME: Hack due to broken class circularity checking.
     if (over == this) return;
 
     OverriddenDecl = over;

@@ -744,8 +744,8 @@ character.
 Some less important operators are longer and may also contain one or more
 natural numbers. But it's always important that the demangler can identify the
 end (the last character) of an operator. For example, it's not possible to
-determince the last character if there are two operators ``M`` and ``Ma``:
-``a`` could belong to ``M`` or it could be the first charater of the next
+determine the last character if there are two operators ``M`` and ``Ma``:
+``a`` could belong to ``M`` or it could be the first character of the next
 operator.
 
 The intention of the post-fix order is to optimize for common pre-fixes.
@@ -766,7 +766,7 @@ Globals
   global ::= type 'MP'                   // type metadata pattern
   global ::= type 'Ma'                   // type metadata access function
   global ::= type 'ML'                   // type metadata lazy cache variable
-  global ::= nomianl-type 'Mm'           // class metaclass
+  global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
   global ::= protocol 'Mp'               // protocol descriptor
   global ::= type 'MF'                   // metadata for remote mirrors: field descriptor
@@ -1171,7 +1171,7 @@ values indicates a single generic parameter at the outermost depth::
   x_xCru                           // <T_0_0> T_0_0 -> T_0_0
   d_0__xCr_0_u                     // <T_0_0><T_1_0, T_1_1> T_0_0 -> T_1_1
 
-A generic signature must only preceed an operator character which is different
+A generic signature must only precede an operator character which is different
 from any character in a ``<GENERIC-PARAM-COUNT>``.
 
 Identifiers
@@ -1222,7 +1222,7 @@ A maximum of 26 words in a mangling can be used for substitutions.
 
 ::
 
-  identifier ::= '00' natural '_'? IDENTIFIER-CHAR+  // '_' is inserted if the identifer starts with a digit or '_'.
+  identifier ::= '00' natural '_'? IDENTIFIER-CHAR+  // '_' is inserted if the identifier starts with a digit or '_'.
 
 Identifiers that contain non-ASCII characters are encoded using the Punycode
 algorithm specified in RFC 3492, with the modifications that ``_`` is used
@@ -1274,7 +1274,7 @@ Substitutions
 
 ::
 
-  substitution ::= 'A' INDEX                  // substiution of N+26
+  substitution ::= 'A' INDEX                  // substitution of N+26
   substitution ::= 'A' [a-z]* [A-Z]           // One or more consecutive substitutions of N < 26
 
 
@@ -1346,7 +1346,7 @@ The type is the function type of the specialized function.
   specialization ::= spec-arg* 'Tf' SPEC-INFO ARG-SPEC-KIND* '_' ARG-SPEC-KIND  // Function signature specialization kind
 
 The ``<ARG-SPEC-KIND>`` describes how arguments are specialized.
-Some kinds need arguments, which preceed ``Tf``.
+Some kinds need arguments, which precede ``Tf``.
 
 ::
 
