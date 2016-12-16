@@ -162,7 +162,7 @@ public:
     return "Sinks instructions closer to their users";
   }
 };
-}
+} // end anonymous namespace
 
 SILTransform *swift::createCodeSinking() {
   return new CodeSinkingPass();

@@ -149,7 +149,7 @@ public:
   bool inlineCallsIntoFunction(SILFunction *F);
 };
 
-} // namespace
+} // end anonymous namespace
 
 // Return true if the callee has self-recursive calls.
 static bool calleeIsSelfRecursive(SILFunction *Callee) {

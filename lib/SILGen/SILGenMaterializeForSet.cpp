@@ -72,7 +72,7 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
     New = NewMangler.mangleClosureEntity(&closure,
                                 NewMangling::ASTMangler::SymbolKind::Default);
   }
-  mangler.mangleClosureEntity(&closure, /*uncurryLevel=*/1);
+  mangler.mangleClosureEntity(&closure, /*uncurryingLevel=*/1);
   std::string Old = mangler.finalize();
 
   return NewMangling::selectMangling(Old, New);
@@ -746,7 +746,7 @@ namespace {
       gen.B.createDeallocValueBuffer(loc, ValueType, Buffer);
     }
   }; 
-}
+} // end anonymous namespace
 
 /// Emit a materializeForSet callback that stores the value from the
 /// result buffer back into the l-value.

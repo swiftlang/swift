@@ -170,7 +170,7 @@ namespace {
       P.markWasHandled(D);
     }
   };
-}
+} // end anonymous namespace
 
 /// \brief Main entrypoint for the parser.
 ///
@@ -774,7 +774,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                        AvailableAttr(AtLoc, AttrRange,
                                      Platform,
                                      /*Message=*/StringRef(),
-                                     /*Renamed=*/StringRef(),
+                                     /*Rename=*/StringRef(),
                                      /*Introduced=*/Version,
                                      /*Deprecated=*/clang::VersionTuple(),
                                      /*Obsoleted=*/clang::VersionTuple(),

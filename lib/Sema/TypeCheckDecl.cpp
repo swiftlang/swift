@@ -195,7 +195,7 @@ public:
   }
 };
   
-} // end llvm namespace
+} // namespace llvm
 
 /// Determine whether the given declaration can inherit a class.
 static bool canInheritClass(Decl *decl) {
@@ -825,7 +825,7 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
 static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
   // Default-initialize optional types and weak values to 'nil'.
   if (type->getReferenceStorageReferent()->getAnyOptionalObjectType())
-    return new (tc.Context) NilLiteralExpr(SourceLoc(), /*implicit=*/true);
+    return new (tc.Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
 
   // Build tuple literals for tuple types.
   if (auto tupleType = type->getAs<TupleType>()) {
@@ -1216,7 +1216,7 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
                          decltype(TypeChecker::TypeAccessScopeCache) &caches)
       : AccessScopeChecker(useDC, caches) {}
 
-  Action walkToTypePre(Type T) {
+  Action walkToTypePre(Type T) override {
     ValueDecl *VD;
     if (auto *TAD = dyn_cast<NameAliasType>(T.getPointer()))
       VD = TAD->getDecl();
@@ -2241,7 +2241,7 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     return;
 
   // Add the 'dynamic' attribute.
-  D->getAttrs().add(new (ctx) DynamicAttr(/*isImplicit=*/true));
+  D->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit=*/true));
 }
 
 /// Check runtime functions responsible for implicit bridging of Objective-C
@@ -2582,7 +2582,7 @@ static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
 
   case AutomaticEnumValueKind::String:
     return new (TC.Context) StringLiteralExpr(forElt->getNameStr(), SourceLoc(),
-                                              /*implicit=*/true);
+                                              /*Implicit=*/true);
 
   case AutomaticEnumValueKind::Integer:
     // If there was no previous value, start from zero.
@@ -6435,7 +6435,7 @@ public:
               TC.diagnose(CD, diag::required_initializer_override_wrong_keyword)
                 .fixItReplace(attr->getLocation(), "required");
               CD->getAttrs().add(
-                new (TC.Context) RequiredAttr(/*implicit=*/true));
+                new (TC.Context) RequiredAttr(/*IsImplicit=*/true));
             }
 
             TC.diagnose(findNonImplicitRequiredInit(CD->getOverriddenDecl()),
@@ -6568,7 +6568,7 @@ public:
     TC.checkDeclAttributes(DD);
   }
 };
-}; // end anonymous namespace.
+} // end anonymous namespace
 
 bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
   return DeclChecker::checkOverrides(TC, decl);
@@ -7390,7 +7390,7 @@ namespace swift {
 GenericParamList *cloneGenericParams(ASTContext &ctx,
                                      DeclContext *dc,
                                      GenericParamList *fromParams);
-}
+} // namespace swift
 
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // If we already validated this extension, there's nothing more to do.

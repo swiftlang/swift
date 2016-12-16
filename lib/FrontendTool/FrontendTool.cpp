@@ -151,11 +151,11 @@ static bool printAsObjC(const std::string &outputPath, Module *M,
   std::error_code EC;
   std::unique_ptr<llvm::raw_pwrite_stream> out =
     Clang.createOutputFile(outputPath, EC,
-                           /*binary=*/false,
-                           /*removeOnSignal=*/true,
+                           /*Binary=*/false,
+                           /*RemoveFileOnSignal=*/true,
                            /*inputPath=*/"",
                            path::extension(outputPath),
-                           /*temporary=*/true,
+                           /*UseTemporary=*/true,
                            /*createDirs=*/false,
                            /*finalPath=*/nullptr,
                            &tmpFilePath);
@@ -215,7 +215,7 @@ public:
     : OSPtr(std::move(OS)),
       FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
-  ~JSONFixitWriter() {
+  ~JSONFixitWriter() override {
     swift::writeEditsInJson(llvm::makeArrayRef(AllEdits), *OSPtr);
   }
 private:

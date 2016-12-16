@@ -863,7 +863,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 /// Return the dispatchable length of the given column.
 static unsigned getConstructorPrefix(const ClauseMatrix &matrix,
@@ -2075,7 +2075,7 @@ namespace {
     bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   };
-}
+} // end anonymous namespace
 
 
 static bool containsFallthrough(Stmt *S) {

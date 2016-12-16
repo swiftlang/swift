@@ -65,7 +65,7 @@ template<> struct DenseMapInfo<DefaultCacheKey> {
     return LHS.CBs->keyIsEqualCB(LHS.Key, RHS.Key, nullptr);
   }
 };
-}
+} // namespace llvm
 
 CacheImpl::ImplTy CacheImpl::create(StringRef Name, const CallBacks &CBs) {
   return new DefaultCache(CBs);

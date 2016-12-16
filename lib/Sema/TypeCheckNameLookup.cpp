@@ -175,7 +175,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
@@ -492,7 +492,7 @@ namespace {
       DelegatingLazyResolver::resolveDeclSignature(VD);
     }
   };
-}
+} // end anonymous namespace
 
 void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         Type baseTypeOrNull,

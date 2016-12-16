@@ -793,7 +793,7 @@ namespace llvm {
       llvm_unreachable("Unhandled CGForDotView in switch.");
     }
   };
-} // end llvm namespace
+} // namespace llvm
 
 #endif
 

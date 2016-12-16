@@ -206,7 +206,7 @@ namespace {
       return FailureGeneration.load(std::memory_order_relaxed);
     }
   };
-}
+} // end anonymous namespace
 
 // Conformance Cache.
 struct ConformanceState {

@@ -669,7 +669,7 @@ namespace {
   private:
     const SILInstruction *LHS;
   };
-}
+} // end anonymous namespace
 
 bool SILInstruction::hasIdenticalState(const SILInstruction *RHS) const {
   SILInstruction *UnconstRHS = const_cast<SILInstruction *>(RHS);
@@ -946,7 +946,7 @@ namespace {
     }
     SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
   };
-}
+} // end anonymous namespace
 
 bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this))

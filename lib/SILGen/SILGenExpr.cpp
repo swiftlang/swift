@@ -252,7 +252,7 @@ namespace {
     RValue visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
                                         SGFContext C);
   };
-}
+} // end anonymous namespace
 
 RValue RValueEmitter::visitApplyExpr(ApplyExpr *E, SGFContext C) {
   return SGF.emitApplyExpr(E, C);
@@ -2723,7 +2723,7 @@ namespace {
                              std::move(next.getValue()));
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit a simple assignment, i.e.
 ///
@@ -2867,7 +2867,7 @@ namespace {
       SGF.BindOptionalFailureDests.pop_back();
     }
   };
-}
+} // end anonymous namespace
 
 
 /// emitOptimizedOptionalEvaluation - Look for cases where we can short-circuit

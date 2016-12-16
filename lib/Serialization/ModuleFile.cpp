@@ -288,7 +288,7 @@ namespace {
     explicit PrettyModuleFileDeserialization(const ModuleFile &file)
         : File(file) {}
 
-    virtual void print(raw_ostream &os) const override {
+    void print(raw_ostream &os) const override {
       os << "While reading from " << File.getModuleFilename() << "\n";
     }
   };

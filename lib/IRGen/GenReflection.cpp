@@ -474,7 +474,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     addConstantInt32(0);
   }
 
-  void layout() {
+  void layout() override {
     PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
     auto type = NTD->getDeclaredType()->getCanonicalType();
     addTypeRef(NTD->getModuleContext(), type);
@@ -540,7 +540,7 @@ public:
         nominalDecl->getDeclaredTypeInContext()->getCanonicalType()));
   }
 
-  void layout() {
+  void layout() override {
     addTypeRef(module, type);
 
     addConstantInt32(ti->getFixedSize().getValue());
@@ -586,7 +586,7 @@ public:
   BoxDescriptorBuilder(IRGenModule &IGM, CanType BoxedType)
     : ReflectionMetadataBuilder(IGM), BoxedType(BoxedType) {}
 
-  void layout() {
+  void layout() override {
     addConstantInt32(1);
     addConstantInt32(0); // Number of sources
     addConstantInt32(0); // Number of generic bindings
@@ -747,7 +747,7 @@ public:
     return CaptureTypes;
   }
 
-  void layout() {
+  void layout() override {
     auto CaptureTypes = getCaptureTypes();
     auto MetadataSources = getMetadataSourceMap();
 

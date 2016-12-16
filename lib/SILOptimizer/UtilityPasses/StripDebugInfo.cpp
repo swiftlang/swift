@@ -35,7 +35,7 @@ static void stripFunction(SILFunction *F) {
 
 namespace {
 class StripDebugInfo : public swift::SILFunctionTransform {
-  virtual ~StripDebugInfo() {}
+  ~StripDebugInfo() override {}
 
   /// The entry point to the transformation.
   void run() override {

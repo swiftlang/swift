@@ -118,7 +118,7 @@ static void diagnoseStaticReports(const SILInstruction *I,
 
 namespace {
 class EmitDFDiagnostics : public SILFunctionTransform {
-  virtual ~EmitDFDiagnostics() {}
+  ~EmitDFDiagnostics() override {}
 
   StringRef getName() override { return "Emit Dataflow Diagnostics"; }
 

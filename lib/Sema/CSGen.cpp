@@ -992,7 +992,7 @@ namespace {
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
-}
+} // end anonymous namespace
 
 namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
@@ -3018,7 +3018,7 @@ class InferUnresolvedMemberConstraintGenerator : public ConstraintGenerator {
 public:
   InferUnresolvedMemberConstraintGenerator(Expr *Target, ConstraintSystem &CS) :
     ConstraintGenerator(CS), Target(Target), VT(nullptr) {};
-  virtual ~InferUnresolvedMemberConstraintGenerator() = default;
+  ~InferUnresolvedMemberConstraintGenerator() override = default;
 
   Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *Expr) override {
     if (Target != Expr) {

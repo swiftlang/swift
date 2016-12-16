@@ -466,7 +466,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
     return "";
   }
 };
-} // end llvm namespace
+} // namespace llvm
 #endif
 
 #ifndef NDEBUG

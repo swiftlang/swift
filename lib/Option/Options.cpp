@@ -39,7 +39,7 @@ public:
   SwiftOptTable() : OptTable(InfoTable) {}
 };
 
-}
+} // end anonymous namespace
 
 std::unique_ptr<OptTable> swift::createSwiftOptTable() {
   return std::unique_ptr<OptTable>(new SwiftOptTable());

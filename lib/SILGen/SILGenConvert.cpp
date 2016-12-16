@@ -395,13 +395,13 @@ public:
                                                 repr);
   }
 
-  void finishInitialization(SILGenFunction &gen) {
+  void finishInitialization(SILGenFunction &gen) override {
     SingleBufferInitialization::finishInitialization(gen);
     gen.Cleanups.setCleanupState(Cleanup, CleanupState::Dead);
   }
 };
 
-}
+} // end anonymous namespace
 
 ManagedValue SILGenFunction::emitExistentialErasure(
                             SILLocation loc,

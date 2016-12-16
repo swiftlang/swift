@@ -41,7 +41,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, PassPipelineKind Kind) {
 #include "swift/SILOptimizer/PassManager/PassPipeline.def"
   }
 }
-}
+} // namespace llvm
 
 int main(int argc, char **argv) {
   INITIALIZE_LLVM(argc, argv);

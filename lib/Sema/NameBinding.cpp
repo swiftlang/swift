@@ -61,7 +61,7 @@ namespace {
     /// Returns null if no module can be loaded.
     Module *getModule(ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
   };
-}
+} // end anonymous namespace
 
 Module *
 NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {

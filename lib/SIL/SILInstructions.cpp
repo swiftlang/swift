@@ -1336,7 +1336,7 @@ namespace {
 
     return nullptr;
   }
-}
+} // end anonymous namespace
 
 NullablePtr<EnumElementDecl> SelectEnumInstBase::getUniqueCaseForDefault() {
   return getUniqueCaseForDefaultValue(this, getEnumOperand());

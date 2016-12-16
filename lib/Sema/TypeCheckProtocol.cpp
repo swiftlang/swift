@@ -492,7 +492,7 @@ namespace {
       : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
         RequiredAvailability(requiredAvailability) { }
   };
-}
+} // end anonymous namespace
 
 ///\ brief Decompose the given type into a set of tuple elements.
 static SmallVector<TupleTypeElt, 4> decomposeIntoTupleElements(Type type) {
@@ -1800,7 +1800,7 @@ namespace {
     /// witnesses are resolved and emitting any diagnostics.
     void checkConformance();
   };
-}
+} // end anonymous namespace
 
 /// \brief Add the next associated type deduction to the string representation
 /// of the deductions, used in diagnostics.
@@ -3240,7 +3240,7 @@ namespace {
     /// The witness from which the second type witness was inferred.
     ValueDecl *SecondWitness;
   };
-}
+} // end anonymous namespace
 
 void ConformanceChecker::resolveTypeWitnesses() {
   llvm::SetVector<AssociatedTypeDecl *> unresolvedAssocTypes;
@@ -4604,7 +4604,7 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
     Walker(TypeChecker &tc, DeclContext *dc, ProtocolDecl *proto)
       : TC(tc), DC(dc), Proto(proto) { }
 
-    virtual Action walkToTypePre(Type ty) {
+    Action walkToTypePre(Type ty) override {
       ConformanceCheckOptions options = ConformanceCheckFlags::InExpression
           | ConformanceCheckFlags::Used
           | ConformanceCheckFlags::SuppressDependencyTracking;
@@ -4823,7 +4823,7 @@ namespace {
     MoveToExtension,
     MoveToAnotherExtension
   };
-}
+} // end anonymous namespace
 
 /// Determine we can suppress the warning about a potential witness nearly
 /// matching an optional requirement by moving the declaration.
@@ -5409,7 +5409,7 @@ namespace {
     void recordWitness(ValueDecl *requirement, const RequirementMatch &match,
                        RequirementEnvironment &&reqEnvironment);
   };
-}
+} // end anonymous namespace
 
 ResolveWitnessResult
 DefaultWitnessChecker::resolveWitnessViaLookup(ValueDecl *requirement) {

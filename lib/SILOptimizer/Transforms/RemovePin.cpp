@@ -313,7 +313,7 @@ public:
     return true;
   }
 };
-}
+} // end anonymous namespace
 
 SILTransform *swift::createRemovePins() {
   return new RemovePinInsts();

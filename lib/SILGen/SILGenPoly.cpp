@@ -156,7 +156,8 @@ namespace {
                                    CanAnyFunctionType outputSubstType,
                                    const TypeLowering &expectedTL);
   };
-};
+} // end anonymous namespace
+;
 
 static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(Module *M, Type fromType, Type toType) {
@@ -901,7 +902,7 @@ namespace {
                                   inputTupleType,
                                   outputOrigType,
                                   outputTupleType,
-                                  *temp.get());
+                                  *temp);
 
           Outputs.push_back(temp->getManagedAddress());
           return;
@@ -1200,7 +1201,7 @@ namespace {
         auto temp = SGF.emitTemporary(Loc, outputTL);
         translateSingleInto(inputOrigType, inputSubstType,
                             outputOrigType, outputSubstType,
-                            input, *temp.get());
+                            input, *temp);
         Outputs.push_back(temp->getManagedAddress());
         return;
       }
@@ -1252,7 +1253,7 @@ namespace {
       return claimNext(OutputTypes);
     }
   };
-}
+} // end anonymous namespace
 
 /// Forward arguments according to a function type's ownership conventions.
 static void forwardFunctionArguments(SILGenFunction &gen,

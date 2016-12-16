@@ -602,7 +602,7 @@ namespace {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
   };
-}
+} // end anonymous namespace
 
 /// Constructs a type info which performs simple loads and stores of
 /// the given IR type.
@@ -1529,7 +1529,7 @@ namespace {
       return true;
     }
   };
-}
+} // end anonymous namespace
 
 static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
   assert(!isa<ProtocolDecl>(decl));

@@ -782,7 +782,7 @@ llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
     explicit RecordingTraversal(llvm::DenseMap<Expr *, Expr *> &parentMap)
       : ParentMap(parentMap) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto parent = Parent.getAsExpr())
         ParentMap[E] = parent;
 
@@ -805,13 +805,13 @@ llvm::DenseMap<Expr *, unsigned> Expr::getDepthMap() {
     explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &depthMap)
       : DepthMap(depthMap) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       DepthMap[E] = Depth;
       Depth++;
       return { true, E };
     }
 
-    virtual Expr *walkToExprPost(Expr *E) {
+    Expr *walkToExprPost(Expr *E) override {
       Depth--;
       return E;
     }
@@ -832,7 +832,7 @@ llvm::DenseMap<Expr *, unsigned> Expr::getPreorderIndexMap() {
     explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &indexMap)
       : IndexMap(indexMap) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       IndexMap[E] = Index;
       Index++;
       return { true, E };
@@ -1133,8 +1133,8 @@ static Expr *packSingleArgument(
     }
       
     auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                                 rParenLoc, /*hasTrailingClosure=*/false,
-                                 /*implicit=*/false);
+                                 rParenLoc, /*HasTrailingClosure=*/false,
+                                 /*Implicit=*/false);
     computeSingleArgumentType(ctx, arg, implicit);
     return arg;
   }
@@ -1178,8 +1178,8 @@ static Expr *packSingleArgument(
 
   auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels,
                                argLabelLocs, rParenLoc,
-                               /*hasTrailingClosure=*/true,
-                               /*implicit=*/false);
+                               /*HasTrailingClosure=*/true,
+                               /*Implicit=*/false);
   computeSingleArgumentType(ctx, arg, implicit);
 
   return arg;

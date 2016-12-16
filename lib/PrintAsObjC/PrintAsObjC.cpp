@@ -87,7 +87,7 @@ namespace {
     IsFunctionParam = true,
     IsNotFunctionParam = false,
   };
-}
+} // end anonymous namespace
 
 static StringRef getNameForObjC(const ValueDecl *VD,
                                 CustomNamesOnly_t customNamesOnly = Normal) {
@@ -2384,7 +2384,7 @@ public:
     return false;
   }
 };
-}
+} // end anonymous namespace
 
 bool swift::printAsObjC(llvm::raw_ostream &os, Module *M,
                         StringRef bridgingHeader,

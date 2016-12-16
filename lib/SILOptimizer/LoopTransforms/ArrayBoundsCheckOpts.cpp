@@ -1397,7 +1397,7 @@ public:
     }
   }
 };
-}
+} // end anonymous namespace
 
 SILTransform *swift::createABCOpt() {
   return new ABCOpt();

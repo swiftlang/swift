@@ -336,7 +336,7 @@ namespace {
       return ReferenceCounting::Native;
     }
   };
-}
+} // end anonymous namespace
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinNativeObject() {
   return new BuiltinNativeObjectTypeInfo(IGM.RefCountedPtrTy,
@@ -384,7 +384,7 @@ namespace {
       return storeHeapObjectExtraInhabitant(IGF, index, dest);
     }
   };
-}
+} // end anonymous namespace
 
 const LoadableTypeInfo *
 TypeConverter::createUnmanagedStorageType(llvm::Type *valueType) {
@@ -538,7 +538,7 @@ namespace {
       IGF.emitNativeWeakAssign(value, dest);
     }
   };
-}
+} // end anonymous namespace
 
 SpareBitVector IRGenModule::getWeakReferenceSpareBits() const {
   // The runtime needs to be able to freely manipulate live weak
@@ -766,7 +766,7 @@ namespace {
       IGF.emitUnknownWeakAssign(value, dest);
     }
   };
-}
+} // end anonymous namespace
 
 const TypeInfo *TypeConverter::createUnownedStorageType(llvm::Type *valueType,
                                                       ReferenceCounting style) {
@@ -1547,7 +1547,7 @@ public:
   {}
 };
 
-}
+} // end anonymous namespace
 
 const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // We can share a type info for all dynamic-sized heap metadata.

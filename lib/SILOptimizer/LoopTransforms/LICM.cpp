@@ -436,7 +436,7 @@ protected:
   /// \brief Optimize the current loop nest.
   void optimizeLoop(SILLoop *CurrentLoop, ReadSet &SafeReads);
 };
-}
+} // end anonymous namespace
 
 bool LoopTreeOptimization::optimize() {
   // Process loops bottom up in the loop tree.
@@ -576,7 +576,7 @@ public:
     }
   }
 };
-}
+} // end anonymous namespace
 
 SILTransform *swift::createLICM() {
   return new LICM(false);

@@ -219,7 +219,7 @@ namespace {
       return ReferenceCounting::ObjC;
     }
   };
-}
+} // end anonymous namespace
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinUnknownObject() {
   return new ObjCTypeInfo(IGM.ObjCPtrTy, IGM.getPointerSize(),
@@ -272,7 +272,7 @@ namespace {
       IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.SizeTy, 0), dest);
     }
   };
-}
+} // end anonymous namespace
 
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinBridgeObject() {
@@ -574,7 +574,7 @@ namespace {
 
 #undef FOREACH_FAMILY
   };
-}
+} // end anonymous namespace
 
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
                               llvm::Value *selfValue,

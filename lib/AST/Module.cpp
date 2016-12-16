@@ -1538,8 +1538,8 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   // FIXME: And there are more compact ways to encode a 16-byte value.
   buffer.reserve(buffer.size() + 2*llvm::array_lengthof(result));
   for (uint8_t byte : result) {
-    buffer.push_back(llvm::hexdigit(byte >> 4, /*lowercase=*/false));
-    buffer.push_back(llvm::hexdigit(byte & 0xF, /*lowercase=*/false));
+    buffer.push_back(llvm::hexdigit(byte >> 4, /*LowerCase=*/false));
+    buffer.push_back(llvm::hexdigit(byte & 0xF, /*LowerCase=*/false));
   }
 
   PrivateDiscriminator = getASTContext().getIdentifier(buffer);

@@ -322,7 +322,7 @@ struct MultiPayloadLayout {
   size_t payloadSize;
   size_t numTagBytes;
 };
-}
+} // end anonymous namespace
 
 static MultiPayloadLayout getMultiPayloadLayout(const EnumMetadata *enumType) {
   size_t payloadSize = enumType->getPayloadSize();

@@ -174,7 +174,7 @@ namespace {
     Yes,
     Partial
   };
-}
+} // end anonymous namespace
 
 /// This implements the lattice merge operation for 2 optional DIKinds.
 static Optional<DIKind> mergeKinds(Optional<DIKind> OK1, Optional<DIKind> OK2) {
@@ -321,7 +321,7 @@ namespace {
     AS.dump(OS);
     return OS;
   }
-}
+} // end anonymous namespace
 
 
 namespace {
