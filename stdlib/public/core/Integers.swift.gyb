@@ -2661,7 +2661,7 @@ public struct ${Self}
   @_transparent
   public var magnitude: U${Self} {
     let base = U${Self}(_value)
-    return self < 0 ? ~base + 1 : base
+    return self < (0 as ${Self}) ? ~base + 1 : base
   }
 % end
 
@@ -2889,7 +2889,7 @@ extension ${Self} {
 /// It has only an effect if the argument is a load or call.
 @_transparent
 public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
-  _sanityCheck(x >= 0)
+  _sanityCheck(x >= (0 as ${Self}))
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
 % end

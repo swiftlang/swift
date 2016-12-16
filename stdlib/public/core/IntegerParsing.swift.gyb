@@ -42,7 +42,7 @@ internal func _parseUnsignedAsciiAsUInt64(
     radix <= (10 + lower.count),
     "Radix exceeds what can be expressed using the English alphabet")
 
-  let uRadix = UInt64(bitPattern: Int64(radix))
+  let uRadix = UInt64(bitPattern: Int64(extendingOrTruncating: radix))
   var result: UInt64 = 0
   for c in u16 {
     let n: UInt64
@@ -95,7 +95,7 @@ internal func _parseAsciiAsUInt64(
 internal func _parseAsciiAsInt64(
   _ utf16: String.UTF16View, _ radix: Int, _ maximum: Int64
 ) -> Int64? {
-  _sanityCheck(maximum >= 0, "maximum should be non-negative")
+  _sanityCheck(maximum >= (0 as Int64), "maximum should be non-negative")
   if utf16.isEmpty { return nil }
   // Parse (optional) sign.
   let (digitsUTF16, hasMinus) = _parseOptionalAsciiSign(utf16)
