@@ -1137,6 +1137,44 @@ static Type resolveNestedIdentTypeComponent(
               bool diagnoseErrors,
               GenericTypeResolver *resolver,
               UnsatisfiedDependency *unsatisfiedDependency) {
+  // Local function to produce a diagnostic if the type we referenced was an
+  // associated type but the type itself was erroneous. We'll produce a
+  // diagnostic here if the diagnostic for the bad type witness would show up in
+  // a different context.
+  auto maybeDiagnoseBadConformanceRef = [&](AssociatedTypeDecl *assocType,
+                                            ProtocolConformance *conformance) {
+    // If we aren't emitting any diagnostics, we're done.
+    if (!diagnoseErrors)
+      return;
+
+    // If we weren't given a conformance, go look it up.
+    if (!conformance) {
+      if (auto conformanceRef =
+            TC.conformsToProtocol(
+              parentTy, assocType->getProtocol(), DC,
+              (ConformanceCheckFlags::InExpression|
+               ConformanceCheckFlags::SuppressDependencyTracking))) {
+        if (conformanceRef->isConcrete())
+          conformance = conformanceRef->getConcrete();
+      }
+    }
+
+    // If there is a conformance and it comes from the same source file as type
+    // resolution, don't diagnose.
+    if (conformance &&
+        conformance->getDeclContext()->getParentSourceFile() ==
+          DC->getParentSourceFile())
+      return;
+
+    // If any errors have occurred, don't bother diagnosing this cross-file
+    // issue.
+    if (TC.Context.Diags.hadAnyError())
+      return;
+
+    TC.diagnose(comp->getLoc(), diag::broken_associated_type_witness,
+                assocType->getFullName(), parentTy);
+  };
+
   // Short-circuiting.
   if (comp->isInvalid()) return ErrorType::get(TC.Context);
 
@@ -1182,8 +1220,15 @@ static Type resolveNestedIdentTypeComponent(
       }
 
       // FIXME: Establish that we need a type witness.
-      return conformance->getConcrete()->getTypeWitness(assocType, &TC)
-               .getReplacement();
+      auto memberType =
+        conformance->getConcrete()->getTypeWitness(assocType, &TC)
+          .getReplacement();
+
+      // Diagnose the bad reference if we need to.
+      if (memberType->hasError())
+        maybeDiagnoseBadConformanceRef(assocType, conformance->getConcrete());
+
+      return memberType;
     }
 
     // Otherwise, simply substitute the parent type into the member.
@@ -1316,6 +1361,10 @@ static Type resolveNestedIdentTypeComponent(
   // was marked invalid, just return ErrorType to silence downstream errors.
   if (member && member->isInvalid())
     memberType = ErrorType::get(TC.Context);
+
+  // Diagnose the bad reference if we need to.
+  if (member && isa<AssociatedTypeDecl>(member) && memberType->hasError())
+    maybeDiagnoseBadConformanceRef(cast<AssociatedTypeDecl>(member), nullptr);
 
   if (member)
     comp->setValue(member);
