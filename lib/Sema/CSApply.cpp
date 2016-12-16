@@ -5094,18 +5094,8 @@ ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) 
     auto singleExpr = returnStmt->getResult();
 
     tc.checkIgnoredExpr(singleExpr);
-
-    SmallVector<ASTNode, 1> elements;
-    elements.push_back(singleExpr);
-
-    auto braceStmt = BraceStmt::create(tc.Context,
-                                       closureExpr->getStartLoc(),
-                                       elements,
-                                       closureExpr->getEndLoc(),
-                                       /*implicit*/true);
-
-    closureExpr->setImplicit();
-    closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
+    // Strip off 'return' statement.
+    closureExpr->getBody()->getElements().back() = singleExpr;
   }
 
   return closureExpr;
