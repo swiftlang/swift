@@ -2966,15 +2966,22 @@ static Type substType(Type derivedType,
     if (auto known = substitutions(substOrig))
       return known;
 
-    // For archetypes, we can substitute the parent (if present).
-    auto archetype = substOrig->getAs<ArchetypeType>();
-    if (!archetype) return type;
-
-    // If we don't have a substitution for this type and it doesn't have a
-    // parent, then we're not substituting it.
-    auto parent = archetype->getParent();
-    if (!parent)
+    // If we failed to substitute a generic type parameter, give up.
+    if (substOrig->is<GenericTypeParamType>()) {
+      if (options.contains(SubstFlags::UseErrorType))
+        return ErrorType::get(type);
       return type;
+    }
+
+    auto archetype = substOrig->castTo<ArchetypeType>();
+
+    // For archetypes, we can substitute the parent (if present).
+    auto parent = archetype->getParent();
+    if (!parent) {
+      if (options.contains(SubstFlags::UseErrorType))
+        return ErrorType::get(type);
+      return type;
+    }
 
     // Substitute into the parent type.
     Type substParent = substType(parent, substitutions,
