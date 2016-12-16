@@ -344,10 +344,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
           SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
       });
 
-  if (!importerOpts.DisableModulesValidateSystemHeaders) {
-    invocationArgStrs.push_back("-fmodules-validate-system-headers");
-  }
-
   // Set C language options.
   if (triple.isOSDarwin()) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -485,6 +481,10 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     invocationArgStrs.push_back("-fapinotes-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
+  }
+
+  if (!importerOpts.DisableModulesValidateSystemHeaders) {
+    invocationArgStrs.push_back("-fmodules-validate-system-headers");
   }
 
   if (importerOpts.DetailedPreprocessingRecord) {
