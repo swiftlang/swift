@@ -2916,7 +2916,16 @@ static Type substType(Type derivedType,
                       TypeSubstitutionFn substitutions,
                       LookupConformanceFn lookupConformances,
                       SubstOptions options) {
+
+  // FIXME: Change getTypeOfMember() to not pass GenericFunctionType here
+  if (!derivedType->hasArchetype() &&
+      !derivedType->hasTypeParameter() &&
+      !derivedType->is<GenericFunctionType>())
+    return derivedType;
+
   return derivedType.transform([&](Type type) -> Type {
+    // FIXME: Add SIL versions of mapTypeIntoContext() and
+    // mapTypeOutOfContext() and use them appropriately
     assert((options.contains(SubstFlags::AllowLoweredTypes) ||
             !isa<SILFunctionType>(type.getPointer())) &&
            "should not be doing AST type-substitution on a lowered SIL type;"
