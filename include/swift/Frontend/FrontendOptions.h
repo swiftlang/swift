@@ -230,6 +230,9 @@ public:
 
   /// Indicates whether the playground transformation should be applied.
   bool PlaygroundTransform = false;
+  
+  /// Indicates whether the pc macro should be applied.
+  bool PCMacro = false;
 
   /// Indicates whether the playground transformation should omit
   /// instrumentation that has a high runtime performance impact.

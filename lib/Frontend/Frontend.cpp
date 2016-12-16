@@ -507,6 +507,13 @@ void CompilerInstance::performSema() {
     Diags.setSuppressWarnings(DidSuppressWarnings);
     
     if (mainIsPrimary && !Context->hadError() &&
+        Invocation.getFrontendOptions().PCMacro) {
+      performPCMacro(MainFile, PersistentState.getTopLevelContext());
+    }
+    
+    // Playground transform knows to look out for PCMacro's changes and not
+    // to playground log them.
+    if (mainIsPrimary && !Context->hadError() &&
         Invocation.getFrontendOptions().PlaygroundTransform)
       performPlaygroundTransform(MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);
     if (!mainIsPrimary) {

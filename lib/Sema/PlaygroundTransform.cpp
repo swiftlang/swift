@@ -14,26 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTNode.h"
-#include "swift/AST/ASTWalker.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/NameLookup.h"
-#include "swift/AST/Pattern.h"
-#include "swift/AST/Stmt.h"
-#include "swift/AST/Types.h"
-#include "swift/Parse/Lexer.h"
-#include "swift/Sema/IDETypeChecking.h"
-#include "swift/Subsystems.h"
-#include "TypeChecker.h"
+#include "InstrumenterSupport.h"
 
-#include <cstdio>
-#include <forward_list>
+#include "swift/Subsystems.h"
+
 #include <random>
 
 using namespace swift;
+using namespace swift::instrumenter_support;
 
 //===----------------------------------------------------------------------===//
 // performPlaygroundTransform
@@ -41,21 +29,7 @@ using namespace swift;
 
 namespace {
 
-template <class E> class Added {
-private:
-  E Contents;
-public:
-  Added() { }
-  Added(E NewContents) { Contents = NewContents; }
-  const Added<E> &operator=(const Added<E> &rhs) {
-    Contents = rhs.Contents;
-    return *this;
-  }
-  E &operator*() { return Contents; }
-  E &operator->() { return Contents; }
-};
-
-class Instrumenter {
+class Instrumenter : InstrumenterBase {
 private:
   std::mt19937_64 &RNG;
   ASTContext &Context;
@@ -140,41 +114,12 @@ private:
     }
     return EI;
   }
-    
-  class ClosureFinder : public ASTWalker {
-  private:
-    Instrumenter &I;
-  public:
-    ClosureFinder (Instrumenter &Inst) : I(Inst) { }
-    std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
-      if (isa<BraceStmt>(S)) {
-        return { false, S }; // don't walk into brace statements; we
-                             // need to respect nesting!
-      } else {
-        return { true, S };
-      }
-    }
-    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
-      if (ClosureExpr *CE = dyn_cast<ClosureExpr>(E)) {
-        BraceStmt *B = CE->getBody();
-        if (B) {
-          BraceStmt *NB = I.transformBraceStmt(B);
-          CE->setBody(NB, false);
-          // just with the entry and exit logging this is going to
-          // be more than a single expression!
-        }
-      }
-      return { true, E };
-    }
-  };
-    
-  ClosureFinder CF;
 
 public:
   Instrumenter(ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG, bool HP,
                unsigned &TmpNameIndex)
-      : RNG(RNG), Context(C), TypeCheckDC(DC), TmpNameIndex(TmpNameIndex),
-        HighPerformance(HP), CF(*this) {}
+      : RNG(RNG), Context(C), TypeCheckDC(DC),  TmpNameIndex(TmpNameIndex),
+        HighPerformance(HP) {}
 
   Stmt *transformStmt(Stmt *S) { 
     switch (S->getKind()) {
@@ -423,79 +368,6 @@ public:
       auto subExpr = E->getSemanticsProvidingExpr();
       return (E == subExpr ? nullptr : digForInoutDeclRef(subExpr));
     }
-  }
-
-  class ErrorGatherer : public DiagnosticConsumer {
-  private:
-    bool error = false;
-    DiagnosticEngine &diags;
-  public:
-    ErrorGatherer(DiagnosticEngine &diags) : diags(diags) {
-      diags.addConsumer(*this);
-    }
-    ~ErrorGatherer() override {
-      diags.takeConsumers();
-    }
-    void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                  DiagnosticKind Kind, StringRef Text,
-                                  const DiagnosticInfo &Info) override {
-      if (Kind == swift::DiagnosticKind::Error) {
-        error = true;
-      }
-      llvm::errs() << Text << "\n";
-    }
-    bool hadError() { 
-      return error;
-    }
-  };
-
-  class ErrorFinder : public ASTWalker {
-    bool error = false;
-  public:
-    ErrorFinder () { }
-    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
-      if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->hasError()) {
-        error = true;
-        return { false, E };
-      }
-      return { true, E };
-    }
-    bool walkToDeclPre(Decl *D) override {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-        if (!VD->hasInterfaceType() ||
-            VD->getInterfaceType()->hasError()) {
-          error = true;
-          return false;
-        }
-      }
-      return true;
-    }
-    bool hadError() { 
-      return error;
-    }
-  };
-
-  template <class T> bool doTypeCheck(ASTContext &Ctx,
-                                      DeclContext *DC,
-                                      Added<T*> &parsedExpr) {
-    DiagnosticEngine diags(Ctx.SourceMgr);
-    ErrorGatherer errorGatherer(diags);
-  
-    TypeChecker TC(Ctx, diags);
-
-    Expr *E = *parsedExpr;
-    TC.typeCheckExpression(E, DC);
-    parsedExpr = Added<T*>(dyn_cast<T>(E));
-    
-    if (*parsedExpr) {
-      ErrorFinder errorFinder;
-      parsedExpr->walk(errorFinder);
-      if (!errorFinder.hadError() && !errorGatherer.hadError()) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
   BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) {
@@ -975,6 +847,12 @@ public:
   Added<Stmt *> buildLoggerCallWithArgs(const char *LoggerName,
                                         MutableArrayRef<Expr *> Args,
                                         SourceRange SR) {
+    // If something doesn't have a valid source range it can not be playground
+    // logged. For example, a PC Macro event.
+    if (!SR.isValid()) {
+      return nullptr;
+    }
+    
     std::pair<unsigned, unsigned> StartLC =
       Context.SourceMgr.getLineAndColumn(SR.Start);
 

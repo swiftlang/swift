@@ -193,6 +193,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.PlaygroundHighPerformance |=
     Args.hasArg(OPT_playground_high_performance);
 
+  // This can be enabled independently of the playground transform.
+  Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
+
   if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
     if (A->getOption().matches(OPT_help)) {
       Opts.PrintHelp = true;
