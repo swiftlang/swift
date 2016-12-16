@@ -6689,9 +6689,13 @@ void ClangImporter::Implementation::finishProtocolConformance(
                        inheritedProtos.end(),
                        [](ProtocolDecl * const *left,
                           ProtocolDecl * const *right) -> int {
-    // We know all Objective-C protocols have unique names.
+    // We know all Objective-C protocols in a translation unit have unique
+    // names, so go by the Objective-C name.
     auto getDeclName = [](const ProtocolDecl *proto) -> StringRef {
-      return cast<clang::ObjCProtocolDecl>(proto->getClangDecl())->getName();
+      if (auto *objCAttr = proto->getAttrs().getAttribute<ObjCAttr>())
+        if (auto name = objCAttr->getName())
+          return name.getValue().getSelectorPieces().front().str();
+      return proto->getName().str();
     };
     return getDeclName(*left).compare(getDeclName(*right));
   });
