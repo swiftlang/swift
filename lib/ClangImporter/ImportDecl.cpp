@@ -243,19 +243,19 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     switch(CTypeKind) {
     case MappedCTypeKind::FloatIEEEsingle:
       assert(Bitwidth == 32 && "FloatIEEEsingle should be 32 bits wide");
-      if (&Sem != &APFloat::IEEEsingle)
+      if (&Sem != &APFloat::IEEEsingle())
         return std::make_pair(Type(), "");
       break;
 
     case MappedCTypeKind::FloatIEEEdouble:
       assert(Bitwidth == 64 && "FloatIEEEdouble should be 64 bits wide");
-      if (&Sem != &APFloat::IEEEdouble)
+      if (&Sem != &APFloat::IEEEdouble())
         return std::make_pair(Type(), "");
       break;
 
     case MappedCTypeKind::FloatX87DoubleExtended:
       assert(Bitwidth == 80 && "FloatX87DoubleExtended should be 80 bits wide");
-      if (&Sem != &APFloat::x87DoubleExtended)
+      if (&Sem != &APFloat::x87DoubleExtended())
         return std::make_pair(Type(), "");
       break;
 

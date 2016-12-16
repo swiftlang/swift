@@ -1404,12 +1404,12 @@ Identifier GenericTypeParamType::getName() const {
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   switch (getFPKind()) {
-  case BuiltinFloatType::IEEE16:  return APFloat::IEEEhalf;
-  case BuiltinFloatType::IEEE32:  return APFloat::IEEEsingle;
-  case BuiltinFloatType::IEEE64:  return APFloat::IEEEdouble;
-  case BuiltinFloatType::IEEE80:  return APFloat::x87DoubleExtended;
-  case BuiltinFloatType::IEEE128: return APFloat::IEEEquad;
-  case BuiltinFloatType::PPC128:  return APFloat::PPCDoubleDouble;
+  case BuiltinFloatType::IEEE16:  return APFloat::IEEEhalf();
+  case BuiltinFloatType::IEEE32:  return APFloat::IEEEsingle();
+  case BuiltinFloatType::IEEE64:  return APFloat::IEEEdouble();
+  case BuiltinFloatType::IEEE80:  return APFloat::x87DoubleExtended();
+  case BuiltinFloatType::IEEE128: return APFloat::IEEEquad();
+  case BuiltinFloatType::PPC128:  return APFloat::PPCDoubleDouble();
   }
   llvm::report_fatal_error("Unknown FP semantics");
 }

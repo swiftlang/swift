@@ -552,17 +552,17 @@ namespace {
     }
 
     llvm::Type *convertFloatingType(const llvm::fltSemantics &format) {
-      if (&format == &llvm::APFloat::IEEEhalf)
+      if (&format == &llvm::APFloat::IEEEhalf())
         return llvm::Type::getHalfTy(IGM.getLLVMContext());
-      if (&format == &llvm::APFloat::IEEEsingle)
+      if (&format == &llvm::APFloat::IEEEsingle())
         return llvm::Type::getFloatTy(IGM.getLLVMContext());
-      if (&format == &llvm::APFloat::IEEEdouble)
+      if (&format == &llvm::APFloat::IEEEdouble())
         return llvm::Type::getDoubleTy(IGM.getLLVMContext());
-      if (&format == &llvm::APFloat::IEEEquad)
+      if (&format == &llvm::APFloat::IEEEquad())
         return llvm::Type::getFP128Ty(IGM.getLLVMContext());
-      if (&format == &llvm::APFloat::PPCDoubleDouble)
+      if (&format == &llvm::APFloat::PPCDoubleDouble())
         return llvm::Type::getPPC_FP128Ty(IGM.getLLVMContext());
-      if (&format == &llvm::APFloat::x87DoubleExtended)
+      if (&format == &llvm::APFloat::x87DoubleExtended())
         return llvm::Type::getX86_FP80Ty(IGM.getLLVMContext());
       llvm_unreachable("bad float format");
     }
