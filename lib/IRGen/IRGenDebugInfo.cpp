@@ -135,8 +135,8 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   // Note that File + Dir need not result in a valid path.
   // Clang is doing the same thing here.
   TheCU = DBuilder.createCompileUnit(
-      Lang, AbsMainFile, Opts.DebugCompilationDir, Producer, IsOptimized,
-      Flags, MajorRuntimeVersion, SplitName,
+      Lang, DBuilder.createFile(AbsMainFile, Opts.DebugCompilationDir),
+      Producer, IsOptimized, Flags, MajorRuntimeVersion, SplitName,
       Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly);
