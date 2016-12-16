@@ -2481,18 +2481,29 @@ public struct ${Self}
 %       for x in binaryArithmetic['Arithmetic']:
   @_transparent
   public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
-    let (result, overflow) =
 %   if x.kind == '/':
+    // No LLVM primitives for checking overflow of division
+    // operations, so we check manually.
+    if _slowPath(rhs == (0 as ${Self})) {
+      _preconditionFailure("Remainder of or division by zero")
+    }
+%     if signed:
+    if _slowPath(
+      ${'lhs == %s.min && rhs == (-1 as %s)' % (Self, Self)}
+    ) {
+      _preconditionFailure("Overflow in remainder of or division")
+    }
+%     end
+    let (result, overflow) =
       (Builtin.${u}${x.llvmName}_Int${bits}(lhs._value, rhs._value),
       false._value)
 %   else:
-  // !!! This implementation is incorrect for division and modulo, as it does
-  // not catch division by zero.
+    let (result, overflow) =
       Builtin.${u}${x.llvmName}_with_overflow_Int${bits}(
         lhs._value, rhs._value, true._value)
 %   end
-      Builtin.condfail(overflow)
-      lhs = ${Self}(result)
+    Builtin.condfail(overflow)
+    lhs = ${Self}(result)
   }
 %       end
 // end of FIXME(integers)
@@ -2534,7 +2545,7 @@ public struct ${Self}
   @_transparent
   public static func %=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
     if _slowPath(rhs == (0 as ${Self})) {
-      preconditionFailure("Remainder of division by zero")
+      _preconditionFailure("Remainder of division by zero")
     }
 
     let (newStorage, _) = (

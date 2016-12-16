@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t ; mkdir -p %t
 // RUN: %gyb -DWORD_BITS=%target-ptrsize %s -o %t/Integers.swift
-// RUN: %line-directive %t/Integers.swift -- %target-build-swift %t/Integers.swift -o %t/a.out
+// RUN: %line-directive %t/Integers.swift -- %target-build-swift %t/Integers.swift -Onone -o %t/a.out
 // RUN: %line-directive %t/Integers.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
@@ -543,6 +543,32 @@ tests.test("DoubleWidthMultiplyAndDivide/Int8") {
   let (quotient, remainder) = Int8.doubleWidthDivide(res, b)
   expectEqual(a, quotient)
   expectEqual(0, remainder)
+}
+
+tests.test("Remainder/DividingBy0") {
+  expectCrashLater()
+  _ = 42 % 0
+}
+
+tests.test("Division/By0") {
+  expectCrashLater()
+  _ = 42 / 0
+}
+
+tests.test("DivideMinByMinusOne") {
+  func f(_ x: Int) -> Int {
+    return x / -1
+  }
+  expectCrashLater()
+  _ = f(Int.min)
+}
+
+tests.test("MultiplyMinByMinusOne") {
+  func f(_ x: Int) -> Int {
+    return x * -1
+  }
+  expectCrashLater()
+  _ = f(Int.min)
 }
 
 
