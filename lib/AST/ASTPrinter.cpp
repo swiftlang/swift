@@ -2340,7 +2340,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   if (decl->hasInterfaceType()) {
     Printer << ": ";
     auto tyLoc = decl->getTypeLoc();
-    if (!tyLoc.getTypeRepr())
+    if (!tyLoc.getTypeRepr() || tyLoc.getTypeRepr()->isInconsistent())
       tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
     printTypeLoc(tyLoc);
   }

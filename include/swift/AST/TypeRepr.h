@@ -48,7 +48,7 @@ class alignas(8) TypeRepr {
   class TypeReprBitfields {
     friend class TypeRepr;
     /// The subclass of TypeRepr that this is.
-    unsigned Kind : 6;
+    unsigned Kind : 5;
 
     /// Whether this type representation is known to contain an invalid
     /// type.
@@ -58,6 +58,10 @@ class alignas(8) TypeRepr {
     /// This is a hack related to how we resolve type exprs multiple times in
     /// generic contexts.
     unsigned Warned : 1;
+
+    /// Whether the type representation had a type that differs from its literal
+    /// content.
+    unsigned Inconsistent : 1;
   };
   enum { NumTypeReprBits = 8 };
   class TupleTypeReprBitfields {
@@ -79,6 +83,7 @@ protected:
     TypeReprBits.Kind = static_cast<unsigned>(K);
     TypeReprBits.Invalid = false;
     TypeReprBits.Warned = false;
+    TypeReprBits.Inconsistent = false;
   }
 
 private:
@@ -99,7 +104,12 @@ public:
   /// don't emit another one upon further reanalysis.
   bool isWarnedAbout() const { return TypeReprBits.Warned; }
   void setWarned() { TypeReprBits.Warned = true; }
-  
+
+  /// If the type checker believes the type representation's actual type is
+  /// inferred by more than the content of itself, we keep track of it.
+  bool isInconsistent() const { return TypeReprBits.Inconsistent; }
+  void setInconsistent() {  TypeReprBits.Inconsistent = true; }
+
   /// Get the representative location for pointing at this type.
   SourceLoc getLoc() const;
 
