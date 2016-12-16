@@ -5219,7 +5219,7 @@ public:
                                        base->getDescriptiveKind(), baseTy));
       }
 
-      if (fixItOverrideDeclarationTypes(TC, *activeDiag, decl, base))
+      if (fixItOverrideDeclarationTypes(*activeDiag, decl, base))
         return true;
     }
 
