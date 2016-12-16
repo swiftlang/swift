@@ -2317,6 +2317,12 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
   if (!options.excludeAttrKind(TAK_escaping) && flags.isEscaping())
     printer << "@escaping ";
 }
+static bool isVariadicParam(VarDecl *decl) {
+  if (auto PV = dyn_cast<ParamDecl>(decl)) {
+    return PV->isVariadic();
+  }
+  return false;
+}
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
@@ -2340,7 +2346,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   if (decl->hasInterfaceType()) {
     Printer << ": ";
     auto tyLoc = decl->getTypeLoc();
-    if (!tyLoc.getTypeRepr() || tyLoc.getTypeRepr()->isInconsistent())
+    if (!tyLoc.getTypeRepr() || isVariadicParam(decl))
       tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
     printTypeLoc(tyLoc);
   }

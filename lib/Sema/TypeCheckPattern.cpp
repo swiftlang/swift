@@ -762,7 +762,6 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
       hadError = true;
     }
     decl->getTypeLoc().setType(Ty);
-    decl->getTypeLoc().getTypeRepr()->setInconsistent();
   }
   // If the param is not a 'let' and it is not an 'inout'.
   // It must be a 'var'. Provide helpful diagnostics like a shadow copy
