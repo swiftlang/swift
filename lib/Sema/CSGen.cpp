@@ -1330,8 +1330,11 @@ namespace {
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         if (VD->getInterfaceType() &&
             !VD->getInterfaceType()->is<TypeVariableType>()) {
-          auto type = VD->getDeclContext()->mapTypeIntoContext(
-              VD->getInterfaceType());
+          // FIXME: ParamDecls in closures shouldn't get an interface type
+          // until the constraint system has been solved.
+          auto type = VD->getInterfaceType();
+          if (type->hasTypeParameter())
+            type = VD->getDeclContext()->mapTypeIntoContext(type);
           CS.setFavoredType(E, type.getPointer());
         }
       }

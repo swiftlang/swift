@@ -295,17 +295,13 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
 }
 
 Type DeclContext::mapTypeIntoContext(Type type) const {
-  if (auto genericEnv = getGenericEnvironmentOfContext())
-    return genericEnv->mapTypeIntoContext(getParentModule(), type);
-
-  return type;
+  return ArchetypeBuilder::mapTypeIntoContext(
+      getParentModule(), getGenericEnvironmentOfContext(), type);
 }
 
 Type DeclContext::mapTypeOutOfContext(Type type) const {
-  if (auto genericEnv = getGenericEnvironmentOfContext())
-    return genericEnv->mapTypeOutOfContext(type);
-
-  return type;
+  return ArchetypeBuilder::mapTypeOutOfContext(
+      getGenericEnvironmentOfContext(), type);
 }
 
 DeclContext *DeclContext::getLocalContext() {
