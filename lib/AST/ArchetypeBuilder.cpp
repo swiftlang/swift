@@ -1956,10 +1956,7 @@ Type ArchetypeBuilder::mapTypeIntoContext(const DeclContext *dc, Type type) {
 Type ArchetypeBuilder::mapTypeIntoContext(ModuleDecl *M,
                                           GenericEnvironment *env,
                                           Type type) {
-  auto canType = type->getCanonicalType();
-  assert(!canType->hasArchetype() && "already have a contextual type");
-  if (!canType->hasTypeParameter())
-    return type;
+  assert(!type->hasArchetype() && "already have a contextual type");
 
   if (!env)
     return type.substDependentTypesWithErrorTypes();
@@ -1976,10 +1973,7 @@ ArchetypeBuilder::mapTypeOutOfContext(const DeclContext *dc, Type type) {
 Type
 ArchetypeBuilder::mapTypeOutOfContext(GenericEnvironment *env,
                                       Type type) {
-  auto canType = type->getCanonicalType();
-  assert(!canType->hasTypeParameter() && "already have an interface type");
-  if (!canType->hasArchetype())
-    return type;
+  assert(!type->hasTypeParameter() && "already have an interface type");
 
   if (!env)
     return type.substDependentTypesWithErrorTypes();
