@@ -4318,15 +4318,19 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     // Generic signature and environment.
     GenericSignature *syntheticSig = nullptr;
     GenericEnvironment *syntheticEnv = nullptr;
+
+    // Requirement -> synthetic map.
+    SubstitutionMap reqToSyntheticMap;
+    bool hasReqToSyntheticMap = false;
     if (unsigned numGenericParams = *rawIDIter++) {
-      // Generic parameters.
+      // Generic parameters of the synthetic environment.
       SmallVector<GenericTypeParamType *, 2> genericParams;
       while (numGenericParams--) {
         genericParams.push_back(
           getType(*rawIDIter++)->castTo<GenericTypeParamType>());
       }
 
-      // Generic requirements.
+      // Generic requirements of the synthetic environment.
       SmallVector<Requirement, 4> requirements;
       readGenericRequirements(requirements, DeclTypeCursor);
 
@@ -4339,24 +4343,23 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       builder.addGenericSignature(syntheticSig);
       builder.finalize(SourceLoc());
       syntheticEnv = builder.getGenericEnvironment(syntheticSig);
-    }
 
-    // Requirement -> synthetic map.
-    SubstitutionMap reqToSyntheticMap;
-    bool hasReqToSyntheticMap = false;
-    if (unsigned numEntries = *rawIDIter++) {
+      // Requirement -> synthetic map.
       hasReqToSyntheticMap = true;
-      while (numEntries--) {
-        auto first = getType(*rawIDIter++);
-        auto second = getType(*rawIDIter++);
-        reqToSyntheticMap.addSubstitution(first->getCanonicalType(), second);
+      auto reqSignature =
+        req->getInnermostDeclContext()->getGenericSignatureOfContext();
+      for (auto reqGP : reqSignature->getGenericParams()) {
+        auto canonicalGP =
+          cast<GenericTypeParamType>(reqGP->getCanonicalType());
+        auto concreteTy = getType(*rawIDIter++);
+        reqToSyntheticMap.addSubstitution(canonicalGP, concreteTy);
 
         if (unsigned numConformances = *rawIDIter++) {
           SmallVector<ProtocolConformanceRef, 2> conformances;
           while (numConformances--) {
             conformances.push_back(readConformance(DeclTypeCursor));
           }
-          reqToSyntheticMap.addConformances(first->getCanonicalType(),
+          reqToSyntheticMap.addConformances(canonicalGP,
                                             ctx.AllocateCopy(conformances));
         }
       }
