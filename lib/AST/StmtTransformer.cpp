@@ -1,4 +1,4 @@
-//===--- Stmt.cpp - Swift Language Statement ASTs -------------------------===//
+//===--- StmtTransformer.cpp - Swift Language Statement ASTs --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
