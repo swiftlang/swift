@@ -858,9 +858,13 @@ NodePointer Demangler::demangleMetatype() {
     case 'A':
       return createWithChild(Node::Kind::ReflectionMetadataAssocTypeDescriptor,
                              popProtocolConformance());
-    case 'C':
+    case 'C': {
+      NodePointer Ty = popNode(Node::Kind::Type);
+      if (!Ty || !isNominal(Ty->getChild(0)->getKind()))
+        return nullptr;
       return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
-                             popNode(isNominal));
+                             Ty->getChild(0));
+    }
     default:
       return nullptr;
   }
