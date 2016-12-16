@@ -1241,7 +1241,7 @@ static SDKNode *constructVarNode(SDKContext &Ctx, ValueDecl *VD) {
 
 static SDKNode *constructTypeAliasNode(SDKContext &Ctx,TypeAliasDecl *TAD) {
   auto Alias = SDKNodeInitInfo(Ctx, TAD).createSDKNode(SDKNodeKind::TypeAlias);
-  Alias->addChild(constructTypeNode(Ctx, TAD->getUnderlyingType()));
+  Alias->addChild(constructTypeNode(Ctx, TAD->getUnderlyingTypeLoc().getType()));
   return Alias;
 }
 

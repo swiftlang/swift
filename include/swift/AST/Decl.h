@@ -72,6 +72,7 @@ namespace swift {
   class TypeAliasDecl;
   class Stmt;
   class SubscriptDecl;
+  class UnboundGenericType;
   class ValueDecl;
   class VarDecl;
 
@@ -413,9 +414,10 @@ class alignas(1 << DeclAlignInBits) Decl {
     friend class TypeAliasDecl;
     unsigned : NumGenericTypeDeclBits;
 
-    /// Whether the underlying type is an interface type that will be lazily
-    /// resolved to a context type.
-    unsigned HasInterfaceUnderlyingType : 1;
+    /// Whether we have completed validation of the typealias.
+    /// This is necessary because unlike other declarations, a
+    /// typealias will not get an interface type right away.
+    unsigned HasCompletedValidation : 1;
   };
   enum { NumTypeAliasDeclBits = NumGenericTypeDeclBits + 1 };
   static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
@@ -2391,60 +2393,38 @@ public:
 /// TypeAliasDecl's always have 'MetatypeType' type.
 ///
 class TypeAliasDecl : public GenericTypeDecl {
-  /// The type that represents this (sugared) name alias.
-  mutable NameAliasType *AliasTy;
-
   SourceLoc TypeAliasLoc;           // The location of the 'typealias' keyword
-  mutable TypeLoc UnderlyingTy;
-
-  Type computeUnderlyingContextType() const;
+  TypeLoc UnderlyingTy;
 
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                SourceLoc NameLoc, TypeLoc UnderlyingTy,
-                GenericParamList *GenericParams, DeclContext *DC);
+                SourceLoc NameLoc, GenericParamList *GenericParams,
+                DeclContext *DC);
 
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
   SourceRange getSourceRange() const;
 
-  /// getUnderlyingType - Returns the underlying type, which is
-  /// assumed to have been set.
-  Type getUnderlyingType() const {
-    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
-      return computeUnderlyingContextType();
-
-    assert(!UnderlyingTy.getType().isNull() &&
-           "getting invalid underlying type");
-    return UnderlyingTy.getType();
-  }
-
-  /// computeType - Compute the type (and declared type) of this type alias;
-  /// can only be called after the alias type has been resolved.
-  void computeType();
-
-  /// \brief Determine whether this type alias has an underlying type.
-  bool hasUnderlyingType() const {
-    return !UnderlyingTy.getType().isNull();
-  }
-
   TypeLoc &getUnderlyingTypeLoc() {
-    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
-      (void)computeUnderlyingContextType();
-
     return UnderlyingTy;
   }
   const TypeLoc &getUnderlyingTypeLoc() const {
-    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
-      (void)computeUnderlyingContextType();
-
     return UnderlyingTy;
   }
 
-  /// Set the underlying type after deserialization.
-  void setDeserializedUnderlyingType(Type type);
+  /// Set the underlying type, for deserialization and synthesized
+  /// aliases.
+  void setUnderlyingType(Type type);
 
-  /// getAliasType - Return the sugared version of this decl as a Type.
-  NameAliasType *getAliasType() const { return AliasTy; }
+  bool hasCompletedValidation() const {
+    return TypeAliasDeclBits.HasCompletedValidation;
+  }
+
+  void setHasCompletedValidation() {
+    TypeAliasDeclBits.HasCompletedValidation = 1;
+  }
+
+  /// For generic typealiases, return the unbound generic type.
+  UnboundGenericType *getUnboundGenericType() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TypeAlias;
@@ -4164,10 +4144,7 @@ protected:
   /// This is the type specified, including location information.
   TypeLoc typeLoc;
 
-  mutable Type typeInContext;
-
-  /// Compute the type in context from the interface type.
-  Type computeTypeInContextSlow() const;
+  Type typeInContext;
 
 public:
   VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
@@ -4190,15 +4167,13 @@ public:
   bool hasType() const {
     // We have a type if either the type has been computed already or if
     // this is a deserialized declaration with an interface type.
-    return typeInContext ||
-      (hasInterfaceType() && !getDeclContext()->getParentSourceFile());
+    return !typeInContext.isNull();
   }
 
   /// Get the type of the variable within its context. If the context is generic,
   /// this will use archetypes.
   Type getType() const {
-    if (!typeInContext)
-      return computeTypeInContextSlow();
+    assert(!typeInContext.isNull() && "no contextual type set yet");
     return typeInContext;
   }
 
@@ -4414,7 +4389,7 @@ public:
   /// type wrapping it.
   Type getVarargBaseTy() const {
     assert(isVariadic());
-    return getVarargBaseTy(getType());
+    return getVarargBaseTy(getInterfaceType());
   }
   
   SourceRange getSourceRange() const;

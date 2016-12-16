@@ -932,9 +932,9 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
 // -- MagicMirror implementation.
 
 #define MIRROR_CONFORMANCE_SYM(Mirror, Subst) \
-  SELECT_MANGLING(_TWPV##Mirror##s7_Mirrors , _S##Mirror##Vs01_##Subst##0sWP)
+  SELECT_MANGLING(WPV##Mirror##s7_Mirrors , Mirror##Vs01_##Subst##0sWP)
 #define OBJC_MIRROR_CONFORMANCE_SYM() \
-  SELECT_MANGLING(_TWPVs11_ObjCMirrors7_Mirrors, _Ss11_ObjCMirrorVs7_MirrorsWP)
+  SELECT_MANGLING(WPVs11_ObjCMirrors7_Mirrors, s11_ObjCMirrorVs7_MirrorsWP)
 
 // Addresses of the type metadata and Mirror witness tables for the primitive
 // mirrors.

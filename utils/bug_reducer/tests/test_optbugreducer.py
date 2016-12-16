@@ -33,7 +33,12 @@ class OptBugReducerTestCase(unittest.TestCase):
         self.reducer = os.path.join(os.path.dirname(self.file_dir),
                                     'bug_reducer', 'bug_reducer.py')
         self.build_dir = os.path.abspath(os.environ['BUGREDUCE_TEST_SWIFT_OBJ_ROOT'])
-        self.tmp_dir = os.path.abspath(os.environ['BUGREDUCE_TEST_TMP_DIR'])
+
+        (root, _) = os.path.splitext(os.path.abspath(__file__))
+        self.root_basename = ''.join(os.path.basename(root).split('_'))
+        self.tmp_dir = os.path.join(os.path.abspath(os.environ['BUGREDUCE_TEST_TMP_DIR']),
+                                    self.root_basename)
+        subprocess.call(['mkdir', '-p', self.tmp_dir])
 
         self.module_cache = os.path.join(self.tmp_dir, 'module_cache')
         self.sdk = subprocess.check_output(['xcrun', '--sdk', 'macosx',
@@ -57,10 +62,8 @@ class OptBugReducerTestCase(unittest.TestCase):
         os.makedirs(self.module_cache)
 
     def _get_test_file_path(self, module_name):
-        (root, _) = os.path.splitext(os.path.abspath(__file__))
-        root_basename = ''.join(os.path.basename(root).split('_'))
         return os.path.join(self.file_dir,
-                            '{}_{}.swift'.format(root_basename, module_name))
+                            '{}_{}.swift'.format(self.root_basename, module_name))
 
     def _get_sib_file_path(self, filename):
         (root, ext) = os.path.splitext(filename)
@@ -77,13 +80,11 @@ class OptBugReducerTestCase(unittest.TestCase):
                 '-resource-dir', os.path.join(self.build_dir, 'lib', 'swift'),
                 '-o', self._get_sib_file_path(input_file_path),
                 input_file_path]
-        #print ' '.join(args)
-        return subprocess.check_call(args)
+        subprocess.call(args)
 
     def test_basic(self):
         name = 'testbasic'
-        result_code = self.run_swiftc_command(name)
-        assert result_code == 0, "Failed initial compilation"
+        self.run_swiftc_command(name)
         args = [
             self.reducer,
             'opt',
@@ -106,8 +107,7 @@ class OptBugReducerTestCase(unittest.TestCase):
 
     def test_suffix_in_need_of_prefix(self):
         name = 'testsuffixinneedofprefix'
-        result_code = self.run_swiftc_command(name)
-        assert result_code == 0, "Failed initial compilation"
+        self.run_swiftc_command(name)
         args = [
             self.reducer,
             'opt',
@@ -127,6 +127,32 @@ class OptBugReducerTestCase(unittest.TestCase):
         output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
         output_matches = [1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 0)
+
+    def test_reduce_function(self):
+        name = 'testreducefunction'
+        self.run_swiftc_command(name)
+        args = [
+            self.reducer,
+            'opt',
+            self.build_dir,
+            self._get_sib_file_path(self._get_test_file_path(name)),
+            '--sdk=%s' % self.sdk,
+            '--module-cache=%s' % self.module_cache,
+            '--module-name=%s' % name,
+            '--work-dir=%s' % self.tmp_dir,
+            '--extra-arg=-bug-reducer-tester-target-func=__TF_test_target',
+            '--reduce-sil'
+        ]
+        args.extend(self.passes)
+        output = subprocess.check_output(args).split("\n")
+        self.assertTrue('*** Found miscompiling passes!' in output)
+        self.assertTrue('*** Final Functions: _TF18testreducefunction6foo413FT_T_')
+        self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
+        re_end = 'testoptbugreducer_testreducefunction_initial_'
+        re_end += 'a490c440d7e84b77e5b134720b298d2c.sib'
+        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
+        output_matches = [1 for o in output if output_file_re.match(o) is not None]
+        self.assertEquals(sum(output_matches), 1)
 
 
 if __name__ == '__main__':

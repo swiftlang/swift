@@ -92,7 +92,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       remangled = name;
     } else {
       remangled = swift::Demangle::mangleNode(pointer,
-                                        /*NewMangling*/ name.startswith("_S"));
+                          /*NewMangling*/ name.startswith(MANGLING_PREFIX_STR));
       if (name != remangled) {
         llvm::errs() << "\nError: re-mangled name \n  " << remangled
                      << "\ndoes not match original name\n  " << name << '\n';

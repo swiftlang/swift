@@ -114,18 +114,17 @@ Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
+  auto *dc = decl->getDeclContext();
+
   // Hack for 'out of context' GenericTypeParamDecls when resolving
   // a generic typealias
   if (auto *paramDecl = dyn_cast<GenericTypeParamDecl>(decl)) {
-    return decl->getDeclContext()->getGenericEnvironmentOfContext()
-        ->mapTypeIntoContext(paramDecl->getDeclaredInterfaceType()
-            ->castTo<GenericTypeParamType>());
+    return dc->mapTypeIntoContext(paramDecl->getDeclaredInterfaceType());
   }
 
-  auto *aliasDecl = cast<TypeAliasDecl>(decl);
-  if (aliasDecl->isInvalid())
-    return ErrorType::get(aliasDecl->getASTContext());
-  return aliasDecl->getAliasType();
+  return ArchetypeBuilder::mapTypeIntoContext(
+      dc->getParentModule(), GenericEnv,
+      decl->getDeclaredInterfaceType());
 }
 
 void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type) {
@@ -138,10 +137,8 @@ void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type)
   // When type checking functions, the CompleteGenericTypeResolver sets
   // the interface type.
   if (!decl->hasInterfaceType())
-    decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
-        decl->getDeclContext()->getParentModule(),
-        GenericEnv,
-        type));
+    decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(GenericEnv,
+                                                                 type));
 }
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(

@@ -1,16 +1,27 @@
 // RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
 
-struct Val {
-}
+import Builtin
 
 // CHECK-LABEL: sil @test_copy_release_value
-sil @test_copy_release_value : $(Val) -> (Val) {
-// CHECK: bb0([[T0:%[0-9]+]] : $Val):
-bb0(%0 : $Val):
-  %1 = copy_value %0 : $Val
-  destroy_value %0 : $Val
-  return %1 : $Val
-// CHECK-NEXT: [[COPY_RESULT:%.*]] = copy_value [[T0]] : $Val
-// CHECK-NEXT: destroy_value [[T0]] : $Val
+// CHECK: bb0([[T0:%[0-9]+]] : $Builtin.NativeObject):
+// CHECK-NEXT: [[COPY_RESULT:%.*]] = copy_value [[T0]] : $Builtin.NativeObject
+// CHECK-NEXT: destroy_value [[T0]] : $Builtin.NativeObject
 // CHECK-NEXT: return [[COPY_RESULT]]
+sil @test_copy_release_value : $@convention(thin) (Builtin.NativeObject) -> Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil @test_copy_unowned_value : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[T0:%[0-9]+]] : $@sil_unowned Builtin.NativeObject):
+// CHECK-NEXT: [[COPY_RESULT:%.*]] = copy_unowned_value [[T0]] : $@sil_unowned Builtin.NativeObject
+// CHECK-NEXT: destroy_value [[T0]] : $@sil_unowned Builtin.NativeObject
+// CHECK-NEXT: return [[COPY_RESULT]] : $Builtin.NativeObject
+sil @test_copy_unowned_value : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $@sil_unowned Builtin.NativeObject):
+  %1 = copy_unowned_value %0 : $@sil_unowned Builtin.NativeObject
+  destroy_value %0 : $@sil_unowned Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
 }

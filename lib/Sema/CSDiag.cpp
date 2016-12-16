@@ -355,7 +355,7 @@ tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc, const Expr *expr,
     const ParamDecl *param = paramList->getArray().back();
 
     // Sanity-check that the trailing closure corresponds to this parameter.
-    if (!param->getType()->is<AnyFunctionType>())
+    if (!param->getInterfaceType()->is<AnyFunctionType>())
       return false;
 
     Identifier trailingClosureLabel = param->getArgumentName();
@@ -4302,7 +4302,8 @@ static bool isSymmetricBinaryOperator(const CalleeCandidateInfo &CCI) {
     if (params->size() != 2) return false;
 
     // Require the types to be the same.
-    if (!params->get(0)->getType()->isEqual(params->get(1)->getType()))
+    if (!params->get(0)->getInterfaceType()->isEqual(
+          params->get(1)->getInterfaceType()))
       return false;
   }
 
@@ -7071,7 +7072,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
     if (auto *nominal = dyn_cast<NominalTypeDecl>(FoundDecl))
       type = nominal->getDeclaredType();
     else if (auto *typeAlias = dyn_cast<TypeAliasDecl>(FoundDecl))
-      type = typeAlias->getAliasType();
+      type = typeAlias->getUnboundGenericType();
     else
       type = FoundDecl->getDeclaredInterfaceType();
     tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype, type);
@@ -7254,7 +7255,9 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
     unsigned numConstraints = 0;
     {
       llvm::SmallVector<Constraint *, 2> constraints;
-      CS->getConstraintGraph().gatherConstraints(tv, constraints);
+      CS->getConstraintGraph().gatherConstraints(
+                             tv, constraints,
+                             ConstraintGraph::GatheringKind::EquivalenceClass);
 
       for (auto constraint : constraints) {
         // We are not interested in ConformsTo constraints because

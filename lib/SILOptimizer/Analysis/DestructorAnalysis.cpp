@@ -75,7 +75,7 @@ bool DestructorAnalysis::isSafeType(Type Ty) {
 
     // Check the stored properties.
     for (auto SP : Struct->getStoredProperties())
-      if (!isSafeType(SP->getType()))
+      if (!isSafeType(SP->getInterfaceType()))
         return cacheResult(Canonical, false);
 
     return cacheResult(Canonical, true);

@@ -550,3 +550,8 @@ SILType::canUseExistentialRepresentation(SILModule &M,
   }
 }
 
+SILType SILType::getReferentType(SILModule &M) const {
+  ReferenceStorageType *Ty =
+      getSwiftRValueType()->castTo<ReferenceStorageType>();
+  return M.Types.getLoweredType(Ty->getReferentType()->getCanonicalType());
+}

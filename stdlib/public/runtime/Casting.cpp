@@ -2972,8 +2972,8 @@ id _swift_bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 //===----------------------------------------------------------------------===//
 
 #define BRIDGING_CONFORMANCE_SYM \
-  SELECT_MANGLING(_TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables, \
-                  _Ss19_BridgeableMetatypeVs21_ObjectiveCBridgeablesWP)
+  SELECT_MANGLING(WPVs19_BridgeableMetatypes21_ObjectiveCBridgeables, \
+                  s19_BridgeableMetatypeVs21_ObjectiveCBridgeablesWP)
 
 extern "C" const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
 

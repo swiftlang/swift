@@ -566,7 +566,8 @@ namespace {
     // be the disjunction constraint for the overload group.
     auto &CG = CS.getConstraintGraph();
     SmallVector<Constraint *, 4> constraints;
-    CG.gatherConstraints(tyvarType, constraints);
+    CG.gatherConstraints(tyvarType, constraints,
+                         ConstraintGraph::GatheringKind::EquivalenceClass);
     if (constraints.empty())
       return;
     
@@ -1300,7 +1301,8 @@ namespace {
       // for the decl that isn't bound to anything.  This will ensure that it
       // is considered ambiguous.
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
-        if (VD->hasType() && VD->getType()->is<UnresolvedType>()) {
+        if (VD->hasInterfaceType() &&
+            VD->getInterfaceType()->is<UnresolvedType>()) {
           return CS.createTypeVariable(CS.getConstraintLocator(E),
                                        TVO_CanBindToLValue);
         }
@@ -1326,8 +1328,11 @@ namespace {
                                         E->getFunctionRefKind()));
       
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
-        if (VD->getType() && !VD->getType()->is<TypeVariableType>()) {
-          CS.setFavoredType(E, VD->getType().getPointer());
+        if (VD->getInterfaceType() &&
+            !VD->getInterfaceType()->is<TypeVariableType>()) {
+          auto type = VD->getDeclContext()->mapTypeIntoContext(
+              VD->getInterfaceType());
+          CS.setFavoredType(E, type.getPointer());
         }
       }
 

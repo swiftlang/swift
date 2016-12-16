@@ -43,8 +43,9 @@ static unsigned getElementCountRec(CanType T,
 
       unsigned NumElements = 0;
       for (auto *VD : NTD->getStoredProperties())
-        NumElements += getElementCountRec(VD->getType()->getCanonicalType(),
-                                          false);
+        NumElements += getElementCountRec(
+            VD->getInterfaceType()->getCanonicalType(),
+            false);
       return NumElements;
     }
   }

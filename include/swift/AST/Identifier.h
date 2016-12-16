@@ -375,15 +375,15 @@ public:
   }
 
   friend bool operator<=(DeclName lhs, DeclName rhs) {
-    return lhs.compare(lhs) <= 0;
+    return lhs.compare(rhs) <= 0;
   }
 
   friend bool operator>(DeclName lhs, DeclName rhs) {
-    return lhs.compare(lhs) > 0;
+    return lhs.compare(rhs) > 0;
   }
 
   friend bool operator>=(DeclName lhs, DeclName rhs) {
-    return lhs.compare(lhs) >= 0;
+    return lhs.compare(rhs) >= 0;
   }
 
   void *getOpaqueValue() const { return SimpleOrCompound.getOpaqueValue(); }

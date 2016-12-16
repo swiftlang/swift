@@ -994,7 +994,8 @@ Types
   type ::= context decl-name 'a'             // Type alias (DWARF only)
   type ::= function-signature 'c'            // function type
   type ::= function-signature 'X' FUNCTION-KIND // special function type
-  type ::= type-list+ type 'G'               // bound generic type (one type-list per nesting level of type)
+  type ::= type 'y' (type* '_')* type* 'G'   // bound generic type (one type-list per nesting level of type)
+  type ::= type 'Sg'                         // optional type, shortcut for: type 'ySqG'
   type ::= type 'Xo'                         // @unowned type
   type ::= type 'Xu'                         // @unowned(unsafe) type
   type ::= type 'Xw'                         // @weak type

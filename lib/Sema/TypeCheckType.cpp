@@ -379,8 +379,13 @@ Type TypeChecker::resolveTypeInContext(
     // If this is a typealias not in type context, we still need the
     // interface type; the typealias might be in a function context, and
     // its underlying type might reference outer generic parameters.
-    if (isa<TypeAliasDecl>(typeDecl))
-      return resolver->resolveTypeOfDecl(typeDecl);
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      // For a generic typealias, return the unbound generic form of the type.
+      if (aliasDecl->getGenericParams())
+        return aliasDecl->getUnboundGenericType();
+
+      return resolver->resolveTypeOfDecl(aliasDecl);
+    }
 
     // When a nominal type used outside its context, return the unbound
     // generic form of the type.
@@ -614,9 +619,19 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
 
     // FIXME: Change callers to pass the right type in for generic typealiases
-    if (type->is<UnboundGenericType>() || isa<NameAliasType>(type.getPointer())) {
-      type = ArchetypeBuilder::mapTypeOutOfContext(TAD, TAD->getUnderlyingType());
-    }
+    if (type->is<UnboundGenericType>() || isa<NameAliasType>(type.getPointer()))
+      type = TAD->getDeclaredInterfaceType();
+
+    // When resolving a generic typealias with a base type, we have a partially
+    // substituted type by now. Put the archetypes in the substitution map so that
+    // the subst() call leaves them alone.
+    //
+    // FIXME: Combine base type substitution step with applying generic arguments
+    // to avoid this gross hack.
+    type.visit([&](Type t) {
+      if (auto *archetype = t->getAs<ArchetypeType>())
+        subs[archetype] = archetype;
+    });
 
     return type.subst(dc->getParentModule(), subs, SubstFlags::UseErrorType);
   }
@@ -2106,9 +2121,6 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
 
   extInfo = extInfo.withThrows(repr->throws());
 
-  ModuleDecl *M = DC->getParentModule();
-  
-  
   // If this is a function type without parens around the parameter list,
   // diagnose this and produce a fixit to add them.
   if (!isa<TupleTypeRepr>(repr->getArgsTypeRepr()) &&
@@ -2127,8 +2139,8 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   if (auto genericEnv = repr->getGenericEnvironment()) {
     auto *genericSig = repr->getGenericSignature();
     assert(genericSig != nullptr && "Did not call handleSILGenericParams()?");
-    inputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericEnv, inputTy);
-    outputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericEnv, outputTy);
+    inputTy = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, inputTy);
+    outputTy = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, outputTy);
     return GenericFunctionType::get(genericSig, inputTy, outputTy, extInfo);
   }
 
@@ -2186,8 +2198,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     genericSig = repr->getGenericSignature()->getCanonicalSignature();
     
     for (auto &field : fields) {
-      auto transTy = genericEnv->mapTypeOutOfContext(DC->getParentModule(),
-                                                     field.getLoweredType());
+      auto transTy = genericEnv->mapTypeOutOfContext(field.getLoweredType());
       field = {transTy->getCanonicalType(), field.isMutable()};
     }
   }
@@ -2311,8 +2322,6 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     return ErrorType::get(Context);
   }
 
-  ModuleDecl *M = DC->getParentModule();
-
   // FIXME: Remap the parsed context types to interface types.
   CanGenericSignature genericSig;
   SmallVector<SILParameterInfo, 4> interfaceParams;
@@ -2323,19 +2332,19 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
  
     for (auto &param : params) {
       auto transParamType = ArchetypeBuilder::mapTypeOutOfContext(
-          M, genericEnv, param.getType())->getCanonicalType();
+          genericEnv, param.getType())->getCanonicalType();
       interfaceParams.push_back(param.getWithType(transParamType));
     }
     for (auto &result : results) {
       auto transResultType =
         ArchetypeBuilder::mapTypeOutOfContext(
-          M, genericEnv, result.getType())->getCanonicalType();
+          genericEnv, result.getType())->getCanonicalType();
       interfaceResults.push_back(result.getWithType(transResultType));
     }
 
     if (errorResult) {
       auto transErrorResultType = ArchetypeBuilder::mapTypeOutOfContext(
-          M, genericEnv, errorResult->getType())->getCanonicalType();
+          genericEnv, errorResult->getType())->getCanonicalType();
       interfaceErrorResult =
         errorResult->getWithType(transErrorResultType);
     }
@@ -3489,7 +3498,7 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (VD->isInvalid())
     return false;
 
-  Type T = VD->getType();
+  Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
     // In-memory layout of @weak and @unowned does not correspond to anything
     // in Objective-C, but this does not really matter here, since Objective-C
@@ -3514,7 +3523,8 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   diagnose(VD->getLoc(), diag::objc_invalid_on_var,
            getObjCDiagnosticAttrKind(Reason))
       .highlight(TypeRange);
-  diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(), VD->getType(),
+  diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(),
+                                     VD->getInterfaceType(),
                                      TypeRange);
   describeObjCReason(*this, VD, Reason);
 
@@ -3649,7 +3659,7 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
     return;
   }
 
-  if (T->is<ArchetypeType>()) {
+  if (T->is<ArchetypeType>() || T->isTypeParameter()) {
     diagnose(TypeRange.Start, diag::not_objc_generic_type_param)
         .highlight(TypeRange);
     return;
@@ -3736,9 +3746,9 @@ public:
         T->setInvalid();
       }
     } else if (auto alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
-      if (!alias->hasUnderlyingType())
+      if (!alias->hasInterfaceType())
         return;
-      auto type = alias->getUnderlyingType();
+      auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
       type.findIf([&](Type type) -> bool {
         if (T->isInvalid())
           return false;

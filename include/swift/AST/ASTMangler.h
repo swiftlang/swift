@@ -149,7 +149,7 @@ protected:
     appendType(BlandTy);
   }
 
-  void appendBoundGenericArgs(Type type);
+  void appendBoundGenericArgs(Type type, bool &isFirstArgList);
 
   void appendImplFunctionType(SILFunctionType *fn);
 

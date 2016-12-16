@@ -6,5 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-let f=[.A{#if8
-guard let:
+_{if{return 0 & +1 + 2

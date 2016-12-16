@@ -2985,8 +2985,8 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
-                                          UnderlyingTy.getPtrOrNull(),
                                           genericParams, CurDeclContext);
+  TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
   TAD->getAttrs() = Attributes;
 
   // Exit the scope introduced for the generic parameters.

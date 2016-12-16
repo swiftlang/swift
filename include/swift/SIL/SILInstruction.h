@@ -1239,6 +1239,13 @@ public:
     return getSubstCalleeType()->getSILArgumentConvention(index);
   }
 
+  Optional<SILResultInfo> getSingleResult() const {
+    auto SubstCallee = getSubstCalleeType();
+    if (SubstCallee->getNumAllResults() != 1)
+      return None;
+    return SubstCallee->getSingleResult();
+  }
+
   Substitution getSelfSubstitution() const {
     assert(getNumArguments() && "Should only be called when Callee has "
            "at least a self parameter.");
@@ -4236,6 +4243,16 @@ class CopyValueInst : public UnaryInstructionBase<ValueKind::CopyValueInst> {
 
   CopyValueInst(SILDebugLocation DebugLoc, SILValue operand)
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+};
+
+class CopyUnownedValueInst
+    : public UnaryInstructionBase<ValueKind::CopyUnownedValueInst> {
+  friend class SILBuilder;
+
+  CopyUnownedValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                       SILModule &M)
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().getReferentType(M)) {}
 };
 
 class DestroyValueInst

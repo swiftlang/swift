@@ -303,7 +303,7 @@ Type DeclContext::mapTypeIntoContext(Type type) const {
 
 Type DeclContext::mapTypeOutOfContext(Type type) const {
   if (auto genericEnv = getGenericEnvironmentOfContext())
-    return genericEnv->mapTypeOutOfContext(getParentModule(), type);
+    return genericEnv->mapTypeOutOfContext(type);
 
   return type;
 }

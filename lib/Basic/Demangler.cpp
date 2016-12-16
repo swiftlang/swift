@@ -337,6 +337,10 @@ NodePointer Demangler::demangleKnownType() {
       return createSwiftType(Node::Kind::Structure, "String");
     case 'u':
       return createSwiftType(Node::Kind::Structure, "UInt");
+    case 'g':
+      return createType(createWithChildren(Node::Kind::BoundGenericEnum,
+              createSwiftType(Node::Kind::Enum, "Optional"),
+              createWithChild(Node::Kind::TypeList, popNode(Node::Kind::Type))));
     default:
       return nullptr;
   }
@@ -661,17 +665,35 @@ NodePointer Demangler::popProtocol() {
 }
 
 NodePointer Demangler::demangleBoundGenericType() {
+  std::vector<NodePointer> TypeListList;
+  std::vector<NodePointer> Types;
+  for (;;) {
+    NodePointer TList = NodeFactory::create(Node::Kind::TypeList);
+    TypeListList.push_back(TList);
+    while (NodePointer Ty = popNode(Node::Kind::Type)) {
+      Types.push_back(Ty);
+    }
+    while (NodePointer Ty = pop_back_val(Types)) {
+      TList->addChild(Ty);
+    }
+    if (popNode(Node::Kind::EmptyList))
+      break;
+    if (!popNode(Node::Kind::FirstElementMarker))
+      return nullptr;
+  }
   NodePointer Nominal = popTypeAndGetNominal();
-  return createType(demangleBoundGenericArgs(Nominal));
+  return createType(demangleBoundGenericArgs(Nominal, TypeListList, 0));
 }
 
-NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal) {
+NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
+                                    const std::vector<NodePointer> &TypeLists,
+                                    size_t TypeListIdx) {
   if (!Nominal || Nominal->getNumChildren() < 2)
     return nullptr;
 
-  NodePointer args = popTypeList();
-  if (!args)
+  if (TypeListIdx >= TypeLists.size())
     return nullptr;
+  NodePointer args = TypeLists[TypeListIdx];
 
   // Generic arguments for the outermost type come first.
   NodePointer Context = Nominal->getFirstChild();
@@ -679,7 +701,8 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal) {
   if (Context->getKind() != Node::Kind::Module &&
       Context->getKind() != Node::Kind::Function &&
       Context->getKind() != Node::Kind::Extension) {
-    NodePointer BoundParent = demangleBoundGenericArgs(Context);
+    NodePointer BoundParent = demangleBoundGenericArgs(Context, TypeLists,
+                                                       TypeListIdx + 1);
 
     // Rebuild this type with the new parent type, which may have
     // had its generic arguments applied.

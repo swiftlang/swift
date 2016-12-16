@@ -1308,15 +1308,7 @@ TypeBase *ParenType::getSinglyDesugaredType() {
 }
 
 TypeBase *NameAliasType::getSinglyDesugaredType() {
-  auto *TAD = getDecl();
-
-  // The type for a generic TypeAliasDecl is an UnboundGenericType.
-  if (TAD->getGenericParams())
-    return UnboundGenericType::get(TAD,
-                           TAD->getDeclContext()->getDeclaredTypeInContext(),
-                                   TAD->getASTContext());
-
-  return getDecl()->getUnderlyingType().getPointer();
+  return getDecl()->getUnderlyingTypeLoc().getType().getPointer();
 }
 
 TypeBase *SyntaxSugarType::getSinglyDesugaredType() {
@@ -2765,9 +2757,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 
 FunctionType *
 GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
-  auto params = getGenericParams();
-  (void)params;
-  
   auto subs = getGenericSignature()->getSubstitutionMap(args);
 
   Type input = getInput().subst(subs);
@@ -2775,10 +2764,15 @@ GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
   return FunctionType::get(input, result, getExtInfo());
 }
 
-using ConformanceSource =
-    llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *>;
+FunctionType *
+GenericFunctionType::substGenericArgs(TypeSubstitutionFn subs,
+                                      LookupConformanceFn conformances) {
+  Type input = getInput().subst(subs, conformances);
+  Type result = getResult().subst(subs, conformances);
+  return FunctionType::get(input, result, getExtInfo());
+}
 
-static Type getMemberForBaseType(ConformanceSource conformances,
+static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
                                  Type origBase,
                                  Type substBase,
                                  AssociatedTypeDecl *assocType,
@@ -2843,14 +2837,10 @@ static Type getMemberForBaseType(ConformanceSource conformances,
   if (assocType) {
     auto proto = assocType->getProtocol();
     // FIXME: Introduce substituted type node here?
-    Optional<ProtocolConformanceRef> conformance;
-    if (conformances.is<ModuleDecl *>()) {
-      conformance = conformances.get<ModuleDecl *>()->lookupConformance(
-          substBase, proto, resolver);
-    } else {
-      conformance = conformances.get<const SubstitutionMap *>()->lookupConformance(
-          origBase->getCanonicalType(), proto);
-    }
+    Optional<ProtocolConformanceRef> conformance
+      = lookupConformances(origBase ? origBase->getCanonicalType() : CanType(),
+                           substBase,
+                           proto->getDeclaredType());
 
     if (!conformance) return failed();
     if (!conformance->isConcrete()) return failed();
@@ -2880,15 +2870,33 @@ static Type getMemberForBaseType(ConformanceSource conformances,
     return witness;
   }
 
-  // FIXME: This is a fallback. We want the above, conformance-based
-  // result to be the only viable path.
-  if (resolver && conformances.is<ModuleDecl *>()) {
-    if (auto result = resolver->resolveMemberType(
-                        conformances.get<ModuleDecl *>(), substBase, name))
-      return result;
-  }
-
   return failed();
+}
+
+Optional<ProtocolConformanceRef>
+LookUpConformanceInModule::operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolType *conformedProtocol) const {
+  return M->lookupConformance(conformingReplacementType,
+                  conformedProtocol->getDecl(),
+                  conformingReplacementType->getASTContext().getLazyResolver());
+}
+
+Optional<ProtocolConformanceRef>
+LookUpConformanceInSubstitutionMap::operator()(CanType dependentType,
+                                       Type conformingReplacementType,
+                                       ProtocolType *conformedProtocol) const {
+  return Subs.lookupConformance(dependentType, conformedProtocol->getDecl());
+}
+
+Optional<ProtocolConformanceRef>
+MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
+                                       Type conformingReplacementType,
+                                       ProtocolType *conformedProtocol) const {
+  assert((conformingReplacementType->is<SubstitutableType>()
+          || conformingReplacementType->is<DependentMemberType>())
+         && "replacement requires looking up a concrete conformance");
+  return ProtocolConformanceRef(conformedProtocol->getDecl());
 }
 
 Type DependentMemberType::substBaseType(ModuleDecl *module,
@@ -2898,15 +2906,16 @@ Type DependentMemberType::substBaseType(ModuleDecl *module,
       substBase->hasTypeParameter())
     return this;
 
-  return getMemberForBaseType(module, Type(), substBase,
-                              getAssocType(), getName(), None);
+  return getMemberForBaseType(LookUpConformanceInModule(module),
+                              Type(), substBase,
+                              getAssocType(), getName(),
+                              None);
 }
 
-static Type substType(
-    Type derivedType,
-    llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *> conformances,
-    TypeSubstitutionFn substitutions,
-    SubstOptions options) {
+static Type substType(Type derivedType,
+                      TypeSubstitutionFn substitutions,
+                      LookupConformanceFn lookupConformances,
+                      SubstOptions options) {
   return derivedType.transform([&](Type type) -> Type {
     assert((options.contains(SubstFlags::AllowLoweredTypes) ||
             !isa<SILFunctionType>(type.getPointer())) &&
@@ -2918,12 +2927,12 @@ static Type substType(
     // For dependent member types, we may need to look up the member if the
     // base is resolved to a non-dependent type.
     if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
-      auto newBase = substType(depMemTy->getBase(), conformances,
-                               substitutions, options);
+      auto newBase = substType(depMemTy->getBase(),
+                               substitutions, lookupConformances, options);
       if (!newBase)
         return Type();
       
-      return getMemberForBaseType(conformances,
+      return getMemberForBaseType(lookupConformances,
                                   depMemTy->getBase(), newBase,
                                   depMemTy->getAssocType(),
                                   depMemTy->getName(), options);
@@ -2948,7 +2957,8 @@ static Type substType(
       return type;
 
     // Substitute into the parent type.
-    Type substParent = substType(parent, conformances, substitutions, options);
+    Type substParent = substType(parent, substitutions,
+                                 lookupConformances, options);
 
     // If the parent didn't change, we won't change.
     if (substParent.getPointer() == parent)
@@ -2957,7 +2967,7 @@ static Type substType(
     // Get the associated type reference from a child archetype.
     AssociatedTypeDecl *assocType = archetype->getAssocType();
 
-    return getMemberForBaseType(conformances, parent, substParent,
+    return getMemberForBaseType(lookupConformances, parent, substParent,
                                 assocType, archetype->getName(),
                                 options);
   });
@@ -2966,19 +2976,24 @@ static Type substType(
 Type Type::subst(Module *module,
                  const TypeSubstitutionMap &substitutions,
                  SubstOptions options) const {
-  return substType(*this, module, QueryTypeSubstitutionMap{substitutions}, options);
+  return substType(*this,
+                   QueryTypeSubstitutionMap{substitutions},
+                   LookUpConformanceInModule(module),
+                   options);
 }
 
 Type Type::subst(const SubstitutionMap &substitutions,
                  SubstOptions options) const {
-  return substType(*this, &substitutions,
-                   QueryTypeSubstitutionMap{substitutions.getMap()}, options);
+  return substType(*this,
+                   QueryTypeSubstitutionMap{substitutions.getMap()},
+                   LookUpConformanceInSubstitutionMap(substitutions),
+                   options);
 }
 
-Type Type::subst(ModuleDecl *module,
-                 TypeSubstitutionFn substitutions,
+Type Type::subst(TypeSubstitutionFn substitutions,
+                 LookupConformanceFn conformances,
                  SubstOptions options) const {
-  return substType(*this, module, substitutions, options);
+  return substType(*this, substitutions, conformances, options);
 }
 
 Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
@@ -3413,15 +3428,15 @@ case TypeKind::Id:
 
   case TypeKind::NameAlias: {
     auto alias = cast<NameAliasType>(base);
-    auto underlyingTy = alias->getDecl()->getUnderlyingType().transform(fn);
-    if (!underlyingTy)
+    auto underlyingTy = Type(alias->getSinglyDesugaredType());
+    auto transformedTy = underlyingTy.transform(fn);
+    if (!transformedTy)
       return Type();
 
-    if (underlyingTy.getPointer() ==
-          alias->getDecl()->getUnderlyingType().getPointer())
+    if (transformedTy.getPointer() == underlyingTy.getPointer())
       return *this;
 
-    return underlyingTy;
+    return transformedTy;
   }
 
   case TypeKind::Paren: {

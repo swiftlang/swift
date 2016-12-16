@@ -1721,8 +1721,8 @@ namespace {
     void buildPropertyAttributes(VarDecl *prop, SmallVectorImpl<char> &out) {
       llvm::raw_svector_ostream outs(out);
 
-      auto propTy = prop->getType()->getReferenceStorageReferent();
-      
+      auto propTy = prop->getInterfaceType()->getReferenceStorageReferent();
+
       // Emit the type encoding for the property.
       outs << 'T';
       
@@ -1739,7 +1739,8 @@ namespace {
       if (prop->getAttrs().hasAttribute<NSManagedAttr>())
         outs << ",D";
       
-      auto isObject = propTy->hasRetainablePointerRepresentation();
+      auto isObject = prop->getDeclContext()->mapTypeIntoContext(propTy)
+          ->hasRetainablePointerRepresentation();
       auto hasObjectEncoding = typeEnc[0] == '@';
       
       // Determine the assignment semantics.

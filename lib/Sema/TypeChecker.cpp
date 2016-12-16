@@ -326,7 +326,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
-      extendedType = aliasDecl->getUnderlyingType()->getAnyNominal()
+      extendedType = aliasDecl->getDeclaredInterfaceType()->getAnyNominal()
           ->getDeclaredType();
       ED->getExtendedTypeLoc().setType(extendedType);
     }

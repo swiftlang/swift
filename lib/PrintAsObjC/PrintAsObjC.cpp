@@ -365,7 +365,7 @@ private:
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
-      print(param->getType(), OTK_None, Identifier(), IsFunctionParam);
+      print(param->getInterfaceType(), OTK_None, Identifier(), IsFunctionParam);
     }
     os << ")";
 
@@ -579,7 +579,7 @@ private:
     auto params = FD->getParameterLists().back();
     interleave(*params,
                [&](const ParamDecl *param) {
-                 print(param->getType(), OTK_None, param->getName(),
+                 print(param->getInterfaceType(), OTK_None, param->getName(),
                        IsFunctionParam);
                },
                [&]{ os << ", "; });
@@ -628,7 +628,7 @@ private:
     const TypeAliasDecl *TAD = nullptr;
     while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
       TAD = aliasTy->getDecl();
-      ty = TAD->getUnderlyingType();
+      ty = aliasTy->getSinglyDesugaredType();
     }
 
     return TAD && TAD->getName() == ID_CFTypeRef && TAD->hasClangNode();
@@ -662,7 +662,7 @@ private:
     // We treat "unowned" as "assign" (even though it's more like
     // "safe_unretained") because we want people to think twice about
     // allowing that object to disappear.
-    Type ty = VD->getType();
+    Type ty = VD->getInterfaceType();
     if (auto weakTy = ty->getAs<WeakStorageType>()) {
       auto innerTy = weakTy->getReferentType()->getAnyOptionalObjectType();
       auto innerClass = innerTy->getClassOrBoundGenericClass();
@@ -1125,7 +1125,7 @@ private:
       return;
     }
 
-    visitPart(alias->getUnderlyingType(), optionalKind);
+    visitPart(alias->getUnderlyingTypeLoc().getType(), optionalKind);
   }
 
   void maybePrintTagKeyword(const NominalTypeDecl *NTD) {
@@ -1898,7 +1898,7 @@ public:
         } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
           (void)addImport(TD);
           // Just in case, make sure the underlying type is visible too.
-          finder.visit(TAD->getUnderlyingType());
+          finder.visit(TAD->getUnderlyingTypeLoc().getType());
         } else if (addImport(TD)) {
           return;
         } else if (auto ED = dyn_cast<EnumDecl>(TD)) {

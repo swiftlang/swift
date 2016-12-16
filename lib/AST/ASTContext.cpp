@@ -3661,7 +3661,7 @@ static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
     if (auto typealias = dyn_cast<TypeAliasDecl>(result)) {
       if (auto resolver = ctx.getLazyResolver())
         resolver->resolveDeclSignature(typealias);
-      return typealias->getUnderlyingType()->getAnyNominal();
+      return typealias->getDeclaredInterfaceType()->getAnyNominal();
     }
   }
 

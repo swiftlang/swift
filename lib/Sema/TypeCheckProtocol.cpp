@@ -1062,10 +1062,6 @@ RequirementEnvironment::RequirementEnvironment(
     allGenericParams.push_back(substGenericParam);
     builder.addGenericParameter(substGenericParam);
 
-    // If the generic parameter and its substitution are equivalent, there's
-    // nothing more to do.
-    if (genericParam->isEqual(substGenericParam)) continue;
-
     // Create a substitution from the requirement's generic parameter to the
     // generic parameter known to the builder.
     reqToSyntheticEnvMap.addSubstitution(genericParam->getCanonicalType(),
@@ -2260,17 +2256,10 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     auto aliasDecl = new (TC.Context) TypeAliasDecl(SourceLoc(),
                                                     assocType->getName(),
                                                     SourceLoc(),
-                                                    TypeLoc::withoutLoc(type),
                                                     /*genericparams*/nullptr, 
                                                     DC);
     aliasDecl->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
-    aliasDecl->computeType();
-
-    aliasDecl->getAliasType()->setRecursiveProperties(
-        type->getRecursiveProperties());
-
-    auto interfaceTy = DC->mapTypeOutOfContext(aliasDecl->getAliasType());
-    aliasDecl->setInterfaceType(MetatypeType::get(interfaceTy));
+    aliasDecl->setUnderlyingType(type);
 
     aliasDecl->setImplicit();
     if (type->hasError())

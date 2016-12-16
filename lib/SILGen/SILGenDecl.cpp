@@ -1986,12 +1986,10 @@ getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
 
     // Substitute context parameters out of the "from" and "to" types.
     auto fromInterfaceType
-        = ArchetypeBuilder::mapTypeOutOfContext(
-            M.getSwiftModule(), genericEnv, fromType)
+        = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, fromType)
                 ->getCanonicalType();
     auto toInterfaceType
-        = ArchetypeBuilder::mapTypeOutOfContext(
-            M.getSwiftModule(), genericEnv, toType)
+        = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, toType)
                 ->getCanonicalType();
 
     mangler.mangleType(fromInterfaceType, /*uncurry*/ 0);

@@ -661,7 +661,7 @@ ParserResult<Expr> Parser::parseExprSelector() {
     if (Tok.is(tok::r_paren))
       rParenLoc = consumeToken();
     else
-      rParenLoc = Tok.getLoc();
+      rParenLoc = PreviousLoc;
   } else {
     parseMatchingToken(tok::r_paren, rParenLoc,
                        diag::expr_selector_expected_rparen, lParenLoc);
