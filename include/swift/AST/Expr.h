@@ -324,8 +324,12 @@ class alignas(8) Expr {
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     unsigned HasAnonymousClosureVars : 1;
+
+    /// True if this closure has code completion token in it.
+    /// If true, we don't create single expression closure.
+    unsigned HasCodeCompletion : 1;
   };
-  enum { NumClosureExprBits = NumAbstractClosureExprBits + 1 };
+  enum { NumClosureExprBits = NumAbstractClosureExprBits + 2 };
   static_assert(NumClosureExprBits <= 32, "fits in an unsigned");
 
   class BindOptionalExprBitfields {
@@ -3370,6 +3374,7 @@ public:
       Body(nullptr) {
     setParameterList(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
+    ClosureExprBits.HasCodeCompletion = false;
   }
 
   SourceRange getSourceRange() const;
@@ -3393,6 +3398,14 @@ public:
   /// whether these parameters are actually anonymous closure variables.
   void setHasAnonymousClosureVars() {
     ClosureExprBits.HasAnonymousClosureVars = true;
+  }
+
+  bool hasCodeCompletion() const {
+    return ClosureExprBits.HasCodeCompletion;
+  }
+
+  void setHasCodeCompletion() {
+    ClosureExprBits.HasCodeCompletion = true;
   }
   
   /// \brief Determine whether this closure expression has an
@@ -3446,6 +3459,10 @@ public:
   /// checker. This function does not return true for empty closures.
   bool hasSingleExpressionBody() const {
     return Body.getInt();
+  }
+
+  void setHasSingleExpressionBody() {
+    return Body.setInt(true);
   }
 
   /// \brief Retrieve the body for closure that has a single expression for

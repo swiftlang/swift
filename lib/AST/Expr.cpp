@@ -1842,7 +1842,7 @@ FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
 
 Expr *ClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getElement(0);
+  auto body = getBody()->getElements().back();
   if (body.is<Stmt *>())
     return cast<ReturnStmt>(body.get<Stmt *>())->getResult();
   return body.get<Expr *>();
@@ -1850,12 +1850,12 @@ Expr *ClosureExpr::getSingleExpressionBody() const {
 
 void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getElement(0);
+  auto body = getBody()->getElements().back();
   if (body.is<Stmt *>()) {
     cast<ReturnStmt>(body.get<Stmt *>())->setResult(NewBody);
     return;
   }
-  getBody()->setElement(0, NewBody);
+  getBody()->getElements().back() = NewBody;
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)

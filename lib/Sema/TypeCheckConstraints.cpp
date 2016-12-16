@@ -928,6 +928,55 @@ namespace {
 /// true for single-expression closures, where we want the body to be considered
 /// part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
+  bool hasSingleExpressionBody = false;
+
+  // But don't do this transformation during code completion, as the source
+  // may be incomplete and the type mismatch in return statement will just
+  // confuse the type checker.
+  auto *Body = closure->getBody();
+  if (Body && !closure->hasCodeCompletion()) {
+    unsigned NumOfActiveNode = count_if(Body->getElements(),
+        [](ASTNode Node) -> bool {
+          if (auto *S = Node.dyn_cast<Stmt *>())
+            return !isa<IfConfigStmt>(S);
+          return true;
+        });
+
+    if (NumOfActiveNode == 1) {
+      auto TheNode = Body->getElements().back();
+      Expr *returnExpr = nullptr;
+
+      // If the closure's only body element is a single return statement,
+      // use that instead of creating a new wrapping return expression.
+      if (auto *S = TheNode.dyn_cast<Stmt *>()) {
+        if (auto returnStmt = dyn_cast<ReturnStmt>(S)) {
+          
+          if (!returnStmt->hasResult()) {
+            returnExpr = TupleExpr::createEmpty(TC.Context,
+                                                SourceLoc(),
+                                                SourceLoc(),
+                                                /*implicit*/true);
+            returnStmt->setResult(returnExpr);
+          }
+          
+          hasSingleExpressionBody = true;
+        }
+      }
+      
+      // If the body consists of a single expression, turn it into a return
+      // statement.
+      if (TheNode.is<Expr *>()) {
+        hasSingleExpressionBody = true;
+        returnExpr = TheNode.get<Expr*>();
+        auto returnStmt = 
+          new (TC.Context) ReturnStmt(SourceLoc(), returnExpr);
+        Body->getElements().back() = returnStmt;
+      }
+      if (hasSingleExpressionBody)
+        closure->setHasSingleExpressionBody();
+    }
+  }
+
   auto *PL = closure->getParameters();
 
   // Validate the parameters.
@@ -962,7 +1011,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // If the closure has a multi-statement body, we don't walk into it
   // here.
-  if (!closure->hasSingleExpressionBody())
+  if (!hasSingleExpressionBody)
     return false;
 
   // Update the current DeclContext to be the closure we're about to

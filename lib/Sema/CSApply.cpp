@@ -5046,46 +5046,29 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
 ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
   auto &tc = cs.getTypeChecker();
 
-  // Re-write the single-expression closure to return '()'
+  // Re-write the single-expression closure to 'return _ = <expr>'.
   assert(closureExpr->hasSingleExpressionBody());
 
-  // A single-expression body contains a single return statement
-  // prior to this transformation.
-  auto member = closureExpr->getBody()->getElement(0);
- 
-  if (member.is<Stmt *>()) {
-    auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
-    auto singleExpr = returnStmt->getResult();
-    auto voidExpr =
-      cs.cacheType(
-          TupleExpr::createEmpty(tc.Context,
-                                 singleExpr->getStartLoc(),
-                                 singleExpr->getEndLoc(),
-                                 /*implicit*/true));
-    returnStmt->setResult(voidExpr);
+  auto singleExpr = closureExpr->getSingleExpressionBody();
+  auto discardExpr = new (tc.Context) DiscardAssignmentExpr(SourceLoc(),
+                                                            /*Implicit=*/true);
+  auto voidExpr = new (tc.Context) AssignExpr(discardExpr,
+                                              /*EqualLoc=*/SourceLoc(),
+                                              singleExpr, /*Implicit=*/true);
 
-    // For l-value types, reset to the object type. This might not be strictly
-    // necessary any more, but it's probably still a good idea.
-    if (cs.getType(singleExpr)->getAs<LValueType>())
-      cs.setType(singleExpr,
-                 cs.getType(singleExpr)->getLValueOrInOutObjectType());
+  // For l-value types, reset to the object type. This might not be strictly
+  // necessary any more, but it's probably still a good idea.
+  if (cs.getType(singleExpr)->getAs<LValueType>())
+    cs.setType(singleExpr,
+                cs.getType(singleExpr)->getLValueOrInOutObjectType());
+  cs.setType(discardExpr, LValueType::get(cs.getType(singleExpr)));
+  cs.propagateLValueAccessKind(discardExpr, AccessKind::Write);
+  cs.setType(voidExpr, tc.Context.TheEmptyTupleType);
 
-    tc.checkIgnoredExpr(singleExpr);
+  tc.checkIgnoredExpr(singleExpr);
 
-    SmallVector<ASTNode, 2> elements;
-    elements.push_back(singleExpr);
-    elements.push_back(returnStmt);
-    
-    auto braceStmt = BraceStmt::create(tc.Context,
-                                       closureExpr->getStartLoc(),
-                                       elements,
-                                       closureExpr->getEndLoc(),
-                                       /*implicit*/true);
-    
-    closureExpr->setImplicit();
-    closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
-  }
-  
+  closureExpr->setSingleExpressionBody(voidExpr);
+
   // Finally, compute the proper type for the closure.
   auto fnType = cs.getType(closureExpr)->getAs<FunctionType>();
   Type inputType = fnType->getInput();
@@ -5104,7 +5087,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) 
 
   // A single-expression body contains a single return statement
   // prior to this transformation.
-  auto member = closureExpr->getBody()->getElement(0);
+  auto member = closureExpr->getBody()->getElements().back();
 
   if (member.is<Stmt *>()) {
     auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());

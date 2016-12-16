@@ -2357,49 +2357,15 @@ ParserResult<Expr> Parser::parseExprClosure() {
     closure->setHasAnonymousClosureVars();
   }
 
-  // If the body consists of a single expression, turn it into a return
-  // statement.
-  //
-  // But don't do this transformation during code completion, as the source
-  // may be incomplete and the type mismatch in return statement will just
-  // confuse the type checker.
-  bool hasSingleExpressionBody = false;
-  if (!Status.hasCodeCompletion() && bodyElements.size() == 1) {
-    // If the closure's only body element is a single return statement,
-    // use that instead of creating a new wrapping return expression.
-    Expr *returnExpr = nullptr;
-    
-    if (bodyElements[0].is<Stmt *>()) {
-      if (auto returnStmt =
-                  dyn_cast<ReturnStmt>(bodyElements[0].get<Stmt*>())) {
-        
-        if (!returnStmt->hasResult()) {
-          
-          returnExpr = TupleExpr::createEmpty(Context,
-                                              SourceLoc(),
-                                              SourceLoc(),
-                                              /*implicit*/true);
-          
-          returnStmt->setResult(returnExpr);
-        }
-        
-        hasSingleExpressionBody = true;
-      }
-    }
-    
-    // Otherwise, create the wrapping return.
-    if (bodyElements[0].is<Expr *>()) {
-      hasSingleExpressionBody = true;
-      returnExpr = bodyElements[0].get<Expr*>();
-      bodyElements[0] = new (Context) ReturnStmt(SourceLoc(),
-                                                 returnExpr);
-    }
-  }
-
   // Set the body of the closure.
+  // 'isSingnleExpression' will be resolved in Sema.
   closure->setBody(BraceStmt::create(Context, leftBrace, bodyElements,
                                      rightBrace),
-                   hasSingleExpressionBody);
+                   /*isSingleExpression=*/false);
+
+  // Remember the body has code completion token.
+  if (Status.hasCodeCompletion())
+    closure->setHasCodeCompletion();
 
   // If the closure includes a capture list, create an AST node for it as well.
   Expr *result = closure;

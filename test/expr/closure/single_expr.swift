@@ -99,3 +99,48 @@ func haltAndCatchFire() -> Never { while true { } }
 let backupPlan: () -> Int = { haltAndCatchFire() }
 func missionCritical(storage: () -> String) {}
 missionCritical(storage: { haltAndCatchFire() })
+
+// #if blocks
+func testIfConfig() {
+  let _: () -> String = {
+#if true
+    "foo"
+#else
+    "bar"
+#endif
+  }
+
+  let _: () -> String = {
+#if true
+    let foo = "foo"
+    foo // expected-warning {{expression of type 'String' is unused}}
+#else
+    "bar"
+#endif
+  }
+
+  let _: () -> Int = {
+    print("foo");
+#if true
+    [1,2,3].count // expected-warning {{expression of type 'Int' is unused}}
+#else
+    42
+#endif
+  }
+
+  let _: () -> Void = {
+#if true
+    stmt.bind(12, "foo")
+#else
+    stmt.bind("bar", 42)
+#endif
+  }
+
+  let _: () -> Void = {
+#if false 
+    "foo"
+#else
+    "bar" // expected-warning {{expression of type 'String' is unused}}
+#endif
+  }
+}

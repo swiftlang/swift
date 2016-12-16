@@ -36,7 +36,30 @@ func diagnoseNeverWithBody(i : Int) -> Never {
 } // expected-error {{function with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
 
 class MyClassWithClosure {
-  var f : (_ s: String) -> String = { (_ s: String) -> String in } // expected-error {{missing return in a closure expected to return 'String'}}
+  var f1 : (_ s: String) -> String = { (_ s: String) -> String in } // expected-error {{missing return in a closure expected to return 'String'}}
+
+  var f2 : (_ s: String) -> String = { (_ s: String) -> String in
+    let str = s + "foo"
+    str // expected-warning {{expression of type 'String' is unused}}
+  } // expected-error {{missing return in a closure expected to return 'String'}}
+
+  var f3 : (_ s: String) -> String = { (_ s: String) -> String in
+#if true
+    let str = s + "foo"
+    str // expected-warning {{expression of type 'String' is unused}}
+#else
+    s + "bar"
+#endif
+  } // expected-error {{missing return in a closure expected to return 'String'}}
+
+  var f4 : (_ s: String) -> String = { (_ s: String) -> String in
+#if false 
+    let str = s + "foo"
+    str
+#else
+    s + "bar"
+#endif
+  }
 }
 
 func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
