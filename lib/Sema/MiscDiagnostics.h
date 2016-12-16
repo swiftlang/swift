@@ -76,8 +76,7 @@ void fixItAvailableAttrRename(TypeChecker &TC,
 /// should have written.
 ///
 /// \returns true iff any fix-its were attached to \p diag.
-bool fixItOverrideDeclarationTypes(TypeChecker &TC,
-                                   InFlightDiagnostic &diag,
+bool fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
                                    ValueDecl *decl,
                                    const ValueDecl *base);
 

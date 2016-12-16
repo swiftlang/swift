@@ -460,10 +460,6 @@ void ASTContext::setLazyResolver(LazyResolver *resolver) {
   } else {
     assert(Impl.Resolver != nullptr && "no resolver to remove");
     Impl.Resolver = resolver;
-
-    // DelayedConformanceDiags callbacks contain pointers to the TypeChecker, so
-    // they must be removed when the TypeChecker goes away.
-    Impl.DelayedConformanceDiags.clear();
   }
 }
 
