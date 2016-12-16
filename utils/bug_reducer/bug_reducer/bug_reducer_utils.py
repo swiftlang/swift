@@ -193,7 +193,8 @@ class SILFuncExtractorInvoker(SILConstantInputToolInvoker):
     def tool(self):
         return self.tools.sil_func_extractor
 
-    def _cmdline(self, input_file, funclist_path, output_file='-', invert=False):
+    def _cmdline(self, input_file, funclist_path, output_file='-',
+                 invert=False):
         sanity_check_file_exists(input_file)
         sanity_check_file_exists(funclist_path)
         assert(isinstance(funclist_path, str))
@@ -204,13 +205,15 @@ class SILFuncExtractorInvoker(SILConstantInputToolInvoker):
             base_args.append('-invert')
         return base_args
 
-    def _invoke(self, input_file, funclist_path, output_filename, invert=False):
+    def _invoke(self, input_file, funclist_path, output_filename,
+                invert=False):
         assert(isinstance(funclist_path, str))
         cmdline = self._cmdline(input_file, funclist_path, output_filename,
                                 invert)
         return br_call(cmdline)
 
-    def invoke_with_functions(self, funclist_path, output_filename, invert=False):
+    def invoke_with_functions(self, funclist_path, output_filename,
+                              invert=False):
         assert(isinstance(funclist_path, str))
         return self._invoke(self.input_file, funclist_path, output_filename,
                             invert)
