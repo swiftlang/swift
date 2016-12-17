@@ -161,6 +161,6 @@ public:
   //  void print(raw_ostream &OS) const;
 };
 
-} // end namespace swift.
+} // end namespace swift
 
 #endif
