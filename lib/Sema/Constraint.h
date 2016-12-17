@@ -574,7 +574,8 @@ public:
   void operator delete(void *mem) { }
 };
 
-} } // end namespace swift::constraints
+} // end namespace constraints
+} // end namespace swift
 
 namespace llvm {
 

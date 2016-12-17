@@ -206,7 +206,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     return true;
   }
 };
-}  // end anonymous namespace
+} // end anonymous namespace
 
 
 namespace {
@@ -233,7 +233,7 @@ namespace {
       return HasUnresolvedPattern;
     }
   };
-}  // end anonymous namespace
+} // end anonymous namespace
 
 namespace {
   

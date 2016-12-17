@@ -382,7 +382,7 @@ private:
   friend class ConstraintGraphScope;
 };
 
-} // end namespace swift::constraints
+} // end namespace constraints
 
 } // end namespace swift
 

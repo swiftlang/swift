@@ -1013,7 +1013,7 @@ namespace {
       OS << ')';
     }
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void ParameterList::dump() const {
   dump(llvm::errs(), 0);
@@ -1458,7 +1458,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void Stmt::dump() const {
   print(llvm::errs());
@@ -2291,7 +2291,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 
 void Expr::dump(raw_ostream &OS) const {
@@ -2468,7 +2468,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void PrintDecl::printRec(TypeRepr *T) {
   PrintTypeRepr(OS, Indent+2).visit(T);

@@ -58,7 +58,7 @@ struct QuotedString {
 
   explicit QuotedString(std::string Value) : Value(Value) {}
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 static DemanglerPrinter &operator<<(DemanglerPrinter &printer,
                                     const QuotedString &QS) {

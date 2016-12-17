@@ -193,7 +193,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   return OS;
 }
 
-}  // end namespace swift
+} // end namespace swift
 
 namespace llvm {
 
@@ -758,6 +758,6 @@ namespace llvm {
     enum { NumLowBitsAvailable = swift::SILValue::NumLowBitsAvailable };
   };
 
-}  // end namespace llvm
+} // end namespace llvm
 
 #endif
