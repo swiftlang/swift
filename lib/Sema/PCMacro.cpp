@@ -464,8 +464,7 @@ public:
 
     Expr *MaybeLoadInitExpr = nullptr;
 
-    if (LValueType *LVT =
-            dyn_cast<LValueType>(InitExpr->getType().getPointer())) {
+    if (LValueType *LVT = InitExpr->getType()->getAs<LValueType>()) {
       MaybeLoadInitExpr =
           new (Context) LoadExpr(InitExpr, LVT->getObjectType());
     } else {
