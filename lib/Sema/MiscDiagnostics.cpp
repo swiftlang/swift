@@ -1198,8 +1198,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
   return true;
 }
 
-bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
-                                          InFlightDiagnostic &diag,
+bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
                                           ValueDecl *decl,
                                           const ValueDecl *base) {
   // For now, just rewrite cases where the base uses a value type and the
@@ -1222,16 +1221,18 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
     Type normalizedBaseTy = normalizeType(baseTy);
     const DeclContext *DC = decl->getDeclContext();
 
+    ASTContext &ctx = decl->getASTContext();
+
     // ...and just knowing that it's bridged isn't good enough if we don't
     // know what it's bridged /to/. Also, don't do this check for trivial
     // bridging---that doesn't count.
     Type bridged;
     if (normalizedBaseTy->isAny()) {
       const ProtocolDecl *anyObjectProto =
-          TC.Context.getProtocol(KnownProtocolKind::AnyObject);
+          ctx.getProtocol(KnownProtocolKind::AnyObject);
       bridged = anyObjectProto->getDeclaredType();
     } else {
-      bridged = TC.Context.getBridgedToObjC(DC, normalizedBaseTy);
+      bridged = ctx.getBridgedToObjC(DC, normalizedBaseTy);
     }
     if (!bridged || bridged->isEqual(normalizedBaseTy))
       return false;
@@ -1308,7 +1309,7 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
       for_each(*fn->getParameterLists().back(),
                *baseFn->getParameterLists().back(),
                [&](ParamDecl *param, const ParamDecl *baseParam) {
-        fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
+        fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
@@ -1331,7 +1332,7 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
     for_each(*subscript->getIndices(),
              *baseSubscript->getIndices(),
              [&](ParamDecl *param, const ParamDecl *baseParam) {
-      fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
+      fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
     });
 
     auto resultType = ArchetypeBuilder::mapTypeIntoContext(
