@@ -1879,7 +1879,7 @@ public:
   }
 };
 
-} // end anonymous namespace 
+} // end anonymous namespace
 
 /// The uniquing structure for existential metatype value witness tables.
 static SimpleGlobalCache<ExistentialMetatypeValueWitnessTableCacheEntry>

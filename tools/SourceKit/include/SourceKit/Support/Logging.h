@@ -95,7 +95,7 @@ public:
   Logger &operator<<(const llvm::format_object_base &Fmt);
 };
 
-} // namespace SourceKit.
+} // namespace SourceKit
 
 /// \brief Macros to automate common uses of Logger. Like this:
 /// \code

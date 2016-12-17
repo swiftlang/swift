@@ -512,7 +512,7 @@ private:
   bool processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
                                  SILBasicBlock::iterator &I);
 };
-}  // namespace swift
+} // namespace swift
 
 //===----------------------------------------------------------------------===//
 //                             CSE Implementation

@@ -2536,7 +2536,7 @@ struct TypeMemberDiffItem {
 };
 typedef std::vector<TypeMemberDiffItem> TypeMemberDiffVector;
 
-} // End namespace
+} // end anonymous namespace
 
 
 static void printNode(llvm::raw_ostream &os, NodePtr node) {
@@ -3174,7 +3174,7 @@ public:
   }
 };
 
-}// End of anonymous namespace
+} // end anonymous namespace
 
 namespace fs = llvm::sys::fs;
 namespace path = llvm::sys::path;

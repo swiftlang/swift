@@ -41,6 +41,6 @@ private:
   friend class SwiftASTManager;
 };
 
-} // namespace SourceKit.
+} // namespace SourceKit
 
 #endif

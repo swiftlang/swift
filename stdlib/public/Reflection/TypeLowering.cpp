@@ -1288,5 +1288,5 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   swift_unreachable("Unhandled FieldDescriptorKind in switch.");
 }
 
-}  // namespace reflection
-}  // namespace swift
+} // namespace reflection
+} // namespace swift

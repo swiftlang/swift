@@ -2066,7 +2066,7 @@ public:
     return true;
   }
 };
-} // end namespace
+} // end anonymous namespace
 
 namespace {
 class ASTCommentPrinter : public ASTWalker {

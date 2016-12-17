@@ -131,5 +131,5 @@ bool splitAllCriticalEdges(SILFunction &F, bool OnlyNonCondBr,
 bool mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
                                   SILLoopInfo *LI);
 
-} // End namespace swift.
+} // end namespace swift
 #endif
