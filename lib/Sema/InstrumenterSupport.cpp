@@ -18,11 +18,6 @@
 #include "InstrumenterSupport.h"
 
 using namespace swift;
+using namespace swift::instrumenter_support;
 
-namespace swift {
-namespace instrumenter_support {
-
-InstrumenterBase::~InstrumenterBase() {};
-
-}
-}
+void InstrumenterBase::anchor() {}

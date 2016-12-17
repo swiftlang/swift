@@ -40,7 +40,8 @@ class InstrumenterBase {
 
 protected:
   InstrumenterBase() : CF(*this) {}
-  virtual ~InstrumenterBase();
+  virtual ~InstrumenterBase() = default;
+  virtual void anchor();
   virtual BraceStmt *transformBraceStmt(BraceStmt *BS,
                                         bool TopLevel = false) = 0;
 
