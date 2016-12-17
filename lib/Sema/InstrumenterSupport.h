@@ -17,9 +17,6 @@
 
 #include "TypeChecker.h"
 
-using namespace swift;
-
-
 namespace swift {
 namespace instrumenter_support {
 
