@@ -5,8 +5,8 @@
 # Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http:#swift.org/LICENSE.txt for license information
-# See http:#swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ==----------------------------------------------------------------------===#
 
@@ -32,12 +32,14 @@ class OptBugReducerTestCase(unittest.TestCase):
         self.file_dir = os.path.dirname(os.path.abspath(__file__))
         self.reducer = os.path.join(os.path.dirname(self.file_dir),
                                     'bug_reducer', 'bug_reducer.py')
-        self.build_dir = os.path.abspath(os.environ['BUGREDUCE_TEST_SWIFT_OBJ_ROOT'])
+        self.build_dir = os.path.abspath(
+            os.environ['BUGREDUCE_TEST_SWIFT_OBJ_ROOT'])
 
         (root, _) = os.path.splitext(os.path.abspath(__file__))
         self.root_basename = ''.join(os.path.basename(root).split('_'))
-        self.tmp_dir = os.path.join(os.path.abspath(os.environ['BUGREDUCE_TEST_TMP_DIR']),
-                                    self.root_basename)
+        self.tmp_dir = os.path.join(os.path.abspath(
+            os.environ['BUGREDUCE_TEST_TMP_DIR']),
+            self.root_basename)
         subprocess.call(['mkdir', '-p', self.tmp_dir])
 
         self.module_cache = os.path.join(self.tmp_dir, 'module_cache')
@@ -63,7 +65,8 @@ class OptBugReducerTestCase(unittest.TestCase):
 
     def _get_test_file_path(self, module_name):
         return os.path.join(self.file_dir,
-                            '{}_{}.swift'.format(self.root_basename, module_name))
+                            '{}_{}.swift'.format(
+                                self.root_basename, module_name))
 
     def _get_sib_file_path(self, filename):
         (root, ext) = os.path.splitext(filename)
@@ -102,7 +105,8 @@ class OptBugReducerTestCase(unittest.TestCase):
         self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
         re_end = 'testoptbugreducer_testbasic_initial'
         output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
-        output_matches = [1 for o in output if output_file_re.match(o) is not None]
+        output_matches = [
+            1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 1)
 
     def test_suffix_in_need_of_prefix(self):
@@ -125,7 +129,8 @@ class OptBugReducerTestCase(unittest.TestCase):
         self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
         re_end = 'testoptbugreducer_testsuffixinneedofprefix_initial'
         output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
-        output_matches = [1 for o in output if output_file_re.match(o) is not None]
+        output_matches = [
+            1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 0)
 
     def test_reduce_function(self):
@@ -146,12 +151,14 @@ class OptBugReducerTestCase(unittest.TestCase):
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")
         self.assertTrue('*** Found miscompiling passes!' in output)
-        self.assertTrue('*** Final Functions: _TF18testreducefunction6foo413FT_T_')
+        self.assertTrue(
+            '*** Final Functions: _TF18testreducefunction6foo413FT_T_')
         self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
         re_end = 'testoptbugreducer_testreducefunction_initial_'
         re_end += 'a490c440d7e84b77e5b134720b298d2c.sib'
         output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
-        output_matches = [1 for o in output if output_file_re.match(o) is not None]
+        output_matches = [
+            1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 1)
 
 

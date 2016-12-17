@@ -1,4 +1,4 @@
-//===--- Unreachable.h - Implements swift_unrachable ------------*- C++ -*-===//
+//===--- Unreachable.h - Implements swift_unreachable -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

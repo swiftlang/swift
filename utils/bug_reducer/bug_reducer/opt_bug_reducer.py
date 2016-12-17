@@ -24,7 +24,8 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
         # broken with JUST the kept passes, discard the prefix passes.
         suffix_joined = ' '.join(suffix)
         suffix_hash = md5.md5(suffix_joined).hexdigest()
-        print("Checking to see if suffix '%s' compiles correctly" % suffix_joined)
+        print("Checking to see if suffix '%s' compiles correctly" %
+              suffix_joined)
 
         result = self.invoker.invoke_with_passlist(
             suffix,
@@ -165,7 +166,8 @@ def add_parser_arguments(parser):
                         help='The name of the module we are optimizing')
     parser.add_argument('--pass', help='pass to test', dest='pass_list',
                         action='append')
-    parser.add_argument('--extra-arg', help='extra argument to pass to sil-opt',
+    parser.add_argument('--extra-arg',
+                        help='extra argument to pass to sil-opt',
                         dest='extra_args', action='append')
     parser.add_argument('--reduce-sil', help='After finding the relevant '
                         'passes, try to reduce the SIL by eliminating '

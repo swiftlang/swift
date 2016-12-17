@@ -109,7 +109,7 @@ public:
   std::string mangleGlobalInit(const VarDecl *decl, int counter,
                                bool isInitFunc);
 
-  std::string mangleReabstructionThunkHelper(CanSILFunctionType ThunkType,
+  std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
 

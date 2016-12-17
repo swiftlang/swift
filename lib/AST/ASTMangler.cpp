@@ -238,7 +238,7 @@ std::string ASTMangler::mangleGlobalInit(const VarDecl *decl, int counter,
   return finalize();
 }
 
-std::string ASTMangler::mangleReabstructionThunkHelper(
+std::string ASTMangler::mangleReabstractionThunkHelper(
                                             CanSILFunctionType ThunkType,
                                             Type FromType,
                                             Type ToType,

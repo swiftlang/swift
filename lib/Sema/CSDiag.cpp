@@ -4651,7 +4651,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     return false;
 
   auto context = CS->DC;
-  using CandididateMap =
+  using CandidateMap =
       llvm::SmallDenseMap<ValueDecl *, llvm::SmallVector<OverloadChoice, 2>>;
 
   auto getBaseKind = [](ValueDecl *base) -> DescriptiveDeclKind {
@@ -4734,7 +4734,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     if (!result || result.empty())
       continue;
 
-    CandididateMap candidates;
+    CandidateMap candidates;
     for (const auto &candidate : result) {
       auto base = candidate.Base;
       if ((base && base->isInvalid()) || candidate->isInvalid())

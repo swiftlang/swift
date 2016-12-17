@@ -2000,7 +2000,7 @@ getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
     std::string Old = mangler.finalize();
 
     NewMangling::ASTMangler NewMangler;
-    std::string New = NewMangler.mangleReabstructionThunkHelper(thunkType,
+    std::string New = NewMangler.mangleReabstractionThunkHelper(thunkType,
                        fromInterfaceType, toInterfaceType, M.getSwiftModule());
 
     name = NewMangling::selectMangling(Old, New);

@@ -1766,7 +1766,7 @@ class BeginBorrowInst
 };
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
-/// address. Must be paired with a end_borrow in its use-def list.
+/// address. Must be paired with an end_borrow in its use-def list.
 class StoreBorrowInst : public SILInstruction {
   friend class SILBuilder;
 
