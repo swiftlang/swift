@@ -814,7 +814,8 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
   case ValueKind::CLASS:                                                       \
     return MemoryBehavior::MEMBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
-  case ValueKind::SILArgument:
+  case ValueKind::SILPHIArgument:
+  case ValueKind::SILFunctionArgument:
   case ValueKind::SILUndef:
     llvm_unreachable("Non-instructions are unreachable.");
   }
@@ -827,9 +828,10 @@ SILInstruction::ReleasingBehavior SILInstruction::getReleasingBehavior() const {
   case ValueKind::CLASS:                                                       \
     return ReleasingBehavior::RELEASINGBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
- case ValueKind::SILArgument:
- case ValueKind::SILUndef:
-   llvm_unreachable("Non-instructions are unreachable.");
+  case ValueKind::SILPHIArgument:
+  case ValueKind::SILFunctionArgument:
+  case ValueKind::SILUndef:
+    llvm_unreachable("Non-instructions are unreachable.");
   }
   llvm_unreachable("We've just exhausted the switch.");
 }

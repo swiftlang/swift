@@ -94,11 +94,9 @@ public:
 
     // If we have a function argument that is guaranteed, set the guaranteed
     // flag so we know that it is always known safe.
-    if (auto *A = dyn_cast<SILArgument>(MatchSet.Ptr)) {
-      if (A->isFunctionArg()) {
-        auto C = A->getArgumentConvention();
-        PtrIsGuaranteedArg = C == SILArgumentConvention::Direct_Guaranteed;
-      }
+    if (auto *A = dyn_cast<SILFunctionArgument>(MatchSet.Ptr)) {
+      auto C = A->getArgumentConvention();
+      PtrIsGuaranteedArg = C == SILArgumentConvention::Direct_Guaranteed;
     }
     NewIncrements.push_back(Inst);
   }

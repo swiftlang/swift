@@ -53,10 +53,9 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
   case ValueKind::ReleaseValueInst:
     return RCStateTransitionKind::StrongDecrement;
 
-  case ValueKind::SILArgument: {
-    auto *Arg = cast<SILArgument>(V);
-    if (Arg->isFunctionArg() &&
-        Arg->hasConvention(SILArgumentConvention::Direct_Owned))
+  case ValueKind::SILFunctionArgument: {
+    auto *Arg = cast<SILFunctionArgument>(V);
+    if (Arg->hasConvention(SILArgumentConvention::Direct_Owned))
       return RCStateTransitionKind::StrongEntrance;
     return RCStateTransitionKind::Unknown;
   }

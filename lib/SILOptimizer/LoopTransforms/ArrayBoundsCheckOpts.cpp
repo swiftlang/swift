@@ -203,8 +203,8 @@ static bool isIdentifiedUnderlyingArrayObject(SILValue V) {
     return true;
 
   // Function arguments are safe.
-  if (auto Arg = dyn_cast<SILArgument>(V))
-    return Arg->isFunctionArg();
+  if (isa<SILFunctionArgument>(V))
+    return true;
 
   return false;
 }

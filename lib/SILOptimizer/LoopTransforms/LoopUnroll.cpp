@@ -122,7 +122,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
 
   // Match an add 1 recurrence.
-  SILArgument *RecArg;
+  SILPHIArgument *RecArg;
   IntegerLiteralInst *End;
   SILValue RecNext;
 
@@ -132,7 +132,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
   if (!match(RecNext,
              m_TupleExtractInst(m_ApplyInst(BuiltinValueKind::SAddOver,
-                                            m_SILArgument(RecArg), m_One()),
+                                            m_SILPHIArgument(RecArg), m_One()),
                                 0)))
     return None;
 

@@ -407,7 +407,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 
       return InlineCost::Expensive;
     }
-    case ValueKind::SILArgument:
+    case ValueKind::SILPHIArgument:
+    case ValueKind::SILFunctionArgument:
     case ValueKind::SILUndef:
       llvm_unreachable("Only instructions should be passed into this "
                        "function.");

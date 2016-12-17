@@ -110,11 +110,18 @@ SILArgument *SILBasicBlock::replaceArgument(unsigned i, SILType Ty,
   SILModule &M = getParent()->getModule();
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
+  bool IsFunctionArg =
+      ArgumentList[i]->getKind() == ValueKind::SILFunctionArgument;
 
   // Notify the delete handlers that this argument is being deleted.
   M.notifyDeleteHandlers(ArgumentList[i]);
 
-  auto *NewArg = new (M) SILArgument(Ty, D);
+  SILArgument *NewArg;
+  if (IsFunctionArg) {
+    NewArg = new (M) SILFunctionArgument(Ty, D);
+  } else {
+    NewArg = new (M) SILPHIArgument(Ty, D);
+  }
   NewArg->setParent(this);
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
@@ -125,12 +132,16 @@ SILArgument *SILBasicBlock::replaceArgument(unsigned i, SILType Ty,
 }
 
 SILArgument *SILBasicBlock::createArgument(SILType Ty, const ValueDecl *D) {
-  return new (getModule()) SILArgument(this, Ty, D);
+  if (isEntry())
+    return new (getModule()) SILFunctionArgument(this, Ty, D);
+  return new (getModule()) SILPHIArgument(this, Ty, D);
 }
 
 SILArgument *SILBasicBlock::insertArgument(arg_iterator Iter, SILType Ty,
                                            const ValueDecl *D) {
-  return new (getModule()) SILArgument(this, Iter, Ty, D);
+  if (isEntry())
+    return new (getModule()) SILFunctionArgument(this, Iter, Ty, D);
+  return new (getModule()) SILPHIArgument(this, Iter, Ty, D);
 }
 
 void SILBasicBlock::eraseArgument(int Index) {
@@ -234,4 +245,21 @@ ScopeCloner::getOrCreateClonedScope(const SILDebugScope *OrigScope) {
 
 bool SILBasicBlock::isEntry() const {
   return this == &*getParent()->begin();
+}
+
+SILBasicBlock::PHIArgumentArrayRefTy SILBasicBlock::getPHIArguments() const {
+  using FuncTy = std::function<SILPHIArgument *(SILArgument *)>;
+  FuncTy F = [](SILArgument *A) -> SILPHIArgument * {
+    return cast<SILPHIArgument>(A);
+  };
+  return makeTransformArrayRef(getArguments(), F);
+}
+
+SILBasicBlock::FunctionArgumentArrayRefTy
+SILBasicBlock::getFunctionArguments() const {
+  using FuncTy = std::function<SILFunctionArgument *(SILArgument *)>;
+  FuncTy F = [](SILArgument *A) -> SILFunctionArgument * {
+    return cast<SILFunctionArgument>(A);
+  };
+  return makeTransformArrayRef(getArguments(), F);
 }

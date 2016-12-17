@@ -18,11 +18,15 @@
 #define SWIFT_SIL_BASICBLOCK_H
 
 #include "swift/Basic/Range.h"
+#include "swift/Basic/TransformArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
+
 class SILFunction;
 class SILArgument;
+class SILPHIArgument;
+class SILFunctionArgument;
 
 class SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
@@ -154,6 +158,12 @@ public:
   const_arg_iterator args_end() const { return ArgumentList.end(); }
 
   ArrayRef<SILArgument *> getArguments() const { return ArgumentList; }
+  using PHIArgumentArrayRefTy =
+      TransformArrayRef<std::function<SILPHIArgument *(SILArgument *)>>;
+  PHIArgumentArrayRefTy getPHIArguments() const;
+  using FunctionArgumentArrayRefTy =
+      TransformArrayRef<std::function<SILFunctionArgument *(SILArgument *)>>;
+  FunctionArgumentArrayRefTy getFunctionArguments() const;
 
   unsigned getNumArguments() const { return ArgumentList.size(); }
   const SILArgument *getArgument(unsigned i) const { return ArgumentList[i]; }

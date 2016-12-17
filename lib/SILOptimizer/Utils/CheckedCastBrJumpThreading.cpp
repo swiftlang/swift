@@ -180,8 +180,8 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
     if (Value == DomValue)
       return Value;
 
-    // We know how to propagate through BBArgs only.
-    auto *V = dyn_cast<SILArgument>(Value);
+    // We know how to propagate through phi arguments only.
+    auto *V = dyn_cast<SILPHIArgument>(Value);
     if (!V)
       return SILValue();
 
@@ -375,7 +375,7 @@ bool CheckedCastBrJumpThreading::checkCloningConstraints() {
 bool CheckedCastBrJumpThreading::
 areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
                                       SILValue DomCondition) {
-  auto *Arg = dyn_cast<SILArgument>(Condition);
+  auto *Arg = dyn_cast<SILPHIArgument>(Condition);
   if (!Arg)
     return false;
 

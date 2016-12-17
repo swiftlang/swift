@@ -126,10 +126,10 @@ bool swift::isIntermediateRelease(SILInstruction *I,
   // OK. we have a release instruction.
   // Check whether this is a release on part of a guaranteed function argument.
   SILValue Op = stripValueProjections(I->getOperand(0));
-  SILArgument *Arg = dyn_cast<SILArgument>(Op);
-  if (!Arg || !Arg->isFunctionArg())
+  auto *Arg = dyn_cast<SILFunctionArgument>(Op);
+  if (!Arg)
     return false;
-  
+
   // This is a release on a guaranteed parameter. Its not the final release.
   if (Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed))
     return true;
