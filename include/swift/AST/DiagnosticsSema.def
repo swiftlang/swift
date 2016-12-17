@@ -1703,6 +1703,9 @@ ERROR(override_ownership_mismatch,none,
       "cannot override %select{strong|weak|unowned|unowned(unsafe)}0 property "
       "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
       (/*Ownership*/unsigned, /*Ownership*/unsigned))
+ERROR(override_class_declaration_in_extension,none,
+      "cannot override a non-dynamic class declaration from an extension.", 
+      ())
 ERROR(override_throws,none,
       "cannot override non-throwing %select{method|initializer}0 with "
       "throwing %select{method|initializer}0", (bool))
