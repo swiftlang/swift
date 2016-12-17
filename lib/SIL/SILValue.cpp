@@ -12,6 +12,7 @@
 
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
 
@@ -339,11 +340,6 @@ ValueOwnershipKindVisitor::visitSILUndef(SILUndef *Arg) {
 }
 
 Optional<ValueOwnershipKind>
-ValueOwnershipKindVisitor::visitBuiltinInst(BuiltinInst *Arg) {
-  llvm_unreachable("unimplemented");
-}
-
-Optional<ValueOwnershipKind>
 ValueOwnershipKindVisitor::visitPHISILArgument(SILArgument *Arg) {
   llvm_unreachable("unimplemented");
 }
@@ -418,4 +414,217 @@ ValueOwnershipKindVisitor::visitLoadInst(LoadInst *LI) {
 Optional<ValueOwnershipKind> SILValue::getOwnershipKind() const {
   // Once we have multiple return values, this must be changed.
   return ValueOwnershipKindVisitor().visit(const_cast<ValueBase *>(Value));
+}
+
+//===----------------------------------------------------------------------===//
+//                   Builtin OwnershipValueKind Computation
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct ValueOwnershipKindBuiltinVisitor
+    : SILBuiltinVisitor<ValueOwnershipKindBuiltinVisitor, ValueOwnershipKind> {
+
+  ValueOwnershipKind visitLLVMIntrinsic(BuiltinInst *BI,
+                                        llvm::Intrinsic::ID ID) {
+    // LLVM intrinsics do not traffic in ownership, so if we have a result, it
+    // must be trivial.
+    assert(BI->hasValue() && "Can only get here if we have a SILValue");
+    assert(BI->getType().isTrivial(BI->getModule()) &&
+           "LLVM intrinsics should always be trivial");
+    return ValueOwnershipKind::Trivial;
+  }
+
+#define BUILTIN(ID, NAME, ATTRS)                                               \
+  ValueOwnershipKind visit##ID(BuiltinInst *BI, StringRef Attr);
+#include "swift/AST/Builtins.def"
+};
+
+} // end anonymous namespace
+
+#define CONSTANT_OWNERSHIP_BUILTIN(OWNERSHIP, ID)                              \
+  ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
+      BuiltinInst *BI, StringRef Attr) {                                       \
+    assert(BI->hasValue() && "Expected to have type");                         \
+    if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
+      assert(BI->getType().isTrivial(BI->getModule()) &&                       \
+             "Only trivial types can have trivial ownership");                 \
+    } else {                                                                   \
+      assert(!BI->getType().isTrivial(BI->getModule()) &&                      \
+             "Only non trivial types can have non trivial ownership");         \
+    }                                                                          \
+    return ValueOwnershipKind::OWNERSHIP;                                      \
+  }
+CONSTANT_OWNERSHIP_BUILTIN(Owned, Take)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, TryPin)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, AShr)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Add)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, And)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, AssumeNonNegative)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, BitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ExactSDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ExactUDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FAdd)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_OEQ)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_OGE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_OGT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_OLE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_OLT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_ONE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_UEQ)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_UGE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_UGT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_ULE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_ULT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_UNE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FMul)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FNeg)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FPExt)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FPToSI)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FPToUI)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FPTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FRem)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FSub)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_EQ)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_NE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_SGE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_SGT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_SLE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_SLT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_UGE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_UGT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_ULE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_ULT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, IntToPtr)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, LShr)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Load)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, LoadRaw)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Mul)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Or)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, PtrToInt)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, SAddOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, SDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, SExt)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, SExtOrBitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, SIToFP)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, SMulOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, SRem)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, SSubOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Shl)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Sub)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Trunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, TruncOrBitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, UAddOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, UDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, UIToFP)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, UMulOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, URem)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, USubOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Xor)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ZExt)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ZExtOrBitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_ORD)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_UNO)
+CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastToUnknownObject)
+CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastFromUnknownObject)
+CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastToNativeObject)
+CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastFromNativeObject)
+CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastToBridgeObject)
+CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastReferenceFromBridgeObject)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, CastBitPatternFromBridgeObject)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, BridgeToRawPointer)
+CONSTANT_OWNERSHIP_BUILTIN(Unowned, BridgeFromRawPointer)
+CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastReference)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, AddressOf)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, GepRaw)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Gep)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, GetTailAddr)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUnique)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUniqueOrPinned)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUnique_native)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUniqueOrPinned_native)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, BindMemory)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, AllocWithTailElems)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ProjectTailElems)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsOptionalType)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Sizeof)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Strideof)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsPOD)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Alignof)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, AllocRaw)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, AssertConf)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, UToSCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, SToSCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, SToUCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, UToUCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, SUCheckedConversion)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, USCheckedConversion)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, IntToFPWithOverflow)
+
+/// AtomicRMW has type (Builtin.RawPointer, T) -> T. But it provides overloads
+/// for integer or rawpointer, so it should be trivial.
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, AtomicRMW)
+
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, CondUnreachable)
+CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, UnsafeGuaranteed)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, UnsafeGuaranteedEnd)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, GetObjCTypeEncoding)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, CanBeObjCClass)
+#undef CONSTANT_OWNERSHIP_BUILTIN
+
+#define NO_OWNERSHIP_BUILTIN(ID)                                               \
+  ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
+      BuiltinInst *BI, StringRef Attr) {                                       \
+    assert(!BI->hasValue() && "Expected to not have a value");                 \
+    llvm_unreachable("Should never get a SILValue to a Builtin "               \
+                     "without result");                                        \
+  }
+NO_OWNERSHIP_BUILTIN(Unreachable)
+NO_OWNERSHIP_BUILTIN(DestroyArray)
+NO_OWNERSHIP_BUILTIN(CopyArray)
+NO_OWNERSHIP_BUILTIN(TakeArrayFrontToBack)
+NO_OWNERSHIP_BUILTIN(TakeArrayBackToFront)
+NO_OWNERSHIP_BUILTIN(WillThrow)
+NO_OWNERSHIP_BUILTIN(UnexpectedError)
+NO_OWNERSHIP_BUILTIN(ErrorInMain)
+NO_OWNERSHIP_BUILTIN(DeallocRaw)
+NO_OWNERSHIP_BUILTIN(Fence)
+NO_OWNERSHIP_BUILTIN(OnFastPath)
+NO_OWNERSHIP_BUILTIN(Retain)
+NO_OWNERSHIP_BUILTIN(Release)
+NO_OWNERSHIP_BUILTIN(CondFail)
+NO_OWNERSHIP_BUILTIN(FixLifetime)
+NO_OWNERSHIP_BUILTIN(Autorelease)
+NO_OWNERSHIP_BUILTIN(Unpin)
+NO_OWNERSHIP_BUILTIN(Destroy)
+NO_OWNERSHIP_BUILTIN(Assign)
+NO_OWNERSHIP_BUILTIN(Init)
+NO_OWNERSHIP_BUILTIN(AtomicStore)
+NO_OWNERSHIP_BUILTIN(StaticReport)
+NO_OWNERSHIP_BUILTIN(Once)
+#undef NO_OWNERSHIP_BUILTIN
+
+// Check all of these...
+#define UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ID)                             \
+  ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
+      BuiltinInst *BI, StringRef Attr) {                                       \
+    if (BI->getType().isTrivial(BI->getModule())) {                            \
+      return ValueOwnershipKind::Trivial;                                      \
+    }                                                                          \
+    return ValueOwnershipKind::Unowned;                                        \
+  }
+UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ReinterpretCast)
+UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(CmpXChg)
+UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(AtomicLoad)
+UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ExtractElement)
+UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(InsertElement)
+UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ZeroInitializer)
+#undef UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT
+
+Optional<ValueOwnershipKind>
+ValueOwnershipKindVisitor::visitBuiltinInst(BuiltinInst *BI) {
+  // For now, just conservatively say builtins are None. We need to use a
+  // builtin in here to guarantee correctness.
+  return ValueOwnershipKindBuiltinVisitor().visit(BI);
 }
