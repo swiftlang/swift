@@ -12,6 +12,7 @@
 
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILVisitor.h"
 
 using namespace swift;
 
@@ -104,4 +105,40 @@ swift::ValueOwnershipKindMerge(Optional<ValueOwnershipKind> LHS,
   }
 
   return (LHSVal == RHSVal) ? LHS : None;
+}
+
+//===----------------------------------------------------------------------===//
+//                 Instruction ValueOwnershipKind Computation
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class ValueOwnershipKindVisitor
+    : public SILVisitor<ValueOwnershipKindVisitor,
+                        Optional<ValueOwnershipKind>> {
+
+public:
+  ValueOwnershipKindVisitor() = default;
+  ~ValueOwnershipKindVisitor() = default;
+  ValueOwnershipKindVisitor(const ValueOwnershipKindVisitor &) = delete;
+  ValueOwnershipKindVisitor(ValueOwnershipKindVisitor &&) = delete;
+
+  Optional<ValueOwnershipKind> visitForwardingInst(SILInstruction *I);
+  Optional<ValueOwnershipKind> visitPHISILArgument(SILArgument *Arg);
+
+  Optional<ValueOwnershipKind> visitValueBase(ValueBase *V) {
+    llvm_unreachable("unimplemented method on ValueBaseOwnershipVisitor");
+  }
+#define VALUE(Id, Parent)                                                      \
+  Optional<ValueOwnershipKind> visit##Id(Id *ID) {                             \
+    llvm_unreachable("unimplemented");                                         \
+  }
+#include "swift/SIL/SILNodes.def"
+};
+
+} // end anonymous namespace
+
+Optional<ValueOwnershipKind> SILValue::getOwnershipKind() const {
+  // Once we have multiple return values, this must be changed.
+  return ValueOwnershipKindVisitor().visit(const_cast<ValueBase *>(Value));
 }

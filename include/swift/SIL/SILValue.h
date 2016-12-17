@@ -254,6 +254,14 @@ public:
     llvm::PointerLikeTypeTraits<ValueBase *>::
           NumLowBitsAvailable
   };
+
+  /// Returns the ValueOwnershipKind that describes this SILValue's ownership
+  /// semantics if the SILValue has ownership semantics. Returns is a value
+  /// without any Ownership Semantics.
+  ///
+  /// An example of a SILValue without ownership semantics is a
+  /// struct_element_addr.
+  Optional<ValueOwnershipKind> getOwnershipKind() const;
 };
 
 /// A formal SIL reference to a value, suitable for use as a stored
