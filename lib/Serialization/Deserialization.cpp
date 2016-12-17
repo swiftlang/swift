@@ -1021,13 +1021,16 @@ ModuleFile::readGenericSignatureOrEnvironment(
         Identifier name = getIdentifier(rawParamIDs[i]);
         auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
 
-        auto paramDecl = createDecl<GenericTypeParamDecl>(getAssociatedModule(),
-                                                          name,
-                                                          SourceLoc(),
-                                                          paramTy->getDepth(),
-                                                          paramTy->getIndex());
-        paramTy = paramDecl->getDeclaredInterfaceType()
-                   ->castTo<GenericTypeParamType>();
+        if (!name.empty()) {
+          auto paramDecl =
+            createDecl<GenericTypeParamDecl>(getAssociatedModule(),
+                                             name,
+                                             SourceLoc(),
+                                             paramTy->getDepth(),
+                                             paramTy->getIndex());
+          paramTy = paramDecl->getDeclaredInterfaceType()
+                     ->castTo<GenericTypeParamType>();
+        }
 
         paramTypes.push_back(paramTy);
 
