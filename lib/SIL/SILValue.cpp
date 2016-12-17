@@ -65,3 +65,43 @@ SILModule *ValueBase::getModule() const {
     return &Arg->getModule();
   return nullptr;
 }
+
+//===----------------------------------------------------------------------===//
+//                             ValueOwnershipKind
+//===----------------------------------------------------------------------===//
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     ValueOwnershipKind Kind) {
+  switch (Kind) {
+  case ValueOwnershipKind::Trivial:
+    return os << "Trivial";
+  case ValueOwnershipKind::Unowned:
+    return os << "Unowned";
+  case ValueOwnershipKind::Owned:
+    return os << "Owned";
+  case ValueOwnershipKind::Guaranteed:
+    return os << "Guaranteed";
+  case ValueOwnershipKind::Undef:
+    return os << "Undef";
+  }
+}
+
+Optional<ValueOwnershipKind>
+swift::ValueOwnershipKindMerge(Optional<ValueOwnershipKind> LHS,
+                               Optional<ValueOwnershipKind> RHS) {
+  if (!LHS.hasValue() || !RHS.hasValue())
+    return NoneType::None;
+  auto LHSVal = LHS.getValue();
+  auto RHSVal = RHS.getValue();
+
+  // Undef merges with anything.
+  if (LHSVal == ValueOwnershipKind::Undef) {
+    return RHSVal;
+  }
+  // Undef merges with anything.
+  if (RHSVal == ValueOwnershipKind::Undef) {
+    return LHSVal;
+  }
+
+  return (LHSVal == RHSVal) ? LHS : None;
+}
