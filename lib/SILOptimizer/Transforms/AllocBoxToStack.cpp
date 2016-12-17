@@ -553,7 +553,12 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
       auto boxTy = param.getType()->castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented");
-      auto paramTy = boxTy->getFieldType(Orig->getModule(), 0);
+      SILType paramTy;
+      {
+        Lowering::GenericContextScope scope(Orig->getModule().Types,
+                                            OrigFTI->getGenericSignature());
+        paramTy = boxTy->getFieldType(Orig->getModule(), 0);
+      }
       auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
                                   ParameterConvention::Indirect_InoutAliasable);
       ClonedInterfaceArgTys.push_back(promotedParam);

@@ -1125,14 +1125,19 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
   // FIXME: A generic SILFunctionType should not contain any nondependent
   // archetypes.
   if (isa<SILFunctionType>(contextTy)
-      && cast<SILFunctionType>(contextTy)->isPolymorphic())
+      && cast<SILFunctionType>(contextTy)->isPolymorphic()) {
     return contextTy;
-  else
-    return CanType(contextTy.transform([&](Type t) -> Type {
-      if (auto arch = dyn_cast<ArchetypeType>(t.getPointer()))
-        return getExemplarArchetype(arch);
-      return t;
-    }));
+  } else {
+    auto exemplified = contextTy.subst(
+      [&](SubstitutableType *type) -> Type {
+        if (auto arch = dyn_cast<ArchetypeType>(type))
+          return getExemplarArchetype(arch);
+        return type;
+      },
+      MakeAbstractConformanceForGenericType(),
+      SubstFlags::AllowLoweredTypes);
+    return CanType(exemplified);
+  }
 }
 
 TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {

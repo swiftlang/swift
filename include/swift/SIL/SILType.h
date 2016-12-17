@@ -591,18 +591,6 @@ static inline llvm::hash_code hash_value(SILType V) {
   return llvm::hash_value(V.getOpaqueValue());
 }
 
-inline CanType
-SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
-  auto fieldTy = getLayout()->getFields()[index].getLoweredType();
-  // Apply generic arguments if the layout is generic.
-  if (!getGenericArgs().empty()) {
-    auto substMap =
-     getLayout()->getGenericSignature()->getSubstitutionMap(getGenericArgs());
-    fieldTy = fieldTy.subst(substMap)->getCanonicalType();
-  }
-  return fieldTy;
-}
-
 inline SILType SILBoxType::getFieldType(SILModule &M, unsigned index) const {
   return SILType::getPrimitiveAddressType(getFieldLoweredType(M, index));
 }

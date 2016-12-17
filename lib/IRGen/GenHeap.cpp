@@ -1397,7 +1397,7 @@ public:
 
   /// Allocate a box of the given type.
   virtual OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const = 0;
 
   /// Deallocate an uninitialized box.
@@ -1415,7 +1415,7 @@ public:
   EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const override {
     return OwnedAddress(IGF.getTypeInfo(boxedType).getUndefAddress(),
                         IGF.IGM.RefCountedNull);
@@ -1440,7 +1440,7 @@ public:
   NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const override {
     auto &ti = IGF.getTypeInfo(boxedType);
     // Use the runtime to allocate a box of the appropriate size.
@@ -1481,10 +1481,17 @@ public:
   {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name)
   const override {
     // Allocate a new object using the layout.
+    auto boxedInterfaceType = boxedType;
+    if (env) {
+      boxedInterfaceType = SILType::getPrimitiveType(
+        env->mapTypeOutOfContext(boxedType.getSwiftRValueType())
+           ->getCanonicalType(),
+         boxedType.getCategory());
+    }
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
         boxedInterfaceType.getSwiftRValueType());
@@ -1604,14 +1611,13 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
 
 OwnedAddress
 irgen::emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
-                       CanSILBoxType boxInterfaceType,
+                       GenericEnvironment *env,
                        const llvm::Twine &name) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
   return boxTI.allocate(IGF,
-                      boxType->getFieldType(IGF.IGM.getSILModule(), 0),
-                      boxInterfaceType->getFieldType(IGF.IGM.getSILModule(), 0),
+                      boxType->getFieldType(IGF.IGM.getSILModule(), 0), env,
                       name);
 }
 

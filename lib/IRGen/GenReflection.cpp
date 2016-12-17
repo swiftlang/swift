@@ -28,6 +28,7 @@
 #include "GenEnum.h"
 #include "GenHeap.h"
 #include "GenProto.h"
+#include "GenType.h"
 #include "IRGenModule.h"
 #include "Linking.h"
 #include "LoadableTypeInfo.h"
@@ -205,7 +206,8 @@ protected:
 
   /// Add a 32-bit relative offset to a mangled typeref string
   /// in the typeref reflection section.
-  void addTypeRef(Module *ModuleContext, CanType type) {
+  void addTypeRef(Module *ModuleContext, CanType type,
+                  CanGenericSignature Context = {}) {
     assert(type);
 
     // Generic parameters should be written in terms of interface types
@@ -221,6 +223,7 @@ protected:
     // mangling in reflection metadata.
     auto boxTy = dyn_cast<SILBoxType>(type);
     if (boxTy && boxTy->getLayout()->getFields().size() == 1) {
+      GenericContextScope scope(IGM, Context);
       mangler.mangleLegacyBoxType(
         boxTy->getFieldLoweredType(IGM.getSILModule(), 0));
     } else {
@@ -757,7 +760,8 @@ public:
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
-      addTypeRef(IGM.getSILModule().getSwiftModule(), CaptureType);
+      addTypeRef(IGM.getSILModule().getSwiftModule(), CaptureType,
+                 OrigCalleeType->getGenericSignature());
       addBuiltinTypeRefs(CaptureType);
     }
 

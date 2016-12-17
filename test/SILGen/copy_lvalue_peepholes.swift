@@ -8,9 +8,9 @@ var zero = getInt()
 func getInt() -> Int { return zero }
 
 // CHECK-LABEL: sil hidden @_TF21copy_lvalue_peepholes20init_var_from_lvalue
-// CHECK:   [[X:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+// CHECK:   [[X:%.*]] = alloc_box ${ var Builtin.Int64 }
 // CHECK:   [[PBX:%.*]] = project_box [[X]]
-// CHECK:   [[Y:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+// CHECK:   [[Y:%.*]] = alloc_box ${ var Builtin.Int64 }
 // CHECK:   [[PBY:%.*]] = project_box [[Y]]
 // CHECK:   copy_addr [[PBX]] to [initialization] [[PBY]] : $*Builtin.Int64
 func init_var_from_lvalue(x: Int) {
@@ -19,7 +19,7 @@ func init_var_from_lvalue(x: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF21copy_lvalue_peepholes22assign_var_from_lvalue
-// CHECK:   [[Y:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+// CHECK:   [[Y:%.*]] = alloc_box ${ var Builtin.Int64 }
 // CHECK:   [[PBY:%.*]] = project_box [[Y]]
 // CHECK:   copy_addr [[PBY]] to %0
 func assign_var_from_lvalue(x: inout Int, y: Int) {

@@ -29,6 +29,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 using namespace swift::Lowering;
@@ -792,8 +793,9 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
       }
       case CaptureKind::Box: {
         // Lvalues are captured as a box that owns the captured value.
-        SILType ty = loweredTy.getAddressType();
-        CanType boxTy = SILBoxType::get(ty.getSwiftRValueType());
+        auto boxTy = Types.getInterfaceBoxTypeForCapture(VD,
+                                                 loweredTy.getSwiftRValueType(),
+                                                 /*mutable*/ true);
         auto convention = M.getOptions().EnableGuaranteedClosureContexts
           ? ParameterConvention::Direct_Guaranteed
           : ParameterConvention::Direct_Owned;
@@ -2191,44 +2193,6 @@ namespace {
     CanType visitSILBlockStorageType(CanSILBlockStorageType origType) {
       auto substCaptureType = visit(origType->getCaptureType());
       return SILBlockStorageType::get(substCaptureType);
-    }
-    CanType visitSILBoxType(CanSILBoxType origType) {
-      // TODO: This should eventually go away once SILLayouts are fully
-      // adopted, since a layout should only ever be parameterized by formal
-      // types once the box transition is finished.
-      bool didChange = false;
-      SmallVector<Substitution, 4> substArgs;
-      for (auto &arg : origType->getGenericArgs()) {
-        auto substReplacementTy = visit(CanType(arg.getReplacement()));
-        
-        if (substReplacementTy == CanType(arg.getReplacement())) {
-          substArgs.push_back(arg);
-          continue;
-        }
-        
-        // FIXME: We need to update the substitution conformances for the
-        // transformed type in the general case. For now, only handle
-        // transformations between generic types with abstract conformances.
-        assert((arg.getConformances().empty()
-                || (std::all_of(arg.getConformances().begin(),
-                                arg.getConformances().end(),
-                                [](ProtocolConformanceRef conformance) -> bool {
-                                  return conformance.isAbstract();
-                                })
-                    && (substReplacementTy->is<SubstitutableType>()
-                        || substReplacementTy->is<DependentMemberType>()
-                        || substReplacementTy->is<GenericTypeParamType>())))
-               && "transforming concrete conformance not implemented");
-        substArgs.push_back(Substitution(substReplacementTy,
-                                         arg.getConformances()));
-        didChange = true;
-      }
-      if (!didChange)
-        return origType;
-
-      return SILBoxType::get(origType->getASTContext(),
-                             origType->getLayout(),
-                             substArgs);
     }
 
     /// Optionals need to have their object types substituted by these rules.

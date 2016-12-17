@@ -477,7 +477,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
       assert(getType()->getNominalOrBoundGenericNominal()
                == substType->getNominalOrBoundGenericNominal()
              && "substitution mapped to different nominal?!");
-      return module->getASTContext()
+      return substType->getASTContext()
         .getSpecializedConformance(substType,
                            const_cast<ProtocolConformance *>(this),
                            substType->gatherAllSubstitutions(module, nullptr));
@@ -498,7 +498,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
       newBase = inheritedConformance;
     }
 
-    return module->getASTContext()
+    return substType->getASTContext()
       .getInheritedConformance(substType, newBase);
   }
   case ProtocolConformanceKind::Specialized: {
@@ -509,9 +509,9 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
     for (auto &sub : spec->getGenericSubstitutions())
       newSubs.push_back(sub.subst(module, subs, conformances));
     
-    auto ctxNewSubs = module->getASTContext().AllocateCopy(newSubs);
+    auto ctxNewSubs = substType->getASTContext().AllocateCopy(newSubs);
     
-    return module->getASTContext()
+    return substType->getASTContext()
       .getSpecializedConformance(substType, spec->getGenericConformance(),
                                  ctxNewSubs);
   }

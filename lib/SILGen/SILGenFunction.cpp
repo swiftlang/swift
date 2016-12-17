@@ -335,7 +335,11 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // since we could conceivably forward the copied value into the
         // closure context and pass it down to the partially applied function
         // in-place.
-        auto boxTy = SILBoxType::get(vl.value->getType().getSwiftRValueType());
+        // TODO: Use immutable box for immutable captures.
+        auto boxTy = SGM.Types.getContextBoxTypeForCapture(vd,
+                                       vl.value->getType().getSwiftRValueType(),
+                                       F.getGenericEnvironment(),
+                                       /*mutable*/ true);
         
         AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
@@ -708,13 +712,14 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   }
 
   case CaptureKind::Box: {
-    auto *var = dyn_cast<VarDecl>(vd);
-    SILType ty = gen.getLoweredType(var->getType()->getRValueType())
-      .getAddressType();
     // Forward the captured owning box.
-    SILType boxTy = SILType::getPrimitiveObjectType(
-        SILBoxType::get(ty.getSwiftRValueType()));
-    addSILArgument(boxTy, vd);
+    auto *var = cast<VarDecl>(vd);
+    auto boxTy = gen.SGM.Types
+      .getInterfaceBoxTypeForCapture(vd,
+                                     gen.getLoweredType(var->getType())
+                                        .getSwiftRValueType(),
+                                     /*mutable*/ true);
+    addSILArgument(SILType::getPrimitiveObjectType(boxTy), vd);
     break;
   }
 

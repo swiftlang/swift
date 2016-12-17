@@ -14,16 +14,16 @@ struct A {
 func test0(c c: C) {
   var c = c
 // CHECK:    bb0(%0 : $C):
-// CHECK:      [[C:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <C>
+// CHECK:      [[C:%.*]] = alloc_box ${ var C }
 // CHECK-NEXT: [[PBC:%.*]] = project_box [[C]]
 
   var a: A
-// CHECK:      [[A1:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <A>
+// CHECK:      [[A1:%.*]] = alloc_box ${ var A }
 // CHECK-NEXT: [[PBA:%.*]] = project_box [[A1]]
 // CHECK:      [[A:%.*]] = mark_uninitialized [var] [[PBA]]
 
   weak var x = c
-// CHECK:      [[X:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <@sil_weak Optional<C>>, var, name "x"
+// CHECK:      [[X:%.*]] = alloc_box ${ var @sil_weak Optional<C> }, var, name "x"
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 //   Implicit conversion
 // CHECK-NEXT: [[TMP:%.*]] = load [copy] [[PBC]] : $*C
@@ -46,8 +46,8 @@ func test0(c c: C) {
 
 // <rdar://problem/16871284> silgen crashes on weak capture
 // CHECK: weak.(testClosureOverWeak () -> ()).(closure #1)
-// CHECK-LABEL: sil shared @_TFF4weak19testClosureOverWeakFT_T_U_FT_Si : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <@sil_weak Optional<C>>) -> Int {
-// CHECK: bb0(%0 : $<τ_0_0> { var τ_0_0 } <@sil_weak Optional<C>>):
+// CHECK-LABEL: sil shared @_TFF4weak19testClosureOverWeakFT_T_U_FT_Si : $@convention(thin) (@owned { var @sil_weak Optional<C> }) -> Int {
+// CHECK: bb0(%0 : ${ var @sil_weak Optional<C> }):
 // CHECK-NEXT:  %1 = project_box %0
 // CHECK-NEXT:  debug_value_addr %1 : $*@sil_weak Optional<C>, var, name "bC", argno 1
 // CHECK-NEXT:  %3 = alloc_stack $Optional<C>
@@ -62,7 +62,7 @@ class CC {
   weak var x: CC?
 
   // CHECK-LABEL: sil hidden @_TFC4weak2CCc
-  // CHECK:  [[FOO:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<CC>>
+  // CHECK:  [[FOO:%.*]] = alloc_box ${ var Optional<CC> }
   // CHECK:  [[PB:%.*]] = project_box [[FOO]]
   // CHECK:  [[X:%.*]] = ref_element_addr %2 : $CC, #CC.x
   // CHECK:  [[VALUE:%.*]] = load_weak [[X]] : $*@sil_weak Optional<CC>

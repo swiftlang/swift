@@ -282,8 +282,11 @@ public:
     assert(decl->hasStorage() && "can't emit storage for a computed variable");
     assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
 
-    SILType lType = SGF.getLoweredType(decl->getType()->getRValueType());
-    auto boxType = SILBoxType::get(lType.getSwiftRValueType());
+    auto boxType = SGF.SGM.Types
+      .getContextBoxTypeForCapture(decl,
+                     SGF.getLoweredType(decl->getType()).getSwiftRValueType(),
+                     SGF.F.getGenericEnvironment(),
+                     /*mutable*/ true);
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
