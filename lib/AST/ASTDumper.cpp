@@ -2819,7 +2819,11 @@ namespace {
 
       // FIXME: This is ugly.
       OS << "\n";
-      T->getASTContext().dumpArchetypeContext(T, OS, Indent + 2);
+      if (auto genericEnv = T->getGenericEnvironment()) {
+        if (auto owningDC = genericEnv->getOwningDeclContext()) {
+          owningDC->printContext(OS, Indent + 2);
+        }
+      }
 
       if (auto superclass = T->getSuperclass())
         printRec("superclass", superclass);

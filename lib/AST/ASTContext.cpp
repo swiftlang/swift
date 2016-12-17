@@ -2411,22 +2411,6 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
   return objcName;
 }
 
-void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
-                                      unsigned indent) const {
-  dumpArchetypeContext(archetype, llvm::errs(), indent);
-}
-
-void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
-                                      llvm::raw_ostream &os,
-                                      unsigned indent) const {
-  if (archetype->isOpenedExistential())
-    return;
-
-  if (auto env = archetype->getGenericEnvironment())
-    if (auto owningDC = env->getOwningDeclContext())
-      owningDC->printContext(os, indent);
-}
-
 //===----------------------------------------------------------------------===//
 // Type manipulation routines.
 //===----------------------------------------------------------------------===//
