@@ -23,6 +23,16 @@
 
 using namespace swift;
 
+static void checkEnumInstIsTrivial(EnumInst *EI) {
+  if (!EI->hasOperand())
+    return;
+
+  if (EI->getOperand()->getType().isTrivial(EI->getModule()))
+    return;
+
+  llvm_unreachable("Found enum with non-trivial operand but trivial ownership?!");
+}
+
 namespace {
 
 class ValueOwnershipKindDumper : public SILFunctionTransform {
@@ -39,12 +49,17 @@ class ValueOwnershipKindDumper : public SILFunctionTransform {
         SILValue V(&II);
         llvm::outs() << "Visiting: " << II;
         auto Kind = V.getOwnershipKind();
-        if (!Kind.hasValue()) {
-          llvm_unreachable("    Error... has a value but no kind?!");
-        }
-        llvm::outs() << "    " << Kind.getValue() << "\n";
-        if (Kind.getValue() == ValueOwnershipKind::Trivial) {
-          if (!V->getType().isTrivial(M)) {
+        llvm::outs() << "    " << Kind << "\n";
+        if (Kind == ValueOwnershipKind::Any)
+          continue;
+
+        if (Kind == ValueOwnershipKind::Trivial) {
+          if (auto *EI = dyn_cast<EnumInst>(V)) {
+            checkEnumInstIsTrivial(EI);
+            continue;
+          }
+          SILType Ty = V->getType();
+          if (!Ty.isTrivial(M) && !Ty.isAddress()) {
             llvm_unreachable("Error! Trivial ownership without trivial type\n");
           }
         } else {

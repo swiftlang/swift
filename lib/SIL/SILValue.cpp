@@ -14,6 +14,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
 
 using namespace swift;
@@ -84,8 +85,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
     return os << "Owned";
   case ValueOwnershipKind::Guaranteed:
     return os << "Guaranteed";
-  case ValueOwnershipKind::Undef:
-    return os << "Undef";
+  case ValueOwnershipKind::Any:
+    return os << "Any";
   }
 }
 
@@ -97,12 +98,12 @@ swift::ValueOwnershipKindMerge(Optional<ValueOwnershipKind> LHS,
   auto LHSVal = LHS.getValue();
   auto RHSVal = RHS.getValue();
 
-  // Undef merges with anything.
-  if (LHSVal == ValueOwnershipKind::Undef) {
+  // Any merges with anything.
+  if (LHSVal == ValueOwnershipKind::Any) {
     return RHSVal;
   }
-  // Undef merges with anything.
-  if (RHSVal == ValueOwnershipKind::Undef) {
+  // Any merges with anything.
+  if (RHSVal == ValueOwnershipKind::Any) {
     return LHSVal;
   }
 
@@ -117,7 +118,7 @@ namespace {
 
 class ValueOwnershipKindVisitor
     : public SILVisitor<ValueOwnershipKindVisitor,
-                        Optional<ValueOwnershipKind>> {
+                        ValueOwnershipKind> {
 
 public:
   ValueOwnershipKindVisitor() = default;
@@ -125,21 +126,20 @@ public:
   ValueOwnershipKindVisitor(const ValueOwnershipKindVisitor &) = delete;
   ValueOwnershipKindVisitor(ValueOwnershipKindVisitor &&) = delete;
 
-  Optional<ValueOwnershipKind> visitForwardingInst(SILInstruction *I);
-  Optional<ValueOwnershipKind> visitPHISILArgument(SILArgument *Arg);
+  ValueOwnershipKind visitForwardingInst(SILInstruction *I);
+  ValueOwnershipKind visitPHISILArgument(SILArgument *Arg);
 
-  Optional<ValueOwnershipKind> visitValueBase(ValueBase *V) {
+  ValueOwnershipKind visitValueBase(ValueBase *V) {
     llvm_unreachable("unimplemented method on ValueBaseOwnershipVisitor");
   }
-#define VALUE(Id, Parent)                                                      \
-  Optional<ValueOwnershipKind> visit##Id(Id *ID);
+#define VALUE(Id, Parent) ValueOwnershipKind visit##Id(Id *ID);
 #include "swift/SIL/SILNodes.def"
 };
 
 } // end anonymous namespace
 
 #define CONSTANT_OWNERSHIP_INST(OWNERSHIP, INST)                               \
-  Optional<ValueOwnershipKind> ValueOwnershipKindVisitor::visit##INST##Inst(   \
+  ValueOwnershipKind ValueOwnershipKindVisitor::visit##INST##Inst(   \
       INST##Inst *Arg) {                                                       \
     assert(Arg->hasValue() && "Expected to have a result");                    \
     if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
@@ -151,9 +151,6 @@ public:
   }
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
-CONSTANT_OWNERSHIP_INST(Guaranteed, StructExtract)
-CONSTANT_OWNERSHIP_INST(Guaranteed, TupleExtract)
-CONSTANT_OWNERSHIP_INST(Guaranteed, UncheckedEnumData)
 CONSTANT_OWNERSHIP_INST(Owned, AllocBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocRef)
@@ -192,9 +189,10 @@ CONSTANT_OWNERSHIP_INST(Trivial, MarkFunctionEscape)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitialized)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, Metatype)
-CONSTANT_OWNERSHIP_INST(Trivial, ObjCExistentialMetatypeToObject) // Is this right?
-CONSTANT_OWNERSHIP_INST(Trivial, ObjCMetatypeToObject) // Is this right?
-CONSTANT_OWNERSHIP_INST(Trivial, ObjCProtocol) // Is this right?
+CONSTANT_OWNERSHIP_INST(Trivial,
+                        ObjCExistentialMetatypeToObject) // Is this right?
+CONSTANT_OWNERSHIP_INST(Trivial, ObjCMetatypeToObject)   // Is this right?
+CONSTANT_OWNERSHIP_INST(Trivial, ObjCProtocol)           // Is this right?
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCToThickMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, OpenExistentialAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, OpenExistentialBox)
@@ -233,13 +231,25 @@ CONSTANT_OWNERSHIP_INST(Unowned, UnmanagedToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
 #undef CONSTANT_OWNERSHIP_INST
 
+#define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP, INST)                    \
+  ValueOwnershipKind ValueOwnershipKindVisitor::visit##INST##Inst(INST##Inst *I) { \
+    if (I->getType().isTrivial(I->getModule())) {                       \
+      return ValueOwnershipKind::Trivial;                               \
+    }                                                                   \
+    return ValueOwnershipKind::OWNERSHIP;                               \
+  }
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, StructExtract)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, UncheckedEnumData)
+#undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
+
 // These are instructions that do not have any result, so we should never reach
 // this point in the code since we need a SILValue to compute
 // ValueOwnershipKind. We define methods so that all instructions have a method
 // on the visitor (causing the compiler to warn if a new instruction is added
 // within a method being added).
 #define NO_RESULT_OWNERSHIP_INST(INST)                                         \
-  Optional<ValueOwnershipKind> ValueOwnershipKindVisitor::visit##INST##Inst(   \
+  ValueOwnershipKind ValueOwnershipKindVisitor::visit##INST##Inst(   \
       INST##Inst *I) {                                                         \
     assert(!I->hasValue() && "Expected an instruction without a result");      \
     llvm_unreachable("Instruction without a result can not have ownership");   \
@@ -294,34 +304,58 @@ NO_RESULT_OWNERSHIP_INST(CheckedCastBranch)
 NO_RESULT_OWNERSHIP_INST(CheckedCastAddrBranch)
 #undef NO_RESULT_OWNERSHIP_INST
 
-// For a forwarding instruction, we loop over all operands and make sure they
-// are all the same.
-Optional<ValueOwnershipKind>
+// For a forwarding instruction, we loop over all operands and make sure that
+// all non-trivial values have the same ownership.
+ValueOwnershipKind
 ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I) {
   ArrayRef<Operand> Ops = I->getAllOperands();
+  // A forwarding inst without operands must be trivial.
   if (Ops.empty())
-    llvm_unreachable("All forwarding insts should have operands");
-  Optional<ValueOwnershipKind> Base = Ops[0].get().getOwnershipKind();
-  if (!Base)
-    return None;
+    return ValueOwnershipKind::Trivial;
 
-  for (const Operand &Op : Ops.slice(1)) {
-    if (!(Base = ValueOwnershipKindMerge(Base, Op.get().getOwnershipKind()))) {
-      return None;
+  // Find the first index where we have a trivial value.
+  auto Iter =
+    find_if(Ops,
+            [](const Operand &Op) -> bool {
+              return Op.get().getOwnershipKind() != ValueOwnershipKind::Trivial;
+            });
+  // All trivial.
+  if (Iter == Ops.end()) {
+    return ValueOwnershipKind::Trivial;
+  }
+
+  // See if we have any Any. If we do, just return that for now.
+  if (any_of(Ops,
+             [](const Operand &Op) -> bool {
+               return Op.get().getOwnershipKind() == ValueOwnershipKind::Any;
+             }))
+    return ValueOwnershipKind::Any;
+  unsigned Index = std::distance(Ops.begin(), Iter);
+
+  ValueOwnershipKind Base = Ops[Index].get().getOwnershipKind();
+
+  for (const Operand &Op : Ops.slice(Index+1)) {
+    auto OpKind = Op.get().getOwnershipKind();
+    if (ValueOwnershipKindMerge(OpKind, ValueOwnershipKind::Trivial))
+      continue;
+
+    auto MergedValue = ValueOwnershipKindMerge(Base, OpKind);
+    if (!MergedValue.hasValue()) {
+      llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
     }
   }
+
   return Base;
 }
 
 #define FORWARDING_OWNERSHIP_INST(INST)                                        \
-  Optional<ValueOwnershipKind> ValueOwnershipKindVisitor::visit##INST##Inst(   \
+  ValueOwnershipKind ValueOwnershipKindVisitor::visit##INST##Inst(   \
       INST##Inst *I) {                                                         \
     assert(I->hasValue() && "Expected to have a value");                       \
     return visitForwardingInst(I);                                             \
   }
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
-FORWARDING_OWNERSHIP_INST(Enum)
 FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
@@ -334,18 +368,27 @@ FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
 #undef FORWARDING_OWNERSHIP_INST
 
-Optional<ValueOwnershipKind>
-ValueOwnershipKindVisitor::visitSILUndef(SILUndef *Arg) {
-  return ValueOwnershipKind::Undef;
+// An enum without payload is trivial. One with non-trivial payload is
+// forwarding.
+ValueOwnershipKind
+ValueOwnershipKindVisitor::visitEnumInst(EnumInst *EI) {
+  if (!EI->hasOperand())
+    return ValueOwnershipKind::Trivial;
+  return visitForwardingInst(EI);
 }
 
-Optional<ValueOwnershipKind>
+ValueOwnershipKind
+ValueOwnershipKindVisitor::visitSILUndef(SILUndef *Arg) {
+  return ValueOwnershipKind::Any;
+}
+
+ValueOwnershipKind
 ValueOwnershipKindVisitor::visitPHISILArgument(SILArgument *Arg) {
   // For now just return undef.
-  return ValueOwnershipKind::Undef;
+  return ValueOwnershipKind::Any;
 }
 
-Optional<ValueOwnershipKind>
+ValueOwnershipKind
 ValueOwnershipKindVisitor::visitSILArgument(SILArgument *Arg) {
   // If we have a PHI node, we need to look at our predecessors.
   if (!Arg->isFunctionArg()) {
@@ -378,41 +421,79 @@ ValueOwnershipKindVisitor::visitSILArgument(SILArgument *Arg) {
 }
 
 // This is a forwarding instruction through only one of its arguments.
-Optional<ValueOwnershipKind>
+ValueOwnershipKind
 ValueOwnershipKindVisitor::visitMarkDependenceInst(MarkDependenceInst *MDI) {
   return MDI->getValue().getOwnershipKind();
 }
 
-Optional<ValueOwnershipKind>
-ValueOwnershipKindVisitor::visitApplyInst(ApplyInst *AI) {
-  auto Result = AI->getSingleResult();
-  assert(Result && "SIL for now only has single results");
-  switch (Result->getConvention()) {
+static ValueOwnershipKind getResultOwnershipKind(const SILResultInfo &Info,
+                                                 SILModule &M) {
+  SILType Ty = M.Types.getLoweredType(Info.getType());
+  bool IsTrivial = Ty.isTrivial(M);
+  switch (Info.getConvention()) {
   case ResultConvention::Indirect:
-    return None;
+    return ValueOwnershipKind::Trivial; // Should this be an Any?
   case ResultConvention::Autoreleased:
   case ResultConvention::Owned:
     return ValueOwnershipKind::Owned;
   case ResultConvention::Unowned:
   case ResultConvention::UnownedInnerPointer:
+    if (IsTrivial)
+      return ValueOwnershipKind::Trivial;
     return ValueOwnershipKind::Unowned;
   }
 }
 
-Optional<ValueOwnershipKind>
+ValueOwnershipKind
+ValueOwnershipKindVisitor::visitApplyInst(ApplyInst *AI) {
+  SILModule &M = AI->getModule();
+  bool IsTrivial = AI->getType().isTrivial(M);
+  auto Results = AI->getSubstCalleeType()->getDirectResults();
+  // No results => empty tuple result => Trivial.
+  if (Results.empty() || IsTrivial)
+    return ValueOwnershipKind::Trivial;
+
+  // Find the first index where we have a trivial value.
+  auto Iter =
+    find_if(Results,
+            [&M](const SILResultInfo &Info) -> bool {
+              return getResultOwnershipKind(Info, M) != ValueOwnershipKind::Trivial;
+            });
+  // If we have all trivial, then we must be trivial.
+  if (Iter == Results.end())
+    return ValueOwnershipKind::Trivial;
+
+  unsigned Index = std::distance(Results.begin(), Iter);
+  ValueOwnershipKind Base = getResultOwnershipKind(Results[Index], M);
+
+  for (const SILResultInfo &ResultInfo : Results.slice(Index+1)) {
+    auto RKind = getResultOwnershipKind(ResultInfo, M);
+    if (ValueOwnershipKindMerge(RKind, ValueOwnershipKind::Trivial))
+      continue;
+
+    auto MergedValue = ValueOwnershipKindMerge(Base, RKind);
+    if (!MergedValue.hasValue()) {
+      llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
+    }
+  }
+
+  return Base;
+}
+
+ValueOwnershipKind
 ValueOwnershipKindVisitor::visitLoadInst(LoadInst *LI) {
   switch (LI->getOwnershipQualifier()) {
   case LoadOwnershipQualifier::Take:
   case LoadOwnershipQualifier::Copy:
     return ValueOwnershipKind::Owned;
   case LoadOwnershipQualifier::Unqualified:
-    return None;
+    return ValueOwnershipKind::Any;
   case LoadOwnershipQualifier::Trivial:
     return ValueOwnershipKind::Trivial;
   }
 }
 
-Optional<ValueOwnershipKind> SILValue::getOwnershipKind() const {
+ValueOwnershipKind SILValue::getOwnershipKind() const {
   // Once we have multiple return values, this must be changed.
   return ValueOwnershipKindVisitor().visit(const_cast<ValueBase *>(Value));
 }
@@ -623,7 +704,7 @@ UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(InsertElement)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ZeroInitializer)
 #undef UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT
 
-Optional<ValueOwnershipKind>
+ValueOwnershipKind
 ValueOwnershipKindVisitor::visitBuiltinInst(BuiltinInst *BI) {
   // For now, just conservatively say builtins are None. We need to use a
   // builtin in here to guarantee correctness.

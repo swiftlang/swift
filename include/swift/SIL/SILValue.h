@@ -93,9 +93,11 @@ enum class ValueOwnershipKind : uint8_t {
   /// instruction exactly once along any path through the program.
   Guaranteed,
 
-  /// A SILValue with undefined ownership. This means that it could take on
-  /// /any/ ownership semantics. This is meant only to model SILUndef.
-  Undef,
+  /// A SILValue with undefined ownership. It can pair with /Any/ ownership
+  /// kinds . This means that it could take on /any/ ownership semantics. This
+  /// is meant only to model SILUndef and to express certain situations where we
+  /// use unqualified ownership. Expected to tighten over time.
+  Any,
 };
 
 Optional<ValueOwnershipKind>
@@ -261,7 +263,7 @@ public:
   ///
   /// An example of a SILValue without ownership semantics is a
   /// struct_element_addr.
-  Optional<ValueOwnershipKind> getOwnershipKind() const;
+  ValueOwnershipKind getOwnershipKind() const;
 };
 
 /// A formal SIL reference to a value, suitable for use as a stored
