@@ -1,4 +1,4 @@
-//===--- InstrumenterSupport.h - Instrumenter Support ---------------------===//
+//===--- InstrumenterSupport.h - Instrumenter Support -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

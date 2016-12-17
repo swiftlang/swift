@@ -153,9 +153,9 @@ namespace swift {
   /// instrumentation that has a high runtime performance impact.
   void performPlaygroundTransform(SourceFile &SF, bool HighPerformance);
   
-  /// Once parsing, name-binding and the playground transform (if required)
-  /// are complete this optionally walks the ASTs to add calls to externally
-  /// provided functions that simulate "program counter"-like debugging events.
+  /// Once parsing and name-binding are complete this optionally walks the ASTs
+  /// to add calls to externally provided functions that simulate
+  /// "program counter"-like debugging events.
   void performPCMacro(SourceFile &SF, TopLevelContext &TLC);
   
   /// Flags used to control type checking.
