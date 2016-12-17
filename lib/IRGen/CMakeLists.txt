@@ -45,6 +45,7 @@ add_swift_library(swiftIRGen STATIC
     swiftLLVMPasses
     swiftSIL
     swiftSILGen
+    swiftSILOptimizer
 
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.

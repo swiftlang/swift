@@ -23,6 +23,14 @@
 #error "Macro must be defined by includer"
 #endif
 
+/// IRGEN_PASS(Id, Name, Description)
+///   The pass is identified by PassKind::Id.
+///   An IRGen pass is created by IRGen and needs to be register with the pass
+///   manager dynamically.
+#ifndef IRGEN_PASS
+#define IRGEN_PASS(Id, Name, Description) PASS(Id, Name, Description)
+#endif
+
 /// PASS_RANGE(RANGE_ID, START, END)
 ///   Pass IDs between PassKind::START and PassKind::END, inclusive,
 ///   fall within the set known as
@@ -243,5 +251,6 @@ PASS(BugReducerTester, "bug-reducer-tester",
      "Utility pass for testing sil-bug-reducer. Asserts when visits an apply that calls a specific function")
 PASS_RANGE(AllPasses, AADumper, BugReducerTester)
 
+#undef IRGEN_PASS
 #undef PASS
 #undef PASS_RANGE

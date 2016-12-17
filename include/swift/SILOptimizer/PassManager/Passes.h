@@ -74,6 +74,7 @@ namespace swift {
   StringRef PassKindID(PassKind Kind);
 
 #define PASS(ID, NAME, DESCRIPTION) SILTransform *create##ID();
+#define IRGEN_PASS(ID, NAME, DESCRIPTION)
 #include "Passes.def"
 
 } // end namespace swift

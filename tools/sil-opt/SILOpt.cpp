@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -29,6 +30,8 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "swift/IRGen/IRGenPublic.h"
+#include "swift/IRGen/IRGenSILPasses.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -169,10 +172,20 @@ AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
     llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
 
-static void runCommandLineSelectedPasses(SILModule *Module) {
-  SILPassManager PM(Module);
+static void runCommandLineSelectedPasses(SILModule *Module,
+                                         irgen::IRGenModule *IRGenMod) {
+  SILPassManager PM(Module, IRGenMod);
+  for (auto P : Passes) {
+#define PASS(ID, Name, Description)
+#define IRGEN_PASS(ID, Name, Description)                                      \
+  if (P == PassKind::ID)                                                       \
+    PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());
+#include "swift/SILOptimizer/PassManager/Passes.def"
+  }
+
   PM.executePassPipelinePlan(
       SILPassPipelinePlan::getPassPipelineForKinds(Passes));
+
   if (Module->getOptions().VerifyAll)
     Module->verify();
 }
@@ -318,7 +331,12 @@ int main(int argc, char **argv) {
   } else if (OptimizationGroup == OptGroup::Performance) {
     runSILOptimizationPasses(*CI.getSILModule());
   } else {
-    runCommandLineSelectedPasses(CI.getSILModule());
+    auto *SILMod = CI.getSILModule();
+    {
+      auto T = irgen::createIRGenModule(SILMod, getGlobalLLVMContext());
+      runCommandLineSelectedPasses(SILMod, T.second);
+      irgen::deleteIRGenModule(T);
+    }
   }
 
   if (EmitSIB) {

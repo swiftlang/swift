@@ -401,6 +401,18 @@ static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {
   P.addSILDebugInfoGenerator();
 }
 
+/// Non-mandatory passes that should run as preparation for IRGen.
+static void addIRGenPreparePipeline(SILPassPipelinePlan &P) {
+  P.startPipeline("IRGen Preparation");
+  // Insert SIL passes to run during IRGen.
+}
+
+SILPassPipelinePlan SILPassPipelinePlan::getIRGenPreparePassPipeline() {
+  SILPassPipelinePlan P;
+  addIRGenPreparePipeline(P);
+  return P;
+}
+
 SILPassPipelinePlan
 SILPassPipelinePlan::getPerformancePassPipeline(SILOptions Options) {
   SILPassPipelinePlan P;
