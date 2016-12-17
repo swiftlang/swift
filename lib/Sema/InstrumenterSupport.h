@@ -19,14 +19,16 @@
 
 using namespace swift;
 
+
 namespace swift {
 namespace instrumenter_support {
 
 template <class E> class Added {
 private:
   E Contents;
+
 public:
-  Added() { }
+  Added() {}
   Added(E NewContents) { Contents = NewContents; }
   const Added<E> &operator=(const Added<E> &rhs) {
     Contents = rhs.Contents;
@@ -49,13 +51,12 @@ protected:
   private:
     bool error = false;
     DiagnosticEngine &diags;
+
   public:
     ErrorGatherer(DiagnosticEngine &diags) : diags(diags) {
       diags.addConsumer(*this);
     }
-    ~ErrorGatherer() override {
-      diags.takeConsumers();
-    }
+    ~ErrorGatherer() override { diags.takeConsumers(); }
     void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                           DiagnosticKind Kind, StringRef Text,
                           const DiagnosticInfo &Info) override {
@@ -64,25 +65,24 @@ protected:
       }
       llvm::errs() << Text << "\n";
     }
-    bool hadError() { 
-      return error;
-    }
+    bool hadError() { return error; }
   };
 
   class ClosureFinder : public ASTWalker {
   private:
     InstrumenterBase &I;
+
   public:
-    ClosureFinder (InstrumenterBase &Inst) : I(Inst) { }
-    std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
+    ClosureFinder(InstrumenterBase &Inst) : I(Inst) {}
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       if (isa<BraceStmt>(S)) {
-        return { false, S }; // don't walk into brace statements; we
-                             // need to respect nesting!
+        return {false, S}; // don't walk into brace statements; we
+                           // need to respect nesting!
       } else {
-        return { true, S };
+        return {true, S};
       }
     }
-    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (ClosureExpr *CE = dyn_cast<ClosureExpr>(E)) {
         BraceStmt *B = CE->getBody();
         if (B) {
@@ -92,50 +92,47 @@ protected:
           // be more than a single expression!
         }
       }
-      return { true, E };
+      return {true, E};
     }
   };
-    
+
   ClosureFinder CF;
 
   class ErrorFinder : public ASTWalker {
     bool error = false;
+
   public:
-    ErrorFinder () { }
-    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+    ErrorFinder() {}
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->hasError()) {
         error = true;
-        return { false, E };
+        return {false, E};
       }
-      return { true, E };
+      return {true, E};
     }
     bool walkToDeclPre(Decl *D) override {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-        if (!VD->hasInterfaceType() ||
-            VD->getInterfaceType()->hasError()) {
+        if (!VD->hasInterfaceType() || VD->getInterfaceType()->hasError()) {
           error = true;
           return false;
         }
       }
       return true;
     }
-    bool hadError() { 
-      return error;
-    }
+    bool hadError() { return error; }
   };
 
-  template <class T> bool doTypeCheck(ASTContext &Ctx,
-                                      DeclContext *DC,
-                                      Added<T*> &parsedExpr) {
+  template <class T>
+  bool doTypeCheck(ASTContext &Ctx, DeclContext *DC, Added<T *> &parsedExpr) {
     DiagnosticEngine diags(Ctx.SourceMgr);
     ErrorGatherer errorGatherer(diags);
-  
+
     TypeChecker TC(Ctx, diags);
 
     Expr *E = *parsedExpr;
     TC.typeCheckExpression(E, DC);
-    parsedExpr = Added<T*>(dyn_cast<T>(E));
-    
+    parsedExpr = Added<T *>(dyn_cast<T>(E));
+
     if (*parsedExpr) {
       ErrorFinder errorFinder;
       parsedExpr->walk(errorFinder);
@@ -147,6 +144,5 @@ protected:
     return false;
   }
 };
-
 }
 }
