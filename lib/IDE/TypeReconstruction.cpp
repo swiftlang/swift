@@ -60,10 +60,10 @@ private:
     std::vector<ValueDecl *> m_decls;
 
   public:
-    virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
       m_decls.push_back(VD);
     }
-    virtual ~VisibleDeclsConsumer() = default;
+    ~VisibleDeclsConsumer() override = default;
     explicit operator bool() { return m_decls.size() > 0; }
 
     decltype(m_decls)::const_iterator begin() { return m_decls.begin(); }
@@ -581,7 +581,7 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
         // declarations in sub-stmts, etc.
         UnqualifiedLookup lookup(ast->getIdentifier(name), FD,
                                  ast->getLazyResolver(),
-                                 /*isKnownPrivate=*/false, FD->getEndLoc());
+                                 /*IsKnownPrivate=*/false, FD->getEndLoc());
         if (!lookup.isSuccess()) {
           result._error = "no decl found in function";
         } else {

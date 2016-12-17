@@ -145,7 +145,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     // the call (or not).
     llvm::SmallDenseMap<Expr*, PartialApplication,2> InvalidPartialApplications;
 
-    ~DiagnoseWalker() {
+    ~DiagnoseWalker() override {
       for (auto &unapplied : InvalidPartialApplications) {
         unsigned kind = unapplied.second.kind;
         TC.diagnose(unapplied.first->getLoc(),
@@ -1671,7 +1671,7 @@ namespace {
     InstanceMethod,
     Property,
   };
-}
+} // end anonymous namespace
 
 static Optional<ReplacementDeclKind>
 describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
@@ -1971,7 +1971,7 @@ public:
   AvailabilityWalker(
       TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {}
 
-  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     ExprStack.push_back(E);
 
     auto visitChildren = [&]() { return std::make_pair(true, E); };
@@ -2013,7 +2013,7 @@ public:
     return visitChildren();
   }
 
-  virtual Expr *walkToExprPost(Expr *E) override {
+  Expr *walkToExprPost(Expr *E) override {
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
 
@@ -2159,7 +2159,7 @@ private:
     }
   }
 };
-}
+} // end anonymous namespace
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
@@ -2399,7 +2399,7 @@ public:
     
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
-  ~VarDeclUsageChecker();
+  ~VarDeclUsageChecker() override;
 
   /// Check to see if the specified VarDecl is part of a larger
   /// PatternBindingDecl, where some other bound variable was mutated.  In this
@@ -2530,7 +2530,7 @@ public:
   }
 
 };
-}
+} // end anonymous namespace
 
 
 // After we have scanned the entire region, diagnose variables that could be
@@ -3092,7 +3092,7 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
       .fixItRemoveChars(FS->getFirstSemicolonLoc(), endOfIncrementLoc);
   }
 }
-}// Anonymous namespace end.
+} // end anonymous namespace
 
 // Perform MiscDiagnostics on Switch Statements.
 static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
@@ -3237,7 +3237,7 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
   public:
     DiagnoseWalker(TypeChecker &tc) : TC(tc) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // Dig into implicit expression.
       if (E->isImplicit()) return { true, E };
       // Diagnose call expression.
@@ -3368,7 +3368,7 @@ public:
   ObjCSelectorWalker(TypeChecker &tc, const DeclContext *dc, Type selectorTy)
     : TC(tc), DC(dc), SelectorTy(selectorTy) { }
 
-  virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     StringLiteralExpr *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
     bool fromStringLiteral = false;
     bool hadParens = false;
@@ -3668,7 +3668,7 @@ public:
   }
 
 };
-}
+} // end anonymous namespace
 
 static void diagDeprecatedObjCSelectors(TypeChecker &tc, const DeclContext *dc,
                                         const Expr *expr) {
@@ -3726,7 +3726,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     TypeChecker &TC;
     SmallPtrSet<Expr *, 4> ErasureCoercedToAny;
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return { false, E };
 

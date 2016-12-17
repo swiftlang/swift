@@ -104,6 +104,6 @@ namespace SourceKit {
   template <typename T>
   using RefPtr = IntrusiveRefCntPtr<T>;
   
-} // end namespace SourceKit.
+} // end namespace SourceKit
 
 #endif

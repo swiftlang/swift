@@ -256,7 +256,7 @@ namespace {
       return CastStrategy::Address;
     }
   };
-}
+} // end anonymous namespace
 
 void SILGenFunction::emitCheckedCastBranch(SILLocation loc, Expr *source,
                                            Type targetType,

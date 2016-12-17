@@ -61,7 +61,7 @@ namespace {
       llvm_unreachable("Unhandled RecordKind in switch.");
     }
 
-    virtual void print(raw_ostream &os) const override {
+    void print(raw_ostream &os) const override {
       if (!DeclOrOffset.isComplete()) {
         os << "While deserializing decl #" << ID << " ("
            << getRecordKindString(Kind) << ")";
@@ -223,7 +223,7 @@ namespace {
       path.push_back({ PathPiece::Kind::Unknown, kind });
     }
 
-    virtual void print(raw_ostream &os) const override {
+    void print(raw_ostream &os) const override {
       os << "Cross-reference to module '" << baseM.getName() << "'\n";
       for (auto &piece : path) {
         os << "\t... ";
@@ -2572,7 +2572,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       createDecl<ConstructorDecl>(name, SourceLoc(),
                                   failability, /*FailabilityLoc=*/SourceLoc(),
                                   /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-                                  /*bodyParams=*/nullptr, nullptr,
+                                  /*BodyParams=*/nullptr, nullptr,
                                   genericParams, parent);
     declOrOffset = ctor;
 
@@ -2768,7 +2768,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
     auto fn = FuncDecl::createDeserialized(
         ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
-        /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
+        /*FuncLoc=*/SourceLoc(), name, /*nameLoc=*/SourceLoc(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
         /*AccessorKeywordLoc=*/SourceLoc(), genericParams,
         numParamPatterns, DC);

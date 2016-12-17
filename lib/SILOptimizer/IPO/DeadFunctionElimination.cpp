@@ -292,7 +292,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
   /// DeadFunctionElimination pass takes functions
   /// reachable via vtables and witness_tables into account
   /// when computing a function liveness information.
-  void findAnchorsInTables() {
+  void findAnchorsInTables() override {
     // Check vtable methods.
     for (SILVTable &vTable : Module->getVTableList()) {
       for (auto &entry : vTable.getEntries()) {
@@ -458,7 +458,7 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
   /// ExternalFunctionDefinitionsElimination pass does not take functions
   /// reachable via vtables and witness_tables into account when computing
   /// a function liveness information.
-  void findAnchorsInTables() {
+  void findAnchorsInTables() override {
   }
 
   bool findAliveFunctions() {

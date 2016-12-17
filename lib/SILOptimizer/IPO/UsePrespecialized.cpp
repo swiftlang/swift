@@ -43,7 +43,7 @@ static void collectApplyInst(SILFunction &F,
 /// of the corresponding pre-specialized function, if such a pre-specialization
 /// exists.
 class UsePrespecialized: public SILModuleTransform {
-  virtual ~UsePrespecialized() { }
+  ~UsePrespecialized() override { }
 
   void run() override {
     auto &M = *getModule();

@@ -534,7 +534,7 @@ namespace {
   /// class is at the bottom of the class hierarchy.
   class SpeculativeDevirtualization : public SILFunctionTransform {
   public:
-    virtual ~SpeculativeDevirtualization() {}
+    ~SpeculativeDevirtualization() override {}
 
     void run() override {
       ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();

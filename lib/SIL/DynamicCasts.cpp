@@ -1024,7 +1024,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit an unconditional scalar cast that's known to succeed.
 SILValue

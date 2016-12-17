@@ -1059,7 +1059,7 @@ namespace {
                ImportHint::ObjCPointer };
     }
   };
-}
+} // end anonymous namespace
 
 /// True if we're converting a function parameter, property type, or
 /// function result type, and can thus safely apply representation

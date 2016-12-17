@@ -163,7 +163,7 @@ namespace llvm {
       return lhs == rhs;
     }
   };
-}
+} // namespace llvm
 
 static Module *getModule(ModuleOrSourceFile DC) {
   if (auto M = DC.dyn_cast<Module *>())
@@ -215,7 +215,7 @@ namespace {
     FuncDecl *Address = nullptr, *MutableAddress = nullptr;
     FuncDecl *WillSet = nullptr, *DidSet = nullptr;
   };
-}
+} // end anonymous namespace
 
 static StorageKind getRawStorageKind(AbstractStorageDecl::StorageKindTy kind) {
   switch (kind) {
@@ -4279,11 +4279,11 @@ withOutputFile(ASTContext &ctx, StringRef outputPath,
     std::error_code EC;
     std::unique_ptr<llvm::raw_pwrite_stream> out =
       Clang.createOutputFile(outputPath, EC,
-                             /*binary=*/true,
-                             /*removeOnSignal=*/true,
+                             /*Binary=*/true,
+                             /*RemoveFileOnSignal=*/true,
                              /*inputPath=*/"",
                              path::extension(outputPath),
-                             /*temporary=*/true,
+                             /*UseTemporary=*/true,
                              /*createDirs=*/false,
                              /*finalPath=*/nullptr,
                              &tmpFilePath);

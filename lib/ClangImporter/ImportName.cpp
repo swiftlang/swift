@@ -411,7 +411,7 @@ namespace llvm {
     }
     enum { NumLowBitsAvailable = 0 };
   };
-}
+} // namespace llvm
 
 /// Retrieve the name of the given Clang declaration context for
 /// printing.
@@ -465,7 +465,7 @@ namespace {
                            overriddenNames[i].first->getDeclContext()));
     }
   }
-}
+} // end anonymous namespace
 
 /// Skip a leading 'k' in a 'kConstant' pattern
 static StringRef stripLeadingK(StringRef name) {

@@ -78,7 +78,7 @@ namespace {
       return true;
     }
   };
-}
+} // end anonymous namespace
 
 /// Does the metatype for the given type have a known-singleton
 /// representation?
@@ -466,7 +466,7 @@ namespace {
       return handleAggWithReference(type);
     }
   };
-}
+} // end anonymous namespace
 
 static LoweredTypeKind classifyType(CanType type, SILModule &M,
                                     CanGenericSignature sig,
@@ -1188,7 +1188,7 @@ namespace {
       return new (TC, Dependent) LoadableEnumTypeLowering(enumType);
     }
   };
-}
+} // end anonymous namespace
 
 TypeConverter::TypeConverter(SILModule &m)
   : M(m), Context(m.getASTContext()) {

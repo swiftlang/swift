@@ -503,7 +503,7 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
   // references.
   llvm::SmallSet<SILValue, 4> PromotedParameters;
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
                                  IsFragile_t Fragile,

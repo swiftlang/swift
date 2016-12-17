@@ -171,7 +171,7 @@ public:
   clang::CanQualType convertMemberType(NominalTypeDecl *DC,
                                        StringRef memberName);
 };
-}
+} // end anonymous namespace
 
 clang::CanQualType
 GenClangType::convertMemberType(NominalTypeDecl *DC, StringRef memberName) {

@@ -244,7 +244,7 @@ protected:
   
   SILValue emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs);
 };
-}
+} // end anonymous namespace
 
 /// Inserts type checks in the original generic function for dispatching to the
 /// given specialized function. Converts call arguments. Emits an invocation of
@@ -422,7 +422,7 @@ public:
 
   StringRef getName() override { return "Eager Specializer"; }
 };
-}
+} // end anonymous namespace
 
 /// Specializes a generic function for a concrete type list.
 static SILFunction *eagerSpecialize(SILFunction *GenericFunc,

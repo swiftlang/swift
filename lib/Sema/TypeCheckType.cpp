@@ -1523,7 +1523,7 @@ static bool checkForIllegalIUOs(TypeChecker &TC, TypeRepr *Repr,
       : TC(TC)
       , IUOsAllowed{!IsGenericParameter} {}
 
-    bool walkToTypeReprPre(TypeRepr *T) {
+    bool walkToTypeReprPre(TypeRepr *T) override {
       bool iuoAllowedHere = IUOsAllowed.back();
 
       // Raise a diagnostic if we run into a prohibited IUO.
@@ -1552,7 +1552,7 @@ static bool checkForIllegalIUOs(TypeChecker &TC, TypeRepr *Repr,
       return true;
     }
 
-    bool walkToTypeReprPost(TypeRepr *T) {
+    bool walkToTypeReprPost(TypeRepr *T) override {
       IUOsAllowed.pop_back();
       return true;
     }
@@ -1688,7 +1688,7 @@ namespace {
                            Type instanceType,
                            Optional<MetatypeRepresentation> storedRepr);
   };
-}
+} // end anonymous namespace
 
 Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                               TypeResolutionOptions options,
@@ -3759,7 +3759,7 @@ public:
     recurseIntoSubstatements = recurse;
   }
 
-  bool walkToTypeReprPre(TypeRepr *T) {
+  bool walkToTypeReprPre(TypeRepr *T) override {
     if (T->isInvalid())
       return false;
     if (auto compound = dyn_cast<CompoundIdentTypeRepr>(T)) {
@@ -3772,7 +3772,7 @@ public:
     return true;
   }
 
-  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) {
+  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
     if (recurseIntoSubstatements) {
       return { true, S };
     } else if (hitTopStmt) {
@@ -3818,7 +3818,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
   if (!decl || decl->isInvalid())

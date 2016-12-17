@@ -265,7 +265,7 @@ namespace {
     void expandParameters();
     llvm::Type *expandExternalSignatureTypes();
   };
-}
+} // end anonymous namespace
 
 llvm::Type *SignatureExpansion::addIndirectResult() {
   auto resultType = FnType->getSILResult();
@@ -676,7 +676,7 @@ namespace {
       Types.push_back(type);
     }
   };
-}
+} // end anonymous namespace
 
 static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
                                           clang::CanQualType type,
@@ -1531,7 +1531,7 @@ namespace {
       IGF.Builder.CreateStore(value, addr);
     }
   };
-}
+} // end anonymous namespace
 
 /// Given a Swift value explosion in 'in', produce a Clang expansion
 /// (according to ABIArgInfo::Expand) in 'out'.

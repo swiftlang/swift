@@ -339,7 +339,7 @@ class SILCombine : public SILFunctionTransform {
     }
   }
   
-  virtual void handleDeleteNotification(ValueBase *I) override {
+  void handleDeleteNotification(ValueBase *I) override {
     // Linear searching the tracking list doesn't hurt because usually it only
     // contains a few elements.
     auto Iter = std::find(TrackingList.begin(), TrackingList.end(), I);
@@ -347,7 +347,7 @@ class SILCombine : public SILFunctionTransform {
       TrackingList.erase(Iter);      
   }
   
-  virtual bool needsNotifications() override { return true; }
+  bool needsNotifications() override { return true; }
 
   StringRef getName() override { return "SIL Combine"; }
 };

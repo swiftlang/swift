@@ -2164,7 +2164,7 @@ namespace {
       return RValue();
     }
   };
-}
+} // end anonymous namespace
 
 /// Build a result plan for the results of an apply.
 ///
@@ -3451,7 +3451,7 @@ namespace {
       return {SGFContext(), finalContext, requiresReabstraction};
     }
   };
-}
+} // end anonymous namespace
 
 /// Decompose a type, whether it is a tuple or a single type, into an
 /// array of tuple type elements.
@@ -4905,7 +4905,7 @@ namespace {
       gen.emitUninitializedArrayDeallocation(l, Array);
     }
   };
-}
+} // end anonymous namespace
 
 CleanupHandle
 SILGenFunction::enterDeallocateUninitializedArrayCleanup(SILValue array) {

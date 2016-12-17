@@ -192,7 +192,7 @@ namespace {
 #define PATTERN(ID, BASE)
 #include "swift/AST/PatternNodes.def"
   };
-}
+} // end anonymous namespace
 
 /// Find the first identifier bound by the given binding.  This
 /// assumes that field and global-variable bindings always bind at

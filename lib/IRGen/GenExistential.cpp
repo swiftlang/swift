@@ -116,7 +116,7 @@ namespace {
       return IGF.Builder.CreateLoad(projectMetadataRef(IGF, addr));
     }
   };
-}
+} // end anonymous namespace
 
 
 /// Given the address of an existential object, destroy it.
@@ -293,7 +293,7 @@ public:
   }
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                      SILType T) const {
+                      SILType T) const override {
     auto objPtrTy = dest.getAddress()->getType();
     auto fn = getAssignExistentialsFunction(IGF.IGM, objPtrTy, getLayout());
     auto call = IGF.Builder.CreateCall(
@@ -316,7 +316,7 @@ public:
 
   void initializeWithCopy(IRGenFunction &IGF,
                           Address dest, Address src,
-                          SILType T) const {
+                          SILType T) const override {
     llvm::Value *metadata = copyType(IGF, dest, src);
 
     auto layout = getLayout();
@@ -332,7 +332,7 @@ public:
 
   void initializeWithTake(IRGenFunction &IGF,
                           Address dest, Address src,
-                          SILType T) const {
+                          SILType T) const override {
     llvm::Value *metadata = copyType(IGF, dest, src);
 
     auto layout = getLayout();
@@ -346,7 +346,7 @@ public:
                                              srcBuffer);
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const {
+  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
     emitDestroyExistential(IGF, addr, getLayout());
   }
 };
@@ -668,7 +668,7 @@ public:
 
   using super::getNumStoredProtocols;
 
-  unsigned getExplosionSize() const final override {
+  unsigned getExplosionSize() const final {
     return 1 + getNumStoredProtocols();
   }
 

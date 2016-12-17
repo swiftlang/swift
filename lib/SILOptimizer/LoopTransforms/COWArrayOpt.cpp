@@ -224,7 +224,7 @@ protected:
     }
   }
 };
-} // namespace
+} // end anonymous namespace
 
 // Do the two values \p A and \p B reference the same 'array' after potentially
 // looking through a load. To identify a common array address this functions
@@ -410,7 +410,7 @@ protected:
       SILValue V, llvm::SmallSet<SILInstruction *, 16> &Releases);
   bool hoistInLoopWithOnlyNonArrayValueMutatingOperations();
 };
-} // namespace
+} // end anonymous namespace
 
 /// \return true of the given container is known to be a unique copy of the
 /// array with no aliases. Cases we check:
@@ -1604,7 +1604,7 @@ class COWArrayOptPass : public SILFunctionTransform {
 
   StringRef getName() override { return "SIL COW Array Optimization"; }
 };
-} // anonymous
+} // end anonymous namespace
 
 SILTransform *swift::createCOWArrayOpts() {
   return new COWArrayOptPass();
@@ -1933,7 +1933,7 @@ private:
     return true;
   }
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 namespace {
 /// Clone a single exit multiple exit region starting at basic block and ending
@@ -2102,7 +2102,7 @@ protected:
     }
   }
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 namespace {
 /// This class transforms a hoistable loop nest into a speculatively specialized
@@ -2130,7 +2130,7 @@ public:
 protected:
   void specializeLoopNest();
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 static SILValue createStructExtract(SILBuilder &B, SILLocation Loc,
                                     SILValue Opd, unsigned FieldNo) {
@@ -2361,7 +2361,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
 
   StringRef getName() override { return "SIL Swift Array Optimization"; }
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 SILTransform *swift::createSwiftArrayOpts() {
   return new SwiftArrayOptPass();

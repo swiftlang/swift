@@ -442,7 +442,7 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
     return Impl.Allocator;
 
   case AllocationArena::ConstraintSolver:
-    assert(Impl.CurrentConstraintSolverArena.get() != nullptr);
+    assert(Impl.CurrentConstraintSolverArena != nullptr);
     return Impl.CurrentConstraintSolverArena->Allocator;
   }
   llvm_unreachable("bad AllocationArena");
@@ -1679,7 +1679,7 @@ namespace {
       return OrderDeclarations(SrcMgr)(lhs, rhs);
     }
   };
-}
+} // end anonymous namespace
 
 /// Compute the information used to describe an Objective-C redeclaration.
 std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
@@ -3483,7 +3483,7 @@ public:
   raw_capturing_ostream(CapturingTypeCheckerDebugConsumer &Listener)
       : Listener(Listener) {}
 
-  ~raw_capturing_ostream() {
+  ~raw_capturing_ostream() override {
     flush();
   }
 

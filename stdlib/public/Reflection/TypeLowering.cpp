@@ -190,7 +190,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
   PrintTypeInfo(OS, Indent).print(*this);

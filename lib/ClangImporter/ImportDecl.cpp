@@ -78,7 +78,7 @@ enum class MakeStructRawValuedFlags {
   IsImplicit = 0x04,
 };
 using MakeStructRawValuedOptions = OptionSet<MakeStructRawValuedFlags>;
-}
+} // end anonymous namespace
 
 static MakeStructRawValuedOptions
 getDefaultMakeStructRawValuedOptions() {
@@ -928,7 +928,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
 
     // Construct the left-hand reference to self.
     Expr *lhs = new (context) DeclRefExpr(constructor->getImplicitSelfDecl(),
-                                          DeclNameLoc(), /*implicit=*/true);
+                                          DeclNameLoc(), /*Implicit=*/true);
 
     // Construct the right-hand call to Builtin.zeroInitializer.
     Identifier zeroInitID = context.getIdentifier("zeroInitializer");
@@ -1419,13 +1419,13 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
   clang::VersionTuple noVersion;
   auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
                                       targetPlatform(C.LangOpts),
-                                      /*message=*/StringRef(),
-                                      /*rename=*/StringRef(),
+                                      /*Message=*/StringRef(),
+                                      /*Rename=*/StringRef(),
                                       info.getOSVersion().getLowerEndpoint(),
-                                      /*deprecated=*/noVersion,
-                                      /*obsoleted=*/noVersion,
+                                      /*Deprecated=*/noVersion,
+                                      /*Obsoleted=*/noVersion,
                                       PlatformAgnosticAvailabilityKind::None,
-                                      /*implicit=*/false);
+                                      /*Implicit=*/false);
 
   decl->getAttrs().add(AvAttr);
 }
@@ -1496,7 +1496,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
       isStatic,
-      /*isLet=*/false, SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
+      /*IsLet=*/false, SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setAccessibility(Accessibility::Public);
 
@@ -3194,7 +3194,7 @@ namespace {
         if (forceClassMethod)
           return nullptr;
 
-        return importConstructor(decl, dc, /*isImplicit=*/false, None,
+        return importConstructor(decl, dc, /*implicit=*/false, None,
                                  /*required=*/false);
       }
 
@@ -3794,7 +3794,7 @@ namespace {
       auto createRootClass = [=](DeclContext *dc = nullptr) -> ClassDecl * {
         if (!dc) {
           dc = Impl.getClangModuleForDecl(decl->getCanonicalDecl(),
-                                          /*forwardDeclaration=*/true);
+                                          /*allowForwardDeclaration=*/true);
         }
 
         auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
@@ -4230,7 +4230,7 @@ namespace {
       return nullptr;
     }
   };
-}
+} // end anonymous namespace
 
 /// Try to strip "Mutable" out of a type name.
 static clang::IdentifierInfo *
@@ -4735,7 +4735,7 @@ SwiftDeclConverter::importGlobalAsInitializer(const clang::FunctionDecl *decl,
     // argument label
     auto *paramDecl =
         new (Impl.SwiftContext) ParamDecl(
-            /*IsLet=*/true, SourceLoc(), SourceLoc(), argNames.front(),
+            /*isLet=*/true, SourceLoc(), SourceLoc(), argNames.front(),
             SourceLoc(), argNames.front(), Impl.SwiftContext.TheEmptyTupleType,
             dc);
     paramDecl->setInterfaceType(Impl.SwiftContext.TheEmptyTupleType);
@@ -4750,8 +4750,8 @@ SwiftDeclConverter::importGlobalAsInitializer(const clang::FunctionDecl *decl,
     return nullptr;
 
   bool selfIsInOut = !dc->getDeclaredInterfaceType()->hasReferenceSemantics();
-  auto selfParam = ParamDecl::createSelf(SourceLoc(), dc, /*static=*/false,
-                                         /*inout=*/selfIsInOut);
+  auto selfParam = ParamDecl::createSelf(SourceLoc(), dc, /*isStatic=*/false,
+                                         /*isInOut=*/selfIsInOut);
 
   OptionalTypeKind initOptionality;
   auto resultType = Impl.importFunctionReturnType(
@@ -5407,7 +5407,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   // If this initializer is required, add the appropriate attribute.
   if (required) {
     result->getAttrs().add(new (Impl.SwiftContext)
-                               RequiredAttr(/*implicit=*/true));
+                               RequiredAttr(/*IsImplicit=*/true));
   }
 
   // Record the error convention.
@@ -5466,7 +5466,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
     if (memberCtor->isRequired() &&
         !ctor->getAttrs().hasAttribute<RequiredAttr>()) {
       ctor->getAttrs().add(new (Impl.SwiftContext)
-                               RequiredAttr(/*implicit=*/true));
+                               RequiredAttr(/*IsImplicit=*/true));
     }
   }
 }
@@ -6416,7 +6416,7 @@ void ClangImporter::Implementation::importAttributes(
                                           platformK.getValue(),
                                           message, swiftReplacement,
                                           introduced, deprecated, obsoleted,
-                                          PlatformAgnostic, /*implicit=*/false);
+                                          PlatformAgnostic, /*Implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
     }
@@ -6670,7 +6670,7 @@ void ClangImporter::Implementation::finishProtocolConformance(
       if (auto ctor = dyn_cast_or_null<ConstructorDecl>(witness)) {
         if (!ctor->getAttrs().hasAttribute<RequiredAttr>()) {
           ctor->getAttrs().add(
-            new (SwiftContext) RequiredAttr(/*implicit=*/true));
+            new (SwiftContext) RequiredAttr(/*IsImplicit=*/true));
         }
       }
     }

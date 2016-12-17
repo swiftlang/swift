@@ -114,7 +114,7 @@ struct DebugOnlyPassNumberOpt {
   }
 };
 
-}
+} // end anonymous namespace
 
 static DebugOnlyPassNumberOpt DebugOnlyPassNumberOptLoc;
 
@@ -741,7 +741,7 @@ namespace {
     }
   }
 
-} // end swift namespace
+} // end anonymous namespace
 
 namespace llvm {
 
@@ -836,7 +836,7 @@ namespace llvm {
       return "";
     }
   };
-} // end llvm namespace
+} // namespace llvm
 #endif
 
 void SILPassManager::viewCallGraph() {

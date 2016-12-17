@@ -224,7 +224,7 @@ namespace {
       assert(Types.size() == Values.size());
     }
   };
-}
+} // end anonymous namespace
 
 /// Given an array of polymorphic arguments as might be set up by
 /// GenericArguments, bind the polymorphic parameters.
@@ -1028,7 +1028,7 @@ namespace {
       return metatype;
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit a type metadata reference without using an accessor function.
 static llvm::Value *emitDirectTypeMetadataRef(IRGenFunction &IGF,
@@ -1719,7 +1719,7 @@ namespace {
       return metatype;
     }
   };
-}
+} // end anonymous namespace
 
 llvm::Value *IRGenFunction::emitTypeMetadataRefForLayout(SILType type) {
   return EmitTypeMetadataRefForLayout(*this).visit(type.getSwiftRValueType());
@@ -2702,7 +2702,7 @@ namespace {
     }
   };
 
-}
+} // end anonymous namespace
 
 void
 IRGenModule::addLazyFieldTypeAccessor(NominalTypeDecl *type,
@@ -3140,7 +3140,7 @@ namespace {
       return makeArray(IGM.Int8PtrTy, privateData);
     }
   };
-}
+} // end anonymous namespace
 
 // Classes
 
@@ -3994,7 +3994,7 @@ namespace {
       (void) emitFinishInitializationOfClassMetadata(IGF, metadata);
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit the ObjC-compatible class symbol for a class.
 /// Since LLVM and many system linkers do not have a notion of relative symbol
@@ -4182,7 +4182,7 @@ namespace {
       super::addParentMetadataRef(forClass, classType);
     }
   END_METADATA_SEARCHER()
-}
+} // end anonymous namespace
 
 /// Return the index of the parent metadata pointer for the given class.
 static int getClassParentIndex(IRGenModule &IGM, ClassDecl *classDecl) {
@@ -4237,7 +4237,7 @@ namespace {
         this->setTargetOffset();
     }
   END_GENERIC_METADATA_SEARCHER(GenericRequirements)
-}
+} // end anonymous namespace
 
 static int getIndexOfGenericRequirement(IRGenModule &IGM,
                                         NominalTypeDecl *decl,
@@ -4622,7 +4622,7 @@ namespace {
       super::addMethod(fn);
     }
   END_METADATA_SEARCHER()
-}
+} // end anonymous namespace
 
 /// Load the correct virtual function for the given class method.
 llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
@@ -4728,7 +4728,7 @@ namespace {
       addWord(parentMetadata);
     }
   };
-}
+} // end anonymous namespace
 
 static llvm::Value *
 emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
@@ -4963,7 +4963,7 @@ namespace {
                             IGF.IGM.getLoweredType(structTy));
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit the type metadata or metadata template for a struct.
 void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
@@ -5153,7 +5153,7 @@ public:
   }
 };
   
-}
+} // end anonymous namespace
 
 void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   // Set up a dummy global to stand in for the metadata object while we produce
@@ -5455,7 +5455,7 @@ namespace {
       assert(HasUnfilledParent);
     }
   };
-}
+} // end anonymous namespace
 
 llvm::Constant *
 IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {

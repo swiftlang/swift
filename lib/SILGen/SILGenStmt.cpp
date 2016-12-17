@@ -104,7 +104,7 @@ namespace {
                       CleanupLocation(cleanupLoc));
     }
   };
-}
+} // end anonymous namespace
 
 void SILGenFunction::emitStmt(Stmt *S) {
   StmtEmitter(*this).visit(S);
@@ -261,7 +261,7 @@ namespace {
       if (cleanup.isValid()) Cleanups.push_back(cleanup);
     }
   };
-}
+} // end anonymous namespace
 
 static InitializationPtr
 prepareIndirectResultInit(SILGenFunction &gen, CanType resultType,
@@ -406,7 +406,7 @@ namespace {
       assert(false && "Sema didn't catch exit out of a defer?");
     }
   };
-}
+} // end anonymous namespace
 
 
 namespace {
@@ -426,7 +426,7 @@ namespace {
         SGF.Cleanups.setCleanupState(TheCleanup, CleanupState::Dead);
     }
   };
-}
+} // end anonymous namespace
 
 
 void StmtEmitter::visitDeferStmt(DeferStmt *S) {

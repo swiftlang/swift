@@ -189,7 +189,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 static void setAutoClosureDiscriminators(DeclContext *DC, Stmt *S) {
   S->walk(ContextualizeClosures(DC));
@@ -1299,7 +1299,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   r = CallExpr::createImplicit(Context, r, { }, { });
 
   if (ctor->hasThrows())
-    r = new (Context) TryExpr(SourceLoc(), r, Type(), /*Implicit=*/true);
+    r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
   if (typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
                           TypeCheckExprFlags::IsDiscarded | 

@@ -512,7 +512,7 @@ private:
   bool processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
                                  SILBasicBlock::iterator &I);
 };
-}  // end anonymous namespace
+}  // namespace swift
 
 //===----------------------------------------------------------------------===//
 //                             CSE Implementation
@@ -593,7 +593,7 @@ namespace {
     }
     SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
   };
-}
+} // end anonymous namespace
 
 /// Update SIL basic block's arguments types which refer to opened
 /// archetypes. Replace such types by performing type substitutions

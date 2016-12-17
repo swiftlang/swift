@@ -120,7 +120,7 @@ namespace {
       gen.B.emitDestroyValueOperation(l, closure);
     }
   };
-}
+} // end anonymous namespace
 
 ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
   return F.getForwardingSubstitutions();
@@ -623,7 +623,7 @@ public:
   
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
-      subInitialization.get()->finishInitialization(SGF);
+      subInitialization->finishInitialization(SGF);
   }
 };
 } // end anonymous namespace
@@ -778,7 +778,7 @@ public:
   
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
-      subInitialization.get()->finishInitialization(SGF);
+      subInitialization->finishInitialization(SGF);
   }
 };
 } // end anonymous namespace
@@ -1175,7 +1175,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
 /// of the specified value.
@@ -1953,7 +1953,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
   SILLinkage linkage =

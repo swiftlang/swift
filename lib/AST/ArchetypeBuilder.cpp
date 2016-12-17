@@ -1535,7 +1535,7 @@ public:
                           unsigned Depth)
     : Builder(builder), Loc(loc), Depth(Depth) { }
 
-  virtual Action walkToTypePost(Type ty) override { 
+  Action walkToTypePost(Type ty) override {
     auto boundGeneric = ty->getAs<BoundGenericType>();
     if (!boundGeneric)
       return Action::Continue; 
@@ -1670,7 +1670,7 @@ static Identifier typoCorrectNestedType(
         continue;
 
       unsigned dist = name.edit_distance(assocType->getName().str(),
-                                         /*allowReplacements=*/true,
+                                         /*AllowReplacements=*/true,
                                          maxScore);
       assert(dist > 0 && "nested type should have matched associated type");
       if (bestEditDistance == 0 || dist == bestEditDistance) {

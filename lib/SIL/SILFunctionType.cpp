@@ -580,7 +580,7 @@ enum class ConventionsKind : uint8_t {
       NextOrigParamIndex++;
     }
   };
-}
+} // end anonymous namespace
 
 static bool isPseudogeneric(SILDeclRef c) {
   // FIXME: should this be integrated in with the Sema check that prevents
@@ -979,7 +979,7 @@ namespace {
       return C->getKind() == ConventionsKind::DefaultBlock;
     }
   };
-}
+} // end anonymous namespace
 
 static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                                          AbstractionPattern origType,
@@ -1342,7 +1342,7 @@ namespace {
       return C->getKind() == ConventionsKind::CFunction;
     }
   };
-}
+} // end anonymous namespace
 
 /// Given that we have an imported Clang declaration, deduce the
 /// ownership conventions for calling it and build the SILFunctionType.
@@ -1409,7 +1409,7 @@ namespace {
 FOREACH_FAMILY(GET_LABEL)
 #undef GET_LABEL
   };
-}
+} // end anonymous namespace
 
 /// Derive the ObjC selector family from an identifier.
 ///
@@ -1550,7 +1550,7 @@ namespace {
       return C->getKind() == ConventionsKind::SelectorFamily;
     }
   };
-}
+} // end anonymous namespace
 
 static CanSILFunctionType
 getSILFunctionTypeForSelectorFamily(SILModule &M, SelectorFamily family,
@@ -1864,7 +1864,7 @@ namespace {
       llvm_unreachable("bad parameter convention");
     }
   };
-}
+} // end anonymous namespace
 
 void SILFunctionTypeSubstituter::substResults(AbstractionPattern origResultType,
                                               CanType substResultType) {
@@ -2234,7 +2234,7 @@ namespace {
                .getSwiftRValueType();
     }
   };
-}
+} // end anonymous namespace
 
 SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
   SILTypeSubstituter STST(silModule, subs);

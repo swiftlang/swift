@@ -920,7 +920,7 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
 
   CompilerInstance CI;
   CI.addDiagnosticConsumer(&PDC);
-  if (CI.setup(*Invocation.get()))
+  if (CI.setup(*Invocation))
     return 1;
   CI.performSema();
 

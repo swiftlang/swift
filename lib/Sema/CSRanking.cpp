@@ -222,7 +222,7 @@ namespace {
     /// The second type conforms to the first.
     ConformedToBy
   };
-}
+} // end anonymous namespace
 
 /// Determines whether the first type is nominally a superclass of the second
 /// type, ignore generic arguments.

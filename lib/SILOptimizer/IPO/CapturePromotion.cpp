@@ -186,7 +186,7 @@ private:
   void compute();
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 
 namespace {
@@ -235,7 +235,7 @@ private:
   llvm::DenseMap<SILArgument*, SILValue> BoxArgumentMap;
   llvm::DenseMap<ProjectBoxInst*, SILValue> ProjectBoxArgumentMap;
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 /// \brief Compute ReachabilityInfo so that it can answer queries about
 /// whether a given basic block in a function is reachable from another basic

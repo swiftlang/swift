@@ -39,7 +39,7 @@ namespace {
     
     Cleanup &getCopy() { return *reinterpret_cast<Cleanup*>(Data.data()); }
   };
-}
+} // end anonymous namespace
 
 void CleanupManager::popTopDeadCleanups(CleanupsDepth end) {
   Stack.checkIterator(end);

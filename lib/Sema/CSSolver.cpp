@@ -245,7 +245,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
     if (!getFixedType(binding.first) && !binding.second->hasTypeVariable())
-      assignFixedType(binding.first, binding.second, /*updateScore=*/false);
+      assignFixedType(binding.first, binding.second, /*updateState=*/false);
   }
 
   // Register overload choices.
@@ -687,7 +687,7 @@ namespace {
       out << ")\n";
     }
   };
-}
+} // end anonymous namespace
 
 /// \brief Return whether a relational constraint between a type variable and a
 /// trivial wrapper type (autoclosure, unary tuple) should result in the type
@@ -746,7 +746,7 @@ static void findInferableTypeVars(
     explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVars)
       : typeVars(typeVars) { }
 
-    virtual Action walkToTypePre(Type ty) override {
+    Action walkToTypePre(Type ty) override {
       if (ty->is<DependentMemberType>())
         return Action::SkipChildren;
 

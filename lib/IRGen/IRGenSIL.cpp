@@ -943,7 +943,7 @@ public:
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
 };
 
-}
+} // end anonymous namespace
 
 llvm::Value *StaticFunction::getExplosionValue(IRGenFunction &IGF) const {
   return IGF.Builder.CreateBitCast(Function, IGF.IGM.Int8PtrTy);

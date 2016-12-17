@@ -372,4 +372,4 @@ template class BottomUpDataflowRCStateVisitor<ARCRegionState>;
 template class TopDownDataflowRCStateVisitor<ARCBBState>;
 template class TopDownDataflowRCStateVisitor<ARCRegionState>;
 
-} // end swift namespace
+} // namespace swift

@@ -75,7 +75,7 @@ public:
   PassManagerBuilderWrapper(const IRGenOptions &IRGOpts)
       : PassManagerBuilder(), IRGOpts(IRGOpts) {}
 };
-}
+} // end anonymous namespace
 
 static void addSwiftARCOptPass(const PassManagerBuilder &Builder,
                                PassManagerBase &PM) {

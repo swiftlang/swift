@@ -326,7 +326,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   TupleExpr *Arg = TupleExpr::create(TC.Context,
                                      SourceLoc(), 
                                      ArgElts2, { }, { }, SourceLoc(),
-                                     /*hasTrailingClosure=*/false,
+                                     /*HasTrailingClosure=*/false,
                                      /*Implicit=*/true);
 
   
@@ -352,7 +352,7 @@ namespace {
                == Associativity::Left;
     }
   };
-}
+} // end anonymous namespace
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.

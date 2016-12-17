@@ -447,7 +447,7 @@ namespace {
       return type;
     }
   };
-}
+} // end anonymous namespace
 
 Type ConstraintSystem::openType(
        Type startingType,

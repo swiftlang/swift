@@ -3733,7 +3733,7 @@ bool Type::findIf(llvm::function_ref<bool(Type)> pred) const {
   public:
     explicit Walker(llvm::function_ref<bool(Type)> pred) : Pred(pred) {}
 
-    virtual Action walkToTypePre(Type ty) override {
+    Action walkToTypePre(Type ty) override {
       if (Pred(ty))
         return Action::Stop;
       return Action::Continue;

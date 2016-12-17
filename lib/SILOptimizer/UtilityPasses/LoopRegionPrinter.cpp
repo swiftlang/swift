@@ -39,7 +39,7 @@ class LoopRegionViewText : public SILModuleTransform {
     }
   }
 
-  virtual StringRef getName() override { return "LoopRegionViewText"; }
+  StringRef getName() override { return "LoopRegionViewText"; }
 };
 
 class LoopRegionViewCFG : public SILModuleTransform {
@@ -54,7 +54,7 @@ class LoopRegionViewCFG : public SILModuleTransform {
       LRA->get(&Fn)->viewLoopRegions();
     }
   }
-  virtual StringRef getName() override { return "LoopRegionViewCFG"; }
+  StringRef getName() override { return "LoopRegionViewCFG"; }
 };
 
 } // end anonymous namespace

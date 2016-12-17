@@ -67,7 +67,7 @@ protected:
   }
 };
 
-} // End anonymous namespace.
+} // end anonymous namespace
 
 void LoopCloner::cloneLoop() {
   auto *Header = Loop->getHeader();
@@ -457,7 +457,7 @@ class LoopUnrolling : public SILFunctionTransform {
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 SILTransform *swift::createLoopUnroll() {
   return new LoopUnrolling();

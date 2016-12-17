@@ -290,7 +290,7 @@ GenericParamList *cloneGenericParams(ASTContext &ctx,
 
   return toParams;
 }
-}
+} // namespace swift
 
 // FIXME: total hack
 GenericParamList *createProtocolGenericParams(ASTContext &ctx,
@@ -766,7 +766,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
   case CompletionTypeCheckKind::ObjCKeyPath:
     referencedDecl = nullptr;
     if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(parsedExpr))
-      return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResulType=*/true);
+      return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResultType=*/true);
 
     return None;
   }
@@ -974,7 +974,7 @@ public:
   }
 
 private:
-  virtual bool walkToDeclPre(Decl *D) override {
+  bool walkToDeclPre(Decl *D) override {
     TypeRefinementContext *DeclTRC = getNewContextForWalkOfDecl(D);
 
     if (DeclTRC) {
@@ -984,7 +984,7 @@ private:
     return true;
   }
 
-  virtual bool walkToDeclPost(Decl *D) override {
+  bool walkToDeclPost(Decl *D) override {
     if (ContextStack.back().ScopeNode.getAsDecl() == D) {
       ContextStack.pop_back();
     }
@@ -1105,7 +1105,7 @@ private:
     return D->getSourceRange();
   }
 
-  virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *IS = dyn_cast<IfStmt>(S)) {
       buildIfStmtRefinementContext(IS);
       return std::make_pair(false, S);
@@ -1124,7 +1124,7 @@ private:
     return std::make_pair(true, S);
   }
 
-  virtual Stmt *walkToStmtPost(Stmt *S) override {
+  Stmt *walkToStmtPost(Stmt *S) override {
     // If we have multiple guard statements in the same block
     // then we may have multiple refinement contexts to pop
     // after walking that block.
@@ -1425,7 +1425,7 @@ private:
     return AvailabilityContext(VersionRange::allGTE(VersionSpec->getVersion()));
   }
 
-  virtual Expr *walkToExprPost(Expr *E) override {
+  Expr *walkToExprPost(Expr *E) override {
     if (ContextStack.back().ScopeNode.getAsExpr() == E) {
       ContextStack.pop_back();
     }
@@ -1434,7 +1434,7 @@ private:
   }
 };
   
-}
+} // end anonymous namespace
 
 void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
                                                       unsigned StartElem) {
@@ -1614,23 +1614,23 @@ public:
   /// the predicate.
   Optional<ASTNode> getInnermostMatchingNode() { return InnermostMatchingNode; }
 
-  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     return std::make_pair(walkToRangePre(E->getSourceRange()), E);
   }
 
-  virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     return std::make_pair(walkToRangePre(S->getSourceRange()), S);
   }
 
-  virtual bool walkToDeclPre(Decl *D) override {
+  bool walkToDeclPre(Decl *D) override {
     return walkToRangePre(D->getSourceRange());
   }
 
-  virtual std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
     return std::make_pair(walkToRangePre(P->getSourceRange()), P);
   }
 
-  virtual bool walkToTypeReprPre(TypeRepr *T) override {
+  bool walkToTypeReprPre(TypeRepr *T) override {
     return walkToRangePre(T->getSourceRange());
   }
 
@@ -1660,7 +1660,7 @@ public:
     return SM.rangeContains(Range, TargetRange);
   }
 
-  virtual Expr *walkToExprPost(Expr *E) override {
+  Expr *walkToExprPost(Expr *E) override {
     if (walkToNodePost(E)) {
       return E;
     }
@@ -1668,7 +1668,7 @@ public:
     return nullptr;
   }
 
-  virtual Stmt *walkToStmtPost(Stmt *S) override {
+  Stmt *walkToStmtPost(Stmt *S) override {
     if (walkToNodePost(S)) {
       return S;
     }
@@ -1676,7 +1676,7 @@ public:
     return nullptr;
   }
 
-  virtual bool walkToDeclPost(Decl *D) override {
+  bool walkToDeclPost(Decl *D) override {
     return walkToNodePost(D);
   }
 

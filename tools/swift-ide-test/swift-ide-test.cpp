@@ -611,7 +611,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   // Consumer.
   std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                              *Consumer.get()));
+                                              *Consumer));
 
   Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
   if (!SecondSourceFileName.empty()) {
@@ -833,7 +833,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 static int doSyntaxColoring(const CompilerInvocation &InitInvok,
                             StringRef SourceFilename,
@@ -1683,7 +1683,7 @@ public:
     OS << "</ref>";
   }
 };
-}
+} // end anonymous namespace
 
 struct GroupNamesPrinter {
   llvm::StringSet<> Groups;

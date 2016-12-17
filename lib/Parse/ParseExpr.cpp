@@ -1132,7 +1132,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
     SourceLoc Loc = consumeToken();
     Result = makeParserResult(
-       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
+       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*implicit=*/false));
     break;
   }
       
@@ -2494,7 +2494,7 @@ ParserResult<Expr> Parser::parseExprList(tok leftTok, tok rightTok) {
   return makeParserResult(
       status,
       TupleExpr::create(Context, leftLoc, subExprs, subExprNames,
-                        subExprNameLocs, rightLoc, /*hasTrailingClosure=*/false,
+                        subExprNameLocs, rightLoc, /*HasTrailingClosure=*/false,
                         /*Implicit=*/false));
 }
 

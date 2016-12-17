@@ -439,7 +439,7 @@ protected:
   bool areCopyDestUsersDominatedBy(CopyAddrInst *,
                                    SmallVectorImpl<Operand *> &);
 };
-} // namespace
+} // end anonymous namespace
 
 /// Gather all instructions that use CurrentDef:
 /// - DestroyPoints records 'destroy'
@@ -1212,7 +1212,7 @@ class CopyForwardingPass : public SILFunctionTransform
 
   StringRef getName() override { return "Copy Forwarding"; }
 };
-} // anonymous
+} // end anonymous namespace
 
 SILTransform *swift::createCopyForwarding() {
   return new CopyForwardingPass();

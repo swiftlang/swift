@@ -1025,7 +1025,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   if (context.Args.hasFlag(options::OPT_link_objc_runtime,
                            options::OPT_no_link_objc_runtime,
-                           /*default=*/wantsObjCRuntime)) {
+                           /*Default=*/wantsObjCRuntime)) {
     llvm::SmallString<128> ARCLiteLib(D.getSwiftProgramPath());
     llvm::sys::path::remove_filename(ARCLiteLib); // 'swift'
     llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'

@@ -492,7 +492,7 @@ namespace {
       IGF.unimplemented(SourceLoc(), "destroying @block_storage");
     }
   };
-}
+} // end anonymous namespace
 
 const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
   // The block storage consists of the block header (ObjCBlockStructTy)

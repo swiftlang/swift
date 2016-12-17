@@ -57,7 +57,7 @@ namespace swift {
     
     DiagnosticEngine *Diags = nullptr;
   };
-}
+} // namespace swift
 
 SILParserState::SILParserState(SILModule *M) : M(M) {
   S = M ? new SILParserTUState(*M) : nullptr;
@@ -307,7 +307,7 @@ namespace {
     Optional<llvm::coverage::Counter>
     parseSILCoverageExpr(llvm::coverage::CounterExpressionBuilder &Builder);
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
                                    const Diagnostic &D) {
@@ -830,7 +830,7 @@ bool SILParser::parseASTType(CanType &result) {
   ParserResult<TypeRepr> parsedType = P.parseType();
   if (parsedType.isNull()) return true;
   TypeLoc loc = parsedType.get();
-  if (performTypeLocChecking(loc, /*isSILType=*/ false))
+  if (performTypeLocChecking(loc, /*IsSILType=*/ false))
     return true;
   result = loc.getType()->getCanonicalType();
   // Invoke the callback on the parsed type.
@@ -885,7 +885,7 @@ bool SILParser::parseSILType(SILType &Result,
       : C(C), SF(SF)
     {}
     
-    bool walkToTypeReprPre(TypeRepr *T) {
+    bool walkToTypeReprPre(TypeRepr *T) override {
       if (auto fnType = dyn_cast<FunctionTypeRepr>(T)) {
         if (auto generics = fnType->getGenericParams()) {
           auto env = handleSILGenericParams(C, generics, SF);
@@ -913,7 +913,7 @@ bool SILParser::parseSILType(SILType &Result,
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), inoutLoc, attrs);
 
-  if (performTypeLocChecking(Ty, /*isSILType=*/true, nullptr))
+  if (performTypeLocChecking(Ty, /*IsSILType=*/true, nullptr))
     return true;
 
   Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),
@@ -1266,7 +1266,7 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
     if (TyR.isNull())
       return true;
     TypeLoc Ty = TyR.get();
-    if (performTypeLocChecking(Ty, /*isSILType=*/ false, GenericEnv))
+    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, GenericEnv))
       return true;
     parsed.push_back({Loc, Ty.getType()});
   } while (P.consumeIf(tok::comma));
@@ -2943,7 +2943,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       }
     }
 
-    if (performTypeLocChecking(Ty, /*isSILType=*/ false, genericEnv))
+    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, genericEnv))
       return true;
 
     if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
@@ -4421,7 +4421,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
   if (TyR.isNull())
     return nullptr;
   TypeLoc Ty = TyR.get();
-  if (performTypeLocChecking(Ty, /*isSILType=*/ false, witnessEnv))
+  if (performTypeLocChecking(Ty, /*IsSILType=*/ false, witnessEnv))
     return nullptr;
   auto ConformingTy = Ty.getType();
 

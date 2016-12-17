@@ -32,7 +32,7 @@ namespace {
                                  CanType bridgedError) const = 0;
     virtual void emitRelease(SILGenFunction &gen, SILLocation loc) const = 0;
   };
-}
+} // end anonymous namespace
 
 /// Emit a store of a native error to the foreign-error slot.
 static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
@@ -168,7 +168,7 @@ namespace {
     void emitRelease(SILGenFunction &gen, SILLocation loc) const override {
     }
   };
-}
+} // end anonymous namespace
 
 /// Given that we are throwing a native error, turn it into a bridged
 /// error, dispose of it in the correct way, and create the appropriate

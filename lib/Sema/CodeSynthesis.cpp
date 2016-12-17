@@ -393,7 +393,7 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
     
     Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
     if (param->getInterfaceType()->is<InOutType>())
-      ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*implicit=*/true);
+      ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*isImplicit=*/true);
     args.push_back(ref);
     
     labels.push_back(param->getArgumentName());
@@ -481,7 +481,7 @@ namespace {
     FuncDecl *Accessor;
   public:
     AccessorStorageReferenceContext(FuncDecl *accessor) : Accessor(accessor) {}
-    virtual ~AccessorStorageReferenceContext() = default;
+    ~AccessorStorageReferenceContext() override = default;
 
     VarDecl *getSelfDecl() const override {
       return Accessor->getImplicitSelfDecl();
@@ -491,7 +491,7 @@ namespace {
       return buildSubscriptIndexReference(ctx, Accessor);
     }
   };
-}
+} // end anonymous namespace
 
 /// Build an l-value for the storage of a declaration.
 static Expr *buildStorageReference(
@@ -1003,7 +1003,7 @@ namespace {
     bool walkToDeclPre(Decl *) override { return false; }
     std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override { return {false,S}; }
   };
-}
+} // end anonymous namespace
 
 /// Synthesize the getter for a lazy property with the specified storage
 /// vardecl.
@@ -1940,7 +1940,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   // 'override' attribute.
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->getSuperclass())
-      ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*implicit=*/true));
+      ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*IsImplicit=*/true));
   }
 
   // Type-check the constructor declaration.
@@ -1983,7 +1983,7 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(call),
                                   SourceLoc(),
-                                  /*Implicit=*/true));
+                                  /*implicit=*/true));
 
   // Note that this is a stub implementation.
   ctor->setStubImplementation(true);
@@ -2100,10 +2100,10 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
   }
   if (superclassCtor->isRequired())
-    ctor->getAttrs().add(new (tc.Context) RequiredAttr(/*implicit=*/true));
+    ctor->getAttrs().add(new (tc.Context) RequiredAttr(/*IsImplicit=*/true));
 
   // Wire up the overrides.
-  ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*Implicit=*/true));
+  ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*IsImplicit=*/true));
   ctor->setOverriddenDecl(superclassCtor);
 
   if (kind == DesignatedInitKind::Stub) {
@@ -2143,12 +2143,12 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                      /*hasTrailingClosure=*/false, /*implicit=*/true);
   if (superclassCtor->hasThrows()) {
     superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
-                                  /*Implicit=*/true);
+                                  /*implicit=*/true);
   }
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(superCall),
                                   SourceLoc(),
-                                  /*Implicit=*/true));
+                                  /*implicit=*/true));
 
   return ctor;
 }
