@@ -341,7 +341,8 @@ ValueOwnershipKindVisitor::visitSILUndef(SILUndef *Arg) {
 
 Optional<ValueOwnershipKind>
 ValueOwnershipKindVisitor::visitPHISILArgument(SILArgument *Arg) {
-  llvm_unreachable("unimplemented");
+  // For now just return undef.
+  return ValueOwnershipKind::Undef;
 }
 
 Optional<ValueOwnershipKind>

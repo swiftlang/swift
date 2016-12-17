@@ -237,6 +237,8 @@ PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
      "Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use pre-specialized functions")
+PASS(ValueOwnershipKindDumper, "value-ownership-kind-dumper",
+     "Print the value ownership kind of all ValueBase in a SILModule")
 PASS(BugReducerTester, "bug-reducer-tester",
      "Utility pass for testing sil-bug-reducer. Asserts when visits an apply that calls a specific function")
 PASS_RANGE(AllPasses, AADumper, BugReducerTester)
