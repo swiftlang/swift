@@ -765,7 +765,9 @@ public:
 
   std::pair<PatternBindingDecl*, VarDecl*>
     buildPatternAndVariable(Expr *InitExpr) {
-    char NameBuf[11] = { 0 };
+    // This is 14 because "tmp" is 3 chars, %u is at most 10 digits long plus a
+    // null terminator.
+    char NameBuf[14] = { 0 };
     snprintf(NameBuf, sizeof(NameBuf), "tmp%u", TmpNameIndex);
     TmpNameIndex++;
         

@@ -456,7 +456,9 @@ public:
 
   std::pair<PatternBindingDecl *, VarDecl *>
   buildPatternAndVariable(Expr *InitExpr) {
-    char NameBuf[11] = {0};
+    // This is 16 because "pctmp" is 5 chars, %u is at most 10 digits long plus
+    // a null terminator.
+    char NameBuf[16] = {0};
     snprintf(NameBuf, sizeof(NameBuf), "pctmp%u", TmpNameIndex);
     TmpNameIndex++;
 
