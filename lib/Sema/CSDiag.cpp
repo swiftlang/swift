@@ -2546,7 +2546,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
 
   // Check if the expression is the matching operator ~=, most often used in
   // case statements. If so, try to provide a single dot fix-it
-  const Expr *contextualTypeNode;
+  const Expr *contextualTypeNode = nullptr;
   for (auto iterateCS = CS; iterateCS; iterateCS = iterateCS->baseCS) {
     contextualTypeNode = iterateCS->getContextualTypeNode();
   }
