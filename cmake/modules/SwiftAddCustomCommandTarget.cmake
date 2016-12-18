@@ -110,7 +110,7 @@ function(add_custom_command_target dependency_out_var_name)
   # they don't follow the pattern supported by cmake_parse_arguments.
   # As a result, they end up in ACCT_UNPARSED_ARGUMENTS and are
   # forwarded verbatim.
-  set(options ALL VERBATIM APPEND IDEMPOTENT)
+  set(options ALL VERBATIM APPEND IDEMPOTENT EXCLUDE_FROM_ALL)
   set(single_value_args
       MAIN_DEPENDENCY WORKING_DIRECTORY COMMENT CUSTOM_TARGET_NAME)
   set(multi_value_args OUTPUT DEPENDS IMPLICIT_DEPENDS SOURCES)
@@ -150,6 +150,11 @@ function(add_custom_command_target dependency_out_var_name)
     set_target_properties(
         "${target_name}" PROPERTIES
         FOLDER "add_custom_command_target artifacts")
+    if (ACCT_EXCLUDE_FROM_ALL)
+      set_target_properties(
+        "${target_name}" PROPERTIES
+        EXCLUDE_FROM_ALL TRUE)
+    endif()
   endif()
 
   # "Return" the name of the custom target

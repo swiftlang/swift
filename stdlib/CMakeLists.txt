@@ -36,22 +36,41 @@ if(SWIFT_BUILD_STATIC_STDLIB)
 endif()
 
 add_custom_target(swift-stdlib-all)
+add_custom_target(swift-stdlib-sib-all)
+add_custom_target(swift-stdlib-sibgen-all)
 foreach(SDK ${SWIFT_SDKS})
   add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
   add_custom_target("swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+  add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sib")
+  add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibgen")
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
     set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
     add_custom_target("swift-stdlib${VARIANT_SUFFIX}")
+    add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sib")
+    add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sibgen")
     add_custom_target("swift-test-stdlib${VARIANT_SUFFIX}")
+
     add_dependencies(swift-stdlib-all "swift-stdlib${VARIANT_SUFFIX}")
+    add_dependencies(swift-stdlib-sib-all "swift-stdlib${VARIANT_SUFFIX}-sib")
+    add_dependencies(swift-stdlib-sibgen-all "swift-stdlib${VARIANT_SUFFIX}-sibgen")
+
     add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-        "swift-stdlib${VARIANT_SUFFIX}")
+      "swift-stdlib${VARIANT_SUFFIX}")
+    add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sib"
+        "swift-stdlib${VARIANT_SUFFIX}-sib")
+    add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibgen"
+        "swift-stdlib${VARIANT_SUFFIX}-sibgen")
+
     add_dependencies("swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
         "swift-test-stdlib${VARIANT_SUFFIX}")
   endforeach()
 endforeach()
 add_custom_target(swift-stdlib
     DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}")
+add_custom_target(swift-stdlib-sib
+    DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}-sib")
+add_custom_target(swift-stdlib-sibgen
+    DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}-sibgen")
 add_custom_target(swift-test-stdlib ALL
     DEPENDS "swift-test-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}")
 
