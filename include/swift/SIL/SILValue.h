@@ -85,7 +85,7 @@ enum class ValueOwnershipKind : uint8_t {
   /// 1. @guaranteed function argument. This guarantees that a value will
   /// outlive a function.
   ///
-  /// 2. A shared borrow region. This is a region denotated by a
+  /// 2. A shared borrow region. This is a region denoted by a
   /// begin_borrow/load_borrow instruction and an end_borrow instruction. The
   /// SSA value must not be destroyed or taken inside the borrowed region.
   ///
