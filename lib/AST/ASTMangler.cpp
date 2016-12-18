@@ -1676,7 +1676,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   appendDeclName(decl);
 
   ArrayRef<GenericTypeParamType *> genericParams;
-  unsigned initialParamDepth;
+  unsigned initialParamDepth = 0;
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();
