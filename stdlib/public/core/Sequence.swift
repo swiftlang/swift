@@ -1379,7 +1379,6 @@ extension Sequence {
   public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
-    public func _copyContents(
       var it = self.makeIterator()
       guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
       for idx in buffer.startIndex..<buffer.count {
