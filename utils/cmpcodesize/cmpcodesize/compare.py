@@ -30,10 +30,12 @@ categories = [
     ["Value Witness", re.compile('^__(Tw|T0.*w..$)')],
     ["Type Metadata", re.compile('^__(TM|T0.*(N|M.)$)')],
     # Function signature specialization of a generic specialization.
-    ["FuncSigGen Spec", re.compile('^__(TTSf.*__TTSg|T0.*T[gGpP]q?[0-9].*Tfq?[0-9])')],
+    ["FuncSigGen Spec", re.compile(
+        '^__(TTSf.*__TTSg|T0.*T[gGpP]q?[0-9].*Tfq?[0-9])')],
     ["Generic Spec", re.compile('^__(TTSg|T0.*T[gGpP]q?[0-9])')],
     ["FuncSig Spec", re.compile('^__(TTSf|T0.*Tfq?[0-9])')],
-    ["Generic Function", re.compile('__(T[^0].*q(x|d?[0-9]*_)|T0.*q(z|d?[0-9]*_))')],
+    ["Generic Function", re.compile(
+        '__(T[^0].*q(x|d?[0-9]*_)|T0.*q(z|d?[0-9]*_))')],
     ["Static Func", re.compile('^__(TZF|T0.*FZ)')],
     ["Swift @objc Func", re.compile('^__(TTo|T0.*To$)')],
     ["Accessor", re.compile('^__(TW[atTlI]|T0.*W[atTlI]$)')],
@@ -41,6 +43,7 @@ categories = [
     ["Swift Function", re.compile('^__(TF|T0.*(F|f.|f[AuU][0-9]*_)$)')],
     ["Unknown", re.compile('')]
 ]
+
 
 def add_function(sizes, function, start_addr, end_addr, group_by_prefix):
     if not function or start_addr is None or end_addr is None:
@@ -50,7 +53,7 @@ def add_function(sizes, function, start_addr, end_addr, group_by_prefix):
 
     if group_by_prefix:
         if function.endswith('_merged'):
-          function = function[:-7]
+            function = function[:-7]
         for cat in categories:
             cat_name = cat[0]
             pattern = cat[1]

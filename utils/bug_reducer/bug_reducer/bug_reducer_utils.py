@@ -218,10 +218,6 @@ class SILFuncExtractorInvoker(SILConstantInputToolInvoker):
         return self._invoke(self.input_file, funclist_path, output_filename,
                             invert)
 
-    def cmdline_with_functions(self, funclist_path, invert=False):
-        assert(isinstance(funclist_path, str))
-        return self._cmdline(self.input_file, funclist_path, invert)
-
 
 class SILNMInvoker(SILToolInvoker):
 

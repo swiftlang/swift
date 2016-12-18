@@ -93,15 +93,6 @@ class OptimizerTester(object):
         return result
 
 
-def get_functionnames_from_file(nm, filename):
-    # Begin by getting our function list.
-    def get_function(l):
-        l = l.split(' ')
-        if l[0] == 'F':
-            return l[1]
-        return None
-
-
 def function_bug_reducer(input_file, nm, sil_opt_invoker, sil_extract_invoker,
                          pass_list):
     functions = [s[1] for s in nm.get_symbols(input_file) if s[0] == 'F']
@@ -119,6 +110,7 @@ def function_bug_reducer(input_file, nm, sil_opt_invoker, sil_extract_invoker,
     print("*** Final File: %s" % sil_opt_invoker.input_file)
     print("*** Final Functions: %s" % (' '.join(r.target_list)))
     print("*** Repro command line: %s" % (' '.join(cmdline)))
+
 
 def invoke_function_bug_reducer(args):
     """Given a path to a sib file with canonical sil, attempt to find a perturbed
@@ -148,6 +140,7 @@ list of function given a specific pass that causes the perf pipeline to crash
 
     function_bug_reducer(input_file, nm, sil_opt_invoker, sil_extract_invoker,
                          args.pass_list)
+
 
 def add_parser_arguments(parser):
     """Add parser arguments for func_bug_reducer"""
