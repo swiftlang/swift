@@ -2768,7 +2768,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
     auto fn = FuncDecl::createDeserialized(
         ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
-        /*FuncLoc=*/SourceLoc(), name, /*nameLoc=*/SourceLoc(),
+        /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
         /*AccessorKeywordLoc=*/SourceLoc(), genericParams,
         numParamPatterns, DC);

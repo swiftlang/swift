@@ -2513,7 +2513,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                              ? parameterListTypes[CurrPattern]
                              : nullptr;
     printParameterList(BodyParams[CurrPattern], paramListType,
-                       /*Curried=*/CurrPattern > 0,
+                       /*isCurried=*/CurrPattern > 0,
                        [&]()->bool {
       return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault();
     });
@@ -2764,7 +2764,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer << "subscript";
   }, [&] { // Parameters
     printParameterList(decl->getIndices(), decl->getIndicesInterfaceType(),
-                       /*Curried=*/false,
+                       /*isCurried=*/false,
                        /*isAPINameByDefault*/[]()->bool{return false;});
   });
   Printer << " -> ";

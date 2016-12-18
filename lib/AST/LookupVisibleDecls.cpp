@@ -624,7 +624,7 @@ template <> struct DenseMapInfo<FoundDeclTy> {
   }
 };
 
-} // end llvm namespace
+} // namespace llvm
 
 namespace {
 
