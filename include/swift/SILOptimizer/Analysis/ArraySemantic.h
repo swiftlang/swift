@@ -37,7 +37,11 @@ enum class ArrayCallKind {
   // The following two semantic function kinds return the result @owned
   // instead of operating on self passed as parameter.
   kArrayInit,
-  kArrayUninitialized
+  kArrayUninitialized,
+  // The following semantic function kinds have a self parameter,
+  // and are mutating
+  kAppendContentsOf,
+  kAppendElement
 };
 
 /// Wrapper around array semantic calls.
@@ -130,6 +134,12 @@ public:
   ///
   /// Returns true on success, false otherwise.
   bool replaceByValue(SILValue V);
+
+  /// Replace a call to append(contentsOf: ) with a series of
+  /// append(element: ) calls.
+  bool replaceByAppendingValues(SILModule &M, SILFunction *AppendFn,
+                                llvm::SmallVectorImpl<SILValue> &Vals,
+                                ArrayRef<Substitution> Subs);
 
   /// Hoist the call to the insert point.
   void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {
