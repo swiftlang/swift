@@ -113,7 +113,7 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
       // Forward the existing return argument to a new BBArg.
       MergedBB = RetBB->split(RetInst->getIterator());
       SILValue OldRetVal = RetInst->getOperand(0);
-      RetInst->setOperand(0, MergedBB->createArgument(OldRetVal->getType()));
+      RetInst->setOperand(0, MergedBB->createPHIArgument(OldRetVal->getType()));
       Builder.setInsertionPoint(RetBB);
       Builder.createBranch(Loc, MergedBB, {OldRetVal});
     }
@@ -165,7 +165,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
     // Emit the rethrow logic.
     Builder.emitBlock(ErrorBB);
     SILValue Error =
-        ErrorBB->createArgument(CanSILFuncTy->getErrorResult().getSILType());
+        ErrorBB->createPHIArgument(CanSILFuncTy->getErrorResult().getSILType());
 
     Builder.createBuiltin(Loc,
                           Builder.getASTContext().getIdentifier("willThrow"),
@@ -180,7 +180,8 @@ emitApplyWithRethrow(SILBuilder &Builder,
   // result value.
   Builder.clearInsertionPoint();
   Builder.emitBlock(NormalBB);
-  return Builder.getInsertionBB()->createArgument(CanSILFuncTy->getSILResult());
+  return Builder.getInsertionBB()->createPHIArgument(
+      CanSILFuncTy->getSILResult());
 }
 
 /// Emits code to invoke the specified nonpolymorphic CalleeFunc using the

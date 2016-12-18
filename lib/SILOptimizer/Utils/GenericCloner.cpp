@@ -88,8 +88,8 @@ void GenericCloner::populateCloned() {
         ReturnValueAddr = ASI;
       } else {
         // Store the new direct parameter to the alloc_stack.
-        auto *NewArg =
-            ClonedEntryBB->createArgument(mappedType, OrigArg->getDecl());
+        auto *NewArg = ClonedEntryBB->createFunctionArgument(
+            mappedType, OrigArg->getDecl());
         getBuilder().createStore(Loc, NewArg, ASI,
                                  StoreOwnershipQualifier::Unqualified);
 
@@ -104,7 +104,7 @@ void GenericCloner::populateCloned() {
       }
     } else {
       auto *NewArg =
-          ClonedEntryBB->createArgument(mappedType, OrigArg->getDecl());
+          ClonedEntryBB->createFunctionArgument(mappedType, OrigArg->getDecl());
       ValueMap[OrigArg] = NewArg;
     }
     ++I;

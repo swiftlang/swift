@@ -512,7 +512,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   F->setInlineStrategy(AlwaysInline);
   SILBasicBlock *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgumentDescList) {
-    ThunkBody->createArgument(ArgDesc.Arg->getType(), ArgDesc.Decl);
+    ThunkBody->createFunctionArgument(ArgDesc.Arg->getType(), ArgDesc.Decl);
   }
 
   SILLocation Loc = ThunkBody->getParent()->getLocation();
@@ -537,11 +537,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     // We need a try_apply to call a function with an error result.
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
-    ReturnValue = NormalBlock->createArgument(ResultType, nullptr);
+    ReturnValue = NormalBlock->createPHIArgument(ResultType);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createArgument(Error, nullptr);
+    auto *ErrorArg = ErrorBlock->createPHIArgument(Error);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
@@ -840,8 +840,8 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     AD.ProjTree.getLeafNodes(LeafNodes);
     for (auto Node : LeafNodes) {
       LeafValues.push_back(
-          BB->insertArgument(ArgOffset++, Node->getType(),
-                             BB->getArgument(OldArgIndex)->getDecl()));
+          BB->insertFunctionArgument(ArgOffset++, Node->getType(),
+                                     BB->getArgument(OldArgIndex)->getDecl()));
       AIM[TotalArgIndex - 1] = AD.Index;
       TotalArgIndex ++;
     }

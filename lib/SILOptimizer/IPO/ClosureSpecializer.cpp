@@ -588,7 +588,7 @@ void ClosureSpecCloner::populateCloned() {
 
     // Otherwise, create a new argument which copies the original argument
     SILValue MappedValue =
-        ClonedEntryBB->createArgument(Arg->getType(), Arg->getDecl());
+        ClonedEntryBB->createFunctionArgument(Arg->getType(), Arg->getDecl());
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }
 
@@ -605,7 +605,8 @@ void ClosureSpecCloner::populateCloned() {
   unsigned NumNotCaptured = NumTotalParams - CallSiteDesc.getNumArguments();
   llvm::SmallVector<SILValue, 4> NewPAIArgs;
   for (auto &PInfo : ClosedOverFunTy->getParameters().slice(NumNotCaptured)) {
-    SILValue MappedValue = ClonedEntryBB->createArgument(PInfo.getSILType());
+    SILValue MappedValue =
+        ClonedEntryBB->createFunctionArgument(PInfo.getSILType());
     NewPAIArgs.push_back(MappedValue);
   }
 
