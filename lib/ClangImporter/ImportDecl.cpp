@@ -7225,7 +7225,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
                                     Instance->getSourceManager(),
                                     "loading members for");
 
-  // TODO: accomodate deprecated versions as well
+  // TODO: accommodate deprecated versions as well
   SwiftDeclConverter converter(*this, CurrentVersion);
   SwiftDeclConverter swift2Converter(*this, ImportNameVersion::Swift2);
 
