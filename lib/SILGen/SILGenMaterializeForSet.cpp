@@ -385,9 +385,8 @@ public:
   /// Given part of the witness's interface type, produce its
   /// substitution according to the witness substitutions.
   CanType getSubstWitnessInterfaceType(CanType type) {
-    return SubstSelfType->getTypeOfMember(SGM.SwiftModule, type,
-                                          WitnessStorage->getDeclContext())
-                        ->getCanonicalType();
+    auto subs = SubstSelfType->getMemberSubstitutions(WitnessStorage);
+    return type.subst(SGM.SwiftModule, subs)->getCanonicalType();
   }
 
 };

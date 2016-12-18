@@ -1876,11 +1876,15 @@ Type ClangImporter::Implementation::importMethodType(
     if (dc != origDC) {
       // Replace origDC's archetypes with interface types.
       type = ArchetypeBuilder::mapTypeOutOfContext(origDC, type);
+
       // Get the substitutions that we need to access a member of
-      // 'origDC' on 'dc', and apply them to the interface type
-      // to produce the final substituted type.
-      type = dc->getDeclaredTypeInContext()->getTypeOfMember(
-                dc->getParentModule(), type, origDC);
+      // 'origDC' on 'dc'.
+      auto subs = dc->getDeclaredTypeInContext()
+          ->getContextSubstitutions(origDC);
+
+      // Apply them to the interface type to produce the final
+      // substituted type.
+      type = type.subst(dc->getParentModule(), subs);
     }
     return type;
   };

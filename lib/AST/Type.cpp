@@ -2916,7 +2916,16 @@ static Type substType(Type derivedType,
                       TypeSubstitutionFn substitutions,
                       LookupConformanceFn lookupConformances,
                       SubstOptions options) {
+
+  // FIXME: Change getTypeOfMember() to not pass GenericFunctionType here
+  if (!derivedType->hasArchetype() &&
+      !derivedType->hasTypeParameter() &&
+      !derivedType->is<GenericFunctionType>())
+    return derivedType;
+
   return derivedType.transform([&](Type type) -> Type {
+    // FIXME: Add SIL versions of mapTypeIntoContext() and
+    // mapTypeOutOfContext() and use them appropriately
     assert((options.contains(SubstFlags::AllowLoweredTypes) ||
             !isa<SILFunctionType>(type.getPointer())) &&
            "should not be doing AST type-substitution on a lowered SIL type;"
@@ -2966,15 +2975,22 @@ static Type substType(Type derivedType,
     if (auto known = substitutions(substOrig))
       return known;
 
-    // For archetypes, we can substitute the parent (if present).
-    auto archetype = substOrig->getAs<ArchetypeType>();
-    if (!archetype) return type;
-
-    // If we don't have a substitution for this type and it doesn't have a
-    // parent, then we're not substituting it.
-    auto parent = archetype->getParent();
-    if (!parent)
+    // If we failed to substitute a generic type parameter, give up.
+    if (substOrig->is<GenericTypeParamType>()) {
+      if (options.contains(SubstFlags::UseErrorType))
+        return ErrorType::get(type);
       return type;
+    }
+
+    auto archetype = substOrig->castTo<ArchetypeType>();
+
+    // For archetypes, we can substitute the parent (if present).
+    auto parent = archetype->getParent();
+    if (!parent) {
+      if (options.contains(SubstFlags::UseErrorType))
+        return ErrorType::get(type);
+      return type;
+    }
 
     // Substitute into the parent type.
     Type substParent = substType(parent, substitutions,
@@ -3016,6 +3032,13 @@ Type Type::subst(TypeSubstitutionFn substitutions,
   return substType(*this, substitutions, conformances, options);
 }
 
+Type Type::substDependentTypesWithErrorTypes() const {
+  return substType(*this,
+                   [](SubstitutableType *t) -> Type { return Type(); },
+                   MakeAbstractConformanceForGenericType(),
+                   SubstFlags::UseErrorType);
+}
+
 Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
                                     LazyResolver *resolver) {
   Type t(this);
@@ -3031,7 +3054,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
   llvm_unreachable("no inheritance relationship between given classes");
 }
 
-TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
+TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
 
   // Ignore lvalues in the base type.
   Type baseTy(getRValueType());
@@ -3110,25 +3133,47 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   return substitutions;
 }
 
+TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
+  auto *memberDC = member->getDeclContext();
+
+  TypeSubstitutionMap substitutions;
+
+  // If the member is not part of a type, there's nothing to substitute.
+  if (!memberDC->isTypeContext())
+    return substitutions;
+
+  // Compute the set of member substitutions to apply.
+  substitutions = getContextSubstitutions(memberDC);
+
+  // If the member itself is generic, preserve its generic parameters.
+  // We need this since code completion and diagnostics want to be able
+  // to call getTypeOfMember() with functions and nested types.
+  if (isa<AbstractFunctionDecl>(member) ||
+      isa<GenericTypeDecl>(member)) {
+    auto *innerDC = member->getInnermostDeclContext();
+    if (innerDC->isInnermostContextGeneric()) {
+      auto *sig = innerDC->getGenericSignatureOfContext();
+      for (auto param : sig->getInnermostGenericParams()) {
+        auto *genericParam = param->getCanonicalType()
+            ->castTo<GenericTypeParamType>();
+        substitutions[genericParam] = param;
+      }
+    }
+  }
+
+  return substitutions;
+}
+
 Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
                                LazyResolver *resolver, Type memberType) {
   // If no member type was provided, use the member's type.
   if (!memberType)
     memberType = member->getInterfaceType();
 
-  return getTypeOfMember(module, memberType, member->getDeclContext());
-}
-
-Type TypeBase::getTypeOfMember(Module *module, Type memberType,
-                               const DeclContext *memberDC) {
   assert(memberType);
 
-  // If the member is not part of a type, there's nothing to substitute.
-  if (!memberDC->isTypeContext())
-    return memberType;
-
   // Compute the set of member substitutions to apply.
-  auto substitutions = getMemberSubstitutions(memberDC);
+  auto substitutions = getMemberSubstitutions(member);
   if (substitutions.empty())
     return memberType;
 
@@ -3143,7 +3188,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *decl,
   auto *DC = parentDecl->getDeclContext();
   auto superclass = getSuperclassForDecl(
       DC->getAsClassOrClassExtensionContext(), resolver);
-  auto subs = superclass->getMemberSubstitutions(DC);
+  auto subs = superclass->getContextSubstitutions(DC);
 
   if (auto *parentFunc = dyn_cast<AbstractFunctionDecl>(parentDecl)) {
     if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {

@@ -727,7 +727,7 @@ public:
 
     auto FoundSignature = VD->getOverloadSignature();
     if (FoundSignature.InterfaceType && shouldSubst) {
-      auto subs = BaseTy->getMemberSubstitutions(VD->getDeclContext());
+      auto subs = BaseTy->getMemberSubstitutions(VD);
       if (auto CT = FoundSignature.InterfaceType.subst(M, subs, None))
         FoundSignature.InterfaceType = CT->getCanonicalType();
     }
@@ -743,7 +743,7 @@ public:
 
       auto OtherSignature = OtherVD->getOverloadSignature();
       if (OtherSignature.InterfaceType && shouldSubst) {
-        auto subs = BaseTy->getMemberSubstitutions(OtherVD->getDeclContext());
+        auto subs = BaseTy->getMemberSubstitutions(OtherVD);
         if (auto CT = OtherSignature.InterfaceType.subst(M, subs, None))
           OtherSignature.InterfaceType = CT->getCanonicalType();
       }

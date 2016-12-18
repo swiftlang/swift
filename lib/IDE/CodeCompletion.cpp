@@ -1985,16 +1985,15 @@ public:
             MaybeNominalType->getAnyOptionalObjectType())
           MaybeNominalType = MaybeNominalType->getAnyOptionalObjectType();
 
-        // For dynamic lookup don't substitute in the base type
+        // For dynamic lookup don't substitute in the base type.
         if (MaybeNominalType->isAnyObject())
           return T;
 
         // For everything else, substitute in the base type.
-        //
+        auto Subs = MaybeNominalType->getMemberSubstitutions(VD);
+
         // Pass in DesugarMemberTypes so that we see the actual
         // concrete type witnesses instead of type alias types.
-        auto Subs = MaybeNominalType->getMemberSubstitutions(
-            VD->getDeclContext());
         T = T.subst(M, Subs, (SubstFlags::DesugarMemberTypes |
                               SubstFlags::UseErrorType));
       }
