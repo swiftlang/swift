@@ -3870,11 +3870,9 @@ public:
         IterativeTypeChecker ITC(TC);
         ITC.satisfy(requestResolveTypeDecl(TAD));
       } else {
-        bool invalid = false;
         if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD, options)) {
           TAD->setInvalid();
           TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
-          invalid = true;
         }
 
         TAD->setUnderlyingType(TAD->getUnderlyingTypeLoc().getType());
