@@ -30,12 +30,14 @@ class FuncBugReducerTestCase(unittest.TestCase):
         self.file_dir = os.path.dirname(os.path.abspath(__file__))
         self.reducer = os.path.join(os.path.dirname(self.file_dir),
                                     'bug_reducer', 'bug_reducer.py')
-        self.build_dir = os.path.abspath(os.environ['BUGREDUCE_TEST_SWIFT_OBJ_ROOT'])
+        self.build_dir = os.path.abspath(
+            os.environ['BUGREDUCE_TEST_SWIFT_OBJ_ROOT'])
 
         (root, _) = os.path.splitext(os.path.abspath(__file__))
         self.root_basename = ''.join(os.path.basename(root).split('_'))
-        self.tmp_dir = os.path.join(os.path.abspath(os.environ['BUGREDUCE_TEST_TMP_DIR']),
-                                    self.root_basename)
+        self.tmp_dir = os.path.join(
+            os.path.abspath(os.environ['BUGREDUCE_TEST_TMP_DIR']),
+            self.root_basename)
         subprocess.call(['mkdir', '-p', self.tmp_dir])
 
         self.module_cache = os.path.join(self.tmp_dir, 'module_cache')
@@ -94,7 +96,8 @@ class FuncBugReducerTestCase(unittest.TestCase):
         re_end = 'testfuncbugreducer_testbasic_'
         re_end += 'c36efe1eb0993b53c570bfed38933af8.sib'
         output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
-        output_matches = [1 for o in output if output_file_re.match(o) is not None]
+        output_matches = [
+            1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 1)
 
 
