@@ -1327,18 +1327,18 @@ extension Sequence {
   public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
-    var it = self.makeIterator()
-    guard let base = buffer.baseAddress else { return (it,buffer.startIndex) }
-    var idx = buffer.startIndex
-    for p in base..<(base + buffer.count) {
-      // underflow is permitted – e.g. a sequence into
-      // the spare capacity of an Array buffer
-      guard let x = it.next() else { break }
-      p.initialize(to: x)
-      buffer.formIndex(after: &idx)
+    public func _copyContents(
+      var it = self.makeIterator()
+      guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
+      for idx in buffer.startIndex..<buffer.count {
+        guard let x = it.next() else {
+          return (it, idx)
+        }
+        ptr.initialize(to: x)
+        ptr += 1
+      }
+      return (it,buffer.endIndex)
     }
-    return (it,idx)
-  }
 }
 
 // FIXME(ABI) #167(Recursive Protocol Constraints): IteratorSequence
