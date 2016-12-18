@@ -133,6 +133,8 @@ function(_add_variant_c_compile_link_flags)
     list(APPEND result "-DLLVM_ON_WIN32")
     list(APPEND result "-D_CRT_SECURE_NO_WARNINGS")
     list(APPEND result "-D_CRT_NONSTDC_NO_WARNINGS")
+    # TODO(compnerd) permit building for different families
+    list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
     # TODO(compnerd) handle /MT
     list(APPEND result "-D_DLL")
     list(APPEND result "-fms-compatibility-version=1900")
