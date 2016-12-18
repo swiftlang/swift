@@ -170,7 +170,7 @@ public:
 
 private:
   DataflowResult visitStrongEntranceApply(ApplyInst *AI);
-  DataflowResult visitStrongEntranceArgument(SILArgument *Arg);
+  DataflowResult visitStrongEntranceArgument(SILFunctionArgument *Arg);
   DataflowResult visitStrongEntranceAllocRef(AllocRefInst *ARI);
   DataflowResult visitStrongEntranceAllocRefDynamic(AllocRefDynamicInst *ARI);
   DataflowResult visitStrongAllocBox(AllocBoxInst *ABI);

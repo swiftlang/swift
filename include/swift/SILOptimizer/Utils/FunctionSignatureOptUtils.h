@@ -32,7 +32,7 @@ namespace swift {
 /// SILArgument that we are tracking.
 struct ArgumentDescriptor {
   /// The argument that we are tracking original data for.
-  SILArgument *Arg;
+  SILFunctionArgument *Arg;
 
   /// Parameter Info.
   SILParameterInfo PInfo;
@@ -76,11 +76,10 @@ struct ArgumentDescriptor {
   /// to the original argument. The reason why we do this is to make sure we
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
-  ArgumentDescriptor(SILArgument *A)
-      : Arg(A), PInfo(Arg->getKnownParameterInfo()), Index(A->getIndex()),
+  ArgumentDescriptor(SILFunctionArgument *A)
+      : Arg(A), PInfo(A->getKnownParameterInfo()), Index(A->getIndex()),
         Decl(A->getDecl()), IsEntirelyDead(false), Explode(false),
-        OwnedToGuaranteed(false),
-        IsIndirectResult(A->isIndirectResult()),
+        OwnedToGuaranteed(false), IsIndirectResult(A->isIndirectResult()),
         CalleeRelease(), CalleeReleaseInThrowBlock(),
         ProjTree(A->getModule(), A->getType()) {}
 

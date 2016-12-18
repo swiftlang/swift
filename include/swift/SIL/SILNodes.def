@@ -21,6 +21,13 @@
 #define VALUE(Id, Parent)
 #endif
 
+/// ARGUMENT(Id, Parent)
+///   The expression enumerator value is a ValueKind. The node's class name is
+///   Id and the name of its base class (in the SILValue hierarchy) is Parent.
+#ifndef ARGUMENT
+#define ARGUMENT(Id, Parent) VALUE(Id, Parent)
+#endif
+
 /// INST(Id, Parent, TextualName, MemBehavior, MayRelease)
 ///
 ///   The expression enumerator value is a ValueKind.  The node's class name is
@@ -46,9 +53,8 @@
       INST(Id, Parent, TextualName, MemBehavior, MayRelease)
 #endif
 
-/// An abstract instruction is an abstract base class in the hierarchy;
-/// it is never a most-derived type, and it does not have an enumerator in
-/// ValueKind.
+/// An abstract value base is an abstract base class in the hierarchy; it is
+/// never a most-derived type, and it does not have an enumerator in ValueKind.
 ///
 /// Most metaprograms do not care about abstract expressions, so the default
 /// is to ignore them.
@@ -62,7 +68,11 @@
 #define VALUE_RANGE(Id, First, Last)
 #endif
 
-VALUE(SILArgument, ValueBase)
+ABSTRACT_VALUE(SILArgument, ValueBase)
+  ARGUMENT(SILPHIArgument, SILArgument)
+  ARGUMENT(SILFunctionArgument, SILArgument)
+  VALUE_RANGE(SILArgument, SILPHIArgument, SILFunctionArgument)
+
 VALUE(SILUndef, ValueBase)
 
 // Please keep the order of instructions consistent with the order of their
@@ -285,4 +295,5 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 #undef ABSTRACT_VALUE
 #undef TERMINATOR
 #undef INST
+#undef ARGUMENT
 #undef VALUE

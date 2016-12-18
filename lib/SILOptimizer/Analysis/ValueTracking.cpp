@@ -25,8 +25,8 @@ using namespace swift::PatternMatch;
 
 bool swift::isNotAliasingArgument(SILValue V,
                                   InoutAliasingAssumption isInoutAliasing) {
-  auto *Arg = dyn_cast<SILArgument>(V);
-  if (!Arg || !Arg->isFunctionArg())
+  auto *Arg = dyn_cast<SILFunctionArgument>(V);
+  if (!Arg)
     return false;
 
   return isNotAliasedIndirectParameter(Arg->getArgumentConvention(),
@@ -69,11 +69,9 @@ static bool isLocalObject(SILValue Obj) {
       }
     }
 
-    if (auto Arg = dyn_cast<SILArgument>(V)) {
+    if (auto *Arg = dyn_cast<SILPHIArgument>(V)) {
       // A BB argument is local if all of its
       // incoming values are local.
-      if (Arg->isFunctionArg())
-        return false;
       SmallVector<SILValue, 4> IncomingValues;
       if (Arg->getIncomingValues(IncomingValues)) {
         for (auto InValue : IncomingValues) {

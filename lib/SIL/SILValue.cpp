@@ -127,7 +127,6 @@ public:
   ValueOwnershipKindVisitor(ValueOwnershipKindVisitor &&) = delete;
 
   ValueOwnershipKind visitForwardingInst(SILInstruction *I);
-  ValueOwnershipKind visitPHISILArgument(SILArgument *Arg);
 
   ValueOwnershipKind visitValueBase(ValueBase *V) {
     llvm_unreachable("unimplemented method on ValueBaseOwnershipVisitor");
@@ -383,20 +382,14 @@ ValueOwnershipKindVisitor::visitSILUndef(SILUndef *Arg) {
 }
 
 ValueOwnershipKind
-ValueOwnershipKindVisitor::visitPHISILArgument(SILArgument *Arg) {
+ValueOwnershipKindVisitor::visitSILPHIArgument(SILPHIArgument *Arg) {
   // For now just return undef.
   return ValueOwnershipKind::Any;
 }
 
 ValueOwnershipKind
-ValueOwnershipKindVisitor::visitSILArgument(SILArgument *Arg) {
-  // If we have a PHI node, we need to look at our predecessors.
-  if (!Arg->isFunctionArg()) {
-    return visitPHISILArgument(Arg);
-  }
-
-  // Otherwise, we need to discover our ownership kind from our function
-  // signature.
+ValueOwnershipKindVisitor::visitSILFunctionArgument(SILFunctionArgument *Arg) {
+  // Discover our ownership kind from our function signature.
   switch (Arg->getArgumentConvention()) {
   // These involve addresses and from an ownership perspective, addresses are
   // trivial. This is distinct from the ownership properties of the values that

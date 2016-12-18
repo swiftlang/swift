@@ -96,10 +96,10 @@ class ConstantTracker {
 
   // Gets the parameter in the caller for a function argument.
   SILValue getParam(SILValue value) {
-    if (SILArgument *arg = dyn_cast<SILArgument>(value)) {
-      if (AI && arg->isFunctionArg() && arg->getFunction() == F) {
+    if (auto *Arg = dyn_cast<SILFunctionArgument>(value)) {
+      if (AI && Arg->getFunction() == F) {
         // Continue at the caller.
-        return AI.getArgument(arg->getIndex());
+        return AI.getArgument(Arg->getIndex());
       }
     }
     return SILValue();

@@ -1019,7 +1019,8 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
 
 /// Try to CSE the users of the protocol that's passed in argument \p Arg.
 /// \returns True if some instructions were modified.
-static bool CSExistentialInstructions(SILArgument *Arg, DominanceInfo *DA) {
+static bool CSExistentialInstructions(SILFunctionArgument *Arg,
+                                      DominanceInfo *DA) {
   ParameterConvention Conv = Arg->getKnownParameterInfo().getConvention();
   // We can assume that the address of Proto does not alias because the
   // calling convention is In or In-guaranteed.
@@ -1106,8 +1107,10 @@ static bool CSExistentialInstructions(SILArgument *Arg, DominanceInfo *DA) {
 static bool CSEExistentialCalls(SILFunction *Func, DominanceInfo *DA) {
   bool Changed = false;
   for (auto *Arg : Func->getArgumentsWithoutIndirectResults()) {
-    if (Arg->getType().isExistentialType())
-      Changed |= CSExistentialInstructions(Arg, DA);
+    if (Arg->getType().isExistentialType()) {
+      auto *FArg = cast<SILFunctionArgument>(Arg);
+      Changed |= CSExistentialInstructions(FArg, DA);
+    }
   }
 
   return Changed;

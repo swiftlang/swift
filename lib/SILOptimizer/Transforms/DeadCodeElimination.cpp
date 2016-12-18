@@ -345,7 +345,7 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
   for (Operand *DU : getDebugUses(Arg))
     markValueLive(DU->getUser());
 
-  if (Arg->isFunctionArg())
+  if (isa<SILFunctionArgument>(Arg))
     return;
 
   auto *Block = Arg->getParent();

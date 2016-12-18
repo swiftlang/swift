@@ -240,8 +240,8 @@ protected:
   void emitTypeCheck(SILBasicBlock *FailedTypeCheckBB,
                      SubstitutableType *ParamTy, Type SubTy);
 
-  SILValue emitArgumentCast(SILArgument *OrigArg, unsigned Idx);
-  
+  SILValue emitArgumentCast(SILFunctionArgument *OrigArg, unsigned Idx);
+
   SILValue emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs);
 };
 } // end anonymous namespace
@@ -358,7 +358,8 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
 }
 
 /// Cast a generic argument to its specialized type.
-SILValue EagerDispatch::emitArgumentCast(SILArgument *OrigArg, unsigned Idx) {
+SILValue EagerDispatch::emitArgumentCast(SILFunctionArgument *OrigArg,
+                                         unsigned Idx) {
 
   auto CastTy = ReInfo.getSubstitutedType()->getSILArgumentType(Idx);
   assert(CastTy.isAddress() ==
@@ -380,7 +381,7 @@ SILValue EagerDispatch::emitArgumentCast(SILArgument *OrigArg, unsigned Idx) {
 /// has a direct result.
 SILValue EagerDispatch::
 emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
-  auto OrigArgs = GenericFunc->getArguments();
+  auto OrigArgs = GenericFunc->begin()->getFunctionArguments();
   assert(OrigArgs.size() == ReInfo.getNumArguments() && "signature mismatch");
   
   CallArgs.reserve(OrigArgs.size());
