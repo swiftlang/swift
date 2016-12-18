@@ -5,17 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-.f{(t: _?==nil-{
-a?==0
-__?=nil?(
-{ :_{_
-&_?
-[]
-_
-{f{}{
-.{_{nil)
-{
-._?=(
-&()
-.f\n
+// RUN: not %target-swift-frontend %s -emit-ir
+// REQUIRES: asserts
+{_=(t:_?{{

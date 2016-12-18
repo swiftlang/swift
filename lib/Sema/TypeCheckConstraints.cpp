@@ -904,6 +904,33 @@ namespace {
         return expr;
       }
 
+      // Double check if there are any BindOptionalExpr remaining in the
+      // tree (see comment below for more details), if there are no BOE
+      // expressions remaining remove OptionalEvaluationExpr from the tree.
+      if (auto OEE = dyn_cast<OptionalEvaluationExpr>(expr)) {
+        bool hasBindOptional = false;
+        OEE->forEachChildExpr([&](Expr *expr) -> Expr * {
+          if (isa<BindOptionalExpr>(expr))
+            hasBindOptional = true;
+          // If at least a single BOE was found, no reason
+          // to walk any further in the tree.
+          return hasBindOptional ? nullptr : expr;
+        });
+
+        return hasBindOptional ? OEE : OEE->getSubExpr();
+      }
+
+      // Check if there are any BindOptionalExpr in the tree which
+      // wrap DiscardAssignmentExpr, such situation corresponds to syntax
+      // like - `_? = <value>`, since it doesn't really make
+      // sense to have optional assignment to discarded LValue which can
+      // never be optional, we can remove BOE from the tree and avoid
+      // generating any of the uncessary constraints.
+      if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
+        if (auto DAE = dyn_cast<DiscardAssignmentExpr>(BOE->getSubExpr()))
+          return DAE;
+      }
+
       // If this is a sugared type that needs to be folded into a single
       // TypeExpr, do it.
       if (auto *simplified = simplifyTypeExpr(expr))
