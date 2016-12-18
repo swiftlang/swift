@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -44,6 +44,9 @@ namespace swift {
   /// user code.
   void performSILDiagnoseUnreachable(SILModule *M);
 
+  /// \brief Remove dead functions from \p M.
+  void performSILDeadFunctionElimination(SILModule *M);
+
   /// \brief Link a SILFunction declaration to the actual definition in the
   /// serialized modules.
   ///
@@ -65,6 +68,10 @@ namespace swift {
 #include "Passes.def"
     invalidPassKind
   };
+
+  PassKind PassKindFromString(StringRef ID);
+  StringRef PassKindName(PassKind Kind);
+  StringRef PassKindID(PassKind Kind);
 
 #define PASS(ID, NAME, DESCRIPTION) SILTransform *create##ID();
 #include "Passes.def"

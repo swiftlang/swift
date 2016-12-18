@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func f0(_ x: Int, y: Int, z: Int) { }
 func f1(_ x: Int, while: Int) { }

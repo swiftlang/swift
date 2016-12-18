@@ -1,8 +1,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -61,7 +61,10 @@ class TestAffineTransform : TestAffineTransformSuper {
     }
     
     func test_BasicConstruction() {
+        let defaultAffineTransform = AffineTransform()
         let identityTransform = AffineTransform.identity
+
+        expectEqual(defaultAffineTransform, identityTransform)
         
         // The diagonal entries (1,1) and (2,2) of the identity matrix are ones. The other entries are zeros.
         // TODO: These should use DBL_MAX but it's not available as part of Glibc on Linux
@@ -324,8 +327,7 @@ class TestAffineTransform : TestAffineTransformSuper {
             AffineTransform(m11: 0.498, m12: -0.284, m21: -0.742, m22: 0.3248, tX: 12, tY: 44)
         ]
         for val in values {
-            let ref = NSAffineTransform()
-            ref.transformStruct = val
+            let ref = val as NSAffineTransform
             expectEqual(ref.hashValue, val.hashValue)
         }
     }

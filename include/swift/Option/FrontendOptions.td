@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -115,6 +115,9 @@ def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
 
 def autolink_library : Separate<["-"], "autolink-library">,
   HelpText<"Add dependent library">, Flags<[FrontendOption]>;
+
+def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
+  HelpText<"Disable typo correction">;
 
 } // end let Flags = [FrontendOption, NoDriverOption]
 
@@ -236,10 +239,6 @@ def assume_parsing_unqualified_ownership_sil : Flag<["-"], "assume-parsing-unqua
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
-
-def enable_experimental_nested_generic_types :
-  Flag<["-"], "enable-experimental-nested-generic-types">,
-  HelpText<"Enable experimental support for nested generic types">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,

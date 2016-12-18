@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -78,7 +78,7 @@ namespace {
       return true;
     }
   };
-}
+} // end anonymous namespace
 
 /// Does the metatype for the given type have a known-singleton
 /// representation?
@@ -448,9 +448,10 @@ namespace {
       // because the rest of type lowering doesn't have a generic
       // signature plumbed through.
       if (Sig && type->hasTypeParameter()) {
-        auto builder = M.getASTContext().getOrCreateArchetypeBuilder(
-            Sig, M.getSwiftModule());
-        type = builder->substDependentType(type)->getCanonicalType();
+        type = Sig->getCanonicalSignature()
+          .getGenericEnvironment(*M.getSwiftModule())
+          ->mapTypeIntoContext(M.getSwiftModule(), type)
+          ->getCanonicalType();
       }
 
       return type;
@@ -465,7 +466,7 @@ namespace {
       return handleAggWithReference(type);
     }
   };
-}
+} // end anonymous namespace
 
 static LoweredTypeKind classifyType(CanType type, SILModule &M,
                                     CanGenericSignature sig,
@@ -494,8 +495,7 @@ namespace {
   public:
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
-      SILValue value =
-          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      SILValue value = emitLoad(B, loc, addr, LoadOwnershipQualifier::Take);
       emitDestroyValue(B, loc, value);
     }
 
@@ -520,13 +520,29 @@ namespace {
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
                             IsTake_t isTake) const override {
-      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      return emitLoad(B, loc, addr, LoadOwnershipQualifier::Trivial);
     }
 
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue value, SILValue addr,
                          IsInitialization_t isInit) const override {
+      emitStore(B, loc, value, addr, StoreOwnershipQualifier::Trivial);
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
+        return;
+      }
       B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
+      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
     }
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
@@ -566,22 +582,57 @@ namespace {
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
                             SILValue addr, IsTake_t isTake) const override {
-      SILValue value =
-          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
-      if (!isTake)
-        emitCopyValue(B, loc, value);
-      return value;
+      auto qual =
+          isTake ? LoadOwnershipQualifier::Take : LoadOwnershipQualifier::Copy;
+      return emitLoad(B, loc, addr, qual);
     }
 
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue newValue, SILValue addr,
                          IsInitialization_t isInit) const override {
-      SILValue oldValue;
-      if (!isInit)
-        oldValue = B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
-      B.createStore(loc, newValue, addr, StoreOwnershipQualifier::Unqualified);
-      if (!isInit)
-        emitDestroyValue(B, loc, oldValue);
+      auto qual = isInit ? StoreOwnershipQualifier::Init
+                         : StoreOwnershipQualifier::Assign;
+      emitStore(B, loc, newValue, addr, qual);
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createStore(loc, value, addr, qual);
+        return;
+      }
+
+      if (qual != StoreOwnershipQualifier::Assign) {
+        B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+        return;
+      }
+
+      // If the ownership qualifier is [assign], then we need to eliminate the
+      // old value.
+      //
+      // 1. Load old value.
+      // 2. Store new value.
+      // 3. Release old value.
+      SILValue old =
+          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+      B.emitDestroyValueOperation(loc, old);
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createLoad(loc, addr, qual);
+
+      SILValue loadValue =
+          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+
+      // If we do not have a copy, just return the value...
+      if (qual != LoadOwnershipQualifier::Copy)
+        return loadValue;
+
+      // Otherwise, emit the copy value operation.
+      return B.emitCopyValueOperation(loc, loadValue);
     }
   };
 
@@ -698,7 +749,7 @@ namespace {
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue aggValue) const override {
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, aggValue);
+        B.createDestroyValue(loc, aggValue);
         return;
       }
 
@@ -818,7 +869,7 @@ namespace {
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, value);
+        B.createDestroyValue(loc, value);
         return;
       }
       B.emitReleaseValueAndFold(loc, value);
@@ -830,7 +881,7 @@ namespace {
              "This method should never be called when performing a shallow "
              "destroy value.");
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, value);
+        B.createDestroyValue(loc, value);
         return;
       }
       B.emitReleaseValueAndFold(loc, value);
@@ -876,7 +927,7 @@ namespace {
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, value);
+        B.createDestroyValue(loc, value);
         return;
       }
       B.emitStrongReleaseAndFold(loc, value);
@@ -930,6 +981,16 @@ namespace {
                          SILValue newValue, SILValue addr,
                          IsInitialization_t isInit) const override {
       llvm_unreachable("calling emitStoreOfCopy on non-loadable type");
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitStore on non-loadable type");
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitLoad on non-loadable type");
     }
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
@@ -1127,7 +1188,7 @@ namespace {
       return new (TC, Dependent) LoadableEnumTypeLowering(enumType);
     }
   };
-}
+} // end anonymous namespace
 
 TypeConverter::TypeConverter(SILModule &m)
   : M(m), Context(m.getASTContext()) {
@@ -1521,27 +1582,34 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      AbstractFunctionDecl *AFD,
                                                      unsigned DefaultArgIndex,
                                                      ASTContext &context) {
-  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second->getCanonicalType();
+  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second;
   assert(resultTy && "Didn't find default argument?");
-  
+
+  // The result type might be written in terms of type parameters
+  // that have been made fully concrete.
+  CanType canResultTy;
+  if (auto *sig = AFD->getGenericSignature())
+    canResultTy = sig->getCanonicalTypeInContext(resultTy,
+                                                 *TC.M.getSwiftModule());
+  else
+    canResultTy = resultTy->getCanonicalType();
+
   // Get the generic signature from the surrounding context.
   auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
   CanGenericSignature sig;
-  if (auto genTy = funcInfo.FormalInterfaceType->getAs<GenericFunctionType>()) {
+  if (auto genTy = funcInfo.FormalInterfaceType->getAs<GenericFunctionType>())
     sig = genTy->getGenericSignature()->getCanonicalSignature();
-    resultTy = ArchetypeBuilder::mapTypeOutOfContext(
-        TC.M.getSwiftModule(),
-        funcInfo.GenericEnv,
-        resultTy)->getCanonicalType();
+
+  if (sig) {
+    return cast<GenericFunctionType>(
+        GenericFunctionType::get(sig,
+                                 TupleType::getEmpty(context),
+                                 canResultTy,
+                                 AnyFunctionType::ExtInfo())
+            ->getCanonicalType());
   }
   
-  if (sig)
-    return CanGenericFunctionType::get(sig,
-                                       TupleType::getEmpty(context),
-                                       resultTy,
-                                       AnyFunctionType::ExtInfo());
-  
-  return CanFunctionType::get(TupleType::getEmpty(context), resultTy);
+  return CanFunctionType::get(TupleType::getEmpty(context), canResultTy);
 }
 
 /// Get the type of a stored property initializer, () -> T.
@@ -1666,7 +1734,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
 
   // If we don't have any local captures (including function captures),
   // there's no context to apply.
-  if (!theClosure.getCaptureInfo().hasLocalCaptures()) {
+  if (!hasLoweredLocalCaptures(theClosure)) {
     if (!genericSig)
       return CanFunctionType::get(funcType.getInput(),
                                   funcType.getResult(),
@@ -1991,6 +2059,11 @@ getAnyFunctionRefFromCapture(CapturedValue capture) {
   return None;
 }
 
+bool
+TypeConverter::hasLoweredLocalCaptures(AnyFunctionRef fn) {
+  return !getLoweredLocalCaptures(fn).getCaptures().empty();
+}
+
 CaptureInfo
 TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   // First, bail out if there are no local captures at all.
@@ -2292,4 +2365,99 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
   }
 
   return ABIDifference::Trivial;
+}
+
+void canonicalizeSubstitutions(MutableArrayRef<Substitution> subs) {
+  for (auto &sub : subs) {
+    sub = Substitution(sub.getReplacement()->getCanonicalType(),
+                       sub.getConformances());
+  }
+}
+
+CanSILBoxType
+TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
+                                             CanType loweredInterfaceType,
+                                             bool isMutable) {
+  auto &C = M.getASTContext();
+  CanGenericSignature signature;
+  if (auto sig = captured->getDeclContext()->getGenericSignatureOfContext())
+    signature = sig->getCanonicalSignature();
+  
+  // If the type is not dependent at all, we can form a concrete box layout.
+  // We don't need to capture the generic environment.
+  if (!loweredInterfaceType->hasTypeParameter()) {
+    auto layout = SILLayout::get(C, nullptr,
+                                 SILField(loweredInterfaceType, isMutable));
+    return SILBoxType::get(C, layout, {});
+  }
+  
+  // Otherwise, the layout needs to capture the generic environment of its
+  // originating scope.
+  // TODO: We could conceivably minimize the captured generic environment to
+  // only the parts used by the captured variable.
+  
+  auto layout = SILLayout::get(C, signature,
+                               SILField(loweredInterfaceType, isMutable));
+  
+  // Instantiate the layout with identity substitutions.
+  SmallVector<Substitution, 4> genericArgs;
+  signature->getSubstitutions(*M.getSwiftModule(),
+    [&](SubstitutableType* type) -> Type {
+      return signature->getCanonicalTypeInContext(type,
+                                                  *M.getSwiftModule());
+    },
+    [](Type depTy, Type replacementTy, ProtocolType *conformedTy)
+    -> ProtocolConformanceRef {
+      return ProtocolConformanceRef(conformedTy->getDecl());
+    },
+    genericArgs);
+  canonicalizeSubstitutions(genericArgs);
+  
+  auto boxTy = SILBoxType::get(C, layout, genericArgs);
+#ifndef NDEBUG
+  // FIXME: Map the box type out of context when asserting the field so
+  // we don't need to push a GenericContextScope (which really ought to die).
+  auto loweredContextType = loweredInterfaceType;
+  auto contextBoxTy = boxTy;
+  if (signature) {
+    auto env = signature.getGenericEnvironment(*M.getSwiftModule());
+    loweredContextType = env->mapTypeIntoContext(M.getSwiftModule(),
+                                                 loweredContextType)
+                            ->getCanonicalType();
+    contextBoxTy = cast<SILBoxType>(
+      env->mapTypeIntoContext(M.getSwiftModule(), contextBoxTy)
+         ->getCanonicalType());
+  }
+  assert(contextBoxTy->getLayout()->getFields().size() == 1
+         && contextBoxTy->getFieldType(M, 0).getSwiftRValueType()
+             == loweredContextType
+         && "box field type doesn't match capture!");
+#endif
+  return boxTy;
+}
+
+CanSILBoxType
+TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
+                                           CanType loweredContextType,
+                                           GenericEnvironment *env,
+                                           bool isMutable) {
+  CanType loweredInterfaceType = loweredContextType;
+  if (env) {
+    if (auto homeSig = captured->getDeclContext()
+                               ->getGenericSignatureOfContext()) {
+      loweredInterfaceType = homeSig->getCanonicalTypeInContext(
+        env->mapTypeOutOfContext(loweredInterfaceType),
+        *M.getSwiftModule());
+    }
+  }
+  
+  auto boxType = getInterfaceBoxTypeForCapture(captured,
+                                               loweredInterfaceType,
+                                               isMutable);
+  if (env)
+    boxType = cast<SILBoxType>(
+      env->mapTypeIntoContext(M.getSwiftModule(), boxType)
+         ->getCanonicalType());
+  
+  return boxType;
 }

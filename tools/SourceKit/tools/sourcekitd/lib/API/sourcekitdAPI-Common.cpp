@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -120,6 +120,7 @@ UIdent sourcekitd::KeyPopular("key.popular");
 UIdent sourcekitd::KeyUnpopular("key.unpopular");
 UIdent sourcekitd::KeyHide("key.hide");
 UIdent sourcekitd::KeySimplified("key.simplified");
+UIdent sourcekitd::KeyRangeContent("key.rangecontent");
 
 UIdent sourcekitd::KeyIsDeprecated("key.is_deprecated");
 UIdent sourcekitd::KeyIsUnavailable("key.is_unavailable");
@@ -222,7 +223,12 @@ static UIdent *OrderedKeys[] = {
   &KeyIntroduced,
   &KeyDeprecated,
   &KeyObsoleted,
-  &KeyRemoveCache
+  &KeyRemoveCache,
+
+  &KeyTypeInterface,
+  &KeyTypeUsr,
+  &KeyContainerTypeUsr,
+  &KeyModuleGroups,
 };
 
 static unsigned findPrintOrderForDictKey(UIdent Key) {
@@ -800,7 +806,7 @@ private:
     return true;
   }
 };
-} // anonymous namespace.
+} // anonymous namespace
 
 sourcekitd_object_t
 sourcekitd_request_create_from_yaml(const char *yaml, char **error) {

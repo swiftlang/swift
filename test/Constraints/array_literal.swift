@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
@@ -107,7 +107,8 @@ func longArray() {
 
 // <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to _ArrayProtocol
 func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
-  var x: T = [1] // expected-error {{contextual type 'T' cannot be used with array literal}}
+  var x: T = [1] // expected-error {{cannot convert value of type '[Int]' to specified type 'T'}}
+  // expected-warning@-1{{variable 'x' was never used; consider replacing with '_' or removing it}}
 }
 
 func rdar25563498_ok<T : ExpressibleByArrayLiteral>(t: T) -> T
@@ -157,4 +158,18 @@ func joinWithNil(s: String) {
 
   let a4 = [nil, "hello"]
   let _: Int = a4 // expected-error{{value of type '[String?]'}}
+}
+
+struct OptionSetLike : ExpressibleByArrayLiteral {
+  typealias Element = OptionSetLike
+  init() { }
+
+  init(arrayLiteral elements: OptionSetLike...) { }
+
+  static let option: OptionSetLike = OptionSetLike()
+}
+
+func testOptionSetLike(b: Bool) {
+  let _: OptionSetLike = [ b ? [] : OptionSetLike.option, OptionSetLike.option]
+  let _: OptionSetLike = [ b ? [] : .option, .option]
 }

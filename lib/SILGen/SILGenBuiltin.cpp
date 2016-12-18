@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -236,7 +236,7 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &gen,
   
   // Destroy the value indirectly. Canonicalization will promote to loads
   // and releases if appropriate.
-  gen.B.emitDestroyAddrAndFold(loc, addr);
+  gen.B.createDestroyAddr(loc, addr);
   
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
@@ -262,7 +262,8 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
                                                /*isStrict*/ true);
   
   // Build the value to be assigned, reconstructing tuples if needed.
-  RValue src(args.slice(0, args.size() - 1), assignFormalType);
+  auto src = RValue::withPreExplodedElements(args.slice(0, args.size() - 1),
+                                             assignFormalType);
   
   std::move(src).assignInto(gen, loc, addr);
 
@@ -592,8 +593,8 @@ emitBuiltinCastReference(SILGenFunction &gen,
     // a retain. The cast will load the reference from the source temp and
     // store it into a dest temp effectively forwarding the cleanup.
     fromAddr = gen.emitTemporaryAllocation(loc, srcVal->getType());
-    gen.B.createStore(loc, srcVal, fromAddr,
-                      StoreOwnershipQualifier::Unqualified);
+    fromTL.emitStore(gen.B, loc, srcVal, fromAddr,
+                     StoreOwnershipQualifier::Init);
   } else {
     // The cast loads directly from the source address.
     fromAddr = srcVal;
@@ -607,8 +608,7 @@ emitBuiltinCastReference(SILGenFunction &gen,
     return gen.emitManagedBufferWithCleanup(toAddr);
 
   // Load the destination value.
-  auto result =
-      gen.B.createLoad(loc, toAddr, LoadOwnershipQualifier::Unqualified);
+  auto result = toTL.emitLoad(gen.B, loc, toAddr, LoadOwnershipQualifier::Take);
   return gen.emitManagedRValueWithCleanup(result);
 }
 
@@ -632,8 +632,8 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
     // If the from value is loadable, move it to a buffer.
     if (fromTL.isLoadable()) {
       fromAddr = gen.emitTemporaryAllocation(loc, args[0].getValue()->getType());
-      gen.B.createStore(loc, args[0].getValue(), fromAddr,
-                        StoreOwnershipQualifier::Unqualified);
+      fromTL.emitStore(gen.B, loc, args[0].getValue(), fromAddr,
+                       StoreOwnershipQualifier::Init);
     } else {
       fromAddr = args[0].getValue();
     }
@@ -643,9 +643,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
     // Load and retain the destination value if it's loadable. Leave the cleanup
     // on the original value since we don't know anything about it's type.
     if (toTL.isLoadable()) {
-      SILValue val =
-          gen.B.createLoad(loc, toAddr, LoadOwnershipQualifier::Unqualified);
-      return gen.emitManagedRetain(loc, val, toTL);
+      return gen.emitManagedLoadCopy(loc, toAddr, toTL);
     }
     // Leave the cleanup on the original value.
     if (toTL.isTrivial())

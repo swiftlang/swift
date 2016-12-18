@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -252,7 +252,7 @@ SILBasicBlock *SILDeserializer::getBBForDefinition(SILFunction *Fn,
   SILBasicBlock *&BB = BlocksByID[ID];
   // If the block has never been named yet, just create it.
   if (BB == nullptr)
-    return BB = new (SILMod) SILBasicBlock(Fn, Prev);
+    return BB = Fn->createBasicBlock(Prev);
 
   // If it already exists, it was either a forward reference or a redefinition.
   // The latter should never happen.
@@ -273,7 +273,7 @@ SILBasicBlock *SILDeserializer::getBBForReference(SILFunction *Fn,
     return BB;
 
   // Otherwise, create it and remember that this is a forward reference
-  BB = new (SILMod) SILBasicBlock(Fn);
+  BB = Fn->createBasicBlock();
   UndefinedBlocks[BB] = ID;
   return BB;
 }
@@ -492,8 +492,13 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly) {
-    SmallVector<GenericTypeParamType *, 4> genericParamTypes;
-    genericEnv = MF->readGenericEnvironment(genericParamTypes, SILCursor);
+    auto signature = fn->getLoweredFunctionType()->getGenericSignature();
+    genericEnv = MF->readGenericSignatureOrEnvironment(
+                    SILCursor,
+                    /*wantEnvironment=*/true,
+                    signature ? signature->getRequirements()
+                              : ArrayRef<Requirement>())
+                  .get<GenericEnvironment *>();
   }
 
   // If the next entry is the end of the block, then this function has
@@ -624,9 +629,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     if (!ValId) return nullptr;
 
     auto ArgTy = MF->getType(TyID);
-    auto Arg = new (SILMod) SILArgument(CurrentBB,
-                                        getSILType(ArgTy,
-                                                   (SILValueCategory)Args[I+1]));
+    auto Arg = CurrentBB->createArgument(
+        getSILType(ArgTy, (SILValueCategory)Args[I + 1]));
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);
   }
@@ -770,7 +774,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
   SILInstruction *ResultVal;
   switch ((ValueKind)OpCode) {
-  case ValueKind::SILArgument:
+  case ValueKind::SILPHIArgument:
+  case ValueKind::SILFunctionArgument:
   case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
@@ -778,13 +783,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::DebugValueAddrInst:
     llvm_unreachable("not supported");
 
+  case ValueKind::AllocBoxInst:
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultVal = Builder.createAllocBox(Loc,
+                       cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()));
+    break;
+  
 #define ONETYPE_INST(ID)                      \
   case ValueKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");         \
     ResultVal = Builder.create##ID(Loc,                                        \
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
     break;
-  ONETYPE_INST(AllocBox)
   ONETYPE_INST(AllocStack)
   ONETYPE_INST(Metatype)
 #undef ONETYPE_INST
@@ -798,7 +808,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(MF->getType(TyID2),                             \
                                (SILValueCategory)TyCategory2)));               \
     break;
-  ONETYPE_ONEOPERAND_INST(DeallocBox)
   ONETYPE_ONEOPERAND_INST(ValueMetatype)
   ONETYPE_ONEOPERAND_INST(ExistentialMetatype)
   ONETYPE_ONEOPERAND_INST(AllocValueBuffer)
@@ -806,6 +815,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONETYPE_ONEOPERAND_INST(ProjectExistentialBox)
   ONETYPE_ONEOPERAND_INST(DeallocValueBuffer)
 #undef ONETYPE_ONEOPERAND_INST
+  case ValueKind::DeallocBoxInst:
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultVal = Builder.createDeallocBox(Loc,
+                  getLocalValue(ValID,
+                    getSILType(MF->getType(TyID2),
+                               (SILValueCategory)TyCategory2)));
+    break;
+
 #define ONEOPERAND_ONETYPE_INST(ID)           \
   case ValueKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&       \
@@ -1064,8 +1082,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     
     auto SubstFnTy = SILType::getPrimitiveObjectType(
       FnTy.castTo<SILFunctionType>()
-        ->substGenericArgs(Builder.getModule(),
-                         Builder.getModule().getSwiftModule(), Substitutions));
+        ->substGenericArgs(Builder.getModule(), Substitutions));
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
     auto ArgTys = FTI->getParameterSILTypes();
 
@@ -1286,6 +1303,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(CondFail)
   REFCOUNTING_INSTRUCTION(RetainValue)
   UNARY_INSTRUCTION(CopyValue)
+  UNARY_INSTRUCTION(CopyUnownedValue)
   UNARY_INSTRUCTION(DestroyValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
   REFCOUNTING_INSTRUCTION(AutoreleaseValue)
@@ -1298,6 +1316,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(CopyBlock)
   UNARY_INSTRUCTION(LoadBorrow)
+  UNARY_INSTRUCTION(BeginBorrow)
   REFCOUNTING_INSTRUCTION(StrongPin)
   REFCOUNTING_INSTRUCTION(StrongUnpin)
   REFCOUNTING_INSTRUCTION(StrongRetain)
@@ -1351,6 +1370,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Qualifier = StoreOwnershipQualifier(Attr);
     ResultVal = Builder.createStore(Loc, getLocalValue(ValID, ValType),
                                     getLocalValue(ValID2, addrType), Qualifier);
+    break;
+  }
+  case ValueKind::StoreBorrowInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
+    SILType ValType = addrType.getObjectType();
+    ResultVal = Builder.createStoreBorrow(Loc, getLocalValue(ValID, ValType),
+                                          getLocalValue(ValID2, addrType));
     break;
   }
   case ValueKind::EndBorrowInst: {
@@ -2010,6 +2037,10 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   if (!GlobalVarList)
     return nullptr;
 
+  // If we already deserialized this global variable, just return it.
+  if (auto *GV = SILMod.lookUpGlobalVariable(Name))
+    return GV;
+
   // Find Id for the given name.
   auto iter = GlobalVarList->find(Name);
   if (iter == GlobalVarList->end())
@@ -2066,6 +2097,15 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), v);
   return v;
+}
+
+void SILDeserializer::getAllSILGlobalVariables() {
+  if (!GlobalVarList)
+    return;
+
+  for (auto Key : GlobalVarList->keys()) {
+    readGlobalVar(Key);
+  }
 }
 
 void SILDeserializer::getAllSILFunctions() {
@@ -2135,6 +2175,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   std::vector<SILVTable::Pair> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
   while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
+         kind != SIL_DEFAULT_WITNESS_TABLE &&
          kind != SIL_FUNCTION) {
     assert(kind == SIL_VTABLE_ENTRY &&
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");

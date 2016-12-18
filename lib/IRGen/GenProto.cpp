@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -200,32 +200,18 @@ void PolymorphicConvention::addPseudogenericFulfillments() {
 void PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback) {
   if (!Generics) return;
 
-  // Make a first pass to get all the type metadata.
-  for (auto &reqt : Generics->getRequirements()) {
-    switch (reqt.getKind()) {
-        // Ignore these; they don't introduce extra requirements.
-      case RequirementKind::Superclass:
-      case RequirementKind::SameType:
-      case RequirementKind::Conformance:
-        continue;
-
-      case RequirementKind::WitnessMarker: {
-        CanType type = CanType(reqt.getFirstType());
-        if (isa<GenericTypeParamType>(type))
-          callback({type, nullptr});
-        continue;
-      }
-    }
-    llvm_unreachable("bad requirement kind");
+  // Get all of the type metadata.
+  for (auto gp : Generics.getGenericParams()) {
+    if (Generics->getCanonicalTypeInContext(gp, M) == gp)
+      callback({gp, nullptr});
   }
 
-  // Make a second pass for all the protocol conformances.
+  // Get the protocol conformances.
   for (auto &reqt : Generics->getRequirements()) {
     switch (reqt.getKind()) {
-        // Ignore these; they don't introduce extra requirements.
+      // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
-      case RequirementKind::WitnessMarker:
         continue;
 
       case RequirementKind::Conformance: {
@@ -935,7 +921,7 @@ static bool isDependentConformance(IRGenModule &IGM,
 
 /// Detail about how an object conforms to a protocol.
 class irgen::ConformanceInfo {
-  friend class ProtocolInfo;
+  friend ProtocolInfo;
 public:
   virtual ~ConformanceInfo() {}
   virtual llvm::Value *getTable(IRGenFunction &IGF,
@@ -1009,7 +995,7 @@ namespace {
 
 /// Conformance info for a witness table that can be directly generated.
 class DirectConformanceInfo : public ConformanceInfo {
-  friend class ProtocolInfo;
+  friend ProtocolInfo;
 
   const NormalProtocolConformance *RootConformance;
 public:
@@ -1029,7 +1015,7 @@ public:
 
 /// Conformance info for a witness table that is (or may be) dependent.
 class AccessorConformanceInfo : public ConformanceInfo {
-  friend class ProtocolInfo;
+  friend ProtocolInfo;
 
   const NormalProtocolConformance *Conformance;
 public:
@@ -1298,7 +1284,7 @@ public:
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Build the witness table.
 void WitnessTableBuilder::build() {
@@ -1829,6 +1815,8 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
     // Always carries polymorphic parameters for the Self type.
     return true;
   }
+
+  llvm_unreachable("Not a valid SILFunctionTypeRepresentation.");
 }
 
 static
@@ -2427,7 +2415,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
@@ -2780,7 +2768,7 @@ namespace {
       llvm_unreachable("bad source kind");
     }
   };
-}
+} // end anonymous namespace
 
 /// Given a generic signature, add the argument types required in order to call it.
 void irgen::expandPolymorphicSignature(IRGenModule &IGM,

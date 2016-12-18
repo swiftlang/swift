@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-stdlib -module-name Swift
+// RUN: %target-typecheck-verify-swift -parse-stdlib -module-name Swift
 
 enum Optional<T> {
   case none

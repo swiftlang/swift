@@ -98,7 +98,7 @@ struct StructWithMutatingMethod {
 // CHECK: }
 
 // CHECK-LABEL: sil hidden @_TFV26inout_deshadow_integration24StructWithMutatingMethod28testStandardLibraryOperators{{.*}} : $@convention(method) (@inout StructWithMutatingMethod) -> () {
-// CHECK-NOT: alloc_box $StructWithMutatingMethod
+// CHECK-NOT: alloc_box $<τ_0_0> { var τ_0_0 } <StructWithMutatingMethod>
 // CHECK-NOT: alloc_stack $StructWithMutatingMethod
 // CHECK: }
 

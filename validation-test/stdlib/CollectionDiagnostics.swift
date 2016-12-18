@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -65,9 +65,8 @@ struct GoodIndexable : Indexable {
 }
 
 
-// expected-warning@+3 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
-// expected-error@+2 {{type 'BadIndexable1' does not conform to protocol '_IndexableBase'}}
-// expected-error@+1 {{type 'BadIndexable1' does not conform to protocol '_Indexable'}}
+// expected-warning@+2 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
+// expected-error@+1 {{type 'BadIndexable1' does not conform to protocol '_IndexableBase'}}
 struct BadIndexable1 : Indexable {
   func index(after i: Int) -> Int { return i + 1 }
   var startIndex: Int { return 0 }

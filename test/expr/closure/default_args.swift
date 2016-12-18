@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func simple_default_args() {
   // <rdar://problem/22753605> QoI: bad diagnostic when closure has default argument

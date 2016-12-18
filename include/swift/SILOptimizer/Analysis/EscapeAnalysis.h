@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -299,6 +299,8 @@ public:
         case EscapeState::Global:
           return true;
       }
+
+      llvm_unreachable("Unhandled EscapeState in switch.");
     }
 
     /// Returns the content node if of this node if it exists in the graph.
@@ -695,14 +697,14 @@ private:
   void buildConnectionGraph(FunctionInfo *FInfo, FunctionOrder &BottomUpOrder,
                             int RecursionDepth);
 
-  /// Updates the graph by analysing instruction \p I.
+  /// Updates the graph by analyzing instruction \p I.
   /// Visited callees are added to \p BottomUpOrder until \p RecursionDepth
   /// reaches MaxRecursionDepth.
   void analyzeInstruction(SILInstruction *I, FunctionInfo *FInfo,
                           FunctionOrder &BottomUpOrder,
                           int RecursionDepth);
 
-  /// Updates the graph by analysing instruction \p SI, which may be a
+  /// Updates the graph by analyzing instruction \p SI, which may be a
   /// select_enum, select_enum_addr or select_value.
   template<class SelectInst>
   void analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph);

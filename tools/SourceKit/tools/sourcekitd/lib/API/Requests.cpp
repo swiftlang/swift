@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,6 +25,8 @@
 #include "SourceKit/SwiftLang/Factory.h"
 
 #include "swift/Basic/DemangleWrappers.h"
+#include "swift/Basic/ManglingMacros.h"
+#include "swift/Basic/Mangler.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -58,7 +60,7 @@ public:
     return get();
   }
 };
-} // anonymous namespace.
+} // anonymous namespace
 
 static LazySKDUID RequestProtocolVersion("source.request.protocol_version");
 
@@ -81,6 +83,7 @@ static LazySKDUID RequestCodeCompleteSetPopularAPI(
 static LazySKDUID
     RequestCodeCompleteSetCustom("source.request.codecomplete.setcustom");
 static LazySKDUID RequestCursorInfo("source.request.cursorinfo");
+static LazySKDUID RequestRangeInfo("source.request.rangeinfo");
 static LazySKDUID RequestRelatedIdents("source.request.relatedidents");
 static LazySKDUID RequestEditorOpen("source.request.editor.open");
 static LazySKDUID RequestEditorOpenInterface(
@@ -166,6 +169,8 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
                                            ArrayRef<const char *> Args);
 
 static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec);
+
+static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec);
 
 static void findRelatedIdents(StringRef Filename,
                               int64_t Offset,
@@ -737,6 +742,21 @@ handleSemanticRequest(RequestDict Req,
         "either 'key.offset' or 'key.usr' is required"));
   }
 
+  if (ReqUID == RequestRangeInfo) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    int64_t Offset;
+    int64_t Length;
+    if (!Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
+      if (!Req.getInt64(KeyLength, Length, /*isOptional=*/false)) {
+        return Lang.getRangeInfo(*SourceFile, Offset, Length, Args,
+          [Rec](const RangeInfo &Info) { reportRangeInfo(Info, Rec); });
+      }
+    }
+
+    return Rec(createErrorRequestInvalid(
+      "'key.offset' or 'key.length' is required"));
+  }
+
   if (ReqUID == RequestRelatedIdents) {
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
@@ -1027,7 +1047,8 @@ public:
 static bool isSwiftPrefixed(StringRef MangledName) {
   if (MangledName.size() < 2)
     return false;
-  return (MangledName[0] == '_' && MangledName[1] == 'T');
+  return MangledName[0] == '_' &&
+         (MangledName[1] == 'T' || MangledName[1] == MANGLING_PREFIX_STR[1]);
 }
 
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
@@ -1077,7 +1098,7 @@ static std::string mangleSimpleClass(StringRef moduleName,
   typeNode->addChild(classNode);
   typeManglingNode->addChild(typeNode);
   globalNode->addChild(typeManglingNode);
-  return mangleNode(globalNode);
+  return mangleNode(globalNode, swift::NewMangling::useNewMangling());
 }
 
 static sourcekitd_response_t
@@ -1348,6 +1369,21 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
     Elem.set(KeyContainerTypeUsr, Info.ContainerTypeUSR);
 
   return Rec(RespBuilder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportRangeInfo
+//===----------------------------------------------------------------------===//
+
+static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec) {
+  if (Info.IsCancelled)
+    return Rec(createErrorRequestCancelled());
+  ResponseBuilder RespBuilder;
+  auto Elem = RespBuilder.getDictionary();
+  Elem.set(KeyKind, Info.RangeKind);
+  Elem.set(KeyTypeName, Info.ExprType);
+  Elem.set(KeyRangeContent, Info.RangeContent);
+  Rec(RespBuilder.createResponse());
 }
 
 //===----------------------------------------------------------------------===//

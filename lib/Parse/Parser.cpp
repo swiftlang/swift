@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -41,7 +41,7 @@ namespace {
     Parser &P;
   public:
     PrettyStackTraceParser(Parser &P) : P(P) {}
-    void print(llvm::raw_ostream &out) const {
+    void print(llvm::raw_ostream &out) const override {
       out << "With parser at source location: ";
       P.Tok.getLoc().print(out, P.Context.SourceMgr);
       out << '\n';
@@ -92,6 +92,11 @@ private:
     }
     if (!Parsed && ParserState.hasFunctionBodyState(AFD))
       TheParser.parseAbstractFunctionBodyDelayed(AFD);
+
+    SmallVector<Decl *, 2> scratch;
+    performDelayedConditionResolution(AFD, SF, scratch);
+    assert(scratch.empty());
+
     if (CodeCompletion)
       CodeCompletion->doneParsing();
   }
@@ -170,7 +175,7 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
                                 int BufID, std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
   SmallVector<Lexer::StringSegment, 4> Segments;
-  Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
+  Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
   for (unsigned i = 0, e = Segments.size(); i != e; ++i) {
     Lexer::StringSegment &Seg = Segments[i];
     bool isFirst = i == 0;
@@ -364,7 +369,8 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
 
   // ... or a multi-character token with the first character being the one that
   // we want to consume as a separate token.
-  restoreParserPosition(getParserPositionAfterFirstCharacter(Tok));
+  restoreParserPosition(getParserPositionAfterFirstCharacter(Tok),
+                        /*enableDiagnostics=*/true);
   return PreviousLoc;
 }
 
@@ -554,18 +560,23 @@ Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
                              const Diagnostic &D) {
   switch (Tok.getKind()) {
+  case tok::kw_throws:
   case tok::kw_rethrows:
+    if (!Context.isSwiftVersion3())
+      break;
+    // Swift3 accepts 'throws' and 'rethrows'
+    SWIFT_FALLTHROUGH;
   case tok::kw_self:
   case tok::kw_Self:
-  case tok::kw_throws:
   case tok::identifier:
     Loc = consumeIdentifier(&Result);
     return false;
   default:
-    checkForInputIncomplete();
-    diagnose(Tok, D);
-    return true;
+    break;
   }
+  checkForInputIncomplete();
+  diagnose(Tok, D);
+  return true;
 }
 
 bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
@@ -797,25 +808,6 @@ const LangOptions &ParserUnit::getLangOptions() const {
 
 SourceFile &ParserUnit::getSourceFile() {
   return *Impl.SF;
-}
-
-ConditionalCompilationExprState
-swift::operator&&(ConditionalCompilationExprState lhs,
-                  ConditionalCompilationExprState rhs) {
-  return {lhs.isConditionActive() && rhs.isConditionActive(),
-          ConditionalCompilationExprKind::Binary};
-}
-
-ConditionalCompilationExprState
-swift::operator||(ConditionalCompilationExprState lhs,
-                  ConditionalCompilationExprState rhs) {
-  return {lhs.isConditionActive() || rhs.isConditionActive(),
-          ConditionalCompilationExprKind::Binary};
-}
-
-ConditionalCompilationExprState
-swift::operator!(ConditionalCompilationExprState state) {
-  return {!state.isConditionActive(), state.getKind()};
 }
 
 ParsedDeclName swift::parseDeclName(StringRef name) {

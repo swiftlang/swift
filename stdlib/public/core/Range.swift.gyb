@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -517,21 +517,84 @@ extension ${Self} : CustomReflectable {
 }
 
 extension ${Self} : Equatable {
+  /// Returns a Boolean value indicating whether two ranges are equal.
+  ///
+  /// Two ranges are equal when they have the same lower and upper bounds.
+% if 'Closed' in Self:
+  ///
+  ///     let x: ${Self} = 5...15
+  ///     print(x == 5...15)
+  ///     // Prints "true"
+  ///     print(x == 10...20)
+  ///     // Prints "false"
+% else:
+  /// That requirement holds even for empty ranges.
+  ///
+  ///     let x: ${Self} = 5..<15
+  ///     print(x == 5..<15)
+  ///     // Prints "true"
+  ///
+  ///     let y: ${Self} = 5..<5
+  ///     print(y == 15..<15)
+  ///     // Prints "false"
+% end
+  ///
+  /// - Parameters:
+  ///   - lhs: A range to compare.
+  ///   - rhs: Another range to compare.
   public static func == (lhs: ${Self}<Bound>, rhs: ${Self}<Bound>) -> Bool {
     return
       lhs.lowerBound == rhs.lowerBound &&
       lhs.upperBound == rhs.upperBound
   }
 
+  /// Returns a Boolean value indicating whether a value is included in a
+  /// range.
+  ///
+  /// You can use this pattern matching operator (`~=`) to test whether a value
+  /// is included in a range. The following example uses the `~=` operator to
+  /// test whether an integer is included in a range of single-digit numbers.
+  ///
+  ///     let chosenNumber = 3
+% if 'Closed' in Self:
+  ///     if 0...9 ~= chosenNumber {
+% else:
+  ///     if 0..<10 ~= chosenNumber {
+% end
+  ///         print("\(chosenNumber) is a single digit.")
+  ///     }
+  ///     // Prints "3 is a single digit."
+  ///
+  /// The `~=` operator is used internally in `case` statements for pattern
+  /// matching. When you match against a range in a `case` statement, this
+  /// operator is called behind the scenes.
+  ///
+  ///     switch chosenNumber {
+% if 'Closed' in Self:
+  ///     case 0...9:
+% else:
+  ///     case 0..<10:
+% end
+  ///         print("\(chosenNumber) is a single digit.")
+  ///     case Int.min..<0:
+  ///         print("\(chosenNumber) is negative.")
+  ///     default:
+  ///         print("\(chosenNumber) is positive.")
+  ///     }
+  ///     // Prints "3 is a single digit."
+  ///
+  /// - Parameters:
+  ///   - lhs: A range.
+  ///   - rhs: A value to match against `lhs`.
   public static func ~= (pattern: ${Self}<Bound>, value: Bound) -> Bool {
     return pattern.contains(value)
   }
 }
 % end
 
-% for (Self, CountableSelf) in [
-%   ('Range', 'CountableRange'),
-%   ('ClosedRange', 'CountableClosedRange'),
+% for Self in [
+%   'Range',
+%   'ClosedRange',
 % ]:
 // FIXME(ABI)#57 (Conditional Conformance): replace this extension with a conditional
 // conformance.

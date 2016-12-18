@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 let _ = 1 // expected-error{{global variable declaration does not bind any variables}}
 

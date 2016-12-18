@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Tests and samples.
@@ -113,9 +113,9 @@ func funcdecl7(_ a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 }
 
 // Error recovery.
-func testfunc2 (_: (((), Int)) -> Int) -> Int {}
+func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
-  testfunc2({ $0 + 1 }) // expected-error {{binary operator '+' cannot be applied to operands of type '((), Int)' and 'Int'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  testfunc2({ $0 + 1 }) // expected-error {{contextual closure type '((), Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
 
   enum union1 {
     case bar
@@ -456,7 +456,7 @@ func stringliterals(_ d: [String: Int]) {
     "something else")"
   // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}}
 
-  // expected-warning @+2 {{initialization of variable 'x2' was never used; consider replacing with assignment to '_' or removing it}}
+  // expected-warning @+2 {{variable 'x2' was never used; consider replacing with '_' or removing it}}
   // expected-error @+1 {{unterminated string literal}}
   var x2 : () = ("hello" + "
   ;

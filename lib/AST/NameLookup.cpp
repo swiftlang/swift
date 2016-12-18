@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -156,11 +156,13 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     CanType signature;
 
     // FIXME: Egregious hack to avoid failing when there are no declared types.
-    if (!decl->hasType() || isa<TypeAliasDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) {
+    if (!decl->hasInterfaceType() ||
+        isa<TypeAliasDecl>(decl) ||
+        isa<AbstractTypeParamDecl>(decl)) {
       // FIXME: Pass this down instead of getting it from the ASTContext.
       if (typeResolver && !decl->isBeingTypeChecked())
         typeResolver->resolveDeclSignature(decl);
-      if (!decl->hasType())
+      if (!decl->hasInterfaceType())
         continue;
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
         if (!assocType->getProtocol()->isValidGenericContext())
@@ -173,7 +175,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     if (decl->isBeingTypeChecked())
       continue;
 
-    signature = decl->getType()->getCanonicalType();
+    signature = decl->getInterfaceType()->getCanonicalType();
 
     // FIXME: The type of a variable or subscript doesn't include
     // enough context to distinguish entities from different
@@ -195,7 +197,8 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     if (decl->hasClangNode()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
         auto ctorSignature
-          = std::make_pair(ctor->getExtensionType()->getCanonicalType(),
+          = std::make_pair(ctor->getDeclContext()->getDeclaredInterfaceType()
+                               ->getCanonicalType(),
                            decl->getFullName());
         auto &knownCtors = ObjCCollidingConstructors[ctorSignature];
         if (!knownCtors.empty())
@@ -334,7 +337,7 @@ enum class DiscriminatorMatch {
   Matches,
   Different
 };
-}
+} // end anonymous namespace
 
 static DiscriminatorMatch matchDiscriminator(Identifier discriminator,
                                              const ValueDecl *value) {
@@ -681,8 +684,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       // scope, and if so, whether this is a reference to one of them.
       // FIXME: We should persist this information between lookups.
       while (!DC->isModuleScopeContext()) {
-        ValueDecl *BaseDecl = 0;
-        ValueDecl *MetaBaseDecl = 0;
+        ValueDecl *BaseDecl = nullptr;
+        ValueDecl *MetaBaseDecl = nullptr;
         GenericParamList *GenericParams = nullptr;
         Type ExtendedType;
         bool isTypeLookup = false;
@@ -720,18 +723,17 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (!isCascadingUse.hasValue() || isCascadingUse.getValue())
             isCascadingUse = AFD->isCascadingContextForLookup(false);
 
-          if (AFD->getExtensionType()) {
-            if (AFD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
-              ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
+          if (AFD->getDeclContext()->isTypeContext()) {
+            ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
+            // FIXME: Hack to deal with missing 'Self' archetypes.
+            if (!ExtendedType)
+              if (auto *PD = AFD->getDeclContext()
+                      ->getAsProtocolOrProtocolExtensionContext())
+                ExtendedType = PD->getDeclaredType();
 
-              // Fallback path.
-              if (!ExtendedType)
-                ExtendedType = AFD->getExtensionType();
-            } else {
-              ExtendedType = AFD->getExtensionType();
-            }
             BaseDecl = AFD->getImplicitSelfDecl();
-            MetaBaseDecl = AFD->getExtensionType()->getAnyNominal();
+            MetaBaseDecl = AFD->getDeclContext()
+                ->getAsNominalTypeOrNominalTypeExtensionContext();
             DC = DC->getParent();
 
             if (auto *FD = dyn_cast<FuncDecl>(AFD))
@@ -785,7 +787,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           DC = I->getParent()->getParent();
           continue;
         } else {
-          assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC));
+          assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC) ||
+                 isa<TypeAliasDecl>(DC));
           if (!isCascadingUse.hasValue())
             isCascadingUse = DC->isCascadingContextForLookup(false);
         }
@@ -873,12 +876,17 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           else if (auto ext = dyn_cast<ExtensionDecl>(DC))
             dcGenericParams = ext->getGenericParams();
 
-          if (dcGenericParams) {
+          while (dcGenericParams) {
             namelookup::FindLocalVal localVal(SM, Loc, Consumer);
             localVal.checkGenericParams(dcGenericParams);
 
             if (!Results.empty())
               return;
+
+            if (!isa<ExtensionDecl>(DC))
+              break;
+
+            dcGenericParams = dcGenericParams->getOuterParameters();
           }
         }
 
@@ -1046,7 +1054,7 @@ namespace {
     /// The set of methods with the given selector.
     llvm::TinyPtrVector<AbstractFunctionDecl *> Methods;
   };
-}
+} // end anonymous namespace
 
 /// Class member lookup table, which is a member lookup table with a second
 /// table for lookup based on Objective-C selector.
@@ -1559,7 +1567,7 @@ bool DeclContext::lookupQualified(Type type,
       if (typeResolver && !decl->isBeingTypeChecked()) {
         typeResolver->resolveDeclSignature(decl);
 
-        if (!decl->hasType())
+        if (!decl->hasInterfaceType())
           continue;
       }
 
@@ -1629,7 +1637,7 @@ bool DeclContext::lookupQualified(Type type,
 
       if (typeResolver && !decl->isBeingTypeChecked()) {
         typeResolver->resolveDeclSignature(decl);
-        if (!decl->hasType())
+        if (!decl->hasInterfaceType())
           continue;
       }
 

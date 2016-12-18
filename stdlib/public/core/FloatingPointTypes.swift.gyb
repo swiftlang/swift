@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -668,6 +668,7 @@ extension ${Self}: BinaryFloatingPoint {
   public var significandWidth: Int {
     let trailingZeros = significandBitPattern.countTrailingZeros
     if isNormal {
+      guard significandBitPattern != 0 else { return 0 }
       return ${Self}.significandBitCount - trailingZeros
     }
     if isSubnormal {
@@ -695,8 +696,8 @@ extension ${Self}: BinaryFloatingPoint {
   }
 }
 
-@_transparent
 extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral {
+  @_transparent
   public
   init(_builtinIntegerLiteral value: Builtin.Int${builtinIntLiteralBits}){
     self = ${Self}(_bits: Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
@@ -715,6 +716,7 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
   ///     // x == 100.0
   ///
   /// - Parameter value: The new value.
+  @_transparent
   public init(integerLiteral value: Int64) {
     self = ${Self}(_bits: Builtin.sitofp_Int64_FPIEEE${bits}(value._value))
   }
@@ -723,8 +725,8 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 
 % builtinFloatLiteralBits = 80
-@_transparent
 extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
+  @_transparent
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
@@ -741,8 +743,8 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
 #else
 
 % builtinFloatLiteralBits = 64
-@_transparent
 extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
+  @_transparent
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
@@ -830,12 +832,12 @@ public prefix func - (x: ${Self}) -> ${Self} {
 //===----------------------------------------------------------------------===//
 
 // Construction from integers.
-@_transparent
 extension ${Self} {
 % for (srcBits, srcSigned) in allInts():
 %    That = intName(srcBits, srcSigned)
 %    ThatBuiltinName = builtinIntName(srcBits)
 %    sign = 's' if srcSigned else 'u'
+  @_transparent
   public init(_ v: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
@@ -843,7 +845,6 @@ extension ${Self} {
 }
 
 // Construction from other floating point numbers.
-@_transparent
 extension ${Self} {
 % for src_type in all_floating_point_types():
 %   srcBits = src_type.bits
@@ -972,7 +973,6 @@ public func /= (lhs: inout ${Self}, rhs: ${Self}) {
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
 
-@_transparent
 extension ${Self} : Strideable {
   /// Returns the distance from this value to the specified value.
   ///
@@ -1057,9 +1057,10 @@ public postfix func -- (lhs: inout ${Self}) -> ${Self} {
 }
 
 extension ${Self} {
-  @available(*, unavailable, message: "Please use the `abs(_:)` free function")
+  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
+  @_transparent
   public static func abs(_ x: ${Self}) -> ${Self} {
-    fatalError("unavailable")
+    return x.magnitude
   }
 }
 

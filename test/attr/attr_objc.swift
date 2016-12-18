@@ -1,6 +1,6 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: not %target-swift-frontend -parse -dump-ast -disable-objc-attr-requires-foundation-module %s 2> %t.dump
+// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s 2> %t.dump
 // RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.dump
 // REQUIRES: objc_interop
 
@@ -383,22 +383,22 @@ func genericContext1<T>(_: T) {
 
 class GenericContext2<T> {
   @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{3-9=}}
-  class subject_inGenericContext {} // expected-error{{nested in generic type}}
+  class subject_inGenericContext {}
 
   @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{3-9=}}
-  class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{nested in generic type}}
+  class subject_inGenericContext2 : Class_ObjC1 {}
 
   @objc
   func f() {} // no-error
 }
 
 class GenericContext3<T> {
-  class MoreNested { // expected-error{{nested in generic type}}
+  class MoreNested {
     @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{5-11=}}
-    class subject_inGenericContext {} // expected-error{{nested in generic type}}
+    class subject_inGenericContext {}
 
     @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{5-11=}}
-    class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{nested in generic type}}
+    class subject_inGenericContext2 : Class_ObjC1 {}
 
     @objc
     func f() {} // no-error

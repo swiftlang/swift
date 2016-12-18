@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -125,7 +125,9 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
                       SkipBodies ? &delayCallbacks : nullptr);
   assert(done && "Parser returned early?");
   (void)done;
-  
+
+  performConditionResolution(*importFile);
+
   if (SkipBodies)
     performDelayedParsing(importMod, persistentState, nullptr);
 
@@ -134,9 +136,8 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   if (SkipBodies)
     performNameBinding(*importFile);
   else
-    performTypeChecking(*importFile, persistentState.getTopLevelContext(), 
+    performTypeChecking(*importFile, persistentState.getTopLevelContext(),
                         None);
-
   return importMod;
 }
 

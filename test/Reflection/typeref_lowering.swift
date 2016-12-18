@@ -1,3 +1,4 @@
+// REQUIRES: rdar://29605167
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/libTypesToReflect.%target-dylib-extension
 // RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension -binary-filename %platform-module-dir/libswiftCore.%target-dylib-extension -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
@@ -913,11 +914,11 @@ V12TypeLowering10EnumStruct
 // CHECK-64: (struct TypeLowering.EnumStruct)
 // CHECK-64-NEXT: (struct size=81 alignment=8 stride=88 num_extra_inhabitants=0
 // CHECK-64-NEXT:   (field name=empty offset=0
-// CHECK-64-NEXT:     (no_payload_enum size=0 alignment=0 stride=1 num_extra_inhabitants=0))
+// CHECK-64-NEXT:     (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0))
 // CHECK-64-NEXT:   (field name=noPayload offset=0
-// CHECK-64-NEXT:     (no_payload_enum size=1 alignment=0 stride=1 num_extra_inhabitants=0))
-// CHECK-64-NEXT:   (field name=sillyNoPayload offset=0
-// CHECK-64-NEXT:     (no_payload_enum size=1 alignment=0 stride=1 num_extra_inhabitants=0))
+// CHECK-64-NEXT:     (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0))
+// CHECK-64-NEXT:   (field name=sillyNoPayload offset=1
+// CHECK-64-NEXT:     (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0))
 // CHECK-64-NEXT:   (field name=singleton offset=8
 // CHECK-64-NEXT:     (reference kind=strong refcounting=native))
 // CHECK-64-NEXT:   (field name=singlePayload offset=16

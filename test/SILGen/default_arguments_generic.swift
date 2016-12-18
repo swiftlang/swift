@@ -14,17 +14,17 @@ struct Zim<T: ExpressibleByIntegerLiteral> {
 // CHECK-LABEL: sil hidden @_TF25default_arguments_generic3barFT_T_ : $@convention(thin) () -> () {
 func bar() {
   // CHECK: [[FOO_DFLT:%.*]] = function_ref @_TIF25default_arguments_generic3foo
-  // CHECK: apply [[FOO_DFLT]]<Int, Int>
+  // CHECK: apply [[FOO_DFLT]]<Int>
   foo(Int.self)
   // CHECK: [[ZIM_DFLT:%.*]] = function_ref @_TIZFV25default_arguments_generic3Zim3zim
-  // CHECK: apply [[ZIM_DFLT]]<Int, Int>
+  // CHECK: apply [[ZIM_DFLT]]<Int>
   Zim<Int>.zim()
   // CHECK: [[ZANG_DFLT_0:%.*]] = function_ref @_TIZFV25default_arguments_generic3Zim4zang
-  // CHECK: apply [[ZANG_DFLT_0]]<Int, Double, Int, Double>
+  // CHECK: apply [[ZANG_DFLT_0]]<Int, Double>
   // CHECK: [[ZANG_DFLT_1:%.*]] = function_ref @_TIZFV25default_arguments_generic3Zim4zang
-  // CHECK: apply [[ZANG_DFLT_1]]<Int, Double, Int, Double>
+  // CHECK: apply [[ZANG_DFLT_1]]<Int, Double>
   Zim<Int>.zang(Double.self)
   // CHECK: [[ZANG_DFLT_1:%.*]] = function_ref @_TIZFV25default_arguments_generic3Zim4zang
-  // CHECK: apply [[ZANG_DFLT_1]]<Int, Double, Int, Double>
+  // CHECK: apply [[ZANG_DFLT_1]]<Int, Double>
   Zim<Int>.zang(Double.self, 22)
 }

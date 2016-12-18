@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -152,7 +152,7 @@ void SILFunction::numberValues(llvm::DenseMap<const ValueBase*,
                                unsigned> &ValueToNumberMap) const {
   unsigned idx = 0;
   for (auto &BB : *this) {
-    for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
+    for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I)
       ValueToNumberMap[*I] = idx++;
     
     for (auto &I : BB)
@@ -267,15 +267,17 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
     type);
 }
 
-SILType ArchetypeBuilder::substDependentType(SILModule &M, SILType type) {
+SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
+                                               SILType type) const {
   return doSubstDependentSILType(M,
-    [&](CanType t) { return substDependentType(t)->getCanonicalType(); },
+    [&](CanType t) {
+      return mapTypeIntoContext(M.getSwiftModule(), t)->getCanonicalType();
+    },
     type);
 }
 
 Type SILFunction::mapTypeOutOfContext(Type type) const {
-  return ArchetypeBuilder::mapTypeOutOfContext(getModule().getSwiftModule(),
-                                               getGenericEnvironment(),
+  return ArchetypeBuilder::mapTypeOutOfContext(getGenericEnvironment(),
                                                type);
 }
 
@@ -286,6 +288,10 @@ bool SILFunction::isNoReturnFunction() const {
 
 SILBasicBlock *SILFunction::createBasicBlock() {
   return new (getModule()) SILBasicBlock(this);
+}
+
+SILBasicBlock *SILFunction::createBasicBlock(SILBasicBlock *AfterBlock) {
+  return new (getModule()) SILBasicBlock(this, AfterBlock);
 }
 
 //===----------------------------------------------------------------------===//
@@ -460,7 +466,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
     return "";
   }
 };
-} // end llvm namespace
+} // namespace llvm
 #endif
 
 #ifndef NDEBUG
@@ -547,9 +553,8 @@ ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
   if (!env)
     return {};
 
-  auto sig = getLoweredFunctionType()->getGenericSignature();
   auto *M = getModule().getSwiftModule();
-  ForwardingSubs = env->getForwardingSubstitutions(M, sig);
+  ForwardingSubs = env->getForwardingSubstitutions(M);
 
   return *ForwardingSubs;
 }

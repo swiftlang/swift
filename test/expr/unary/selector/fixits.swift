@@ -12,16 +12,16 @@
 // FIXME: END -enable-source-import hackaround
 
 // Make sure we get the right diagnostics.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %s -verify
 
 // Copy the source, apply the Fix-Its, and compile it again, making
 // sure that we've cleaned up all of the deprecation warnings.
 // RUN: mkdir -p %t.sources
 // RUN: mkdir -p %t.remapping
 // RUN: cp %s %t.sources/fixits.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -parse %t.sources/fixits.swift -fixit-all -emit-fixits-path %t.remapping/fixits.remap
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift -fixit-all -emit-fixits-path %t.remapping/fixits.remap
 // RUN: %utils/apply-fixit-edits.py %t.remapping
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -parse %t.sources/fixits.swift 2> %t.result
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift 2> %t.result
 
 // RUN: %FileCheck %s < %t.result
 // RUN: grep -c "warning:" %t.result | grep 3

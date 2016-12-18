@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol P1 {
   subscript (i: Int) -> Int { get } // expected-note{{protocol requires subscript with type '(Int) -> Int'}}

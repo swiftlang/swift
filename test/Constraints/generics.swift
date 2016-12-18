@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 infix operator +++
 
@@ -52,9 +52,9 @@ func generic_metatypes<T : SomeProtocol>(_ x: T)
 }
 
 // Inferring a variable's type from a call to a generic.
-struct Pair<T, U> { } // expected-note 5 {{'T' declared as parameter to type 'Pair'}}
+struct Pair<T, U> { } // expected-note 4 {{'T' declared as parameter to type 'Pair'}} expected-note {{'U' declared as parameter to type 'Pair'}}
 
-func pair<T, U>(_ x: T, _ y: U) -> Pair<T, U> { } // expected-note 3 {{in call to function 'pair'}}
+func pair<T, U>(_ x: T, _ y: U) -> Pair<T, U> { }
 
 var i : Int, f : Float
 var p = pair(i, f)
@@ -260,7 +260,7 @@ protocol SubProto: BaseProto {}
   func copy() -> Any
 }
 
-struct FullyGeneric<Foo> {} // expected-note 3 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 6 {{generic type 'FullyGeneric' declared here}}
+struct FullyGeneric<Foo> {} // expected-note 6 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 6 {{generic type 'FullyGeneric' declared here}}
 
 struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic type 'AnyClassBound' declared here}}
 struct AnyClassBound2<Foo> where Foo: AnyObject {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound2'}}
@@ -333,8 +333,7 @@ func testFixIts() {
   _ = ClassAndProtosBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{27-27=<<#Foo: X & NSCopyish & SubProto#>>}}
 
   _ = Pair() // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<Any, Any>}}
-  // FIXME: This should say "generic parameter 'U'".
-  _ = Pair(first: S()) // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<S, Any>}}
+  _ = Pair(first: S()) // expected-error {{generic parameter 'U' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<S, Any>}}
   _ = Pair(second: S()) // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<Any, S>}}
 }
 
@@ -388,17 +387,16 @@ func testFixItNested() {
     FullyGeneric<Any>
   >()
 
-  // FIXME: These errors could be improved.
-  _ = pair( // expected-error {{generic parameter 'T' could not be inferred}} {{none}}
-    FullyGeneric(),
+  _ = pair( // expected-error {{generic parameter 'Foo' could not be inferred}} {{none}}
+    FullyGeneric(), // expected-note {{explicitly specify the generic arguments to fix this issue}}
     FullyGeneric()
   )
-  _ = pair( // expected-error {{generic parameter 'T' could not be inferred}} {{none}}
+  _ = pair( // expected-error {{generic parameter 'Foo' could not be inferred}} {{none}}
     FullyGeneric<Any>(),
-    FullyGeneric()
+    FullyGeneric() // expected-note {{explicitly specify the generic arguments to fix this issue}}
   )
-  _ = pair( // expected-error {{generic parameter 'T' could not be inferred}} {{none}}
-    FullyGeneric(),
+  _ = pair( // expected-error {{generic parameter 'Foo' could not be inferred}} {{none}}
+    FullyGeneric(), // expected-note {{explicitly specify the generic arguments to fix this issue}}
     FullyGeneric<Any>()
   )
 }
@@ -406,4 +404,15 @@ func testFixItNested() {
 // rdar://problem/26845038
 func occursCheck26845038(a: [Int]) {
   _ = Array(a)[0]
+}
+
+// rdar://problem/29633747
+extension Array where Element: Hashable {
+    public func trimmed(_ elements: [Element]) -> SubSequence {
+        return []
+    }
+}
+
+func rdar29633747(characters: String.CharacterView) {
+  let _ = Array(characters).trimmed(["("])
 }

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -96,10 +96,10 @@ class ConstantTracker {
 
   // Gets the parameter in the caller for a function argument.
   SILValue getParam(SILValue value) {
-    if (SILArgument *arg = dyn_cast<SILArgument>(value)) {
-      if (AI && arg->isFunctionArg() && arg->getFunction() == F) {
+    if (auto *Arg = dyn_cast<SILFunctionArgument>(value)) {
+      if (AI && Arg->getFunction() == F) {
         // Continue at the caller.
-        return AI.getArgument(arg->getIndex());
+        return AI.getArgument(Arg->getIndex());
       }
     }
     return SILValue();
@@ -194,7 +194,7 @@ public:
     /// Our assumption on how many times a loop is executed.
     LoopCount = 10,
 
-    /// To keep things simple we only analyse up to this number of nested loops.
+    /// To keep things simple we only analyze up to this number of nested loops.
     MaxNumLoopLevels = 4,
 
     /// The "weight" for the benefit which a single loop nest gives.

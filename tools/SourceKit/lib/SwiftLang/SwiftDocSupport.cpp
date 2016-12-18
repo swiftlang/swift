@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -269,9 +269,6 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
     proto = typeDC->getAsProtocolOrProtocolExtensionContext();
 
   for (auto &Req : GenericSig->getRequirements()) {
-    if (Req.getKind() == RequirementKind::WitnessMarker)
-      continue;
-
     // Skip protocol Self requirement.
     if (proto &&
         Req.getKind() == RequirementKind::Conformance &&
@@ -480,11 +477,11 @@ static void reportRelated(ASTContext &Ctx,
 
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
 
-    // If underlying type exists, report the inheritance and conformance of the
-    // underlying type.
-    auto Ty = TAD->getUnderlyingType();
-    if (Ty) {
-      if (auto NM = Ty->getCanonicalType()->getAnyNominal()) {
+    if (TAD->hasInterfaceType()) {
+      // If underlying type exists, report the inheritance and conformance of the
+      // underlying type.
+      auto Ty = TAD->getDeclaredInterfaceType();
+      if (auto NM = Ty->getAnyNominal()) {
         passInherits(NM->getInherited(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                      Consumer);

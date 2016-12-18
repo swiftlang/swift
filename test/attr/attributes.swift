@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 @unknown func f0() {} // expected-error{{unknown attribute 'unknown'}}
 @unknown(x,y) func f1() {} // expected-error{{unknown attribute 'unknown'}}
@@ -85,27 +85,27 @@ struct TestTranspStruct : ProtoWithTransparent{
 struct CannotHaveTransparentStruct {
   func m1() {}
 }
-@_transparent // expected-error{{@_transparent is only supported on struct and enum extensions}} {{1-15=}}
+@_transparent // expected-error{{@_transparent cannot be applied to this declaration}} {{1-15=}}
 extension TestTranspClass {
   func tr1() {}
 }
-@_transparent
+@_transparent // expected-error{{@_transparent cannot be applied to this declaration}} {{1-15=}}
 extension TestTranspStruct {
   func tr1() {}
 }
-@_transparent
+@_transparent // expected-error{{@_transparent cannot be applied to this declaration}} {{1-15=}}
 extension binary {
   func tr1() {}
 }
 
-class transparentOnCalssVar {
+class transparentOnClassVar {
   @_transparent var max: Int { return 0xFF }; // expected-error {{@_transparent is not supported on declarations within classes}} {{3-17=}}
   func blah () {
     var _: Int = max
   }
 };
 
-class transparentOnCalssVar2 {
+class transparentOnClassVar2 {
   var max: Int {
     @_transparent // expected-error {{@_transparent is not supported on declarations within classes}} {{5-19=}}
     get {

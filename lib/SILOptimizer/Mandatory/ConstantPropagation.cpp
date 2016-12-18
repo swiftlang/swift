@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -232,21 +232,32 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
   }
 
   SILValue Other;
+  auto MatchNonNegative =
+      m_BuiltinInst(BuiltinValueKind::AssumeNonNegative, m_ValueBase());
   if (match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_ULT,
                                           m_SILValue(Other), m_Zero()),
-                            m_BuiltinInst(BuiltinValueKind::ICMP_UGT,
-                                          m_Zero(), m_SILValue(Other))))) {
+                            m_BuiltinInst(BuiltinValueKind::ICMP_UGT, m_Zero(),
+                                          m_SILValue(Other)))) ||
+      match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_SLT,
+                                          MatchNonNegative, m_Zero()),
+                            m_BuiltinInst(BuiltinValueKind::ICMP_SGT, m_Zero(),
+                                          MatchNonNegative)))) {
     SILBuilderWithScope B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
   }
 
   if (match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_UGE,
                                           m_SILValue(Other), m_Zero()),
-                            m_BuiltinInst(BuiltinValueKind::ICMP_ULE,
-                                          m_Zero(), m_SILValue(Other))))) {
+                            m_BuiltinInst(BuiltinValueKind::ICMP_ULE, m_Zero(),
+                                          m_SILValue(Other)))) ||
+      match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_SGE,
+                                          MatchNonNegative, m_Zero()),
+                            m_BuiltinInst(BuiltinValueKind::ICMP_SLE, m_Zero(),
+                                          MatchNonNegative)))) {
     SILBuilderWithScope B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
   }
+
   return nullptr;
 }
 
@@ -1096,8 +1107,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
 
     // Eagerly DCE. We do this after visiting all users to ensure we don't
     // invalidate the uses iterator.
-    auto UserArray = ArrayRef<SILInstruction *>(&*FoldedUsers.begin(),
-                                                FoldedUsers.size());
+    ArrayRef<SILInstruction *> UserArray = FoldedUsers.getArrayRef();
     if (!UserArray.empty()) {
       InvalidateInstructions = true;
     }

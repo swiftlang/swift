@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -118,18 +118,6 @@ struct ilist_traits<::swift::SILVTable> :
 public ilist_default_traits<::swift::SILVTable> {
   typedef ::swift::SILVTable SILVTable;
 
-private:
-  mutable ilist_half_node<SILVTable> Sentinel;
-
-public:
-  SILVTable *createSentinel() const {
-    return static_cast<SILVTable*>(&Sentinel);
-  }
-  void destroySentinel(SILVTable *) const {}
-
-  SILVTable *provideInitialHead() const { return createSentinel(); }
-  SILVTable *ensureHead(SILVTable*) const { return createSentinel(); }
-  static void noteHead(SILVTable*, SILVTable*) {}
   static void deleteNode(SILVTable *VT) { VT->~SILVTable(); }
 
 private:

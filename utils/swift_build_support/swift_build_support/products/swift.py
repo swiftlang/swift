@@ -5,8 +5,8 @@
 # Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ----------------------------------------------------------------------------
 
@@ -32,6 +32,9 @@ class Swift(product.Product):
 
         # Add any sil ownership flags.
         self.cmake_options.extend(self._sil_ownership_flags)
+
+        # Generate the compile db.
+        self.cmake_options.extend(self._compile_db_flags)
 
     @property
     def _runtime_sanitizer_flags(self):
@@ -101,3 +104,7 @@ updated without updating swift.py?")
         if not self.args.enable_sil_ownership:
             return []
         return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE"]
+
+    @property
+    def _compile_db_flags(self):
+        return ['-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE']

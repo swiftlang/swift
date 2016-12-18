@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/Mangle.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
@@ -53,7 +54,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
   // First populate a worklist of predecessors.
   llvm::SmallVector<SILBasicBlock*, 64> Worklist;
   for (auto *BB : LiveIn)
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
 
   // Now propagate liveness backwards until we hit the alloc_box.
@@ -65,7 +66,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
     if (BB == DefBB || !LiveIn.insert(BB).second)
       continue;
 
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
   }
 }
@@ -272,7 +273,7 @@ static SILArgument *getParameterForOperand(SILFunction *F, Operand *O) {
   auto &Entry = F->front();
   size_t ParamIndex = getParameterIndexForOperand(O);
 
-  return Entry.getBBArg(ParamIndex);
+  return Entry.getArgument(ParamIndex);
 }
 
 /// Return a pointer to the SILFunction called by Call if we can
@@ -406,8 +407,11 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   auto &Entry = ABI->getFunction()->front();
   SILBuilder BuildAlloc(&Entry, Entry.begin());
   BuildAlloc.setCurrentDebugScope(ABI->getDebugScope());
-  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(), ABI->getElementType(),
-                                          ABI->getVarInfo());
+  assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
+         && "rewriting multi-field box not implemented");
+  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(),
+                          ABI->getBoxType()->getFieldType(ABI->getModule(), 0),
+                          ABI->getVarInfo());
 
   // Replace all uses of the address of the box's contained value with
   // the address of the stack location.
@@ -429,7 +433,10 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
       break;
     }
 
-  auto &Lowering = ABI->getModule().getTypeLowering(ABI->getElementType());
+  assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
+         && "promoting multi-field box not implemented");
+  auto &Lowering = ABI->getModule()
+    .getTypeLowering(ABI->getBoxType()->getFieldType(ABI->getModule(), 0));
   auto Loc = CleanupLocation::get(ABI->getLoc());
 
   // For non-trivial types, insert destroys for each final release-like
@@ -496,7 +503,7 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
   // references.
   llvm::SmallSet<SILValue, 4> PromotedParameters;
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
                                  IsFragile_t Fragile,
@@ -515,11 +522,16 @@ static std::string getClonedName(SILFunction *F,
                                  ParamIndexList &PromotedParamIndices) {
   Mangle::Mangler M;
   auto P = SpecializationPass::AllocBoxToStack;
-  FunctionSignatureSpecializationMangler FSSM(P, M, Fragile, F);
-  for (unsigned i : PromotedParamIndices)
-    FSSM.setArgumentBoxToStack(i);
-  FSSM.mangle();
-  return M.finalize();
+  FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
+  for (unsigned i : PromotedParamIndices) {
+    OldFSSM.setArgumentBoxToStack(i);
+    NewFSSM.setArgumentBoxToStack(i);
+  }
+  OldFSSM.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewFSSM.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// \brief Create the function corresponding to the clone of the
@@ -538,8 +550,15 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   unsigned Index = OrigFTI->getNumIndirectResults();
   for (auto &param : OrigFTI->getParameters()) {
     if (count(PromotedParamIndices, Index)) {
-      auto paramTy = param.getType()->castTo<SILBoxType>()
-        ->getBoxedAddressType();
+      auto boxTy = param.getType()->castTo<SILBoxType>();
+      assert(boxTy->getLayout()->getFields().size() == 1
+             && "promoting compound box not implemented");
+      SILType paramTy;
+      {
+        Lowering::GenericContextScope scope(Orig->getModule().Types,
+                                            OrigFTI->getGenericSignature());
+        paramTy = boxTy->getFieldType(Orig->getModule(), 0);
+      }
       auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
                                   ParameterConvention::Indirect_InoutAliasable);
       ClonedInterfaceArgTys.push_back(promotedParam);
@@ -585,20 +604,21 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
 void
 PromotedParamCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block
   SILBasicBlock *OrigEntryBB = &*Orig->begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   unsigned ArgNo = 0;
-  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   while (I != E) {
     if (count(PromotedParamIndices, ArgNo)) {
       // Create a new argument with the promoted type.
-      auto promotedTy = (*I)->getType().castTo<SILBoxType>()
-        ->getBoxedAddressType();
-      auto promotedArg = new (M)
-        SILArgument(ClonedEntryBB, promotedTy, (*I)->getDecl());
+      auto boxTy = (*I)->getType().castTo<SILBoxType>();
+      assert(boxTy->getLayout()->getFields().size() == 1
+             && "promoting multi-field boxes not implemented yet");
+      auto promotedTy = boxTy->getFieldType(Cloned->getModule(), 0);
+      auto *promotedArg =
+          ClonedEntryBB->createArgument(promotedTy, (*I)->getDecl());
       PromotedParameters.insert(*I);
       
       // Map any projections of the box to the promoted argument.
@@ -611,7 +631,7 @@ PromotedParamCloner::populateCloned() {
     } else {
       // Create a new argument which copies the original argument.
       SILValue MappedValue =
-        new (M) SILArgument(ClonedEntryBB, (*I)->getType(), (*I)->getDecl());
+          ClonedEntryBB->createArgument((*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;
@@ -761,9 +781,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
                                                    ClonedFn);
   CanSILFunctionType CanFnTy = ClonedFn->getLoweredFunctionType();
   auto const &Subs = PartialApply->getSubstitutions();
-  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M,
-                                                             M.getSwiftModule(),
-                                                             Subs);
+  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M, Subs);
   return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
                                  SILType::getPrimitiveObjectType(SubstCalleeTy),
                                     PartialApply->getSubstitutions(), Args,

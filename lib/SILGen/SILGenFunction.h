@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -197,6 +197,8 @@ public:
   SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
                 SILBasicBlock::iterator insertInst)
       : SILGenBuilder(gen, &*insertBB, insertInst) {}
+
+  SILGenModule &getSILGenModule() const { return SGM; }
 
   // Metatype instructions use the conformances necessary to instantiate the
   // type.
@@ -455,10 +457,8 @@ public:
 
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.
-  bool allowsVoidReturn() const {
-    return ReturnDest.getBlock()->bbarg_empty();
-  }
-  
+  bool allowsVoidReturn() const { return ReturnDest.getBlock()->args_empty(); }
+
   /// This location, when set, is used as an override location for magic
   /// identifier expansion (e.g. #file).  This allows default argument
   /// expansion to report the location of the call, instead of the location
@@ -1153,7 +1153,11 @@ public:
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
                                  const TypeLowering &lowering);
-  
+
+  ManagedValue emitManagedLoadCopy(SILLocation loc, SILValue v);
+  ManagedValue emitManagedLoadCopy(SILLocation loc, SILValue v,
+                                   const TypeLowering &lowering);
+
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
   ManagedValue emitManagedRValueWithCleanup(SILValue v,
                                             const TypeLowering &lowering);
@@ -1445,9 +1449,8 @@ public:
                                        SILValue foreignErrorSlot,
                                  const ForeignErrorConvention &foreignError);
 
-  void emitForeignErrorBlock(SILLocation loc,
-                             SILBasicBlock *errorBB,
-                             ManagedValue errorSlot);
+  void emitForeignErrorBlock(SILLocation loc, SILBasicBlock *errorBB,
+                             Optional<ManagedValue> errorSlot);
 
   void emitForeignErrorCheck(SILLocation loc,
                              SmallVectorImpl<ManagedValue> &directResults,

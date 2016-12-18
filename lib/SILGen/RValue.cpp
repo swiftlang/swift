@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -105,7 +105,7 @@ public:
         // loaded.  Except it's not really an invariant, because
         // argument emission likes to lie sometimes.
         if (eltTI.isLoadable()) {
-          elt = gen.B.createLoad(loc, elt, LoadOwnershipQualifier::Unqualified);
+          elt = eltTI.emitLoad(gen.B, loc, elt, LoadOwnershipQualifier::Take);
         }
       }
 
@@ -254,8 +254,8 @@ public:
     : gen(gen), parent(parent), loc(l), functionArgs(functionArgs) {}
 
   RValue visitType(CanType t) {
-    SILValue arg = new (gen.SGM.M)
-      SILArgument(parent, gen.getLoweredType(t), loc.getAsASTNode<ValueDecl>());
+    SILValue arg = parent->createArgument(gen.getLoweredType(t),
+                                          loc.getAsASTNode<ValueDecl>());
     ManagedValue mv = isa<InOutType>(t)
       ? ManagedValue::forLValue(arg)
       : gen.emitManagedRValueWithCleanup(arg);
@@ -363,9 +363,24 @@ static void copyOrInitValuesInto(Initialization *init,
   init->finishInitialization(gen);
 }
 
+static unsigned
+expectedExplosionSize(CanType type) {
+  auto tuple = dyn_cast<TupleType>(type);
+  if (!tuple)
+    return 1;
+  unsigned total = 0;
+  for (unsigned i = 0; i < tuple->getNumElements(); ++i) {
+    total += expectedExplosionSize(tuple.getElementType(i));
+  }
+  return total;
+}
 
 RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
   : values(values.begin(), values.end()), type(type), elementsToBeAdded(0) {
+  
+  assert(values.size() == expectedExplosionSize(type)
+         && "creating rvalue with wrong number of pre-exploded elements");
+  
   if (values.size() == 1 && values[0].isInContext()) {
     values = ArrayRef<ManagedValue>();
     type = CanType();
@@ -373,6 +388,11 @@ RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
     return;
   }
 
+}
+
+RValue RValue::withPreExplodedElements(ArrayRef<ManagedValue> values,
+                                       CanType type) {
+  return RValue(values, type);
 }
 
 RValue::RValue(SILGenFunction &gen, SILLocation l, CanType formalType,

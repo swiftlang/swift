@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %target-build-swift -emit-sil -emit-module-path %t/SwiftLib.swiftmodule -I %S/Inputs/conformance-removed/ %S/Inputs/conformance-removed/SwiftLib.swift -Xcc -DUSE_PROTO
-// RUN: not --crash %target-build-swift -parse -I %t -I %S/Inputs/custom-modules/ %s 2>&1 | %FileCheck %s
+// RUN: not --crash %target-build-swift -typecheck -I %t -I %S/Inputs/custom-modules/ %s 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop
 

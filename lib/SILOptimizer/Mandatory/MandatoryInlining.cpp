@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -51,16 +51,16 @@ public:
     Module.registerDeleteNotificationHandler(this);
   }
 
-  ~DeleteInstructionsHandler() {
+  ~DeleteInstructionsHandler() override {
      // Unregister the handler.
     Module.removeDeleteNotificationHandler(this);
   }
 
   // Handling of instruction removal notifications.
-  bool needsNotifications() { return true; }
+  bool needsNotifications() override { return true; }
 
   // Handle notifications about removals of instructions.
-  void handleDeleteNotification(swift::ValueBase *Value) {
+  void handleDeleteNotification(swift::ValueBase *Value) override {
     if (auto DeletedI = dyn_cast<SILInstruction>(Value)) {
       if (CurrentI == SILBasicBlock::iterator(DeletedI)) {
         if (CurrentI != CurrentI->getParent()->begin()) {
@@ -360,7 +360,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         if (auto *II = dyn_cast<SILInstruction>(NewInst))
           I = II->getIterator();
         else
-          I = NewInst->getParentBB()->begin();
+          I = NewInst->getParentBlock()->begin();
         auto NewAI = FullApplySite::isa(NewInstPair.second.getInstruction());
         if (!NewAI)
           continue;

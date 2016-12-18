@@ -5,20 +5,21 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_TYPELOWERING_H
 #define SWIFT_SIL_TYPELOWERING_H
 
-#include "swift/AST/CaptureInfo.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/CaptureInfo.h"
 #include "swift/SIL/AbstractionPattern.h"
+#include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
@@ -208,6 +209,21 @@ public:
                                SILValue value,
                                SILValue addr,
                                IsInitialization_t isInit) const = 0;
+
+  /// Emit a store of \p value into \p addr given the StoreOwnershipQualifier
+  /// qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types.
+  virtual void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                         SILValue addr, StoreOwnershipQualifier qual) const = 0;
+
+  /// Emit a load from \p addr given the LoadOwnershipQualifier \p qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types.
+  virtual SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                            LoadOwnershipQualifier qual) const = 0;
 
   /// Put an exact copy of the value in the source address in the
   /// destination address.
@@ -746,6 +762,7 @@ public:
   /// Get the capture list from a closure, with transitive function captures
   /// flattened.
   CaptureInfo getLoweredLocalCaptures(AnyFunctionRef fn);
+  bool hasLoweredLocalCaptures(AnyFunctionRef fn);
 
   enum class ABIDifference : uint8_t {
     // No ABI differences, function can be trivially bitcast to result type.
@@ -778,6 +795,20 @@ public:
   CanSILFunctionType
   getUncachedSILFunctionTypeForConstant(SILDeclRef constant,
                                   CanAnyFunctionType origInterfaceType);
+  
+  /// Get the boxed interface type to use for a capture of the given decl.
+  CanSILBoxType
+  getInterfaceBoxTypeForCapture(ValueDecl *captured,
+                                CanType loweredInterfaceType,
+                                bool isMutable);
+  /// Get the boxed contextual type to use for a capture of the given decl
+  /// in the given generic environment.
+  CanSILBoxType
+  getContextBoxTypeForCapture(ValueDecl *captured,
+                              CanType loweredContextType,
+                              GenericEnvironment *env,
+                              bool isMutable);
+
 private:
   CanType getLoweredRValueType(AbstractionPattern origType, CanType substType,
                                unsigned uncurryLevel);

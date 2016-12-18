@@ -17,7 +17,7 @@ func testNonnull(_ obj: Test) -> [Any] {
   // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Array<Any>
   return obj.nonnullArray
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF20objc_bridged_results11testNonnullFCSo4TestGSaP__'
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results12testNullableFCSo4TestGSqGSaP___
 func testNullable(_ obj: Test) -> [Any]? {
@@ -44,7 +44,7 @@ func testNullable(_ obj: Test) -> [Any]? {
   // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Optional<Array<Any>>
   return obj.nullableArray
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF20objc_bridged_results12testNullableFCSo4TestGSqGSaP___'
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results19testNullUnspecifiedFCSo4TestGSQGSaP___
 func testNullUnspecified(_ obj: Test) -> [Any]! {
@@ -70,7 +70,7 @@ func testNullUnspecified(_ obj: Test) -> [Any]! {
   // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Optional<Array<Any>>
   return obj.nullUnspecifiedArray
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF20objc_bridged_results19testNullUnspecifiedFCSo4TestGSQGSaP___'
 
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results21testNonnullDictionaryFCSo4TestGVs10DictionaryVs11AnyHashableP__
@@ -83,7 +83,7 @@ func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
   // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Dictionary<AnyHashable, Any>
   return obj.nonnullDictionary
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF20objc_bridged_results21testNonnullDictionaryFCSo4TestGVs10DictionaryVs11AnyHashableP__'
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results14testNonnullSetFCSo4TestGVs3SetVs11AnyHashable_
 func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
@@ -95,7 +95,7 @@ func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
   // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Set<AnyHashable>
   return obj.nonnullSet
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF20objc_bridged_results14testNonnullSetFCSo4TestGVs3SetVs11AnyHashable_'
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results17testNonnullStringFCSo4TestSS
 func testNonnullString(_ obj: Test) -> String {
@@ -107,7 +107,7 @@ func testNonnullString(_ obj: Test) -> String {
   // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $String
   return obj.nonnullString
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF20objc_bridged_results17testNonnullStringFCSo4TestSS'
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results13testClassPropFT_SS
 func testClassProp() -> String {
@@ -120,7 +120,7 @@ func testClassProp() -> String {
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]], [[STRING_META]]) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
   // CHECK: return [[RESULT]] : $String
   return Test.nonnullSharedString
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF20objc_bridged_results13testClassPropFT_SS'
 
 
 // Note: This doesn't really "work" in that it doesn't accept a nil value the
@@ -136,7 +136,7 @@ func testNonnullSubscript(_ obj: Test) -> [Any] {
   // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Array<Any>
   return obj[0]
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF20objc_bridged_results20testNonnullSubscriptFCSo4TestGSaP__'
 
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results19testPerformSelectorFCSo8NSObjectT_
@@ -145,4 +145,4 @@ func testPerformSelector(_ obj: NSObject) {
   // CHECK: [[RESULT:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, {{%[0-9]+}}, %0)
   _ = obj.perform("foo", with: nil)
   // CHECK-NOT: {{(retain|release).+}}[[RESULT]]
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF20objc_bridged_results19testPerformSelectorFCSo8NSObjectT_'

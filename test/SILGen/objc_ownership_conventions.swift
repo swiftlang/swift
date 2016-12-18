@@ -33,40 +33,68 @@ func test3() -> NSObject {
 func test5(_ g: Gizmo) {
   var g = g
   Gizmo.inspect(g)
-  // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
-  // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
-  // CHECK-NEXT: [[OBJC_CLASS:%[0-9]+]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:      [[V:%.*]] = load
-  // CHECK:      copy_value [[V]]
-  // CHECK:      [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!enumelt.1, [[V]]
-  // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])
-  // CHECK-NEXT: destroy_value [[G]]
+  // CHECK: bb0([[ARG:%.*]] : $Gizmo):
+  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
+  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
+  // CHECK:   [[CLASS:%.*]] = metatype $@thick Gizmo.Type
+  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
+  // CHECK:   [[OBJC_CLASS:%[0-9]+]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
+  // CHECK:   [[V:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!enumelt.1, [[V]]
+  // CHECK:   apply [[METHOD]]([[G]], [[OBJC_CLASS]])
+  // CHECK:   destroy_value [[G]]
+  // CHECK:   destroy_value [[GIZMO_BOX]]
+  // CHECK:   destroy_value [[ARG]]
 }
+// CHECK: } // end sil function '_TF26objc_ownership_conventions5test5{{.*}}'
+
 // The argument to consume is __attribute__((ns_consumed)).
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test6
 func test6(_ g: Gizmo) {
   var g = g
   Gizmo.consume(g)
-  // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
-  // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
-  // CHECK-NEXT: [[OBJC_CLASS:%.*]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:      [[V:%.*]] = load
-  // CHECK:      copy_value [[V]]
-  // CHECK:      [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!
-  // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])
+  // CHECK: bb0([[ARG:%.*]] : $Gizmo):
+  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
+  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
+  // CHECK:   [[CLASS:%.*]] = metatype $@thick Gizmo.Type
+  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
+  // CHECK:   [[OBJC_CLASS:%.*]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
+  // CHECK:   [[V:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!enumelt.1, [[V]]
+  // CHECK:   apply [[METHOD]]([[G]], [[OBJC_CLASS]])
+  // CHECK-NOT:  destroy_value [[G]]
+  // CHECK:   destroy_value [[GIZMO_BOX]]
+  // CHECK-NOT:  destroy_value [[G]]
+  // CHECK:   destroy_value [[ARG]]
   // CHECK-NOT:  destroy_value [[G]]
 }
+// CHECK: } // end sil function '_TF26objc_ownership_conventions5test6{{.*}}'
+
 // fork is __attribute__((ns_consumes_self)).
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test7
 func test7(_ g: Gizmo) {
   var g = g
   g.fork()
-  // CHECK:      [[G:%.*]] = load
-  // CHECK-NEXT: copy_value [[G]]
-  // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.fork!1.foreign
-  // CHECK-NEXT: apply [[METHOD]]([[G]])
+  // CHECK: bb0([[ARG:%.*]] : $Gizmo):
+  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
+  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
+  // CHECK:   [[G:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.fork!1.foreign
+  // CHECK:   apply [[METHOD]]([[G]])
+  // CHECK-NOT:  destroy_value [[G]]
+  // CHECK:   destroy_value [[GIZMO_BOX]]
+  // CHECK-NOT:  destroy_value [[G]]
+  // CHECK:   destroy_value [[ARG]]
   // CHECK-NOT:  destroy_value [[G]]
 }
+// CHECK: } // end sil function '_TF26objc_ownership_conventions5test7{{.*}}'
+
 // clone is __attribute__((ns_returns_retained)).
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test8
 func test8(_ g: Gizmo) -> Gizmo {
@@ -96,16 +124,16 @@ func test9(_ g: Gizmo) -> Gizmo {
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions6test10
 func test10(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
-  // CHECK:      copy_value [[G]]
-  // CHECK-NEXT: [[NS_G:%[0-9]+]] = upcast [[G:%[0-9]+]] : $Gizmo to $NSObject
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type! , $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
-  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
+  // CHECK:      [[G_COPY:%.*]] = copy_value [[G]]
+  // CHECK-NEXT: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY]] : $Gizmo to $NSObject
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G_COPY]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type! , $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
+  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
   // CHECK:      select_enum [[OPT_OBJC]]
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $Optional<@thick AnyObject.Type>, #Optional.some!enumelt.1, [[THICK]]
   // CHECK:      [[RES:%.*]] = unchecked_enum_data
-  // CHECK:      destroy_value [[G]] : $Gizmo
+  // CHECK:      destroy_value [[G_COPY]] : $Gizmo
   // CHECK:      destroy_value [[G]] : $Gizmo
   // CHECK-NEXT: return [[RES]] : $@thick AnyObject.Type
   return g.classProp
@@ -114,10 +142,10 @@ func test10(_ g: Gizmo) -> AnyClass {
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions6test11
 func test11(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
-  // CHECK: copy_value [[G]]
-  // CHECK: [[NS_G:%[0-9]+]] = upcast [[G:%[0-9]+]] : $Gizmo to $NSObject
-  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type! , $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
-  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
+  // CHECK: [[G_COPY:%.*]] = copy_value [[G]]
+  // CHECK: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY:%[0-9]+]] : $Gizmo to $NSObject
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G_COPY]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type! , $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
+  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
   // CHECK:      select_enum [[OPT_OBJC]]
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
@@ -125,7 +153,7 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK:      [[RES:%.*]] = unchecked_enum_data
   // CHECK:      [[OPENED:%.*]] = open_existential_metatype [[RES]]
   // CHECK:      [[RES_ANY:%.*]] = init_existential_metatype [[OPENED]]
-  // CHECK:      destroy_value [[G]] : $Gizmo
+  // CHECK:      destroy_value [[G_COPY]] : $Gizmo
   // CHECK:      destroy_value [[G]] : $Gizmo
   // CHECK-NEXT: return [[RES_ANY]] : $@thick AnyObject.Type
   return g.qualifiedClassProp
@@ -137,9 +165,9 @@ func test11(_ g: Gizmo) -> AnyClass {
 func applyBlock(_ f: @convention(block) (Gizmo) -> Gizmo, x: Gizmo) -> Gizmo {
   // CHECK:     bb0([[BLOCK:%.*]] : $@convention(block) (Gizmo) -> @autoreleased Gizmo, [[ARG:%.*]] : $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
-  // CHECK:       copy_value [[BLOCK_COPY]]
-  // CHECK:       [[RESULT:%.*]] = apply [[BLOCK_COPY]]([[ARG]])
-  // CHECK:       destroy_value [[BLOCK_COPY]]
+  // CHECK:       [[BLOCK_COPY_COPY:%.*]] = copy_value [[BLOCK_COPY]]
+  // CHECK:       [[RESULT:%.*]] = apply [[BLOCK_COPY_COPY]]([[ARG]])
+  // CHECK:       destroy_value [[BLOCK_COPY_COPY]]
   // CHECK:       destroy_value [[ARG]]
   // CHECK:       destroy_value [[BLOCK_COPY]]
   // CHECK:       destroy_value [[BLOCK]]
@@ -157,26 +185,31 @@ func maybeApplyBlock(_ f: (@convention(block) (Gizmo) -> Gizmo)?, x: Gizmo) -> G
 func useInnerPointer(_ p: UnsafeMutableRawPointer) {}
 
 // Handle inner-pointer methods by autoreleasing self after the call.
-// CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions18innerPointerMethod
+// CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions18innerPointerMethodFCSo5GizmoT_ : $@convention(thin) (@owned Gizmo) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Gizmo):
 // CHECK:         [[USE:%.*]] = function_ref @_TF26objc_ownership_conventions15useInnerPointer
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.getBytes!1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer , $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
-// CHECK:         copy_value %0
-// CHECK:         [[PTR:%.*]] = apply [[METHOD]](%0)
-// CHECK:         autorelease_value %0
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] [[ARG]] : $Gizmo, #Gizmo.getBytes!1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer , $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// SEMANTIC ARC TODO: The apply below /should/ be on ARG_COPY
+// CHECK:         [[PTR:%.*]] = apply [[METHOD]]([[ARG]])
+// CHECK:         autorelease_value [[ARG_COPY]]
 // CHECK:         apply [[USE]]([[PTR]])
-// CHECK:         destroy_value %0
+// CHECK:         destroy_value [[ARG]]
 func innerPointerMethod(_ g: Gizmo) {
   useInnerPointer(g.getBytes())
 }
 
-// CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions20innerPointerProperty
+// CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions20innerPointerPropertyFCSo5GizmoT_ : $@convention(thin) (@owned Gizmo) -> () {
+// CHECK:       bb0([[ARG:%.*]] : $Gizmo):
 // CHECK:         [[USE:%.*]] = function_ref @_TF26objc_ownership_conventions15useInnerPointer
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer , $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
-// CHECK:         copy_value %0
-// CHECK:         [[PTR:%.*]] = apply [[METHOD]](%0)
-// CHECK:         autorelease_value %0
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] [[ARG]] : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer , $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// SEMANTIC ARC TODO: The apply below should be on ARG_COPY
+// CHECK:         [[PTR:%.*]] = apply [[METHOD]]([[ARG]])
+// CHECK:         autorelease_value [[ARG_COPY]]
 // CHECK:         apply [[USE]]([[PTR]])
-// CHECK:         destroy_value %0
+// CHECK:         destroy_value [[ARG]]
+// CHECK: } // end sil function '_TF26objc_ownership_conventions20innerPointerPropertyFCSo5GizmoT_'
 func innerPointerProperty(_ g: Gizmo) {
   useInnerPointer(g.innerProperty)
 }

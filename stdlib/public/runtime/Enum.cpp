@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -115,9 +115,9 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
 #if OPTIONAL_OBJECT_OPTIMIZATION
   auto payloadVWT = payload->getValueWitnesses();
   if (emptyCases == 1
-      && (payloadVWT == &_TWVBo
+      && (payloadVWT == &VALUE_WITNESS_SYM(Bo)
 #if SWIFT_OBJC_INTEROP
-          || payloadVWT == &_TWVBO
+          || payloadVWT == &VALUE_WITNESS_SYM(BO)
 #endif
           )) {
 #define COPY_PAYLOAD_WITNESS(NAME) vwtable->NAME = payloadVWT->NAME;
@@ -322,7 +322,7 @@ struct MultiPayloadLayout {
   size_t payloadSize;
   size_t numTagBytes;
 };
-}
+} // end anonymous namespace
 
 static MultiPayloadLayout getMultiPayloadLayout(const EnumMetadata *enumType) {
   size_t payloadSize = enumType->getPayloadSize();

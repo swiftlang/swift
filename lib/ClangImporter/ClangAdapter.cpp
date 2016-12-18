@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -418,13 +418,8 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
   return StringRef();
 }
 
-clang::SwiftNewtypeAttr *
-importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
-                              bool useSwift2Name) {
-  // If we're determining the Swift 2 name, don't honor this attribute.
-  if (useSwift2Name)
-    return nullptr;
-
+static clang::SwiftNewtypeAttr *
+retrieveNewTypeAttr(const clang::TypedefNameDecl *decl) {
   // Retrieve the attribute.
   auto attr = decl->getAttr<clang::SwiftNewtypeAttr>();
   if (!attr)
@@ -439,14 +434,22 @@ importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
   return attr;
 }
 
+clang::SwiftNewtypeAttr *
+importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
+                              ImportNameVersion version) {
+  // Newtype was introduced in Swift 3
+  if (version < ImportNameVersion::Swift3 )
+    return nullptr;
+  return retrieveNewTypeAttr(decl);
+}
+
 // If this decl is associated with a swift_newtype typedef, return it, otherwise
 // null
 clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
                                                    clang::Sema &clangSema,
-                                                   bool useSwift2Name) {
-  // If we aren't honoring the swift_newtype attribute, don't even
-  // bother looking. Similarly for swift2 names
-  if (useSwift2Name)
+                                                   ImportNameVersion version) {
+  // Newtype was introduced in Swift 3
+  if (version < ImportNameVersion::Swift3 )
     return nullptr;
 
   auto varDecl = dyn_cast<clang::VarDecl>(decl);
@@ -454,7 +457,7 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
     return nullptr;
 
   if (auto typedefTy = varDecl->getType()->getAs<clang::TypedefType>())
-    if (getSwiftNewtypeAttr(typedefTy->getDecl(), false))
+    if (retrieveNewTypeAttr(typedefTy->getDecl()))
       return typedefTy->getDecl();
 
   // Special case: "extern NSString * fooNotification" adopts
@@ -472,7 +475,7 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
       return nullptr;
 
     // Make sure it also has a newtype decl on it
-    if (getSwiftNewtypeAttr(nsDecl, false))
+    if (retrieveNewTypeAttr(nsDecl))
       return nsDecl;
 
     return nullptr;
@@ -563,6 +566,8 @@ OptionalTypeKind importer::translateNullability(clang::NullabilityKind kind) {
   case clang::NullabilityKind::Unspecified:
     return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
   }
+
+  llvm_unreachable("Invalid NullabilityKind.");
 }
 
 bool importer::hasDesignatedInitializers(
@@ -616,26 +621,19 @@ static bool isAccessibilityConformingContext(const clang::DeclContext *ctx) {
   return false;
 }
 
-bool importer::isAccessibilityDecl(const clang::Decl *decl) {
+bool
+importer::shouldImportPropertyAsAccessors(const clang::ObjCPropertyDecl *prop) {
+  if (prop->hasAttr<clang::SwiftImportPropertyAsAccessorsAttr>())
+    return true;
 
-  if (auto objCMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
-    StringRef name = objCMethod->getSelector().getNameForSlot(0);
-    if (!(objCMethod->getSelector().getNumArgs() <= 1 &&
-          (name.startswith("accessibility") ||
-           name.startswith("setAccessibility") ||
-           name.startswith("isAccessibility")))) {
-      return false;
-    }
-
-  } else if (auto objCProperty = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
-    if (!objCProperty->getName().startswith("accessibility"))
-      return false;
-
-  } else {
-    llvm_unreachable("The declaration is not an ObjC property or method.");
-  }
-
-  if (isAccessibilityConformingContext(decl->getDeclContext()))
+  // Check if the property is one of the specially handled accessibility APIs.
+  //
+  // These appear as both properties and methods in ObjC and should be
+  // imported as methods into Swift, as a sort of least-common-denominator
+  // compromise.
+  if (!prop->getName().startswith("accessibility"))
+    return false;
+  if (isAccessibilityConformingContext(prop->getDeclContext()))
     return true;
 
   return false;
@@ -702,18 +700,27 @@ bool importer::isUnavailableInSwift(
   return false;
 }
 
-OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
+OptionalTypeKind importer::getParamOptionality(version::Version swiftVersion,
+                                               const clang::ParmVarDecl *param,
                                                bool knownNonNull) {
   auto &clangCtx = param->getASTContext();
 
   // If nullability is available on the type, use it.
-  if (auto nullability = param->getType()->getNullability(clangCtx)) {
+  clang::QualType paramTy = param->getType();
+  if (auto nullability = paramTy->getNullability(clangCtx)) {
     return translateNullability(*nullability);
   }
 
   // If it's known non-null, use that.
   if (knownNonNull || param->hasAttr<clang::NonNullAttr>())
     return OTK_None;
+
+  // Check for the 'static' annotation on C arrays.
+  if (!swiftVersion.isVersion3())
+    if (const auto *DT = dyn_cast<clang::DecayedType>(paramTy))
+      if (const auto *AT = DT->getOriginalType()->getAsArrayTypeUnsafe())
+        if (AT->getSizeModifier() == clang::ArrayType::Static)
+          return OTK_None;
 
   // Default to implicitly unwrapped optionals.
   return OTK_ImplicitlyUnwrappedOptional;

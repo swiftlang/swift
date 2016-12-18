@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -77,7 +77,6 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
   /// used for debug info and diagnostics.
   SILDebugLocation Location;
 
-  friend llvm::ilist_sentinel_traits<SILInstruction>;
   SILInstruction() = delete;
   void operator=(const SILInstruction &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
@@ -863,11 +862,11 @@ class AllocBoxInst final
 
   TailAllocatedDebugVariable VarInfo;
 
-  AllocBoxInst(SILDebugLocation DebugLoc, SILType ElementType,
+  AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                SILDebugVariable Var);
 
-  static AllocBoxInst *create(SILDebugLocation Loc, SILType elementType,
+  static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
                               SILFunction &F,
                               SILOpenedArchetypesState &OpenedArchetypes,
                               SILDebugVariable Var);
@@ -883,10 +882,9 @@ public:
       Operands[i].~Operand();
     }
   }
-
-  SILType getElementType() const {
-    return SILType::getPrimitiveObjectType(
-        getType().castTo<SILBoxType>()->getBoxedType());
+  
+  CanSILBoxType getBoxType() const {
+    return getType().castTo<SILBoxType>();
   }
 
   /// Return the underlying variable declaration associated with this
@@ -1239,6 +1237,13 @@ public:
 
   SILArgumentConvention getArgumentConvention(unsigned index) const {
     return getSubstCalleeType()->getSILArgumentConvention(index);
+  }
+
+  Optional<SILResultInfo> getSingleResult() const {
+    auto SubstCallee = getSubstCalleeType();
+    if (SubstCallee->getNumAllResults() != 1)
+      return None;
+    return SubstCallee->getSingleResult();
   }
 
   Substitution getSelfSubstitution() const {
@@ -1747,6 +1752,46 @@ class LoadBorrowInst : public UnaryInstructionBase<ValueKind::LoadBorrowInst> {
   LoadBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {}
+};
+
+/// Represents the begin scope of a borrowed value. Must be paired with an
+/// end_borrow instruction in its use-def list.
+class BeginBorrowInst
+    : public UnaryInstructionBase<ValueKind::BeginBorrowInst> {
+  friend class SILBuilder;
+
+  BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
+      : UnaryInstructionBase(DebugLoc, LValue,
+                             LValue->getType().getObjectType()) {}
+};
+
+/// Represents a store of a borrowed value into an address. Returns the borrowed
+/// address. Must be paired with an end_borrow in its use-def list.
+class StoreBorrowInst : public SILInstruction {
+  friend class SILBuilder;
+
+public:
+  enum {
+    /// The source of the value being borrowed.
+    Src,
+    /// The destination of the borrowed value.
+    Dest
+  };
+
+private:
+  FixedOperandList<2> Operands;
+  StoreBorrowInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+
+public:
+  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::StoreBorrowInst;
+  }
 };
 
 /// Represents the end of a borrow scope for a value or address from another
@@ -4200,6 +4245,16 @@ class CopyValueInst : public UnaryInstructionBase<ValueKind::CopyValueInst> {
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
+class CopyUnownedValueInst
+    : public UnaryInstructionBase<ValueKind::CopyUnownedValueInst> {
+  friend class SILBuilder;
+
+  CopyUnownedValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                       SILModule &M)
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().getReferentType(M)) {}
+};
+
 class DestroyValueInst
     : public UnaryInstructionBase<ValueKind::DestroyValueInst> {
   friend class SILBuilder;
@@ -4338,15 +4393,8 @@ class DeallocBoxInst :
 {
   friend SILBuilder;
 
-  // TODO: The element type can be derived from a typed box.
-  SILType ElementType;
-
-  DeallocBoxInst(SILDebugLocation DebugLoc, SILType elementType,
-                 SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand), ElementType(elementType) {}
-
-public:
-  SILType getElementType() const { return ElementType; }
+  DeallocBoxInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand) {}
 };
 
 /// Deallocate memory allocated for a boxed existential container created by
@@ -5536,19 +5584,11 @@ struct ilist_traits<::swift::SILInstruction> :
   using SILInstruction = ::swift::SILInstruction;
 
 private:
-  mutable ilist_half_node<SILInstruction> Sentinel;
-
   swift::SILBasicBlock *getContainingBlock();
 
-public:
-  SILInstruction *createSentinel() const {
-    return static_cast<SILInstruction*>(&Sentinel);
-  }
-  void destroySentinel(SILInstruction *) const {}
+  using instr_iterator = simple_ilist<SILInstruction>::iterator;
 
-  SILInstruction *provideInitialHead() const { return createSentinel(); }
-  SILInstruction *ensureHead(SILInstruction*) const { return createSentinel(); }
-  static void noteHead(SILInstruction*, SILInstruction*) {}
+public:
   static void deleteNode(SILInstruction *V) {
     SILInstruction::destroy(V);
   }
@@ -5556,8 +5596,7 @@ public:
   void addNodeToList(SILInstruction *I);
   void removeNodeFromList(SILInstruction *I);
   void transferNodesFromList(ilist_traits<SILInstruction> &L2,
-                             ilist_iterator<SILInstruction> first,
-                             ilist_iterator<SILInstruction> last);
+                             instr_iterator first, instr_iterator last);
 
 private:
   void createNode(const SILInstruction &);

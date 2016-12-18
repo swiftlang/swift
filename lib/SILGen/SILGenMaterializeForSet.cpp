@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -26,6 +26,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -53,6 +54,8 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
   closure.getCaptureInfo().setGenericParamCaptures(true);
 
   Mangle::Mangler mangler;
+  NewMangling::ASTMangler NewMangler;
+  std::string New;
   if (conformance) {
     // Concrete witness thunk for a conformance:
     //
@@ -60,14 +63,19 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
     // within the requirement.
     mangler.append("_TTW");
     mangler.mangleProtocolConformance(conformance);
+    New = NewMangler.mangleClosureWitnessThunk(conformance, &closure);
   } else {
     // Default witness thunk or concrete implementation:
     //
     // Mangle this as if it were a closure within the requirement.
     mangler.append("_T");
+    New = NewMangler.mangleClosureEntity(&closure,
+                                NewMangling::ASTMangler::SymbolKind::Default);
   }
-  mangler.mangleClosureEntity(&closure, /*uncurryLevel=*/1);
-  return mangler.finalize();
+  mangler.mangleClosureEntity(&closure, /*uncurryingLevel=*/1);
+  std::string Old = mangler.finalize();
+
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// A helper class for emitting materializeForSet.
@@ -201,7 +209,7 @@ public:
                             ArrayRef<Substitution> witnessSubs) {
     auto *dc = witness->getDeclContext();
     Type selfInterfaceType = dc->getSelfInterfaceType();
-    Type selfType = dc->getSelfTypeInContext();
+    Type selfType = witness->mapTypeIntoContext(selfInterfaceType);
 
     SILDeclRef constant(witness);
     auto constantInfo = SGM.Types.getConstantInfo(constant);
@@ -305,7 +313,7 @@ public:
     }
 
     CanType witnessSelfType =
-      Witness->computeInterfaceSelfType(false)->getCanonicalType();
+      Witness->computeInterfaceSelfType()->getCanonicalType();
     witnessSelfType = getSubstWitnessInterfaceType(witnessSelfType);
     if (auto selfTuple = dyn_cast<TupleType>(witnessSelfType)) {
       assert(selfTuple->getNumElements() == 1);
@@ -317,8 +325,9 @@ public:
     // load+materialize in some cases, but it's not really important.
     SILValue selfValue = self.getValue();
     if (selfValue->getType().isAddress()) {
-      selfValue =
-          gen.B.createLoad(loc, selfValue, LoadOwnershipQualifier::Unqualified);
+      // SEMANTIC ARC TODO: We are returning self as a borrowed value. Is this
+      // correct?
+      selfValue = gen.B.createLoadBorrow(loc, selfValue);
     }
 
     // Do a derived-to-base conversion if necessary.
@@ -376,9 +385,8 @@ public:
   /// Given part of the witness's interface type, produce its
   /// substitution according to the witness substitutions.
   CanType getSubstWitnessInterfaceType(CanType type) {
-    return SubstSelfType->getTypeOfMember(SGM.SwiftModule, type,
-                                          WitnessStorage->getDeclContext())
-                        ->getCanonicalType();
+    auto subs = SubstSelfType->getMemberSubstitutions(WitnessStorage);
+    return type.subst(SGM.SwiftModule, subs)->getCanonicalType();
   }
 
 };
@@ -402,7 +410,7 @@ void MaterializeForSetEmitter::emit(SILGenFunction &gen) {
   // If there's an abstraction difference, we always need to use the
   // get/set pattern.
   AccessStrategy strategy;
-  if (WitnessStorage->getType()->is<ReferenceStorageType>() ||
+  if (WitnessStorage->getInterfaceType()->is<ReferenceStorageType>() ||
       (RequirementStorageType != WitnessStorageType)) {
     strategy = AccessStrategy::DispatchToAccessor;
   } else {
@@ -556,7 +564,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
     auto makeParam = [&](unsigned index) -> SILArgument* {
       SILType type = gen.F.mapTypeIntoContext(
           callbackType->getParameters()[index].getSILType());
-      return new (SGM.M) SILArgument(gen.F.begin(), type);
+      return gen.F.begin()->createArgument(type);
     };
 
     // Add arguments for all the parameters.
@@ -630,8 +638,9 @@ SILValue MaterializeForSetEmitter::emitUsingAddressor(SILGenFunction &gen,
   } else {
     SILValue allocatedCallbackBuffer =
       gen.B.createAllocValueBuffer(loc, owner.getType(), callbackBuffer);
-    gen.B.createStore(loc, owner.forward(gen), allocatedCallbackBuffer,
-                      StoreOwnershipQualifier::Unqualified);
+    gen.B.emitStoreValueOperation(loc, owner.forward(gen),
+                                  allocatedCallbackBuffer,
+                                  StoreOwnershipQualifier::Init);
 
     callback = createAddressorCallback(gen.F, owner.getType(), addressorKind);
   }
@@ -650,8 +659,8 @@ MaterializeForSetEmitter::createAddressorCallback(SILFunction &F,
                             SILValue self) {
     auto ownerAddress =
       gen.B.createProjectValueBuffer(loc, ownerType, callbackStorage);
-    auto owner = gen.B.createLoad(loc, ownerAddress,
-                                  LoadOwnershipQualifier::Unqualified);
+    auto owner = gen.B.emitLoadValueOperation(loc, ownerAddress,
+                                              LoadOwnershipQualifier::Take);
 
     switch (addressorKind) {
     case AddressorKind::NotAddressor:
@@ -736,7 +745,7 @@ namespace {
       gen.B.createDeallocValueBuffer(loc, ValueType, Buffer);
     }
   }; 
-}
+} // end anonymous namespace
 
 /// Emit a materializeForSet callback that stores the value from the
 /// result buffer back into the l-value.
@@ -763,8 +772,8 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
       SILValue indicesV =
         gen.B.createProjectValueBuffer(loc, indicesTy, callbackBuffer);
       if (indicesTL->isLoadable())
-        indicesV = gen.B.createLoad(loc, indicesV,
-                                    LoadOwnershipQualifier::Unqualified);
+        indicesV = indicesTL->emitLoad(gen.B, loc, indicesV,
+                                       LoadOwnershipQualifier::Take);
       ManagedValue mIndices =
         gen.emitManagedRValueWithCleanup(indicesV, *indicesTL);
 
@@ -784,7 +793,7 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
     value = gen.B.createPointerToAddress(
       loc, value, valueTL.getLoweredType().getAddressType(), /*isStrict*/ true);
     if (valueTL.isLoadable())
-      value = gen.B.createLoad(loc, value, LoadOwnershipQualifier::Unqualified);
+      value = valueTL.emitLoad(gen.B, loc, value, LoadOwnershipQualifier::Take);
     ManagedValue mValue = gen.emitManagedRValueWithCleanup(value, valueTL);
     RValue rvalue(gen, loc, lvalue.getSubstFormalType(), mValue);
 

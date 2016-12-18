@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -86,6 +86,14 @@ public:
 
   bool IsInCommentLine() {
     return InCommentLine;
+  }
+
+  bool isSwitchControlStmt(unsigned LineIndex, StringRef Text) {
+    if (!isSwitchContext())
+      return false;
+    StringRef LineText = swift::ide::getTrimmedTextForLine(LineIndex, Text);
+    return LineText.startswith("break") || LineText.startswith("continue") ||
+      LineText.startswith("return") || LineText.startswith("fallthrough");
   }
 
   void padToSiblingColumn(StringBuilder &Builder) {
@@ -248,7 +256,8 @@ public:
     return E->getEndLoc().isValid() && SM.getLineNumber(E->getEndLoc()) == Line;
   };
 
-  bool shouldAddIndentForLine(unsigned Line, TokenInfo TInfo) {
+  bool shouldAddIndentForLine(unsigned Line, TokenInfo TInfo,
+                              const CodeFormatOptions &FmtOptions) {
     if (Cursor == Stack.rend())
       return false;
 
@@ -276,7 +285,7 @@ public:
       // case xyz: <-- No indent here, should be at same level as switch.
       Stmt *AtStmtStart = Start.getAsStmt();
       if (AtStmtStart && isa<CaseStmt>(AtStmtStart))
-        return false;
+        return FmtOptions.IndentSwitchCase;
 
       // If we're at the open brace of the switch, don't add an indent.
       // For example:
@@ -292,7 +301,7 @@ public:
           // // case comment <-- No indent here.
           // case 0:
           if (SM.getLineAndColumn(Case->swift::Stmt::getStartLoc()).first == Line + 1)
-            return false;
+            return FmtOptions.IndentSwitchCase;
         }
       }
     }
@@ -813,8 +822,18 @@ public:
       ExpandedIndent -= ExpandedIndent % Width;
     };
 
-    if (LineAndColumn.second > 0 && FC.shouldAddIndentForLine(LineIndex, ToInfo))
+    if (LineAndColumn.second > 0 &&
+        FC.shouldAddIndentForLine(LineIndex, ToInfo, FmtOptions))
       AddIndentFunc();
+
+    // Control statements in switch align with the rest of the block in case.
+    // For example:
+    // switch ... {
+    //   case xyz:
+    //     break <-- Extra indent level here.
+    if (FmtOptions.IndentSwitchCase && FC.isSwitchControlStmt(LineIndex, Text))
+      AddIndentFunc();
+
     if (FC.IsInDocCommentBlock()) {
 
       // Inside doc comment block, the indent is one space, e.g.

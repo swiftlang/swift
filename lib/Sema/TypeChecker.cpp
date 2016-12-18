@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -81,7 +81,7 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
              Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->hasType()) {
+  if (protocol && !protocol->hasInterfaceType()) {
     validateDecl(protocol);
     if (protocol->isInvalid())
       return nullptr;
@@ -199,7 +199,7 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
 /// unambiguous name.
 Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
                                                 ConstructorDecl *ctor) {
-  Type argType = ctor->getArgumentType();
+  Type argType = ctor->getArgumentInterfaceType();
   auto argTuple = argType->getAs<TupleType>();
   if (!argTuple) return argType;
 
@@ -247,7 +247,7 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
         return Type();
       }
 
-      auto tyDecl = dyn_cast<TypeDecl>(results.front());
+      auto tyDecl = dyn_cast<NominalTypeDecl>(results.front());
       if (!tyDecl) {
         diagnose(SourceLoc(), diag::broken_bool);
         return Type();
@@ -265,8 +265,7 @@ namespace swift {
 /// of the requirements, because they will be inferred.
 GenericParamList *cloneGenericParams(ASTContext &ctx,
                                      DeclContext *dc,
-                                     GenericParamList *fromParams,
-                                     GenericParamList *outerParams) {
+                                     GenericParamList *fromParams) {
   // Clone generic parameters.
   SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
   for (auto fromGP : *fromParams) {
@@ -283,10 +282,15 @@ GenericParamList *cloneGenericParams(ASTContext &ctx,
 
   auto toParams = GenericParamList::create(ctx, SourceLoc(), toGenericParams,
                                            SourceLoc());
+
+  auto outerParams = fromParams->getOuterParameters();
+  if (outerParams != nullptr)
+    outerParams = cloneGenericParams(ctx, dc, outerParams);
   toParams->setOuterParameters(outerParams);
+
   return toParams;
 }
-}
+} // namespace swift
 
 // FIXME: total hack
 GenericParamList *createProtocolGenericParams(ASTContext &ctx,
@@ -318,6 +322,15 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   // Dig out the extended type.
   auto extendedType = ED->getExtendedType();
+
+  // Hack to allow extending a generic typealias.
+  if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
+      extendedType = aliasDecl->getDeclaredInterfaceType()->getAnyNominal()
+          ->getDeclaredType();
+      ED->getExtendedTypeLoc().setType(extendedType);
+    }
+  }
 
   // Handle easy cases.
 
@@ -353,7 +366,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   // If the extended type is generic or is a protocol. Clone or create
   // the generic parameters.
-  if (extendedNominal->getGenericParams()) {
+  if (extendedNominal->isGenericContext()) {
     if (auto proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
       // For a protocol extension, build the generic parameter list.
       ED->setGenericParams(proto->createGenericParams(ED));
@@ -361,15 +374,14 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
       // Clone the existing generic parameter list.
       ED->setGenericParams(
         cloneGenericParams(TC.Context, ED,
-                           extendedNominal->getGenericParams(),
-                           nullptr));
+                           extendedNominal->getGenericParamsOfContext()));
     }
   }
 
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
   if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-    if (!extendedNominal->getGenericParams()) {
+    if (!extendedNominal->isGenericContext()) {
       // Only generic and protocol types are permitted to have
       // trailing where clauses.
       TC.diagnose(ED, diag::extension_nongeneric_trailing_where, extendedType)
@@ -505,6 +517,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
+           !TC.ValidatedTypes.empty() ||
            !TC.UsedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
@@ -544,6 +557,12 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 unsigned WarnLongFunctionBodies) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
+
+  // Resolve condition clauses so name binding can accurately track imports.
+  {
+    SharedTimer timer("Condition resolution");
+    performConditionResolution(SF);
+  }
 
   // Make sure that name binding has been completed before doing any type
   // checking.
@@ -680,11 +699,12 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
-  return performTypeLocChecking(Ctx, T,
-                                /*isSILMode=*/false,
-                                /*isSILType=*/false,
-                                /*GenericEnv=*/nullptr,
-                                DC, ProduceDiagnostics);
+  return performTypeLocChecking(
+                            Ctx, T,
+                            /*isSILMode=*/false,
+                            /*isSILType=*/false,
+                            /*GenericEnv=*/DC->getGenericEnvironmentOfContext(),
+                            DC, ProduceDiagnostics);
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
@@ -702,27 +722,21 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (isSILType)
     options |= TR_SILType;
 
-  // FIXME: Get rid of PartialGenericTypeToArchetypeResolver
   GenericTypeToArchetypeResolver contextResolver(GenericEnv);
-  PartialGenericTypeToArchetypeResolver defaultResolver;
-
-  GenericTypeResolver *resolver =
-      (GenericEnv ? (GenericTypeResolver *) &contextResolver
-                  : (GenericTypeResolver *) &defaultResolver);
 
   if (ProduceDiagnostics) {
-    return TypeChecker(Ctx).validateType(T, DC, options, resolver);
+    return TypeChecker(Ctx).validateType(T, DC, options, &contextResolver);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    return TypeChecker(Ctx, Diags).validateType(T, DC, options, resolver);
+    return TypeChecker(Ctx, Diags).validateType(T, DC, options,
+                                                &contextResolver);
   }
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-std::pair<GenericSignature *, GenericEnvironment *>
-swift::handleSILGenericParams(ASTContext &Ctx,
-                              GenericParamList *genericParams,
+GenericEnvironment *
+swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
                               DeclContext *DC) {
   return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
@@ -752,7 +766,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
   case CompletionTypeCheckKind::ObjCKeyPath:
     referencedDecl = nullptr;
     if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(parsedExpr))
-      return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResulType=*/true);
+      return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResultType=*/true);
 
     return None;
   }
@@ -960,7 +974,7 @@ public:
   }
 
 private:
-  virtual bool walkToDeclPre(Decl *D) override {
+  bool walkToDeclPre(Decl *D) override {
     TypeRefinementContext *DeclTRC = getNewContextForWalkOfDecl(D);
 
     if (DeclTRC) {
@@ -970,7 +984,7 @@ private:
     return true;
   }
 
-  virtual bool walkToDeclPost(Decl *D) override {
+  bool walkToDeclPost(Decl *D) override {
     if (ContextStack.back().ScopeNode.getAsDecl() == D) {
       ContextStack.pop_back();
     }
@@ -1091,7 +1105,7 @@ private:
     return D->getSourceRange();
   }
 
-  virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *IS = dyn_cast<IfStmt>(S)) {
       buildIfStmtRefinementContext(IS);
       return std::make_pair(false, S);
@@ -1110,7 +1124,7 @@ private:
     return std::make_pair(true, S);
   }
 
-  virtual Stmt *walkToStmtPost(Stmt *S) override {
+  Stmt *walkToStmtPost(Stmt *S) override {
     // If we have multiple guard statements in the same block
     // then we may have multiple refinement contexts to pop
     // after walking that block.
@@ -1411,7 +1425,7 @@ private:
     return AvailabilityContext(VersionRange::allGTE(VersionSpec->getVersion()));
   }
 
-  virtual Expr *walkToExprPost(Expr *E) override {
+  Expr *walkToExprPost(Expr *E) override {
     if (ContextStack.back().ScopeNode.getAsExpr() == E) {
       ContextStack.pop_back();
     }
@@ -1420,7 +1434,7 @@ private:
   }
 };
   
-}
+} // end anonymous namespace
 
 void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
                                                       unsigned StartElem) {
@@ -1600,23 +1614,23 @@ public:
   /// the predicate.
   Optional<ASTNode> getInnermostMatchingNode() { return InnermostMatchingNode; }
 
-  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     return std::make_pair(walkToRangePre(E->getSourceRange()), E);
   }
 
-  virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     return std::make_pair(walkToRangePre(S->getSourceRange()), S);
   }
 
-  virtual bool walkToDeclPre(Decl *D) override {
+  bool walkToDeclPre(Decl *D) override {
     return walkToRangePre(D->getSourceRange());
   }
 
-  virtual std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
     return std::make_pair(walkToRangePre(P->getSourceRange()), P);
   }
 
-  virtual bool walkToTypeReprPre(TypeRepr *T) override {
+  bool walkToTypeReprPre(TypeRepr *T) override {
     return walkToRangePre(T->getSourceRange());
   }
 
@@ -1646,7 +1660,7 @@ public:
     return SM.rangeContains(Range, TargetRange);
   }
 
-  virtual Expr *walkToExprPost(Expr *E) override {
+  Expr *walkToExprPost(Expr *E) override {
     if (walkToNodePost(E)) {
       return E;
     }
@@ -1654,7 +1668,7 @@ public:
     return nullptr;
   }
 
-  virtual Stmt *walkToStmtPost(Stmt *S) override {
+  Stmt *walkToStmtPost(Stmt *S) override {
     if (walkToNodePost(S)) {
       return S;
     }
@@ -1662,7 +1676,7 @@ public:
     return nullptr;
   }
 
-  virtual bool walkToDeclPost(Decl *D) override {
+  bool walkToDeclPost(Decl *D) override {
     return walkToNodePost(D);
   }
 

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -434,6 +434,9 @@ namespace swift {
     void setShowDiagnosticsAfterFatalError(bool val = true) {
       showDiagnosticsAfterFatalError = val;
     }
+    bool getShowDiagnosticsAfterFatalError() {
+      return showDiagnosticsAfterFatalError;
+    }
 
     /// \brief Whether to skip emitting warnings
     void setSuppressWarnings(bool val) { suppressWarnings = val; }
@@ -508,6 +511,9 @@ namespace swift {
 
     void setShowDiagnosticsAfterFatalError(bool val = true) {
       state.setShowDiagnosticsAfterFatalError(val);
+    }
+    bool getShowDiagnosticsAfterFatalError() {
+      return state.getShowDiagnosticsAfterFatalError();
     }
 
     /// \brief Whether to skip emitting warnings

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -34,14 +34,14 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 SILBasicBlock *SILGenFunction::createBasicBlock(SILBasicBlock *afterBB) {
   // Honor an explicit placement if given.
   if (afterBB) {
-    return new (F.getModule()) SILBasicBlock(&F, afterBB);
+    return F.createBasicBlock(afterBB);
 
-  // If we don't have a requested placement, but we do have a current
-  // insertion point, insert there.
+    // If we don't have a requested placement, but we do have a current
+    // insertion point, insert there.
   } else if (B.hasValidInsertionPoint()) {
-    return new (F.getModule()) SILBasicBlock(&F, B.getInsertionBB());
+    return F.createBasicBlock(B.getInsertionBB());
 
-  // Otherwise, insert at the end of the current section.
+    // Otherwise, insert at the end of the current section.
   } else {
     return createBasicBlock(CurFunctionSection);
   }
@@ -55,13 +55,13 @@ SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
     SILBasicBlock *afterBB = (StartOfPostmatter != F.end())
                                  ? &*std::prev(StartOfPostmatter)
                                  : nullptr;
-    return new (F.getModule()) SILBasicBlock(&F, afterBB);
+    return F.createBasicBlock(afterBB);
   }
 
   case FunctionSection::Postmatter: {
     // The end of the postmatter section is always the end of the function.
     // Register the new block as the start of the postmatter if needed.
-    SILBasicBlock *newBB = new (F.getModule()) SILBasicBlock(&F, nullptr);
+    SILBasicBlock *newBB = F.createBasicBlock(nullptr);
     if (StartOfPostmatter == F.end())
       StartOfPostmatter = newBB->getIterator();
     return newBB;
@@ -104,7 +104,7 @@ namespace {
                       CleanupLocation(cleanupLoc));
     }
   };
-}
+} // end anonymous namespace
 
 void SILGenFunction::emitStmt(Stmt *S) {
   StmtEmitter(*this).visit(S);
@@ -166,7 +166,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   SILBasicBlock *ContBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
-    new (F.getModule()) SILArgument(ContBB, argTy);
+    ContBB->createArgument(argTy);
   }
   
   SILBasicBlock *FalseBB, *FalseDestBB;
@@ -261,7 +261,7 @@ namespace {
       if (cleanup.isValid()) Cleanups.push_back(cleanup);
     }
   };
-}
+} // end anonymous namespace
 
 static InitializationPtr
 prepareIndirectResultInit(SILGenFunction &gen, CanType resultType,
@@ -406,7 +406,7 @@ namespace {
       assert(false && "Sema didn't catch exit out of a defer?");
     }
   };
-}
+} // end anonymous namespace
 
 
 namespace {
@@ -426,7 +426,7 @@ namespace {
         SGF.Cleanups.setCleanupState(TheCleanup, CleanupState::Dead);
     }
   };
-}
+} // end anonymous namespace
 
 
 void StmtEmitter::visitDeferStmt(DeferStmt *S) {
@@ -620,7 +620,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   JumpDest throwDest = createJumpDest(S->getBody(),
                                       FunctionSection::Postmatter);
   SILArgument *exnArg =
-    throwDest.getBlock()->createBBArg(exnTL.getLoweredType());
+      throwDest.getBlock()->createArgument(exnTL.getLoweredType());
 
   // We always need a continuation block because we might fall out of
   // a catch block.  But we don't need a loop block unless the 'do'
@@ -906,7 +906,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // For now, don't try to re-use destination blocks for multiple
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
-  SILValue exn = destBB->createBBArg(exnResult.getSILType());
+  SILValue exn = destBB->createArgument(exnResult.getSILType());
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);

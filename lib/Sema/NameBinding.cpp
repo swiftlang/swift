@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Parse/Parser.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -60,7 +61,7 @@ namespace {
     /// Returns null if no module can be loaded.
     Module *getModule(ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
   };
-}
+} // end anonymous namespace
 
 Module *
 NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
@@ -111,6 +112,8 @@ static bool isCompatibleImportKind(ImportKind expected, ImportKind actual) {
   case ImportKind::Func:
     return false;
   }
+
+  llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
 static const char *getImportKindString(ImportKind kind) {
@@ -132,6 +135,8 @@ static const char *getImportKindString(ImportKind kind) {
   case ImportKind::Func:
     return "func";
   }
+
+  llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
 static bool shouldImportSelfImportClang(const ImportDecl *ID,

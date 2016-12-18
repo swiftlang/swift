@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %gyb -D_runtime=%target-runtime %s -o %t/main.swift
-// RUN: %line-directive %t/main.swift -- %target-swift-frontend -parse -verify %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify %t/main.swift
 
 func test_StringSubscriptByInt(
   x: String,

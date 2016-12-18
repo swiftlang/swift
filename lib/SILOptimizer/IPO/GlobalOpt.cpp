@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,6 +25,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 using namespace swift;
 
 namespace {
@@ -147,7 +148,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
   }
 };
 
-} // namespace
+} // end anonymous namespace
 
 /// If this is a call to a global initializer, map it.
 void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
@@ -190,15 +191,24 @@ static void removeToken(SILValue Op) {
   }
 }
 
+static std::string mangleGetter(VarDecl *varDecl) {
+  Mangle::Mangler getterMangler;
+  getterMangler.append("_T");
+  getterMangler.mangleGlobalGetterEntity(varDecl);
+  std::string Old = getterMangler.finalize();
+
+  NewMangling::ASTMangler NewMangler;
+  std::string New = NewMangler.mangleGlobalGetterEntity(varDecl);
+
+  return NewMangling::selectMangling(Old, New);
+}
+
 /// Generate getter from the initialization code whose
 /// result is stored by a given store instruction.
 static SILFunction *genGetterFromInit(StoreInst *Store,
                                       SILGlobalVariable *SILG) {
   auto *varDecl = SILG->getDecl();
-
-  Mangle::Mangler getterMangler;
-  getterMangler.mangleGlobalGetterEntity(varDecl);
-  auto getterName = getterMangler.finalize();
+  auto getterName = mangleGetter(varDecl);
 
   // Check if a getter was generated already.
   if (auto *F = Store->getModule().lookUpFunction(getterName))
@@ -231,7 +241,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
       ParameterConvention::Direct_Owned, { }, Results, None,
       Store->getModule().getASTContext());
   auto *GetterF = Store->getModule().getOrCreateFunction(Store->getLoc(),
-      getterName, SILLinkage::PrivateExternal, LoweredType,
+      getterName, SILLinkage::Private, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsFragile_t::IsFragile);
   GetterF->setDebugScope(Store->getFunction()->getDebugScope());
@@ -469,9 +479,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
 static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
 
-  Mangle::Mangler getterMangler;
-  getterMangler.mangleGlobalGetterEntity(varDecl);
-  auto getterName = getterMangler.finalize();
+  auto getterName = mangleGetter(varDecl);
 
   // Check if a getter was generated already.
   if (auto *F = InitF->getModule().lookUpFunction(getterName))
@@ -486,7 +494,7 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
       ParameterConvention::Direct_Owned, { }, Results, None,
       InitF->getASTContext());
   auto *GetterF = InitF->getModule().getOrCreateFunction(InitF->getLocation(),
-     getterName, SILLinkage::PrivateExternal, LoweredType,
+     getterName, SILLinkage::Private, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsFragile_t::IsFragile);
   if (InitF->hasUnqualifiedOwnership())
@@ -930,7 +938,7 @@ class SILGlobalOptPass : public SILModuleTransform
 
   StringRef getName() override { return "SIL Global Optimization"; }
 };
-} // anonymous
+} // end anonymous namespace
 
 SILTransform *swift::createGlobalOpt() {
   return new SILGlobalOptPass();

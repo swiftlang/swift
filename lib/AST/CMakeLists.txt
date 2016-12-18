@@ -2,6 +2,7 @@ add_swift_library(swiftAST STATIC
   ArchetypeBuilder.cpp
   ASTContext.cpp
   ASTDumper.cpp
+  ASTMangler.cpp
   ASTNode.cpp
   ASTPrinter.cpp
   ASTScope.cpp
@@ -36,7 +37,9 @@ add_swift_library(swiftAST STATIC
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   RawComment.cpp
+  SILLayout.cpp
   Stmt.cpp
+  StmtTransformer.cpp
   SourceEntityWalker.cpp
   Substitution.cpp
   SubstitutionMap.cpp

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -149,7 +149,7 @@ public:
   bool inlineCallsIntoFunction(SILFunction *F);
 };
 
-} // namespace
+} // end anonymous namespace
 
 // Return true if the callee has self-recursive calls.
 static bool calleeIsSelfRecursive(SILFunction *Callee) {
@@ -310,8 +310,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
           BlockW.updateBenefit(Benefit, RemovedStoreBenefit);
       } else if (isa<StrongReleaseInst>(&I) || isa<ReleaseValueInst>(&I)) {
         SILValue Op = stripCasts(I.getOperand(0));
-        if (SILArgument *Arg = dyn_cast<SILArgument>(Op)) {
-          if (Arg->isFunctionArg() && Arg->getArgumentConvention() ==
+        if (auto *Arg = dyn_cast<SILFunctionArgument>(Op)) {
+          if (Arg->getArgumentConvention() ==
               SILArgumentConvention::Direct_Guaranteed) {
             BlockW.updateBenefit(Benefit, RefCountBenefit);
           }
@@ -325,8 +325,9 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     SILBasicBlock *takenBlock = constTracker.getTakenBlock(block->getTerminator());
     if (takenBlock) {
       BlockW.updateBenefit(Benefit, RemovedTerminatorBenefit);
-      domOrder.pushChildrenIf(block, [=] (SILBasicBlock *child) {
-        return child->getSinglePredecessor() != block || child == takenBlock;
+      domOrder.pushChildrenIf(block, [=](SILBasicBlock *child) {
+        return child->getSinglePredecessorBlock() != block ||
+               child == takenBlock;
       });
     } else {
       domOrder.pushChildren(block);

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // ----------------------------------------------------------------------------
 // Using protocol requirements from inside protocol extensions
@@ -221,7 +221,7 @@ func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
-  s4d.extP4Int() // expected-error{{'Int' is not convertible to 'S4d.AssocP4' (aka 'Bool')}}
+  s4d.extP4Int() // expected-error{{'Bool' is not convertible to 'Int'}}
   _ = b1
 }
 
@@ -906,3 +906,10 @@ protocol BadProto5 {
 }
 
 class BadClass5 : BadProto5 {} // expected-error{{type 'BadClass5' does not conform to protocol 'BadProto5'}}
+
+typealias A = BadProto1
+typealias B = BadProto1
+
+extension A & B { // expected-error{{protocol 'BadProto1' in the module being compiled cannot be extended via a typealias}}
+
+}

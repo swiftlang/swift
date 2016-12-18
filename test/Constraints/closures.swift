@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func myMap<T1, T2>(_ array: [T1], _ fn: (T1) -> T2) -> [T2] {}
 
@@ -8,8 +8,8 @@ _ = myMap(intArray, { String($0) })
 _ = myMap(intArray, { x -> String in String(x) } )
 
 // Closures with too few parameters.
-func foo(_ x: ((Int, Int)) -> Int) {}
-foo({$0}) // expected-error{{cannot convert value of type '(Int, Int)' to closure result type 'Int'}}
+func foo(_ x: (Int, Int) -> Int) {}
+foo({$0}) // expected-error{{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
 
 struct X {}
 func mySort(_ array: [String], _ predicate: (String, String) -> Bool) -> [String] {}
@@ -130,7 +130,7 @@ var _: (Int) -> Int = {a,b in 0}
 // expected-error @+1 {{contextual closure type '(Int) -> Int' expects 1 argument, but 3 were used in closure body}}
 var _: (Int) -> Int = {a,b,c in 0}
 
-var _: ((Int, Int)) -> Int = {a in 0}
+var _: (Int, Int) -> Int = {a in 0}
 
 // expected-error @+1 {{contextual closure type '(Int, Int, Int) -> Int' expects 3 arguments, but 2 were used in closure body}}
 var _: (Int, Int, Int) -> Int = {a, b in a+b}
@@ -323,8 +323,6 @@ func r20789423() {
   
 }
 
-let f: (Int, Int) -> Void = { x in }  // expected-error {{contextual closure type specifies '(Int, Int)', but 1 was used in closure body, try adding extra parentheses around the single tuple argument}}
-
 // Make sure that behavior related to allowing trailing closures to match functions
 // with Any as a final parameter is the same after the changes made by SR-2505, namely:
 // that we continue to select function that does _not_ have Any as a final parameter in
@@ -351,6 +349,9 @@ class C_SR_2505 : P_SR_2505 {
   }
 
   func call(_ c: C_SR_2505) -> Bool {
+    // Note: no diagnostic about capturing 'self', because this is a
+    // non-escaping closure -- that's how we know we have selected
+    // test(it:) and not test(_)
     return c.test { o in test(o) }
   }
 }
@@ -368,3 +369,18 @@ func fn_r28909024(n: Int) {
     _ in true
   }
 }
+
+// SR-2994: Unexpected ambiguous expression in closure with generics
+struct S_2994 {
+  var dataOffset: Int
+}
+class C_2994<R> {
+  init(arg: (R) -> Void) {}
+}
+func f_2994(arg: String) {}
+func g_2994(arg: Int) -> Double {
+  return 2
+}
+C_2994<S_2994>(arg: { (r: S_2994) in f_2994(arg: g_2994(arg: r.dataOffset)) }) // expected-error {{cannot convert value of type 'Double' to expected argument type 'String'}}
+
+let _ = { $0[$1] }(1, 1) // expected-error {{cannot subscript a value of incorrect or ambiguous type}}

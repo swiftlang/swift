@@ -5,17 +5,18 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <vector>
 
@@ -33,6 +34,8 @@ class SILTransform;
 
 /// \brief The SIL pass manager.
 class SILPassManager {
+  using ExecutionKind = SILPassPipelinePlan::ExecutionKind;
+
   /// The module that the pass manager will transform.
   SILModule *Mod;
 
@@ -209,18 +212,37 @@ public:
     }
   }
 
+  void executePassPipelinePlan(const SILPassPipelinePlan &Plan) {
+    for (const SILPassPipeline &Pipeline : Plan.getPipelines()) {
+      setStageName(Pipeline.Name);
+      resetAndRemoveTransformations();
+      for (PassKind Kind : Plan.getPipelinePasses(Pipeline)) {
+        addPass(Kind);
+      }
+      execute(Pipeline.ExecutionKind);
+    }
+  }
+
+private:
+  void execute(ExecutionKind K) {
+    switch (K) {
+    case ExecutionKind::OneIteration:
+      runOneIteration();
+      break;
+    case ExecutionKind::UntilFixPoint:
+      run();
+      break;
+    case ExecutionKind::Invalid:
+      llvm_unreachable("Invalid execution kind?!");
+    }
+  }
+
   /// Add a pass of a specific kind.
   void addPass(PassKind Kind);
 
   /// Add a pass with a given name.
   void addPassForName(StringRef Name);
 
-  // Each pass gets its own add-function.
-#define PASS(ID, NAME, DESCRIPTION) void add##ID();
-#include "Passes.def"
-
-  typedef llvm::ArrayRef<SILFunctionTransform *> PassList;
-private:
   /// Run the SIL module transform \p SMT over all the functions in
   /// the module.
   void runModulePass(SILModuleTransform *SMT);
@@ -231,7 +253,7 @@ private:
   /// Run the passes in \p FuncTransforms. Return true
   /// if the pass manager requested to stop the execution
   /// of the optimization cycle (this is a debug feature).
-  void runFunctionPasses(PassList FuncTransforms);
+  void runFunctionPasses(ArrayRef<SILFunctionTransform *> FuncTransforms);
 
   /// A helper function that returns (based on SIL stage and debug
   /// options) whether we should continue running passes.

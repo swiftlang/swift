@@ -5,15 +5,15 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include <random>
 #include <type_traits>
 #include <cmath>
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #include <io.h>
 #else
 #include <unistd.h>
@@ -37,7 +37,7 @@ void swift::_swift_stdlib_free(void *ptr) {
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 int swift::_swift_stdlib_putchar_unlocked(int c) {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   return _putc_nolock(c, stdout);
 #else
   return putchar_unlocked(c);
@@ -65,7 +65,7 @@ int swift::_swift_stdlib_memcmp(const void *s1, const void *s2,
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t
 swift::_swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   return _read(fd, buf, nbyte);
 #else
   return read(fd, buf, nbyte);
@@ -75,7 +75,7 @@ swift::_swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t
 swift::_swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   return _write(fd, buf, nbyte);
 #else
   return write(fd, buf, nbyte);
@@ -84,7 +84,7 @@ swift::_swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 int swift::_swift_stdlib_close(int fd) {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   return _close(fd);
 #else
   return close(fd);
@@ -103,7 +103,7 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(const_cast<void *>(ptr));
 }
-#elif defined(_MSC_VER)
+#elif defined(_WIN32)
 #include <malloc.h>
 SWIFT_RUNTIME_STDLIB_INTERFACE
 size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
@@ -155,7 +155,7 @@ double swift::_swift_stdlib_remainder(double dividend, double divisor) {
 SWIFT_RUNTIME_STDLIB_INTERFACE
 double swift::_swift_stdlib_squareRoot(double x) { return std::sqrt(x); }
 
-#if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
+#if (defined(__i386__) || defined(__x86_64__)) && !defined(_WIN32)
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift::_swift_stdlib_remainderl(void *_self, const void *_other) {
   *(long double *)_self = std::remainder(*(long double *)_self,

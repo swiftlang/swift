@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -252,7 +252,7 @@ static ValueDecl *importNil(ClangImporter::Implementation &Impl,
   auto type = TupleType::getEmpty(Impl.SwiftContext);
   return Impl.createUnavailableDecl(name, DC, type,
                                     "use 'nil' instead of this imported macro",
-                                    /*static=*/false, clangN);
+                                    /*isStatic=*/false, clangN);
 }
 
 static bool isSignToken(const clang::Token &tok) {
@@ -449,7 +449,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                           clangTy->isUnsignedIntegerType() };
       return createMacroConstant(impl, macro, name, DC, type,
                                  clang::APValue(value),
-                                 ConstantConvertKind::Coerce, /*static=*/false,
+                                 ConstantConvertKind::Coerce, /*isStatic=*/false,
                                  ClangN);
     // Check for an expression of the form (FLAG1 | FLAG2), (FLAG1 & FLAG2),
     // (FLAG1 || FLAG2), or (FLAG1 || FLAG2)
@@ -463,12 +463,10 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         auto firstMacroInfo = impl.getClangPreprocessor().getMacroInfo(firstID);
         auto secondMacroInfo = impl.getClangPreprocessor().getMacroInfo(
                                                                       secondID);
-        auto firstIdentifier = importMacroName(firstID, firstMacroInfo,
-                                               impl.getClangASTContext(),
-                                               impl.SwiftContext);
-        auto secondIdentifier = importMacroName(secondID, secondMacroInfo,
-                                               impl.getClangASTContext(),
-                                               impl.SwiftContext);
+        auto firstIdentifier =
+            impl.getNameImporter().importMacroName(firstID, firstMacroInfo);
+        auto secondIdentifier =
+            impl.getNameImporter().importMacroName(secondID, secondMacroInfo);
         impl.importMacro(firstIdentifier, firstMacroInfo);
         impl.importMacro(secondIdentifier, secondMacroInfo);
         auto firstIterator = impl.ImportedMacroConstants.find(firstMacroInfo);
@@ -535,7 +533,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         return createMacroConstant(impl, macro, name, DC, type,
                                    value,
                                    ConstantConvertKind::Coerce,
-                                   /*static=*/false, ClangN);
+                                   /*isStatic=*/false, ClangN);
       }
     }
     break;

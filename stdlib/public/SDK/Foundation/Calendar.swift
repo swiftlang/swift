@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -86,16 +86,18 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         case timeZone
     }
     
-    /// Returns the user's current calendar. This calendar does not track changes that the user makes to their preferences.
+    /// Returns the user's current calendar.
+    ///
+    /// This calendar does not track changes that the user makes to their preferences.
     public static var current : Calendar {
         return Calendar(adoptingReference: __NSCalendarCurrent(), autoupdating: false)
     }
     
-    /// A Calendar that tracks changes to user's preferred calendar identifier.
+    /// A Calendar that tracks changes to user's preferred calendar.
     ///
-    /// If mutated, this calendar will no longer autoupdate.
+    /// If mutated, this calendar will no longer track the user's preferred calendar.
     ///
-    /// - note: The autoupdating Calendar will only compare equal to another autoupdating calendar.
+    /// - note: The autoupdating Calendar will only compare equal to another autoupdating Calendar.
     public static var autoupdatingCurrent : Calendar {
         return Calendar(adoptingReference: __NSCalendarAutoupdating(), autoupdating: true)
     }

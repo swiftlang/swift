@@ -649,8 +649,8 @@ class C {
   init(v: Int32)
 }
 
-// CHECK-LABEL: @redundant_switch_enum
-sil @redundant_switch_enum : $@convention(thin) (@owned Optional<C>) -> Int32 {
+// CHECK-LABEL: @redundant_switchenum
+sil @redundant_switchenum : $@convention(thin) (@owned Optional<C>) -> Int32 {
 bb0(%0 : $Optional<C>):
   switch_enum %0 : $Optional<C>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
@@ -2632,8 +2632,8 @@ bb2(%16 : $Error):
 // CHECK: br bb1([[PB]] : $*Builtin.Int32)
 sil @simplified_branch_arg_has_result_value_1 : $@convention(thin) (@in Builtin.Int32) -> Builtin.Int32 {
 entry(%0 : $*Builtin.Int32):
-  %b = alloc_box $Builtin.Int32
-  %p = project_box %b : $@box Builtin.Int32, 0
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %p = project_box %b : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %i = integer_literal $Builtin.Int32, 0
   store %i to %p : $*Builtin.Int32
   br bb1(%p : $*Builtin.Int32)

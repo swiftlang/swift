@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -40,9 +40,12 @@ AbstractionPattern TypeConverter::getAbstractionPattern(AbstractStorageDecl *dec
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(SubscriptDecl *decl) {
-  // TODO: honor the declared type?
-  // TODO: use interface types
-  return AbstractionPattern(decl->getElementType());
+  CanGenericSignature genericSig;
+  if (auto sig = decl->getGenericSignatureOfContext())
+    genericSig = sig->getCanonicalSignature();
+  return AbstractionPattern(genericSig,
+                            decl->getElementInterfaceType()
+                                ->getCanonicalType());
 }
 
 AbstractionPattern
@@ -65,25 +68,26 @@ static const clang::Type *getClangType(const clang::Decl *decl) {
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(VarDecl *var) {
-  CanType swiftType = var->getType()->getCanonicalType();
-  if (auto inout = dyn_cast<InOutType>(swiftType)) {
+  CanGenericSignature genericSig;
+  if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
+    genericSig = sig->getCanonicalSignature();
+
+  CanType swiftType = var->getInterfaceType()->getCanonicalType();
+  if (auto inout = dyn_cast<InOutType>(swiftType))
     swiftType = inout.getObjectType();
-  }
 
   if (auto clangDecl = var->getClangDecl()) {
-    CanGenericSignature genericSig;
-    if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
-      genericSig = sig->getCanonicalSignature();
     auto clangType = getClangType(clangDecl);
-    swiftType = getLoweredBridgedType(AbstractionPattern(genericSig, swiftType, clangType),
-                                      swiftType,
-                               SILFunctionTypeRepresentation::CFunctionPointer,
-                                      TypeConverter::ForMemory)
-      ->getCanonicalType();
+    auto contextType = var->getDeclContext()->mapTypeIntoContext(swiftType);
+    swiftType = getLoweredBridgedType(
+        AbstractionPattern(genericSig, swiftType, clangType),
+        contextType,
+        SILFunctionTypeRepresentation::CFunctionPointer,
+        TypeConverter::ForMemory)->getCanonicalType();
     return AbstractionPattern(genericSig, swiftType, clangType);
-  } else {
-    return AbstractionPattern(swiftType);
   }
+
+  return AbstractionPattern(genericSig, swiftType);
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {

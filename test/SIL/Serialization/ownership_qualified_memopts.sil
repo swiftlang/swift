@@ -1,9 +1,9 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: rm -rfv %t
 // RUN: mkdir %t
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -emit-sib -o %t/tmp.sib -module-name ownership_qualified_memopts
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %t/tmp.sib -o %t/tmp.2.sib -module-name ownership_qualified_memopts
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %t/tmp.2.sib -module-name ownership_qualified_memopts | %FileCheck %s
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name ownership_qualified_memopts
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name ownership_qualified_memopts
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name ownership_qualified_memopts | %FileCheck %s
 
 sil_stage canonical
 

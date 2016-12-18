@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -parse -verify -primary-file %t/main.swift %S/Inputs/Error_other.swift
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/Error_other.swift
 
 enum ClericalErrorDomain: Error {
   case MisplacedDocument(name: String)

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -47,24 +47,6 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
   SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
     if (auto Func = Des->lookupSILFunction(Callee)) {
-      DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
-            << Des->getModuleIdentifier().str() << "\n");
-      if (!Func->empty())
-        return Func;
-      retVal = Func;
-    }
-  }
-  return retVal;
-}
-
-SILFunction *SerializedSILLoader::lookupSILFunction(SILDeclRef Decl) {
-  llvm::SmallString<32> Name;
-  Decl.mangle(Name);
-  // It is possible that one module has a declaration of a SILFunction, while
-  // another has the full definition.
-  SILFunction *retVal = nullptr;
-  for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(Name)) {
       DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
             << Des->getModuleIdentifier().str() << "\n");
       if (!Func->empty())

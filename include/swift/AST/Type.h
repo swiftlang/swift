@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
@@ -40,8 +41,11 @@ class NominalTypeDecl;
 class GenericTypeDecl;
 class NormalProtocolConformance;
 enum OptionalTypeKind : unsigned;
+class ProtocolConformanceRef;
 class ProtocolDecl;
+class ProtocolType;
 class StructDecl;
+class SubstitutableType;
 class SubstitutionMap;
 class TypeBase;
 class Type;
@@ -49,7 +53,68 @@ class TypeWalker;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
-typedef llvm::DenseMap<TypeBase *, Type> TypeSubstitutionMap;
+typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
+
+/// Function used to provide substitutions.
+///
+/// Returns a null \c Type to indicate that there is no substitution for
+/// this substitutable type; otherwise, the replacement type.
+using TypeSubstitutionFn
+  = llvm::function_ref<Type(SubstitutableType *dependentType)>;
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// queries an underlying \c TypeSubstitutionMap.
+struct QueryTypeSubstitutionMap {
+  const TypeSubstitutionMap &substitutions;
+
+  Type operator()(SubstitutableType *type) const;
+};
+
+/// Function used to resolve conformances.
+using LookupConformanceFn
+  = llvm::function_ref<auto(CanType dependentType,
+                            Type conformingReplacementType,
+                            ProtocolType *conformedProtocol)
+                       -> Optional<ProtocolConformanceRef>>;
+  
+/// Functor class suitable for use as a \c LookupConformanceFn to look up a
+/// conformance through a module.
+class LookUpConformanceInModule {
+  ModuleDecl *M;
+public:
+  explicit LookUpConformanceInModule(ModuleDecl *M)
+    : M(M) {}
+  
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
+
+/// Functor class suitable for use as a \c LookupConformanceFn to look up a
+/// conformance in a \c SubstitutionMap.
+class LookUpConformanceInSubstitutionMap {
+  const SubstitutionMap &Subs;
+public:
+  explicit LookUpConformanceInSubstitutionMap(const SubstitutionMap &Subs)
+    : Subs(Subs) {}
+  
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
+
+/// Functor class suitable for use as a \c LookupConformanceFn that provides
+/// only abstract conformances for generic types. Asserts that the replacement
+/// type is an opaque generic type.
+class MakeAbstractConformanceForGenericType {
+public:
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
 
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
@@ -185,6 +250,24 @@ public:
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(const SubstitutionMap &substitutions,
              SubstOptions options = None) const;
+
+  /// Replace references to substitutable types with new, concrete types and
+  /// return the substituted result.
+  ///
+  /// \param substitutions A function mapping from substitutable types to their
+  /// replacements.
+  ///
+  /// \param conformances A function for looking up conformances.
+  ///
+  /// \param options Options that affect the substitutions.
+  ///
+  /// \returns the substituted type, or a null type if an error occurred.
+  Type subst(TypeSubstitutionFn substitutions,
+             LookupConformanceFn conformances,
+             SubstOptions options = None) const;
+
+  /// Replace references to substitutable types with error types.
+  Type substDependentTypesWithErrorTypes() const;
 
   bool isPrivateStdlibType(bool whitelistProtocols=true) const;
 
@@ -458,7 +541,11 @@ public:
   // in Decl.h
   explicit CanGenericSignature(GenericSignature *Signature);
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
-  
+
+  /// Retrieve the canonical generic environment associated with this
+  /// generic signature.
+  GenericEnvironment *getGenericEnvironment(ModuleDecl &module) const;
+
   GenericSignature *operator->() const {
     return Signature;
   }

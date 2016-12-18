@@ -1,4 +1,5 @@
-// RUN: %target-parse-verify-swift -enable-experimental-property-behaviors -module-name Main
+// RUN: %target-typecheck-verify-swift -enable-experimental-property-behaviors -module-name Main
+// REQUIRES: property_behavior_value_substitution
 
 protocol behavior {
   associatedtype Value
@@ -126,10 +127,9 @@ struct Foo<T> {
   static var staticStorage1: T __behavior hasStorage // expected-error{{static stored properties not supported in generic types}}
   var storage2: T __behavior hasStorage
 
-  var storage3: Int = 0 // expected-error {{initializer expression provided, but property behavior 'hasStorage' does not use it}}
-    __behavior hasStorage
-  var (storage4, storage5) = tuple // expected-error* {{initializer expression provided, but property behavior 'hasStorage' does not use it}}
-    __behavior hasStorage
+  // FIXME: Hack because we can't find the synthesized associated type witness
+  // during witness matching.
+  typealias Value = T
 
   func foo<U>(_: U) {
     var storage1: T __behavior hasStorage // expected-error {{not supported}}
@@ -139,6 +139,20 @@ struct Foo<T> {
     _ = storage2
   }
 }
+
+struct Foo2<T> {
+  var storage3: Int = 0 // expected-error {{initializer expression provided, but property behavior 'hasStorage' does not use it}}
+    __behavior hasStorage
+
+  var (storage4, storage5) = tuple // expected-error* {{initializer expression provided, but property behavior 'hasStorage' does not use it}}
+    __behavior hasStorage
+
+  // FIXME: Hack because we can't find the synthesized associated type witness
+  // during witness matching.
+  typealias Value = Int
+}
+
+
 extension Foo {
   static var y: T __behavior hasStorage // expected-error{{static stored properties not supported in generic types}}
   var y: T __behavior hasStorage // expected-error {{extensions may not contain stored properties}}
@@ -240,4 +254,8 @@ struct TestStorageWithInitialValue {
   var y = 0 __behavior storageWithInitialValue
   var z: Int = 5.5 __behavior storageWithInitialValue // expected-error {{cannot convert value of type 'Double' to type 'Int' in coercion}}
   var (a, b) = tuple __behavior storageWithInitialValue // expected-error* {{do not support destructuring}}
+
+  // FIXME: Hack because we can't find the synthesized associated type witness
+  // during witness matching.
+  typealias Value = Int
 }

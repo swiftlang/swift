@@ -69,7 +69,8 @@ public struct Wrapper {
   }
 }
 
-@_transparent public extension Wrapper {
+public extension Wrapper {
+  @_transparent
   func getValueAgain() -> Int32 {
     return self.value
   }

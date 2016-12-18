@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -dump-type-refinement-contexts %s > %t.dump 2>&1
+// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s > %t.dump 2>&1
 // RUN: %FileCheck --strict-whitespace %s < %t.dump
 
 // REQUIRES: OS=macosx

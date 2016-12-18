@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -141,11 +141,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     };
 
     // Partial applications of functions that are not permitted.  This is
-    // tracked in post-order and unravelled as subsequent applications complete
+    // tracked in post-order and unraveled as subsequent applications complete
     // the call (or not).
     llvm::SmallDenseMap<Expr*, PartialApplication,2> InvalidPartialApplications;
 
-    ~DiagnoseWalker() {
+    ~DiagnoseWalker() override {
       for (auto &unapplied : InvalidPartialApplications) {
         unsigned kind = unapplied.second.kind;
         TC.diagnose(unapplied.first->getLoc(),
@@ -467,7 +467,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// its uses are ok.
     void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *ParentExpr=nullptr) {
       // This only cares about declarations of noescape function type.
-      auto AFT = DRE->getDecl()->getType()->getAs<AnyFunctionType>();
+      auto AFT = DRE->getDecl()->getInterfaceType()->getAs<AnyFunctionType>();
       if (!AFT || !AFT->isNoEscape())
         return;
 
@@ -528,9 +528,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // the missing ".self" as the subexpression of a parenthesized
         // expression, which is a historical bug.
         if (isa<ParenExpr>(ParentExpr) && CallArgs.count(ParentExpr) > 0) {
-          TC.diagnose(E->getEndLoc(), diag::warn_value_of_metatype_missing_self,
-                      E->getType()->getRValueInstanceType())
-            .fixItInsertAfter(E->getEndLoc(), ".self");
+          auto diag = TC.diagnose(E->getEndLoc(),
+              diag::warn_value_of_metatype_missing_self,
+              E->getType()->getRValueInstanceType());
+          if (E->canAppendCallParentheses()) {
+            diag.fixItInsertAfter(E->getEndLoc(), ".self");
+          } else {
+            diag.fixItInsert(E->getStartLoc(), "(");
+            diag.fixItInsertAfter(E->getEndLoc(), ").self");
+          }
           return;
         }
       }
@@ -539,18 +545,26 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       TC.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
 
-      // Add fix-t to insert '()', unless this is a protocol metatype.
-      bool isProtocolMetatype = false;
+      // Add fix-it to insert '()', only if this is a metatype of
+      // non-existential type and has any initializers.
+      bool isExistential = false;
       if (auto metaTy = E->getType()->getAs<MetatypeType>())
-        isProtocolMetatype = metaTy->getInstanceType()->is<ProtocolType>();
-      if (!isProtocolMetatype) {
+        isExistential = metaTy->getInstanceType()->isAnyExistentialType();
+      if (!isExistential &&
+          !TC.lookupConstructors(const_cast<DeclContext *>(DC),
+                                 E->getType()).empty()) {
         TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
           .fixItInsertAfter(E->getEndLoc(), "()");
       }
 
       // Add fix-it to insert ".self".
-      TC.diagnose(E->getEndLoc(), diag::add_self_to_type)
-        .fixItInsertAfter(E->getEndLoc(), ".self");
+      auto diag = TC.diagnose(E->getEndLoc(), diag::add_self_to_type);
+      if (E->canAppendCallParentheses()) {
+        diag.fixItInsertAfter(E->getEndLoc(), ".self");
+      } else {
+        diag.fixItInsert(E->getStartLoc(), "(");
+        diag.fixItInsertAfter(E->getEndLoc(), ").self");
+      }
     }
 
     void checkUnqualifiedAccessUse(const DeclRefExpr *DRE) {
@@ -1184,8 +1198,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
   return true;
 }
 
-bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
-                                          InFlightDiagnostic &diag,
+bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
                                           ValueDecl *decl,
                                           const ValueDecl *base) {
   // For now, just rewrite cases where the base uses a value type and the
@@ -1208,16 +1221,18 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
     Type normalizedBaseTy = normalizeType(baseTy);
     const DeclContext *DC = decl->getDeclContext();
 
+    ASTContext &ctx = decl->getASTContext();
+
     // ...and just knowing that it's bridged isn't good enough if we don't
     // know what it's bridged /to/. Also, don't do this check for trivial
     // bridging---that doesn't count.
     Type bridged;
     if (normalizedBaseTy->isAny()) {
       const ProtocolDecl *anyObjectProto =
-          TC.Context.getProtocol(KnownProtocolKind::AnyObject);
+          ctx.getProtocol(KnownProtocolKind::AnyObject);
       bridged = anyObjectProto->getDeclaredType();
     } else {
-      bridged = TC.Context.getBridgedToObjC(DC, normalizedBaseTy);
+      bridged = ctx.getBridgedToObjC(DC, normalizedBaseTy);
     }
     if (!bridged || bridged->isEqual(normalizedBaseTy))
       return false;
@@ -1281,7 +1296,9 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
 
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     SourceRange typeRange = var->getTypeSourceRangeForDiagnostics();
-    return checkType(var->getType(), base->getType(), typeRange);
+    auto *baseVar = cast<VarDecl>(base);
+    return checkType(var->getInterfaceType(), baseVar->getInterfaceType(),
+                     typeRange);
   }
 
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -1292,13 +1309,18 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
       for_each(*fn->getParameterLists().back(),
                *baseFn->getParameterLists().back(),
                [&](ParamDecl *param, const ParamDecl *baseParam) {
-        fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
+        fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
+      auto resultType = ArchetypeBuilder::mapTypeIntoContext(
+          method, method->getResultInterfaceType());
+
       auto *baseMethod = cast<FuncDecl>(base);
-      fixedAny |= checkType(method->getBodyResultType(),
-                            baseMethod->getResultType(),
+      auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
+          baseMethod, baseMethod->getResultInterfaceType());
+
+      fixedAny |= checkType(resultType, baseResultType,
                             method->getBodyResultTypeLoc().getSourceRange());
     }
     return fixedAny;
@@ -1310,10 +1332,16 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
     for_each(*subscript->getIndices(),
              *baseSubscript->getIndices(),
              [&](ParamDecl *param, const ParamDecl *baseParam) {
-      fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
+      fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
     });
-    fixedAny |= checkType(subscript->getElementType(),
-                          baseSubscript->getElementType(),
+
+    auto resultType = ArchetypeBuilder::mapTypeIntoContext(
+        subscript->getDeclContext(),
+        subscript->getElementInterfaceType());
+    auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
+        baseSubscript->getDeclContext(),
+        baseSubscript->getElementInterfaceType());
+    fixedAny |= checkType(resultType, baseResultType,
                           subscript->getElementTypeLoc().getSourceRange());
     return fixedAny;
   }
@@ -1643,7 +1671,7 @@ namespace {
     InstanceMethod,
     Property,
   };
-}
+} // end anonymous namespace
 
 static Optional<ReplacementDeclKind>
 describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
@@ -1943,7 +1971,7 @@ public:
   AvailabilityWalker(
       TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {}
 
-  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     ExprStack.push_back(E);
 
     auto visitChildren = [&]() { return std::make_pair(true, E); };
@@ -1985,7 +2013,7 @@ public:
     return visitChildren();
   }
 
-  virtual Expr *walkToExprPost(Expr *E) override {
+  Expr *walkToExprPost(Expr *E) override {
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
 
@@ -2131,7 +2159,7 @@ private:
     }
   }
 };
-}
+} // end anonymous namespace
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
@@ -2371,7 +2399,7 @@ public:
     
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
-  ~VarDeclUsageChecker();
+  ~VarDeclUsageChecker() override;
 
   /// Check to see if the specified VarDecl is part of a larger
   /// PatternBindingDecl, where some other bound variable was mutated.  In this
@@ -2502,7 +2530,7 @@ public:
   }
 
 };
-}
+} // end anonymous namespace
 
 
 // After we have scanned the entire region, diagnose variables that could be
@@ -2559,11 +2587,15 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //  ->
       //    _ = foo()
       if (auto *pbd = var->getParentPatternBinding())
-        if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr) {
+        if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
+            !isa<TypedPattern>(pbd->getPatternList()[0].getPattern())) {
           unsigned varKind = var->isLet();
+          SourceRange replaceRange(
+              pbd->getStartLoc(),
+              pbd->getPatternList()[0].getPattern()->getEndLoc());
           TC.diagnose(var->getLoc(), diag::pbd_never_used,
                       var->getName(), varKind)
-            .fixItReplace(SourceRange(pbd->getLoc(), var->getLoc()), "_");
+            .fixItReplace(replaceRange, "_");
           continue;
         }
       
@@ -3060,13 +3092,17 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
       .fixItRemoveChars(FS->getFirstSemicolonLoc(), endOfIncrementLoc);
   }
 }
-}// Anonymous namespace end.
+} // end anonymous namespace
 
 // Perform MiscDiagnostics on Switch Statements.
 static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
+    // We forgot to do this in Swift 3
+    if (!TC.Context.isSwiftVersion3())
+      TC.checkUnsupportedProtocolType(cs);
+
     // The case statement can have multiple case items, each can have a where.
     // If we find a "where", and there is a preceding item without a where, and
     // if they are on the same source line, then warn.
@@ -3201,7 +3237,7 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
   public:
     DiagnoseWalker(TypeChecker &tc) : TC(tc) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // Dig into implicit expression.
       if (E->isImplicit()) return { true, E };
       // Diagnose call expression.
@@ -3332,7 +3368,7 @@ public:
   ObjCSelectorWalker(TypeChecker &tc, const DeclContext *dc, Type selectorTy)
     : TC(tc), DC(dc), SelectorTy(selectorTy) { }
 
-  virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     StringLiteralExpr *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
     bool fromStringLiteral = false;
     bool hadParens = false;
@@ -3632,7 +3668,7 @@ public:
   }
 
 };
-}
+} // end anonymous namespace
 
 static void diagDeprecatedObjCSelectors(TypeChecker &tc, const DeclContext *dc,
                                         const Expr *expr) {
@@ -3690,7 +3726,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     TypeChecker &TC;
     SmallPtrSet<Expr *, 4> ErasureCoercedToAny;
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return { false, E };
 
@@ -3727,7 +3763,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
           }
 
           // Bail out if we don't have an optional.
-          if (!segment->getType()->getOptionalObjectType()) {
+          if (!segment->getType()->getRValueType()->getOptionalObjectType()) {
             continue;
           }
 
@@ -3799,19 +3835,6 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
 //===----------------------------------------------------------------------===//
 // Utility functions
 //===----------------------------------------------------------------------===//
-
-
-Accessibility
-swift::accessibilityFromScopeForDiagnostics(const DeclContext *accessScope) {
-  if (!accessScope)
-    return Accessibility::Public;
-  if (isa<ModuleDecl>(accessScope))
-    return Accessibility::Internal;
-  if (accessScope->isModuleScopeContext()) {
-    return Accessibility::FilePrivate;
-  }
-  return Accessibility::Private;
-}
 
 void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
                                Accessibility desiredAccess, bool isForSetter) {
@@ -3909,7 +3932,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   do {
     // Look through typealiases.
     if (auto aliasTy = dyn_cast<NameAliasType>(type.getPointer())) {
-      type = aliasTy->getDecl()->getUnderlyingType();
+      type = aliasTy->getSinglyDesugaredType();
       continue;
     }
 
@@ -3992,7 +4015,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->hasType())
+  if (!afd->hasInterfaceType())
     validateDecl(afd);
 
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
@@ -4027,7 +4050,8 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   bool returnsSelf = false;
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
-    resultType = func->getResultType();
+    resultType = func->getResultInterfaceType();
+    resultType = ArchetypeBuilder::mapTypeIntoContext(func, resultType);
     returnsSelf = func->hasDynamicSelf();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;

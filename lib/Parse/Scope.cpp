@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -32,6 +32,7 @@ static bool isResolvableScope(ScopeKind SK) {
   case ScopeKind::ClassBody:
   case ScopeKind::ProtocolBody:
   case ScopeKind::TopLevel:
+  case ScopeKind::InheritanceClause:
     return false;
   case ScopeKind::FunctionBody:
   case ScopeKind::Generics:
@@ -47,19 +48,22 @@ static bool isResolvableScope(ScopeKind SK) {
   case ScopeKind::WhileVars:
     return true;
   }
+
+  llvm_unreachable("Unhandled ScopeKind in switch.");
 }
 
-Scope::Scope(Parser *P, ScopeKind SC, bool InactiveConfigBlock)
+Scope::Scope(Parser *P, ScopeKind SC, bool IsStaticallyInactiveConfigBlock)
   : SI(P->getScopeInfo()),
-    HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : 0),
+    HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
     PrevScope(SI.CurScope),
     PrevResolvableDepth(SI.ResolvableDepth),
-    Kind(SC), IsInactiveConfigBlock(InactiveConfigBlock) {
+    Kind(SC),
+    IsStaticallyInactiveConfigBlock(IsStaticallyInactiveConfigBlock) {
   assert(PrevScope || Kind == ScopeKind::TopLevel);
   
   if (SI.CurScope) {
     Depth = SI.CurScope->Depth + 1;
-    IsInactiveConfigBlock |= SI.CurScope->IsInactiveConfigBlock;
+    IsStaticallyInactiveConfigBlock |= SI.CurScope->IsStaticallyInactiveConfigBlock;
   } else {
     Depth = 0;
   }
@@ -74,8 +78,9 @@ Scope::Scope(Parser *P, SavedScope &&SS):
     PrevScope(SI.CurScope),
     PrevResolvableDepth(SI.ResolvableDepth),
     Depth(SS.Depth),
-    Kind(SS.Kind), IsInactiveConfigBlock(SS.IsInactiveConfigBlock) {
-    
+    Kind(SS.Kind),
+    IsStaticallyInactiveConfigBlock(SS.IsStaticallyInactiveConfigBlock) {
+
     SI.CurScope = this;
     if (!isResolvableScope(Kind))
       SI.ResolvableDepth = Depth + 1;

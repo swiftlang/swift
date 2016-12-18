@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -301,10 +301,10 @@ public:
         getSILDebugLocation(Loc), valueType, operand, F, OpenedArchetypes));
   }
 
-  AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType,
+  AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                                SILDebugVariable Var = SILDebugVariable()) {
     Loc.markAsPrologue();
-    return insert(AllocBoxInst::create(getSILDebugLocation(Loc), ElementType, F,
+    return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, F,
                                        OpenedArchetypes, Var));
   }
 
@@ -367,18 +367,21 @@ public:
     auto &C = getASTContext();
 
     llvm::SmallString<16> NameStr = Name;
-    if (auto BuiltinIntTy =
-            dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
-      if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
-        NameStr += "_Word";
-      } else {
-        unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
-        NameStr += "_Int" + llvm::utostr(NumBits);
-      }
-    } else {
-      assert(OpdTy.getSwiftRValueType() == C.TheRawPointerType);
-      NameStr += "_RawPointer";
-    }
+    appendOperandTypeName(OpdTy, NameStr);
+    auto Ident = C.getIdentifier(NameStr);
+    return insert(BuiltinInst::create(getSILDebugLocation(Loc), Ident, ResultTy,
+                                      {}, Args, F));
+  }
+
+  // Create a binary function with the signature: OpdTy1, OpdTy2 -> ResultTy.
+  BuiltinInst *createBuiltinBinaryFunctionWithTwoOpTypes(
+      SILLocation Loc, StringRef Name, SILType OpdTy1, SILType OpdTy2,
+      SILType ResultTy, ArrayRef<SILValue> Args) {
+    auto &C = getASTContext();
+
+    llvm::SmallString<16> NameStr = Name;
+    appendOperandTypeName(OpdTy1, NameStr);
+    appendOperandTypeName(OpdTy2, NameStr);
     auto Ident = C.getIdentifier(NameStr);
     return insert(BuiltinInst::create(getSILDebugLocation(Loc), Ident,
                                       ResultTy, {}, Args, F));
@@ -459,9 +462,24 @@ public:
 
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
+    assert((Qualifier != LoadOwnershipQualifier::Unqualified) ||
+           F.hasUnqualifiedOwnership() &&
+               "Unqualified inst in qualified function");
+    assert((Qualifier == LoadOwnershipQualifier::Unqualified) ||
+           F.hasQualifiedOwnership() &&
+               "Qualified inst in unqualified function");
     assert(LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
+  }
+
+  /// Convenience function for calling emitLoad on the type lowering for
+  /// non-address values.
+  SILValue emitLoadValueOperation(SILLocation Loc, SILValue LV,
+                                  LoadOwnershipQualifier Qualifier) {
+    assert(LV->getType().isLoadable(F.getModule()));
+    const auto &lowering = getTypeLowering(LV->getType());
+    return lowering.emitLoad(*this, Loc, LV, Qualifier);
   }
 
   LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
@@ -470,10 +488,30 @@ public:
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
+  BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV) {
+    return insert(new (F.getModule())
+                      BeginBorrowInst(getSILDebugLocation(Loc), LV));
+  }
+
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
                          StoreOwnershipQualifier Qualifier) {
+    assert((Qualifier != StoreOwnershipQualifier::Unqualified) ||
+           F.hasUnqualifiedOwnership() &&
+               "Unqualified inst in qualified function");
+    assert((Qualifier == StoreOwnershipQualifier::Unqualified) ||
+           F.hasQualifiedOwnership() &&
+               "Qualified inst in unqualified function");
     return insert(new (F.getModule()) StoreInst(getSILDebugLocation(Loc), Src,
                                                 DestAddr, Qualifier));
+  }
+
+  /// Convenience function for calling emitStore on the type lowering for
+  /// non-address values.
+  void emitStoreValueOperation(SILLocation Loc, SILValue Src, SILValue DestAddr,
+                               StoreOwnershipQualifier Qualifier) {
+    assert(!Src->getType().isAddress());
+    const auto &lowering = getTypeLowering(Src->getType());
+    return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
   EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue Src,
@@ -485,6 +523,12 @@ public:
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
     return insert(new (F.getModule())
                       AssignInst(getSILDebugLocation(Loc), Src, DestAddr));
+  }
+
+  StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
+                                     SILValue DestAddr) {
+    return insert(new (F.getModule())
+                      StoreBorrowInst(getSILDebugLocation(Loc), Src, DestAddr));
   }
 
   MarkUninitializedInst *
@@ -762,6 +806,12 @@ public:
   CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
     return insert(new (F.getModule())
                       CopyValueInst(getSILDebugLocation(Loc), operand));
+  }
+
+  CopyUnownedValueInst *createCopyUnownedValue(SILLocation Loc,
+                                               SILValue operand) {
+    return insert(new (F.getModule()) CopyUnownedValueInst(
+        getSILDebugLocation(Loc), operand, getModule()));
   }
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
@@ -1206,16 +1256,10 @@ public:
     return insert(new (F.getModule()) DeallocPartialRefInst(
         getSILDebugLocation(Loc), operand, metatype));
   }
-  DeallocBoxInst *createDeallocBox(SILLocation Loc, SILType eltType,
+  DeallocBoxInst *createDeallocBox(SILLocation Loc,
                                    SILValue operand) {
     return insert(new (F.getModule()) DeallocBoxInst(
-        getSILDebugLocation(Loc), eltType, operand));
-  }
-  DeallocBoxInst *createDeallocBox(SILLocation Loc, SILValue operand) {
-    auto eltType =
-        operand->getType().castTo<SILBoxType>()->getBoxedAddressType();
-    return insert(new (F.getModule()) DeallocBoxInst(
-        getSILDebugLocation(Loc), eltType, operand));
+        getSILDebugLocation(Loc), operand));
   }
   DeallocExistentialBoxInst *createDeallocExistentialBox(SILLocation Loc,
                                                          CanType concreteType,
@@ -1243,7 +1287,7 @@ public:
   ProjectBoxInst *createProjectBox(SILLocation Loc, SILValue boxOperand,
                                    unsigned index) {
     auto boxTy = boxOperand->getType().castTo<SILBoxType>();
-    auto fieldTy = boxTy->getFieldType(index);
+    auto fieldTy = boxTy->getFieldType(getModule(), index);
 
     return insert(new (F.getModule()) ProjectBoxInst(
         getSILDebugLocation(Loc), boxOperand, index, fieldTy));
@@ -1604,6 +1648,21 @@ private:
       InsertedInstrs->push_back(TheInst);
 
     BB->insert(InsertPt, TheInst);
+  }
+
+  void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
+    if (auto BuiltinIntTy =
+            dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
+      if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
+        Name += "_Word";
+      } else {
+        unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
+        Name += "_Int" + llvm::utostr(NumBits);
+      }
+    } else {
+      assert(OpdTy.getSwiftRValueType() == getASTContext().TheRawPointerType);
+      Name += "_RawPointer";
+    }
   }
 };
 

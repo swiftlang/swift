@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func takeAny(_ left: Any, _ right: Any) -> Int? {
   return left as? Int
@@ -89,6 +89,12 @@ func warnOptionalInStringInterpolationSegment(_ o : Int?) {
   // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
   // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{52-52=)}} 
   // expected-note@-3 {{provide a default value to avoid this warning}} {{52-52= ?? <#default value#>}}
+  var i: Int? = o
+  print("Always some, Always some, Always some: \(i)")
+  // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
+  // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{52-52=)}}
+  // expected-note@-3 {{provide a default value to avoid this warning}} {{52-52= ?? <#default value#>}}
+  i = nil
   print("Always some, Always some, Always some: \(o.map { $0 + 1 })")
   // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
   // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{67-67=)}} 

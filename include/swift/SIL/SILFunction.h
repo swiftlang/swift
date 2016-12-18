@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -619,6 +619,7 @@ public:
   const SILBasicBlock &front() const { return *begin(); }
 
   SILBasicBlock *createBasicBlock();
+  SILBasicBlock *createBasicBlock(SILBasicBlock *After);
 
   /// Splice the body of \p F into this function at end.
   void spliceBody(SILFunction *F) {
@@ -671,29 +672,29 @@ public:
 
   SILArgument *getArgument(unsigned i) {
     assert(!empty() && "Cannot get argument of a function without a body");
-    return begin()->getBBArg(i);
+    return begin()->getArgument(i);
   }
 
   const SILArgument *getArgument(unsigned i) const {
     assert(!empty() && "Cannot get argument of a function without a body");
-    return begin()->getBBArg(i);
+    return begin()->getArgument(i);
   }
 
   ArrayRef<SILArgument *> getArguments() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
-    return begin()->getBBArgs();
+    return begin()->getArguments();
   }
 
   ArrayRef<SILArgument *> getIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
-    return begin()->getBBArgs().slice(0,
-                            getLoweredFunctionType()->getNumIndirectResults());
+    return begin()->getArguments().slice(
+        0, getLoweredFunctionType()->getNumIndirectResults());
   }
 
   ArrayRef<SILArgument *> getArgumentsWithoutIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
-    return begin()->getBBArgs().slice(
-                            getLoweredFunctionType()->getNumIndirectResults());
+    return begin()->getArguments().slice(
+        getLoweredFunctionType()->getNumIndirectResults());
   }
 
   const SILArgument *getSelfArgument() const {
@@ -774,18 +775,7 @@ struct ilist_traits<::swift::SILFunction> :
 public ilist_default_traits<::swift::SILFunction> {
   typedef ::swift::SILFunction SILFunction;
 
-private:
-  mutable ilist_half_node<SILFunction> Sentinel;
-
 public:
-  SILFunction *createSentinel() const {
-    return static_cast<SILFunction*>(&Sentinel);
-  }
-  void destroySentinel(SILFunction *) const {}
-
-  SILFunction *provideInitialHead() const { return createSentinel(); }
-  SILFunction *ensureHead(SILFunction*) const { return createSentinel(); }
-  static void noteHead(SILFunction*, SILFunction*) {}
   static void deleteNode(SILFunction *V) { V->~SILFunction(); }
 
 private:

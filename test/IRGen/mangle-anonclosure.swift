@@ -12,7 +12,7 @@ class TestHeapStorage<T> : HeapStorage<CountAndCapacity,T> {
   deinit {
     withUnsafeMutablePointerToElements {
       // Don't crash when mangling this closure's name.
-      // CHECK: _TFFC4main15TestHeapStoragedU_FGSpQ__T_
+      // CHECK: _TFFC4main15TestHeapStoragedU_FGSpx_T_
       //         ---> main.TestHeapStorage.deinit.(closure #1)
       (p: UnsafeMutablePointer<T>) -> () in
     }

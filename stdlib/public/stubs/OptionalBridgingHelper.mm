@@ -5,11 +5,14 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Config.h"
+
+#if SWIFT_OBJC_INTEROP
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Metadata.h"
@@ -97,3 +100,5 @@ id _swift_Foundation_getOptionalNilSentinelObject(const Metadata *Wrapped) {
 
   return objc_retain(getSentinelForDepth(depth));
 }
+#endif
+

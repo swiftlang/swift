@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -438,21 +438,29 @@ public struct ${Self}<Pointee>
   }
 
   /// Returns the next consecutive position.
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
   public func successor() -> ${Self} {
     return self + 1
   }
 
   /// Returns the previous consecutive position.
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
   public func predecessor() -> ${Self} {
     return self - 1
   }
 
   /// Returns `end - self`.
-  public func distance(to x: ${Self}) -> Int {
-    return x - self
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
+  public func distance(to end: ${Self}) -> Int {
+    return end - self
   }
 
   /// Returns `self + n`.
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
   public func advanced(by n: Int) -> ${Self} {
     return self + n
   }
@@ -484,60 +492,65 @@ extension ${Self} : CustomPlaygroundQuickLookable {
   }
 }
 
-/// - Note: Strideable's implementation is potentially less efficient and cannot
-///   handle misaligned pointers.
-@_transparent
-public func == <Pointee>(
-  lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>
-) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-}
+extension ${Self} {
+  // - Note: Strideable's implementation is potentially less efficient and cannot
+  //   handle misaligned pointers.
+  @_transparent
+  public static func == (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 
-/// - Note: Strideable's implementation is potentially less efficient and cannot
-///   handle misaligned pointers.
-///
-/// - Note: This is an unsigned comparison unlike Strideable's implementation.
-@_transparent
-public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
-  return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
-}
+  // - Note: Strideable's implementation is potentially less efficient and
+  // cannot handle misaligned pointers.
+  //
+  // - Note: This is an unsigned comparison unlike Strideable's implementation.
+  @_transparent
+  public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
+    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 
-/// - Note: The following family of operator overloads are redundant
-///   with Strideable. However, optimizer improvements are needed
-///   before they can be removed without affecting performance.
-@_transparent
-public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
-  return ${Self}(Builtin.gep_Word(
-    lhs._rawValue, rhs._builtinWordValue, Pointee.self))
-}
+  // - Note: The following family of operator overloads are redundant
+  //   with Strideable. However, optimizer improvements are needed
+  //   before they can be removed without affecting performance.
 
-@_transparent
-public func + <Pointee>(lhs: Int,
-           rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
-  return rhs + lhs
-}
+  /// - Precondition: The result is within bounds of the same allocation.
+  @_transparent
+  public static func + (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
+    return ${Self}(Builtin.gep_Word(
+      lhs._rawValue, rhs._builtinWordValue, Pointee.self))
+  }
 
-@_transparent
-public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
-  return lhs + -rhs
-}
+  /// - Precondition: The result is within the bounds of the same allocation.
+  @_transparent
+  public static func + (lhs: Int, rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
+    return rhs + lhs
+  }
 
-@_transparent
-public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
-  return
-    Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
-                         Builtin.ptrtoint_Word(rhs._rawValue)))
-    / MemoryLayout<Pointee>.stride
-}
+  /// - Precondition: The result is within the bounds of the same allocation.
+  @_transparent
+  public static func - (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
+    return lhs + -rhs
+  }
 
-@_transparent
-public func += <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
-  lhs = lhs + rhs
-}
+  @_transparent
+  public static func - (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
+    return
+      Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
+                           Builtin.ptrtoint_Word(rhs._rawValue)))
+      / MemoryLayout<Pointee>.stride
+  }
 
-@_transparent
-public func -= <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
-  lhs = lhs - rhs
+  /// - Precondition: The result is within the bounds of the same allocation.
+  @_transparent
+  public static func += (lhs: inout ${Self}<Pointee>, rhs: Int) {
+    lhs = lhs + rhs
+  }
+
+  /// - Precondition: The result is within the bounds of the same allocation.
+  @_transparent
+  public static func -= (lhs: inout ${Self}<Pointee>, rhs: Int) {
+    lhs = lhs - rhs
+  }
 }
 
 extension ${Self} {

@@ -18,9 +18,12 @@ func test_concrete_erasure(_ x: ClericalError) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_concrete_erasureFOS_13ClericalErrorPs5Error_
+// CHECK:       bb0([[ARG:%.*]] : $ClericalError):
 // CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $Error, $ClericalError
 // CHECK:         [[ADDR:%.*]] = project_existential_box $ClericalError in [[EXISTENTIAL]] : $Error
-// CHECK:         store %0 to [[ADDR]] : $*ClericalError
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:         store [[ARG_COPY]] to [init] [[ADDR]] : $*ClericalError
+// CHECK:         destroy_value [[ARG]]
 // CHECK:         return [[EXISTENTIAL]] : $Error
 
 protocol HairType {}
@@ -45,7 +48,8 @@ func test_class_composition_erasure(_ x: HairClass & Error) -> Error {
 // CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $Error & HairClass to $[[VALUE_TYPE:@opened\(.*\) Error & HairClass]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
-// CHECK:         store [[VALUE]] to [[ADDR]]
+// CHECK:         [[COPIED_VALUE:%.*]] = copy_value [[VALUE]]
+// CHECK:         store [[COPIED_VALUE]] to [init] [[ADDR]]
 // CHECK:         return [[NEW_EXISTENTIAL]]
 
 func test_property(_ x: Error) -> String {
@@ -67,25 +71,26 @@ func test_property_of_lvalue(_ x: Error) -> String {
   var x = x
   return x._domain
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPs5Error_SS
-// CHECK:         [[VAR:%.*]] = alloc_box $Error
-// CHECK-NEXT:    [[PVAR:%.*]] = project_box [[VAR]]
-// CHECK-NEXT:    copy_value %0 : $Error
-// CHECK-NEXT:    store %0 to [[PVAR]]
-// CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[PVAR]]
-// CHECK-NEXT:    copy_value [[VALUE_BOX]]
-// CHECK-NEXT:    [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
-// CHECK-NEXT:    [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
-// CHECK-NEXT:    copy_addr [[VALUE]] to [initialization] [[COPY]]
-// CHECK-NEXT:    [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter.1
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]])
-// CHECK-NEXT:    destroy_addr [[COPY]]
-// CHECK-NEXT:    dealloc_stack [[COPY]]
-// CHECK-NEXT:    destroy_value [[VALUE_BOX]]
-// CHECK-NEXT:    destroy_value [[VAR]]
-// CHECK-NEXT:    destroy_value %0
-// CHECK-NEXT:    return [[RESULT]]
 
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPs5Error_SS :
+// CHECK:       bb0([[ARG:%.*]] : $Error):
+// CHECK:         [[VAR:%.*]] = alloc_box ${ var Error }
+// CHECK:         [[PVAR:%.*]] = project_box [[VAR]]
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Error
+// CHECK:         store [[ARG_COPY]] to [init] [[PVAR]]
+// CHECK:         [[VALUE_BOX:%.*]] = load [copy] [[PVAR]]
+// CHECK:         [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
+// CHECK:         [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
+// CHECK:         copy_addr [[VALUE]] to [initialization] [[COPY]]
+// CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter.1
+// CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]])
+// CHECK:         destroy_addr [[COPY]]
+// CHECK:         dealloc_stack [[COPY]]
+// CHECK:         destroy_value [[VALUE_BOX]]
+// CHECK:         destroy_value [[VAR]]
+// CHECK:         destroy_value [[ARG]]
+// CHECK:         return [[RESULT]]
+// CHECK:      } // end sil function '_TF18boxed_existentials23test_property_of_lvalueFPs5Error_SS'
 extension Error {
   final func extensionMethod() { }
 }
@@ -111,9 +116,9 @@ func plusOneError() -> Error { }
 func test_open_existential_semantics(_ guaranteed: Error,
                                      _ immediate: Error) {
   var immediate = immediate
-  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $Error
+  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
-  // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box $Error
+  // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }
   // GUARANTEED: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
 
   // CHECK-NOT: copy_value %0
@@ -131,9 +136,8 @@ func test_open_existential_semantics(_ guaranteed: Error,
   // GUARANTEED-NOT: destroy_value [[GUARANTEED]]
   guaranteed.extensionMethod()
 
-  // CHECK: [[IMMEDIATE:%.*]] = load [[PB]]
+  // CHECK: [[IMMEDIATE:%.*]] = load [copy] [[PB]]
   // -- need a copy_value to guarantee
-  // CHECK: copy_value [[IMMEDIATE]]
   // CHECK: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK-NOT: copy_addr
@@ -143,9 +147,8 @@ func test_open_existential_semantics(_ guaranteed: Error,
   //    out.
   // CHECK: destroy_value [[IMMEDIATE]]
 
-  // GUARANTEED: [[IMMEDIATE:%.*]] = load [[PB]]
+  // GUARANTEED: [[IMMEDIATE:%.*]] = load [copy] [[PB]]
   // -- need a copy_value to guarantee
-  // GUARANTEED: copy_value [[IMMEDIATE]]
   // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
   // GUARANTEED: [[METHOD:%.*]] = function_ref
   // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
@@ -176,7 +179,7 @@ func test_open_existential_semantics(_ guaranteed: Error,
 // CHECK:       bb0([[OUT:%.*]] : $*Any, [[GUAR:%.*]] : $Error,
 func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
   var immediate = immediate
-  // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box $Error
+  // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }
   // CHECK:       [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
   if true {
     // CHECK-NOT: copy_value [[GUAR]]
@@ -186,8 +189,7 @@ func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
     // CHECK-NOT: destroy_value [[GUAR]]
     return guaranteed
   } else if true {
-    // CHECK:     [[IMMEDIATE:%.*]] = load [[PB]]
-    // CHECK:     copy_value [[IMMEDIATE]]
+    // CHECK:     [[IMMEDIATE:%.*]] = load [copy] [[PB]]
     // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
     // CHECK:     [[TO_VALUE:%.*]] = init_existential_addr [[OUT]]
     // CHECK:     copy_addr [[FROM_VALUE]] to [initialization] [[TO_VALUE]]

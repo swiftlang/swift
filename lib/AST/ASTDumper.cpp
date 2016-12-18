@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -460,8 +460,8 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       OS << " type='";
-      if (TAD->hasUnderlyingType())
-        OS << TAD->getUnderlyingType().getString();
+      if (TAD->getUnderlyingTypeLoc().getType())
+        OS << TAD->getUnderlyingTypeLoc().getType().getString();
       else
         OS << "<<<unresolved>>>";
       printInherited(TAD->getInherited());
@@ -489,9 +489,6 @@ namespace {
         defaultDef.print(OS);
       }
       
-      if (decl->isRecursive())
-        OS << " <<RECURSIVE>>";
-      
       OS << ")";
     }
 
@@ -517,20 +514,18 @@ namespace {
       if (GenericTypeDecl *GTD = dyn_cast<GenericTypeDecl>(VD))
         printGenericParameters(OS, GTD->getGenericParams());
 
-      if (!VD->hasType() || !VD->getType()->is<PolymorphicFunctionType>()) {
+      if (auto *var = dyn_cast<VarDecl>(VD)) {
         OS << " type='";
-        if (VD->hasType())
-          VD->getType().print(OS);
+        if (var->hasType())
+          var->getType().print(OS);
         else
           OS << "<null type>";
         OS << '\'';
       }
 
-      if (VD->hasInterfaceType() &&
-          (!VD->hasType() ||
-           VD->getInterfaceType().getPointer() != VD->getType().getPointer())) {
+      if (VD->hasInterfaceType()) {
         OS << " interface type='";
-        VD->getInterfaceType()->getCanonicalType().print(OS);
+        VD->getInterfaceType()->print(OS);
         OS << '\'';
       }
 
@@ -571,7 +566,7 @@ namespace {
                       llvm::Optional<llvm::raw_ostream::Colors>()) {
       printCommon((ValueDecl *)NTD, Name, Color);
 
-      if (NTD->hasType()) {
+      if (NTD->hasInterfaceType()) {
         if (NTD->hasFixedLayout())
           OS << " @_fixed_layout";
         else
@@ -707,7 +702,6 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *SD) {
       printCommon(SD, "subscript_decl");
       OS << " storage_kind=" << getStorageKindName(SD->getStorageKind());
-      OS << " element=" << SD->getElementType()->getCanonicalType();
       printAccessors(SD);
       OS << ')';
     }
@@ -762,13 +756,19 @@ namespace {
       if (!P->getArgumentName().empty())
         OS << " apiName=" << P->getArgumentName();
       
-      OS << " type=";
       if (P->hasType()) {
+        OS << " type=";
         OS << '\'';
         P->getType().print(OS);
         OS << '\'';
-      } else
-        OS << "<null type>";
+      }
+      
+      if (P->hasInterfaceType()) {
+        OS << " interface type=";
+        OS << '\'';
+        P->getInterfaceType().print(OS);
+        OS << '\'';
+      }
       
       if (!P->isLet())
         OS << " mutable";
@@ -1013,7 +1013,7 @@ namespace {
       OS << ')';
     }
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void ParameterList::dump() const {
   dump(llvm::errs(), 0);
@@ -1458,7 +1458,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void Stmt::dump() const {
   print(llvm::errs());
@@ -2291,7 +2291,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 
 void Expr::dump(raw_ostream &OS) const {
@@ -2420,20 +2420,22 @@ public:
 
   void visitTupleTypeRepr(TupleTypeRepr *T) {
     printCommon(T, "type_tuple");
+
+    if (T->hasElementNames()) {
+      OS << " names=";
+      for (unsigned i = 0, end = T->getNumElements(); i != end; ++i) {
+        if (i) OS << ",";
+        auto name = T->getElementName(i);
+        if (T->isNamedParameter(i))
+          OS << (name.empty() ? "_" : "_ " + name.str());
+        else
+          OS << (name.empty() ? "''" : name.str());
+      }
+    }
+
     for (auto elem : T->getElements()) {
       OS << '\n';
       printRec(elem);
-    }
-    OS << ')';
-  }
-
-  void visitNamedTypeRepr(NamedTypeRepr *T) {
-    printCommon(T, "type_named");
-    if (T->hasName())
-      OS << " id=" << T->getName();
-    if (T->getTypeRepr()) {
-      OS << '\n';
-      printRec(T->getTypeRepr());
     }
     OS << ')';
   }
@@ -2466,7 +2468,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void PrintDecl::printRec(TypeRepr *T) {
   PrintTypeRepr(OS, Indent+2).visit(T);
@@ -2817,7 +2819,11 @@ namespace {
 
       // FIXME: This is ugly.
       OS << "\n";
-      T->getASTContext().dumpArchetypeContext(T, OS, Indent + 2);
+      if (auto genericEnv = T->getGenericEnvironment()) {
+        if (auto owningDC = genericEnv->getOwningDeclContext()) {
+          owningDC->printContext(OS, Indent + 2);
+        }
+      }
 
       if (auto superclass = T->getSuperclass())
         printRec("superclass", superclass);
@@ -2825,20 +2831,17 @@ namespace {
         printRec("opened_existential", openedExistential);
 
       Indent += 2;
-      for (auto nestedType : T->getNestedTypes(/*resolveTypes=*/false)) {
+      for (auto nestedType : T->getKnownNestedTypes()) {
         OS << "\n";
         OS.indent(Indent) << "(";
         PrintWithColorRAII(OS, TypeFieldColor) << "nested_type";
         OS << "=";
         OS << nestedType.first.str() << " ";
         if (!nestedType.second) {
-          PrintWithColorRAII(OS, TypeColor) << "unresolved";          
-        } else if (auto concrete = nestedType.second.getAsConcreteType()) {
-          PrintWithColorRAII(OS, TypeColor) << "concrete";
-          OS << "=" << concrete.getString();
+          PrintWithColorRAII(OS, TypeColor) << "<<unresolved>>";
         } else {
-          PrintWithColorRAII(OS, TypeColor) << "archetype";
-          OS << "=" << static_cast<void *>(nestedType.second.getAsArchetype());
+          PrintWithColorRAII(OS, TypeColor);
+          OS << "=" << nestedType.second.getString();
         }
         OS << ")";
       }
@@ -2853,19 +2856,6 @@ namespace {
       printField("index", T->getIndex());
       if (auto decl = T->getDecl())
         printField("decl", decl->printRef());
-      OS << ")";
-    }
-
-    void visitAssociatedTypeType(AssociatedTypeType *T, StringRef label) {
-      printCommon(T, label, "associated_type_type");
-      printField("decl", T->getDecl()->printRef());
-      OS << ")";
-    }
-
-    void visitSubstitutedType(SubstitutedType *T, StringRef label) {
-      printCommon(T, label, "substituted_type");
-      printRec("original", T->getOriginal());
-      printRec("replacement", T->getReplacementType());
       OS << ")";
     }
 
@@ -2930,13 +2920,6 @@ namespace {
       OS << ")";
     }
 
-    void visitPolymorphicFunctionType(PolymorphicFunctionType *T,
-                                      StringRef label) {
-      printAnyFunctionTypeCommon(T, label, "polymorphic_function_type");
-      // FIXME: generic parameters
-      OS << ")";
-    }
-
     void visitGenericFunctionType(GenericFunctionType *T, StringRef label) {
       printAnyFunctionTypeCommon(T, label, "generic_function_type");
       // FIXME: generic signature dumping needs improvement
@@ -2949,7 +2932,7 @@ namespace {
 
     void visitSILFunctionType(SILFunctionType *T, StringRef label) {
       printCommon(T, label, "sil_function_type");
-      // FIXME: Make this useful.
+      // FIXME: Print the structure of the type.
       printField("type", T->getString());
       OS << ")";
     }
@@ -2962,7 +2945,8 @@ namespace {
 
     void visitSILBoxType(SILBoxType *T, StringRef label) {
       printCommon(T, label, "sil_box_type");
-      printRec(T->getBoxedType());
+      // FIXME: Print the structure of the type.
+      printField("type", T->getString());
       OS << ")";
     }
 
@@ -3060,7 +3044,7 @@ namespace {
 
 #undef TRIVIAL_TYPE_PRINTER
   };
-}
+} // end anonymous namespace
 
 void Type::dump() const {
   // Make sure to print type variables.
@@ -3090,9 +3074,9 @@ void TypeBase::dump(raw_ostream &os, unsigned indent) const {
 
 void GenericEnvironment::dump() const {
   llvm::errs() << "Generic environment:\n";
-  for (auto pair : getInterfaceToArchetypeMap()) {
-    pair.first->dump();
-    pair.second->dump();
+  for (auto gp : getGenericParams()) {
+    gp->dump();
+    mapTypeIntoContext(gp)->dump();
   }
   llvm::errs() << "Generic parameters:\n";
   for (auto paramTy : getGenericParams())

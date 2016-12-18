@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -87,3 +87,6 @@ def interested_usr : Separate<["-"], "interested-usr">,
 
 def async : Flag<["-"], "async">,
   HelpText<"Perform request asynchronously">;
+
+def end_pos : Separate<["-"], "end-pos">, HelpText<"line:col">;
+def end_pos_EQ : Joined<["-"], "end-pos=">, Alias<end_pos>;

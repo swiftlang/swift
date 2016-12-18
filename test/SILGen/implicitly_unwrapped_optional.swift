@@ -4,26 +4,31 @@ func foo(f f: (() -> ())!) {
   var f: (() -> ())! = f
   f?()
 }
-// CHECK:    sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned Optional<@callee_owned () -> ()>) -> () {
-// CHECK:    bb0([[T0:%.*]] : $Optional<@callee_owned () -> ()>):
-// CHECK: [[F:%.*]] = alloc_box $Optional<@callee_owned () -> ()>
-// CHECK-NEXT: [[PF:%.*]] = project_box [[F]]
-// CHECK: store [[T0]] to [[PF]]
-// CHECK:      [[T1:%.*]] = select_enum_addr [[PF]]
-// CHECK-NEXT: cond_br [[T1]], bb1, bb3
+// CHECK: sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned Optional<@callee_owned () -> ()>) -> () {
+// CHECK: bb0([[T0:%.*]] : $Optional<@callee_owned () -> ()>):
+// CHECK:   [[F:%.*]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
+// CHECK:   [[PF:%.*]] = project_box [[F]]
+// CHECK:   [[T0_COPY:%.*]] = copy_value [[T0]]
+// CHECK:   store [[T0_COPY]] to [init] [[PF]]
+// CHECK:   [[T1:%.*]] = select_enum_addr [[PF]]
+// CHECK:   cond_br [[T1]], bb1, bb3
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
 // CHECK:    bb1:
 // CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[PF]]
-// CHECK-NEXT: [[FN0:%.*]] = load [[FN0_ADDR]]
+// CHECK-NEXT: [[FN0:%.*]] = load [copy] [[FN0_ADDR]]
 //   .... then call it
-// CHECK:      apply [[FN0]]()
-// CHECK:      br bb2
-//   (first nothing block)
-// CHECK:    bb3:
-// CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
-// CHECK-NEXT: br bb2
+// CHECK:   apply [[FN0]]() : $@callee_owned () -> ()
+// CHECK:   br bb2
+// CHECK: bb2(
+// CHECK:   destroy_value [[F]]
+// CHECK:   destroy_value [[T0]]
+// CHECK:   return
+// CHECK: bb3:
+// CHECK:   enum $Optional<()>, #Optional.none!enumelt
+// CHECK:   br bb2
 //   The rest of this is tested in optional.swift
+// } // end sil function '{{.*}}foo{{.*}}'
 
 func wrap<T>(x x: T) -> T! { return x }
 

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -930,7 +930,7 @@ namespace {
                                 CastConsumptionKind::TakeAlways);
         } else {
           SILValue sourceObjectValue =
-            new (M) SILArgument(someBB, loweredSourceObjectType);
+              someBB->createArgument(loweredSourceObjectType);
           objectSource = Source(sourceObjectValue, sourceObjectType,
                                 source.Consumption);
         }
@@ -968,7 +968,7 @@ namespace {
       if (target.isAddress()) {
         return target.asAddressSource();
       } else {
-        SILValue result = new (M) SILArgument(contBB, target.LoweredType);
+        SILValue result = contBB->createArgument(target.LoweredType);
         return target.asScalarSource(result);
       }
     }
@@ -1024,7 +1024,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit an unconditional scalar cast that's known to succeed.
 SILValue
@@ -1214,8 +1214,7 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
   // Emit the success block.
   B.setInsertionPoint(scalarSuccBB); {
     auto &targetTL = B.getModule().Types.getTypeLowering(targetValueType);
-    SILValue succValue =
-      new (B.getModule()) SILArgument(scalarSuccBB, targetValueType);
+    SILValue succValue = scalarSuccBB->createArgument(targetValueType);
     if (!shouldTakeOnSuccess(consumption))
       targetTL.emitCopyValue(B, loc, succValue);
     targetTL.emitStoreOfCopy(B, loc, succValue, dest, IsInitialization);

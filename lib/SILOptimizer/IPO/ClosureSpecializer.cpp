@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -56,6 +56,7 @@
 
 #define DEBUG_TYPE "closure-specialization"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
@@ -398,19 +399,23 @@ IsFragile_t CallSiteDescriptor::isFragile() const {
 std::string CallSiteDescriptor::createName() const {
   Mangle::Mangler M;
   auto P = SpecializationPass::ClosureSpecializer;
-  FunctionSignatureSpecializationMangler FSSM(P, M, isFragile(),
-                                              getApplyCallee());
+  FunctionSignatureSpecializationMangler OldFSSM(P, M, isFragile(),
+                                                 getApplyCallee());
+  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, isFragile(),
+                                                              getApplyCallee());
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
-    FSSM.setArgumentClosureProp(getClosureIndex(), PAI);
-    FSSM.mangle();
-    return M.finalize();
+    OldFSSM.setArgumentClosureProp(getClosureIndex(), PAI);
+    NewFSSM.setArgumentClosureProp(getClosureIndex(), PAI);
+  } else {
+    auto *TTTFI = cast<ThinToThickFunctionInst>(getClosure());
+    OldFSSM.setArgumentClosureProp(getClosureIndex(), TTTFI);
+    NewFSSM.setArgumentClosureProp(getClosureIndex(), TTTFI);
   }
-
-  auto *TTTFI = cast<ThinToThickFunctionInst>(getClosure());
-  FSSM.setArgumentClosureProp(getClosureIndex(), TTTFI);
-  FSSM.mangle();
-  return M.finalize();
+  OldFSSM.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewFSSM.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
@@ -566,18 +571,16 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
 /// necessary. This is where we create the actual specialized BB Arguments.
 void ClosureSpecCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
-
   SILFunction *ClosureUser = CallSiteDesc.getApplyCallee();
 
   // Create arguments for the entry block.
   SILBasicBlock *ClosureUserEntryBB = &*ClosureUser->begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
 
   // Remove the closure argument.
   SILArgument *ClosureArg = nullptr;
-  for (size_t i = 0, e = ClosureUserEntryBB->bbarg_size(); i != e; ++i) {
-    SILArgument *Arg = ClosureUserEntryBB->getBBArg(i);
+  for (size_t i = 0, e = ClosureUserEntryBB->args_size(); i != e; ++i) {
+    SILArgument *Arg = ClosureUserEntryBB->getArgument(i);
     if (i == CallSiteDesc.getClosureIndex()) {
       ClosureArg = Arg;
       continue;
@@ -585,8 +588,7 @@ void ClosureSpecCloner::populateCloned() {
 
     // Otherwise, create a new argument which copies the original argument
     SILValue MappedValue =
-      new (M) SILArgument(ClonedEntryBB, Arg->getType(), Arg->getDecl());
-
+        ClonedEntryBB->createArgument(Arg->getType(), Arg->getDecl());
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }
 
@@ -603,8 +605,7 @@ void ClosureSpecCloner::populateCloned() {
   unsigned NumNotCaptured = NumTotalParams - CallSiteDesc.getNumArguments();
   llvm::SmallVector<SILValue, 4> NewPAIArgs;
   for (auto &PInfo : ClosedOverFunTy->getParameters().slice(NumNotCaptured)) {
-    SILValue MappedValue =
-      new (M) SILArgument(ClonedEntryBB, PInfo.getSILType());
+    SILValue MappedValue = ClonedEntryBB->createArgument(PInfo.getSILType());
     NewPAIArgs.push_back(MappedValue);
   }
 

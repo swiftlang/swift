@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -34,10 +34,12 @@
 
 namespace swift {
 
+class SubstitutableType;
+
 class SubstitutionMap {
   using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
 
-  llvm::DenseMap<TypeBase *, Type> subMap;
+  llvm::DenseMap<SubstitutableType *, Type> subMap;
   llvm::DenseMap<TypeBase *, ArrayRef<ProtocolConformanceRef>> conformanceMap;
   llvm::DenseMap<TypeBase *, SmallVector<ParentType, 1>> parentMap;
 
@@ -52,9 +54,12 @@ public:
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType type, ProtocolDecl *proto) const;
 
-  const llvm::DenseMap<TypeBase *, Type> &getMap() const {
+  const llvm::DenseMap<SubstitutableType *, Type> &getMap() const {
     return subMap;
   }
+
+  /// Retrieve the conformances for the given type.
+  ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
 
   void addSubstitution(CanType type, Type replacement);
 
@@ -62,8 +67,10 @@ public:
 
   void addParent(CanType type, CanType parent,
                  AssociatedTypeDecl *assocType);
-
-  void removeType(CanType type);
+  
+  bool empty() const {
+    return subMap.empty();
+  }
 };
 
 } // end namespace swift

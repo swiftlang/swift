@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -294,10 +294,10 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         return;
 
       // Ensure that the declaration has a type.
-      if (!D->hasType()) {
+      if (!D->hasInterfaceType()) {
         if (!TypeResolver) return;
         TypeResolver->resolveDeclSignature(D);
-        if (!D->hasType()) return;
+        if (!D->hasInterfaceType()) return;
       }
 
       switch (D->getKind()) {
@@ -338,7 +338,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         (void)FD;
 
         // Get the type without the first uncurry level with 'self'.
-        CanType T = D->getType()
+        CanType T = D->getInterfaceType()
                         ->castTo<AnyFunctionType>()
                         ->getResult()
                         ->getCanonicalType();
@@ -350,15 +350,17 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       }
 
       case DeclKind::Subscript: {
-        auto Signature = D->getType()->getCanonicalType();
+        auto Signature = D->getInterfaceType()->getCanonicalType();
         if (!SubscriptsReported.insert(Signature).second)
           return;
         break;
       }
 
       case DeclKind::Var: {
+        auto *VD = cast<VarDecl>(D);
         auto Signature =
-            std::make_pair(D->getName(), D->getType()->getCanonicalType());
+            std::make_pair(VD->getName(),
+                           VD->getInterfaceType()->getCanonicalType());
         if (!PropertiesReported.insert(Signature).second)
           return;
         break;
@@ -380,7 +382,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
 
 namespace {
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
-}
+} // end anonymous namespace
 
 static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
   switch (Reason) {
@@ -718,12 +720,14 @@ public:
     // Does it make sense to substitute types?
     bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
                        !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
-                       !BaseTy->isAnyExistentialType();
+                       !BaseTy->isAnyExistentialType() &&
+                       !BaseTy->hasTypeVariable() &&
+                       VD->getDeclContext()->isTypeContext();
     ModuleDecl *M = DC->getParentModule();
 
     auto FoundSignature = VD->getOverloadSignature();
     if (FoundSignature.InterfaceType && shouldSubst) {
-      auto subs = BaseTy->getMemberSubstitutions(VD->getDeclContext());
+      auto subs = BaseTy->getMemberSubstitutions(VD);
       if (auto CT = FoundSignature.InterfaceType.subst(M, subs, None))
         FoundSignature.InterfaceType = CT->getCanonicalType();
     }
@@ -739,7 +743,7 @@ public:
 
       auto OtherSignature = OtherVD->getOverloadSignature();
       if (OtherSignature.InterfaceType && shouldSubst) {
-        auto subs = BaseTy->getMemberSubstitutions(OtherVD->getDeclContext());
+        auto subs = BaseTy->getMemberSubstitutions(OtherVD);
         if (auto CT = OtherSignature.InterfaceType.subst(M, subs, None))
           OtherSignature.InterfaceType = CT->getCanonicalType();
       }
@@ -825,13 +829,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         Consumer.foundDecl(const_cast<ParamDecl*>(AFD->getImplicitSelfDecl()),
                            DeclVisibilityKind::FunctionParameter);
 
-      if (AFD->getExtensionType()) {
-        ExtendedType = AFD->getExtensionType();
+      if (AFD->getDeclContext()->isTypeContext()) {
+        ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
         BaseDecl = AFD->getImplicitSelfDecl();
         DC = DC->getParent();
-
-        if (DC->getAsProtocolExtensionContext())
-          ExtendedType = DC->getSelfTypeInContext();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())

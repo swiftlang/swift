@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,13 +31,6 @@ namespace swift {
   class Stmt;
   class TypeChecker;
   class ValueDecl;
-
-/// Returns the access level associated with \p accessScope, for diagnostic
-/// purposes.
-///
-/// \sa ValueDecl::getFormalAccessScope
-Accessibility
-accessibilityFromScopeForDiagnostics(const DeclContext *accessScope);
 
 /// \brief Emit diagnostics for syntactic restrictions on a given expression.
 void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
@@ -83,8 +76,7 @@ void fixItAvailableAttrRename(TypeChecker &TC,
 /// should have written.
 ///
 /// \returns true iff any fix-its were attached to \p diag.
-bool fixItOverrideDeclarationTypes(TypeChecker &TC,
-                                   InFlightDiagnostic &diag,
+bool fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
                                    ValueDecl *decl,
                                    const ValueDecl *base);
 

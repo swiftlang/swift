@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -43,8 +43,9 @@ static unsigned getElementCountRec(CanType T,
 
       unsigned NumElements = 0;
       for (auto *VD : NTD->getStoredProperties())
-        NumElements += getElementCountRec(VD->getType()->getCanonicalType(),
-                                          false);
+        NumElements += getElementCountRec(
+            VD->getInterfaceType()->getCanonicalType(),
+            false);
       return NumElements;
     }
   }
@@ -57,11 +58,14 @@ static unsigned getElementCountRec(CanType T,
 DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
   MemoryInst = MI;
   // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst))
-    MemorySILType = ABI->getElementType();
-  else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst))
+  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
+    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
+           && "analyzing multi-field boxes not implemented");
+    MemorySILType =
+      ABI->getBoxType()->getFieldType(getFunction().getModule(), 0);
+  } else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
     MemorySILType = ASI->getElementType();
-  else {
+  } else {
     auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
     MemorySILType = MUI->getType().getObjectType();
 
@@ -562,13 +566,16 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
     if (isa<StrongReleaseInst>(User))
       continue;
 
-    if (isa<ProjectBoxInst>(User)) {
-      collectUses(User, 0);
+    if (auto project = dyn_cast<ProjectBoxInst>(User)) {
+      collectUses(User, project->getFieldIndex());
       continue;
     }
 
-    // Other uses of the container are considered escapes of the value.
-    addElementUses(0, ABI->getElementType(), User, DIUseKind::Escape);
+    // Other uses of the container are considered escapes of the values.
+    for (unsigned field : indices(ABI->getBoxType()->getLayout()->getFields()))
+      addElementUses(field,
+                     ABI->getBoxType()->getFieldType(ABI->getModule(), field),
+                     User, DIUseKind::Escape);
   }
 }
 
@@ -1144,7 +1151,7 @@ static bool isSelfInitUse(SILArgument *Arg) {
   // predecessor to the block, and the predecessor instruction is a try_apply
   // of a throwing delegated init.
   auto *BB = Arg->getParent();
-  auto *Pred = BB->getSinglePredecessor();
+  auto *Pred = BB->getSinglePredecessorBlock();
 
   // The two interesting cases are where self.init throws, in which case
   // the argument came from a try_apply, or if self.init is failable,
@@ -1157,6 +1164,27 @@ static bool isSelfInitUse(SILArgument *Arg) {
   return isSelfInitUse(Pred->getTerminator());
 }
 
+/// Returns true if \p Method is a callee of a full apply site that takes in \p
+/// Pointer as an argument. In such a case, we want to ignore the class method
+/// use and allow for the use by the apply inst to take precedence.
+static bool shouldIgnoreClassMethodUseError(
+    ClassMethodInst *Method, SILValue Pointer) {
+
+  // In order to work around use-list ordering issues, if this method is called
+  // by an apply site that has I as an argument, we want to process the apply
+  // site for errors to emit, not the class method. If we do not obey these
+  // conditions, then continue to treat the class method as an escape.
+  auto CheckFullApplySite = [&](Operand *Op) -> bool {
+    FullApplySite FAS(Op->getUser());
+    if (!FAS || (FAS.getCallee() != Method))
+      return false;
+    return llvm::any_of(
+        FAS.getArgumentsWithoutIndirectResults(),
+        [&](SILValue Arg) -> bool { return Arg == Pointer; });
+  };
+
+  return llvm::any_of(Method->getUses(), CheckFullApplySite);
+}
 
 void ElementUseCollector::
 collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
@@ -1195,6 +1223,12 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     if (isa<StrongReleaseInst>(User)) {
       Releases.push_back(User);
       continue;
+    }
+
+    if (auto *Method = dyn_cast<ClassMethodInst>(User)) {
+      if (shouldIgnoreClassMethodUseError(Method, ClassPointer)){
+        continue;
+      }
     }
 
     // If this is an upcast instruction, it is a conversion of self to the base.
@@ -1324,10 +1358,15 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
           continue;
         }
 
-        // class_method that refers to an initializing constructor is a method
-        // lookup for delegation, which is ignored.
-        if (auto Method = dyn_cast<ClassMethodInst>(User)) {
+        if (auto *Method = dyn_cast<ClassMethodInst>(User)) {
+          // class_method that refers to an initializing constructor is a method
+          // lookup for delegation, which is ignored.
           if (Method->getMember().kind == SILDeclRef::Kind::Initializer)
+            continue;
+
+          /// Returns true if \p Method used by an apply in a way that we know
+          /// will cause us to emit a better error.
+          if (shouldIgnoreClassMethodUseError(Method, LI))
             continue;
         }
 
@@ -1335,12 +1374,13 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         // base.  This is either part of a super.init sequence, or a general
         // superclass access.  We special case super.init calls since they are
         // part of the object lifecycle.
-        if (auto *UCI = dyn_cast<UpcastInst>(User))
+        if (auto *UCI = dyn_cast<UpcastInst>(User)) {
           if (auto *subAI = isSuperInitUse(UCI)) {
             Uses.push_back(DIMemoryUse(subAI, DIUseKind::SuperInit, 0, 1));
             recordFailableInitCall(subAI);
             continue;
           }
+        }
 
         // We only track two kinds of uses for delegating initializers:
         // calls to self.init, and "other", which we choose to model as escapes.
