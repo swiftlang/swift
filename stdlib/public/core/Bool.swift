@@ -227,7 +227,7 @@ extension Bool {
   @_transparent
   @inline(__always)
   public static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
-      -> Bool{
+      -> Bool {
     return lhs ? try rhs() : false
   }
 
