@@ -294,7 +294,7 @@ namespace {
       return true;
     }
   };
-}
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 // performConditionResolution
