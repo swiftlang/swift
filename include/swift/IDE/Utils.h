@@ -209,9 +209,15 @@ struct ResolvedRangeInfo {
   RangeKind Kind;
   Type Ty;
   StringRef Content;
-  ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content): Kind(Kind),
-    Ty(Ty), Content(Content) {}
-  ResolvedRangeInfo(): ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef()) {}
+  ArrayRef<ValueDecl*> DeclaredDecls;
+  ArrayRef<ValueDecl*> ReferencedDecls;
+  ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content,
+                    ArrayRef<ValueDecl*> DeclaredDecls,
+                    ArrayRef<ValueDecl*> ReferencedDecls): Kind(Kind),
+                      Ty(Ty), Content(Content), DeclaredDecls(DeclaredDecls),
+                      ReferencedDecls(ReferencedDecls) {}
+  ResolvedRangeInfo() :
+    ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef(), {}, {}) {}
   void print(llvm::raw_ostream &OS);
 };
 
@@ -224,6 +230,8 @@ class RangeResolver : public SourceEntityWalker {
   bool walkToStmtPost(Stmt *S) override;
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
   bool walkToDeclPost(Decl *D) override;
+  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                          TypeDecl *CtorTyRef, Type T) override;
 public:
   RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);
   RangeResolver(SourceFile &File, unsigned Offset, unsigned Length);

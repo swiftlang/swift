@@ -19,22 +19,41 @@ struct S { func foo() {} }
 
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
+// CHECK1-NEXT: <Declared>foo1</Declared>
+// CHECK1-NEXT: <end>
 
 // CHECK2: <Kind>SingleDecl</Kind>
 // CHECK2-NEXT: <Content>class C { func foo() {} }</Content>
+// CHECK2-NEXT: <Declared>C</Declared>
+// CHECK2-NEXT: <end>
 
 // CHECK3: <Kind>SingleDecl</Kind>
 // CHECK3-NEXT: <Content>struct S { func foo() {} }</Content>
+// CHECK3-NEXT: <Declared>S</Declared>
+// CHECK3-NEXT: <end>
 
 // CHECK4: <Kind>MultiStatement</Kind>
 // CHECK4-NEXT: <Content>aaa = aaa + 3
 // CHECK4-NEXT: if aaa == 3 { aaa = 4 }</Content>
+// CHECK4-NEXT: <Declared>foo</Declared>
+// CHECK4-NEXT: <Referenced>aaa</Referenced>
+// CHECK4-NEXT: <Referenced>+</Referenced>
+// CHECK4-NEXT: <end>
 
 // CHECK5: <Kind>MultiStatement</Kind>
 // CHECK5-NEXT: <Content>aaa = aaa + 3
 // CHECK5-NEXT: if aaa == 3 { aaa = 4 }
 // CHECK5-NEXT: return aaa</Content>
+// CHECK5-NEXT: <Declared>foo</Declared>
+// CHECK5-NEXT: <Referenced>aaa</Referenced>
+// CHECK5-NEXT: <Referenced>+</Referenced>
+// CHECK5-NEXT: <Referenced>==</Referenced>
+// CHECK5-NEXT: <end>
 
 // CHECK6: <Kind>MultiStatement</Kind>
 // CHECK6-NEXT: if aaa == 3 { aaa = 4 }
 // CHECK6-NEXT: return aaa</Content>
+// CHECK6-NEXT: <Declared>foo</Declared>
+// CHECK6-NEXT: <Referenced>aaa</Referenced>
+// CHECK6-NEXT: <Referenced>==</Referenced>
+// CHECK6-NEXT: <end>
