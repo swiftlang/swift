@@ -224,8 +224,6 @@ protected:
   void appendProtocolConformance(const ProtocolConformance *conformance);
 
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
-
-  static bool checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params);
 };
 
 } // end namespace NewMangling
