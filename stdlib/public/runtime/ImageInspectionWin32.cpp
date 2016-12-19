@@ -168,7 +168,7 @@ static int _addImageCallback(struct _swift_dl_phdr_info *info,
   if (!info->dlpi_name || info->dlpi_name[0] == '\0')
     handle = GetModuleHandle(nullptr);
   else
-    handle = GetModuleHandle(info->dlpi_name);
+    handle = GetModuleHandleA(info->dlpi_name);
 #else
   void *handle;
   if (!info->dlpi_name || info->dlpi_name[0] == '\0')
