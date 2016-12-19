@@ -581,3 +581,20 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
   }
   return fieldTy;
 }
+
+ValueOwnershipKind SILResultInfo::getOwnershipKind(SILModule &M) const {
+  SILType Ty = M.Types.getLoweredType(getType());
+  bool IsTrivial = Ty.isTrivial(M);
+  switch (getConvention()) {
+  case ResultConvention::Indirect:
+    return ValueOwnershipKind::Trivial; // Should this be an Any?
+  case ResultConvention::Autoreleased:
+  case ResultConvention::Owned:
+    return ValueOwnershipKind::Owned;
+  case ResultConvention::Unowned:
+  case ResultConvention::UnownedInnerPointer:
+    if (IsTrivial)
+      return ValueOwnershipKind::Trivial;
+    return ValueOwnershipKind::Unowned;
+  }
+}

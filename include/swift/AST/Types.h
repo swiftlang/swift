@@ -68,6 +68,7 @@ namespace swift {
   enum class SILArgumentConvention : uint8_t;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
+  enum class ValueOwnershipKind : uint8_t;
 
   enum class TypeKind {
 #define TYPE(id, parent) id,
@@ -2923,6 +2924,8 @@ public:
     type.print(out);
     return out;
   }
+
+  ValueOwnershipKind getOwnershipKind(SILModule &) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;
