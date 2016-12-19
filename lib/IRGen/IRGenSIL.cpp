@@ -807,6 +807,9 @@ public:
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitRetainValueInst(RetainValueInst *i);
   void visitCopyValueInst(CopyValueInst *i);
+  void visitCopyUnownedValueInst(CopyUnownedValueInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitReleaseValueInst(ReleaseValueInst *i);
   void visitDestroyValueInst(DestroyValueInst *i);
   void visitAutoreleaseValueInst(AutoreleaseValueInst *i);
@@ -858,7 +861,13 @@ public:
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
   
   void visitFixLifetimeInst(FixLifetimeInst *i);
+  void visitBeginBorrowInst(BeginBorrowInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitEndBorrowInst(EndBorrowInst *i) {
+    llvm_unreachable("unimplemented");
+  }
+  void visitStoreBorrowInst(StoreBorrowInst *i) {
     llvm_unreachable("unimplemented");
   }
   void visitMarkDependenceInst(MarkDependenceInst *i);
@@ -934,7 +943,7 @@ public:
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
 };
 
-}
+} // end anonymous namespace
 
 llvm::Value *StaticFunction::getExplosionValue(IRGenFunction &IGF) const {
   return IGF.Builder.CreateBitCast(Function, IGF.IGM.Int8PtrTy);
@@ -3648,7 +3657,8 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   assert(i->getBoxType()->getLayout()->getFields().size() == 1
          && "multi field boxes not implemented yet");
-  const TypeInfo &type = getTypeInfo(i->getBoxType()->getFieldType(0));
+  const TypeInfo &type = getTypeInfo(i->getBoxType()
+                                      ->getFieldType(IGM.getSILModule(), 0));
 
   // Derive name from SIL location.
   VarDecl *Decl = i->getDecl();
@@ -3662,10 +3672,8 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 # endif
 
   auto boxTy = i->getType().castTo<SILBoxType>();
-  auto boxInterfaceTy = cast<SILBoxType>(
-      CurSILFn->mapTypeOutOfContext(boxTy)
-          ->getCanonicalType());
-  OwnedAddress boxWithAddr = emitAllocateBox(*this, boxTy, boxInterfaceTy,
+  OwnedAddress boxWithAddr = emitAllocateBox(*this, boxTy,
+                                             CurSILFn->getGenericEnvironment(),
                                              DbgName);
   setLoweredBox(i, boxWithAddr);
 
@@ -3680,8 +3688,9 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
     assert(i->getBoxType()->getLayout()->getFields().size() == 1
            && "box for a local variable should only have one field");
-    DebugTypeInfo DbgTy(Decl, i->getBoxType()->getFieldType(0).getSwiftType(),
-                        type, false);
+    DebugTypeInfo DbgTy(Decl,
+            i->getBoxType()->getFieldType(IGM.getSILModule(), 0).getSwiftType(),
+            type, false);
     IGM.DebugInfo->emitVariableDeclaration(
         Builder,
         emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),

@@ -65,6 +65,21 @@ public func run_ArrayAppendArrayOfInt(_ N: Int) {
     for _ in 0..<10 {
       var nums = [Int]()
       for _ in 0..<8 {
+        nums.append(contentsOf: other)
+      }
+    }
+  }
+}
+
+// Identical to run_ArrayAppendArrayOfInt
+// except +=, to check equally performant.
+@inline(never)
+public func run_ArrayPlusEqualArrayOfInt(_ N: Int) {
+  let other = Array(repeating: 1, count: 10_000)
+  for _ in 0..<N {
+    for _ in 0..<10 {
+      var nums = [Int]()
+      for _ in 0..<8 {
         nums += other
       }
     }
@@ -157,4 +172,72 @@ public func run_ArrayAppendRepeatCol(_ N: Int) {
   }
 }
 
+
+// Append an array as a generic sequence to another array
+@inline(never)
+public func appendFromGeneric<
+  S: Sequence
+>(array: inout [S.Iterator.Element], sequence: S) {
+  array.append(contentsOf: sequence)
+}
+
+@inline(never)
+public func run_ArrayAppendFromGeneric(_ N: Int) {
+  let other = Array(repeating: 1, count: 10_000)
+
+  for _ in 0..<N {
+    for _ in 0..<10 {
+      var nums = [Int]()
+      for _ in 0..<8 {
+        appendFromGeneric(array: &nums, sequence: other)
+      }
+    }
+  }
+}
+
+// Append an array to an array as a generic range replaceable colleciton.
+@inline(never)
+public func appendToGeneric<
+  R: RangeReplaceableCollection
+>(collection: inout R, array: [R.Iterator.Element]) {
+  collection.append(contentsOf: array)
+}
+
+@inline(never)
+public func run_ArrayAppendToGeneric(_ N: Int) {
+  let other = Array(repeating: 1, count: 10_000)
+
+  for _ in 0..<N {
+    for _ in 0..<10 {
+      var nums = [Int]()
+      for _ in 0..<8 {
+        appendToGeneric(collection: &nums, array: other)
+      }
+    }
+  }
+}
+
+// Append an array as a generic sequence to an array as a generic range
+// replaceable colleciton.
+@inline(never)
+public func appendToFromGeneric<
+  R: RangeReplaceableCollection, S: Sequence
+>(collection: inout R, sequence: S) 
+where R.Iterator.Element == S.Iterator.Element {
+  collection.append(contentsOf: sequence)
+}
+
+@inline(never)
+public func run_ArrayAppendToFromGeneric(_ N: Int) {
+  let other = Array(repeating: 1, count: 10_000)
+
+  for _ in 0..<N {
+    for _ in 0..<10 {
+      var nums = [Int]()
+      for _ in 0..<8 {
+        appendToFromGeneric(collection: &nums, sequence: other)
+      }
+    }
+  }
+}
 

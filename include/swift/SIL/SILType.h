@@ -126,14 +126,9 @@ public:
     return SILType(T, SILValueCategory::Address);
   }
 
-  ///  Apply a substitution to the type to produce another lowered SIL type.
-  static SILType substType(SILModule &silModule, ModuleDecl *astModule,
-                           const TypeSubstitutionMap &subs, SILType SrcTy);
-
   ///  Apply a substitution to the function type.
   static CanSILFunctionType substFuncType(SILModule &silModule,
-                                          ModuleDecl *astModule,
-                                          const TypeSubstitutionMap &subs,
+                                          const SubstitutionMap &subs,
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics);
 
@@ -447,8 +442,7 @@ public:
   SILType substGenericArgs(SILModule &M,
                            ArrayRef<Substitution> Subs) const;
 
-  SILType subst(SILModule &silModule, ModuleDecl *astModule,
-                const TypeSubstitutionMap &subs) const;
+  SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
 
   /// If this is a specialized generic type, return all substitutions used to
   /// generate it.
@@ -482,6 +476,10 @@ public:
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }
+
+  /// Returns the underlying referent SILType of an @sil_unowned or @sil_weak
+  /// Type.
+  SILType getReferentType(SILModule &M) const;
 
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {
@@ -588,17 +586,13 @@ inline SILType SILBlockStorageType::getCaptureAddressType() const {
   return SILType::getPrimitiveAddressType(getCaptureType());
 }
 
-inline SILType SILBoxType::getBoxedAddressType() const {
-  return SILType::getPrimitiveAddressType(getBoxedType());
-}
-
 /// The hash of a SILType is the hash of its opaque value.
 static inline llvm::hash_code hash_value(SILType V) {
   return llvm::hash_value(V.getOpaqueValue());
 }
- 
-inline SILType SILBoxType::getFieldType(unsigned index) const {
-  return SILType::getPrimitiveAddressType(getFieldLoweredType(index));
+
+inline SILType SILBoxType::getFieldType(SILModule &M, unsigned index) const {
+  return SILType::getPrimitiveAddressType(getFieldLoweredType(M, index));
 }
 
 inline SILType SILField::getAddressType() const {

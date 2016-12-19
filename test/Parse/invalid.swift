@@ -31,8 +31,36 @@ func foo() {
 super.init() // expected-error {{'super' cannot be used outside of class members}}
 
 switch state { // expected-error {{use of unresolved identifier 'state'}}
-  let duration : Int = 0 // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} \
-                         // expected-error {{expected expression}}
+  let duration : Int = 0 // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
+  case 1:
+    break
+}
+
+func testNotCoveredCase(x: Int) {
+  switch x {
+    let y = "foo" // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
+    switch y {
+      case "bar":
+        blah blah // ignored
+    }
+  case "baz": // expected-error {{expression pattern of type 'String' cannot match values of type 'Int'}}
+    break
+  case 1:
+    break
+  default:
+    break
+  }
+
+  switch x {
+#if true // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
+  case 1:
+    break
+  case "foobar": // ignored
+    break
+  default:
+    break
+#endif
+  }
 }
 
 // rdar://18926814

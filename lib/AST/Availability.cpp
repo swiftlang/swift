@@ -187,8 +187,8 @@ public:
 
   AvailabilityInferenceTypeWalker(ASTContext &AC) : AC(AC) {}
 
-  virtual Action walkToTypePre(Type ty) {
-    if (auto *nominalDecl = ty.getCanonicalTypeOrNull().getAnyNominal()) {
+  Action walkToTypePre(Type ty) override {
+    if (auto *nominalDecl = ty->getCanonicalType()->getAnyNominal()) {
       AvailabilityInfo.intersectWith(
           AvailabilityInference::availableRange(nominalDecl, AC));
     }
@@ -196,7 +196,7 @@ public:
     return Action::Continue;
   }
 };
-};
+} // end anonymous namespace
 
 
 AvailabilityContext AvailabilityInference::inferForType(Type t) {

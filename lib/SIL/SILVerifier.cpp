@@ -231,14 +231,6 @@ public:
     // TODO: We should compare generic signatures. Class and witness methods
     // allow variance in "self"-fulfilled parameters; other functions must
     // match exactly.
-    auto signature1 = type1->getGenericSignature();
-    auto signature2 = type2->getGenericSignature();
-
-    auto getAnyOptionalObjectTypeInContext = [&](CanGenericSignature sig,
-                                                 SILType type) {
-      Lowering::GenericContextScope context(F.getModule().Types, sig);
-      return type.getAnyOptionalObjectType();
-    };
 
     // TODO: More sophisticated param and return ABI compatibility rules could
     // diverge.
@@ -292,8 +284,8 @@ public:
           continue;
         
         // Optional and IUO are interchangeable if their elements are.
-        auto aObject = getAnyOptionalObjectTypeInContext(signature1, aa);
-        auto bObject = getAnyOptionalObjectTypeInContext(signature2, bb);
+        auto aObject = aa.getAnyOptionalObjectType();
+        auto bObject = bb.getAnyOptionalObjectType();
         if (aObject && bObject
             && areABICompatibleParamsOrReturns(aObject, bObject))
           continue;
@@ -736,7 +728,7 @@ public:
             "callee of apply with substitutions must be polymorphic");
 
     // Apply the substitutions.
-    return fnTy->substGenericArgs(F.getModule(), M, subs);
+    return fnTy->substGenericArgs(F.getModule(), subs);
   }
 
   /// Check that for each opened archetype or dynamic self type in substitutions
@@ -1287,7 +1279,6 @@ public:
     require(InitStorageTy,
             "mark_uninitialized initializer must be a function");
     auto SubstInitStorageTy = InitStorageTy->substGenericArgs(F.getModule(),
-                                             F.getModule().getSwiftModule(),
                                              MU->getInitStorageSubstitutions());
     // FIXME: Destructured value or results?
     require(SubstInitStorageTy->getAllResults().size() == 1,
@@ -1302,7 +1293,6 @@ public:
     require(SetterTy,
             "mark_uninitialized setter must be a function");
     auto SubstSetterTy = SetterTy->substGenericArgs(F.getModule(),
-                                               F.getModule().getSwiftModule(),
                                                MU->getSetterSubstitutions());
     require(SubstSetterTy->getParameters().size() == 2,
             "mark_uninitialized setter must have a value and self param");
@@ -1351,6 +1341,16 @@ public:
             "Source value should be an object value");
     require(F.hasQualifiedOwnership(),
             "copy_value is only valid in functions with qualified "
+            "ownership");
+  }
+
+  void checkCopyUnownedValueInst(CopyUnownedValueInst *I) {
+    auto unownedType = requireObjectType(UnownedStorageType, I->getOperand(),
+                                         "Operand of unowned_retain");
+    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
+            "unowned_retain requires unowned type to be loadable");
+    require(F.hasQualifiedOwnership(),
+            "copy_unowned_value is only valid in functions with qualified "
             "ownership");
   }
 
@@ -1411,7 +1411,8 @@ public:
             "project_box operand should be a value");
     auto boxTy = I->getOperand()->getType().getAs<SILBoxType>();
     require(boxTy, "project_box operand should be a @box type");
-    require(I->getType() == boxTy->getFieldType(I->getFieldIndex()),
+    require(I->getType() == boxTy->getFieldType(F.getModule(),
+                                                I->getFieldIndex()),
             "project_box result should be address of boxed type");
   }
 
@@ -1729,7 +1730,8 @@ public:
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
     for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields()))
-      verifyOpenedArchetype(AI, AI->getBoxType()->getFieldLoweredType(field));
+      verifyOpenedArchetype(AI,
+                   AI->getBoxType()->getFieldLoweredType(F.getModule(), field));
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {
@@ -1954,7 +1956,7 @@ public:
     // Map interface types to archetypes.
     if (auto *env = constantInfo.GenericEnv) {
       auto subs = env->getForwardingSubstitutions(M);
-      methodTy = methodTy->substGenericArgs(F.getModule(), M, subs);
+      methodTy = methodTy->substGenericArgs(F.getModule(), subs);
     }
     assert(!methodTy->isPolymorphic());
 

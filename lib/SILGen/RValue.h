@@ -52,6 +52,10 @@ class RValue {
   /// Private constructor used by copy().
   RValue(const RValue &copied, SILGenFunction &gen, SILLocation l);
   
+  /// Construct an RValue from a pre-exploded set of
+  /// ManagedValues. Used to implement the extractElement* methods.
+  RValue(ArrayRef<ManagedValue> values, CanType type);
+
 public:
   /// Creates an invalid RValue object, in a "used" state.
   RValue() : elementsToBeAdded(Used) {}
@@ -90,7 +94,8 @@ public:
 
   /// Construct an RValue from a pre-exploded set of
   /// ManagedValues. Used to implement the extractElement* methods.
-  RValue(ArrayRef<ManagedValue> values, CanType type);
+  static RValue withPreExplodedElements(ArrayRef<ManagedValue> values,
+                                        CanType type);
   
   /// Create an RValue to which values will be subsequently added using
   /// addElement(), with the level of tuple expansion in the input specified

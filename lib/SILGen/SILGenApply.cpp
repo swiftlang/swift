@@ -270,8 +270,7 @@ private:
                                           CanSILFunctionType origFnType) const {
     if (!HasSubstitutions) return origFnType;
     
-    return origFnType->substGenericArgs(SGM.M, SGM.SwiftModule,
-                                        Substitutions);
+    return origFnType->substGenericArgs(SGM.M, Substitutions);
   }
 
   /// Add the 'self' clause back to the substituted formal type of
@@ -678,7 +677,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                     LValue::forAddress(selfLV, AbstractionPattern(formalTy),
                                        formalTy));
     } else {
-      selfValue = ArgumentSource(loc, RValue(address, formalTy));
+      selfValue = ArgumentSource(loc, RValue(gen, loc, formalTy, address));
     }
   };
 
@@ -989,7 +988,8 @@ public:
             auto metatype = std::move(selfValue).getAsSingleValue(SGF);
             auto allocated = allocateObjCObject(metatype, loc);
             auto allocatedType = allocated.getType().getSwiftRValueType();
-            selfValue = ArgumentSource(loc, RValue(allocated, allocatedType));
+            selfValue = ArgumentSource(loc, RValue(SGF, loc,
+                                                   allocatedType, allocated));
           } else {
             // For non-Objective-C initializers, we have an allocating
             // initializer to call.
@@ -1678,7 +1678,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
   {
     B.emitBlock(errorBB);
     SILValue error =
-        errorBB->createArgument(silFnType->getErrorResult().getSILType());
+        errorBB->createPHIArgument(silFnType->getErrorResult().getSILType());
 
     B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
                     SGM.Types.getEmptyTupleType(), {}, {error});
@@ -1689,7 +1689,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
 
   // Enter the normal path.
   B.emitBlock(normalBB);
-  return normalBB->createArgument(resultType);
+  return normalBB->createPHIArgument(resultType);
 }
 
 static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
@@ -1768,7 +1768,7 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
 
   CanType ty =
     TupleType::get(TypeElts, SGF.getASTContext())->getCanonicalType();
-  return RValue(Elts, ty);
+  return RValue::withPreExplodedElements(Elts, ty);
 }
 
 /// Emit a raw apply operation, performing no additional lowering of
@@ -1833,7 +1833,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
   // Otherwise, we need to create a try_apply.
   } else {
     SILBasicBlock *normalBB = gen.createBasicBlock();
-    result = normalBB->createArgument(resultType);
+    result = normalBB->createPHIArgument(resultType);
 
     SILBasicBlock *errorBB =
       gen.getTryApplyErrorDest(loc, substFnType->getErrorResult(),
@@ -2164,7 +2164,7 @@ namespace {
       return RValue();
     }
   };
-}
+} // end anonymous namespace
 
 /// Build a result plan for the results of an apply.
 ///
@@ -3451,7 +3451,7 @@ namespace {
       return {SGFContext(), finalContext, requiresReabstraction};
     }
   };
-}
+} // end anonymous namespace
 
 /// Decompose a type, whether it is a tuple or a single type, into an
 /// array of tuple type elements.
@@ -4905,7 +4905,7 @@ namespace {
       gen.emitUninitializedArrayDeallocation(l, Array);
     }
   };
-}
+} // end anonymous namespace
 
 CleanupHandle
 SILGenFunction::enterDeallocateUninitializedArrayCleanup(SILValue array) {
@@ -5222,7 +5222,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     SmallVector<ManagedValue, 4> Elts;
     std::move(setValue).getAll(Elts);
     std::move(subscripts).getAll(Elts);
-    setValue = RValue(Elts, accessType.getInput());
+    setValue = RValue::withPreExplodedElements(Elts, accessType.getInput());
   } else {
     setValue.rewriteType(accessType.getInput());
   }
@@ -5286,7 +5286,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
     if (subscripts) {
       std::move(subscripts).getAll(elts);
     }
-    return RValue(elts, accessType.getInput());
+    return RValue::withPreExplodedElements(elts, accessType.getInput());
   }();
   emission.addCallSite(loc, ArgumentSource(loc, std::move(args)), accessType);
   // (buffer, optionalCallback)
@@ -5535,7 +5535,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     auto dynamicMethodTy = getDynamicMethodLoweredType(*this, operand, member,
                                                        memberFnTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
-    SILValue memberArg = hasMemberBB->createArgument(loweredMethodTy);
+    SILValue memberArg = hasMemberBB->createPHIArgument(loweredMethodTy);
 
     // Create the result value.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, operand,
@@ -5630,7 +5630,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto dynamicMethodTy = getDynamicMethodLoweredType(*this, base, member,
                                                        functionTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
-    SILValue memberArg = hasMemberBB->createArgument(loweredMethodTy);
+    SILValue memberArg = hasMemberBB->createPHIArgument(loweredMethodTy);
     // Emit the application of 'self'.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, base,
                                               cast<FunctionType>(methodTy));

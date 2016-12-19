@@ -143,7 +143,7 @@ static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
 static llvm::cl::opt<bool>
-EnableSILSortOutput("sil-sort-output", llvm::cl::Hidden,
+EnableSILSortOutput("emit-sorted-sil", llvm::cl::Hidden,
                     llvm::cl::init(false),
                     llvm::cl::desc("Sort Functions, VTables, Globals, "
                                    "WitnessTables by name to ease diffing."));
@@ -171,12 +171,8 @@ AssumeUnqualifiedOwnershipWhenParsing(
 
 static void runCommandLineSelectedPasses(SILModule *Module) {
   SILPassManager PM(Module);
-
-  for (auto Pass : Passes) {
-    PM.addPass(Pass);
-  }
-  PM.run();
-
+  PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
+      SILPassPipelinePlan::ExecutionKind::UntilFixPoint, Passes));
   if (Module->getOptions().VerifyAll)
     Module->verify();
 }
@@ -301,8 +297,8 @@ int main(int argc, char **argv) {
   if (HasSerializedAST) {
     assert(!CI.hasSILModule() &&
            "performSema() should not create a SILModule.");
-    CI.setSILModule(SILModule::createEmptyModule(CI.getMainModule(),
-                                                 CI.getSILOptions()));
+    CI.setSILModule(SILModule::createEmptyModule(
+        CI.getMainModule(), CI.getSILOptions(), PerformWMO));
     std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
         CI.getASTContext(), CI.getSILModule(), nullptr);
 

@@ -23,6 +23,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/DiagnosticConsumer.h"
@@ -610,7 +611,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   // Consumer.
   std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                              *Consumer.get()));
+                                              *Consumer));
 
   Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
   if (!SecondSourceFileName.empty()) {
@@ -832,7 +833,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 static int doSyntaxColoring(const CompilerInvocation &InitInvok,
                             StringRef SourceFilename,
@@ -1585,7 +1586,8 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       while (node->getKind() != NodeKind::LocalDeclName)
         node = node->getChild(1); // local decl name
 
-      auto remangled = Demangle::mangleNode(typeNode);
+      auto remangled = Demangle::mangleNode(typeNode,
+                                            NewMangling::useNewMangling());
 
       auto LTD = M->lookupLocalType(remangled);
 
@@ -1681,7 +1683,7 @@ public:
     OS << "</ref>";
   }
 };
-}
+} // end anonymous namespace
 
 struct GroupNamesPrinter {
   llvm::StringSet<> Groups;
@@ -1941,8 +1943,8 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
 
       if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
         if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-          TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
-            ->getNominalOrBoundGenericNominal();
+          TypeDecl *origTypeDecl = typeAliasDecl->getDeclaredInterfaceType()
+            ->getAnyNominal();
           if (origTypeDecl) {
             origTypeDecl->print(*Printer, Options);
             typeDecl = origTypeDecl;
@@ -2064,7 +2066,7 @@ public:
     return true;
   }
 };
-} // end namespace
+} // end anonymous namespace
 
 namespace {
 class ASTCommentPrinter : public ASTWalker {

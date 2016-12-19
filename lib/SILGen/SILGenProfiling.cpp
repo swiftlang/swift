@@ -56,8 +56,8 @@ static void walkFunctionForProfiling(AbstractFunctionDecl *Root,
 
   // We treat class initializers as part of the constructor for profiling.
   if (auto *CD = dyn_cast<ConstructorDecl>(Root)) {
-    Type DT = CD->getDeclContext()->getDeclaredTypeInContext();
-    auto *NominalType = DT->getNominalOrBoundGenericNominal();
+    auto *NominalType = CD->getDeclContext()
+        ->getAsNominalTypeOrNominalTypeExtensionContext();
     for (auto *Member : NominalType->getMembers()) {
       // Find pattern binding declarations that have initializers.
       if (auto *PBD = dyn_cast<PatternBindingDecl>(Member))

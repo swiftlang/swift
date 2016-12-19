@@ -30,6 +30,7 @@
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
+#include "swift/Basic/ManglingMacros.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -218,7 +219,7 @@ namespace {
       return ReferenceCounting::ObjC;
     }
   };
-}
+} // end anonymous namespace
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinUnknownObject() {
   return new ObjCTypeInfo(IGM.ObjCPtrTy, IGM.getPointerSize(),
@@ -271,7 +272,7 @@ namespace {
       IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.SizeTy, 0), dest);
     }
   };
-}
+} // end anonymous namespace
 
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinBridgeObject() {
@@ -573,7 +574,7 @@ namespace {
 
 #undef FOREACH_FAMILY
   };
-}
+} // end anonymous namespace
 
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
                               llvm::Value *selfValue,
@@ -763,7 +764,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   // FIXME: Maybe cache the thunk by function and closure types?
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
-                           "_TPAo", &IGM.Module);
+                           MANGLE_AS_STRING(OBJC_PARTIAL_APPLY_THUNK_SYM),
+                           &IGM.Module);
 
   auto initialAttrs = IGM.constructInitialAttributes();
   // Merge initialAttrs with attrs.

@@ -146,7 +146,7 @@ private:
     Instrumenter &I;
   public:
     ClosureFinder (Instrumenter &Inst) : I(Inst) { }
-    virtual std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) {
+    std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
       if (isa<BraceStmt>(S)) {
         return { false, S }; // don't walk into brace statements; we
                              // need to respect nesting!
@@ -154,7 +154,7 @@ private:
         return { true, S };
       }
     }
-    virtual std::pair<bool, Expr*> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
       if (ClosureExpr *CE = dyn_cast<ClosureExpr>(E)) {
         BraceStmt *B = CE->getBody();
         if (B) {
@@ -433,12 +433,12 @@ public:
     ErrorGatherer(DiagnosticEngine &diags) : diags(diags) {
       diags.addConsumer(*this);
     }
-    ~ErrorGatherer() {
+    ~ErrorGatherer() override {
       diags.takeConsumers();
     }
-    virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+    void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                   DiagnosticKind Kind, StringRef Text,
-                                  const DiagnosticInfo &Info) {
+                                  const DiagnosticInfo &Info) override {
       if (Kind == swift::DiagnosticKind::Error) {
         error = true;
       }
@@ -453,14 +453,14 @@ public:
     bool error = false;
   public:
     ErrorFinder () { }
-    virtual std::pair<bool, Expr*> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
       if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->hasError()) {
         error = true;
         return { false, E };
       }
       return { true, E };
     }
-    virtual bool walkToDeclPre(Decl *D) {
+    bool walkToDeclPre(Decl *D) override {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
         if (!VD->hasInterfaceType() ||
             VD->getInterfaceType()->hasError()) {
@@ -1083,7 +1083,7 @@ void swift::performPlaygroundTransform(SourceFile &SF,
   public:
     ExpressionFinder(bool HP) : HighPerformance(HP) {}
 
-    virtual bool walkToDeclPre(Decl *D) {
+    bool walkToDeclPre(Decl *D) override {
       if (AbstractFunctionDecl *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {

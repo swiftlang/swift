@@ -173,7 +173,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK-LABEL: sil [transparent] [fragile] @_TF17struct_resilience30publicTransparentLocalFunctionFVS_6MySizeFT_Si : $@convention(thin) (@in MySize) -> @owned @callee_owned () -> Int
 @_transparent public func publicTransparentLocalFunction(_ s: MySize) -> () -> Int {
 
-// CHECK-LABEL: sil shared [fragile] @_TFF17struct_resilience30publicTransparentLocalFunctionFVS_6MySizeFT_SiU_FT_Si : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <MySize>) -> Int
+// CHECK-LABEL: sil shared [fragile] @_TFF17struct_resilience30publicTransparentLocalFunctionFVS_6MySizeFT_SiU_FT_Si : $@convention(thin) (@owned { var MySize }) -> Int
 // CHECK: function_ref @_TFV17struct_resilience6MySizeg1wSi : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK: return {{.*}} : $Int
 

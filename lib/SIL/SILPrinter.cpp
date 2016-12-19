@@ -124,7 +124,7 @@ public:
   }
 #undef DEF_COL
 };
-}
+} // end anonymous namespace
 
 static raw_ostream &operator<<(raw_ostream &OS, ID i) {
   SILColor C(OS, i.Kind);
@@ -183,7 +183,7 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   case DeclContextKind::ExtensionDecl: {
     Type Ty = cast<ExtensionDecl>(Context)->getExtendedType();
     TypeBase *Base = Ty->getCanonicalType().getPointer();
-    const NominalTypeDecl *ExtNominal = 0;
+    const NominalTypeDecl *ExtNominal = nullptr;
     switch (Base->getKind()) {
       default:
         llvm_unreachable("unhandled context kind in SILPrint!");
@@ -1038,6 +1038,10 @@ public:
     *this << getIDAndType(LBI->getOperand());
   }
 
+  void visitBeginBorrowInst(BeginBorrowInst *LBI) {
+    *this << getIDAndType(LBI->getOperand());
+  }
+
   void printStoreOwnershipQualifier(StoreOwnershipQualifier Qualifier) {
     switch (Qualifier) {
     case StoreOwnershipQualifier::Unqualified:
@@ -1057,6 +1061,11 @@ public:
   void visitStoreInst(StoreInst *SI) {
     *this << getID(SI->getSrc()) << " to ";
     printStoreOwnershipQualifier(SI->getOwnershipQualifier());
+    *this << getIDAndType(SI->getDest());
+  }
+
+  void visitStoreBorrowInst(StoreBorrowInst *SI) {
+    *this << getID(SI->getSrc()) << " to ";
     *this << getIDAndType(SI->getDest());
   }
 
@@ -1271,6 +1280,10 @@ public:
   }
 
   void visitCopyValueInst(CopyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitCopyUnownedValueInst(CopyUnownedValueInst *I) {
     *this << getIDAndType(I->getOperand());
   }
 
@@ -2075,8 +2088,13 @@ void SILModule::print(SILPrintContext &PrintCtx, Module *M,
     break;
   }
   
-  OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
-     << "\nimport SwiftShims" << "\n\n";
+  OS << "\n\nimport Builtin\n";
+
+  // If we are compiling stdlib, do not try to import ourselves
+  if (!M->isStdlibModule())
+    OS << "import " << STDLIB_NAME << "\n";
+
+  OS << "import SwiftShims" << "\n\n";
 
   // Print the declarations and types from the origin module, unless we're not
   // in whole-module mode.

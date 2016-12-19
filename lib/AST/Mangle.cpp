@@ -56,7 +56,7 @@ namespace {
       return (out << '_');
     }
   };        
-}
+} // end anonymous namespace
 
 // Translates operator fixity to demangler operators.
 static Demangle::OperatorKind TranslateOperator(OperatorFixity fixity) {
@@ -192,18 +192,20 @@ namespace {
 #define PATTERN(ID, BASE)
 #include "swift/AST/PatternNodes.def"
   };
-}
+} // end anonymous namespace
 
 /// Find the first identifier bound by the given binding.  This
 /// assumes that field and global-variable bindings always bind at
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
-static VarDecl *findFirstVariable(PatternBindingDecl *binding) {
+static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
   for (auto entry : binding->getPatternList()) {
     auto var = FindFirstVariable().visit(entry.getPattern());
     if (var) return var;
   }
-  llvm_unreachable("pattern-binding bound no variables?");
+  // Pattern-binding bound without variables exists in erroneous code, e.g.
+  // during code completion.
+  return None;
 }
 
 void Mangler::mangleContext(const DeclContext *ctx) {
@@ -230,8 +232,8 @@ void Mangler::mangleContext(const DeclContext *ctx) {
     }
     case LocalDeclContextKind::PatternBindingInitializer: {
       auto patternInit = cast<SerializedPatternBindingInitializer>(local);
-      auto var = findFirstVariable(patternInit->getBinding());
-      mangleInitializerEntity(var);
+      if (auto var = findFirstVariable(patternInit->getBinding()))
+        mangleInitializerEntity(var.getValue());
       return;
     }
     case LocalDeclContextKind::TopLevelCodeDecl:
@@ -318,8 +320,8 @@ void Mangler::mangleContext(const DeclContext *ctx) {
 
     case InitializerKind::PatternBinding: {
       auto patternInit = cast<PatternBindingInitializer>(ctx);
-      auto var = findFirstVariable(patternInit->getBinding());
-      mangleInitializerEntity(var);
+      if (auto var = findFirstVariable(patternInit->getBinding()))
+        mangleInitializerEntity(var.getValue());
       return;
     }
     }
@@ -489,13 +491,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
   if (!decl->hasInterfaceType())
     return ErrorType::get(C);
 
-  // FIXME: Interface types for ParamDecls
   Type type = decl->getInterfaceType();
-  if (type->hasArchetype()) {
-    assert(isa<ParamDecl>(decl));
-    type = ArchetypeBuilder::mapTypeOutOfContext(
-        decl->getDeclContext(), type);
-  }
 
   initialParamDepth = 0;
   CanGenericSignature sig;
@@ -572,7 +568,8 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
                                      requirements, requirementsBuf);
 
   // Mangle the generic signature, if any.
-  if (!genericParams.empty() || !requirements.empty()) {
+  if ((!genericParams.empty() || !requirements.empty()) &&
+      checkGenericParamsOrder(genericParams)) {
     Buffer << 'u';
     mangleGenericSignatureParts(genericParams, initialParamDepth,
                                 requirements);
@@ -593,6 +590,24 @@ void Mangler::mangleConstrainedType(CanType type) {
     return;
   }
   mangleType(type, 0);
+}
+
+bool Mangler::
+checkGenericParamsOrder(ArrayRef<swift::GenericTypeParamType *> params) {
+  unsigned depth = 0;
+  unsigned count = 0;
+  for (auto param : params) {
+    if (param->getDepth() > depth) {
+      depth = param->getDepth();
+      count = 0;
+    } else if (param->getDepth() < depth) {
+      return false;
+    }
+    if (param->getIndex() != count)
+      return false;
+    count ++;
+  }
+  return true;
 }
 
 void Mangler::mangleGenericSignatureParts(
@@ -839,7 +854,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     TypeAliasDecl *decl = NameAliasTy->getDecl();
     if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
       // It's not possible to mangle the context of the builtin module.
-      return mangleType(decl->getUnderlyingType(), uncurryLevel);
+      return mangleType(NameAliasTy->getSinglyDesugaredType(), uncurryLevel);
     }
     
     Buffer << "a";
@@ -852,8 +867,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
 
   case TypeKind::Paren:
     return mangleSugaredType<ParenType>(type);
-  case TypeKind::Substituted:
-    return mangleSugaredType<SubstitutedType>(type);
   case TypeKind::ArraySlice: /* fallthrough */
   case TypeKind::Optional:
     return mangleSugaredType<SyntaxSugarType>(type);
@@ -1223,16 +1236,38 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     return;
   }
 
-  case TypeKind::SILBox:
-    Buffer << 'X' << 'b';
-    mangleType(cast<SILBoxType>(tybase)->getBoxedType(),
-               uncurryLevel);
+  case TypeKind::SILBox: {
+    Buffer << 'X' << 'B';
+    auto boxTy = cast<SILBoxType>(tybase);
+    // TODO: Should layouts get substitutions?
+    auto layout = boxTy->getLayout();
+    if (auto sig = layout->getGenericSignature()) {
+      Buffer << 'G';
+      mangleGenericSignature(sig);
+    }
+    for (auto &field : layout->getFields()) {
+      Buffer << (field.isMutable() ? 'm' : 'i');
+      mangleType(field.getLoweredType(), 0);
+    }
+    Buffer << '_';
+    if (!boxTy->getGenericArgs().empty()) {
+      for (auto &arg : boxTy->getGenericArgs()) {
+        mangleType(arg.getReplacement(), 0);
+      }
+      Buffer << '_';
+    }
     return;
+  }
 
   case TypeKind::SILBlockStorage:
     llvm_unreachable("should never be mangled");
   }
   llvm_unreachable("bad type kind");
+}
+
+void Mangler::mangleLegacyBoxType(CanType fieldType) {
+  Buffer << 'X' << 'b';
+  mangleType(fieldType, 0);
 }
 
 /// Mangle a list of protocols.  Each protocol is a substitution
@@ -1596,7 +1631,7 @@ void Mangler::mangleEntity(const ValueDecl *decl,
                            unsigned uncurryLevel) {
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
-  
+
   // entity ::= static? entity-kind context entity-name
   if (decl->isStatic())
     Buffer << 'Z';
@@ -1609,7 +1644,12 @@ void Mangler::mangleEntity(const ValueDecl *decl,
       return mangleAccessorEntity(accessorKind, func->getAddressorKind(),
                                   func->getAccessorStorageDecl());
   }
-  
+
+  // Avoid mangling nameless entity. This may happen in erroneous code as code
+  // completion.
+  if (!decl->hasName())
+    return;
+
   if (isa<VarDecl>(decl)) {
     Buffer << 'v';
   } else if (isa<SubscriptDecl>(decl)) {

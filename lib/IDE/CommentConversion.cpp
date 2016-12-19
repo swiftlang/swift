@@ -730,7 +730,7 @@ public:
   }
 #include "swift/Markup/SimpleFields.def"
 
-  ~DoxygenConverter() {
+  ~DoxygenConverter() override {
     dedent();
     print("*/");
     printNewline();

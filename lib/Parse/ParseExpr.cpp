@@ -661,7 +661,7 @@ ParserResult<Expr> Parser::parseExprSelector() {
     if (Tok.is(tok::r_paren))
       rParenLoc = consumeToken();
     else
-      rParenLoc = Tok.getLoc();
+      rParenLoc = PreviousLoc;
   } else {
     parseMatchingToken(tok::r_paren, rParenLoc,
                        diag::expr_selector_expected_rparen, lParenLoc);
@@ -1132,7 +1132,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
     SourceLoc Loc = consumeToken();
     Result = makeParserResult(
-       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
+       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*implicit=*/false));
     break;
   }
       
@@ -1402,7 +1402,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 #include "swift/Parse/Tokens.def"
 
   case tok::code_complete:
-    Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getRange()));
+    Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
     Result.setHasCodeCompletion();
     if (CodeCompletion &&
         // We cannot code complete anything after var/let.
@@ -1917,7 +1917,7 @@ Expr *Parser::parseExprIdentifier() {
   }
   
   Expr *E;
-  if (D == 0) {
+  if (D == nullptr) {
     if (name.getBaseName().isEditorPlaceholder())
       return parseExprEditorPlaceholder(IdentTok, name.getBaseName());
 
@@ -2494,7 +2494,7 @@ ParserResult<Expr> Parser::parseExprList(tok leftTok, tok rightTok) {
   return makeParserResult(
       status,
       TupleExpr::create(Context, leftLoc, subExprs, subExprNames,
-                        subExprNameLocs, rightLoc, /*hasTrailingClosure=*/false,
+                        subExprNameLocs, rightLoc, /*HasTrailingClosure=*/false,
                         /*Implicit=*/false));
 }
 
@@ -2747,7 +2747,7 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   // callback.
   if (peekToken().is(tok::code_complete) && CodeCompletion) {
     consumeToken(tok::l_paren);
-    auto CCE = new (Context) CodeCompletionExpr(Tok.getRange());
+    auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
     auto Result = makeParserResult(
       CallExpr::create(Context, fn.get(), SourceLoc(),
                        { CCE },

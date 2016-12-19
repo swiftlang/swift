@@ -14,6 +14,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -120,7 +121,7 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
     return true;
 
-  OS << getUSRSpacePrefix();
+  std::string Old = getUSRSpacePrefix().str();
   Mangler Mangler;
 
   Mangler.bindGenericParameters(VD->getDeclContext());
@@ -139,7 +140,13 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     Mangler.mangleEntity(VD, /*uncurryingLevel=*/0);
   }
 
-  Mangler.finalize(OS);
+  Old += Mangler.finalize();
+
+  NewMangling::ASTMangler NewMangler;
+  std::string New = NewMangler.mangleDeclAsUSR(VD, getUSRSpacePrefix());
+
+  OS << NewMangling::selectMangling(Old, New);
+
   return false;
 }
 

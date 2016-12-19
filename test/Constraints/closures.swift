@@ -8,8 +8,8 @@ _ = myMap(intArray, { String($0) })
 _ = myMap(intArray, { x -> String in String(x) } )
 
 // Closures with too few parameters.
-func foo(_ x: ((Int, Int)) -> Int) {}
-foo({$0}) // expected-error{{cannot convert value of type '(Int, Int)' to closure result type 'Int'}}
+func foo(_ x: (Int, Int) -> Int) {}
+foo({$0}) // expected-error{{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
 
 struct X {}
 func mySort(_ array: [String], _ predicate: (String, String) -> Bool) -> [String] {}
@@ -130,7 +130,7 @@ var _: (Int) -> Int = {a,b in 0}
 // expected-error @+1 {{contextual closure type '(Int) -> Int' expects 1 argument, but 3 were used in closure body}}
 var _: (Int) -> Int = {a,b,c in 0}
 
-var _: ((Int, Int)) -> Int = {a in 0}
+var _: (Int, Int) -> Int = {a in 0}
 
 // expected-error @+1 {{contextual closure type '(Int, Int, Int) -> Int' expects 3 arguments, but 2 were used in closure body}}
 var _: (Int, Int, Int) -> Int = {a, b in a+b}
@@ -286,7 +286,7 @@ func rdar21078316() {
 
 // <rdar://problem/20978044> QoI: Poor diagnostic when using an incorrect tuple element in a closure
 var numbers = [1, 2, 3]
-zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{contextual closure type '(Int, Int) -> Bool' expects 2 arguments, but 1 was used in closure body}}
+zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{value of tuple type '(Int, Int)' has no member '2'}}
 
 
 
@@ -323,8 +323,6 @@ func r20789423() {
   
 }
 
-let f: (Int, Int) -> Void = { x in }  // expected-error {{contextual closure type specifies '(Int, Int)', but 1 was used in closure body, try adding extra parentheses around the single tuple argument}}
-
 // Make sure that behavior related to allowing trailing closures to match functions
 // with Any as a final parameter is the same after the changes made by SR-2505, namely:
 // that we continue to select function that does _not_ have Any as a final parameter in
@@ -351,6 +349,9 @@ class C_SR_2505 : P_SR_2505 {
   }
 
   func call(_ c: C_SR_2505) -> Bool {
+    // Note: no diagnostic about capturing 'self', because this is a
+    // non-escaping closure -- that's how we know we have selected
+    // test(it:) and not test(_)
     return c.test { o in test(o) }
   }
 }

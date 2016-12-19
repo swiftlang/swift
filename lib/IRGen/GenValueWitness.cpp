@@ -181,7 +181,7 @@ namespace {
     void complete(IRGenFunction &IGF) override {}
     void get(IRGenFunction &IGF, SILType T, const TypeInfo &type) {}
   };
-}
+} // end anonymous namespace
 
 /// Dynamic check for the enabling conditions of different kinds of
 /// packing into a fixed-size buffer, and perform an operation at each
@@ -1019,7 +1019,7 @@ static llvm::Constant *getCopyOutOfLinePointerFunction(IRGenModule &IGM) {
 
 namespace {
   enum class MemMoveOrCpy { MemMove, MemCpy };
-}
+} // end anonymous namespace
 
 /// Return a function which takes two pointer arguments and a count, memmoves
 /// or memcpys from the second to the first, and returns the first argument.

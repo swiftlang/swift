@@ -741,7 +741,7 @@ static const void *DeallocatedBuffer = nullptr;
 
 namespace swift {
   void installCommonValueWitnesses(ValueWitnessTable *vwtable);
-}
+} // namespace swift
 
 
 TEST(MetadataTest, installCommonValueWitnesses_pod_indirect) {

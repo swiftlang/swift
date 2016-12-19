@@ -87,7 +87,7 @@ namespace {
     IsFunctionParam = true,
     IsNotFunctionParam = false,
   };
-}
+} // end anonymous namespace
 
 static StringRef getNameForObjC(const ValueDecl *VD,
                                 CustomNamesOnly_t customNamesOnly = Normal) {
@@ -365,7 +365,7 @@ private:
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
-      print(param->getType(), OTK_None, Identifier(), IsFunctionParam);
+      print(param->getInterfaceType(), OTK_None, Identifier(), IsFunctionParam);
     }
     os << ")";
 
@@ -541,8 +541,14 @@ private:
           !isa<ProtocolDecl>(ctor->getDeclContext())) {
         os << " OBJC_DESIGNATED_INITIALIZER";
       }
-    } else if (isMistakableForInit(AFD->getObjCSelector())) {
-      os << " SWIFT_METHOD_FAMILY(none)";
+    } else {
+      if (isMistakableForInit(AFD->getObjCSelector())) {
+        os << " SWIFT_METHOD_FAMILY(none)";
+      }
+      if (!methodTy->getResult()->isVoid() &&
+          !AFD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+        os << " SWIFT_WARN_UNUSED_RESULT";
+      }
     }
 
     os << ";\n";
@@ -573,7 +579,7 @@ private:
     auto params = FD->getParameterLists().back();
     interleave(*params,
                [&](const ParamDecl *param) {
-                 print(param->getType(), OTK_None, param->getName(),
+                 print(param->getInterfaceType(), OTK_None, param->getName(),
                        IsFunctionParam);
                },
                [&]{ os << ", "; });
@@ -622,7 +628,7 @@ private:
     const TypeAliasDecl *TAD = nullptr;
     while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
       TAD = aliasTy->getDecl();
-      ty = TAD->getUnderlyingType();
+      ty = aliasTy->getSinglyDesugaredType();
     }
 
     return TAD && TAD->getName() == ID_CFTypeRef && TAD->hasClangNode();
@@ -656,7 +662,7 @@ private:
     // We treat "unowned" as "assign" (even though it's more like
     // "safe_unretained") because we want people to think twice about
     // allowing that object to disappear.
-    Type ty = VD->getType();
+    Type ty = VD->getInterfaceType();
     if (auto weakTy = ty->getAs<WeakStorageType>()) {
       auto innerTy = weakTy->getReferentType()->getAnyOptionalObjectType();
       auto innerClass = innerTy->getClassOrBoundGenericClass();
@@ -1119,7 +1125,7 @@ private:
       return;
     }
 
-    visitPart(alias->getUnderlyingType(), optionalKind);
+    visitPart(alias->getUnderlyingTypeLoc().getType(), optionalKind);
   }
 
   void maybePrintTagKeyword(const NominalTypeDecl *NTD) {
@@ -1453,11 +1459,6 @@ private:
     visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitSubstitutedType(SubstitutedType *ST, 
-                            Optional<OptionalTypeKind> optionalKind) {
-    visitPart(ST->getSinglyDesugaredType(), optionalKind);
-  }
-
   void visitSyntaxSugarType(SyntaxSugarType *SST, 
                             Optional<OptionalTypeKind> optionalKind) {
     visitPart(SST->getSinglyDesugaredType(), optionalKind);
@@ -1590,10 +1591,6 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   void visitDependentMemberType(DependentMemberType *member) {
     // Appears in protocols and in generic ObjC classes.
     return;
-  }
-
-  void visitSubstitutedType(SubstitutedType *sub) {
-    visit(sub->getSinglyDesugaredType());
   }
 
   void visitAnyFunctionType(AnyFunctionType *fnTy) {
@@ -1901,7 +1898,7 @@ public:
         } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
           (void)addImport(TD);
           // Just in case, make sure the underlying type is visible too.
-          finder.visit(TAD->getUnderlyingType());
+          finder.visit(TAD->getUnderlyingTypeLoc().getType());
         } else if (addImport(TD)) {
           return;
         } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
@@ -2120,6 +2117,11 @@ public:
            "# define SWIFT_NOESCAPE __attribute__((noescape))\n"
            "#else\n"
            "# define SWIFT_NOESCAPE\n"
+           "#endif\n"
+           "#if defined(__has_attribute) && __has_attribute(warn_unused_result)\n"
+           "# define SWIFT_WARN_UNUSED_RESULT __attribute__((warn_unused_result))\n"
+           "#else\n"
+           "# define SWIFT_WARN_UNUSED_RESULT\n"
            "#endif\n"
            "#if !defined(SWIFT_CLASS_EXTRA)\n"
            "# define SWIFT_CLASS_EXTRA\n"
@@ -2382,7 +2384,7 @@ public:
     return false;
   }
 };
-}
+} // end anonymous namespace
 
 bool swift::printAsObjC(llvm::raw_ostream &os, Module *M,
                         StringRef bridgingHeader,

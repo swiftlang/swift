@@ -1192,7 +1192,7 @@ namespace {
       }
     }
     
-    ~PayloadEnumImplStrategyBase() {
+    ~PayloadEnumImplStrategyBase() override {
       if (auto schema = PayloadSchema.getSchema())
         delete schema;
     }
@@ -4229,7 +4229,7 @@ namespace {
       // Initialize the extra tag bits, if we have them.
       if (ExtraTagBitCount > 0) {
         extraTag = IGF.Builder.CreateIntCast(extraTag, ExtraTagTy,
-                                             /*signed=*/false);
+                                             /*isSigned=*/false);
         IGF.Builder.CreateStore(extraTag, projectExtraTagBits(IGF, enumAddr));
       }
     }
@@ -4347,7 +4347,7 @@ namespace {
       auto metadataBuffer = IGF.createAlloca(metadataBufferTy,
                                              IGF.IGM.getPointerAlignment(),
                                              "payload_types");
-      llvm::Value *firstAddr;
+      llvm::Value *firstAddr = nullptr;
       for (unsigned i = 0; i < numPayloads; ++i) {
         auto &elt = ElementsWithPayload[i];
         Address eltAddr = IGF.Builder.CreateStructGEP(metadataBuffer, i,
@@ -4360,7 +4360,8 @@ namespace {
         
         IGF.Builder.CreateStore(metadata, eltAddr);
       }
-      
+      assert(firstAddr && "Expected firstAddr to be assigned to");
+
       return firstAddr;
     }
 
@@ -4955,7 +4956,7 @@ namespace {
     EnumTypeInfoBase(EnumImplStrategy &strategy, AA &&...args)
       : BaseTypeInfo(std::forward<AA>(args)...), Strategy(strategy) {}
 
-    ~EnumTypeInfoBase() {
+    ~EnumTypeInfoBase() override {
       delete &Strategy;
     }
 

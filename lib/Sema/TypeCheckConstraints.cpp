@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "GenericTypeResolver.h"
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
@@ -500,7 +501,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // FIXME: This is odd.
     if (isa<ModuleDecl>(ResultValues[0])) {
       return new (Context) DeclRefExpr(ResultValues[0], UDRE->getNameLoc(),
-                                       /*implicit=*/false,
+                                       /*Implicit=*/false,
                                        AccessSemantics::Ordinary,
                                        ResultValues[0]->getInterfaceType());
     }
@@ -548,7 +549,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
   ResultValues.clear();
   bool AllMemberRefs = true;
-  ValueDecl *Base = 0;
+  ValueDecl *Base = nullptr;
   for (auto Result : Lookup) {
     // Track the base for member declarations.
     if (Result.Base && !isa<ModuleDecl>(Result.Base)) {
@@ -569,10 +570,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   if (AllMemberRefs) {
     Expr *BaseExpr;
     if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*implicit=*/true);
+      BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*isImplicit=*/true);
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
-                                           /*implicit=*/true);
+                                           /*Implicit=*/true);
     }
     
    
@@ -903,6 +904,33 @@ namespace {
         return expr;
       }
 
+      // Double check if there are any BindOptionalExpr remaining in the
+      // tree (see comment below for more details), if there are no BOE
+      // expressions remaining remove OptionalEvaluationExpr from the tree.
+      if (auto OEE = dyn_cast<OptionalEvaluationExpr>(expr)) {
+        bool hasBindOptional = false;
+        OEE->forEachChildExpr([&](Expr *expr) -> Expr * {
+          if (isa<BindOptionalExpr>(expr))
+            hasBindOptional = true;
+          // If at least a single BOE was found, no reason
+          // to walk any further in the tree.
+          return hasBindOptional ? nullptr : expr;
+        });
+
+        return hasBindOptional ? OEE : OEE->getSubExpr();
+      }
+
+      // Check if there are any BindOptionalExpr in the tree which
+      // wrap DiscardAssignmentExpr, such situation corresponds to syntax
+      // like - `_? = <value>`, since it doesn't really make
+      // sense to have optional assignment to discarded LValue which can
+      // never be optional, we can remove BOE from the tree and avoid
+      // generating any of the uncessary constraints.
+      if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
+        if (auto DAE = dyn_cast<DiscardAssignmentExpr>(BOE->getSubExpr()))
+          return DAE;
+      }
+
       // If this is a sugared type that needs to be folded into a single
       // TypeExpr, do it.
       if (auto *simplified = simplifyTypeExpr(expr))
@@ -921,19 +949,24 @@ namespace {
     /// type names.
     TypeExpr *simplifyTypeExpr(Expr *E);
   };
-}
+} // end anonymous namespace
 
 /// Perform prechecking of a ClosureExpr before we dive into it.  This returns
 /// true for single-expression closures, where we want the body to be considered
 /// part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
+  auto *PL = closure->getParameters();
+
   // Validate the parameters.
   TypeResolutionOptions options;
   options |= TR_AllowUnspecifiedTypes;
   options |= TR_AllowUnboundGenerics;
   options |= TR_InExpression;
   bool hadParameterError = false;
-  if (TC.typeCheckParameterList(closure->getParameters(), DC, options)) {
+
+  GenericTypeToArchetypeResolver resolver(closure);
+
+  if (TC.typeCheckParameterList(PL, DC, options, resolver)) {
     closure->setType(ErrorType::get(TC.Context));
 
     // If we encounter an error validating the parameter list, don't bail.
@@ -946,7 +979,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
       TC.validateType(closure->getExplicitResultTypeLoc(), DC,
-                      TR_InExpression)) {
+                      TR_InExpression, &resolver)) {
     closure->setType(ErrorType::get(TC.Context));
     return false;
   }
@@ -1459,7 +1492,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
@@ -1494,24 +1527,6 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
          convertType.getType()->hasUnresolvedType())) {
       convertType = TypeLoc();
       convertTypePurpose = CTP_Unused;
-    } else if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-      auto *P = closure->getParameters();
-      
-      if (P->size() == 1 && convertType.getType()->is<FunctionType>()) {
-        auto hintFnType = convertType.getType()->castTo<FunctionType>();
-        auto hintFnInputType = hintFnType->getInput();
-        
-        // Cannot use hintFnInputType->is<TupleType>() since it would desugar ParenType
-        if (isa<TupleType>(hintFnInputType.getPointer())) {
-          TupleType *tupleTy = hintFnInputType->castTo<TupleType>();
-          
-          if (tupleTy->getNumElements() >= 2) {
-            diagnose(P->getStartLoc(), diag::closure_argument_list_single_tuple,
-                     hintFnInputType, P->size(), P->size() > 1);
-            return true;
-          }
-        }
-      }
     }
   }
 
@@ -1624,9 +1639,13 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   auto &solution = viable[0];
   Type exprType = solution.simplifyType(*this, expr->getType());
 
-  assert(exprType && !exprType->hasError() && "erroneous solution?");
-  assert(!exprType->hasTypeVariable() &&
+  assert(exprType && !exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
+
+  if (exprType->hasError()) {
+    recoverOriginalType();
+    return None;
+  }
 
   // Dig the declaration out of the solution.
   auto semanticExpr = expr->getSemanticsProvidingExpr();
@@ -1810,7 +1829,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                              DeclContext *DC)
       : pattern(pattern), initializer(initializer), DC(DC) { }
 
-    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
 
@@ -1828,7 +1847,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       return false;
     }
 
-    virtual Expr *appliedSolution(Solution &solution, Expr *expr) {
+    Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Figure out what type the constraints decided on.
       auto &tc = solution.getConstraintSystem().getTypeChecker();
       InitType = solution.simplifyType(tc, InitType);
@@ -1968,7 +1987,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   public:
     explicit BindingListener(ForEachStmt *stmt) : Stmt(stmt) { }
 
-    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
 
@@ -2066,7 +2085,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       return false;
     }
 
-    virtual Expr *appliedSolution(Solution &solution, Expr *expr) {
+    Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Figure out what types the constraints decided on.
       auto &cs = solution.getConstraintSystem();
       auto &tc = cs.getTypeChecker();
@@ -2119,7 +2138,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     return TupleType::get(destTupleTypes, ctx);
   }
 
-  Type destTy = simplifyType(dest->getType());
+  Type destTy = simplifyType(getType(dest));
   if (destTy->hasError() || destTy->getRValueType()->is<UnresolvedType>())
     return Type();
 
@@ -2167,7 +2186,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
   public:
     // Add the appropriate Boolean constraint.
-    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the original expression.
       OrigExpr = expr;
       
@@ -2184,8 +2203,8 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     }
 
     // Convert the result to a Builtin.i1.
-    virtual Expr *appliedSolution(constraints::Solution &solution,
-                                  Expr *expr) {
+    Expr *appliedSolution(constraints::Solution &solution,
+                                  Expr *expr) override {
       auto &cs = solution.getConstraintSystem();
       return solution.convertBooleanTypeToBuiltinI1(expr,
                                             cs.getConstraintLocator(OrigExpr));
@@ -2279,8 +2298,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          Context.getIdentifier("$match"),
                                          rhsType,
                                          DC);
-  matchVar->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
-      DC, rhsType));
+  matchVar->setInterfaceType(DC->mapTypeOutOfContext(rhsType));
 
   matchVar->setImplicit();
   EP->setMatchVar(matchVar);
@@ -2320,7 +2338,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
     = TupleExpr::create(Context, EP->getSubExpr()->getSourceRange().Start,
                         matchArgElts, { }, { },
                         EP->getSubExpr()->getSourceRange().End,
-                        /*hasTrailingClosure=*/false, /*Implicit=*/true);
+                        /*HasTrailingClosure=*/false, /*Implicit=*/true);
   
   Expr *matchCall = new (Context) BinaryExpr(matchOp, matchArgs,
                                              /*Implicit=*/true);
@@ -2383,33 +2401,6 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
 
   // Solve the system.
   return cs.solveSingle().hasValue();
-}
-
-Expr *TypeChecker::coerceToRValue(Expr *expr) {
-  // Can't load from an inout value.
-  if (auto *iot = expr->getType()->getAs<InOutType>()) {
-    // Emit a fixit if we can find the & expression that turned this into an
-    // inout.
-    if (auto addrOf =
-        dyn_cast<InOutExpr>(expr->getSemanticsProvidingExpr())) {
-      diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
-               iot->getObjectType())
-      .fixItRemove(SourceRange(addrOf->getLoc()));
-      return coerceToRValue(addrOf->getSubExpr());
-    } else {
-      diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
-               iot->getObjectType());
-      return expr;
-    }
-  }
-
-  // If we already have an rvalue, we're done, otherwise emit a load.
-  if (auto lvalueTy = expr->getType()->getAs<LValueType>()) {
-    expr->propagateLValueAccessKind(AccessKind::Read);
-    return new (Context) LoadExpr(expr, lvalueTy->getObjectType());
-  }
-
-  return expr;
 }
 
 Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
@@ -2482,9 +2473,11 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
 
+  cs.cacheExprTypes(expr);
+
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  cs.addConstraint(ConstraintKind::ExplicitConversion, expr->getType(), type,
+  cs.addConstraint(ConstraintKind::ExplicitConversion, cs.getType(expr), type,
                    cs.getConstraintLocator(expr));
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -2712,13 +2705,13 @@ void ConstraintSystem::print(raw_ostream &out) {
     out << "\n";
   }
 
-  if (solverState && !solverState->retiredConstraints.empty()) {
+  if (solverState && !solverState->hasRetiredConstraints()) {
     out << "\nRetired Constraints:\n";
-    for (auto &constraint : solverState->retiredConstraints) {
+    solverState->forEachRetired([&](Constraint &constraint) {
       out.indent(2);
       constraint.print(out, &getTypeChecker().Context.SourceMgr);
       out << "\n";
-    }
+    });
   }
 
   if (resolvedOverloadSets) {

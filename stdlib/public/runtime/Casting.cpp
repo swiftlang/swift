@@ -67,27 +67,25 @@ extern "C" const void *swift_dynamicCastObjCProtocolConditional(
 static void _buildNameForMetadata(const Metadata *type,
                                   bool qualified,
                                   std::string &result) {
+#if SWIFT_OBJC_INTEROP
   if (type->getKind() == MetadataKind::Class) {
     auto classType = static_cast<const ClassMetadata *>(type);
-#if SWIFT_OBJC_INTEROP
     // Look through artificial subclasses.
     while (classType->isTypeMetadata() && classType->isArtificialSubclass())
       classType = classType->SuperClass;
-    
+
     // Ask the Objective-C runtime to name ObjC classes.
     if (!classType->isTypeMetadata()) {
       result += class_getName(classType);
       return;
     }
-#endif
   } else if (type->getKind() == MetadataKind::ObjCClassWrapper) {
-#if SWIFT_OBJC_INTEROP
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
     const char *className = class_getName((Class)objcWrapper->Class);
     result = className;
     return;
-#endif
   }
+#endif
 
   // Use the remangler to generate a mangled name from the type metadata.
   auto demangling = _swift_buildDemanglingForMetadata(type);
@@ -2012,7 +2010,7 @@ struct OptionalCastResult {
   const Metadata* payloadType;
 };
 
-}
+} // end anonymous namespace
 
 /// Handle optional unwrapping of the cast source.
 /// \returns {true, nullptr} if the cast succeeds without unwrapping.
@@ -2974,8 +2972,8 @@ id _swift_bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 //===----------------------------------------------------------------------===//
 
 #define BRIDGING_CONFORMANCE_SYM \
-  SELECT_MANGLING(_TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables, \
-                  _Ss19_BridgeableMetatypeVs21_ObjectiveCBridgeablesWP)
+  SELECT_MANGLING(WPVs19_BridgeableMetatypes21_ObjectiveCBridgeables, \
+                  s19_BridgeableMetatypeVs21_ObjectiveCBridgeablesWP)
 
 extern "C" const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
 

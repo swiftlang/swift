@@ -7,7 +7,7 @@ struct S {
   // CHECK-LABEL: sil hidden @_TFV19init_ref_delegation1SC{{.*}} : $@convention(method) (@thin S.Type) -> S {
   init() {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin S.Type):
-    // CHECK-NEXT:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <S>
+    // CHECK-NEXT:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var S }
     // CHECK-NEXT:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*S
     
@@ -20,7 +20,7 @@ struct S {
     self.init(x: X())
     // CHECK-NEXT:   assign [[REPLACEMENT_SELF]] to [[SELF]] : $*S
     // CHECK-NEXT:   [[SELF_BOX1:%[0-9]+]] = load [trivial] [[SELF]] : $*S
-    // CHECK-NEXT:   destroy_value [[SELF_BOX]] : $<τ_0_0> { var τ_0_0 } <S>
+    // CHECK-NEXT:   destroy_value [[SELF_BOX]] : ${ var S }
     // CHECK-NEXT:   return [[SELF_BOX1]] : $S
   }
 
@@ -35,7 +35,7 @@ enum E {
   // CHECK-LABEL: sil hidden @_TFO19init_ref_delegation1EC{{.*}} : $@convention(method) (@thin E.Type) -> E
   init() {
     // CHECK: bb0([[E_META:%[0-9]+]] : $@thin E.Type):
-    // CHECK:   [[E_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <E>
+    // CHECK:   [[E_BOX:%[0-9]+]] = alloc_box ${ var E }
     // CHECK:   [[PB:%.*]] = project_box [[E_BOX]]
     // CHECK:   [[E_SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*E
 
@@ -48,7 +48,7 @@ enum E {
     // CHECK:   assign [[S:%[0-9]+]] to [[E_SELF]] : $*E
     // CHECK:   [[E_BOX1:%[0-9]+]] = load [trivial] [[E_SELF]] : $*E
     self.init(x: X())
-    // CHECK:   destroy_value [[E_BOX]] : $<τ_0_0> { var τ_0_0 } <E>
+    // CHECK:   destroy_value [[E_BOX]] : ${ var E }
     // CHECK:   return [[E_BOX1:%[0-9]+]] : $E
   }
 
@@ -60,7 +60,7 @@ struct S2 {
   // CHECK-LABEL: sil hidden @_TFV19init_ref_delegation2S2C{{.*}} : $@convention(method) (@thin S2.Type) -> S2
   init() {
     // CHECK: bb0([[S2_META:%[0-9]+]] : $@thin S2.Type):
-    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <S2>
+    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var S2 }
     // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*S2
 
@@ -76,7 +76,7 @@ struct S2 {
     // CHECK:   dealloc_stack [[X_BOX]] : $*X
     // CHECK:   [[SELF_BOX4:%[0-9]+]] = load [trivial] [[SELF]] : $*S2
     self.init(t: X())
-    // CHECK:   destroy_value [[SELF_BOX]] : $<τ_0_0> { var τ_0_0 } <S2>
+    // CHECK:   destroy_value [[SELF_BOX]] : ${ var S2 }
     // CHECK:   return [[SELF_BOX4]] : $S2
   }
 
@@ -91,7 +91,7 @@ class C1 {
  // CHECK-LABEL: sil hidden @_TFC19init_ref_delegation2C1c{{.*}} : $@convention(method) (X, @owned C1) -> @owned C1
   convenience init(x: X) {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[ORIG_SELF:%[0-9]+]] : $C1):
-    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <C1>
+    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var C1 }
     // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*C1
     // CHECK:   store [[ORIG_SELF]] to [init] [[SELF]] : $*C1
@@ -101,7 +101,7 @@ class C1 {
     // CHECK:   [[SELFP:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_FROM_BOX]]) : $@convention(method) (X, X, @owned C1) -> @owned C1
     // CHECK:   store [[SELFP]] to [init] [[SELF]] : $*C1
     // CHECK:   [[SELFP:%[0-9]+]] = load [copy] [[SELF]] : $*C1
-    // CHECK:   destroy_value [[SELF_BOX]] : $<τ_0_0> { var τ_0_0 } <C1>
+    // CHECK:   destroy_value [[SELF_BOX]] : ${ var C1 }
     // CHECK:   return [[SELFP]] : $C1
     self.init(x1: x, x2: x)
   }
@@ -115,7 +115,7 @@ class C1 {
   // CHECK-LABEL: sil hidden @_TFC19init_ref_delegation2C2c{{.*}} : $@convention(method) (X, @owned C2) -> @owned C2
   convenience init(x: X) {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[ORIG_SELF:%[0-9]+]] : $C2):
-    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <C2>
+    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var C2 }
     // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK:   [[UNINIT_SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*C2
     // CHECK:   store [[ORIG_SELF]] to [init] [[UNINIT_SELF]] : $*C2
@@ -128,7 +128,7 @@ class C1 {
     // CHECK:   [[REPLACE_SELF:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF]]) : $@convention(method) (X, X, @owned C2) -> @owned C2
     // CHECK:   store [[REPLACE_SELF]] to [init] [[UNINIT_SELF]] : $*C2
     // CHECK:   [[VAR_15:%[0-9]+]] = load [copy] [[UNINIT_SELF]] : $*C2
-    // CHECK:   destroy_value [[SELF_BOX]] : $<τ_0_0> { var τ_0_0 } <C2>
+    // CHECK:   destroy_value [[SELF_BOX]] : ${ var C2 }
     // CHECK:   return [[VAR_15]] : $C2
     self.init(x1: x, x2: x)
     // CHECK-NOT: sil hidden @_TToFC19init_ref_delegation2C2c{{.*}} : $@convention(objc_method) (X, @owned C2) -> @owned C2 {

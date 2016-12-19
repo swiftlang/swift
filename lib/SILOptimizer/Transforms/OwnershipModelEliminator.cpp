@@ -50,9 +50,16 @@ struct OwnershipModelEliminatorVisitor
   bool visitValueBase(ValueBase *V) { return false; }
   bool visitLoadInst(LoadInst *LI);
   bool visitStoreInst(StoreInst *SI);
+  bool visitStoreBorrowInst(StoreBorrowInst *SI);
   bool visitCopyValueInst(CopyValueInst *CVI);
+  bool visitCopyUnownedValueInst(CopyUnownedValueInst *CVI);
   bool visitDestroyValueInst(DestroyValueInst *DVI);
   bool visitLoadBorrowInst(LoadBorrowInst *LBI);
+  bool visitBeginBorrowInst(BeginBorrowInst *BBI) {
+    BBI->replaceAllUsesWith(BBI->getOperand());
+    BBI->eraseFromParent();
+    return true;
+  }
   bool visitEndBorrowInst(EndBorrowInst *EBI) {
     EBI->eraseFromParent();
     return true;
@@ -95,6 +102,16 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
   return true;
 }
 
+bool OwnershipModelEliminatorVisitor::visitStoreBorrowInst(
+    StoreBorrowInst *SI) {
+  B.emitStoreValueOperation(SI->getLoc(), SI->getSrc(), SI->getDest(),
+                            StoreOwnershipQualifier::Init);
+
+  // Then remove the qualified store.
+  SI->eraseFromParent();
+  return true;
+}
+
 bool
 OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *LBI) {
   // Break down the load borrow into an unqualified load.
@@ -113,6 +130,19 @@ bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
   // operation will delegate to the appropriate strong_release, etc.
   B.emitCopyValueOperation(CVI->getLoc(), CVI->getOperand());
   CVI->replaceAllUsesWith(CVI->getOperand());
+  CVI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitCopyUnownedValueInst(
+    CopyUnownedValueInst *CVI) {
+  B.createStrongRetainUnowned(CVI->getLoc(), CVI->getOperand(),
+                              Atomicity::Atomic);
+  // Users of copy_value_unowned expect an owned value. So we need to convert
+  // our unowned value to a ref.
+  auto *UTRI =
+      B.createUnownedToRef(CVI->getLoc(), CVI->getOperand(), CVI->getType());
+  CVI->replaceAllUsesWith(UTRI);
   CVI->eraseFromParent();
   return true;
 }

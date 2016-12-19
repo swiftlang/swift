@@ -51,9 +51,7 @@ set(swift_runtime_sources
     Once.cpp
     Portability.cpp
     ProtocolConformance.cpp
-    ReflectionNative.cpp
-    RuntimeEntrySymbols.cpp
-    SwiftObjectNative.cpp)
+    RuntimeEntrySymbols.cpp)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
@@ -77,7 +75,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   set(static_binary_lnk_file_list)
   string(TOLOWER "${sdk}" lowercase_sdk)
 
-  # These two libaries are only used with the static swiftcore
+  # These two libraries are only used with the static swiftcore
   add_library(swiftImageInspectionStatic STATIC ImageInspectionStatic.cpp)
   set_target_properties(swiftImageInspectionStatic PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
@@ -119,16 +117,7 @@ add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_runtime_leaks_sources}
   C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
   LINK_FLAGS ${swift_runtime_linker_flags}
-  INSTALL_IN_COMPONENT never_install
-  TARGET_SDKS ALL_APPLE_PLATFORMS)
-
-add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
-  ${swift_runtime_sources}
-  ${swift_runtime_leaks_sources}
-  C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
-  LINK_FLAGS ${swift_runtime_linker_flags}
-  INSTALL_IN_COMPONENT never_install
-  TARGET_SDKS ANDROID CYGWIN FREEBSD LINUX)
+  INSTALL_IN_COMPONENT never_install)
 
 set(ELFISH_SDKS)
 foreach(sdk ${SWIFT_CONFIGURED_SDKS})

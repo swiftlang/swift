@@ -227,7 +227,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     // declaration.
     TypeSubstitutionMap subMap;
     if (!BaseType->isAnyExistentialType())
-      subMap = BaseType->getMemberSubstitutions(Ext);
+      subMap = BaseType->getContextSubstitutions(Ext);
     auto *M = DC->getParentModule();
 
     assert(Ext->getGenericSignature() && "No generic signature.");
@@ -430,7 +430,7 @@ hasMergeGroup(MergeGroupKind Kind) {
   }
   return false;
 }
-}
+} // end anonymous namespace
 
 PrintOptions PrintOptions::printTypeInterface(Type T) {
   PrintOptions result = printInterface();
@@ -867,7 +867,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
         DC = Current->getDeclContext();
 
       // Get the substitutions from our base type.
-      auto subMap = CurrentType->getMemberSubstitutions(DC);
+      auto subMap = CurrentType->getContextSubstitutions(DC);
       auto *M = DC->getParentModule();
       T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
     }
@@ -1265,7 +1265,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
   if (CurrentType) {
     if (!CurrentType->isAnyExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
-      subMap = CurrentType->getMemberSubstitutions(DC);
+      subMap = CurrentType->getContextSubstitutions(DC);
       M = DC->getParentModule();
     }
   }
@@ -2141,9 +2141,8 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
           printGenericSignature(genericSig, PrintParams | InnermostOnly);
     });
   bool ShouldPrint = true;
-  Type Ty;
-  if (decl->hasUnderlyingType())
-    Ty = decl->getUnderlyingType();
+  Type Ty = decl->getUnderlyingTypeLoc().getType();
+
   // If the underlying type is private, don't print it.
   if (Options.SkipPrivateStdlibDecls && Ty && Ty.isPrivateStdlibType())
     ShouldPrint = false;
@@ -2338,11 +2337,11 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (decl->hasType()) {
+  if (decl->hasInterfaceType()) {
     Printer << ": ";
     auto tyLoc = decl->getTypeLoc();
     if (!tyLoc.getTypeRepr())
-      tyLoc = TypeLoc::withoutLoc(decl->getType());
+      tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
     printTypeLoc(tyLoc);
   }
 
@@ -2395,12 +2394,8 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
   printArgName();
 
-  if (!TheTypeLoc.getTypeRepr() && param->hasType()) {
-    // FIXME: ParamDecls should have interface types instead
-    auto *DC = Current->getInnermostDeclContext();
-    auto type = ArchetypeBuilder::mapTypeOutOfContext(DC, param->getType());
-    TheTypeLoc = TypeLoc::withoutLoc(type);
-  }
+  if (!TheTypeLoc.getTypeRepr() && param->hasInterfaceType())
+    TheTypeLoc = TypeLoc::withoutLoc(param->getInterfaceType());
 
   // If the parameter is variadic, we will print the "..." after it, but we have
   // to strip off the added array type.
@@ -2461,7 +2456,7 @@ void PrintAST::printParameterList(ParameterList *PL, Type paramListTy,
                                   bool isCurried,
                                   std::function<bool()> isAPINameByDefault) {
   SmallVector<ParameterTypeFlags, 4> paramFlags;
-  if (paramListTy) {
+  if (paramListTy && !paramListTy->hasError()) {
     if (auto parenTy = dyn_cast<ParenType>(paramListTy.getPointer())) {
       paramFlags.push_back(parenTy->getParameterFlags());
     } else if (auto tupleTy = paramListTy->getAs<TupleType>()) {
@@ -2518,7 +2513,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                              ? parameterListTypes[CurrPattern]
                              : nullptr;
     printParameterList(BodyParams[CurrPattern], paramListType,
-                       /*Curried=*/CurrPattern > 0,
+                       /*isCurried=*/CurrPattern > 0,
                        [&]()->bool {
       return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault();
     });
@@ -2769,7 +2764,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer << "subscript";
   }, [&] { // Parameters
     printParameterList(decl->getIndices(), decl->getIndicesInterfaceType(),
-                       /*Curried=*/false,
+                       /*isCurried=*/false,
                        /*isAPINameByDefault*/[]()->bool{return false;});
   });
   Printer << " -> ";
@@ -3999,10 +3994,6 @@ public:
         context = PrintNameContext::GenericParameter;
       Printer.printName(Name, context);
     }
-  }
-
-  void visitSubstitutedType(SubstitutedType *T) {
-    visit(T->getReplacementType());
   }
 
   void visitDependentMemberType(DependentMemberType *T) {

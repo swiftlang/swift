@@ -145,10 +145,8 @@ protected:
     // Substitute opened existential types, if we have any.
     if (!OpenedExistentialSubs.empty()) {
       auto &F = getBuilder().getFunction();
-      Ty = SILType::substType(F.getModule(),
-                              F.getModule().getSwiftModule(),
-                              OpenedExistentialSubs,
-                              Ty);
+      Ty = Ty.subst(F.getModule(),
+                    OpenedExistentialSubs);
     }
 
     return Ty;
@@ -161,9 +159,7 @@ protected:
   CanType getASTTypeInClonedContext(CanType ty) {
     // Substitute opened existential types, if we have any.
     if (!OpenedExistentialSubs.empty()) {
-      auto &F = getBuilder().getFunction();
-      ty = ty.subst(F.getModule().getSwiftModule(), OpenedExistentialSubs,
-                    None)->getCanonicalType();
+      ty = ty.subst(OpenedExistentialSubs, None)->getCanonicalType();
     }
     return ty;
   }
@@ -234,7 +230,7 @@ public:
 
   // Register a re-mapping for opened existentials.
   void registerOpenedExistentialRemapping(ArchetypeType *From, CanType To) {
-    OpenedExistentialSubs[From] = To;
+    OpenedExistentialSubs.addSubstitution(CanType(From), To);
   }
 
 protected:
@@ -248,7 +244,7 @@ protected:
   // deterministic.
   llvm::MapVector<SILBasicBlock*, SILBasicBlock*> BBMap;
 
-  TypeSubstitutionMap OpenedExistentialSubs;
+  SubstitutionMap OpenedExistentialSubs;
   SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
   /// Set of basic blocks where unreachable was inserted.
@@ -400,9 +396,9 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
       auto *MappedBB = F.createBasicBlock();
       BBMap.insert(std::make_pair(Succ.getBB(), MappedBB));
       // Create new arguments for each of the original block's arguments.
-      for (auto &Arg : Succ.getBB()->getArguments()) {
-        SILValue MappedArg =
-            MappedBB->createArgument(getOpType(Arg->getType()));
+      for (auto *Arg : Succ.getBB()->getPHIArguments()) {
+        SILValue MappedArg = MappedBB->createPHIArgument(
+            getOpType(Arg->getType()), Arg->getOwnershipKind());
 
         ValueMap.insert(std::make_pair(Arg, MappedArg));
       }
@@ -674,12 +670,29 @@ void SILCloner<ImplClass>::visitLoadBorrowInst(LoadBorrowInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitBeginBorrowInst(BeginBorrowInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+                getBuilder().createBeginBorrow(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitStoreInst(StoreInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createStore(getOpLocation(Inst->getLoc()),
                                                getOpValue(Inst->getSrc()),
                                                getOpValue(Inst->getDest()),
                                                Inst->getOwnershipQualifier()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitStoreBorrowInst(StoreBorrowInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+                getBuilder().createStoreBorrow(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getSrc()),
+                                               getOpValue(Inst->getDest())));
 }
 
 template <typename ImplClass>
@@ -1140,6 +1153,15 @@ void SILCloner<ImplClass>::visitCopyValueInst(CopyValueInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitCopyUnownedValueInst(
+    CopyUnownedValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createCopyUnownedValue(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitReleaseValueInst(ReleaseValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
@@ -1406,8 +1428,6 @@ SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst
   // Create a new archetype for this opened existential type.
   auto archetypeTy
     = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
-  assert(OpenedExistentialSubs.count(archetypeTy) == 0 && 
-         "Already substituted opened existential archetype?");
   registerOpenedExistentialRemapping(
       archetypeTy,
       ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));

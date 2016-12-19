@@ -217,7 +217,7 @@ struct GuaranteedARCOpts : SILFunctionTransform {
   StringRef getName() override { return "Guaranteed ARC Opts"; }
 };
 
-} // end swift namespace
+} // end anonymous namespace
 
 SILTransform *swift::createGuaranteedARCOpts() {
   return new GuaranteedARCOpts();

@@ -59,10 +59,11 @@ namespace swift {
     TopLevelCode,
     /// The top-level of a file, when in parse-as-library mode.
     TopLevelLibrary,
-    /// The body of the inactive clause of an #if/#else/#endif block
-    InactiveConditionalBlock,
-    /// The body of the active clause of an #if/#else/#endif block
-    ActiveConditionalBlock
+    /// The body of the clause of an #if/#else/#endif block
+    ConditionalBlock,
+    /// The body of the clause of an #if/#else/#endif block that was statically
+    /// determined to be inactive.
+    StaticallyInactiveConditionalBlock,
   };
 
   
@@ -619,7 +620,7 @@ public:
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
-  void parseIfConfigClauseElements(bool isActive,
+  void parseIfConfigClauseElements(bool isInactive,
                                    BraceItemListKind Kind,
                                    SmallVectorImpl<ASTNode> &Elements);
   
@@ -646,7 +647,7 @@ public:
     PD_InExtension          = 1 << 8,
     PD_InStruct             = 1 << 9,
     PD_InEnum               = 1 << 10,
-    PD_InLoop               = 1 << 11
+    PD_InLoop               = 1 << 11,
   };
 
   /// Options that control the parsing of declarations.
@@ -1001,7 +1002,8 @@ public:
 
   ParserResult<ParameterList> parseSingleParameterClause(
                           ParameterContextKind paramContext,
-                          SmallVectorImpl<Identifier> *namePieces = nullptr);
+                          SmallVectorImpl<Identifier> *namePieces = nullptr,
+                          DefaultArgumentInfo *defaultArgs = nullptr);
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                     SmallVectorImpl<ParameterList*> &BodyParams,
@@ -1014,9 +1016,6 @@ public:
                                       SourceLoc &throws,
                                       bool &rethrows,
                                       TypeRepr *&retType);
-  ParserStatus parseConstructorArguments(DeclName &FullName,
-                                         ParameterList *&BodyParams,
-                                         DefaultArgumentInfo &defaultArgs);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1231,9 +1230,14 @@ public:
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserResult<CaseStmt> parseStmtCase();
 
-  /// Evaluate the condition of an #if directive.
-  ConditionalCompilationExprState
-  evaluateConditionalCompilationExpr(Expr *condition);
+  /// Classify the condition of an #if directive according to whether it can
+  /// be evaluated statically.  If evaluation is not possible, the result is
+  /// 'None'.
+  static Optional<bool>
+  classifyConditionalCompilationExpr(Expr *condition,
+                                     ASTContext &context,
+                                     DiagnosticEngine &diags,
+                                     bool fullCheck = false);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

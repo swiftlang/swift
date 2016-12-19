@@ -45,6 +45,8 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
   case MagicIdentifierLiteralExpr::DSOHandle:
     return DefaultArgumentKind::DSOHandle;
   }
+
+  llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
 void Parser::DefaultArgumentInfo::setFunctionContext(AbstractFunctionDecl *AFD){
@@ -92,10 +94,7 @@ static ParserStatus parseDefaultArgument(Parser &P,
     break;
   }
   
-  assert(((diagID.ID != DiagID()) == !defaultArgs ||
-          // Sometimes curried method parameter lists get default arg info.
-          // Remove this when they go away.
-          paramContext == Parser::ParameterContextKind::Curried) &&
+  assert((diagID.ID != DiagID()) == !defaultArgs &&
          "Default arguments specified for an unexpected parameter list kind");
   
   if (diagID.ID != DiagID()) {
@@ -324,7 +323,6 @@ mapParsedParameters(Parser &parser,
                     SourceLoc leftParenLoc,
                     MutableArrayRef<Parser::ParsedParameter> params,
                     SourceLoc rightParenLoc,
-                    bool isFirstParameterClause,
                     SmallVectorImpl<Identifier> *argNames,
                     Parser::ParameterContextKind paramContext) {
   auto &ctx = parser.Context;
@@ -393,12 +391,10 @@ mapParsedParameters(Parser &parser,
     case Parser::ParameterContextKind::Closure:
     case Parser::ParameterContextKind::Subscript:
     case Parser::ParameterContextKind::Operator:
-      isKeywordArgumentByDefault = !isFirstParameterClause;
+      isKeywordArgumentByDefault = false;
       break;
     case Parser::ParameterContextKind::Curried:
     case Parser::ParameterContextKind::Initializer:
-      isKeywordArgumentByDefault = true;
-      break;
     case Parser::ParameterContextKind::Function:
       isKeywordArgumentByDefault = true;
       break;
@@ -454,7 +450,9 @@ mapParsedParameters(Parser &parser,
     }
 
     if (param.DefaultArg) {
-      assert(isFirstParameterClause &&
+      assert((paramContext == Parser::ParameterContextKind::Function ||
+              paramContext == Parser::ParameterContextKind::Operator ||
+              paramContext == Parser::ParameterContextKind::Initializer) &&
              "Default arguments are only permitted on the first param clause");
       result->setDefaultArgumentKind(getDefaultArgKind(param.DefaultArg));
       result->setDefaultValue(param.DefaultArg);
@@ -470,21 +468,49 @@ mapParsedParameters(Parser &parser,
 }
 
 /// Parse a single parameter-clause.
-ParserResult<ParameterList> Parser::parseSingleParameterClause(
-                                ParameterContextKind paramContext,
-                                SmallVectorImpl<Identifier> *namePieces) {
+ParserResult<ParameterList>
+Parser::parseSingleParameterClause(ParameterContextKind paramContext,
+                                   SmallVectorImpl<Identifier> *namePieces,
+                                   DefaultArgumentInfo *defaultArgs) {
+  if (!Tok.is(tok::l_paren)) {
+    // If we don't have the leading '(', complain.
+    Diag<> diagID;
+    switch (paramContext) {
+    case ParameterContextKind::Function:
+    case ParameterContextKind::Operator:
+      diagID = diag::func_decl_without_paren;
+      break;
+    case ParameterContextKind::Subscript:
+      diagID = diag::expected_lparen_subscript;
+      break;
+    case ParameterContextKind::Initializer:
+      diagID = diag::expected_lparen_initializer;
+      break;
+    case ParameterContextKind::Closure:
+    case ParameterContextKind::Curried:
+      llvm_unreachable("should never be here");
+    }
+
+    auto diag = diagnose(Tok, diagID);
+    if (Tok.isAny(tok::l_brace, tok::arrow, tok::kw_throws, tok::kw_rethrows))
+      diag.fixItInsertAfter(PreviousLoc, "()");
+
+    // Create an empty parameter list to recover.
+    return makeParserErrorResult(
+        ParameterList::createEmpty(Context, PreviousLoc, PreviousLoc));
+  }
+
   ParserStatus status;
   SmallVector<ParsedParameter, 4> params;
   SourceLoc leftParenLoc, rightParenLoc;
   
   // Parse the parameter clause.
   status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
-                                 /*defaultArgs=*/nullptr, paramContext);
+                                 defaultArgs, paramContext);
   
   // Turn the parameter clause into argument and body patterns.
   auto paramList = mapParsedParameters(*this, leftParenLoc, params,
-                                     rightParenLoc, true, namePieces,
-                                     paramContext);
+                                       rightParenLoc, namePieces, paramContext);
 
   return makeParserResult(status, paramList);
 }
@@ -506,26 +532,18 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                DefaultArgumentInfo &DefaultArgs) {
   // Parse parameter-clauses.
   ParserStatus status;
-  bool isFirstParameterClause = true;
   unsigned FirstBodyPatternIndex = BodyParams.size();
+
+  auto FirstParameterClause
+    = parseSingleParameterClause(paramContext, &NamePieces, &DefaultArgs);
+  status |= FirstParameterClause;
+  BodyParams.push_back(FirstParameterClause.get());
+
   while (Tok.is(tok::l_paren)) {
-    SmallVector<ParsedParameter, 4> params;
-    SourceLoc leftParenLoc, rightParenLoc;
-
-    // Parse the parameter clause.
-    status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
-                                   &DefaultArgs, paramContext);
-
-    // Turn the parameter clause into argument and body patterns.
-    auto pattern = mapParsedParameters(*this, leftParenLoc, params,
-                                       rightParenLoc, 
-                                       isFirstParameterClause,
-                                       isFirstParameterClause ? &NamePieces
-                                                              : nullptr,
-                                       paramContext);
-    BodyParams.push_back(pattern);
-    isFirstParameterClause = false;
-    paramContext = ParameterContextKind::Curried;
+    auto CurriedParameterClause
+      = parseSingleParameterClause(ParameterContextKind::Curried);
+    status |= CurriedParameterClause;
+    BodyParams.push_back(CurriedParameterClause.get());
   }
 
   // If the decl uses currying syntax, complain that that syntax has gone away.
@@ -574,39 +592,13 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                bool &rethrows,
                                TypeRepr *&retType) {
   SmallVector<Identifier, 4> NamePieces;
-  NamePieces.push_back(SimpleName);
-  FullName = SimpleName;
-  
   ParserStatus Status;
-  // We force first type of a func declaration to be a tuple for consistency.
-  if (Tok.is(tok::l_paren)) {
-    ParameterContextKind paramContext;
-    if (SimpleName.isOperator())
-      paramContext = ParameterContextKind::Operator;
-    else
-      paramContext = ParameterContextKind::Function;
 
-    Status = parseFunctionArguments(NamePieces, bodyParams, paramContext,
-                                    defaultArgs);
-    FullName = DeclName(Context, SimpleName, 
-                        llvm::makeArrayRef(NamePieces.begin() + 1,
-                                           NamePieces.end()));
-
-    if (bodyParams.empty()) {
-      // If we didn't get anything, add a () pattern to avoid breaking
-      // invariants.
-      assert(Status.hasCodeCompletion() || Status.isError());
-      bodyParams.push_back(ParameterList::createEmpty(Context));
-    }
-  } else {
-    diagnose(Tok, diag::func_decl_without_paren);
-    Status = makeParserError();
-
-    // Recover by creating a '() -> ?' signature.
-    bodyParams.push_back(ParameterList::createEmpty(Context, PreviousLoc,
-                                                    PreviousLoc));
-    FullName = DeclName(Context, SimpleName, bodyParams.back());
-  }
+  ParameterContextKind paramContext = SimpleName.isOperator() ?
+    ParameterContextKind::Operator : ParameterContextKind::Function;
+  Status |= parseFunctionArguments(NamePieces, bodyParams, paramContext,
+                                   defaultArgs);
+  FullName = DeclName(Context, SimpleName, NamePieces);
   
   // Check for the 'throws' keyword.
   rethrows = false;
@@ -688,46 +680,6 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   return Status;
 }
 
-ParserStatus
-Parser::parseConstructorArguments(DeclName &FullName,
-                                  ParameterList *&BodyParams,
-                                  DefaultArgumentInfo &DefaultArgs) {
-  // If we don't have the leading '(', complain.
-  if (!Tok.is(tok::l_paren)) {
-    // Complain that we expected '('.
-    {
-      auto diag = diagnose(Tok, diag::expected_lparen_initializer);
-      if (Tok.is(tok::l_brace))
-        diag.fixItInsertAfter(PreviousLoc, "()");
-    }
-
-    // Create an empty parameter list to recover.
-    BodyParams = ParameterList::createEmpty(Context, PreviousLoc, PreviousLoc);
-    FullName = DeclName(Context, Context.Id_init, BodyParams);
-    return makeParserError();
-  }
-
-  // Parse the parameter-clause.
-  SmallVector<ParsedParameter, 4> params;
-  SourceLoc leftParenLoc, rightParenLoc;
-  
-  // Parse the parameter clause.
-  ParserStatus status 
-    = parseParameterClause(leftParenLoc, params, rightParenLoc,
-                           &DefaultArgs, ParameterContextKind::Initializer);
-
-  // Turn the parameter clause into argument and body patterns.
-  llvm::SmallVector<Identifier, 2> namePieces;
-  BodyParams = mapParsedParameters(*this, leftParenLoc, params,
-                                   rightParenLoc,
-                                   /*isFirstParameterClause=*/true,
-                                   &namePieces,
-                                   ParameterContextKind::Initializer);
-
-  FullName = DeclName(Context, Context.Id_init, namePieces);
-  return status;
-}
-
 
 /// Parse a pattern with an optional type annotation.
 ///
@@ -749,7 +701,9 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
     if (!Ty.isNull()) {
       // Attempt to diagnose initializer calls incorrectly written
       // as typed patterns, such as "var x: [Int]()".
-      if (Tok.isFollowingLParen()) {
+      // Disable this tentative parse when in code-completion mode, otherwise
+      // code-completion may enter the delayed-decl state twice.
+      if (Tok.isFollowingLParen() && !L->isCodeCompletion()) {
         BacktrackingScope backtrack(*this);
         
         // Create a local context if needed so we can parse trailing closures.
@@ -947,8 +901,8 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
     return result;
 
   Pattern *P;
-  if (result.isNull())  // Recover by creating AnyPattern.
-    P = new (Context) AnyPattern(Tok.getLoc());
+  if (result.isNull())
+    return nullptr;
   else
     P = result.get();
 

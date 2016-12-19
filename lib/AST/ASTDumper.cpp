@@ -460,8 +460,8 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       OS << " type='";
-      if (TAD->hasUnderlyingType())
-        OS << TAD->getUnderlyingType().getString();
+      if (TAD->getUnderlyingTypeLoc().getType())
+        OS << TAD->getUnderlyingTypeLoc().getType().getString();
       else
         OS << "<<<unresolved>>>";
       printInherited(TAD->getInherited());
@@ -756,13 +756,19 @@ namespace {
       if (!P->getArgumentName().empty())
         OS << " apiName=" << P->getArgumentName();
       
-      OS << " type=";
       if (P->hasType()) {
+        OS << " type=";
         OS << '\'';
         P->getType().print(OS);
         OS << '\'';
-      } else
-        OS << "<null type>";
+      }
+      
+      if (P->hasInterfaceType()) {
+        OS << " interface type=";
+        OS << '\'';
+        P->getInterfaceType().print(OS);
+        OS << '\'';
+      }
       
       if (!P->isLet())
         OS << " mutable";
@@ -1007,7 +1013,7 @@ namespace {
       OS << ')';
     }
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void ParameterList::dump() const {
   dump(llvm::errs(), 0);
@@ -1452,7 +1458,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void Stmt::dump() const {
   print(llvm::errs());
@@ -2285,7 +2291,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 
 void Expr::dump(raw_ostream &OS) const {
@@ -2462,7 +2468,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void PrintDecl::printRec(TypeRepr *T) {
   PrintTypeRepr(OS, Indent+2).visit(T);
@@ -2813,7 +2819,11 @@ namespace {
 
       // FIXME: This is ugly.
       OS << "\n";
-      T->getASTContext().dumpArchetypeContext(T, OS, Indent + 2);
+      if (auto genericEnv = T->getGenericEnvironment()) {
+        if (auto owningDC = genericEnv->getOwningDeclContext()) {
+          owningDC->printContext(OS, Indent + 2);
+        }
+      }
 
       if (auto superclass = T->getSuperclass())
         printRec("superclass", superclass);
@@ -2828,13 +2838,10 @@ namespace {
         OS << "=";
         OS << nestedType.first.str() << " ";
         if (!nestedType.second) {
-          PrintWithColorRAII(OS, TypeColor) << "unresolved";          
-        } else if (auto concrete = nestedType.second.getAsConcreteType()) {
-          PrintWithColorRAII(OS, TypeColor) << "concrete";
-          OS << "=" << concrete.getString();
+          PrintWithColorRAII(OS, TypeColor) << "<<unresolved>>";
         } else {
-          PrintWithColorRAII(OS, TypeColor) << "archetype";
-          OS << "=" << static_cast<void *>(nestedType.second.getAsArchetype());
+          PrintWithColorRAII(OS, TypeColor);
+          OS << "=" << nestedType.second.getString();
         }
         OS << ")";
       }
@@ -2849,13 +2856,6 @@ namespace {
       printField("index", T->getIndex());
       if (auto decl = T->getDecl())
         printField("decl", decl->printRef());
-      OS << ")";
-    }
-
-    void visitSubstitutedType(SubstitutedType *T, StringRef label) {
-      printCommon(T, label, "substituted_type");
-      printRec("original", T->getOriginal());
-      printRec("replacement", T->getReplacementType());
       OS << ")";
     }
 
@@ -3044,7 +3044,7 @@ namespace {
 
 #undef TRIVIAL_TYPE_PRINTER
   };
-}
+} // end anonymous namespace
 
 void Type::dump() const {
   // Make sure to print type variables.

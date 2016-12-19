@@ -6,6 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 
 if{enum S<T{enum S:d<T>}typealias d<T where B:T>:a

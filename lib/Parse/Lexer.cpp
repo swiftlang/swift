@@ -96,7 +96,9 @@ static unsigned CLO8(unsigned char C) {
 /// isStartOfUTF8Character - Return true if this isn't a UTF8 continuation
 /// character, which will be of the form 0b10XXXXXX
 static bool isStartOfUTF8Character(unsigned char C) {
-  return (signed char)C >= 0 || C >= 0xC0;  // C0 = 0b11000000
+  // RFC 2279: The octet values FE and FF never appear.
+  // RFC 3629: The octet values C0, C1, F5 to FF never appear.
+  return C <= 0x80 || (C >= 0xC2 && C < 0xF5);
 }
 
 /// validateUTF8CharacterAndAdvance - Given a pointer to the starting byte of a
@@ -117,11 +119,7 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
   
   // If this is 0b10XXXXXX, then it is a continuation character.
   if (EncodedBytes == 1 ||
-      // If the number of encoded bytes is > 4, then this is an invalid
-      // character in the range of 0xF5 and above.  These would start an
-      // encoding for something that couldn't be represented with UTF16
-      // digraphs, so Unicode rejects them.
-      EncodedBytes > 4) {
+      !isStartOfUTF8Character(CurByte)) {
     // Skip until we get the start of another character.  This is guaranteed to
     // at least stop at the nul at the end of the buffer.
     while (Ptr < End && !isStartOfUTF8Character(*Ptr))
@@ -1863,7 +1861,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
       if (Tok.is(tok::string_literal)) {
         assert(!InInterpolatedString);
         SmallVector<Lexer::StringSegment, 4> Segments;
-        Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
+        Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
         for (auto &Seg : Segments) {
           unsigned SegOffs = SM.getLocOffsetInBuffer(Seg.Loc, BufferID);
           unsigned SegEnd = SegOffs+Seg.Length;

@@ -336,7 +336,7 @@ namespace {
       return ReferenceCounting::Native;
     }
   };
-}
+} // end anonymous namespace
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinNativeObject() {
   return new BuiltinNativeObjectTypeInfo(IGM.RefCountedPtrTy,
@@ -384,7 +384,7 @@ namespace {
       return storeHeapObjectExtraInhabitant(IGF, index, dest);
     }
   };
-}
+} // end anonymous namespace
 
 const LoadableTypeInfo *
 TypeConverter::createUnmanagedStorageType(llvm::Type *valueType) {
@@ -538,7 +538,7 @@ namespace {
       IGF.emitNativeWeakAssign(value, dest);
     }
   };
-}
+} // end anonymous namespace
 
 SpareBitVector IRGenModule::getWeakReferenceSpareBits() const {
   // The runtime needs to be able to freely manipulate live weak
@@ -766,7 +766,7 @@ namespace {
       IGF.emitUnknownWeakAssign(value, dest);
     }
   };
-}
+} // end anonymous namespace
 
 const TypeInfo *TypeConverter::createUnownedStorageType(llvm::Type *valueType,
                                                       ReferenceCounting style) {
@@ -1397,7 +1397,7 @@ public:
 
   /// Allocate a box of the given type.
   virtual OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const = 0;
 
   /// Deallocate an uninitialized box.
@@ -1415,7 +1415,7 @@ public:
   EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const override {
     return OwnedAddress(IGF.getTypeInfo(boxedType).getUndefAddress(),
                         IGF.IGM.RefCountedNull);
@@ -1440,7 +1440,7 @@ public:
   NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const override {
     auto &ti = IGF.getTypeInfo(boxedType);
     // Use the runtime to allocate a box of the appropriate size.
@@ -1481,10 +1481,17 @@ public:
   {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name)
   const override {
     // Allocate a new object using the layout.
+    auto boxedInterfaceType = boxedType;
+    if (env) {
+      boxedInterfaceType = SILType::getPrimitiveType(
+        env->mapTypeOutOfContext(boxedType.getSwiftRValueType())
+           ->getCanonicalType(),
+         boxedType.getCategory());
+    }
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
         boxedInterfaceType.getSwiftRValueType());
@@ -1547,11 +1554,15 @@ public:
   {}
 };
 
-}
+} // end anonymous namespace
 
 const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // We can share a type info for all dynamic-sized heap metadata.
-  auto &eltTI = IGM.getTypeInfoForLowered(T->getBoxedType());
+  // TODO: Multi-field boxes
+  assert(T->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  auto &eltTI = IGM.getTypeInfoForLowered(
+    T->getFieldLoweredType(IGM.getSILModule(), 0));
   if (!eltTI.isFixedSize()) {
     if (!NonFixedBoxTI)
       NonFixedBoxTI = new NonFixedBoxTypeInfo(IGM);
@@ -1593,32 +1604,41 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // TODO: Other common shapes? Optional-of-Refcounted would be nice.
 
   // Produce a tailored box metadata for the type.
-  return new FixedBoxTypeInfo(IGM, T->getBoxedAddressType());
+  assert(T->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  return new FixedBoxTypeInfo(IGM, T->getFieldType(IGM.getSILModule(), 0));
 }
 
 OwnedAddress
 irgen::emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
-                       CanSILBoxType boxInterfaceType,
+                       GenericEnvironment *env,
                        const llvm::Twine &name) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
+  assert(boxType->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
   return boxTI.allocate(IGF,
-                        boxType->getBoxedAddressType(),
-                        boxInterfaceType->getBoxedAddressType(),
-                        name);
+                      boxType->getFieldType(IGF.IGM.getSILModule(), 0), env,
+                      name);
 }
 
 void irgen::emitDeallocateBox(IRGenFunction &IGF,
                               llvm::Value *box,
                               CanSILBoxType boxType) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
-  return boxTI.deallocate(IGF, box, boxType->getBoxedAddressType());
+  assert(boxType->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  return boxTI.deallocate(IGF, box,
+                          boxType->getFieldType(IGF.IGM.getSILModule(), 0));
 }
 
 Address irgen::emitProjectBox(IRGenFunction &IGF,
                               llvm::Value *box,
                               CanSILBoxType boxType) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
-  return boxTI.project(IGF, box, boxType->getBoxedAddressType());
+  assert(boxType->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  return boxTI.project(IGF, box,
+                       boxType->getFieldType(IGF.IGM.getSILModule(), 0));
 }
 
 #define DEFINE_VALUE_OP(ID)                                           \

@@ -288,7 +288,7 @@ namespace {
     explicit PrettyModuleFileDeserialization(const ModuleFile &file)
         : File(file) {}
 
-    virtual void print(raw_ostream &os) const override {
+    void print(raw_ostream &os) const override {
       os << "While reading from " << File.getModuleFilename() << "\n";
     }
   };
@@ -535,9 +535,17 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         LocalDeclContexts.assign(scratch.begin(), scratch.end());
         break;
+      case index_block::GENERIC_ENVIRONMENT_OFFSETS:
+        assert(blobData.empty());
+        GenericEnvironments.assign(scratch.begin(), scratch.end());
+        break;
       case index_block::NORMAL_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
         NormalConformances.assign(scratch.begin(), scratch.end());
+        break;
+      case index_block::SIL_LAYOUT_OFFSETS:
+        assert(blobData.empty());
+        SILLayouts.assign(scratch.begin(), scratch.end());
         break;
 
       default:

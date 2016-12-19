@@ -1107,6 +1107,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         CodeCompletionResult(*LiteralKind, SemanticContext, NumBytesToErase,
                              CCS, ExpectedTypeRelation);
   }
+
+  llvm_unreachable("Unhandled CodeCompletionResult in switch.");
 }
 
 void CodeCompletionResultBuilder::finishResult() {
@@ -1517,6 +1519,8 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
   case CodeCompletionLiteralKind::Tuple:
     llvm_unreachable("no such protocol kind");
   }
+
+  llvm_unreachable("Unhandled CodeCompletionLiteralKind in switch.");
 }
 
 /// Whether funcType has a single argument (not including defaulted arguments)
@@ -1657,7 +1661,7 @@ private:
           expectedType->lookThroughAllAnyOptionalTypes()
               ->is<AnyFunctionType>() &&
           calculateTypeRelationForDecl(D, expectedType, isImplicitlyCurriedIM,
-                                       /*UseFuncResult=*/false) >=
+                                       /*UseFuncResultType=*/false) >=
               CodeCompletionResult::ExpectedTypeRelation::Convertible) {
         return true;
       }
@@ -1981,16 +1985,15 @@ public:
             MaybeNominalType->getAnyOptionalObjectType())
           MaybeNominalType = MaybeNominalType->getAnyOptionalObjectType();
 
-        // For dynamic lookup don't substitute in the base type
+        // For dynamic lookup don't substitute in the base type.
         if (MaybeNominalType->isAnyObject())
           return T;
 
         // For everything else, substitute in the base type.
-        //
+        auto Subs = MaybeNominalType->getMemberSubstitutions(VD);
+
         // Pass in DesugarMemberTypes so that we see the actual
         // concrete type witnesses instead of type alias types.
-        auto Subs = MaybeNominalType->getMemberSubstitutions(
-            VD->getDeclContext());
         T = T.subst(M, Subs, (SubstFlags::DesugarMemberTypes |
                               SubstFlags::UseErrorType));
       }
@@ -2065,7 +2068,7 @@ public:
         Builder.addComma();
       NeedComma = true;
 
-      Type type = param->getType();
+      Type type = param->getInterfaceType();
       if (param->isVariadic())
         type = ParamDecl::getVarargBaseTy(type);
 
@@ -2195,6 +2198,8 @@ public:
           // these parameters.
           return true;
       }
+
+      llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
     };
 
     // Do not desugar AFT->getInput(), as we want to treat (_: (a,b)) distinctly
@@ -2262,7 +2267,7 @@ public:
       SemanticContextKind::ExpressionSpecific, ExpectedTypes);
     Builder.addTextChunk("available");
     Builder.addLeftParen();
-    Builder.addSimpleTypedParameter("Platform", /*isVarArg=*/true);
+    Builder.addSimpleTypedParameter("Platform", /*IsVarArg=*/true);
     Builder.addComma();
     Builder.addTextChunk("*");
     Builder.addRightParen();
@@ -2282,7 +2287,7 @@ public:
     else
       Builder.addTextChunk("selector");
     Builder.addLeftParen();
-    Builder.addSimpleTypedParameter("@objc method", /*isVarArg=*/false);
+    Builder.addSimpleTypedParameter("@objc method", /*IsVarArg=*/false);
     Builder.addRightParen();
   }
 
@@ -2305,7 +2310,7 @@ public:
       Builder.addTextChunk("keyPath");
     Builder.addLeftParen();
     Builder.addSimpleTypedParameter("@objc property sequence",
-                                    /*isVarArg=*/false);
+                                    /*IsVarArg=*/false);
     Builder.addRightParen();
   }
 
@@ -2368,6 +2373,8 @@ public:
     case LookupKind::ImportFromModule:
       return false;
     }
+
+    llvm_unreachable("Unhandled LookupKind in switch.");
   }
 
   void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
@@ -2618,10 +2625,12 @@ public:
     setClangDeclKeywords(TAD, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(TAD->getName().str());
-    if (TAD->hasUnderlyingType() && !TAD->getUnderlyingType()->is<ErrorType>())
-      addTypeAnnotation(Builder, TAD->getUnderlyingType());
-    else {
-      addTypeAnnotation(Builder, TAD->getAliasType());
+    if (TAD->hasInterfaceType()) {
+      auto underlyingType = TAD->getUnderlyingTypeLoc().getType();
+      if (underlyingType->hasError())
+        addTypeAnnotation(Builder, TAD->getDeclaredInterfaceType());
+      else
+        addTypeAnnotation(Builder, underlyingType);
     }
   }
 
@@ -2863,8 +2872,8 @@ public:
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
         addTypeAliasRef(TAD, Reason);
-        addConstructorCallsForType(TAD->getUnderlyingType(), TAD->getName(),
-                                   Reason);
+        auto type = TAD->mapTypeIntoContext(TAD->getUnderlyingTypeLoc().getType());
+        addConstructorCallsForType(type, TAD->getName(), Reason);
         return;
       }
 
@@ -2932,8 +2941,8 @@ public:
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
         addTypeAliasRef(TAD, Reason);
-        addConstructorCallsForType(TAD->getUnderlyingType(), TAD->getName(),
-                                   Reason);
+        auto type = TAD->mapTypeIntoContext(TAD->getDeclaredInterfaceType());
+        addConstructorCallsForType(type, TAD->getName(), Reason);
         return;
       }
 
@@ -4069,9 +4078,9 @@ public:
 
   void addAccessControl(const ValueDecl *VD,
                         CodeCompletionResultBuilder &Builder) {
-    assert(CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext());
+    assert(CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext());
     auto AccessibilityOfContext =
-      CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
+      CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext()
         ->getFormalAccess();
     auto Access = std::min(VD->getFormalAccess(), AccessibilityOfContext);
     // Only emit 'public', not needed otherwise.
@@ -4309,7 +4318,7 @@ public:
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
-    if (!CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext())
+    if (!CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext())
       return;
 
     Type CurrTy = CurrDeclContext->getDeclaredTypeInContext();
@@ -4333,7 +4342,7 @@ static void addSelectorModifierKeywords(CodeCompletionResultSink &sink) {
     Builder.setKeywordKind(Kind);
     Builder.addTextChunk(Name);
     Builder.addCallParameterColon();
-    Builder.addSimpleTypedParameter("@objc property", /*isVarArg=*/false);
+    Builder.addSimpleTypedParameter("@objc property", /*IsVarArg=*/false);
   };
 
   addKeyword("getter", CodeCompletionKeywordKind::None);
@@ -5075,7 +5084,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
 
-    CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext, ParsedExpr);
+    ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext, ParsedExpr);
     llvm::SmallVector<Type, 2> PossibleTypes;
     if (TypeAnalyzer.Analyze(PossibleTypes)) {
       Lookup.setExpectedTypes(PossibleTypes);
@@ -5089,7 +5098,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
 
   case CompletionKind::PostfixExprBeginning: {
-    CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
+    ::CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
                                                CodeCompleteTokenExpr);
     llvm::SmallVector<Type, 1> Types;
     if (Analyzer.Analyze(Types)) {
@@ -5111,7 +5120,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::PostfixExprParen: {
     Lookup.setHaveLParen(true);
 
-    CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
+    ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
                                                    CodeCompleteTokenExpr);
     SmallVector<Type, 2> PossibleTypes;
     SmallVector<StringRef, 2> PossibleNames;
@@ -5332,8 +5341,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
                                    AccessPath, Request.NeedLeadingDot,
                                    SF.hasTestableImport(TheModule),
                                    Ctx.LangOpts.CodeCompleteInitsInPostfixExpr};
-        std::pair<decltype(ImportsSeen)::iterator, bool>
-        Result = ImportsSeen.insert(K);
+
+        using PairType = llvm::DenseSet<swift::ide::CodeCompletionCache::Key,
+            llvm::DenseMapInfo<CodeCompletionCache::Key>>::iterator;
+        std::pair<PairType, bool> Result = ImportsSeen.insert(K);
         if (!Result.second)
           return; // already handled.
 
@@ -5485,6 +5496,8 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       case CodeCompletionDeclKind::GlobalVar:
         return false;
       }
+
+      llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
     });
   } else {
     targetSink.Results.insert(targetSink.Results.end(),

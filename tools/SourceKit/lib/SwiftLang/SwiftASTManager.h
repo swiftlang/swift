@@ -125,6 +125,6 @@ private:
   Implementation &Impl;
 };
 
-} // namespace SourceKit.
+} // namespace SourceKit
 
 #endif

@@ -173,3 +173,9 @@ struct A8 {
     }
   }
 } // expected-error{{extraneous '}' at top level}} {{1-3=}}
+
+struct A9 {
+  subscript -> Int { // expected-error {{expected '(' for subscript parameters}} {{12-12=()}}
+    return 1
+  }
+}

@@ -250,8 +250,14 @@ private:
   /// Normal protocol conformances referenced by this module.
   std::vector<Serialized<NormalProtocolConformance *>> NormalConformances;
 
+  /// SILLayouts referenced by this module.
+  std::vector<Serialized<SILLayout *>> SILLayouts;
+
   /// Types referenced by this module.
   std::vector<Serialized<Type>> Types;
+
+  /// Generic environments referenced by this module.
+  std::vector<Serialized<GenericEnvironment *>> GenericEnvironments;
 
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
@@ -425,7 +431,7 @@ private:
   /// Recursively reads a pattern from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a pattern, returns null.
-  Pattern *maybeReadPattern();
+  Pattern *maybeReadPattern(DeclContext *owningDC);
 
   ParameterList *readParameterList();
   
@@ -443,20 +449,12 @@ private:
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
                                llvm::BitstreamCursor &Cursor);
 
-  /// Reads a GenericEnvironment from \c DeclTypeCursor.
-  ///
-  /// The optional requirements are used to construct the signature without
-  /// attempting to deserialize any requirements, such as when reading SIL.
-  GenericEnvironment *readGenericEnvironment(
-      llvm::BitstreamCursor &Cursor,
-      Optional<ArrayRef<Requirement>> optRequirements = None);
-
-  /// Reads a GenericEnvironment followed by requirements from \c DeclTypeCursor.
-  ///
-  /// Returns the GenericEnvironment.
-  ///
-  /// Returns nullptr if there's no generic signature here.
-  GenericEnvironment *maybeReadGenericEnvironment();
+  /// Set up a (potentially lazy) generic environment for the given type,
+  /// function or extension.
+  void configureGenericEnvironment(
+                   llvm::PointerUnion3<GenericTypeDecl *, ExtensionDecl *,
+                                       AbstractFunctionDecl *> genericDecl,
+                   serialization::GenericEnvironmentID envID);
 
   /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
   ///
@@ -654,6 +652,9 @@ public:
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
+  GenericEnvironment *loadGenericEnvironment(const Decl *decl,
+                                             uint64_t contextData) override;
+
   Optional<StringRef> getGroupNameById(unsigned Id) const;
   Optional<StringRef> getSourceFileNameById(unsigned Id) const;
   Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
@@ -705,6 +706,35 @@ public:
   /// is loaded instead.
   Module *getModule(ArrayRef<Identifier> name);
 
+  /// Return the generic signature or environment at the current position in
+  /// the given cursor.
+  ///
+  /// \param cursor The cursor to read from.
+  /// \param wantEnvironment Whether we always want to receive a generic
+  /// environment vs. being able to handle the generic signature.
+  /// \param optRequirements If not \c None, use these generic requirements
+  /// rather than deserializing requirements.
+  llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+  readGenericSignatureOrEnvironment(
+                        llvm::BitstreamCursor &cursor,
+                        bool wantEnvironment,
+                        Optional<ArrayRef<Requirement>> optRequirements);
+
+  /// Returns the generic signature or environment for the given ID,
+  /// deserializing it if needed.
+  ///
+  /// \param wantEnvironment If true, always return the full generic
+  /// environment. Otherwise, only return the generic environment if it's
+  /// already been constructed, and the signature in other cases.
+  llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+  getGenericSignatureOrEnvironment(serialization::GenericEnvironmentID ID,
+                                   bool wantEnvironment = false);
+
+  /// Returns the generic environment for the given ID, deserializing it if
+  /// needed.
+  GenericEnvironment *getGenericEnvironment(
+                                        serialization::GenericEnvironmentID ID);
+
   /// Reads a substitution record from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a substitution, returns None.
@@ -716,6 +746,9 @@ public:
   ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,
                                          GenericEnvironment *genericEnv =
                                            nullptr);
+  
+  /// Read a SILLayout from the given cursor.
+  SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
 
   /// Read the given normal conformance from the current module file.
   NormalProtocolConformance *

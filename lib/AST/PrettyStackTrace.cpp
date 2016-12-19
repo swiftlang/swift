@@ -165,7 +165,7 @@ namespace {
       return type->getDecl();
     }
   };
-}
+} // end anonymous namespace
 
 void PrettyStackTraceType::print(llvm::raw_ostream &out) const {
   out << "While " << Action << ' ';

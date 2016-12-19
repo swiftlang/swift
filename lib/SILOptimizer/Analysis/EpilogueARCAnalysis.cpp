@@ -43,8 +43,7 @@ void EpilogueARCContext::initializeDataflow() {
     if (Processed.find(CArg) != Processed.end())
        continue;
     Processed.insert(CArg);
-    SILArgument *A = dyn_cast<SILArgument>(CArg);
-    if (A && !A->isFunctionArg()) {
+    if (auto *A = dyn_cast<SILPHIArgument>(CArg)) {
       // Find predecessor and break the SILArgument to predecessors.
       for (auto X : A->getParent()->getPredecessorBlocks()) {
         // Try to find the predecessor edge-value.

@@ -47,23 +47,3 @@ public enum CommandLine {
   public static var arguments: [String]
     = (0..<Int(argc)).map { String(cString: _unsafeArgv[$0]!) }
 }
-
-// FIXME(ABI)#25 : Remove this and the entrypoints in SILGen.
-// rdar://problem/19696522
-@_transparent
-public // COMPILER_INTRINSIC
-func _stdlib_didEnterMain(
-  argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
-) {
-  // Initialize the CommandLine.argc and CommandLine.unsafeArgv variables with the
-  // values that were passed in to main.
-  CommandLine._argc = Int32(argc)
-  CommandLine._unsafeArgv = argv
-}
-
-// FIXME: Move this to HashedCollections.swift.gyb
-internal class _Box<Wrapped> {
-  internal var _value: Wrapped
-  internal init(_ value: Wrapped) { self._value = value }
-}
-

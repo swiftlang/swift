@@ -156,7 +156,8 @@ namespace {
                                    CanAnyFunctionType outputSubstType,
                                    const TypeLowering &expectedTL);
   };
-};
+} // end anonymous namespace
+;
 
 static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(Module *M, Type fromType, Type toType) {
@@ -253,7 +254,7 @@ RValue Transform::transform(RValue &&input,
     auto result = transform(std::move(input).getScalarValue(),
                             inputOrigType, inputSubstType,
                             outputOrigType, outputSubstType, ctxt);
-    return RValue(result, outputSubstType);
+    return RValue(SGF, Loc, outputSubstType, result);
   }
 
   // Okay, we have a tuple.  The output type will also be a tuple unless
@@ -317,7 +318,7 @@ RValue Transform::transform(RValue &&input,
     return RValue();
   }
 
-  return RValue(outputExpansion, outputTupleType);
+  return RValue::withPreExplodedElements(outputExpansion, outputTupleType);
 }
 
 // Single @objc protocol value metatypes can be converted to the ObjC
@@ -770,7 +771,7 @@ void SILGenFunction::collectThunkParams(SILLocation loc,
   // Add the indirect results.
   for (auto result : F.getLoweredFunctionType()->getIndirectResults()) {
     auto paramTy = F.mapTypeIntoContext(result.getSILType());
-    SILArgument *arg = F.begin()->createArgument(paramTy);
+    SILArgument *arg = F.begin()->createFunctionArgument(paramTy);
     (void)arg;
   }
 
@@ -778,7 +779,7 @@ void SILGenFunction::collectThunkParams(SILLocation loc,
   auto paramTypes = F.getLoweredFunctionType()->getParameters();
   for (auto param : paramTypes) {
     auto paramTy = F.mapTypeIntoContext(param.getSILType());
-    auto paramValue = F.begin()->createArgument(paramTy);
+    auto paramValue = F.begin()->createFunctionArgument(paramTy);
     auto paramMV = manageParam(*this, loc, paramValue, param, allowPlusZero);
     params.push_back(paramMV);
   }
@@ -901,7 +902,7 @@ namespace {
                                   inputTupleType,
                                   outputOrigType,
                                   outputTupleType,
-                                  *temp.get());
+                                  *temp);
 
           Outputs.push_back(temp->getManagedAddress());
           return;
@@ -1200,7 +1201,7 @@ namespace {
         auto temp = SGF.emitTemporary(Loc, outputTL);
         translateSingleInto(inputOrigType, inputSubstType,
                             outputOrigType, outputSubstType,
-                            input, *temp.get());
+                            input, *temp);
         Outputs.push_back(temp->getManagedAddress());
         return;
       }
@@ -1252,7 +1253,7 @@ namespace {
       return claimNext(OutputTypes);
     }
   };
-}
+} // end anonymous namespace
 
 /// Forward arguments according to a function type's ownership conventions.
 static void forwardFunctionArguments(SILGenFunction &gen,
@@ -2343,10 +2344,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // Use the generic signature from the context if the thunk involves
   // generic parameters.
   CanGenericSignature genericSig;
-  GenericEnvironment *genericEnv = nullptr;
   if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
     genericSig = F.getLoweredFunctionType()->getGenericSignature();
-    genericEnv = F.getGenericEnvironment();
     auto subsArray = F.getForwardingSubstitutions();
     subs.append(subsArray.begin(), subsArray.end());
 
@@ -2676,7 +2675,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   if (auto *genericEnv = fd->getGenericEnvironment()) {
     F.setGenericEnvironment(genericEnv);
     subs = getForwardingSubstitutions();
-    fTy = fTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs);
+    fTy = fTy->substGenericArgs(SGM.M, subs);
 
     inputSubstType = cast<FunctionType>(
         cast<GenericFunctionType>(inputSubstType)
@@ -2870,8 +2869,7 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
   // the substituted signature of the witness.
   auto witnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
   if (!witnessSubs.empty())
-    witnessFTy = witnessFTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
-                                              witnessSubs);
+    witnessFTy = witnessFTy->substGenericArgs(SGM.M, witnessSubs);
 
   SmallVector<ManagedValue, 8> witnessParams;
 

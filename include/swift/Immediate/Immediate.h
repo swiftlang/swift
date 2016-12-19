@@ -41,6 +41,6 @@ namespace swift {
 
   void runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                bool ParseStdlib);
-}  // end namespace swift
+} // end namespace swift
 
 #endif // SWIFT_IMMEDIATE_IMMEDIATE_H

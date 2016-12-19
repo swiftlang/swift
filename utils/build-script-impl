@@ -63,7 +63,7 @@ KNOWN_SETTINGS=(
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
     swift-tools-enable-lto      ""               "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime. Must be set to one of 'thin' or 'full'"
     llvm-enable-lto             ""               "Must be set to one of 'thin' or 'full'"
-    llvm-enable-modules         "1"              "enable building llvm using modules"
+    llvm-enable-modules         "0"              "enable building llvm using modules"
     swift-tools-num-parallel-lto-link-jobs ""    "The number of parallel link jobs to use when compiling swift tools"
     llvm-num-parallel-lto-link-jobs ""           "The number of parallel link jobs to use when compiling llvm"
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
@@ -83,7 +83,7 @@ KNOWN_SETTINGS=(
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
     distcc-pump                 ""               "the path to distcc pump executable. This argument is required if distcc is set."
-    build-runtime-with-host-compiler   "1"       "use the host c++ compiler to build everything"
+    build-runtime-with-host-compiler   ""        "use the host c++ compiler to build everything"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of 'cmake --help' for choices"
     verbose-build               ""               "print the commands executed during the build"
     install-prefix              ""               "installation prefix"
@@ -170,7 +170,7 @@ KNOWN_SETTINGS=(
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
     compiler-vendor             "none"           "compiler vendor name [none,apple]"
     clang-user-visible-version  "3.8.0"          "user-visible version of the embedded Clang and LLVM compilers"
-    swift-user-visible-version  "3.0"            "user-visible version of the Swift language"
+    swift-user-visible-version  "3.1"            "user-visible version of the Swift language"
     swift-compiler-version      ""               "string that indicates a compiler version for Swift"
     clang-compiler-version      ""               "string that indicates a compiler version for Clang"
     embed-bitcode-section       "0"              "embed an LLVM bitcode section in stdlib/overlay binaries for supported platforms"
@@ -214,6 +214,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
     darwin-sdk-deployment-targets      ""        "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
+    darwin-overlay-target              ""        "single overlay target to build, dependencies are computed later"
     build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
     android-ndk                        ""        "An absolute path to the NDK that will be used as a libc implementation for Android builds"
@@ -2061,6 +2062,18 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
                         -DSWIFT_ANDROID_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
                         -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
+                    )
+                fi
+
+                if [[ "${DARWIN_OVERLAY_TARGET}" != "" ]]; then
+                    # Split LOCAL_HOST into a pair ``arch-sdk``
+                    # Example LOCAL_HOST: macosx-x86_64
+                    [[ ${LOCAL_HOST} =~ (.*)-(.*) ]]
+                    overlay_target_closure_cmd="${SWIFT_SOURCE_DIR}/utils/find-overlay-deps-closure.sh ${DARWIN_OVERLAY_TARGET} ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+                    overlay_target_closure=$($overlay_target_closure_cmd)
+                    swift_cmake_options=(
+                        "${swift_cmake_options[@]}"
+                        "-DSWIFT_OVERLAY_TARGETS:STRING=${overlay_target_closure}"
                     )
                 fi
 

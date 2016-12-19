@@ -132,13 +132,11 @@ static SILValue skipValueProjections(SILValue V) {
 Effects *FunctionEffects::getEffectsOn(SILValue Addr) {
   SILValue BaseAddr = skipValueProjections(skipAddrProjections(Addr));
   switch (BaseAddr->getKind()) {
-    case swift::ValueKind::SILArgument: {
-      // Can we associate the address to a function parameter?
-      SILArgument *Arg = cast<SILArgument>(BaseAddr);
-      if (Arg->isFunctionArg()) {
-        return &ParamEffects[Arg->getIndex()];
-      }
-      break;
+  case swift::ValueKind::SILFunctionArgument: {
+    // Can we associate the address to a function parameter?
+    auto *Arg = cast<SILFunctionArgument>(BaseAddr);
+    return &ParamEffects[Arg->getIndex()];
+    break;
     }
     case ValueKind::AllocStackInst:
     case ValueKind::AllocRefInst:

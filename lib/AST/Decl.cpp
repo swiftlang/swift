@@ -33,6 +33,7 @@
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
@@ -45,6 +46,13 @@
 #include <algorithm>
 
 using namespace swift;
+
+#define DEBUG_TYPE "Serialization"
+
+STATISTIC(NumLazyGenericEnvironments,
+          "# of lazily-deserialized generic environments known");
+STATISTIC(NumLazyGenericEnvironmentsLoaded,
+          "# of lazily-deserialized generic environments loaded");
 
 clang::SourceLocation ClangNode::getLocation() const {
   if (auto D = getAsDecl())
@@ -614,8 +622,8 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
     return ImportKind::Struct;
 
   case DeclKind::TypeAlias: {
-    Type underlyingTy = cast<TypeAliasDecl>(VD)->getUnderlyingType();
-    return getBestImportKind(underlyingTy->getAnyNominal());
+    Type type = cast<TypeAliasDecl>(VD)->getDeclaredInterfaceType();
+    return getBestImportKind(type->getAnyNominal());
   }
 
   case DeclKind::Func:
@@ -649,47 +657,29 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   return FirstKind;
 }
 
-template <typename T>
-static void
-loadAllConformances(const T *container,
-                    const LazyLoaderArray<ProtocolConformance*> &loaderInfo) {
-  if (!loaderInfo.isLazy())
-    return;
-
-  // Don't try to load conformances re-entrant-ly.
-  auto resolver = loaderInfo.getLoader();
-  auto contextData = loaderInfo.getLoaderContextData();
-  const_cast<LazyLoaderArray<ProtocolConformance*> &>(loaderInfo) = {};
-
-  SmallVector<ProtocolConformance *, 8> Conformances;
-  resolver->loadAllConformances(container, contextData, Conformances);
-  const_cast<T *>(container)->setConformances(
-                        container->getASTContext().AllocateCopy(Conformances));
-}
-
 DeclRange NominalTypeDecl::getMembers() const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
 }
 
-void NominalTypeDecl::setMemberLoader(LazyMemberLoader *resolver,
-                                      uint64_t contextData) {
-  IterableDeclContext::setLoader(resolver, contextData);
-}
-
-void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *resolver,
+void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                            uint64_t contextData) {
-  assert(!HaveConformanceLoader &&
-         "Already have a conformance loader");
-  HaveConformanceLoader = true;
-  getASTContext().recordConformanceLoader(this, resolver, contextData);
+  assert(!NominalTypeDeclBits.HasLazyConformances &&
+         "Already have lazy conformances");
+  NominalTypeDeclBits.HasLazyConformances = true;
+
+  ASTContext &ctx = getASTContext();
+  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, lazyLoader);
+  contextInfo->allConformancesData = contextData;
 }
 
 std::pair<LazyMemberLoader *, uint64_t>
 NominalTypeDecl::takeConformanceLoaderSlow() {
-  assert(HaveConformanceLoader && "no conformance loader?");
-  HaveConformanceLoader = false;
-  return getASTContext().takeConformanceLoader(this);
+  assert(NominalTypeDeclBits.HasLazyConformances && "not lazy conformances");
+  NominalTypeDeclBits.HasLazyConformances = false;
+  auto contextInfo =
+    getASTContext().getOrCreateLazyIterableContextData(this, nullptr);
+  return { contextInfo->loader, contextInfo->allConformancesData };
 }
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
@@ -708,7 +698,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
   ExtensionDeclBits.Validated = false;
   ExtensionDeclBits.CheckedInheritanceClause = false;
   ExtensionDeclBits.DefaultAndMaxAccessLevel = 0;
-  ExtensionDeclBits.HaveConformanceLoader = false;
+  ExtensionDeclBits.HasLazyConformances = false;
 }
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
@@ -741,29 +731,55 @@ void ExtensionDecl::setGenericParams(GenericParamList *params) {
   }
 }
 
+GenericEnvironment *
+ExtensionDecl::getLazyGenericEnvironmentSlow() const {
+  assert(GenericSigOrEnv.is<GenericSignature *>() &&
+         "not a lazily deserialized generic environment");
+  auto contextData = getASTContext().getOrCreateLazyIterableContextData(this,
+                                                                    nullptr);
+  auto genericEnv = contextData->loader->loadGenericEnvironment(
+                                            this, contextData->genericEnvData);
+  const_cast<ExtensionDecl *>(this)->setGenericEnvironment(genericEnv);
+  ++NumLazyGenericEnvironmentsLoaded;
+  return genericEnv;
+}
+
+void ExtensionDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                              GenericSignature *genericSig,
+                                              uint64_t genericEnvData) {
+  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
+  GenericSigOrEnv = genericSig;
+
+  auto contextData =
+    getASTContext().getOrCreateLazyIterableContextData(this, lazyLoader);
+  contextData->genericEnvData = genericEnvData;
+  ++NumLazyGenericEnvironments;
+}
+
 DeclRange ExtensionDecl::getMembers() const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
 }
 
-void ExtensionDecl::setMemberLoader(LazyMemberLoader *resolver,
-                                    uint64_t contextData) {
-  IterableDeclContext::setLoader(resolver, contextData);
-}
-
-void ExtensionDecl::setConformanceLoader(LazyMemberLoader *resolver,
+void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                          uint64_t contextData) {
-  assert(!ExtensionDeclBits.HaveConformanceLoader && 
-         "Already have a conformance loader");
-  ExtensionDeclBits.HaveConformanceLoader = true;
-  getASTContext().recordConformanceLoader(this, resolver, contextData);
+  assert(!ExtensionDeclBits.HasLazyConformances && 
+         "Already have lazy conformances");
+  ExtensionDeclBits.HasLazyConformances = true;
+
+  ASTContext &ctx = getASTContext();
+  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, lazyLoader);
+  contextInfo->allConformancesData = contextData;
 }
 
 std::pair<LazyMemberLoader *, uint64_t>
 ExtensionDecl::takeConformanceLoaderSlow() {
-  assert(ExtensionDeclBits.HaveConformanceLoader && "no conformance loader?");
-  ExtensionDeclBits.HaveConformanceLoader = false;
-  return getASTContext().takeConformanceLoader(this);
+  assert(ExtensionDeclBits.HasLazyConformances && "no conformance loader?");
+  ExtensionDeclBits.HasLazyConformances = false;
+
+  auto contextInfo =
+    getASTContext().getOrCreateLazyIterableContextData(this, nullptr);
+  return { contextInfo->loader, contextInfo->allConformancesData };
 }
 
 bool ExtensionDecl::isConstrainedExtension() const {
@@ -1645,37 +1661,31 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
 }
 
 bool ValueDecl::hasInterfaceType() const {
-  // getInterfaceType() returns the contextual type for ParamDecls which
-  // don't have an explicit interface type.
-  if (auto *PD = dyn_cast<ParamDecl>(this))
-    return PD->hasType();
-
-  return !!InterfaceTy;
+  return !TypeAndAccess.getPointer().isNull();
 }
 
 Type ValueDecl::getInterfaceType() const {
-  if (InterfaceTy)
-    return InterfaceTy;
-
-  // FIXME: ParamDecls are funky and don't always have an interface type
-  if (auto *PD = dyn_cast<ParamDecl>(this))
-    return PD->getType();
-
-  llvm_unreachable("no interface type was set");
+  assert(hasInterfaceType() && "No interface type was set");
+  return TypeAndAccess.getPointer();
 }
 
 void ValueDecl::setInterfaceType(Type type) {
-  assert((type.isNull() || !type->hasTypeVariable()) &&
-         "Type variable in interface type");
-
   // lldb creates global typealiases with archetypes in them.
   // FIXME: Add an isDebugAlias() flag, like isDebugVar().
-  if (!isa<TypeAliasDecl>(this)) {
-    assert((type.isNull() || !type->hasArchetype()) &&
+  //
+  // Also, ParamDecls in closure contexts can have type variables
+  // archetype in them during constraint generation.
+  if (!type.isNull() &&
+      !isa<TypeAliasDecl>(this) &&
+      !(isa<ParamDecl>(this) &&
+        isa<AbstractClosureExpr>(getDeclContext()))) {
+    assert(!type->hasArchetype() &&
+           "Archetype in interface type");
+    assert(!type->hasTypeVariable() &&
            "Archetype in interface type");
   }
-  
-  InterfaceTy = type;
+
+  TypeAndAccess.setPointer(type);
 }
 
 Optional<ObjCSelector> ValueDecl::getObjCRuntimeName() const {
@@ -1897,7 +1907,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
     return NTD->getDeclaredInterfaceType();
 
   Type interfaceType = getInterfaceType();
-  if (interfaceType.isNull() || interfaceType->hasError())
+  if (interfaceType.isNull() || interfaceType->is<ErrorType>())
     return interfaceType;
 
   if (isa<ModuleDecl>(this))
@@ -2005,6 +2015,22 @@ enum class DeclTypeKind : unsigned {
 static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   ASTContext &ctx = decl->getASTContext();
 
+  // Handle the declared type in context.
+  if (kind == DeclTypeKind::DeclaredTypeInContext) {
+    auto interfaceType =
+      computeNominalType(decl, DeclTypeKind::DeclaredInterfaceType);
+
+    if (!decl->isGenericContext())
+      return interfaceType;
+
+    auto *genericEnv = decl->getGenericEnvironmentOfContext();
+    if (genericEnv == nullptr)
+      return ErrorType::get(ctx);
+
+    return genericEnv->mapTypeIntoContext(decl->getModuleContext(),
+                                          interfaceType)->getCanonicalType();
+  }
+
   // Get the parent type.
   Type Ty;
   DeclContext *dc = decl->getDeclContext();
@@ -2014,8 +2040,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       Ty = dc->getDeclaredTypeOfContext();
       break;
     case DeclTypeKind::DeclaredTypeInContext:
-      Ty = dc->getDeclaredTypeInContext();
-      break;
+      llvm_unreachable("Handled above");
     case DeclTypeKind::DeclaredInterfaceType:
       Ty = dc->getDeclaredInterfaceType();
       break;
@@ -2030,18 +2055,8 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
     switch (kind) {
     case DeclTypeKind::DeclaredType:
       return UnboundGenericType::get(decl, Ty, ctx);
-    case DeclTypeKind::DeclaredTypeInContext: {
-      auto *genericEnv = decl->getGenericEnvironment();
-      auto *genericSig = decl->getGenericSignature();
-      if (genericEnv == nullptr)
-        return ErrorType::get(ctx);
-
-      SmallVector<Type, 4> args;
-      for (auto param : genericSig->getInnermostGenericParams())
-        args.push_back(genericEnv->mapTypeIntoContext(param));
-
-      return BoundGenericType::get(decl, Ty, args);
-    }
+    case DeclTypeKind::DeclaredTypeInContext:
+      llvm_unreachable("Handled above");
     case DeclTypeKind::DeclaredInterfaceType: {
       // Note that here, we need to be able to produce a type
       // before the decl has been validated, so we rely on
@@ -2150,17 +2165,37 @@ void GenericTypeDecl::setGenericParams(GenericParamList *params) {
       Param->setDeclContext(this);
 }
 
+GenericEnvironment *
+GenericTypeDecl::getLazyGenericEnvironmentSlow() const {
+  assert(GenericSigOrEnv.is<GenericSignature *>() &&
+         "not a lazily deserialized generic environment");
+  auto contextData = getASTContext().getOrCreateLazyGenericTypeData(this,
+                                                                    nullptr);
+  auto genericEnv = contextData->loader->loadGenericEnvironment(
+                                            this, contextData->genericEnvData);
+  const_cast<GenericTypeDecl *>(this)->setGenericEnvironment(genericEnv);
+  ++NumLazyGenericEnvironmentsLoaded;
+  return genericEnv;
+}
+
+void GenericTypeDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                                GenericSignature *genericSig,
+                                                uint64_t genericEnvData) {
+  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
+  GenericSigOrEnv = genericSig;
+
+  auto contextData =
+    getASTContext().getOrCreateLazyGenericTypeData(this, lazyLoader);
+  contextData->genericEnvData = genericEnvData;
+  ++NumLazyGenericEnvironments;
+}
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                             SourceLoc NameLoc, TypeLoc UnderlyingTy,
-                             GenericParamList *GenericParams, DeclContext *DC)
+                             SourceLoc NameLoc, GenericParamList *GenericParams,
+                             DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    AliasTy(nullptr), TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy) {}
-
-void TypeAliasDecl::computeType() {
-  ASTContext &Ctx = getASTContext();
-  assert(!AliasTy && "already called computeType()");
-  AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
+    TypeAliasLoc(TypeAliasLoc) {
+  TypeAliasDeclBits.HasCompletedValidation = false;
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
@@ -2169,13 +2204,39 @@ SourceRange TypeAliasDecl::getSourceRange() const {
   return { TypeAliasLoc, getNameLoc() };
 }
 
+void TypeAliasDecl::setUnderlyingType(Type underlying) {
+  setHasCompletedValidation();
+
+  // lldb creates global typealiases containing archetypes
+  // sometimes...
+  if (underlying->hasArchetype() && isGenericContext())
+    underlying = mapTypeOutOfContext(underlying);
+  UnderlyingTy.setType(underlying);
+
+  // Create a NameAliasType which will resolve to the underlying type.
+  ASTContext &Ctx = getASTContext();
+  auto aliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
+  aliasTy->setRecursiveProperties(getUnderlyingTypeLoc().getType()
+      ->getRecursiveProperties());
+
+  // Set the interface type of this declaration.
+  setInterfaceType(MetatypeType::get(aliasTy, Ctx));
+}
+
+UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
+  assert(getGenericParams());
+  return UnboundGenericType::get(
+      const_cast<TypeAliasDecl *>(this),
+      getDeclContext()->getDeclaredTypeOfContext(),
+      getASTContext());
+}
+
 Type AbstractTypeParamDecl::getSuperclass() const {
   auto *dc = getDeclContext();
   if (!dc->isValidGenericContext())
     return nullptr;
 
-  auto contextTy = ArchetypeBuilder::mapTypeIntoContext(
-      dc, getDeclaredInterfaceType());
+  auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
     return archetype->getSuperclass();
 
@@ -2187,10 +2248,9 @@ ArrayRef<ProtocolDecl *>
 AbstractTypeParamDecl::getConformingProtocols() const {
   auto *dc = getDeclContext();
   if (!dc->isValidGenericContext())
-    return nullptr;
+    return {};
 
-  auto contextTy = ArchetypeBuilder::mapTypeIntoContext(
-      dc, getDeclaredInterfaceType());
+  auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
     return archetype->getConformsTo();
 
@@ -2407,6 +2467,10 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     if (!CD->hasSuperclass())
       break;
     CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    // If we don't have a valid class here, we should have diagnosed
+    // elsewhere.
+    if (!CD)
+      break;
   }
 
   if (!isObjC)
@@ -2424,6 +2488,9 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
+    // TODO: Mangling: Use new mangling scheme as soon as the ObjC runtime
+    // can demangle it.
+
     // Mangle the type.
     Mangle::Mangler mangler(false/*dwarf*/, false/*punycode*/);
 
@@ -2562,7 +2629,7 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   ProtocolDeclBits.RequiresClass = false;
   ProtocolDeclBits.ExistentialConformsToSelfValid = false;
   ProtocolDeclBits.ExistentialConformsToSelf = false;
-  ProtocolDeclBits.KnownProtocol = 0;
+  KnownProtocol = 0;
   ProtocolDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   HasMissingRequirements = false;
@@ -2943,7 +3010,7 @@ bool AbstractStorageDecl::isGetterMutating() const {
 /// called even on an immutable base value.
 bool AbstractStorageDecl::isSetterNonMutating() const {
   // Setters declared in reference type contexts are never mutating.
-  if (auto contextType = getDeclContext()->getDeclaredTypeInContext()) {
+  if (auto contextType = getDeclContext()->getDeclaredInterfaceType()) {
     if (contextType->hasReferenceSemantics())
       return true;
   }
@@ -3616,7 +3683,7 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     // a property in a non-mutating method.
     auto FD = dyn_cast_or_null<FuncDecl>(UseDC->getInnermostMethodContext());
     if (FD && !FD->isMutating() && !FD->isImplicit() && FD->isInstanceMember()&&
-        !FD->getDeclContext()->getDeclaredTypeInContext()
+        !FD->getDeclContext()->getDeclaredInterfaceType()
                  ->hasReferenceSemantics()) {
       auto &d = getASTContext().Diags;
       d.diagnose(FD->getFuncLoc(), diag::change_to_mutating, FD->isAccessor())
@@ -3667,6 +3734,8 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
     defaultArgumentKind(PD->defaultArgumentKind) {
   typeLoc = PD->getTypeLoc();
+  if (PD->hasInterfaceType())
+    setInterfaceType(PD->getInterfaceType());
 }
 
 
@@ -3697,22 +3766,6 @@ Type DeclContext::getSelfInterfaceType() const {
   return getDeclaredInterfaceType();
 }
 
-/// \brief Retrieve the type of 'self' for the given context.
-Type DeclContext::getSelfTypeOfContext() const {
-  // For a protocol or extension thereof, the type is 'Self'.
-  if (auto *proto = getAsProtocolOrProtocolExtensionContext()) {
-    auto *genericEnv = proto->getGenericEnvironment();
-
-    // In the parser, generic parameters won't be wired up yet, just give up on
-    // producing a type.
-    if (genericEnv == nullptr)
-      return Type();
-
-    return genericEnv->mapTypeIntoContext(getProtocolSelfType());
-  }
-  return getDeclaredTypeOfContext();
-}
-
 /// Create an implicit 'self' decl for a method in the specified decl context.
 /// If 'static' is true, then this is self for a static method in the type.
 ///
@@ -3722,24 +3775,10 @@ Type DeclContext::getSelfTypeOfContext() const {
 /// For a generic context, this also gives the parameter an unbound generic
 /// type with the expectation that type-checking will fill in the context
 /// generic parameters.
-ParamDecl *ParamDecl::createUnboundSelf(SourceLoc loc, DeclContext *DC,
-                                        bool isStaticMethod, bool isInOut) {
+ParamDecl *ParamDecl::createUnboundSelf(SourceLoc loc, DeclContext *DC) {
   ASTContext &C = DC->getASTContext();
-  auto selfType = DC->getSelfTypeOfContext();
-
-  // If we have a valid selfType (i.e. we're not in the parser before we
-  // know such things, or we're nested inside an invalid extension),
-  // configure it.
-  if (selfType && !selfType->hasError()) {
-    if (isStaticMethod)
-      selfType = MetatypeType::get(selfType);
-    
-    if (isInOut)
-      selfType = InOutType::get(selfType);
-  }
-    
-  auto *selfDecl = new (C) ParamDecl(/*IsLet*/!isInOut, SourceLoc(),SourceLoc(),
-                                     Identifier(), loc, C.Id_self, selfType,DC);
+  auto *selfDecl = new (C) ParamDecl(/*IsLet*/true, SourceLoc(), SourceLoc(),
+                                     Identifier(), loc, C.Id_self, Type(), DC);
   selfDecl->setImplicit();
   return selfDecl;
 }
@@ -3758,21 +3797,16 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
   ASTContext &C = DC->getASTContext();
   auto selfType = DC->getSelfTypeInContext();
   auto selfInterfaceType = DC->getSelfInterfaceType();
+  assert(selfType && selfInterfaceType);
 
-  assert(!!selfType == !!selfInterfaceType);
-
-  // If we have a selfType (i.e. we're not in the parser before we know such
-  // things, configure it.
-  if (selfType && selfInterfaceType) {
-    if (isStaticMethod) {
-      selfType = MetatypeType::get(selfType);
-      selfInterfaceType = MetatypeType::get(selfInterfaceType);
-    }
+  if (isStaticMethod) {
+    selfType = MetatypeType::get(selfType);
+    selfInterfaceType = MetatypeType::get(selfInterfaceType);
+  }
     
-    if (isInOut) {
-      selfType = InOutType::get(selfType);
-      selfInterfaceType = InOutType::get(selfInterfaceType);
-    }
+  if (isInOut) {
+    selfType = InOutType::get(selfType);
+    selfInterfaceType = InOutType::get(selfInterfaceType);
   }
 
   auto *selfDecl = new (C) ParamDecl(/*IsLet*/!isInOut, SourceLoc(),SourceLoc(),
@@ -3889,7 +3923,7 @@ static bool isIntegralType(Type type) {
       return false;
 
     // Check whether it has integer type.
-    return singleVar->getType()->is<BuiltinIntegerType>();
+    return singleVar->getInterfaceType()->is<BuiltinIntegerType>();
   }
 
   return false;
@@ -3947,39 +3981,57 @@ SourceRange SubscriptDecl::getSourceRange() const {
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
 }
 
-static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
-                                    bool isInitializingCtor,
-                                    bool wantInterfaceType) {
-  auto *dc = theMethod->getDeclContext();
+GenericEnvironment *
+AbstractFunctionDecl::getLazyGenericEnvironmentSlow() const {
+  assert(GenericSigOrEnv.is<GenericSignature *>() &&
+         "not a lazily deserialized generic environment");
+  auto contextData =
+    getASTContext().getOrCreateLazyFunctionContextData(this, nullptr);
+  auto genericEnv = contextData->loader->loadGenericEnvironment(
+                                            this, contextData->genericEnvData);
+  const_cast<AbstractFunctionDecl *>(this)->setGenericEnvironment(genericEnv);
+  ++NumLazyGenericEnvironmentsLoaded;
+  return genericEnv;
+}
+
+void AbstractFunctionDecl::setLazyGenericEnvironment(
+                                                 LazyMemberLoader *lazyLoader,
+                                                 GenericSignature *genericSig,
+                                                 uint64_t genericEnvData) {
+  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
+  GenericSigOrEnv = genericSig;
+
+  auto contextData =
+    getASTContext().getOrCreateLazyFunctionContextData(this, lazyLoader);
+  contextData->genericEnvData = genericEnvData;
+  ++NumLazyGenericEnvironments;
+}
+
+Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor,
+                                                    bool wantDynamicSelf) {
+  auto *dc = getDeclContext();
   auto &Ctx = dc->getASTContext();
   
   // Determine the type of the container.
-  auto containerTy = wantInterfaceType ? dc->getDeclaredInterfaceType()
-                                       : dc->getDeclaredTypeInContext();
+  auto containerTy = dc->getDeclaredInterfaceType();
   if (!containerTy || containerTy->hasError())
     return ErrorType::get(Ctx);
 
   // Determine the type of 'self' inside the container.
-  auto selfTy = wantInterfaceType ? dc->getSelfInterfaceType()
-                                  : dc->getSelfTypeInContext();
+  auto selfTy = dc->getSelfInterfaceType();
   if (!selfTy || selfTy->hasError())
     return ErrorType::get(Ctx);
 
   bool isStatic = false;
   bool isMutating = false;
-  Type selfTypeOverride;
-  
-  if (auto *FD = dyn_cast<FuncDecl>(theMethod)) {
+
+  if (auto *FD = dyn_cast<FuncDecl>(this)) {
     isStatic = FD->isStatic();
     isMutating = FD->isMutating();
 
-    // The non-interface type of a method that returns DynamicSelf
-    // uses DynamicSelf for the type of 'self', which is important
-    // when type checking the body of the function.
-    if (!wantInterfaceType && FD->hasDynamicSelf()) {
+    if (wantDynamicSelf && FD->hasDynamicSelf())
       selfTy = DynamicSelfType::get(selfTy, Ctx);
-    }
-  } else if (isa<ConstructorDecl>(theMethod)) {
+  } else if (isa<ConstructorDecl>(this)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
       // inout self.
@@ -3988,7 +4040,7 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
       // allocating constructors have metatype 'self'.
       isStatic = true;
     }
-  } else if (isa<DestructorDecl>(theMethod)) {
+  } else if (isa<DestructorDecl>(this)) {
     // destructors of value types always have an implicitly inout self.
     isMutating = true;
   }
@@ -4064,14 +4116,6 @@ void AbstractFunctionDecl::setGenericParams(GenericParamList *GP) {
 }
 
 
-Type AbstractFunctionDecl::computeSelfType() {
-  return getSelfTypeForContainer(this, true, false);
-}
-
-Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
-  return getSelfTypeForContainer(this, isInitializingCtor, true);
-}
-
 /// \brief This method returns the implicit 'self' decl.
 ///
 /// Note that some functions don't have an implicit 'self' decl, for example,
@@ -4087,10 +4131,6 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
   return nullptr;
 }
 
-Type AbstractFunctionDecl::getExtensionType() const {
-  return getDeclContext()->getDeclaredTypeInContext();
-}
-
 std::pair<DefaultArgumentKind, Type>
 AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
   auto paramLists = getParameterLists();
@@ -4101,7 +4141,7 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
   for (auto paramList : paramLists) {
     if (Index < paramList->size()) {
       auto param = paramList->get(Index);
-      return { param->getDefaultArgumentKind(), param->getType() };
+      return { param->getDefaultArgumentKind(), param->getInterfaceType() };
     }
     
     Index -= paramList->size();
@@ -4380,7 +4420,7 @@ bool FuncDecl::isExplicitNonMutating() const {
   return !isMutating() &&
          isAccessor() && !isGetter() &&
          isInstanceMember() &&
-         !getDeclContext()->getDeclaredTypeInContext()->hasReferenceSemantics();
+         !getDeclContext()->getDeclaredInterfaceType()->hasReferenceSemantics();
 }
 
 void FuncDecl::setDeserializedSignature(ArrayRef<ParameterList *> BodyParams,
@@ -4492,7 +4532,7 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   if (params->size() != 1)
     return false;
 
-  return params->get(0)->getType()->isVoid();
+  return params->get(0)->getInterfaceType()->isVoid();
 }
 
 DestructorDecl::DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
@@ -4561,8 +4601,7 @@ bool EnumElementDecl::computeType() {
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
   if (auto inputTy = getArgumentType()) {
-    resultTy = FunctionType::get(
-        ArchetypeBuilder::mapTypeOutOfContext(ED, inputTy), resultTy);
+    resultTy = FunctionType::get(ED->mapTypeOutOfContext(inputTy), resultTy);
   }
 
   if (auto *genericSig = ED->getGenericSignatureOfContext())

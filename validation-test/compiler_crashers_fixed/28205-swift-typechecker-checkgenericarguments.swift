@@ -7,5 +7,4 @@
 
 // DUPLICATE-OF: 26832-swift-typechecker-conformstoprotocol.swift
 // RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 {struct X<a{protocol A{class B<T>:B<T>let h:A

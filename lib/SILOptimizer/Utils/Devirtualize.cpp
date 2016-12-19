@@ -240,7 +240,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
 
     auto *SinglePred = Arg->getParent()->getSinglePredecessorBlock();
     if (!SinglePred) {
-      if (!Arg->isFunctionArg())
+      if (!isa<SILFunctionArgument>(Arg))
         break;
       auto *CD = Arg->getType().getClassOrBoundGenericClass();
       // Check if this class is effectively final.
@@ -252,7 +252,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
     // Traverse the chain of predecessors.
     if (isa<BranchInst>(SinglePred->getTerminator()) ||
         isa<CondBranchInst>(SinglePred->getTerminator())) {
-      S = Arg->getIncomingValue(SinglePred);
+      S = cast<SILPHIArgument>(Arg)->getIncomingValue(SinglePred);
       continue;
     }
 
@@ -335,18 +335,18 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
       return SILType();
     }
 
-    if (Arg->isFunctionArg()) {
+    if (auto *FArg = dyn_cast<SILFunctionArgument>(Arg)) {
       // Bail on metatypes for now.
-      if (Arg->getType().getSwiftRValueType()->is<AnyMetatypeType>()) {
+      if (FArg->getType().getSwiftRValueType()->is<AnyMetatypeType>()) {
         return SILType();
       }
-      auto *CD = Arg->getType().getClassOrBoundGenericClass();
+      auto *CD = FArg->getType().getClassOrBoundGenericClass();
       // If it is not class and it is a trivial type, then it
       // should be the exact type.
-      if (!CD && Arg->getType().isTrivial(M)) {
-        if (ResultType && ResultType != Arg->getType())
+      if (!CD && FArg->getType().isTrivial(M)) {
+        if (ResultType && ResultType != FArg->getType())
           return SILType();
-        ResultType = Arg->getType();
+        ResultType = FArg->getType();
         continue;
       }
 
@@ -360,9 +360,9 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
         return SILType();
       }
 
-      if (ResultType && ResultType != Arg->getType())
+      if (ResultType && ResultType != FArg->getType())
         return SILType();
-      ResultType = Arg->getType();
+      ResultType = FArg->getType();
       continue;
     }
 
@@ -573,8 +573,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
     getSubstitutionsForCallee(Mod, GenCalleeType,
                               ClassOrMetatypeType.getSwiftRValueType(),
                               AI, Subs);
-    SubstCalleeType =
-        GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
+    SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Subs);
   }
 
   // Check if the optimizer knows how to cast the return type.
@@ -609,7 +608,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
                             AI, Subs);
   CanSILFunctionType SubstCalleeType = GenCalleeType;
   if (GenCalleeType->isPolymorphic())
-    SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
+    SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Subs);
 
   SILBuilderWithScope B(AI.getInstruction());
   FunctionRefInst *FRI = B.createFunctionRef(AI.getLoc(), F);
@@ -668,7 +667,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
       ResultBB = TAI->getNormalBB();
     else {
       ResultBB = B.getFunction().createBasicBlock();
-      ResultBB->createArgument(ResultTy);
+      ResultBB->createPHIArgument(ResultTy);
     }
 
     NormalBB = TAI->getNormalBB();
@@ -678,7 +677,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
       ErrorBB = TAI->getErrorBB();
     else {
       ErrorBB = B.getFunction().createBasicBlock();
-      ErrorBB->createArgument(TAI->getErrorBB()->getArgument(0)->getType());
+      ErrorBB->createPHIArgument(TAI->getErrorBB()->getArgument(0)->getType());
     }
 
     NewAI = B.createTryApply(AI.getLoc(), FRI, SubstCalleeSILType,
@@ -703,7 +702,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
       }
       NormalBB->getArgument(0)->replaceAllUsesWith(
           SILUndef::get(AI.getType(), Mod));
-      NormalBB->replaceArgument(0, ResultTy, nullptr);
+      NormalBB->replacePHIArgument(0, ResultTy);
     }
 
     // The result value is passed as a parameter to the normal block.
@@ -1020,8 +1019,7 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.
   auto CalleeCanType = F->getLoweredFunctionType();
-  auto SubstCalleeCanType = CalleeCanType->substGenericArgs(
-    Module, Module.getSwiftModule(), NewSubs);
+  auto SubstCalleeCanType = CalleeCanType->substGenericArgs(Module, NewSubs);
 
   // Bail if some of the arguments cannot be converted into
   // types required by the found devirtualized method.

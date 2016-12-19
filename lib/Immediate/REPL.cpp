@@ -900,7 +900,7 @@ private:
     EE->finalizeObject();
 
     for (auto InitFn : InitFns)
-      EE->runFunctionAsMain(InitFn, CmdLine, 0);
+      EE->runFunctionAsMain(InitFn, CmdLine, nullptr);
     InitFns.clear();
     
     // FIXME: The way we do this is really ugly... we should be able to
@@ -910,8 +910,8 @@ private:
       RanGlobalInitializers = true;
     }
     llvm::Function *EntryFn = TempModule->getFunction("main");
-    EE->runFunctionAsMain(EntryFn, CmdLine, 0);
-    
+    EE->runFunctionAsMain(EntryFn, CmdLine, nullptr);
+
     return true;
   }
 
@@ -1061,7 +1061,9 @@ public:
               
             if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
               if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-                TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
+                TypeDecl *origTypeDecl = typeAliasDecl
+                  ->getDeclaredInterfaceType()
+                  ->getDesugaredType()
                   ->getNominalOrBoundGenericNominal();
                 if (origTypeDecl) {
                   printOrDumpDecl(origTypeDecl, doPrint);

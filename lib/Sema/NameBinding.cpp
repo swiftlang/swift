@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Parse/Parser.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -60,7 +61,7 @@ namespace {
     /// Returns null if no module can be loaded.
     Module *getModule(ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
   };
-}
+} // end anonymous namespace
 
 Module *
 NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {

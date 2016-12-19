@@ -19,3 +19,7 @@ var applyGet: Int {
   `get` { }
   return 0
 }
+
+enum `switch` {}
+
+typealias `Self` = Int

@@ -121,7 +121,7 @@ namespace {
     TypeRepr *visit##CLASS##TypeRepr(CLASS##TypeRepr* type);
 #include "swift/AST/TypeReprNodes.def"
   };
-}
+} // end anonymous namespace
 
 TypeRepr *CloneVisitor::visitErrorTypeRepr(ErrorTypeRepr *T) {
   return new (Ctx) ErrorTypeRepr(T->getSourceRange());

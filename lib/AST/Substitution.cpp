@@ -44,8 +44,15 @@ Substitution::Substitution(Type Replacement,
 
 Substitution Substitution::subst(Module *module,
                                  const SubstitutionMap &subMap) const {
+  return subst(module, QueryTypeSubstitutionMap{subMap.getMap()},
+               LookUpConformanceInSubstitutionMap(subMap));
+}
+
+Substitution Substitution::subst(Module *module,
+                                 TypeSubstitutionFn subs,
+                                 LookupConformanceFn conformances) const {
   // Substitute the replacement.
-  Type substReplacement = Replacement.subst(subMap, None);
+  Type substReplacement = Replacement.subst(subs, conformances, None);
   assert(substReplacement && "substitution replacement failed");
 
   if (substReplacement->isEqual(Replacement))
@@ -63,7 +70,8 @@ Substitution Substitution::subst(Module *module,
     // If we have a concrete conformance, we need to substitute the
     // conformance to apply to the new type.
     if (c.isConcrete()) {
-      auto substC = c.getConcrete()->subst(module, substReplacement, subMap);
+      auto substC = c.getConcrete()->subst(module, substReplacement,
+                                           subs, conformances);
       substConformances.push_back(ProtocolConformanceRef(substC));
       if (c != substConformances.back())
         conformancesChanged = true;
@@ -75,8 +83,11 @@ Substitution Substitution::subst(Module *module,
     Optional<ProtocolConformanceRef> conformance;
 
     // If the original type was an archetype, check the conformance map.
-    if (auto replacementArch = Replacement->getAs<ArchetypeType>()) {
-      conformance = subMap.lookupConformance(CanType(replacementArch), proto);
+    if (Replacement->is<SubstitutableType>()
+        || Replacement->is<DependentMemberType>()) {
+      conformance = conformances(Replacement->getCanonicalType(),
+                                 substReplacement,
+                                 proto->getDeclaredType());
     }
 
     // If that didn't find anything, we can still synthesize AnyObject
@@ -92,21 +103,16 @@ Substitution Substitution::subst(Module *module,
       conformance = ProtocolConformanceRef(lookupResults.front());
     }
 
-    if (conformance) {
-      if (conformance->isConcrete())
-        conformancesChanged = true;
-      substConformances.push_back(*conformance);
-    } else {
-      assert(substReplacement->hasDependentProtocolConformances() &&
-             "couldn't find concrete conformance for concrete type?");
-      substConformances.push_back(ProtocolConformanceRef(proto));
-    }
+    assert(conformance);
+    if (conformance->isConcrete())
+      conformancesChanged = true;
+    substConformances.push_back(*conformance);
   }
   assert(substConformances.size() == Conformance.size());
 
   ArrayRef<ProtocolConformanceRef> substConfs;
   if (conformancesChanged)
-    substConfs = module->getASTContext().AllocateCopy(substConformances);
+    substConfs = Replacement->getASTContext().AllocateCopy(substConformances);
   else
     substConfs = Conformance;
 

@@ -119,6 +119,8 @@ class CMake(object):
 
         if args.build_ninja and args.cmake_generator == 'Ninja':
             define('CMAKE_MAKE_PROGRAM', toolchain.ninja)
+        elif args.cmake_generator == 'Ninja' and toolchain.ninja is not None:
+            define('CMAKE_MAKE_PROGRAM', toolchain.ninja)
 
         return options
 

@@ -329,7 +329,6 @@ protocol P9 {
 struct X7<T: P9> where T.A : C { }
 
 extension X7 where T.A == Int { } // expected-error 2{{'T.A' requires that 'Int' inherit from 'C'}}
-
 struct X8<T: C> { }
 
 extension X8 where T == Int { } // expected-error 2{{'T' requires that 'Int' inherit from 'C'}}

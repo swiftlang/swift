@@ -59,7 +59,7 @@ void SILInstruction::setDebugScope(SILBuilder &B, const SILDebugScope *DS) {
 // reconstruct the BB from the 'self' pointer of the trait.
 SILBasicBlock *llvm::ilist_traits<SILInstruction>::getContainingBlock() {
   size_t Offset(
-      size_t(&((SILBasicBlock *)0->*SILBasicBlock::getSublistAccess())));
+      size_t(&((SILBasicBlock *)nullptr->*SILBasicBlock::getSublistAccess())));
   iplist<SILInstruction> *Anchor(static_cast<iplist<SILInstruction> *>(this));
   return reinterpret_cast<SILBasicBlock *>(reinterpret_cast<char *>(Anchor) -
                                            Offset);
@@ -67,14 +67,14 @@ SILBasicBlock *llvm::ilist_traits<SILInstruction>::getContainingBlock() {
 
 
 void llvm::ilist_traits<SILInstruction>::addNodeToList(SILInstruction *I) {
-  assert(I->ParentBB == 0 && "Already in a list!");
+  assert(I->ParentBB == nullptr && "Already in a list!");
   I->ParentBB = getContainingBlock();
 }
 
 void llvm::ilist_traits<SILInstruction>::removeNodeFromList(SILInstruction *I) {
   // When an instruction is removed from a BB, clear the parent pointer.
   assert(I->ParentBB && "Not in a list!");
-  I->ParentBB = 0;
+  I->ParentBB = nullptr;
 }
 
 void llvm::ilist_traits<SILInstruction>::
@@ -286,6 +286,12 @@ namespace {
     bool visitLoadBorrowInst(const LoadBorrowInst *RHS) { return true; }
 
     bool visitEndBorrowInst(const EndBorrowInst *RHS) { return true; }
+    bool visitBeginBorrowInst(const BeginBorrowInst *BBI) { return true; }
+
+    bool visitStoreBorrowInst(const StoreBorrowInst *RHS) {
+      auto *X = cast<StoreBorrowInst>(LHS);
+      return X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest();
+    }
 
     bool visitStoreInst(const StoreInst *RHS) {
       auto *X = cast<StoreInst>(LHS);
@@ -663,7 +669,7 @@ namespace {
   private:
     const SILInstruction *LHS;
   };
-}
+} // end anonymous namespace
 
 bool SILInstruction::hasIdenticalState(const SILInstruction *RHS) const {
   SILInstruction *UnconstRHS = const_cast<SILInstruction *>(RHS);
@@ -808,7 +814,8 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
   case ValueKind::CLASS:                                                       \
     return MemoryBehavior::MEMBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
-  case ValueKind::SILArgument:
+  case ValueKind::SILPHIArgument:
+  case ValueKind::SILFunctionArgument:
   case ValueKind::SILUndef:
     llvm_unreachable("Non-instructions are unreachable.");
   }
@@ -821,9 +828,10 @@ SILInstruction::ReleasingBehavior SILInstruction::getReleasingBehavior() const {
   case ValueKind::CLASS:                                                       \
     return ReleasingBehavior::RELEASINGBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
- case ValueKind::SILArgument:
- case ValueKind::SILUndef:
-   llvm_unreachable("Non-instructions are unreachable.");
+  case ValueKind::SILPHIArgument:
+  case ValueKind::SILFunctionArgument:
+  case ValueKind::SILUndef:
+    llvm_unreachable("Non-instructions are unreachable.");
   }
   llvm_unreachable("We've just exhausted the switch.");
 }
@@ -940,7 +948,7 @@ namespace {
     }
     SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
   };
-}
+} // end anonymous namespace
 
 bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this))

@@ -21,6 +21,7 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Unreachable.h"
 
 #include <vector>
 #include <unordered_map>
@@ -312,6 +313,11 @@ class TypeDecoder {
       if (!base)
         return BuiltType();
       return Builder.createSILBoxType(base);
+    }
+    case NodeKind::SILBoxTypeWithLayout: {
+      // TODO: Implement SILBoxTypeRefs with layout. As a stopgap, specify the
+      // NativeObject type ref.
+      return Builder.createBuiltinType("Bo");
     }
     default:
       return BuiltType();
@@ -756,6 +762,8 @@ public:
       return BuiltOpaque;
     }
     }
+
+    swift_unreachable("Unhandled MetadataKind in switch");
   }
 
   BuiltType readTypeFromMangledName(const char *MangledTypeName,
@@ -1254,4 +1262,3 @@ namespace llvm {
 }
 
 #endif // SWIFT_REFLECTION_READER_H
-

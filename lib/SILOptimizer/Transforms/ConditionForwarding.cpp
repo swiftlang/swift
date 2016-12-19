@@ -242,7 +242,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
       SILArgument *NewArg = nullptr;
       if (NeedEnumArg.insert(UseBlock).second) {
         // The first Enum use in this UseBlock.
-        NewArg = UseBlock->createArgument(Arg->getType());
+        NewArg = UseBlock->createPHIArgument(Arg->getType());
       } else {
         // We already inserted the Enum argument for this UseBlock.
         assert(UseBlock->getNumArguments() >= 1);

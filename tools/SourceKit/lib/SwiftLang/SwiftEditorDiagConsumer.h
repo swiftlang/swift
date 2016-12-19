@@ -71,6 +71,6 @@ public:
                         const swift::DiagnosticInfo &Info) override;
 };
 
-} // namespace SourceKit.
+} // namespace SourceKit
 
 #endif

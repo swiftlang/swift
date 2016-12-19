@@ -39,7 +39,7 @@ namespace {
               (lhs.size() == rhs.size() && lhs < rhs));
     }
   };
-}
+} // end anonymous namespace
 
 template <size_t Len>
 static constexpr size_t string_lengthof(const char (&data)[Len]) {

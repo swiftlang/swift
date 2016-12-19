@@ -355,7 +355,7 @@ tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc, const Expr *expr,
     const ParamDecl *param = paramList->getArray().back();
 
     // Sanity-check that the trailing closure corresponds to this parameter.
-    if (!param->getType()->is<AnyFunctionType>())
+    if (!param->getInterfaceType()->is<AnyFunctionType>())
       return false;
 
     Identifier trailingClosureLabel = param->getArgumentName();
@@ -792,14 +792,6 @@ static void gatherArgumentLabels(Type type,
   labels.push_back(Identifier());
 }
 
-static Type stripSubstitutedTypes(Type t) {
-  return t.transform([](Type t) -> Type {
-    while (auto *ST = dyn_cast<SubstitutedType>(t.getPointer()))
-      t = ST->getReplacementType();
-    return t;
-  });
-}
-
 namespace {
   /// Each match in an ApplyExpr is evaluated for how close of a match it is.
   /// The result is captured in this enum value, where the earlier entries are
@@ -839,8 +831,17 @@ namespace {
     unsigned level;
     Type entityType;
 
+    // If true, entityType is written in terms of caller archetypes,
+    // with any unbound generic arguments remaining as interface
+    // type parameters in terms of the callee generic signature.
+    //
+    // If false, entityType is written in terms of callee archetypes.
+    //
+    // FIXME: Clean this up.
+    bool substituted;
+
     UncurriedCandidate(ValueDecl *decl, unsigned level)
-      : declOrExpr(decl), level(level) {
+      : declOrExpr(decl), level(level), substituted(false) {
 
       if (auto *PD = dyn_cast<ParamDecl>(decl))
         entityType = PD->getType();
@@ -851,11 +852,13 @@ namespace {
           auto *M = DC->getParentModule();
           auto subs = DC->getGenericEnvironmentOfContext()
               ->getForwardingSubstitutions(M);
-          entityType = stripSubstitutedTypes(GFT->substGenericArgs(subs));
+          entityType = GFT->substGenericArgs(subs);
         } else {
-          entityType = ArchetypeBuilder::mapTypeIntoContext(
-            DC, entityType);
-          entityType = stripSubstitutedTypes(entityType);
+          if (auto objType =
+                  entityType->getImplicitlyUnwrappedOptionalObjectType())
+            entityType = objType;
+
+          entityType = DC->mapTypeIntoContext(entityType);
         }
       }
 
@@ -869,7 +872,8 @@ namespace {
       }
     }
     UncurriedCandidate(Expr *expr)
-      : declOrExpr(expr), level(0), entityType(expr->getType()) {
+      : declOrExpr(expr), level(0), entityType(expr->getType()),
+        substituted(true) {
     }
  
     ValueDecl *getDecl() const {
@@ -1033,9 +1037,7 @@ namespace {
     /// obviously mismatching candidates and compute a "closeness" for the
     /// resultant set.
     ClosenessResultTy
-    evaluateCloseness(DeclContext *dc, Type candArgListType,
-                      ValueDecl *candidateDecl,
-                      unsigned level,
+    evaluateCloseness(UncurriedCandidate candidate,
                       ArrayRef<CallArgParam> actualArgs);
       
     void filterListArgs(ArrayRef<CallArgParam> actualArgs);
@@ -1072,7 +1074,7 @@ namespace {
   private:
     void collectCalleeCandidates(Expr *fnExpr, bool implicitDotSyntax);
   };
-}
+} // end anonymous namespace
 
 void CalleeCandidateInfo::dump() const {
   llvm::errs() << "CalleeCandidateInfo for '" << declName << "': closeness="
@@ -1202,9 +1204,11 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     
     bool mismatch(SubstitutableType *paramType, TypeBase *argType) {
       Type type = paramType;
-      if (dc && dc->isGenericContext() && type->isTypeParameter())
-        type = ArchetypeBuilder::mapTypeIntoContext(dc, paramType);
-      
+      if (type->is<GenericTypeParamType>()) {
+        assert(dc);
+        type = dc->mapTypeIntoContext(paramType);
+      }
+
       if (auto archetype = type->getAs<ArchetypeType>()) {
         auto existing = archetypesMap[archetype];
         if (existing)
@@ -1215,7 +1219,7 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
       return false;
     }
   };
-  
+
   GenericVisitor visitor(dc, archetypesMap);
   return visitor.match(paramType, actualArgType);
 }
@@ -1224,11 +1228,14 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
 /// list.  If the closeness is a miss by a single argument, then this returns
 /// information about that failure.
 CalleeCandidateInfo::ClosenessResultTy
-CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
-                                       ValueDecl *candidateDecl,
-                                       unsigned level,
+CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
                                        ArrayRef<CallArgParam> actualArgs) {
-  auto candArgs = decomposeParamType(candArgListType, candidateDecl, level);
+  auto *dc = candidate.getDecl()
+      ? candidate.getDecl()->getInnermostDeclContext()
+      : nullptr;
+  auto candArgs = decomposeParamType(candidate.getArgumentType(),
+                                     candidate.getDecl(),
+                                     candidate.level);
 
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
@@ -1336,27 +1343,20 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
         if (paramType->is<InOutType>() && argType->is<LValueType>())
           matchType = matchType->getInOutObjectType();
 
-        matchType.findIf([&](Type type) -> bool {
-          if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
-            Type original = substitution->getOriginal();
-            if (dc && dc->isGenericContext() && original->isTypeParameter())
-              original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
-            
-            Type replacement = substitution->getReplacementType();
+        if (candidate.substituted) {
+          matchType.findIf([&](Type type) -> bool {
             // If the replacement is itself an archetype, then the constraint
             // system was asserting equivalencies between different levels of
             // generics, rather than binding a generic to a concrete type (and we
             // don't/won't have a concrete type). In which case, it is the
             // replacement we are interested in, since it is the one in our current
             // context. That generic type should equal itself.
-            if (auto ourGeneric = replacement->getAs<ArchetypeType>())
-              archetypesMap[ourGeneric] = replacement;
-            else if (auto archetype = original->getAs<ArchetypeType>())
-              archetypesMap[archetype] = replacement;
-          }
-          return false;
-        });
-
+            if (auto archetype = type->getAs<ArchetypeType>()) {
+              archetypesMap[archetype] = archetype;
+            }
+            return false;
+          });
+        }
         matched = findGenericSubstitutions(dc, matchType, rArgType,
                                            archetypesMap);
       }
@@ -1569,9 +1569,11 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
         C.level += 1;
 
         // Compute a new substituted type if we have a base type to apply.
-        if (baseType && C.level == 1 && C.getDecl())
+        if (baseType && C.level == 1 && C.getDecl()) {
           C.entityType = baseType->getTypeOfMember(CS->DC->getParentModule(),
                                                    C.getDecl(), nullptr);
+          C.substituted = true;
+        }
       }
 
       return;
@@ -1664,13 +1666,10 @@ void CalleeCandidateInfo::filterListArgs(ArrayRef<CallArgParam> actualArgs) {
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
   filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
-    auto inputType = candidate.getArgumentType();
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
-    if (!inputType) return { CC_GeneralMismatch, {}};
-    ValueDecl *decl = candidate.getDecl();
-    return evaluateCloseness(decl ? decl->getInnermostDeclContext() : nullptr,
-                             inputType, decl, candidate.level, actualArgs);
+    if (!candidate.getArgumentType()) return { CC_GeneralMismatch, {}};
+    return evaluateCloseness(candidate, actualArgs);
   });
 }
 
@@ -1782,8 +1781,10 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
       if (substType && selfAlreadyApplied)
         substType = substType->getTypeOfMember(CS->DC->getParentModule(),
                                                decl, nullptr);
-      if (substType)
+      if (substType) {
         candidates.back().entityType = substType;
+        candidates.back().substituted = true;
+      }
     }
   }
 
@@ -2112,7 +2113,7 @@ private:
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
   bool visitClosureExpr(ClosureExpr *CE);
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 
 
@@ -3109,6 +3110,7 @@ namespace {
     llvm::DenseMap<TypeLoc*, std::pair<Type, bool>> TypeLocTypes;
     llvm::DenseMap<Pattern*, Type> PatternTypes;
     llvm::DenseMap<ParamDecl*, Type> ParamDeclTypes;
+    llvm::DenseMap<ParamDecl*, Type> ParamDeclInterfaceTypes;
     llvm::DenseMap<CollectionExpr*, Expr*> CollectionSemanticExprs;
     llvm::DenseSet<ValueDecl*> PossiblyInvalidDecls;
     ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
@@ -3154,16 +3156,20 @@ namespace {
           // remove them so that they'll get regenerated from the
           // associated TypeLocs or resynthesized as fresh typevars.
           if (auto *CE = dyn_cast<ClosureExpr>(expr))
-            for (auto P : *CE->getParameters())
+            for (auto P : *CE->getParameters()) {
               if (P->hasType()) {
                 TS->ParamDeclTypes[P] = P->getType();
                 P->setType(Type());
-                P->setInterfaceType(Type());
-                TS->PossiblyInvalidDecls.insert(P);
-                
-                if (P->isInvalid())
-                  P->setInvalid(false);
               }
+              if (P->hasInterfaceType()) {
+                TS->ParamDeclInterfaceTypes[P] = P->getInterfaceType();
+                P->setInterfaceType(Type());
+              }
+              TS->PossiblyInvalidDecls.insert(P);
+              
+              if (P->isInvalid())
+                P->setInvalid(false);
+            }
           
           // If we have a CollectionExpr with a type checked SemanticExpr,
           // remove it so we can recalculate a new semantic form.
@@ -3218,10 +3224,11 @@ namespace {
       for (auto patternElt : PatternTypes)
         patternElt.first->setType(patternElt.second);
       
-      for (auto paramDeclElt : ParamDeclTypes) {
+      for (auto paramDeclElt : ParamDeclTypes)
         paramDeclElt.first->setType(paramDeclElt.second);
-        paramDeclElt.first->setInterfaceType(Type());
-      }
+      
+      for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes)
+        paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second);
       
       for (auto CSE : CollectionSemanticExprs)
         CSE.first->setSemanticExpr(CSE.second);
@@ -3266,12 +3273,16 @@ namespace {
         if (!paramDeclElt.first->hasType())
           paramDeclElt.first->setType(paramDeclElt.second);
 
+      for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes)
+        if (!paramDeclIfaceElt.first->hasInterfaceType())
+          paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second);
+
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
           D->setInvalid(D->getInterfaceType()->hasError());
     }
   };
-}
+} // end anonymous namespace
 
 /// Erase an expression tree's open existentials after a re-typecheck operation.
 ///
@@ -3522,8 +3533,10 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
     for (auto param : *CE->getParameters()) {
       auto VD = param;
       if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
-          VD->getType()->getCanonicalType()->hasError())
+          VD->getType()->getCanonicalType()->hasError()) {
         VD->setType(CS->getASTContext().TheUnresolvedType);
+        VD->setInterfaceType(VD->getType());
+      }
     }
   }
 
@@ -4289,7 +4302,8 @@ static bool isSymmetricBinaryOperator(const CalleeCandidateInfo &CCI) {
     if (params->size() != 2) return false;
 
     // Require the types to be the same.
-    if (!params->get(0)->getType()->isEqual(params->get(1)->getType()))
+    if (!params->get(0)->getInterfaceType()->isEqual(
+          params->get(1)->getInterfaceType()))
       return false;
   }
 
@@ -4489,7 +4503,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 
     /// Use a match call argument listener that allows relabeling.
     struct RelabelMatchCallArgumentListener : MatchCallArgumentListener {
-      virtual bool relabelArguments(ArrayRef<Identifier> newNames) override {
+      bool relabelArguments(ArrayRef<Identifier> newNames) override {
         return false;
       }
     } listener;
@@ -4637,7 +4651,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     return false;
 
   auto context = CS->DC;
-  using CandididateMap =
+  using CandidateMap =
       llvm::SmallDenseMap<ValueDecl *, llvm::SmallVector<OverloadChoice, 2>>;
 
   auto getBaseKind = [](ValueDecl *base) -> DescriptiveDeclKind {
@@ -4662,8 +4676,8 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
   };
 
   auto getBaseName = [](DeclContext *context) -> DeclName {
-    if (context->isTypeContext()) {
-      auto generic = context->getAsGenericTypeOrGenericTypeExtensionContext();
+    if (auto generic =
+          context->getAsNominalTypeOrNominalTypeExtensionContext()) {
       return generic->getName();
     } else if (context->isModuleScopeContext())
       return context->getParentModule()->getName();
@@ -4720,7 +4734,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     if (!result || result.empty())
       continue;
 
-    CandididateMap candidates;
+    CandidateMap candidates;
     for (const auto &candidate : result) {
       auto base = candidate.Base;
       if ((base && base->isInvalid()) || candidate->isInvalid())
@@ -5038,7 +5052,13 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
               TC.Context.SourceMgr, FnExpr->getEndLoc());
         }
       } else {
-        llvm_unreachable("unexpected argument expression type");
+        // FIXME: Due to a quirk of CSApply, we can end up without a
+        // ParenExpr if the argument has an '@lvalue TupleType'.
+        assert((isa<TupleType>(ArgExpr->getType().getPointer()) ||
+                isa<ParenType>(ArgExpr->getType().getPointer())) &&
+                "unexpected argument expression type");
+        insertLoc = ArgExpr->getLoc();
+
         // Can't be TupleShuffleExpr because this argExpr is not yet resolved.
       }
 
@@ -5298,14 +5318,12 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
                                  CalleeCandidateInfo::ClosenessResultTy
   {
     // Classify how close this match is.  Non-subscript decls don't match.
-    auto *SD = dyn_cast_or_null<SubscriptDecl>(cand.getDecl());
-    if (!SD) return { CC_GeneralMismatch, {}};
+    if (!dyn_cast_or_null<SubscriptDecl>(cand.getDecl()))
+      return { CC_GeneralMismatch, {}};
     
     // Check whether the self type matches.
     auto selfConstraint = CC_ExactMatch;
-    if (calleeInfo.evaluateCloseness(SD->getInnermostDeclContext(),
-                                     cand.getArgumentType(), SD, cand.level,
-                                     decomposedBaseType)
+    if (calleeInfo.evaluateCloseness(cand, decomposedBaseType)
           .first != CC_ExactMatch)
       selfConstraint = CC_SelfMismatch;
     
@@ -5314,9 +5332,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     
     // Explode out multi-index subscripts to find the best match.
     auto indexResult =
-      calleeInfo.evaluateCloseness(SD->getInnermostDeclContext(),
-                                   cand.getArgumentType(), SD, cand.level,
-                                   decomposedIndexType);
+      calleeInfo.evaluateCloseness(cand, decomposedIndexType);
     if (selfConstraint > indexResult.first)
       return {selfConstraint, {}};
     return indexResult;
@@ -5385,7 +5401,7 @@ namespace {
     explicit CalleeListener(Type contextualType)
       : contextualType(contextualType) { }
 
-    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // If we have no contextual type, there is nothing to do.
       if (!contextualType) return false;
 
@@ -5419,7 +5435,7 @@ namespace {
       return false;
     }
   };
-}
+} // end anonymous namespace
 
 /// Return true if this function name is a comparison operator.  This is a
 /// simple heuristic used to guide comparison related diagnostics.
@@ -5615,7 +5631,14 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       callExpr->setFn(operatorRef);
   };
 
-  auto fnType = fnExpr->getType()->getRValueType();
+  auto getFuncType = [](Type type) -> Type {
+    auto fnType = type->getRValueType();
+    if (auto objectType = fnType->getImplicitlyUnwrappedOptionalObjectType())
+      return objectType;
+    return fnType;
+  };
+
+  auto fnType = getFuncType(fnExpr->getType());
 
   // If we have a contextual type, and if we have an ambiguously typed function
   // result from our previous check, we re-type-check it using this contextual
@@ -5626,9 +5649,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // produce better diagnostics below by diagnosing this here rather than trying
   // to peel apart the failed conversion to function type.
   if (CS->getContextualType() &&
-      (isUnresolvedOrTypeVarType(fnExpr->getType()) ||
-       (fnExpr->getType()->is<AnyFunctionType>() &&
-        fnExpr->getType()->hasUnresolvedType()))) {
+      (isUnresolvedOrTypeVarType(fnType) ||
+       (fnType->is<AnyFunctionType>() && fnType->hasUnresolvedType()))) {
     // FIXME: Prevent typeCheckChildIndependently from transforming expressions,
     // because if we try to typecheck OSR expression with contextual type,
     // it'll end up converting it into DeclRefExpr based on contextual info,
@@ -5645,7 +5667,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
           &listener);
 
       if (type.hasValue())
-        fnType = type.getValue()->getRValueType();
+        fnType = getFuncType(type.getValue());
     } else {
       fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
                                            CTP_CalleeResult, TCC_ForceRecheck,
@@ -5653,7 +5675,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       if (!fnExpr)
         return true;
 
-      fnType = fnExpr->getType()->getRValueType();
+      fnType = getFuncType(fnExpr->getType());
     }
   }
 
@@ -6287,8 +6309,10 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     // Handle this by rewriting the arguments to UnresolvedType().
     for (auto VD : *CE->getParameters()) {
       if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
-          VD->getType()->getCanonicalType()->hasError())
+          VD->getType()->getCanonicalType()->hasError()) {
         VD->setType(CS->getASTContext().TheUnresolvedType);
+        VD->setInterfaceType(VD->getType());
+      }
     }
   }
 
@@ -7044,10 +7068,14 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
 
   auto &tc = cs.getTypeChecker();
   if (FoundDecl) {
-    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype,
-                isa<NominalTypeDecl>(FoundDecl)
-                    ? cast<NominalTypeDecl>(FoundDecl)->getDeclaredType()
-                    : FoundDecl->getDeclaredInterfaceType());
+    Type type;
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(FoundDecl))
+      type = nominal->getDeclaredType();
+    else if (auto *typeAlias = dyn_cast<TypeAliasDecl>(FoundDecl))
+      type = typeAlias->getUnboundGenericType();
+    else
+      type = FoundDecl->getDeclaredInterfaceType();
+    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype, type);
   }
 
   if (FoundGenericTypeBase && !isa<GenericIdentTypeRepr>(FoundGenericTypeBase)){
@@ -7227,7 +7255,9 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
     unsigned numConstraints = 0;
     {
       llvm::SmallVector<Constraint *, 2> constraints;
-      CS->getConstraintGraph().gatherConstraints(tv, constraints);
+      CS->getConstraintGraph().gatherConstraints(
+                             tv, constraints,
+                             ConstraintGraph::GatheringKind::EquivalenceClass);
 
       for (auto constraint : constraints) {
         // We are not interested in ConformsTo constraints because

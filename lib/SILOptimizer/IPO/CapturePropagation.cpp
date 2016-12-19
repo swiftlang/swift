@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "capture-prop"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
@@ -46,7 +47,7 @@ protected:
                                       SILFunction *SubstF);
   void rewritePartialApply(PartialApplyInst *PAI, SILFunction *SpecialF);
 };
-} // namespace
+} // end anonymous namespace
 
 static LiteralInst *getConstant(SILValue V) {
   if (auto I = dyn_cast<ThinToThickFunctionInst>(V))
@@ -72,15 +73,19 @@ static std::string getClonedName(PartialApplyInst *PAI, IsFragile_t Fragile,
 
   Mangle::Mangler M;
   auto P = SpecializationPass::CapturePropagation;
-  FunctionSignatureSpecializationMangler Mangler(P, M, Fragile, F);
+  FunctionSignatureSpecializationMangler OldMangler(P, M, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler NewMangler(P, Fragile, F);
 
   // We know that all arguments are literal insts.
   auto Args = PAI->getArguments();
-  for (unsigned i : indices(Args))
-    Mangler.setArgumentConstantProp(i, getConstant(Args[i]));
-  Mangler.mangle();
-
-  return M.finalize();
+  for (unsigned i : indices(Args)) {
+    OldMangler.setArgumentConstantProp(i, getConstant(Args[i]));
+    NewMangler.setArgumentConstantProp(i, getConstant(Args[i]));
+  }
+  OldMangler.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewMangler.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 namespace {
@@ -130,7 +135,7 @@ protected:
 
   void cloneConstValue(SILValue Const);
 };
-} // namespace
+} // end anonymous namespace
 
 /// Clone a constant value. Recursively walk the operand chain through cast
 /// instructions to ensure that all dependents are cloned. Note that the
@@ -176,7 +181,7 @@ void CapturePropagationCloner::cloneBlocks(
 
     SILArgument *Arg = OrigEntryBB->getArgument(ParamIdx);
 
-    SILValue MappedValue = ClonedEntryBB->createArgument(
+    SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
         remapType(Arg->getType()), Arg->getDecl());
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }

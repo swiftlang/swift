@@ -52,10 +52,6 @@ STATISTIC(TotalHiddenExternalFuncs, "Number of hidden external funcs");
 STATISTIC(TotalPrivateExternalFuncs, "Number of private external funcs");
 STATISTIC(TotalSharedExternalFuncs, "Number of shared external funcs");
 
-// Specialization Statistics
-STATISTIC(TotalSpecializedInsts, "Number of instructions (of all types) in "
-          "specialized functions");
-
 // Individual instruction statistics
 #define INST(Id, Parent, TextualName, MemBehavior, ReleasingBehavior)          \
   STATISTIC(Num##Id, "Number of " #Id);
@@ -119,10 +115,6 @@ class InstCount : public SILFunctionTransform {
       TotalFuncs++;
     }
 
-    if (F->getName().count("_TTSg")) {
-      TotalSpecializedInsts += V.InstCount;
-    }
-
     switch (F->getLinkage()) {
     case SILLinkage::Public:
       ++TotalPublicFuncs;
@@ -151,8 +143,8 @@ class InstCount : public SILFunctionTransform {
     }
   }
 };
-} // end anonymous namespace
 
+} // end anonymous namespace
 
 SILTransform *swift::createInstCount() {
   return new InstCount();
@@ -160,6 +152,6 @@ SILTransform *swift::createInstCount() {
 
 void swift::performSILInstCount(SILModule *M) {
   SILPassManager PrinterPM(M);
-  PrinterPM.addInstCount();
-  PrinterPM.runOneIteration();
+  PrinterPM.executePassPipelinePlan(
+      SILPassPipelinePlan::getInstCountPassPipeline());
 }

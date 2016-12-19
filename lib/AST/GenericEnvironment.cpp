@@ -40,6 +40,46 @@ GenericEnvironment::GenericEnvironment(
     addMapping(entry.first->castTo<GenericTypeParamType>(), entry.second);
 }
 
+/// Compute the depth of the \c DeclContext chain.
+static unsigned declContextDepth(const DeclContext *dc) {
+  unsigned depth = 0;
+  while (auto parentDC = dc->getParent()) {
+    ++depth;
+    dc = parentDC;
+  }
+
+  return depth;
+}
+
+void GenericEnvironment::setOwningDeclContext(DeclContext *newOwningDC) {
+  if (!OwningDC) {
+    OwningDC = newOwningDC;
+    return;
+  }
+
+  if (!newOwningDC || OwningDC == newOwningDC)
+    return;
+
+  // Find the least common ancestor context to be the owner.
+  unsigned oldDepth = declContextDepth(OwningDC);
+  unsigned newDepth = declContextDepth(newOwningDC);
+
+  while (oldDepth > newDepth) {
+    OwningDC = OwningDC->getParent();
+    --oldDepth;
+  }
+
+  while (newDepth > oldDepth) {
+    newOwningDC = newOwningDC->getParent();
+    --newDepth;
+  }
+
+  while (OwningDC != newOwningDC) {
+    OwningDC = OwningDC->getParent();
+    newOwningDC = newOwningDC->getParent();
+  }
+}
+
 void GenericEnvironment::addMapping(GenericParamKey key,
                                     Type contextType) {
   // Find the index into the parallel arrays of generic parameters and
@@ -122,8 +162,9 @@ bool GenericEnvironment::containsPrimaryArchetype(
                        QueryArchetypeToInterfaceSubstitutions(this)(archetype));
 }
 
-Type GenericEnvironment::mapTypeOutOfContext(ModuleDecl *M, Type type) const {
-  type = type.subst(M, QueryArchetypeToInterfaceSubstitutions(this),
+Type GenericEnvironment::mapTypeOutOfContext(Type type) const {
+  type = type.subst(QueryArchetypeToInterfaceSubstitutions(this),
+                    MakeAbstractConformanceForGenericType(),
                     SubstFlags::AllowLoweredTypes);
   assert(!type->hasArchetype() && "not fully substituted");
   return type;
@@ -150,8 +191,8 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
 
       auto mutableSelf = const_cast<GenericEnvironment *>(self);
       contextType =
-        potentialArchetype->getTypeInContext(*mutableSelf->Builder, mutableSelf)
-          .getValue();
+        potentialArchetype->getTypeInContext(*mutableSelf->Builder,
+                                             mutableSelf);
 
       // FIXME: Redundant mapping from key -> index.
       if (self->getContextTypes()[index].isNull())
@@ -229,11 +270,13 @@ Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
 }
 
 Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
-  type = type.subst(M, QueryInterfaceTypeSubstitutions(this),
-                    SubstFlags::AllowLoweredTypes);
-  assert((!type->hasTypeParameter() || type->hasError()) &&
+  Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
+                           LookUpConformanceInModule(M),
+                           (SubstFlags::AllowLoweredTypes|
+                            SubstFlags::UseErrorType));
+  assert((!result->hasTypeParameter() || result->hasError()) &&
          "not fully substituted");
-  return type;
+  return result;
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
@@ -256,9 +299,9 @@ ArrayRef<Substitution>
 GenericEnvironment::getForwardingSubstitutions(ModuleDecl *M) const {
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
-          -> ProtocolConformanceRef {
-    return ProtocolConformanceRef(protoType->getDecl());
-  };
+      -> Optional<ProtocolConformanceRef> {
+        return ProtocolConformanceRef(protoType->getDecl());
+      };
 
   SmallVector<Substitution, 4> result;
   getGenericSignature()->getSubstitutions(*M,
@@ -282,7 +325,8 @@ getSubstitutionMap(ModuleDecl *mod,
   for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
 
     // Map the interface type to a context type.
-    auto contextTy = depTy.subst(mod, QueryInterfaceTypeSubstitutions(this),
+    auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
+                                 LookUpConformanceInModule(mod),
                                  SubstOptions());
     auto *archetype = contextTy->castTo<ArchetypeType>();
 

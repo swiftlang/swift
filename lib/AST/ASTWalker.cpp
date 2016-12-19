@@ -1046,7 +1046,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 #pragma mark Statement traversal
 Stmt *Traversal::visitBreakStmt(BreakStmt *BS) {

@@ -1,4 +1,4 @@
-// All bbs should have IDs that match the rpo order put out when printing with -sil-sort-output
+// All bbs should have IDs that match the rpo order put out when printing with -emit-sorted-sil
 
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name Swift -loop-region-view-text -o /dev/null | %FileCheck %s
 

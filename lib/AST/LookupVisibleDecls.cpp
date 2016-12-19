@@ -359,7 +359,8 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       case DeclKind::Var: {
         auto *VD = cast<VarDecl>(D);
         auto Signature =
-            std::make_pair(VD->getName(), VD->getType()->getCanonicalType());
+            std::make_pair(VD->getName(),
+                           VD->getInterfaceType()->getCanonicalType());
         if (!PropertiesReported.insert(Signature).second)
           return;
         break;
@@ -381,7 +382,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
 
 namespace {
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
-}
+} // end anonymous namespace
 
 static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
   switch (Reason) {
@@ -623,7 +624,7 @@ template <> struct DenseMapInfo<FoundDeclTy> {
   }
 };
 
-} // end llvm namespace
+} // namespace llvm
 
 namespace {
 
@@ -720,12 +721,13 @@ public:
     bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
                        !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
                        !BaseTy->isAnyExistentialType() &&
-                       !BaseTy->hasTypeVariable();
+                       !BaseTy->hasTypeVariable() &&
+                       VD->getDeclContext()->isTypeContext();
     ModuleDecl *M = DC->getParentModule();
 
     auto FoundSignature = VD->getOverloadSignature();
     if (FoundSignature.InterfaceType && shouldSubst) {
-      auto subs = BaseTy->getMemberSubstitutions(VD->getDeclContext());
+      auto subs = BaseTy->getMemberSubstitutions(VD);
       if (auto CT = FoundSignature.InterfaceType.subst(M, subs, None))
         FoundSignature.InterfaceType = CT->getCanonicalType();
     }
@@ -741,7 +743,7 @@ public:
 
       auto OtherSignature = OtherVD->getOverloadSignature();
       if (OtherSignature.InterfaceType && shouldSubst) {
-        auto subs = BaseTy->getMemberSubstitutions(OtherVD->getDeclContext());
+        auto subs = BaseTy->getMemberSubstitutions(OtherVD);
         if (auto CT = OtherSignature.InterfaceType.subst(M, subs, None))
           OtherSignature.InterfaceType = CT->getCanonicalType();
       }
@@ -827,13 +829,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         Consumer.foundDecl(const_cast<ParamDecl*>(AFD->getImplicitSelfDecl()),
                            DeclVisibilityKind::FunctionParameter);
 
-      if (AFD->getExtensionType()) {
-        ExtendedType = AFD->getExtensionType();
+      if (AFD->getDeclContext()->isTypeContext()) {
+        ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
         BaseDecl = AFD->getImplicitSelfDecl();
         DC = DC->getParent();
-
-        if (DC->getAsProtocolExtensionContext())
-          ExtendedType = DC->getSelfTypeInContext();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())

@@ -30,7 +30,7 @@ public:
     :ProtocolImplementationsCache(ProtocolImplementationsCache) {
   }
 
-  virtual bool walkToDeclPre(Decl *D) {
+  bool walkToDeclPre(Decl *D) override {
     auto *NTD = dyn_cast<NominalTypeDecl>(D);
     if (!NTD)
       return true;
@@ -45,7 +45,7 @@ public:
     return true;
   }
 };
-}
+} // end anonymous namespace
 
 void ClassHierarchyAnalysis::init() {
   // Process all types implementing protocols.

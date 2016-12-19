@@ -24,7 +24,7 @@ using namespace Lowering;
 SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
   // Emit the implicit 'self' argument.
   SILType selfType = getLoweredLoadableType(selfDecl->getType());
-  SILValue selfValue = F.begin()->createArgument(selfType, selfDecl);
+  SILValue selfValue = F.begin()->createFunctionArgument(selfType, selfDecl);
   VarLocs[selfDecl] = VarLoc::get(selfValue);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
@@ -129,7 +129,7 @@ public:
            "argument does not have same type as specified by parameter info");
 
     SILValue arg =
-        parent->createArgument(argType, loc.getAsASTNode<ValueDecl>());
+        parent->createFunctionArgument(argType, loc.getAsASTNode<ValueDecl>());
     ManagedValue mv = getManagedValue(arg, t, parameterInfo);
 
     // If the value is a (possibly optional) ObjC block passed into the entry
@@ -329,7 +329,8 @@ static void makeArgument(Type ty, ParamDecl *decl,
     for (auto fieldType : tupleTy->getElementTypes())
       makeArgument(fieldType, decl, args, gen);
   } else {
-    auto arg = gen.F.begin()->createArgument(gen.getLoweredType(ty), decl);
+    auto arg =
+        gen.F.begin()->createFunctionArgument(gen.getLoweredType(ty), decl);
     args.push_back(arg);
   }
 }
@@ -338,7 +339,10 @@ static void makeArgument(Type ty, ParamDecl *decl,
 void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
                                      SmallVectorImpl<SILValue> &parameters) {
   for (auto param : *params) {
-    makeArgument(param->getType(), param, parameters, *this);
+    Type type = (param->hasType()
+                 ? param->getType()
+                 : F.mapTypeIntoContext(param->getInterfaceType()));
+    makeArgument(type, param, parameters, *this);
   }
 }
 
@@ -348,16 +352,28 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
   auto *VD = capture.getDecl();
   SILLocation Loc(VD);
   Loc.markAsPrologue();
+
+  // Local function to get the captured variable type within the capturing
+  // context.
+  auto getVarTypeInCaptureContext = [&]() -> Type {
+    auto interfaceType = cast<VarDecl>(VD)->getInterfaceType();
+    if (!interfaceType->hasTypeParameter()) return interfaceType;
+
+    auto genericEnv = gen.F.getGenericEnvironment();
+    return genericEnv->mapTypeIntoContext(gen.F.getModule().getSwiftModule(),
+                                          interfaceType);
+  };
+
   switch (gen.SGM.Types.getDeclCaptureKind(capture)) {
   case CaptureKind::None:
     break;
 
   case CaptureKind::Constant: {
-    auto type = cast<VarDecl>(VD)->getType();
+    auto type = getVarTypeInCaptureContext();
     auto &lowering = gen.getTypeLowering(type);
     // Constant decls are captured by value.
     SILType ty = lowering.getLoweredType();
-    SILValue val = gen.F.begin()->createArgument(ty, VD);
+    SILValue val = gen.F.begin()->createFunctionArgument(ty, VD);
 
     // If the original variable was settable, then Sema will have treated the
     // VarDecl as an lvalue, even in the closure's use.  As such, we need to
@@ -385,11 +401,12 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
   case CaptureKind::Box: {
     // LValues are captured as a retained @box that owns
     // the captured value.
-    auto type = dyn_cast<VarDecl>(VD)->getType();
-    SILType ty = gen.getLoweredType(type).getAddressType();
-    SILType boxTy = SILType::getPrimitiveObjectType(
-      SILBoxType::get(ty.getSwiftRValueType()));
-    SILValue box = gen.F.begin()->createArgument(boxTy, VD);
+    auto type = getVarTypeInCaptureContext();
+    auto boxTy = gen.SGM.Types.getContextBoxTypeForCapture(VD,
+                               gen.getLoweredType(type).getSwiftRValueType(),
+                               gen.F.getGenericEnvironment(), /*mutable*/ true);
+    SILValue box = gen.F.begin()->createFunctionArgument(
+        SILType::getPrimitiveObjectType(boxTy), VD);
     SILValue addr = gen.B.createProjectBox(VD, box, 0);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     gen.B.createDebugValueAddr(Loc, addr, {/*Constant*/false, ArgNo});
@@ -399,9 +416,9 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
   }
   case CaptureKind::StorageAddress: {
     // Non-escaping stored decls are captured as the address of the value.
-    auto type = dyn_cast<VarDecl>(VD)->getType();
+    auto type = getVarTypeInCaptureContext();
     SILType ty = gen.getLoweredType(type).getAddressType();
-    SILValue addr = gen.F.begin()->createArgument(ty, VD);
+    SILValue addr = gen.F.begin()->createFunctionArgument(ty, VD);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);
     gen.B.createDebugValueAddr(Loc, addr, {/*Constant*/true, ArgNo});
     break;
@@ -425,7 +442,7 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
           MetatypeRepresentation::Thick)
               ->getCanonicalType();
       SILType ty = SILType::getPrimitiveObjectType(selfMetatype);
-      SILValue val = F.begin()->createArgument(ty);
+      SILValue val = F.begin()->createFunctionArgument(ty);
       (void) val;
 
       return;
@@ -446,16 +463,19 @@ static void emitIndirectResultParameters(SILGenFunction &gen, Type resultType,
   }
 
   // If the return type is address-only, emit the indirect return argument.
-  const TypeLowering &resultTI = gen.getTypeLowering(resultType);
+  const TypeLowering &resultTI = gen.getTypeLowering(
+      DC->mapTypeIntoContext(resultType));
   if (!resultTI.isReturnedIndirectly()) return;
 
   auto &ctx = gen.getASTContext();
   auto var = new (ctx) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
-                                 ctx.getIdentifier("$return_value"), resultType,
+                                 ctx.getIdentifier("$return_value"), Type(),
                                  DC);
+  var->setInterfaceType(resultType);
 
-  auto *arg = gen.F.begin()->createArgument(resultTI.getLoweredType(), var);
+  auto *arg =
+      gen.F.begin()->createFunctionArgument(resultTI.getLoweredType(), var);
   (void)arg;
 }
 

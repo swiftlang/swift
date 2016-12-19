@@ -668,6 +668,7 @@ extension ${Self}: BinaryFloatingPoint {
   public var significandWidth: Int {
     let trailingZeros = significandBitPattern.countTrailingZeros
     if isNormal {
+      guard significandBitPattern != 0 else { return 0 }
       return ${Self}.significandBitCount - trailingZeros
     }
     if isSubnormal {

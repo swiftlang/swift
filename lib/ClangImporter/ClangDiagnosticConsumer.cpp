@@ -71,7 +71,7 @@ namespace {
                             {}, SM, {});
     }
   };
-}
+} // end anonymous namespace
 
 ClangDiagnosticConsumer::ClangDiagnosticConsumer(
     ClangImporter::Implementation &impl,

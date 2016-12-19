@@ -92,9 +92,7 @@ static llvm::cl::opt<bool> EnableDestroyHoisting("enable-destroyhoisting",
 ///
 /// (2) A local alloc_stack variable.
 static bool isIdentifiedSourceValue(SILValue Def) {
-  if (SILArgument *Arg = dyn_cast<SILArgument>(Def)) {
-    if (!Arg->isFunctionArg())
-      return false;
+  if (auto *Arg = dyn_cast<SILFunctionArgument>(Def)) {
     // Check that the argument is passed as an in type. This means there are
     // no aliases accessible within this function scope.
     SILArgumentConvention Conv =  Arg->getArgumentConvention();
@@ -107,7 +105,8 @@ static bool isIdentifiedSourceValue(SILValue Def) {
       return false;
     }
   }
-  else if (isa<AllocStackInst>(Def))
+
+  if (isa<AllocStackInst>(Def))
     return true;
 
   return false;
@@ -120,9 +119,7 @@ static bool isIdentifiedSourceValue(SILValue Def) {
 ///
 /// (2) A local alloc_stack variable.
 static bool isIdentifiedDestValue(SILValue Def) {
-  if (SILArgument *Arg = dyn_cast<SILArgument>(Def)) {
-    if (!Arg->isFunctionArg())
-      return false;
+  if (auto *Arg = dyn_cast<SILFunctionArgument>(Def)) {
     // Check that the argument is passed as an out type. This means there are
     // no aliases accessible within this function scope.
     SILArgumentConvention Conv =  Arg->getArgumentConvention();
@@ -135,7 +132,8 @@ static bool isIdentifiedDestValue(SILValue Def) {
       return false;
     }
   }
-  else if (isa<AllocStackInst>(Def))
+
+  if (isa<AllocStackInst>(Def))
     return true;
 
   return false;
@@ -439,7 +437,7 @@ protected:
   bool areCopyDestUsersDominatedBy(CopyAddrInst *,
                                    SmallVectorImpl<Operand *> &);
 };
-} // namespace
+} // end anonymous namespace
 
 /// Gather all instructions that use CurrentDef:
 /// - DestroyPoints records 'destroy'
@@ -1100,11 +1098,11 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
   // dominate all uses of the source. Worse, it may be aliased. This
   // optimization will early-initialize the copy dest, so we can't allow aliases
   // to be accessed between the initialization and the return.
-  auto OutArg = dyn_cast<SILArgument>(CopyInst->getDest());
+  auto OutArg = dyn_cast<SILFunctionArgument>(CopyInst->getDest());
   if (!OutArg)
     return false;
 
-  if (!OutArg->isFunctionArg() || !OutArg->isIndirectResult())
+  if (!OutArg->isIndirectResult())
     return false;
 
   SILBasicBlock *BB = CopyInst->getParent();
@@ -1212,7 +1210,7 @@ class CopyForwardingPass : public SILFunctionTransform
 
   StringRef getName() override { return "Copy Forwarding"; }
 };
-} // anonymous
+} // end anonymous namespace
 
 SILTransform *swift::createCopyForwarding() {
   return new CopyForwardingPass();

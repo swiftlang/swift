@@ -602,7 +602,7 @@ namespace {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
   };
-}
+} // end anonymous namespace
 
 /// Constructs a type info which performs simple loads and stores of
 /// the given IR type.
@@ -1078,10 +1078,18 @@ static void profileArchetypeConstraints(
   for (auto proto : arch->getConformsTo()) {
     ID.AddPointer(proto);
   }
-  
+
+  // Skip nested types if this is an opened existential, since those
+  // won't resolve. Normally opened existentials cannot have nested
+  // types, but one case we missed compiled in Swift 3 so we support
+  // it here.
+  if (arch->getOpenedExistentialType()) {
+    return;
+  }
+
   // Recursively profile nested archetypes.
   for (auto nested : arch->getAllNestedTypes()) {
-    profileArchetypeConstraints(nested.second.getValue(), ID, seen);
+    profileArchetypeConstraints(nested.second, ID, seen);
   }
 }
 
@@ -1117,14 +1125,19 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
   // FIXME: A generic SILFunctionType should not contain any nondependent
   // archetypes.
   if (isa<SILFunctionType>(contextTy)
-      && cast<SILFunctionType>(contextTy)->isPolymorphic())
+      && cast<SILFunctionType>(contextTy)->isPolymorphic()) {
     return contextTy;
-  else
-    return CanType(contextTy.transform([&](Type t) -> Type {
-      if (auto arch = dyn_cast<ArchetypeType>(t.getPointer()))
-        return getExemplarArchetype(arch);
-      return t;
-    }));
+  } else {
+    auto exemplified = contextTy.subst(
+      [&](SubstitutableType *type) -> Type {
+        if (auto arch = dyn_cast<ArchetypeType>(type))
+          return getExemplarArchetype(arch);
+        return type;
+      },
+      MakeAbstractConformanceForGenericType(),
+      SubstFlags::AllowLoweredTypes);
+    return CanType(exemplified);
+  }
 }
 
 TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
@@ -1521,7 +1534,7 @@ namespace {
       return true;
     }
   };
-}
+} // end anonymous namespace
 
 static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
   assert(!isa<ProtocolDecl>(decl));
@@ -1594,14 +1607,14 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
     llvm_unreachable("classes are always considered dependent for now");
 
   case DeclKind::Enum: {
-    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto type = decl->getDeclaredTypeInContext()->getCanonicalType();
     auto result = convertEnumType(key, type, cast<EnumDecl>(decl));
     overwriteForwardDecl(Cache, key, result);
     return result;
   }
 
   case DeclKind::Struct: {
-    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto type = decl->getDeclaredTypeInContext()->getCanonicalType();
     auto result = convertStructType(key, type, cast<StructDecl>(decl));
     overwriteForwardDecl(Cache, key, result);
     return result;

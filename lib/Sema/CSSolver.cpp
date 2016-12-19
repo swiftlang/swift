@@ -80,7 +80,9 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
 
       // Look for a literal-conformance constraint on the type variable.
       SmallVector<Constraint *, 8> constraints;
-      cs.getConstraintGraph().gatherConstraints(bindingTypeVar, constraints);
+      cs.getConstraintGraph().gatherConstraints(
+                              bindingTypeVar, constraints,
+                              ConstraintGraph::GatheringKind::EquivalenceClass);
       for (auto constraint : constraints) {
         if (constraint->getKind() == ConstraintKind::LiteralConformsTo &&
             constraint->getProtocol()->isSpecificProtocol(
@@ -243,7 +245,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
     if (!getFixedType(binding.first) && !binding.second->hasTypeVariable())
-      assignFixedType(binding.first, binding.second, /*updateScore=*/false);
+      assignFixedType(binding.first, binding.second, /*updateState=*/false);
   }
 
   // Register overload choices.
@@ -359,7 +361,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
       }
 
       if (solverState)
-        solverState->retiredConstraints.push_front(constraint);
+        solverState->retireConstraint(constraint);
 
       CG.removeConstraint(constraint);
       break;
@@ -369,7 +371,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
         ++solverState->NumSimplifiedConstraints;
 
         // This constraint has already been solved; retire it.
-        solverState->retiredConstraints.push_front(constraint);
+        solverState->retireConstraint(constraint);
       }
 
       // Remove the constraint from the constraint graph.
@@ -470,16 +472,15 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   resolvedOverloadSets = cs.resolvedOverloadSets;
   numTypeVariables = cs.TypeVariables.size();
   numSavedBindings = cs.solverState->savedBindings.size();
-  firstRetired = cs.solverState->retiredConstraints.begin();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
-  numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
+  cs.solverState->registerScope(this);
   ++cs.solverState->NumStatesExplored;
 }
 
@@ -495,7 +496,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
                                    numSavedBindings);
 
   // Move any remaining active constraints into the inactive list.
-  while (!cs.ActiveConstraints.empty()) {
+  if (!cs.ActiveConstraints.empty()) {
     for (auto &constraint : cs.ActiveConstraints) {
       constraint.setActive(false);
     }
@@ -503,20 +504,10 @@ ConstraintSystem::SolverScope::~SolverScope() {
                                   cs.ActiveConstraints);
   }
 
-  // Add the retired constraints back into circulation.
-  cs.InactiveConstraints.splice(cs.InactiveConstraints.end(), 
-                                cs.solverState->retiredConstraints,
-                                cs.solverState->retiredConstraints.begin(),
-                                firstRetired);
-
-  // Remove any constraints that were generated here.
-  auto &generatedConstraints = cs.solverState->generatedConstraints;
-  auto genStart = generatedConstraints.begin() + numGeneratedConstraints,
-       genEnd = generatedConstraints.end();
-  for (auto genI = genStart; genI != genEnd; ++genI) {
-    cs.InactiveConstraints.erase(ConstraintList::iterator(*genI));
-  }
-  generatedConstraints.erase(genStart, genEnd);
+  // Rollback all of the changes done to constraints by the current scope,
+  // e.g. add retired constraints back to the circulation and remove generated
+  // constraints introduced by the current scope.
+  cs.solverState->rollback(this);
 
   // Remove any constraint restrictions.
   truncate(cs.ConstraintRestrictions, numConstraintRestrictions);
@@ -696,7 +687,7 @@ namespace {
       out << ")\n";
     }
   };
-}
+} // end anonymous namespace
 
 /// \brief Return whether a relational constraint between a type variable and a
 /// trivial wrapper type (autoclosure, unary tuple) should result in the type
@@ -755,7 +746,7 @@ static void findInferableTypeVars(
     explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVars)
       : typeVars(typeVars) { }
 
-    virtual Action walkToTypePre(Type ty) override {
+    Action walkToTypePre(Type ty) override {
       if (ty->is<DependentMemberType>())
         return Action::SkipChildren;
 
@@ -780,7 +771,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   // Gather the constraints associated with this type variable.
   SmallVector<Constraint *, 8> constraints;
   llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
-  cs.getConstraintGraph().gatherConstraints(typeVar, constraints);
+  cs.getConstraintGraph().gatherConstraints(
+                              typeVar, constraints,
+                              ConstraintGraph::GatheringKind::EquivalenceClass);
 
   PotentialBindings result;
   Optional<unsigned> lastSupertypeIndex;
@@ -1491,7 +1484,7 @@ bool ConstraintSystem::Candidate::solve() {
     if (CTP == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
 
-    cs.addConstraint(constraintKind, E->getType(), CT,
+    cs.addConstraint(constraintKind, cs.getType(E), CT,
                      cs.getConstraintLocator(E), /*isFavored=*/true);
   }
 
@@ -1896,7 +1889,7 @@ ConstraintSystem::solve(Expr *&expr,
       });
     }
 
-    addConstraint(constraintKind, expr->getType(), convertType,
+    addConstraint(constraintKind, getType(expr), convertType,
                   getConstraintLocator(expr), /*isFavored*/ true);
   }
 
@@ -2407,11 +2400,11 @@ bool ConstraintSystem::solveSimplified(
     case SolutionKind::Error:
       if (!failedConstraint)
         failedConstraint = constraint;
-      solverState->retiredConstraints.push_back(constraint);
+      solverState->retireConstraint(constraint);
       break;
 
     case SolutionKind::Solved:
-      solverState->retiredConstraints.push_back(constraint);
+      solverState->retireConstraint(constraint);
       break;
 
     case SolutionKind::Unsolved:
@@ -2421,7 +2414,7 @@ bool ConstraintSystem::solveSimplified(
     }
 
     // Record this as a generated constraint.
-    solverState->generatedConstraints.push_back(constraint);
+    solverState->addGeneratedConstraint(constraint);
 
     if (!solveRec(solutions, allowFreeTypeVariables)) {
       firstSolvedConstraint = constraint;

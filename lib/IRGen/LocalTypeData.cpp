@@ -97,13 +97,12 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
   if (it == Map.end()) return nullptr;
   auto &chain = it->second;
 
-  CacheEntry *best = nullptr, *bestPrev = nullptr;
+  CacheEntry *best = nullptr;
   Optional<unsigned> bestCost;
 
-  CacheEntry *next = chain.Root, *nextPrev = nullptr;
+  CacheEntry *next = chain.Root;
   while (next) {
-    CacheEntry *cur = next, *curPrev = nextPrev;
-    nextPrev = cur;
+    CacheEntry *cur = next;
     next = cur->getNext();
 
     // Ignore abstract entries if so requested.
@@ -130,7 +129,6 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
       bestCost = curCost;
     }
     best = cur;
-    bestPrev = curPrev;
   }
 
   // If we didn't find anything, we're done.

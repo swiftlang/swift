@@ -8,7 +8,7 @@ var x = 0
 var y = 0
 #endif
 
-#if foo(BAR) // expected-error {{unexpected platform condition (expected 'os', 'arch', or 'swift')}}
+#if foo(BAR) // expected-error {{unexpected platform condition (expected 'canImport', 'os', 'arch', or 'swift')}}
 var z = 0
 #endif
 
@@ -28,7 +28,7 @@ func h() {}
 #endif /* bbb */
 
 #if foo.bar() 
-      .baz() // expected-error {{unexpected platform condition (expected 'os', 'arch', or 'swift')}}
+      .baz() // expected-error {{unexpected platform condition (expected 'canImport', 'os', 'arch', or 'swift')}}
 
 #endif
 
@@ -44,6 +44,11 @@ struct S {
   #else
   #endif
 }
+
+#if canImport(01101101_01101111_01101111_01100100) // expected-error {{unexpected platform condition argument: expected identifier}}
+#elseif canImport(Foundation) ** FOO // expected-error{{expected '&&' or '||' expression}}
+#else
+#endif
 
 #if FOO
 #else
@@ -64,3 +69,14 @@ struct S {
 
 #if _endian(mid) // expected-warning {{unknown endianness for build configuration '_endian'}}
 #endif
+
+LABEL: #if true // expected-error {{expected statement}}
+func fn_i() {}
+#endif
+fn_i() // OK
+
+try #if false // expected-error {{expected expression}}
+#else
+func fn_j() {}
+#endif
+fn_j() // OK

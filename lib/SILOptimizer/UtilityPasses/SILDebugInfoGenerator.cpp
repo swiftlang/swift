@@ -66,7 +66,7 @@ class SILDebugInfoGenerator : public SILModuleTransform {
       llvm::raw_ostream(/* unbuffered = */ true),
       Underlying(Underlying) { }
     
-    ~LineCountStream() {
+    ~LineCountStream() override {
       flush();
     }
   };
@@ -86,7 +86,7 @@ class SILDebugInfoGenerator : public SILModuleTransform {
 
     PrintContext(llvm::raw_ostream &OS) : SILPrintContext(LCS), LCS(OS) { }
 
-    virtual ~PrintContext() { }
+    ~PrintContext() override { }
   };
 
   void run() override {

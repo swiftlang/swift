@@ -119,25 +119,17 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
-                         SourceFile *SF,
-                         llvm::LLVMContext &LLVMContext,
-                         StringRef ModuleName,
-                         StringRef OutputFilename)
-  : IRGen(irgen),
-    Context(irgen.SIL.getASTContext()),
-    ClangCodeGen(createClangCodeGenerator(Context, LLVMContext,
-                                          irgen.Opts, ModuleName)),
-    Module(*ClangCodeGen->GetModule()),
-    LLVMContext(Module.getContext()),
-    DataLayout(target->createDataLayout()),
-    Triple(Context.LangOpts.Target),
-    TargetMachine(std::move(target)),
-    OutputFilename(OutputFilename),
-    TargetInfo(SwiftTargetInfo::get(*this)),
-    DebugInfo(0), ModuleHash(nullptr),
-    ObjCInterop(Context.LangOpts.EnableObjCInterop),
-    Types(*new TypeConverter(*this))
-{
+                         SourceFile *SF, llvm::LLVMContext &LLVMContext,
+                         StringRef ModuleName, StringRef OutputFilename)
+    : IRGen(irgen), Context(irgen.SIL.getASTContext()),
+      ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
+                                            ModuleName)),
+      Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
+      DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
+      TargetMachine(std::move(target)), OutputFilename(OutputFilename),
+      TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
+      ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
 
   auto &opts = irgen.Opts;
@@ -411,7 +403,7 @@ namespace RuntimeConstants {
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
-}
+} // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
 // RuntimeFunctions.def FUNCTION macro. Instead, special case the one attribute
@@ -524,9 +516,9 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
     auto fnTy = fun->getFunctionType();
     auto fnPtrTy = llvm::PointerType::getUnqual(fnTy);
 
-    auto *globalFnPtr =
-        new llvm::GlobalVariable(Module, fnPtrTy, false,
-                                 llvm::GlobalValue::ExternalLinkage, 0, symbol);
+    auto *globalFnPtr = new llvm::GlobalVariable(
+        Module, fnPtrTy, false, llvm::GlobalValue::ExternalLinkage, nullptr,
+        symbol);
     if (llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF())
       globalFnPtr->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
@@ -868,7 +860,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
 
     if (!Module.getGlobalVariable(buf.str())) {
       auto ref = new llvm::GlobalVariable(Module, symbolAddr->getType(),
-                                          /*constant=*/true,
+                                          /*isConstant=*/true,
                                           llvm::GlobalValue::WeakAnyLinkage,
                                           symbolAddr, buf.str());
       ref->setVisibility(llvm::GlobalValue::HiddenVisibility);
@@ -973,7 +965,7 @@ void IRGenModule::emitAutolinkInfo() {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
     auto symbol =
-        new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/false,
+        new llvm::GlobalVariable(Module, Int1Ty, /*isConstant=*/false,
                                  llvm::GlobalValue::CommonLinkage,
                                  llvm::Constant::getNullValue(Int1Ty),
                                  buf.str());

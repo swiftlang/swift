@@ -287,6 +287,6 @@ namespace llvm {
   template <typename T> struct isPodLike;
   template <>
   struct isPodLike<swift::Token> { static const bool value = true; };
-}  // end namespace llvm
+} // end namespace llvm
 
 #endif

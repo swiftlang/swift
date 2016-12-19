@@ -95,7 +95,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     // Semantic analysis fills in the depth when it processes the generic
     // parameter list.
     auto Param = new (Context) GenericTypeParamDecl(CurDeclContext, Name,
-                                                    NameLoc, /*Depth=*/0,
+                                                    NameLoc, /*depth=*/0,
                                                     GenericParams.size());
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));

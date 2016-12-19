@@ -21,6 +21,7 @@
 
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
 
@@ -34,8 +35,12 @@ static std::string mangleConstant(NormalProtocolConformance *C) {
   //   global ::= 'WP' protocol-conformance
   mangler.append("_TWP");
   mangler.mangleProtocolConformance(C);
-  return mangler.finalize();
+  std::string Old = mangler.finalize();
 
+  NewMangling::ASTMangler NewMangler;
+  std::string New = NewMangler.mangleWitnessTable(C);
+
+  return NewMangling::selectMangling(Old, New);
 }
 
 void SILWitnessTable::addWitnessTable() {

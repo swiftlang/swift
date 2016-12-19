@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -66,10 +66,9 @@ protected:
 class GenericSpecializationMangler : public SpecializationMangler {
 
   ArrayRef<Substitution> Subs;
+  bool isReAbstracted;
 
 public:
-
-  bool isReAbstracted;
 
   GenericSpecializationMangler(SILFunction *F,
                                ArrayRef<Substitution> Subs,
@@ -77,6 +76,22 @@ public:
                                bool isReAbstracted)
     : SpecializationMangler(SpecializationPass::GenericSpecializer, Fragile, F),
       Subs(Subs), isReAbstracted(isReAbstracted) {}
+
+  std::string mangle();
+};
+
+class PartialSpecializationMangler : public SpecializationMangler {
+
+  CanSILFunctionType SpecializedFnTy;
+  bool isReAbstracted;
+  
+public:
+  PartialSpecializationMangler(SILFunction *F,
+                               CanSILFunctionType SpecializedFnTy,
+                               IsFragile_t Fragile,
+                               bool isReAbstracted)
+    : SpecializationMangler(SpecializationPass::GenericSpecializer, Fragile, F),
+      SpecializedFnTy(SpecializedFnTy), isReAbstracted(isReAbstracted) {}
 
   std::string mangle();
 };

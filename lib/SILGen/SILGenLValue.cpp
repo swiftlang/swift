@@ -82,8 +82,8 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
     component->writeback(gen, loc, base, materialized, isFinal);
   }
 };
-}
-}
+} // namespace Lowering
+} // namespace swift
 
 namespace {
   class LValueWritebackCleanup : public Cleanup {
@@ -94,7 +94,7 @@ namespace {
       gen.getWritebackStack()[Depth].performWriteback(gen, /*isFinal*/ false);
     }
   };
-}
+} // end anonymous namespace
 
 std::vector<LValueWriteback> &SILGenFunction::getWritebackStack() {
   if (!WritebackStack)
@@ -558,7 +558,7 @@ namespace {
       OS << "ValueComponent()\n";
     }
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 static bool isReadNoneFunction(const Expr *e) {
   // If this is a curried call to an integer literal conversion operations, then
@@ -880,8 +880,8 @@ namespace {
           CanType type = subscripts.getType();
           SmallVector<ManagedValue, 4> values;
           std::move(subscripts).getAll(values);
-          subscripts = RValue(values, type);
-          borrowedSubscripts = RValue(values, type);
+          subscripts = RValue::withPreExplodedElements(values, type);
+          borrowedSubscripts = RValue::withPreExplodedElements(values, type);
           optSubscripts = &borrowedSubscripts;
         }
         return new GetterSetterComponent(decl, IsSuper, IsDirectAccessorUse,
@@ -957,7 +957,7 @@ namespace {
         auto rawPointerTy = SILType::getRawPointerType(ctx);
 
         // The callback is a BB argument from the switch_enum.
-        SILValue callback = writebackBB->createArgument(rawPointerTy);
+        SILValue callback = writebackBB->createPHIArgument(rawPointerTy);
 
         // Cast the callback to the correct polymorphic function type.
         auto origCallbackFnType = gen.SGM.Types.getMaterializeForSetCallbackType(
@@ -966,7 +966,7 @@ namespace {
         callback = gen.B.createPointerToThinFunction(loc, callback, origCallbackType);
 
         auto substCallbackFnType = origCallbackFnType->substGenericArgs(
-            M, M.getSwiftModule(), substitutions);
+            M, substitutions);
         auto substCallbackType = SILType::getPrimitiveObjectType(substCallbackFnType);
         auto metatypeType = substCallbackFnType->getParameters().back().getSILType();
 
@@ -1250,7 +1250,7 @@ namespace {
       printBase(OS, "AddressorComponent");
     }
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 RValue
 TranslationPathComponent::get(SILGenFunction &gen, SILLocation loc,
@@ -1407,7 +1407,7 @@ namespace {
       OS << "OwnershipComponent(...)\n";
     }
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 LValue LValue::forValue(ManagedValue value,
                         CanType substFormalType) {

@@ -27,16 +27,8 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+
 using namespace swift;
-
-void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
-  assert(this != RHS && "Cannot RAUW a value with itself");
-  while (!use_empty()) {
-    Operand *Op = *use_begin();
-    Op->set(RHS);
-  }
-}
-
 
 SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   // Unique these.

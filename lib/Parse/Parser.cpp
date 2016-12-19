@@ -41,7 +41,7 @@ namespace {
     Parser &P;
   public:
     PrettyStackTraceParser(Parser &P) : P(P) {}
-    void print(llvm::raw_ostream &out) const {
+    void print(llvm::raw_ostream &out) const override {
       out << "With parser at source location: ";
       P.Tok.getLoc().print(out, P.Context.SourceMgr);
       out << '\n';
@@ -92,6 +92,11 @@ private:
     }
     if (!Parsed && ParserState.hasFunctionBodyState(AFD))
       TheParser.parseAbstractFunctionBodyDelayed(AFD);
+
+    SmallVector<Decl *, 2> scratch;
+    performDelayedConditionResolution(AFD, SF, scratch);
+    assert(scratch.empty());
+
     if (CodeCompletion)
       CodeCompletion->doneParsing();
   }
@@ -170,7 +175,7 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
                                 int BufID, std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
   SmallVector<Lexer::StringSegment, 4> Segments;
-  Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
+  Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
   for (unsigned i = 0, e = Segments.size(); i != e; ++i) {
     Lexer::StringSegment &Seg = Segments[i];
     bool isFirst = i == 0;
@@ -803,25 +808,6 @@ const LangOptions &ParserUnit::getLangOptions() const {
 
 SourceFile &ParserUnit::getSourceFile() {
   return *Impl.SF;
-}
-
-ConditionalCompilationExprState
-swift::operator&&(ConditionalCompilationExprState lhs,
-                  ConditionalCompilationExprState rhs) {
-  return {lhs.isConditionActive() && rhs.isConditionActive(),
-          ConditionalCompilationExprKind::Binary};
-}
-
-ConditionalCompilationExprState
-swift::operator||(ConditionalCompilationExprState lhs,
-                  ConditionalCompilationExprState rhs) {
-  return {lhs.isConditionActive() || rhs.isConditionActive(),
-          ConditionalCompilationExprKind::Binary};
-}
-
-ConditionalCompilationExprState
-swift::operator!(ConditionalCompilationExprState state) {
-  return {!state.isConditionActive(), state.getKind()};
 }
 
 ParsedDeclName swift::parseDeclName(StringRef name) {

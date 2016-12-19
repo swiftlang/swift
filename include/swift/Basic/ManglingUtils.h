@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -205,7 +205,7 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
       if (Idx < End - 2) {
         M.Buffer << (char)(Repl.WordIdx + 'a');
       } else {
-        // The last word substitution is a captial letter.
+        // The last word substitution is a capital letter.
         M.Buffer << (char)(Repl.WordIdx + 'A');
         if (Pos == ident.size())
           M.Buffer << '0';

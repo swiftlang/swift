@@ -67,15 +67,11 @@ namespace {
                        }) == Result.end())
         return;
 
-      bool anyRemoved = false;
-
       // Remove any overridden declarations from the found-declarations set.
-      if (removeOverriddenDecls(FoundDecls))
-        anyRemoved = true;
+      removeOverriddenDecls(FoundDecls);
 
       // Remove any shadowed declarations from the found-declarations set.
-      if (removeShadowedDecls(FoundDecls, DC->getParentModule(), &TC))
-        anyRemoved = true;
+      removeShadowedDecls(FoundDecls, DC->getParentModule(), &TC);
 
       // Filter out those results that have been removed from the
       // found-declarations set.
@@ -179,7 +175,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
@@ -496,7 +492,7 @@ namespace {
       DelegatingLazyResolver::resolveDeclSignature(VD);
     }
   };
-}
+} // end anonymous namespace
 
 void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         Type baseTypeOrNull,

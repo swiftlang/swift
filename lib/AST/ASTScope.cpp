@@ -865,14 +865,11 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   if (decl->isImplicit()) return nullptr;
 
   // Accessors are always nested within their abstract storage declaration.
-  bool isAccessor = false;
   if (auto func = dyn_cast<FuncDecl>(decl)) {
-    if (func->isAccessor()) {
-      isAccessor = true;
-      if (!parentDirectDescendedFromAbstractStorageDecl(
-             parent, func->getAccessorStorageDecl()))
-        return nullptr;
-    }
+    if (func->isAccessor() &&
+        !parentDirectDescendedFromAbstractStorageDecl(
+            parent, func->getAccessorStorageDecl()))
+      return nullptr;
   }
 
   ASTContext &ctx = decl->getASTContext();
@@ -1164,7 +1161,7 @@ static SmallVector<ClosureExpr *, 4> findClosures(Expr *expr) {
   public:
     ClosureFinder(SmallVectorImpl<ClosureExpr *> &closures) : closures(closures) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
         closures.push_back(closure);
         return { false, E };
@@ -1173,21 +1170,21 @@ static SmallVector<ClosureExpr *, 4> findClosures(Expr *expr) {
       return { true, E };
     }
 
-    virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       return { false, S };
     }
 
-    virtual std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
       return { false, P };
     }
 
-    virtual bool walkToDeclPre(Decl *D) override { return false; }
+    bool walkToDeclPre(Decl *D) override { return false; }
 
-    virtual bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
 
-    virtual bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
 
-    virtual bool walkToParameterListPre(ParameterList *PL) override {
+    bool walkToParameterListPre(ParameterList *PL) override {
       return false;
     }
   };

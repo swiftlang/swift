@@ -78,7 +78,7 @@ namespace {
       return true;
     }
   };
-}
+} // end anonymous namespace
 
 /// Does the metatype for the given type have a known-singleton
 /// representation?
@@ -466,7 +466,7 @@ namespace {
       return handleAggWithReference(type);
     }
   };
-}
+} // end anonymous namespace
 
 static LoweredTypeKind classifyType(CanType type, SILModule &M,
                                     CanGenericSignature sig,
@@ -1188,7 +1188,7 @@ namespace {
       return new (TC, Dependent) LoadableEnumTypeLowering(enumType);
     }
   };
-}
+} // end anonymous namespace
 
 TypeConverter::TypeConverter(SILModule &m)
   : M(m), Context(m.getASTContext()) {
@@ -1582,27 +1582,34 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      AbstractFunctionDecl *AFD,
                                                      unsigned DefaultArgIndex,
                                                      ASTContext &context) {
-  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second->getCanonicalType();
+  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second;
   assert(resultTy && "Didn't find default argument?");
-  
+
+  // The result type might be written in terms of type parameters
+  // that have been made fully concrete.
+  CanType canResultTy;
+  if (auto *sig = AFD->getGenericSignature())
+    canResultTy = sig->getCanonicalTypeInContext(resultTy,
+                                                 *TC.M.getSwiftModule());
+  else
+    canResultTy = resultTy->getCanonicalType();
+
   // Get the generic signature from the surrounding context.
   auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
   CanGenericSignature sig;
-  if (auto genTy = funcInfo.FormalInterfaceType->getAs<GenericFunctionType>()) {
+  if (auto genTy = funcInfo.FormalInterfaceType->getAs<GenericFunctionType>())
     sig = genTy->getGenericSignature()->getCanonicalSignature();
-    resultTy = ArchetypeBuilder::mapTypeOutOfContext(
-        TC.M.getSwiftModule(),
-        funcInfo.GenericEnv,
-        resultTy)->getCanonicalType();
+
+  if (sig) {
+    return cast<GenericFunctionType>(
+        GenericFunctionType::get(sig,
+                                 TupleType::getEmpty(context),
+                                 canResultTy,
+                                 AnyFunctionType::ExtInfo())
+            ->getCanonicalType());
   }
   
-  if (sig)
-    return CanGenericFunctionType::get(sig,
-                                       TupleType::getEmpty(context),
-                                       resultTy,
-                                       AnyFunctionType::ExtInfo());
-  
-  return CanFunctionType::get(TupleType::getEmpty(context), resultTy);
+  return CanFunctionType::get(TupleType::getEmpty(context), canResultTy);
 }
 
 /// Get the type of a stored property initializer, () -> T.
@@ -2358,4 +2365,99 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
   }
 
   return ABIDifference::Trivial;
+}
+
+void canonicalizeSubstitutions(MutableArrayRef<Substitution> subs) {
+  for (auto &sub : subs) {
+    sub = Substitution(sub.getReplacement()->getCanonicalType(),
+                       sub.getConformances());
+  }
+}
+
+CanSILBoxType
+TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
+                                             CanType loweredInterfaceType,
+                                             bool isMutable) {
+  auto &C = M.getASTContext();
+  CanGenericSignature signature;
+  if (auto sig = captured->getDeclContext()->getGenericSignatureOfContext())
+    signature = sig->getCanonicalSignature();
+  
+  // If the type is not dependent at all, we can form a concrete box layout.
+  // We don't need to capture the generic environment.
+  if (!loweredInterfaceType->hasTypeParameter()) {
+    auto layout = SILLayout::get(C, nullptr,
+                                 SILField(loweredInterfaceType, isMutable));
+    return SILBoxType::get(C, layout, {});
+  }
+  
+  // Otherwise, the layout needs to capture the generic environment of its
+  // originating scope.
+  // TODO: We could conceivably minimize the captured generic environment to
+  // only the parts used by the captured variable.
+  
+  auto layout = SILLayout::get(C, signature,
+                               SILField(loweredInterfaceType, isMutable));
+  
+  // Instantiate the layout with identity substitutions.
+  SmallVector<Substitution, 4> genericArgs;
+  signature->getSubstitutions(*M.getSwiftModule(),
+    [&](SubstitutableType* type) -> Type {
+      return signature->getCanonicalTypeInContext(type,
+                                                  *M.getSwiftModule());
+    },
+    [](Type depTy, Type replacementTy, ProtocolType *conformedTy)
+    -> ProtocolConformanceRef {
+      return ProtocolConformanceRef(conformedTy->getDecl());
+    },
+    genericArgs);
+  canonicalizeSubstitutions(genericArgs);
+  
+  auto boxTy = SILBoxType::get(C, layout, genericArgs);
+#ifndef NDEBUG
+  // FIXME: Map the box type out of context when asserting the field so
+  // we don't need to push a GenericContextScope (which really ought to die).
+  auto loweredContextType = loweredInterfaceType;
+  auto contextBoxTy = boxTy;
+  if (signature) {
+    auto env = signature.getGenericEnvironment(*M.getSwiftModule());
+    loweredContextType = env->mapTypeIntoContext(M.getSwiftModule(),
+                                                 loweredContextType)
+                            ->getCanonicalType();
+    contextBoxTy = cast<SILBoxType>(
+      env->mapTypeIntoContext(M.getSwiftModule(), contextBoxTy)
+         ->getCanonicalType());
+  }
+  assert(contextBoxTy->getLayout()->getFields().size() == 1
+         && contextBoxTy->getFieldType(M, 0).getSwiftRValueType()
+             == loweredContextType
+         && "box field type doesn't match capture!");
+#endif
+  return boxTy;
+}
+
+CanSILBoxType
+TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
+                                           CanType loweredContextType,
+                                           GenericEnvironment *env,
+                                           bool isMutable) {
+  CanType loweredInterfaceType = loweredContextType;
+  if (env) {
+    if (auto homeSig = captured->getDeclContext()
+                               ->getGenericSignatureOfContext()) {
+      loweredInterfaceType = homeSig->getCanonicalTypeInContext(
+        env->mapTypeOutOfContext(loweredInterfaceType),
+        *M.getSwiftModule());
+    }
+  }
+  
+  auto boxType = getInterfaceBoxTypeForCapture(captured,
+                                               loweredInterfaceType,
+                                               isMutable);
+  if (env)
+    boxType = cast<SILBoxType>(
+      env->mapTypeIntoContext(M.getSwiftModule(), boxType)
+         ->getCanonicalType());
+  
+  return boxType;
 }

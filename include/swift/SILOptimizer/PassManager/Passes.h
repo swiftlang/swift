@@ -44,6 +44,9 @@ namespace swift {
   /// user code.
   void performSILDiagnoseUnreachable(SILModule *M);
 
+  /// \brief Remove dead functions from \p M.
+  void performSILDeadFunctionElimination(SILModule *M);
+
   /// \brief Link a SILFunction declaration to the actual definition in the
   /// serialized modules.
   ///
@@ -65,6 +68,10 @@ namespace swift {
 #include "Passes.def"
     invalidPassKind
   };
+
+  PassKind PassKindFromString(StringRef ID);
+  StringRef PassKindName(PassKind Kind);
+  StringRef PassKindID(PassKind Kind);
 
 #define PASS(ID, NAME, DESCRIPTION) SILTransform *create##ID();
 #include "Passes.def"

@@ -268,7 +268,7 @@ var computed_prop_with_init_1: X {
 // FIXME: Redundant error below
 var x2 { // expected-error{{computed property must have an explicit type}} expected-error{{type annotation missing in pattern}}
   get {
-    return _x
+    return _x // expected-error{{unexpected non-void return value in void function}}
   }
 }
 

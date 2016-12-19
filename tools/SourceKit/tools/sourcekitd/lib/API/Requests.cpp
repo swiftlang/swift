@@ -25,6 +25,8 @@
 #include "SourceKit/SwiftLang/Factory.h"
 
 #include "swift/Basic/DemangleWrappers.h"
+#include "swift/Basic/ManglingMacros.h"
+#include "swift/Basic/Mangler.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -58,7 +60,7 @@ public:
     return get();
   }
 };
-} // anonymous namespace.
+} // anonymous namespace
 
 static LazySKDUID RequestProtocolVersion("source.request.protocol_version");
 
@@ -1045,7 +1047,8 @@ public:
 static bool isSwiftPrefixed(StringRef MangledName) {
   if (MangledName.size() < 2)
     return false;
-  return (MangledName[0] == '_' && MangledName[1] == 'T');
+  return MangledName[0] == '_' &&
+         (MangledName[1] == 'T' || MangledName[1] == MANGLING_PREFIX_STR[1]);
 }
 
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
@@ -1095,7 +1098,7 @@ static std::string mangleSimpleClass(StringRef moduleName,
   typeNode->addChild(classNode);
   typeManglingNode->addChild(typeNode);
   globalNode->addChild(typeManglingNode);
-  return mangleNode(globalNode);
+  return mangleNode(globalNode, swift::NewMangling::useNewMangling());
 }
 
 static sourcekitd_response_t

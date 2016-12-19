@@ -414,7 +414,7 @@ struct ASTNodeBase {};
 
       // Check for type variables that escaped the type checker.
       if (type->hasTypeVariable()) {
-        Out << "a type variable escaped the type checker";
+        Out << "a type variable escaped the type checker\n";
         abort();
       }
 
@@ -451,11 +451,12 @@ struct ASTNodeBase {};
             Out << "AST verification error: archetype "
                 << archetype->getString() << " not allowed in this context\n";
 
-            auto knownDC = Ctx.ArchetypeContexts.find(parent);
-            if (knownDC != Ctx.ArchetypeContexts.end()) {
-              llvm::errs() << "archetype came from:\n";
-              knownDC->second->dumpContext();
-              llvm::errs() << "\n";
+            if (auto env = parent->getGenericEnvironment()) {
+              if (auto owningDC = env->getOwningDeclContext()) {
+                llvm::errs() << "archetype came from:\n";
+                owningDC->dumpContext();
+                llvm::errs() << "\n";
+              }
             }
 
             return true;
@@ -466,7 +467,7 @@ struct ASTNodeBase {};
             if (!nested.second)
               continue;
             
-            if (auto nestedType = nested.second.getAsConcreteType()) {
+            if (auto nestedType = nested.second) {
               if (nestedType->hasTypeParameter()) {
                 Out << "Nested type " << nested.first.str()
                     << " of archetype " << archetype->getString()
@@ -476,7 +477,7 @@ struct ASTNodeBase {};
               }
             }
 
-            verifyChecked(nested.second.getValue(), visitedArchetypes);
+            verifyChecked(nested.second, visitedArchetypes);
           }
         }
 
@@ -1497,7 +1498,6 @@ struct ASTNodeBase {};
         return TT->getElementType(i);
       };
 
-      unsigned varargsIndex = 0;
       Type varargsType;
       unsigned callerDefaultArgIndex = 0;
       for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
@@ -1505,7 +1505,6 @@ struct ASTNodeBase {};
         if (subElem == TupleShuffleExpr::DefaultInitialize)
           continue;
         if (subElem == TupleShuffleExpr::Variadic) {
-          varargsIndex = i;
           varargsType = TT->getElement(i).getVarargBaseTy();
           break;
         }
@@ -1705,7 +1704,7 @@ struct ASTNodeBase {};
 
       // Variables must have materializable type, unless they are parameters,
       // in which case they must either have l-value type or be anonymous.
-      if (!var->getType()->isMaterializable()) {
+      if (!var->getInterfaceType()->isMaterializable()) {
         if (!isa<ParamDecl>(var)) {
           Out << "Non-parameter VarDecl has non-materializable type: ";
           var->getType().print(Out);
@@ -1713,7 +1712,7 @@ struct ASTNodeBase {};
           abort();
         }
 
-        if (!var->getType()->is<InOutType>() && var->hasName()) {
+        if (!var->getInterfaceType()->is<InOutType>() && var->hasName()) {
           Out << "ParamDecl may only have non-materializable tuple type "
                  "when it is anonymous: ";
           var->getType().print(Out);
@@ -1725,7 +1724,7 @@ struct ASTNodeBase {};
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
       if (var->getAttrs().hasAttribute<OwnershipAttr>() !=
-          isa<ReferenceStorageType>(var->getType().getPointer())) {
+          isa<ReferenceStorageType>(var->getInterfaceType().getPointer())) {
         if (var->getAttrs().hasAttribute<OwnershipAttr>()) {
           Out << "VarDecl has an ownership attribute, but its type"
                  " is not a ReferenceStorageType: ";
@@ -1733,9 +1732,61 @@ struct ASTNodeBase {};
           Out << "VarDecl has no ownership attribute, but its type"
                  " is a ReferenceStorageType: ";
         }
-        var->getType().print(Out);
+        var->getInterfaceType().print(Out);
         abort();
       }
+
+      Type typeForAccessors =
+          var->getInterfaceType()->getReferenceStorageReferent();
+      typeForAccessors =
+          ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
+                                               typeForAccessors);
+      if (const FuncDecl *getter = var->getGetter()) {
+        if (getter->getParameterLists().back()->size() != 0) {
+          Out << "property getter has parameters\n";
+          abort();
+        }
+        Type getterResultType = getter->getResultInterfaceType();
+        getterResultType =
+            ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
+                                                 getterResultType);
+        if (!getterResultType->isEqual(typeForAccessors)) {
+          Out << "property and getter have mismatched types: '";
+          typeForAccessors.print(Out);
+          Out << "' vs. '";
+          getterResultType.print(Out);
+          Out << "'\n";
+          abort();
+        }
+      }
+
+      if (const FuncDecl *setter = var->getSetter()) {
+        if (!setter->getResultInterfaceType()->isVoid()) {
+          Out << "property setter has non-Void result type\n";
+          abort();
+        }
+        if (setter->getParameterLists().back()->size() == 0) {
+          Out << "property setter has no parameters\n";
+          abort();
+        }
+        if (setter->getParameterLists().back()->size() != 1) {
+          Out << "property setter has 2+ parameters\n";
+          abort();
+        }
+        const ParamDecl *param = setter->getParameterLists().back()->get(0);
+        Type paramType = param->getInterfaceType();
+        paramType = ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
+                                                         paramType);
+        if (!paramType->isEqual(typeForAccessors)) {
+          Out << "property and setter param have mismatched types: '";
+          typeForAccessors.print(Out);
+          Out << "' vs. '";
+          paramType.print(Out);
+          Out << "'\n";
+          abort();
+        }
+      }
+
       verifyCheckedBase(var);
     }
 
@@ -2005,7 +2056,7 @@ struct ASTNodeBase {};
     void verifyChecked(ConstructorDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
 
-      auto *ND = CD->getExtensionType()->getNominalOrBoundGenericNominal();
+      auto *ND = CD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
       if (!isa<ClassDecl>(ND) && !isa<StructDecl>(ND) && !isa<EnumDecl>(ND) &&
           !isa<ProtocolDecl>(ND) && !CD->isInvalid()) {
         Out << "ConstructorDecls outside structs, classes or enums "
@@ -2188,7 +2239,7 @@ struct ASTNodeBase {};
     void verifyChecked(DestructorDecl *DD) {
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
-      auto *ND = DD->getExtensionType()->getNominalOrBoundGenericNominal();
+      auto *ND = DD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
       if (!isa<ClassDecl>(ND) && !DD->isInvalid()) {
         Out << "DestructorDecls outside classes should be marked invalid";
         abort();
@@ -2753,7 +2804,7 @@ struct ASTNodeBase {};
       }
     }
   };
-}
+} // end anonymous namespace
 
 void swift::verify(SourceFile &SF) {
 #if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
