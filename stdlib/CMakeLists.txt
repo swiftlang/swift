@@ -2,7 +2,8 @@
 
 
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
-  if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+  if((NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang") AND
+     (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang"))
     message(FATAL_ERROR "Building the swift runtime is not supported with ${CMAKE_C_COMPILER_ID}. Use the just-built clang instead.")
   else()
     message(WARNING "Building the swift runtime using the host compiler, and not the just-built clang.")
