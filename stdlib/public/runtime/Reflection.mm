@@ -180,7 +180,8 @@ extern "C"
 const Metadata *swift_MagicMirrorData_valueType(HeapObject *owner,
                                                 const OpaqueValue *value,
                                                 const Metadata *type) {
-  return swift_getDynamicType(const_cast<OpaqueValue*>(value), type);
+  return swift_getDynamicType(const_cast<OpaqueValue*>(value), type,
+                              /*existential metatype*/ true);
 }
 
 #if SWIFT_OBJC_INTEROP
