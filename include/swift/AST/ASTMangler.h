@@ -229,8 +229,6 @@ protected:
     appendType(type);
     return finalize();
   }
-
-  static bool checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params);
 };
 
 } // end namespace NewMangling
