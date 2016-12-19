@@ -236,7 +236,7 @@ extension TimeZone : CustomStringConvertible, CustomDebugStringConvertible, Cust
         var c: [(label: String?, value: Any)] = []
         c.append((label: "identifier", value: identifier))
         c.append((label: "kind", value: _kindDescription))
-        c.append((label: "abbreviation", value: abbreviation()))
+        c.append((label: "abbreviation", value: abbreviation() as Any))
         c.append((label: "secondsFromGMT", value: secondsFromGMT()))
         c.append((label: "isDaylightSavingTime", value: isDaylightSavingTime()))
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)

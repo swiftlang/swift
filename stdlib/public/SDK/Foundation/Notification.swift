@@ -44,7 +44,7 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
     }
     
     public var description: String {
-        return "name = \(name.rawValue), object = \(object), userInfo = \(userInfo)"
+        return "name = \(name.rawValue), object = \(object as Any), userInfo = \(userInfo as Any)"
     }
     
     public var debugDescription: String {
