@@ -326,7 +326,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
           // Enable modules
           "-fmodules",
-          "-fmodules-validate-system-headers",
           "-Werror=non-modular-include-in-framework-module",
           // Enable implicit module maps (implied by "-fmodules")
           "-fimplicit-module-maps",
@@ -482,6 +481,10 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     invocationArgStrs.push_back("-fapinotes-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
+  }
+
+  if (!importerOpts.DisableModulesValidateSystemHeaders) {
+    invocationArgStrs.push_back("-fmodules-validate-system-headers");
   }
 
   if (importerOpts.DetailedPreprocessingRecord) {
