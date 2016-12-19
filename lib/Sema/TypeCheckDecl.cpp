@@ -6075,9 +6075,10 @@ public:
     // If the overridden method is declared in a Swift Class Declaration,
     // dispatch will use table dispatch. If the override is in an extension
     // warn, since it is not added to the class vtable.
+    //
     // FIXME: Only warn if the extension is in another module, and if
     // it is in the same module, update the vtable.
-    if (auto baseDecl = dyn_cast<ClassDecl>(base->getDeclContext())) {
+    if (auto *baseDecl = dyn_cast<ClassDecl>(base->getDeclContext())) {
       if (baseDecl->hasKnownSwiftImplementation() && 
           !base->isDynamic() &&
           override->getDeclContext()->isExtensionContext()) {
