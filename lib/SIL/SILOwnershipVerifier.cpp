@@ -70,17 +70,17 @@ class OwnershipCompatibilityUseChecker
 public:
   OwnershipCompatibilityUseChecker(const Operand &Op) : Op(Op) {}
 
-  SILValue getValue() const { return Op.get(); }
+  SILValue getValue() { return Op.get(); }
 
-  ValueOwnershipKind getOwnershipKind() const {
+  ValueOwnershipKind getOwnershipKind() {
     return getValue().getOwnershipKind();
   }
 
-  unsigned getOperandIndex() const { return Op.getOperandNumber(); }
+  unsigned getOperandIndex() { return Op.getOperandNumber(); }
 
-  SILType getType() const { return Op.get()->getType(); }
+  SILType getType() { return Op.get()->getType(); }
 
-  bool compatibleWithOwnership(ValueOwnershipKind Kind) const {
+  bool compatibleWithOwnership(ValueOwnershipKind Kind) {
     return compatibleOwnershipKinds(getOwnershipKind(), Kind);
   }
 
@@ -91,11 +91,18 @@ public:
     llvm_unreachable("triggering standard assertion failure routine");
   }
 
-  void check(SILInstruction *User) {
-    if (visit(User).HasCompatibleOwnership) {
-      return;
+  /// Check if \p User as compatible ownership with the SILValue that we are
+  /// checking.
+  ///
+  /// \returns true if the user is a use that must be checked for dataflow
+  /// violations.
+  bool check(SILInstruction *User) {
+    auto Result = visit(User);
+    if (!Result.HasCompatibleOwnership) {
+      error(User);
     }
-    error(User);
+
+    return Result.ShouldCheckForDataflowViolations;
   }
 
   OwnershipUseCheckerResult visitValueBase(ValueBase *) {
@@ -294,12 +301,14 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyUnownedValue)
 FORWARD_OWNERSHIP_INST(Tuple)
 FORWARD_OWNERSHIP_INST(Struct)
 FORWARD_OWNERSHIP_INST(Enum)
+// All of these should really have take falgs and be guaranteed otherwise.
 FORWARD_OWNERSHIP_INST(Upcast)
 FORWARD_OWNERSHIP_INST(UncheckedRefCast)
 FORWARD_OWNERSHIP_INST(ConvertFunction)
 FORWARD_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_OWNERSHIP_INST(UnconditionalCheckedCast)
+// This should be based off of the argument.
 FORWARD_OWNERSHIP_INST(Branch)
 FORWARD_OWNERSHIP_INST(CondBranch)
 FORWARD_OWNERSHIP_INST(CheckedCastBranch)
@@ -353,7 +362,7 @@ OwnershipCompatibilityUseChecker::visitEndBorrowInst(EndBorrowInst *I) {
   // We do not consider the source to be a verified use for now.
   if (getOperandIndex() == EndBorrowInst::Src)
     return {true, false};
-  return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed), false};
+  return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed), true};
 }
 
 OwnershipUseCheckerResult
@@ -461,7 +470,230 @@ OwnershipCompatibilityUseChecker::visitStoreInst(StoreInst *I) {
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
     MarkDependenceInst *I) {
+  // This needs to be updated.
   llvm_unreachable("Not implemented");
+}
+
+//===----------------------------------------------------------------------===//
+//                         SILValueOwnershipChecker
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class SILValueOwnershipChecker {
+  /// The value whose ownership we will check.
+  SILValue Value;
+
+  // The worklist that we will use for our iterative reachability query.
+  llvm::SmallVector<SILBasicBlock *, 32> Worklist;
+
+  // The set of blocks with lifetime ending uses.
+  llvm::SmallPtrSet<SILBasicBlock *, 8> BlocksWithLifetimeEndingUses;
+
+  // The set of blocks with non-lifetime ending uses and the associated
+  // non-lifetime ending use SILInstruction.
+  llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *, 8>
+      BlocksWithNonLifetimeEndingUses;
+
+  // The blocks that we have already visited.
+  llvm::SmallPtrSet<SILBasicBlock *, 32> VisitedBlocks;
+
+  // A list of successor blocks that we must visit by the time the algorithm
+  // terminates.
+  llvm::SmallPtrSet<SILBasicBlock *, 8> SuccessorBlocksThatMustBeVisited;
+
+public:
+  SILValueOwnershipChecker(SILValue V) : Value(V) {}
+
+  ~SILValueOwnershipChecker() = default;
+  SILValueOwnershipChecker(SILValueOwnershipChecker &) = delete;
+  SILValueOwnershipChecker(SILValueOwnershipChecker &&) = delete;
+
+  void check() {
+    // First check that our uses have coherent ownership. If after evaluating
+    // the ownership we do not need to check dataflow (due to performs
+    // ValueOwnershipKind::None), then bail.
+    if (!checkUses())
+      return;
+    checkDataflow();
+  }
+
+private:
+  bool checkUses();
+  void checkDataflow();
+};
+
+} // end anonymous namespace
+
+bool SILValueOwnershipChecker::checkUses() {
+  // First go through V and gather up its uses. While we do this we:
+  //
+  // 1. Verify that none of the uses are in the same block. This would be an
+  // overconsume so in this case we assert.
+  // 2. Verify that the uses are compatible with our ownership convention.
+  llvm::SmallVector<SILInstruction *, 16> LifetimeEndingUsers;
+  llvm::SmallVector<SILInstruction *, 16> NonLifetimeEndingUsers;
+  for (Operand *Op : Value->getUses()) {
+    auto *User = Op->getUser();
+    if (OwnershipCompatibilityUseChecker(*Op).check(User)) {
+      LifetimeEndingUsers.push_back(User);
+    } else {
+      NonLifetimeEndingUsers.push_back(User);
+    }
+  }
+
+  for (SILInstruction *User : NonLifetimeEndingUsers) {
+    auto *UserBlock = User->getParent();
+    // First try to associate User with User->getParent().
+    auto Result =
+        BlocksWithNonLifetimeEndingUses.insert(std::make_pair(UserBlock, User));
+
+    // If the insertion succeeds, then we know that there is no more work to
+    // be done, so process the next use.
+    if (Result.second)
+      continue;
+
+    // If the insertion fails, then we have at least two non-lifetime ending
+    // uses in the same block. Since we are performing a liveness type of
+    // dataflow, we only need the last non-lifetime ending use to show that all
+    // lifetime ending uses post dominate both. Thus, see if Use is after
+    // Result.first->second in the use list. If Use is not later, then we wish
+    // to keep the already mapped value, not use, so continue.
+    if (std::find_if(Result.first->second->getIterator(), UserBlock->end(),
+                     [&User](const SILInstruction &I) -> bool {
+                       return User == &I;
+                     }) == UserBlock->end()) {
+      continue;
+    }
+
+    // At this point, we know that Use is later in the Block than
+    // Result.first->second, so store Use instead.
+    Result.first->second = User;
+  }
+
+  for (SILInstruction *User : LifetimeEndingUsers) {
+    SILBasicBlock *UserBlock = User->getParent();
+    bool InsertedBlock = BlocksWithLifetimeEndingUses.insert(UserBlock).second;
+    if (!InsertedBlock) {
+      llvm::errs() << "Found over consume?!\n"
+                   << "Value: " << *Value << "User: " << *User << "Block:\n"
+                   << *UserBlock << "\n";
+      llvm_unreachable("triggering standard assertion failure routine");
+    }
+
+    auto Iter = BlocksWithNonLifetimeEndingUses.find(UserBlock);
+    if (Iter != BlocksWithNonLifetimeEndingUses.end()) {
+      SILInstruction *NonLifetimeEndingUser = Iter->second;
+      // Make sure that the non-lifetime ending use is before the lifetime
+      // ending use. Otherwise, we have a use after free.
+      if (std::find_if(
+              User->getIterator(), UserBlock->end(),
+              [&NonLifetimeEndingUser](const SILInstruction &I) -> bool {
+                return NonLifetimeEndingUser == &I;
+              }) != UserBlock->end()) {
+        llvm::errs() << "Found use after free?!\n"
+                     << "Value: " << *Value << "Consuming User: " << *User
+                     << "Non Consuming User: " << *Iter->second << "Block:\n"
+                     << *UserBlock << "\n";
+        llvm_unreachable("triggering standard assertion failure routine");
+      }
+
+      // Erase the use since we know that it is properly joint post-dominated.
+      BlocksWithNonLifetimeEndingUses.erase(Iter);
+    }
+
+    // Add the user block to the visited list so we do not try to add it to our
+    // must visit successor list.
+    VisitedBlocks.insert(UserBlock);
+
+    // Now add all predecessors of this block to the worklist.
+    for (auto *Preds : UserBlock->getPredecessorBlocks()) {
+      VisitedBlocks.insert(Preds);
+      Worklist.push_back(Preds);
+    }
+  }
+
+  return true;
+}
+
+void SILValueOwnershipChecker::checkDataflow() {
+  // Until the worklist is empty...
+  while (!Worklist.empty()) {
+    // Grab the next block to visit.
+    SILBasicBlock *BB = Worklist.pop_back_val();
+
+    // Then assert that this block is not a use containing block. If we are
+    // visiting a use-containing block, we have an over-consume.
+    bool IsBlockWithUses = BlocksWithLifetimeEndingUses.count(BB);
+    if (IsBlockWithUses) {
+      llvm::errs() << "Found over consume?!\n"
+                   << "Value: " << *Value << "Block:\n"
+                   << *BB << "\n";
+      llvm_unreachable("triggering standard assertion failure routine");
+    }
+
+    // Ok, now we know that we are not double-consuming. Update our data
+    // structures.
+
+    // First remove BB from the SuccessorBlocksThatMustBeVisited list. This
+    // ensures that when the algorithm terminates, we know that BB was not the
+    // beginning of a non-covered path to the exit.
+    SuccessorBlocksThatMustBeVisited.erase(BB);
+
+    // Then remove BB from BlocksWithNonLifetimeEndingUses so we know that
+    // this block was properly joint post-dominated by our lifetime ending
+    // users.
+    BlocksWithNonLifetimeEndingUses.erase(BB);
+
+    // Ok, now we know that we do not have an overconsume. So now we need to
+    // update our state for our successors to make sure by the end of the block,
+    // we visit them.
+    for (SILBasicBlock *SuccBlock : BB->getSuccessorBlocks()) {
+      // If we already visited the successor, there is nothing to do since we
+      // already visited the successor.
+      if (VisitedBlocks.count(SuccBlock))
+        continue;
+
+      // Otherwise, add the successor to our SuccessorBlocksThatMustBeVisited
+      // set to ensure that we assert if we do not visit it by the end of the
+      // algorithm.
+      SuccessorBlocksThatMustBeVisited.insert(SuccBlock);
+    }
+
+    // Then add each predecessor of this block to the worklist if we have not
+    // visited it yet.
+    for (auto *PredBlock : BB->getPredecessorBlocks()) {
+      if (VisitedBlocks.count(PredBlock))
+        continue;
+      Worklist.push_back(PredBlock);
+    }
+  }
+
+  // Make sure that we visited all successor blocks that we needed to visit to
+  // make sure we didn't leak.
+  if (!SuccessorBlocksThatMustBeVisited.empty()) {
+    llvm::errs()
+        << "Error! Found a leak due to a consuming post-dominance failure!\n"
+        << "    Value: " << *Value << "    Post Dominating Failure Blocks:\n";
+    for (auto *BB : SuccessorBlocksThatMustBeVisited) {
+      llvm::errs() << *BB;
+    }
+    llvm_unreachable("triggering standard assertion failure routine");
+  }
+
+  // Make sure that we do not have any lifetime ending uses left to visit. If we
+  // do, then these non lifetime ending uses must be outside of our "alive"
+  // blocks implying a use-after free.
+  if (!BlocksWithNonLifetimeEndingUses.empty()) {
+    llvm::errs()
+        << "Found use after free due to unvisited non lifetime ending uses?!\n"
+        << "Value: " << *Value << "    Remaining Users:\n";
+    for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
+      llvm::errs() << "User:" << *Pair.second << "Block:\n"
+                   << *Pair.first << "\n";
+    }
+    llvm_unreachable("triggering standard assertion failure routine");
+  }
 }
 
 #endif
@@ -472,12 +704,18 @@ OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
 
 void SILInstruction::verifyOperandOwnership() const {
 #ifndef NDEBUG
-  // If SILOwnership is not enabled, do not perform actual verification.
+  // If SILOwnership is not enabled, do not perform verification.
   if (!getModule().getOptions().EnableSILOwnership)
     return;
   auto *Self = const_cast<SILInstruction *>(this);
   for (const Operand &Op : getAllOperands()) {
     OwnershipCompatibilityUseChecker(Op).check(Self);
   }
+#endif
+}
+
+void SILValue::verifyOwnership() const {
+#ifndef NDEBUG
+  SILValueOwnershipChecker(*this).check();
 #endif
 }

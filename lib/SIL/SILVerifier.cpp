@@ -437,6 +437,7 @@ public:
 
   void visitSILArgument(SILArgument *arg) {
     checkLegalType(arg->getFunction(), arg, nullptr);
+    checkValueBaseOwnership(arg);
   }
 
   void visitSILInstruction(SILInstruction *I) {
@@ -452,11 +453,27 @@ public:
     // Check ownership.
     SILFunction *F = I->getFunction();
     assert(F && "Expected value base with parent function");
+
+    // Check ownership.
+    checkValueBaseOwnership(I);
+  }
+
+  void checkValueBaseOwnership(ValueBase *V) {
+    // If ownership is not enabled, bail.
+    if (!isSILOwnershipEnabled())
+      return;
+
+    // If V does not have a value, bail.
+    if (!V->hasValue())
+      return;
+
+    SILFunction *F = V->getFunction();
+    assert(F && "Expected value base with parent function");
     // If we do not have qualified ownership, then do not verify value base
     // ownership.
     if (!F->hasQualifiedOwnership())
       return;
-    I->verifyOperandOwnership();
+    SILValue(V).verifyOwnership();
   }
 
   void checkSILInstruction(SILInstruction *I) {

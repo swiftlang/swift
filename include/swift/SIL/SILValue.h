@@ -264,6 +264,9 @@ public:
   /// An example of a SILValue without ownership semantics is a
   /// struct_element_addr.
   ValueOwnershipKind getOwnershipKind() const;
+
+  /// Verify that this SILValue and its uses respects ownership invariants.
+  void verifyOwnership() const;
 };
 
 /// A formal SIL reference to a value, suitable for use as a stored
