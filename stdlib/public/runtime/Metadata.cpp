@@ -2199,6 +2199,8 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
   case ProtocolClassConstraint::Any:
     return getOpaqueExistentialValueWitnesses(numWitnessTables);
   }
+
+  swift_unreachable("Unhandled ProtocolClassConstraint in switch.");
 }
 
 template<> ExistentialTypeRepresentation
@@ -2240,6 +2242,8 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
     return errorBox->isPureNSError();
   }
   }
+
+  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 template<> void
@@ -2289,6 +2293,8 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
     return errorBox->getValue();
   }
   }
+
+  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 template<> const Metadata *
@@ -2311,6 +2317,8 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
     return errorBox->getType();
   }
   }
+
+  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 template<> const WitnessTable *
@@ -2600,6 +2608,8 @@ Metadata::getClassObject() const {
   case MetadataKind::ErrorObject:
     return nullptr;
   }
+
+  swift_unreachable("Unhandled MetdataKind in switch.");
 }
 
 #ifndef NDEBUG
