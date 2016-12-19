@@ -181,7 +181,7 @@ void CapturePropagationCloner::cloneBlocks(
 
     SILArgument *Arg = OrigEntryBB->getArgument(ParamIdx);
 
-    SILValue MappedValue = ClonedEntryBB->createArgument(
+    SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
         remapType(Arg->getType()), Arg->getDecl());
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }

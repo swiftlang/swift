@@ -383,8 +383,7 @@ ValueOwnershipKindVisitor::visitSILUndef(SILUndef *Arg) {
 
 ValueOwnershipKind
 ValueOwnershipKindVisitor::visitSILPHIArgument(SILPHIArgument *Arg) {
-  // For now just return undef.
-  return ValueOwnershipKind::Any;
+  return Arg->getOwnershipKind();
 }
 
 ValueOwnershipKind

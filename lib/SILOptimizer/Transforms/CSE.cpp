@@ -601,7 +601,7 @@ namespace {
 static void updateBasicBlockArgTypes(SILBasicBlock *BB,
                                      const SubstitutionMap &TypeSubstMap) {
   // Check types of all BB arguments.
-  for (auto &Arg : BB->getArguments()) {
+  for (auto *Arg : BB->getPHIArguments()) {
     if (!Arg->getType().getSwiftRValueType()->hasOpenedExistential())
       continue;
     // Type of this BB argument uses an opened existential.
@@ -622,10 +622,12 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
     // Then replace all uses by an undef.
     Arg->replaceAllUsesWith(SILUndef::get(Arg->getType(), BB->getModule()));
     // Replace the type of the BB argument.
-    BB->replaceArgument(Arg->getIndex(), NewArgType, Arg->getDecl());
+    auto *NewArg = BB->replacePHIArgument(Arg->getIndex(), NewArgType,
+                                          Arg->getOwnershipKind(),
+                                          Arg->getDecl());
     // Restore all uses to refer to the BB argument with updated type.
     for (auto ArgUse : OriginalArgUses) {
-      ArgUse->set(Arg);
+      ArgUse->set(NewArg);
     }
   }
 }

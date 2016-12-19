@@ -197,7 +197,12 @@ protected:
 };
 
 class SILPHIArgument : public SILArgument {
+  ValueOwnershipKind Kind;
+
 public:
+  /// Return the static ownership kind associated with this SILPHIArgument.
+  ValueOwnershipKind getOwnershipKind() const { return Kind; }
+
   /// Returns the incoming SILValue from the \p BBIndex predecessor of this
   /// argument's parent BB. If the routine fails, it returns an empty SILValue.
   /// Note that for some predecessor terminators the incoming value is not
@@ -240,17 +245,20 @@ public:
 
 private:
   friend SILBasicBlock;
-  SILPHIArgument(SILBasicBlock *ParentBB, SILType Ty,
+  SILPHIArgument(SILBasicBlock *ParentBB, SILType Ty, ValueOwnershipKind Kind,
                  const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILPHIArgument, ParentBB, Ty, D) {}
+      : SILArgument(ValueKind::SILPHIArgument, ParentBB, Ty, D), Kind(Kind) {}
   SILPHIArgument(SILBasicBlock *ParentBB, SILBasicBlock::arg_iterator Pos,
-                 SILType Ty, const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILPHIArgument, ParentBB, Pos, Ty, D) {}
+                 SILType Ty, ValueOwnershipKind Kind,
+                 const ValueDecl *D = nullptr)
+      : SILArgument(ValueKind::SILPHIArgument, ParentBB, Pos, Ty, D),
+        Kind(Kind) {}
 
   // A special constructor, only intended for use in
   // SILBasicBlock::replaceBBArg.
-  explicit SILPHIArgument(SILType Ty, const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILPHIArgument, Ty, D) {}
+  explicit SILPHIArgument(SILType Ty, ValueOwnershipKind Kind,
+                          const ValueDecl *D = nullptr)
+      : SILArgument(ValueKind::SILPHIArgument, Ty, D), Kind(Kind) {}
 };
 
 class SILFunctionArgument : public SILArgument {

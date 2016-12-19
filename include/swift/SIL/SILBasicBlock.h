@@ -169,27 +169,63 @@ public:
   const SILArgument *getArgument(unsigned i) const { return ArgumentList[i]; }
   SILArgument *getArgument(unsigned i) { return ArgumentList[i]; }
 
-  /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and ValueDecl
-  /// \p D.
-  SILArgument *replaceArgument(unsigned i, SILType Ty,
-                               const ValueDecl *D = nullptr);
+  void cloneArgumentList(SILBasicBlock *Other);
 
   /// Erase a specific argument from the arg list.
   void eraseArgument(int Index);
 
+  /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
+  /// ValueDecl
+  /// \p D.
+  SILFunctionArgument *replaceFunctionArgument(unsigned i, SILType Ty,
+                                               const ValueDecl *D = nullptr);
+
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
-  SILArgument *createArgument(SILType Ty, const ValueDecl *D = nullptr);
+  SILFunctionArgument *createFunctionArgument(SILType Ty,
+                                              const ValueDecl *D = nullptr);
 
-  /// Insert a new SILArgument with type \p Ty and \p Decl at position \p Pos.
-  SILArgument *insertArgument(arg_iterator Pos, SILType Ty,
-                              const ValueDecl *D = nullptr);
+  /// Insert a new SILFunctionArgument with type \p Ty and \p Decl at position
+  /// \p Pos.
+  SILFunctionArgument *insertFunctionArgument(arg_iterator Pos, SILType Ty,
+                                              const ValueDecl *D = nullptr);
 
-  SILArgument *insertArgument(unsigned Index, SILType Ty,
-                              const ValueDecl *D = nullptr) {
+  SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
+                                              const ValueDecl *D = nullptr) {
     arg_iterator Pos = ArgumentList.begin();
     std::advance(Pos, Index);
-    return insertArgument(Pos, Ty, D);
+    return insertFunctionArgument(Pos, Ty, D);
+  }
+
+  /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
+  /// ValueDecl
+  /// \p D.
+  SILPHIArgument *
+  replacePHIArgument(unsigned i, SILType Ty,
+                     ValueOwnershipKind Kind = ValueOwnershipKind::Any,
+                     const ValueDecl *D = nullptr);
+
+  /// Allocate a new argument of type \p Ty and append it to the argument
+  /// list. Optionally you can pass in a value decl parameter.
+  SILPHIArgument *
+  createPHIArgument(SILType Ty,
+                    ValueOwnershipKind Kind = ValueOwnershipKind::Any,
+                    const ValueDecl *D = nullptr);
+
+  /// Insert a new SILPHIArgument with type \p Ty and \p Decl at position \p
+  /// Pos.
+  SILPHIArgument *
+  insertPHIArgument(arg_iterator Pos, SILType Ty,
+                    ValueOwnershipKind Kind = ValueOwnershipKind::Any,
+                    const ValueDecl *D = nullptr);
+
+  SILPHIArgument *
+  insertPHIArgument(unsigned Index, SILType Ty,
+                    ValueOwnershipKind Kind = ValueOwnershipKind::Any,
+                    const ValueDecl *D = nullptr) {
+    arg_iterator Pos = ArgumentList.begin();
+    std::advance(Pos, Index);
+    return insertPHIArgument(Pos, Ty, Kind, D);
   }
 
   /// \brief Remove all block arguments.

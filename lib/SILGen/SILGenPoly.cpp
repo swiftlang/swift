@@ -771,7 +771,7 @@ void SILGenFunction::collectThunkParams(SILLocation loc,
   // Add the indirect results.
   for (auto result : F.getLoweredFunctionType()->getIndirectResults()) {
     auto paramTy = F.mapTypeIntoContext(result.getSILType());
-    SILArgument *arg = F.begin()->createArgument(paramTy);
+    SILArgument *arg = F.begin()->createFunctionArgument(paramTy);
     (void)arg;
   }
 
@@ -779,7 +779,7 @@ void SILGenFunction::collectThunkParams(SILLocation loc,
   auto paramTypes = F.getLoweredFunctionType()->getParameters();
   for (auto param : paramTypes) {
     auto paramTy = F.mapTypeIntoContext(param.getSILType());
-    auto paramValue = F.begin()->createArgument(paramTy);
+    auto paramValue = F.begin()->createFunctionArgument(paramTy);
     auto paramMV = manageParam(*this, loc, paramValue, param, allowPlusZero);
     params.push_back(paramMV);
   }

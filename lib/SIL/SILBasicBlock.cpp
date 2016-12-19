@@ -103,25 +103,36 @@ void SILBasicBlock::eraseFromParent() {
   getParent()->getBlocks().erase(this);
 }
 
+void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
+  assert(Other->isEntry() == isEntry() &&
+         "Expected to both blocks to be entries or not");
+  if (isEntry()) {
+    for (auto *FuncArg : Other->getFunctionArguments()) {
+      createFunctionArgument(FuncArg->getType(), FuncArg->getDecl());
+    }
+    return;
+  }
+
+  for (auto *PHIArg : Other->getPHIArguments()) {
+    createPHIArgument(PHIArg->getType(), PHIArg->getOwnershipKind(),
+                      PHIArg->getDecl());
+  }
+}
+
 /// Replace the ith BB argument with a new one with type Ty (and optional
 /// ValueDecl D).
-SILArgument *SILBasicBlock::replaceArgument(unsigned i, SILType Ty,
-                                            const ValueDecl *D) {
+SILFunctionArgument *
+SILBasicBlock::replaceFunctionArgument(unsigned i, SILType Ty,
+                                       const ValueDecl *D) {
+  assert(isEntry() && "Function Arguments can only be in the entry block");
   SILModule &M = getParent()->getModule();
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
-  bool IsFunctionArg =
-      ArgumentList[i]->getKind() == ValueKind::SILFunctionArgument;
 
   // Notify the delete handlers that this argument is being deleted.
   M.notifyDeleteHandlers(ArgumentList[i]);
 
-  SILArgument *NewArg;
-  if (IsFunctionArg) {
-    NewArg = new (M) SILFunctionArgument(Ty, D);
-  } else {
-    NewArg = new (M) SILPHIArgument(Ty, D);
-  }
+  SILFunctionArgument *NewArg = new (M) SILFunctionArgument(Ty, D);
   NewArg->setParent(this);
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
@@ -131,17 +142,54 @@ SILArgument *SILBasicBlock::replaceArgument(unsigned i, SILType Ty,
   return NewArg;
 }
 
-SILArgument *SILBasicBlock::createArgument(SILType Ty, const ValueDecl *D) {
-  if (isEntry())
-    return new (getModule()) SILFunctionArgument(this, Ty, D);
-  return new (getModule()) SILPHIArgument(this, Ty, D);
+SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,
+                                                           const ValueDecl *D) {
+  assert(isEntry() && "Function Arguments can only be in the entry block");
+  return new (getModule()) SILFunctionArgument(this, Ty, D);
 }
 
-SILArgument *SILBasicBlock::insertArgument(arg_iterator Iter, SILType Ty,
-                                           const ValueDecl *D) {
-  if (isEntry())
-    return new (getModule()) SILFunctionArgument(this, Iter, Ty, D);
-  return new (getModule()) SILPHIArgument(this, Iter, Ty, D);
+SILFunctionArgument *SILBasicBlock::insertFunctionArgument(arg_iterator Iter,
+                                                           SILType Ty,
+                                                           const ValueDecl *D) {
+  assert(isEntry() && "Function Arguments can only be in the entry block");
+  return new (getModule()) SILFunctionArgument(this, Iter, Ty, D);
+}
+
+/// Replace the ith BB argument with a new one with type Ty (and optional
+/// ValueDecl D).
+SILPHIArgument *SILBasicBlock::replacePHIArgument(unsigned i, SILType Ty,
+                                                  ValueOwnershipKind Kind,
+                                                  const ValueDecl *D) {
+  assert(!isEntry() && "PHI Arguments can not be in the entry block");
+  SILModule &M = getParent()->getModule();
+
+  assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
+
+  // Notify the delete handlers that this argument is being deleted.
+  M.notifyDeleteHandlers(ArgumentList[i]);
+
+  SILPHIArgument *NewArg = new (M) SILPHIArgument(Ty, Kind, D);
+  NewArg->setParent(this);
+
+  // TODO: When we switch to malloc/free allocation we'll be leaking memory
+  // here.
+  ArgumentList[i] = NewArg;
+
+  return NewArg;
+}
+
+SILPHIArgument *SILBasicBlock::createPHIArgument(SILType Ty,
+                                                 ValueOwnershipKind Kind,
+                                                 const ValueDecl *D) {
+  assert(!isEntry() && "PHI Arguments can not be in the entry block");
+  return new (getModule()) SILPHIArgument(this, Ty, Kind, D);
+}
+
+SILPHIArgument *SILBasicBlock::insertPHIArgument(arg_iterator Iter, SILType Ty,
+                                                 ValueOwnershipKind Kind,
+                                                 const ValueDecl *D) {
+  assert(!isEntry() && "PHI Arguments can not be in the entry block");
+  return new (getModule()) SILPHIArgument(this, Iter, Ty, Kind, D);
 }
 
 void SILBasicBlock::eraseArgument(int Index) {

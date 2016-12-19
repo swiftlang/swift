@@ -564,7 +564,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
     auto makeParam = [&](unsigned index) -> SILArgument* {
       SILType type = gen.F.mapTypeIntoContext(
           callbackType->getParameters()[index].getSILType());
-      return gen.F.begin()->createArgument(type);
+      return gen.F.begin()->createFunctionArgument(type);
     };
 
     // Add arguments for all the parameters.

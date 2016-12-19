@@ -512,7 +512,7 @@ void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
   DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
   for (auto *Block : PhiBlocks)
-    Block->createArgument(ASI->getElementType());
+    Block->createPHIArgument(ASI->getElementType());
 }
 
 SILValue

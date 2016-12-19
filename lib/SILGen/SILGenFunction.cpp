@@ -696,7 +696,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
                                SmallVectorImpl<SILValue> &args,
                                CapturedValue capture) {
   auto addSILArgument = [&](SILType t, ValueDecl *d) {
-    args.push_back(gen.F.begin()->createArgument(t, d));
+    args.push_back(gen.F.begin()->createFunctionArgument(t, d));
   };
 
   auto *vd = capture.getDecl();
@@ -801,7 +801,7 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
     selfMetaTy = ArchetypeBuilder::mapTypeIntoContext(
         vd->getInnermostDeclContext(), selfMetaTy);
     auto metatypeVal =
-        F.begin()->createArgument(getLoweredLoadableType(selfMetaTy));
+        F.begin()->createFunctionArgument(getLoweredLoadableType(selfMetaTy));
     curriedArgs.push_back(metatypeVal);
 
   } else if (auto fd = dyn_cast<AbstractFunctionDecl>(vd)) {

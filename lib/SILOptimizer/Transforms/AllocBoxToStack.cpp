@@ -618,7 +618,7 @@ PromotedParamCloner::populateCloned() {
              && "promoting multi-field boxes not implemented yet");
       auto promotedTy = boxTy->getFieldType(Cloned->getModule(), 0);
       auto *promotedArg =
-          ClonedEntryBB->createArgument(promotedTy, (*I)->getDecl());
+          ClonedEntryBB->createFunctionArgument(promotedTy, (*I)->getDecl());
       PromotedParameters.insert(*I);
       
       // Map any projections of the box to the promoted argument.
@@ -630,8 +630,8 @@ PromotedParamCloner::populateCloned() {
       
     } else {
       // Create a new argument which copies the original argument.
-      SILValue MappedValue =
-          ClonedEntryBB->createArgument((*I)->getType(), (*I)->getDecl());
+      SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
+          (*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;

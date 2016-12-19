@@ -3944,7 +3944,11 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
       return true;
 
     BB = getBBForDefinition(BBName, NameLoc);
-    
+    // For now, since we always assume that PHIArguments have
+    // ValueOwnershipKind::Any, do not parse or do anything special. Eventually
+    // we will parse the convention.
+    bool IsEntry = BB->isEntry();
+
     // If there is a basic block argument list, process it.
     if (P.consumeIf(tok::l_paren)) {
       do {
@@ -3956,7 +3960,11 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
             P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
             parseSILType(Ty))
           return true;
-        auto Arg = BB->createArgument(Ty);
+        SILArgument *Arg;
+        if (IsEntry)
+          Arg = BB->createFunctionArgument(Ty);
+        else
+          Arg = BB->createPHIArgument(Ty);
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));
       

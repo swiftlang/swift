@@ -667,7 +667,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
       ResultBB = TAI->getNormalBB();
     else {
       ResultBB = B.getFunction().createBasicBlock();
-      ResultBB->createArgument(ResultTy);
+      ResultBB->createPHIArgument(ResultTy);
     }
 
     NormalBB = TAI->getNormalBB();
@@ -677,7 +677,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
       ErrorBB = TAI->getErrorBB();
     else {
       ErrorBB = B.getFunction().createBasicBlock();
-      ErrorBB->createArgument(TAI->getErrorBB()->getArgument(0)->getType());
+      ErrorBB->createPHIArgument(TAI->getErrorBB()->getArgument(0)->getType());
     }
 
     NewAI = B.createTryApply(AI.getLoc(), FRI, SubstCalleeSILType,
@@ -702,7 +702,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
       }
       NormalBB->getArgument(0)->replaceAllUsesWith(
           SILUndef::get(AI.getType(), Mod));
-      NormalBB->replaceArgument(0, ResultTy, nullptr);
+      NormalBB->replacePHIArgument(0, ResultTy);
     }
 
     // The result value is passed as a parameter to the normal block.
