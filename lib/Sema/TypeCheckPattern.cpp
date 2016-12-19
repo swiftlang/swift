@@ -499,6 +499,18 @@ public:
   //   of the type.
   Pattern *visitCallExpr(CallExpr *ce) {
     GenericTypeToArchetypeResolver resolver(DC);
+
+    // Swift3 used to ignore the last generics argument clause:
+    //   EnumTy.CaseVal<SomeType>()
+    // used to be wrongfully converted to
+    //   (pattern_enum_element type='EnumTy' EnumTy.CaseVal
+    //     (pattern_tuple type='()' names=))
+    if (!TC.Context.isSwiftVersion3()) {
+      // Specialized call are not allowed anyway.
+      // Let it be diagnosed as a expression.
+      if (isa<UnresolvedSpecializeExpr>(ce->getFn()))
+        return nullptr;
+    }
     
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ce->getFn()))
