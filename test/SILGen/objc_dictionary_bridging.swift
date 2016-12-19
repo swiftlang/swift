@@ -46,7 +46,7 @@ import gizmo
   var property: Dictionary<Foo, Foo> = [:]
 
   // Property getter
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC24objc_dictionary_bridging3Foog8propertyGVs10DictionaryS0_S0__ : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC24objc_dictionary_bridging3Foog8propertyGVs10DictionaryS0_S0__ : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
   // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foog8propertyGVs10DictionaryS0_S0__ : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
@@ -59,7 +59,7 @@ import gizmo
   // CHECK: } // end sil function '_TToFC24objc_dictionary_bridging3Foog8propertyGVs10DictionaryS0_S0__'
 
   // Property setter
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC24objc_dictionary_bridging3Foos8propertyGVs10DictionaryS0_S0__ : $@convention(objc_method) (NSDictionary, Foo) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC24objc_dictionary_bridging3Foos8propertyGVs10DictionaryS0_S0__ : $@convention(objc_method) (NSDictionary, Foo) -> ()
   // CHECK: bb0([[NSDICT:%[0-9]+]] : $NSDictionary, [[SELF:%[0-9]+]] : $Foo):
   // CHECK:   [[NSDICT_COPY:%.*]] = copy_value [[NSDICT]]
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -73,9 +73,9 @@ import gizmo
   // CHECK:   destroy_value [[SELF_COPY]]
   // CHECK:   return [[RESULT]] : $()
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC24objc_dictionary_bridging3Foog19nonVerbatimProperty{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC24objc_dictionary_bridging3Foog19nonVerbatimProperty{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC24objc_dictionary_bridging3Foos19nonVerbatimProperty{{.*}} : $@convention(objc_method) (NSDictionary, Foo) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC24objc_dictionary_bridging3Foos19nonVerbatimProperty{{.*}} : $@convention(objc_method) (NSDictionary, Foo) -> ()
   @objc var nonVerbatimProperty: Dictionary<String, Int> = [:]
 }
 
