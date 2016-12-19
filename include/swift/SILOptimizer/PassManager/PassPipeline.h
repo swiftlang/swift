@@ -41,14 +41,6 @@ enum class PassPipelineKind {
 };
 
 class SILPassPipelinePlan final {
-public:
-  enum class ExecutionKind {
-    Invalid,
-    OneIteration,
-    UntilFixPoint,
-  };
-
-private:
   std::vector<PassKind> Kinds;
   std::vector<SILPassPipeline> PipelineStages;
 
@@ -71,8 +63,7 @@ public:
   static SILPassPipelinePlan get##NAME##PassPipeline(SILOptions Options);
 #include "swift/SILOptimizer/PassManager/PassPipeline.def"
 
-  static SILPassPipelinePlan getPassPipelineForKinds(ExecutionKind ExecKind,
-                                                     ArrayRef<PassKind> Kinds);
+  static SILPassPipelinePlan getPassPipelineForKinds(ArrayRef<PassKind> Kinds);
   static SILPassPipelinePlan getPassPipelineFromFile(StringRef Filename);
 
   /// Our general format is as follows:
@@ -89,7 +80,7 @@ public:
 
   void print(llvm::raw_ostream &os);
 
-  void startPipeline(ExecutionKind ExecKind, StringRef Name = "");
+  void startPipeline(StringRef Name = "");
   using PipelineKindIterator = decltype(Kinds)::const_iterator;
   using PipelineKindRange = iterator_range<PipelineKindIterator>;
   iterator_range<PipelineKindIterator>
@@ -105,14 +96,12 @@ public:
 struct SILPassPipeline final {
   unsigned ID;
   StringRef Name;
-  SILPassPipelinePlan::ExecutionKind ExecutionKind;
   unsigned KindOffset;
 };
 
-inline void SILPassPipelinePlan::startPipeline(ExecutionKind ExecKind,
-                                               StringRef Name) {
+inline void SILPassPipelinePlan::startPipeline(StringRef Name) {
   PipelineStages.push_back(SILPassPipeline{
-      unsigned(PipelineStages.size()), Name, ExecKind, unsigned(Kinds.size())});
+      unsigned(PipelineStages.size()), Name, unsigned(Kinds.size())});
 }
 
 inline SILPassPipelinePlan::PipelineKindRange
@@ -132,12 +121,5 @@ SILPassPipelinePlan::getPipelinePasses(const SILPassPipeline &P) const {
 }
 
 } // end namespace swift
-
-namespace llvm {
-
-raw_ostream &operator<<(raw_ostream &os,
-                        swift::SILPassPipelinePlan::ExecutionKind ExecKind);
-
-} // end namespace llvm
 
 #endif

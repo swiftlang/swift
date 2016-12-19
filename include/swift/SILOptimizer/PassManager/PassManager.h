@@ -34,8 +34,6 @@ class SILTransform;
 
 /// \brief The SIL pass manager.
 class SILPassManager {
-  using ExecutionKind = SILPassPipelinePlan::ExecutionKind;
-
   /// The module that the pass manager will transform.
   SILModule *Mod;
 
@@ -112,9 +110,6 @@ public:
 
   /// \returns the module that the pass manager owns.
   SILModule *getModule() { return Mod; }
-
-  /// \brief Run the transformations on the module.
-  void run();
 
   /// \brief Run one iteration of the optimization pipeline.
   void runOneIteration();
@@ -219,22 +214,13 @@ public:
       for (PassKind Kind : Plan.getPipelinePasses(Pipeline)) {
         addPass(Kind);
       }
-      execute(Pipeline.ExecutionKind);
+      execute();
     }
   }
 
 private:
-  void execute(ExecutionKind K) {
-    switch (K) {
-    case ExecutionKind::OneIteration:
-      runOneIteration();
-      break;
-    case ExecutionKind::UntilFixPoint:
-      run();
-      break;
-    case ExecutionKind::Invalid:
-      llvm_unreachable("Invalid execution kind?!");
-    }
+  void execute() {
+    runOneIteration();
   }
 
   /// Add a pass of a specific kind.
