@@ -808,6 +808,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    relookupOptions |= NameLookupFlags::OnlyTypes;
     LookupResult inaccessibleResults =
         tc.lookupUnqualified(lookupDC, comp->getIdentifier(), comp->getIdLoc(),
                              relookupOptions);
@@ -899,10 +900,12 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     auto lazyResolver = tc.Context.getLazyResolver();
     if (auto superClass = parentType->getSuperclass(lazyResolver)) {
       if (superClass->isEqual(parentType)) {
-        auto decl = parentType->castTo<NominalType>()->getDecl();
-        tc.diagnose(decl->getLoc(), diag::circular_class_inheritance,
-                    decl->getNameStr());
-        return ErrorType::get(tc.Context);
+        auto decl = parentType->getAnyNominal();
+        if (decl) {
+          tc.diagnose(decl->getLoc(), diag::circular_class_inheritance,
+                      decl->getNameStr());
+          return ErrorType::get(tc.Context);
+        }
       }
     }
 
