@@ -1902,9 +1902,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             // FIXME: If the base is still a type variable, we can't tell
             // what to do here. Might have to try \c ArrayToPointer and make it
             // more robust.
-            bool isWrappedArray = isArrayType(simplifiedInoutBaseType);
-
-            if (isWrappedArray) {
+            if (isArrayType(simplifiedInoutBaseType)) {
               conversionsOrFixes.push_back(
                                      ConversionRestrictionKind::ArrayToPointer);
             }
@@ -2538,8 +2536,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   auto kind = getCheckedCastKind(this, fromType, toType);
   switch (kind) {
   case CheckedCastKind::ArrayDowncast: {
-    auto fromBaseType = getBaseTypeForArrayType(fromType.getPointer());
-    auto toBaseType = getBaseTypeForArrayType(toType.getPointer());
+    auto fromBaseType = *isArrayType(fromType);
+    auto toBaseType = *isArrayType(toType);
     
     // FIXME: Deal with from/to base types that haven't been solved
     // down to type variables yet.
@@ -2602,8 +2600,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
 
   case CheckedCastKind::SetDowncast: {
-    auto fromBaseType = getBaseTypeForSetType(fromType.getPointer());
-    auto toBaseType = getBaseTypeForSetType(toType.getPointer());
+    auto fromBaseType = *isSetType(fromType);
+    auto toBaseType = *isSetType(toType);
     // FIXME: Deal with from/to base types that haven't been solved
     // down to type variables yet.
 
@@ -3543,32 +3541,6 @@ retry:
   return SolutionKind::Error;
 }
 
-Type ConstraintSystem::getBaseTypeForArrayType(TypeBase *type) {
-  type = type->lookThroughAllAnyOptionalTypes().getPointer();
-  
-  if (auto bound = type->getAs<BoundGenericStructType>()) {
-    if (bound->getDecl() == getASTContext().getArrayDecl()) {
-      return bound->getGenericArgs()[0];
-    }
-  }
-
-  type->dump();
-  llvm_unreachable("attempted to extract a base type from a non-array type");
-}
-
-Type ConstraintSystem::getBaseTypeForSetType(TypeBase *type) {
-  type = type->lookThroughAllAnyOptionalTypes().getPointer();
-
-  if (auto bound = type->getAs<BoundGenericStructType>()) {
-    if (bound->getDecl() == getASTContext().getSetDecl()) {
-      return bound->getGenericArgs()[0];
-    }
-  }
-
-  type->dump();
-  llvm_unreachable("attempted to extract a base type from a non-set type");
-}
-
 static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {
   if (Type unwrapped = type->getAnyOptionalObjectType())
     type = unwrapped.getPointer();
@@ -3747,10 +3719,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     
     obj1 = getFixedTypeRecursive(obj1, false, false);
     
-    auto t1 = obj1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
     
-    auto baseType1 = getBaseTypeForArrayType(t1);
+    auto baseType1 = getFixedTypeRecursive(*isArrayType(obj1), false, false);
     auto baseType2 = getBaseTypeForPointer(*this, t2);
 
     return matchTypes(baseType1, baseType2,
@@ -3833,11 +3804,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
   case ConversionRestrictionKind::ArrayUpcast: {
-    auto t1 = type1->getDesugaredType();
-    auto t2 = type2->getDesugaredType();
-    
-    Type baseType1 = getBaseTypeForArrayType(t1);
-    Type baseType2 = getBaseTypeForArrayType(t2);
+    Type baseType1 = *isArrayType(type1);
+    Type baseType2 = *isArrayType(type2);
 
     increaseScore(SK_CollectionUpcastConversion);
     return matchTypes(baseType1,
@@ -3885,11 +3853,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
   // T1 < T2 || T1 bridges to T2 ===> Set<T1> <c Set<T2>
   case ConversionRestrictionKind::SetUpcast: {
-    auto t1 = type1->getDesugaredType();    
-    Type baseType1 = getBaseTypeForSetType(t1);
-
-    auto t2 = type2->getDesugaredType();
-    Type baseType2 = getBaseTypeForSetType(t2);
+    Type baseType1 = *isSetType(type1);
+    Type baseType2 = *isSetType(type2);
 
     increaseScore(SK_CollectionUpcastConversion);
     return matchTypes(baseType1,
