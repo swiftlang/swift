@@ -80,10 +80,9 @@ func _fatalErrorFlags() -> UInt32 {
 @_versioned
 @inline(never)
 @_semantics("stdlib_binary_only")
-func _assertionFailed(
-  // FIXME(ABI)#18 : add argument labels to conform to API guidelines.
+func _assertionFailure(
   _ prefix: StaticString, _ message: StaticString,
-  _ file: StaticString, _ line: UInt,
+  file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
   prefix.withUTF8Buffer {
@@ -112,10 +111,10 @@ func _assertionFailed(
 @_versioned
 @inline(never)
 @_semantics("stdlib_binary_only")
-func _assertionFailed(
+func _assertionFailure(
   // FIXME(ABI)#19 : add argument labels to conform to API guidelines.
   _ prefix: StaticString, _ message: String,
-  _ file: StaticString, _ line: UInt,
+  file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
   prefix.withUTF8Buffer {
@@ -146,9 +145,8 @@ func _assertionFailed(
 @_semantics("stdlib_binary_only")
 @_semantics("arc.programtermination_point")
 func _fatalErrorMessage(
-  // FIXME(ABI)#20 : add argument labels to conform to API guidelines.
   _ prefix: StaticString, _ message: StaticString,
-  _ file: StaticString, _ line: UInt,
+  file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
 #if INTERNAL_CHECKS_ENABLED
@@ -235,5 +233,5 @@ func _undefined<T>(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
-  _assertionFailed("fatal error", message(), file, line, flags: 0)
+  _assertionFailure("fatal error", message(), file: file, line: line, flags: 0)
 }
