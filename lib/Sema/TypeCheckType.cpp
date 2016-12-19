@@ -537,9 +537,9 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   }
 
   // FIXME: More principled handling of circularity.
-  if (!genericDecl->getGenericSignature()) {
+  if (!genericDecl->hasValidSignature()) {
     diagnose(loc, diag::recursive_type_reference,
-             genericDecl->getName());
+             genericDecl->getDescriptiveKind(), genericDecl->getName());
     diagnose(genericDecl, diag::type_declared_here);
     return ErrorType::get(Context);
   }
@@ -660,16 +660,18 @@ Type TypeChecker::applyUnboundGenericArguments(
     auto result = checkGenericArguments(
         dc, loc, noteLoc, UGT, genericSig,
         substitutions, unsatisfiedDependency);
-    switch (result) {
-    case CheckGenericArgsResult::Success:
-      break;
-    case CheckGenericArgsResult::Error:
-      return ErrorType::get(Context);
-    case CheckGenericArgsResult::Unsatisfied:
-      return Type();
-    }
 
-    useObjectiveCBridgeableConformancesOfArgs(dc, BGT);
+    // Unsatisfied dependency case.
+    if (result.first)
+      return Type();
+
+    // Failure case.
+    if (!result.second)
+      return ErrorType::get(Context);
+
+    if (useObjectiveCBridgeableConformancesOfArgs(dc, BGT,
+                                                  unsatisfiedDependency))
+        return Type();
   }
 
   return BGT;
@@ -709,10 +711,11 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
     TC.validateDecl(typeDecl);
   }
 
-  // FIXME: More principled handling of circularity.
+  // If we didn't bail out with an unsatisfiedDependency,
+  // and were not able to validate recursively, bail out.
   if (!typeDecl->hasInterfaceType()) {
     TC.diagnose(loc, diag::recursive_type_reference,
-                typeDecl->getName());
+                typeDecl->getDescriptiveKind(), typeDecl->getName());
     TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
     return ErrorType::get(TC.Context);
   }
@@ -720,7 +723,8 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
   Type type =
-      TC.resolveTypeInContext(typeDecl, dc, options, generic, resolver);
+      TC.resolveTypeInContext(typeDecl, dc, options, generic, resolver,
+                              unsatisfiedDependency);
 
   // FIXME: Defensive check that shouldn't be needed, but prevents a
   // huge number of crashes on ill-formed code.
@@ -1200,9 +1204,6 @@ static Type resolveNestedIdentTypeComponent(
       assert(memberType && "Received null dependent member type");
       return memberType;
     }
-
-    if (assocType && !assocType->hasInterfaceType())
-      assocType->computeType();
 
     if (assocType && !parentTy->is<ArchetypeType>()) {
       assert(!parentTy->isExistentialType());

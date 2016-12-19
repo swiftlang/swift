@@ -767,7 +767,7 @@ public:
                    GenericTypeResolver *resolver = nullptr,
                    UnsatisfiedDependency *unsatisfiedDependency = nullptr);
 
-  void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
+  void validateDecl(ValueDecl *D);
   void validateDecl(OperatorDecl *decl);
   void validateDecl(PrecedenceGroupDecl *decl);
 
@@ -978,7 +978,7 @@ public:
   }
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
-    validateDecl(VD, true);
+    validateDecl(VD);
   }
 
   virtual void bindExtension(ExtensionDecl *ext) override;
@@ -1084,12 +1084,6 @@ public:
                              GenericSignature *parentSig,
                              GenericTypeResolver *resolver);
 
-  enum class CheckGenericArgsResult : unsigned {
-    Success,
-    Error,
-    Unsatisfied
-  };
-
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
   ///
@@ -1099,9 +1093,14 @@ public:
   /// \param owner The type that owns the generic signature.
   /// \param genericSig The actual generic signature.
   /// \param substitutions Substitutions from interface types of the signature.
+  /// \param unsatisfiedDependency Optional callback for reporting unsatisfied
+  /// dependencies.
   ///
-  /// \returns a CheckGenericArgsResult.
-  CheckGenericArgsResult checkGenericArguments(
+  /// \returns One of the following:
+  /// - (true, false) if there was an unsatisfied dependency
+  /// - (false, true) on success
+  /// - (false, false) on failure
+  std::pair<bool, bool> checkGenericArguments(
                              DeclContext *dc, SourceLoc loc,
                              SourceLoc noteLoc,
                              Type owner,
@@ -1576,6 +1575,20 @@ public:
                                      ConformanceCheckOptions options,
                                      SourceLoc ComplainLoc = SourceLoc());
 
+  /// A version of the above meant for use with the iterative type checker.
+  ///
+  /// \returns One of the following:
+  /// - (true, None) if there was an unsatisfied dependency
+  /// - (false, Some(ProtocolConformanceRef)) on success
+  /// - (false, None) on failure
+  std::pair<bool, Optional<ProtocolConformanceRef>>
+  conformsToProtocol(Type T,
+                     ProtocolDecl *Proto,
+                     DeclContext *DC,
+                     ConformanceCheckOptions options,
+                     SourceLoc ComplainLoc,
+                     UnsatisfiedDependency *unsatisfiedDependency);
+
   /// Completely check the given conformance.
   void checkConformance(NormalProtocolConformance *conformance);
 
@@ -1596,17 +1609,20 @@ public:
                                      bool anySingleRequirement = false);
 
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
-  void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
-
-  /// Mark any _BridgedNSError/_BridgedStoredNSError/related
-  /// conformances in the given type as "used".
-  void useBridgedNSErrorConformances(DeclContext *dc, Type type);
+  bool useObjectiveCBridgeableConformances(
+                        DeclContext *dc, Type type,
+                        UnsatisfiedDependency *unsatisfiedDependency = nullptr);
 
   /// If this bound-generic type is bridged, mark any
   /// _ObjectiveCBridgeable conformances in the generic arguments of
   /// the given type as "used".
-  void useObjectiveCBridgeableConformancesOfArgs(DeclContext *dc,
-                                                 BoundGenericType *bound);
+  bool useObjectiveCBridgeableConformancesOfArgs(
+                        DeclContext *dc, BoundGenericType *bound,
+                        UnsatisfiedDependency *unsatisfiedDependency = nullptr);
+
+  /// Mark any _BridgedNSError/_BridgedStoredNSError/related
+  /// conformances in the given type as "used".
+  void useBridgedNSErrorConformances(DeclContext *dc, Type type);
 
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.

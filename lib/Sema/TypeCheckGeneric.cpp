@@ -81,11 +81,7 @@ Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
   if (gpDecl->isInvalid() || !GenericEnv)
     return ErrorType::get(gpDecl->getASTContext());
 
-  auto type = GenericEnv->getMappingIfPresent(gp);
-  if (!type)
-    return ErrorType::get(gpDecl->getASTContext());;
-
-  return *type;
+  return GenericEnv->mapTypeIntoContext(gp);
 }
 
 Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
@@ -102,12 +98,6 @@ Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  // FIXME: Fallback case.
-  if (!isa<ExtensionDecl>(dc) &&
-      dc->isGenericContext() &&
-      !dc->isValidGenericContext())
-    return dc->getSelfInterfaceType();
-
   return GenericEnvironment::mapTypeIntoContext(
       dc->getParentModule(), GenericEnv,
       dc->getSelfInterfaceType());
@@ -361,7 +351,6 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
                                       AbstractFunctionDecl *func,
                                       GenericTypeResolver &resolver) {
   bool badType = false;
-  func->setIsBeingTypeChecked();
 
   // Check the generic parameter list.
   auto genericParams = func->getGenericParams();
@@ -403,7 +392,6 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
     }
   }
 
-  func->setIsBeingTypeChecked(false);
   return badType;
 }
 
@@ -461,11 +449,6 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   DependentGenericTypeResolver dependentResolver(builder);
   if (checkGenericFuncSignature(*this, &builder, func, dependentResolver))
     invalid = true;
-
-  // If this triggered a recursive validation, back out: we're done.
-  // FIXME: This is an awful hack.
-  if (func->hasInterfaceType())
-    return nullptr;
 
   // Finalize the generic requirements.
   (void)builder.finalize(func->getLoc());
@@ -817,13 +800,6 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
 }
 
 void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
-  if (typeDecl->isValidatingGenericSignature())
-    return;
-
-  typeDecl->setIsValidatingGenericSignature();
-
-  SWIFT_DEFER { typeDecl->setIsValidatingGenericSignature(false); };
-
   auto *gp = typeDecl->getGenericParams();
   auto *dc = typeDecl->getDeclContext();
 
@@ -909,7 +885,7 @@ static std::string gatherGenericParamBindingsText(
   return result.str().str();
 }
 
-TypeChecker::CheckGenericArgsResult
+std::pair<bool, bool>
 TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                                    SourceLoc noteLoc,
                                    Type owner,
@@ -936,24 +912,24 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
 
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
-      if (auto *classDecl = firstType->getClassOrBoundGenericClass()) {
-        // If we have a callback to report dependencies, do so.
-        // FIXME: Woefully inadequate.
-        if (unsatisfiedDependency &&
-            (*unsatisfiedDependency)(requestTypeCheckSuperclass(classDecl)))
-          return CheckGenericArgsResult::Unsatisfied;
-      }
-
       // Protocol conformance requirements.
       auto proto = secondType->castTo<ProtocolType>();
       // FIXME: This should track whether this should result in a private
       // or non-private dependency.
       // FIXME: Do we really need "used" at this point?
       // FIXME: Poor location information. How much better can we do here?
-      if (!conformsToProtocol(firstType, proto->getDecl(), dc,
-                              ConformanceCheckFlags::Used, loc)) {
-        return CheckGenericArgsResult::Error;
-      }
+      auto result = conformsToProtocol(
+          firstType, proto->getDecl(), dc,
+          ConformanceCheckFlags::Used, loc,
+          unsatisfiedDependency);
+
+      // Unsatisfied dependency case.
+      if (result.first)
+        return std::make_pair(true, false);
+
+      // Conformance check failure case.
+      if (!result.second)
+        return std::make_pair(false, false);
 
       continue;
     }
@@ -970,7 +946,7 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                  gatherGenericParamBindingsText(
                    {req.getFirstType(), req.getSecondType()},
                    genericSig, substitutions));
-        return CheckGenericArgsResult::Error;
+        return std::make_pair(false, false);
       }
       continue;
 
@@ -984,13 +960,13 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                  gatherGenericParamBindingsText(
                    {req.getFirstType(), req.getSecondType()},
                    genericSig, substitutions));
-        return CheckGenericArgsResult::Error;
+        return std::make_pair(false, false);
       }
       continue;
     }
   }
 
-  return CheckGenericArgsResult::Success;
+  return std::make_pair(false, true);
 }
 
 Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,

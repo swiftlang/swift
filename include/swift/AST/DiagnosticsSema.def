@@ -1173,8 +1173,6 @@ ERROR(unsupported_nested_protocol,none,
       (Identifier))
 
 // Type aliases
-ERROR(circular_type_alias,none,
-      "type alias %0 circularly references itself", (Identifier))
 ERROR(type_alias_underlying_type_access,none,
       "type alias %select{must be declared %select{"
       "%select{private|fileprivate|internal|PUBLIC}2|private or fileprivate}3"
@@ -1548,7 +1546,7 @@ ERROR(requires_superclass_conflict,none,
       "generic parameter %0 cannot be a subclass of both %1 and %2",
       (Identifier, Type, Type))
 ERROR(recursive_type_reference,none,
-      "type %0 references itself", (Identifier))
+      "%0 %1 references itself", (DescriptiveDeclKind, Identifier))
 ERROR(recursive_requirement_reference,none,
       "type may not reference itself as a requirement",())
 ERROR(recursive_same_type_constraint,none,

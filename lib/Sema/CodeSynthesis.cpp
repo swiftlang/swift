@@ -1360,7 +1360,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     makeFinal(Context, Parameter);
   Parameter->setImplicit();
   Parameter->setAccessibility(Accessibility::Private);
-  Parameter->setIsBeingTypeChecked();
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the parameter function.
@@ -1387,7 +1386,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                 SourceLoc(), /*implicit*/ true);
   Parameter->setBody(Body);
   
-  Parameter->setIsBeingTypeChecked(false);
   typeCheckDecl(Parameter, true);
   typeCheckDecl(Parameter, false);
   addMemberToContextIfNeeded(Parameter, DC);
@@ -1621,9 +1619,7 @@ void TypeChecker::introduceLazyVarAccessors(VarDecl *var) {
 }
 
 void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
-  // If we've already synthesized accessors or are currently in the process
-  // of doing so, don't proceed.
-  if (var->getGetter() || var->isBeingTypeChecked())
+  if (var->getGetter())
     return;
 
   auto *dc = var->getDeclContext();
@@ -1639,8 +1635,6 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       assert(!var->hasStorage() && "behavior var was not made computed");
     };
     
-    var->setIsBeingTypeChecked();
-
     auto behavior = var->getMutableBehavior();
     NormalProtocolConformance *conformance = nullptr;
     VarDecl *valueProp = nullptr;
@@ -1685,7 +1679,6 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       // Save the conformance and 'value' decl for later type checking.
       behavior->Conformance = conformance;
       behavior->ValueDecl = valueProp;
-      var->setIsBeingTypeChecked(false);
 
       addMemberToContextIfNeeded(getter, dc);
       if (setter)
@@ -1775,8 +1768,6 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
   // Lazy properties require special handling.
   if (var->getAttrs().hasAttribute<LazyAttr>()) {
-    var->setIsBeingTypeChecked();
-
     auto *getter = createGetterPrototype(var, TC);
     // lazy getters are mutating on an enclosing value type.
     if (!dc->getAsClassOrClassExtensionContext())
@@ -1791,7 +1782,6 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       materializeForSet = createMaterializeForSetPrototype(var, setter, TC);
 
     var->makeComputed(SourceLoc(), getter, setter, materializeForSet, SourceLoc());
-    var->setIsBeingTypeChecked(false);
 
     addMemberToContextIfNeeded(getter, dc);
     addMemberToContextIfNeeded(setter, dc);
@@ -1824,18 +1814,14 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       else
         TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
 
-      var->setIsBeingTypeChecked();
       convertStoredVarInProtocolToComputed(var, TC);
-      var->setIsBeingTypeChecked(false);
     }
     return;
 
   // NSManaged properties on classes require special handling.
   } else if (dc->getAsClassOrClassExtensionContext()) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
-      var->setIsBeingTypeChecked();
       convertNSManagedStoredVarToComputed(var, TC);
-      var->setIsBeingTypeChecked(false);
       return;
     }
 
@@ -1851,9 +1837,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       return;
 
   // Everything else gets accessors.
-  var->setIsBeingTypeChecked();
   addTrivialAccessorsToStorage(var, TC);
-  var->setIsBeingTypeChecked(false);
 }
 
 /// \brief Create an implicit struct or class constructor.
