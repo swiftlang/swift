@@ -331,6 +331,9 @@ ParserStatus Parser::parseGenericWhereClause(
     // If there's a comma, keep parsing the list.
   } while (consumeIf(tok::comma));
 
+  if (Requirements.empty())
+    WhereLoc = SourceLoc();
+
   return Status;
 }
 
