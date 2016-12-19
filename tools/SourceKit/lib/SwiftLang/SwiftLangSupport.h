@@ -427,6 +427,6 @@ public:
   ~CloseClangModuleFiles();
 };
 
-} // namespace SourceKit.
+} // namespace SourceKit
 
 #endif

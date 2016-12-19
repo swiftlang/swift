@@ -355,7 +355,7 @@ struct ult {
     return a.ult(b);
   }
 };
-}
+} // end anonymous namespace
 
 static void emitSubSwitch(IRGenFunction &IGF,
                     MutableArrayRef<EnumPayload::LazyValue> values,

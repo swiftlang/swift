@@ -156,7 +156,8 @@ namespace {
                                    CanAnyFunctionType outputSubstType,
                                    const TypeLowering &expectedTL);
   };
-};
+} // end anonymous namespace
+;
 
 static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(Module *M, Type fromType, Type toType) {
@@ -770,7 +771,7 @@ void SILGenFunction::collectThunkParams(SILLocation loc,
   // Add the indirect results.
   for (auto result : F.getLoweredFunctionType()->getIndirectResults()) {
     auto paramTy = F.mapTypeIntoContext(result.getSILType());
-    SILArgument *arg = F.begin()->createArgument(paramTy);
+    SILArgument *arg = F.begin()->createFunctionArgument(paramTy);
     (void)arg;
   }
 
@@ -778,7 +779,7 @@ void SILGenFunction::collectThunkParams(SILLocation loc,
   auto paramTypes = F.getLoweredFunctionType()->getParameters();
   for (auto param : paramTypes) {
     auto paramTy = F.mapTypeIntoContext(param.getSILType());
-    auto paramValue = F.begin()->createArgument(paramTy);
+    auto paramValue = F.begin()->createFunctionArgument(paramTy);
     auto paramMV = manageParam(*this, loc, paramValue, param, allowPlusZero);
     params.push_back(paramMV);
   }
@@ -901,7 +902,7 @@ namespace {
                                   inputTupleType,
                                   outputOrigType,
                                   outputTupleType,
-                                  *temp.get());
+                                  *temp);
 
           Outputs.push_back(temp->getManagedAddress());
           return;
@@ -1200,7 +1201,7 @@ namespace {
         auto temp = SGF.emitTemporary(Loc, outputTL);
         translateSingleInto(inputOrigType, inputSubstType,
                             outputOrigType, outputSubstType,
-                            input, *temp.get());
+                            input, *temp);
         Outputs.push_back(temp->getManagedAddress());
         return;
       }
@@ -1252,7 +1253,7 @@ namespace {
       return claimNext(OutputTypes);
     }
   };
-}
+} // end anonymous namespace
 
 /// Forward arguments according to a function type's ownership conventions.
 static void forwardFunctionArguments(SILGenFunction &gen,

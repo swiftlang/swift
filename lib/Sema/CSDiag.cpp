@@ -1074,7 +1074,7 @@ namespace {
   private:
     void collectCalleeCandidates(Expr *fnExpr, bool implicitDotSyntax);
   };
-}
+} // end anonymous namespace
 
 void CalleeCandidateInfo::dump() const {
   llvm::errs() << "CalleeCandidateInfo for '" << declName << "': closeness="
@@ -2113,7 +2113,7 @@ private:
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
   bool visitClosureExpr(ClosureExpr *CE);
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 
 
@@ -2546,7 +2546,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
 
   // Check if the expression is the matching operator ~=, most often used in
   // case statements. If so, try to provide a single dot fix-it
-  const Expr *contextualTypeNode;
+  const Expr *contextualTypeNode = nullptr;
   for (auto iterateCS = CS; iterateCS; iterateCS = iterateCS->baseCS) {
     contextualTypeNode = iterateCS->getContextualTypeNode();
   }
@@ -3282,7 +3282,7 @@ namespace {
           D->setInvalid(D->getInterfaceType()->hasError());
     }
   };
-}
+} // end anonymous namespace
 
 /// Erase an expression tree's open existentials after a re-typecheck operation.
 ///
@@ -4503,7 +4503,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 
     /// Use a match call argument listener that allows relabeling.
     struct RelabelMatchCallArgumentListener : MatchCallArgumentListener {
-      virtual bool relabelArguments(ArrayRef<Identifier> newNames) override {
+      bool relabelArguments(ArrayRef<Identifier> newNames) override {
         return false;
       }
     } listener;
@@ -4651,7 +4651,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     return false;
 
   auto context = CS->DC;
-  using CandididateMap =
+  using CandidateMap =
       llvm::SmallDenseMap<ValueDecl *, llvm::SmallVector<OverloadChoice, 2>>;
 
   auto getBaseKind = [](ValueDecl *base) -> DescriptiveDeclKind {
@@ -4734,7 +4734,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     if (!result || result.empty())
       continue;
 
-    CandididateMap candidates;
+    CandidateMap candidates;
     for (const auto &candidate : result) {
       auto base = candidate.Base;
       if ((base && base->isInvalid()) || candidate->isInvalid())
@@ -5401,7 +5401,7 @@ namespace {
     explicit CalleeListener(Type contextualType)
       : contextualType(contextualType) { }
 
-    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // If we have no contextual type, there is nothing to do.
       if (!contextualType) return false;
 
@@ -5435,7 +5435,7 @@ namespace {
       return false;
     }
   };
-}
+} // end anonymous namespace
 
 /// Return true if this function name is a comparison operator.  This is a
 /// simple heuristic used to guide comparison related diagnostics.

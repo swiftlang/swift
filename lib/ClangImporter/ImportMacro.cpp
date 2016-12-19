@@ -252,7 +252,7 @@ static ValueDecl *importNil(ClangImporter::Implementation &Impl,
   auto type = TupleType::getEmpty(Impl.SwiftContext);
   return Impl.createUnavailableDecl(name, DC, type,
                                     "use 'nil' instead of this imported macro",
-                                    /*static=*/false, clangN);
+                                    /*isStatic=*/false, clangN);
 }
 
 static bool isSignToken(const clang::Token &tok) {
@@ -449,7 +449,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                           clangTy->isUnsignedIntegerType() };
       return createMacroConstant(impl, macro, name, DC, type,
                                  clang::APValue(value),
-                                 ConstantConvertKind::Coerce, /*static=*/false,
+                                 ConstantConvertKind::Coerce, /*isStatic=*/false,
                                  ClangN);
     // Check for an expression of the form (FLAG1 | FLAG2), (FLAG1 & FLAG2),
     // (FLAG1 || FLAG2), or (FLAG1 || FLAG2)
@@ -533,7 +533,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         return createMacroConstant(impl, macro, name, DC, type,
                                    value,
                                    ConstantConvertKind::Coerce,
-                                   /*static=*/false, ClangN);
+                                   /*isStatic=*/false, ClangN);
       }
     }
     break;

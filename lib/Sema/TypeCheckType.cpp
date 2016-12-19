@@ -655,7 +655,7 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     // Collect the complete set of generic arguments.
     assert(genericSig != nullptr);
-    auto substitutions = BGT->getMemberSubstitutions(BGT->getDecl());
+    auto substitutions = BGT->getContextSubstitutions(BGT->getDecl());
 
     auto result = checkGenericArguments(
         dc, loc, noteLoc, UGT, genericSig,
@@ -1137,6 +1137,44 @@ static Type resolveNestedIdentTypeComponent(
               bool diagnoseErrors,
               GenericTypeResolver *resolver,
               UnsatisfiedDependency *unsatisfiedDependency) {
+  // Local function to produce a diagnostic if the type we referenced was an
+  // associated type but the type itself was erroneous. We'll produce a
+  // diagnostic here if the diagnostic for the bad type witness would show up in
+  // a different context.
+  auto maybeDiagnoseBadConformanceRef = [&](AssociatedTypeDecl *assocType,
+                                            ProtocolConformance *conformance) {
+    // If we aren't emitting any diagnostics, we're done.
+    if (!diagnoseErrors)
+      return;
+
+    // If we weren't given a conformance, go look it up.
+    if (!conformance) {
+      if (auto conformanceRef =
+            TC.conformsToProtocol(
+              parentTy, assocType->getProtocol(), DC,
+              (ConformanceCheckFlags::InExpression|
+               ConformanceCheckFlags::SuppressDependencyTracking))) {
+        if (conformanceRef->isConcrete())
+          conformance = conformanceRef->getConcrete();
+      }
+    }
+
+    // If there is a conformance and it comes from the same source file as type
+    // resolution, don't diagnose.
+    if (conformance &&
+        conformance->getDeclContext()->getParentSourceFile() ==
+          DC->getParentSourceFile())
+      return;
+
+    // If any errors have occurred, don't bother diagnosing this cross-file
+    // issue.
+    if (TC.Context.Diags.hadAnyError())
+      return;
+
+    TC.diagnose(comp->getLoc(), diag::broken_associated_type_witness,
+                assocType->getFullName(), parentTy);
+  };
+
   // Short-circuiting.
   if (comp->isInvalid()) return ErrorType::get(TC.Context);
 
@@ -1182,8 +1220,15 @@ static Type resolveNestedIdentTypeComponent(
       }
 
       // FIXME: Establish that we need a type witness.
-      return conformance->getConcrete()->getTypeWitness(assocType, &TC)
-               .getReplacement();
+      auto memberType =
+        conformance->getConcrete()->getTypeWitness(assocType, &TC)
+          .getReplacement();
+
+      // Diagnose the bad reference if we need to.
+      if (memberType->hasError())
+        maybeDiagnoseBadConformanceRef(assocType, conformance->getConcrete());
+
+      return memberType;
     }
 
     // Otherwise, simply substitute the parent type into the member.
@@ -1316,6 +1361,10 @@ static Type resolveNestedIdentTypeComponent(
   // was marked invalid, just return ErrorType to silence downstream errors.
   if (member && member->isInvalid())
     memberType = ErrorType::get(TC.Context);
+
+  // Diagnose the bad reference if we need to.
+  if (member && isa<AssociatedTypeDecl>(member) && memberType->hasError())
+    maybeDiagnoseBadConformanceRef(cast<AssociatedTypeDecl>(member), nullptr);
 
   if (member)
     comp->setValue(member);
@@ -1474,7 +1523,7 @@ static bool checkForIllegalIUOs(TypeChecker &TC, TypeRepr *Repr,
       : TC(TC)
       , IUOsAllowed{!IsGenericParameter} {}
 
-    bool walkToTypeReprPre(TypeRepr *T) {
+    bool walkToTypeReprPre(TypeRepr *T) override {
       bool iuoAllowedHere = IUOsAllowed.back();
 
       // Raise a diagnostic if we run into a prohibited IUO.
@@ -1503,7 +1552,7 @@ static bool checkForIllegalIUOs(TypeChecker &TC, TypeRepr *Repr,
       return true;
     }
 
-    bool walkToTypeReprPost(TypeRepr *T) {
+    bool walkToTypeReprPost(TypeRepr *T) override {
       IUOsAllowed.pop_back();
       return true;
     }
@@ -1639,7 +1688,7 @@ namespace {
                            Type instanceType,
                            Optional<MetatypeRepresentation> storedRepr);
   };
-}
+} // end anonymous namespace
 
 Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                               TypeResolutionOptions options,
@@ -2137,11 +2186,10 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericEnv = repr->getGenericEnvironment()) {
-    auto *genericSig = repr->getGenericSignature();
-    assert(genericSig != nullptr && "Did not call handleSILGenericParams()?");
-    inputTy = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, inputTy);
-    outputTy = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, outputTy);
-    return GenericFunctionType::get(genericSig, inputTy, outputTy, extInfo);
+    inputTy = genericEnv->mapTypeOutOfContext(inputTy);
+    outputTy = genericEnv->mapTypeOutOfContext(outputTy);
+    return GenericFunctionType::get(genericEnv->getGenericSignature(),
+                                    inputTy, outputTy, extInfo);
   }
 
   auto fnTy = FunctionType::get(inputTy, outputTy, extInfo);
@@ -2191,11 +2239,11 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
       fields.push_back({fieldTy->getCanonicalType(), fieldRepr.Mutable});
     }
   }
-  
+
   // Substitute out parsed context types into interface types.
   CanGenericSignature genericSig;
   if (auto *genericEnv = repr->getGenericEnvironment()) {
-    genericSig = repr->getGenericSignature()->getCanonicalSignature();
+    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
     
     for (auto &field : fields) {
       auto transTy = genericEnv->mapTypeOutOfContext(field.getLoweredType());
@@ -2328,23 +2376,22 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   SmallVector<SILResultInfo, 4> interfaceResults;
   Optional<SILResultInfo> interfaceErrorResult;
   if (auto *genericEnv = repr->getGenericEnvironment()) {
-    genericSig = repr->getGenericSignature()->getCanonicalSignature();
+    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
  
     for (auto &param : params) {
-      auto transParamType = ArchetypeBuilder::mapTypeOutOfContext(
-          genericEnv, param.getType())->getCanonicalType();
+      auto transParamType = genericEnv->mapTypeOutOfContext(
+          param.getType())->getCanonicalType();
       interfaceParams.push_back(param.getWithType(transParamType));
     }
     for (auto &result : results) {
-      auto transResultType =
-        ArchetypeBuilder::mapTypeOutOfContext(
-          genericEnv, result.getType())->getCanonicalType();
+      auto transResultType = genericEnv->mapTypeOutOfContext(
+          result.getType())->getCanonicalType();
       interfaceResults.push_back(result.getWithType(transResultType));
     }
 
     if (errorResult) {
-      auto transErrorResultType = ArchetypeBuilder::mapTypeOutOfContext(
-          genericEnv, errorResult->getType())->getCanonicalType();
+      auto transErrorResultType = genericEnv->mapTypeOutOfContext(
+          errorResult->getType())->getCanonicalType();
       interfaceErrorResult =
         errorResult->getWithType(transErrorResultType);
     }
@@ -3710,7 +3757,7 @@ public:
     recurseIntoSubstatements = recurse;
   }
 
-  bool walkToTypeReprPre(TypeRepr *T) {
+  bool walkToTypeReprPre(TypeRepr *T) override {
     if (T->isInvalid())
       return false;
     if (auto compound = dyn_cast<CompoundIdentTypeRepr>(T)) {
@@ -3723,7 +3770,7 @@ public:
     return true;
   }
 
-  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) {
+  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
     if (recurseIntoSubstatements) {
       return { true, S };
     } else if (hitTopStmt) {
@@ -3769,7 +3816,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
   if (!decl || decl->isInvalid())

@@ -186,7 +186,7 @@ private:
   void compute();
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 
 namespace {
@@ -235,7 +235,7 @@ private:
   llvm::DenseMap<SILArgument*, SILValue> BoxArgumentMap;
   llvm::DenseMap<ProjectBoxInst*, SILValue> ProjectBoxArgumentMap;
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 /// \brief Compute ReachabilityInfo so that it can answer queries about
 /// whether a given basic block in a function is reachable from another basic
@@ -486,7 +486,7 @@ ClosureCloner::populateCloned() {
              && "promoting compound box not implemented");
       auto BoxedTy = BoxTy->getFieldType(Cloned->getModule(),0).getObjectType();
       SILValue MappedValue =
-          ClonedEntryBB->createArgument(BoxedTy, (*I)->getDecl());
+          ClonedEntryBB->createFunctionArgument(BoxedTy, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
       
       // Track the projections of the box.
@@ -497,8 +497,8 @@ ClosureCloner::populateCloned() {
       }
     } else {
       // Otherwise, create a new argument which copies the original argument
-      SILValue MappedValue =
-          ClonedEntryBB->createArgument((*I)->getType(), (*I)->getDecl());
+      SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
+          (*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;

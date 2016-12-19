@@ -501,7 +501,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // FIXME: This is odd.
     if (isa<ModuleDecl>(ResultValues[0])) {
       return new (Context) DeclRefExpr(ResultValues[0], UDRE->getNameLoc(),
-                                       /*implicit=*/false,
+                                       /*Implicit=*/false,
                                        AccessSemantics::Ordinary,
                                        ResultValues[0]->getInterfaceType());
     }
@@ -570,10 +570,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   if (AllMemberRefs) {
     Expr *BaseExpr;
     if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*implicit=*/true);
+      BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*isImplicit=*/true);
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
-                                           /*implicit=*/true);
+                                           /*Implicit=*/true);
     }
     
    
@@ -904,6 +904,33 @@ namespace {
         return expr;
       }
 
+      // Double check if there are any BindOptionalExpr remaining in the
+      // tree (see comment below for more details), if there are no BOE
+      // expressions remaining remove OptionalEvaluationExpr from the tree.
+      if (auto OEE = dyn_cast<OptionalEvaluationExpr>(expr)) {
+        bool hasBindOptional = false;
+        OEE->forEachChildExpr([&](Expr *expr) -> Expr * {
+          if (isa<BindOptionalExpr>(expr))
+            hasBindOptional = true;
+          // If at least a single BOE was found, no reason
+          // to walk any further in the tree.
+          return hasBindOptional ? nullptr : expr;
+        });
+
+        return hasBindOptional ? OEE : OEE->getSubExpr();
+      }
+
+      // Check if there are any BindOptionalExpr in the tree which
+      // wrap DiscardAssignmentExpr, such situation corresponds to syntax
+      // like - `_? = <value>`, since it doesn't really make
+      // sense to have optional assignment to discarded LValue which can
+      // never be optional, we can remove BOE from the tree and avoid
+      // generating any of the uncessary constraints.
+      if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
+        if (auto DAE = dyn_cast<DiscardAssignmentExpr>(BOE->getSubExpr()))
+          return DAE;
+      }
+
       // If this is a sugared type that needs to be folded into a single
       // TypeExpr, do it.
       if (auto *simplified = simplifyTypeExpr(expr))
@@ -922,7 +949,7 @@ namespace {
     /// type names.
     TypeExpr *simplifyTypeExpr(Expr *E);
   };
-}
+} // end anonymous namespace
 
 /// Perform prechecking of a ClosureExpr before we dive into it.  This returns
 /// true for single-expression closures, where we want the body to be considered
@@ -1465,7 +1492,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
@@ -1802,7 +1829,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                              DeclContext *DC)
       : pattern(pattern), initializer(initializer), DC(DC) { }
 
-    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
 
@@ -1820,7 +1847,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       return false;
     }
 
-    virtual Expr *appliedSolution(Solution &solution, Expr *expr) {
+    Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Figure out what type the constraints decided on.
       auto &tc = solution.getConstraintSystem().getTypeChecker();
       InitType = solution.simplifyType(tc, InitType);
@@ -1960,7 +1987,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   public:
     explicit BindingListener(ForEachStmt *stmt) : Stmt(stmt) { }
 
-    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
 
@@ -2058,7 +2085,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       return false;
     }
 
-    virtual Expr *appliedSolution(Solution &solution, Expr *expr) {
+    Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Figure out what types the constraints decided on.
       auto &cs = solution.getConstraintSystem();
       auto &tc = cs.getTypeChecker();
@@ -2159,7 +2186,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
   public:
     // Add the appropriate Boolean constraint.
-    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the original expression.
       OrigExpr = expr;
       
@@ -2176,8 +2203,8 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     }
 
     // Convert the result to a Builtin.i1.
-    virtual Expr *appliedSolution(constraints::Solution &solution,
-                                  Expr *expr) {
+    Expr *appliedSolution(constraints::Solution &solution,
+                                  Expr *expr) override {
       auto &cs = solution.getConstraintSystem();
       return solution.convertBooleanTypeToBuiltinI1(expr,
                                             cs.getConstraintLocator(OrigExpr));
@@ -2311,7 +2338,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
     = TupleExpr::create(Context, EP->getSubExpr()->getSourceRange().Start,
                         matchArgElts, { }, { },
                         EP->getSubExpr()->getSourceRange().End,
-                        /*hasTrailingClosure=*/false, /*Implicit=*/true);
+                        /*HasTrailingClosure=*/false, /*Implicit=*/true);
   
   Expr *matchCall = new (Context) BinaryExpr(matchOp, matchArgs,
                                              /*Implicit=*/true);

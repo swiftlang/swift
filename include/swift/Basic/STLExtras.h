@@ -704,6 +704,48 @@ inline bool is_sorted_and_uniqued(const Container &C) {
   return is_sorted_and_uniqued(C.begin(), C.end());
 }
 
+//===----------------------------------------------------------------------===//
+//                              Function Traits
+//===----------------------------------------------------------------------===//
+
+template<class T>
+struct function_traits : function_traits<decltype(&T::operator())> {
+};
+
+// function
+template<class R, class... Args>
+struct function_traits<R(Args...)> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+// function pointer
+template<class R, class... Args>
+struct function_traits<R (*)(Args...)> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+// std::function
+template<class R, class... Args>
+struct function_traits<std::function<R(Args...)>> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+// pointer-to-member-function (i.e., operator()'s)
+template<class T, class R, class... Args>
+struct function_traits<R (T::*)(Args...)> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+template<class T, class R, class... Args>
+struct function_traits<R (T::*)(Args...) const> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_INTERLEAVE_H

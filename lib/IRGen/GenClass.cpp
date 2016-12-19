@@ -117,7 +117,7 @@ namespace {
       return Refcount;
     }
 
-    ~ClassTypeInfo() {
+    ~ClassTypeInfo() override {
       delete Layout;
     }
 
@@ -133,7 +133,7 @@ namespace {
       return getLayout(IGM, type).getElements();
     }
   };
-}  // end anonymous namespace.
+} // end anonymous namespace
 
 /// Return the lowered type for the class's 'self' type within its context.
 static SILType getSelfType(ClassDecl *base) {
@@ -350,7 +350,7 @@ namespace {
       return FieldAccess::NonConstantIndirect;
     }
   };
-}
+} // end anonymous namespace
 
 void ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType) const {
   assert(!Layout && FieldLayout.AllStoredProperties.empty() &&
@@ -1942,7 +1942,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit the private data (RO-data) associated with a class.
 llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,

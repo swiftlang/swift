@@ -266,6 +266,9 @@ public:
              LookupConformanceFn conformances,
              SubstOptions options = None) const;
 
+  /// Replace references to substitutable types with error types.
+  Type substDependentTypesWithErrorTypes() const;
+
   bool isPrivateStdlibType(bool whitelistProtocols=true) const;
 
   void dump() const;

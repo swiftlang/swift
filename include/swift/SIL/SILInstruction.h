@@ -332,6 +332,10 @@ public:
   /// additional handling. It is important to know this information when
   /// you perform such optimizations like e.g. jump-threading.
   bool isTriviallyDuplicatable() const;
+
+  /// Verify that all operands of this instruction have compatible ownership
+  /// with this instruction.
+  void verifyOperandOwnership() const;
 };
 
 /// Returns the combined behavior of \p B1 and \p B2.
@@ -1766,7 +1770,7 @@ class BeginBorrowInst
 };
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
-/// address. Must be paired with a end_borrow in its use-def list.
+/// address. Must be paired with an end_borrow in its use-def list.
 class StoreBorrowInst : public SILInstruction {
   friend class SILBuilder;
 

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
@@ -554,4 +555,47 @@ SILType SILType::getReferentType(SILModule &M) const {
   ReferenceStorageType *Ty =
       getSwiftRValueType()->castTo<ReferenceStorageType>();
   return M.Types.getLoweredType(Ty->getReferentType()->getCanonicalType());
+}
+
+CanType
+SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
+  auto fieldTy = getLayout()->getFields()[index].getLoweredType();
+  
+  // Apply generic arguments if the layout is generic.
+  if (!getGenericArgs().empty()) {
+    // FIXME: Map the field type into the layout's generic context because
+    // SIL TypeLowering currently expects to lower abstract generic parameters
+    // with a generic context pushed, but nested generic contexts are not
+    // supported by TypeLowering. If TypeLowering were properly
+    // de-contextualized and plumbed through the generic signature, this could
+    // be avoided.
+    auto *env = getLayout()->getGenericSignature()
+      .getGenericEnvironment(*M.getSwiftModule());
+    auto substMap =
+      env->getSubstitutionMap(M.getSwiftModule(), getGenericArgs());
+    fieldTy = env->mapTypeIntoContext(M.getSwiftModule(), fieldTy)
+      ->getCanonicalType();
+    
+    fieldTy = SILType::getPrimitiveObjectType(fieldTy)
+      .subst(M, substMap)
+      .getSwiftRValueType();
+  }
+  return fieldTy;
+}
+
+ValueOwnershipKind SILResultInfo::getOwnershipKind(SILModule &M) const {
+  SILType Ty = M.Types.getLoweredType(getType());
+  bool IsTrivial = Ty.isTrivial(M);
+  switch (getConvention()) {
+  case ResultConvention::Indirect:
+    return ValueOwnershipKind::Trivial; // Should this be an Any?
+  case ResultConvention::Autoreleased:
+  case ResultConvention::Owned:
+    return ValueOwnershipKind::Owned;
+  case ResultConvention::Unowned:
+  case ResultConvention::UnownedInnerPointer:
+    if (IsTrivial)
+      return ValueOwnershipKind::Trivial;
+    return ValueOwnershipKind::Unowned;
+  }
 }

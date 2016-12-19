@@ -622,6 +622,7 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
   // Args should be a list of pairs, the first number is a TypeID, the
   // second number is a ValueID.
   SILBasicBlock *CurrentBB = getBBForDefinition(Fn, Prev, BasicBlockID++);
+  bool IsEntry = CurrentBB->isEntry();
   for (unsigned I = 0, E = Args.size(); I < E; I += 3) {
     TypeID TyID = Args[I];
     if (!TyID) return nullptr;
@@ -629,8 +630,13 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     if (!ValId) return nullptr;
 
     auto ArgTy = MF->getType(TyID);
-    auto Arg = CurrentBB->createArgument(
-        getSILType(ArgTy, (SILValueCategory)Args[I + 1]));
+    SILArgument *Arg;
+    SILType SILArgTy = getSILType(ArgTy, (SILValueCategory)Args[I + 1]);
+    if (IsEntry) {
+      Arg = CurrentBB->createFunctionArgument(SILArgTy);
+    } else {
+      Arg = CurrentBB->createPHIArgument(SILArgTy);
+    }
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);
   }
@@ -774,7 +780,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
   SILInstruction *ResultVal;
   switch ((ValueKind)OpCode) {
-  case ValueKind::SILArgument:
+  case ValueKind::SILPHIArgument:
+  case ValueKind::SILFunctionArgument:
   case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
@@ -2174,6 +2181,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   std::vector<SILVTable::Pair> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
   while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
+         kind != SIL_DEFAULT_WITNESS_TABLE &&
          kind != SIL_FUNCTION) {
     assert(kind == SIL_VTABLE_ENTRY &&
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");

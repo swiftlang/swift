@@ -101,7 +101,7 @@ public:
     // Unknown kind.
   }
 
-  RCStateTransition(SILArgument *A)
+  RCStateTransition(SILFunctionArgument *A)
       : EndPoint(A), Kind(RCStateTransitionKind::StrongEntrance) {
     assert(A->hasConvention(SILArgumentConvention::Direct_Owned) &&
            "Expected owned argument");

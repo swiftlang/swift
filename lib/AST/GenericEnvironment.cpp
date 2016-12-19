@@ -16,6 +16,7 @@
 
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
@@ -160,6 +161,28 @@ bool GenericEnvironment::containsPrimaryArchetype(
                                               ArchetypeType *archetype) const {
   return static_cast<bool>(
                        QueryArchetypeToInterfaceSubstitutions(this)(archetype));
+}
+
+Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M,
+                                            GenericEnvironment *env,
+                                            Type type) {
+  assert(!type->hasArchetype() && "already have a contextual type");
+
+  if (!env)
+    return type.substDependentTypesWithErrorTypes();
+
+  return env->mapTypeIntoContext(M, type);
+}
+
+Type
+GenericEnvironment::mapTypeOutOfContext(GenericEnvironment *env,
+                                        Type type) {
+  assert(!type->hasTypeParameter() && "already have an interface type");
+
+  if (!env)
+    return type.substDependentTypesWithErrorTypes();
+
+  return env->mapTypeOutOfContext(type);
 }
 
 Type GenericEnvironment::mapTypeOutOfContext(Type type) const {

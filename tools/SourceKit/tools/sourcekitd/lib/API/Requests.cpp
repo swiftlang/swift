@@ -60,7 +60,7 @@ public:
     return get();
   }
 };
-} // anonymous namespace.
+} // anonymous namespace
 
 static LazySKDUID RequestProtocolVersion("source.request.protocol_version");
 

@@ -98,5 +98,10 @@ module ucrt [system] {
       }
     }
   }
+
+  module io {
+    header "corecrt_io.h"
+    export *
+  }
 }
 

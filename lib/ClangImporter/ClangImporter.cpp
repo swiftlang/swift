@@ -87,7 +87,7 @@ namespace {
       Impl.ImportedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
     }
 
-    virtual void InclusionDirective(clang::SourceLocation HashLoc,
+    void InclusionDirective(clang::SourceLocation HashLoc,
                                     const clang::Token &IncludeTok,
                                     StringRef FileName,
                                     bool IsAngled,
@@ -101,7 +101,7 @@ namespace {
         Importer.addDependency(File->getName());
     }
 
-    virtual void moduleImport(clang::SourceLocation ImportLoc,
+    void moduleImport(clang::SourceLocation ImportLoc,
                               clang::ModuleIdPath Path,
                               const clang::Module *Imported) override {
       handleImport(Imported);
@@ -326,7 +326,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
           // Enable modules
           "-fmodules",
-          "-fmodules-validate-system-headers",
           "-Werror=non-modular-include-in-framework-module",
           // Enable implicit module maps (implied by "-fmodules")
           "-fimplicit-module-maps",
@@ -482,6 +481,10 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     invocationArgStrs.push_back("-fapinotes-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
+  }
+
+  if (!importerOpts.DisableModulesValidateSystemHeaders) {
+    invocationArgStrs.push_back("-fmodules-validate-system-headers");
   }
 
   if (importerOpts.DetailedPreprocessingRecord) {
@@ -725,7 +728,7 @@ ClangImporter::create(ASTContext &ctx,
   // Manually run the action, so that the TU stays open for additional parsing.
   instance.createSema(action->getTranslationUnitKind(), nullptr);
   importer->Impl.Parser.reset(new clang::Parser(clangPP, instance.getSema(),
-                                                /*skipFunctionBodies=*/false));
+                                                /*SkipFunctionBodies=*/false));
 
   clangPP.EnterMainSourceFile();
   importer->Impl.Parser->Initialize();
@@ -808,7 +811,7 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
   Impl.Instance->getHeaderSearchOpts().AddPath(newSearchPath,
                                                clang::frontend::Angled,
                                                isFramework,
-                                               /*ignoreSysroot=*/true);
+                                               /*IgnoreSysRoot=*/true);
   return false;
 }
 
@@ -843,7 +846,7 @@ bool ClangImporter::Implementation::importHeader(
       static_cast<HeaderParsingASTConsumer &>(Instance->getASTConsumer());
   consumer.reset();
 
-  pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
+  pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*Loc=*/{});
   // Force the import to occur.
   pp.LookAhead(0);
 
@@ -1318,7 +1321,7 @@ namespace llvm {
     }
     enum { NumLowBitsAvailable = 0 };
   };
-}
+} // namespace llvm
 
 Identifier
 ClangImporter::Implementation::importIdentifier(
@@ -1434,7 +1437,7 @@ bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
       // Suppress the import of this method when the corresponding
       // property is not suppressed.
       return !shouldSuppressDeclImport(
-               objcMethod->findPropertyDecl(/*checkOverrides=*/false));
+               objcMethod->findPropertyDecl(/*CheckOverrides=*/false));
     }
 
     // If the method was declared within a protocol, check that it
@@ -1866,7 +1869,7 @@ public:
   explicit VectorDeclPtrConsumer(SmallVectorImpl<Decl *> &Decls)
     : Results(Decls) {}
 
-  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     Results.push_back(VD);
   }
 };

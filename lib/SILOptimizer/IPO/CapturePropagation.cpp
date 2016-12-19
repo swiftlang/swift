@@ -47,7 +47,7 @@ protected:
                                       SILFunction *SubstF);
   void rewritePartialApply(PartialApplyInst *PAI, SILFunction *SpecialF);
 };
-} // namespace
+} // end anonymous namespace
 
 static LiteralInst *getConstant(SILValue V) {
   if (auto I = dyn_cast<ThinToThickFunctionInst>(V))
@@ -135,7 +135,7 @@ protected:
 
   void cloneConstValue(SILValue Const);
 };
-} // namespace
+} // end anonymous namespace
 
 /// Clone a constant value. Recursively walk the operand chain through cast
 /// instructions to ensure that all dependents are cloned. Note that the
@@ -181,7 +181,7 @@ void CapturePropagationCloner::cloneBlocks(
 
     SILArgument *Arg = OrigEntryBB->getArgument(ParamIdx);
 
-    SILValue MappedValue = ClonedEntryBB->createArgument(
+    SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
         remapType(Arg->getType()), Arg->getDecl());
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }

@@ -120,7 +120,7 @@ namespace {
       gen.B.emitDestroyValueOperation(l, closure);
     }
   };
-}
+} // end anonymous namespace
 
 ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
   return F.getForwardingSubstitutions();
@@ -282,8 +282,11 @@ public:
     assert(decl->hasStorage() && "can't emit storage for a computed variable");
     assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
 
-    SILType lType = SGF.getLoweredType(decl->getType()->getRValueType());
-    auto boxType = SILBoxType::get(lType.getSwiftRValueType());
+    auto boxType = SGF.SGM.Types
+      .getContextBoxTypeForCapture(decl,
+                     SGF.getLoweredType(decl->getType()).getSwiftRValueType(),
+                     SGF.F.getGenericEnvironment(),
+                     /*mutable*/ true);
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
@@ -620,7 +623,7 @@ public:
   
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
-      subInitialization.get()->finishInitialization(SGF);
+      subInitialization->finishInitialization(SGF);
   }
 };
 } // end anonymous namespace
@@ -698,7 +701,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   // is not address-only.
   SILValue eltValue;
   if (!value.getType().isAddress())
-    eltValue = contBB->createArgument(eltTy);
+    eltValue = contBB->createPHIArgument(eltTy);
 
   if (subInit == nullptr) {
     // If there is no subinitialization, then we are done matching.  Don't
@@ -775,7 +778,7 @@ public:
   
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
-      subInitialization.get()->finishInitialization(SGF);
+      subInitialization->finishInitialization(SGF);
   }
 };
 } // end anonymous namespace
@@ -1172,7 +1175,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
 /// of the specified value.
@@ -1712,7 +1715,6 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   CanAnyFunctionType reqtSubstTy;
   ArrayRef<Substitution> witnessSubs;
   if (witness.requiresSubstitution()) {
-    GenericSignature *genericSig = witness.getSyntheticSignature();;
     genericEnv = witness.getSyntheticEnvironment();
     witnessSubs = witness.getSubstitutions();
 
@@ -1721,7 +1723,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
     auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();
 
-    if (genericSig) {
+    if (genericEnv) {
+      auto *genericSig = genericEnv->getGenericSignature();
       reqtSubstTy = cast<GenericFunctionType>(
         GenericFunctionType::get(genericSig, input, result,
                                  reqtOrigTy->getExtInfo())
@@ -1841,7 +1844,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       selfInterfaceType = proto->getSelfInterfaceType();
     }
 
-    selfType = ArchetypeBuilder::mapTypeIntoContext(
+    selfType = GenericEnvironment::mapTypeIntoContext(
         M.getSwiftModule(), genericEnv, selfInterfaceType);
   }
 
@@ -1950,7 +1953,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
   SILLinkage linkage =
@@ -1986,10 +1989,10 @@ getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
 
     // Substitute context parameters out of the "from" and "to" types.
     auto fromInterfaceType
-        = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, fromType)
+        = GenericEnvironment::mapTypeOutOfContext(genericEnv, fromType)
                 ->getCanonicalType();
     auto toInterfaceType
-        = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, toType)
+        = GenericEnvironment::mapTypeOutOfContext(genericEnv, toType)
                 ->getCanonicalType();
 
     mangler.mangleType(fromInterfaceType, /*uncurry*/ 0);
@@ -1997,7 +2000,7 @@ getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
     std::string Old = mangler.finalize();
 
     NewMangling::ASTMangler NewMangler;
-    std::string New = NewMangler.mangleReabstructionThunkHelper(thunkType,
+    std::string New = NewMangler.mangleReabstractionThunkHelper(thunkType,
                        fromInterfaceType, toInterfaceType, M.getSwiftModule());
 
     name = NewMangling::selectMangling(Old, New);

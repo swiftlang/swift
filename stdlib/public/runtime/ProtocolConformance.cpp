@@ -206,7 +206,7 @@ namespace {
       return FailureGeneration.load(std::memory_order_relaxed);
     }
   };
-}
+} // end anonymous namespace
 
 // Conformance Cache.
 struct ConformanceState {
@@ -341,7 +341,7 @@ recur:
         // An up-to-date entry for the original type is authoritative.
         isAuthoritative = true;
       } else {
-        // A up-to-date cached failure for a superclass of the type is not
+        // An up-to-date cached failure for a superclass of the type is not
         // authoritative: there may be a still-undiscovered conformance
         // for the original query type.
         isAuthoritative = false;

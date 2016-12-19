@@ -51,7 +51,7 @@ func direct_to_protocol(_ obj: AnyObject) {
 func direct_to_static_method(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : $AnyObject):
   var obj = obj
-  // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK: store [[ARG_COPY]] to [init] [[PBOBJ]] : $*AnyObject
@@ -70,11 +70,11 @@ func direct_to_static_method(_ obj: AnyObject) {
 func opt_to_class(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : $AnyObject):
   var obj = obj
-  // CHECK:   [[EXISTBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject> 
+  // CHECK:   [[EXISTBOX:%[0-9]+]] = alloc_box ${ var AnyObject } 
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[EXISTBOX]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[PBOBJ]]
-  // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<@callee_owned () -> ()>>
+  // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
   // CHECK:   [[PBOPT:%.*]] = project_box [[OPTBOX]]
   // CHECK:   [[EXISTVAL:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[OBJ_SELF:%[0-9]*]] = open_existential_ref [[EXISTVAL]]
@@ -104,8 +104,8 @@ func opt_to_class(_ obj: AnyObject) {
 
   // Exit
   // CHECK:   destroy_value [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
-  // CHECK:   destroy_value [[OPTBOX]] : $<τ_0_0> { var τ_0_0 } <Optional<@callee_owned () -> ()>>
-  // CHECK:   destroy_value [[EXISTBOX]] : $<τ_0_0> { var τ_0_0 } <AnyObject>
+  // CHECK:   destroy_value [[OPTBOX]] : ${ var Optional<@callee_owned () -> ()> }
+  // CHECK:   destroy_value [[EXISTBOX]] : ${ var AnyObject }
   // CHECK:   destroy_value %0
   // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
   // CHECK:   return [[RESULT]] : $()
@@ -121,11 +121,11 @@ func forced_without_outer(_ obj: AnyObject) {
 func opt_to_static_method(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK:   [[OBJBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  // CHECK:   [[OBJBOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<@callee_owned () -> ()>>
+  // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
   // CHECK:   [[PBO:%.*]] = project_box [[OPTBOX]]
   // CHECK:   [[OBJCOPY:%[0-9]+]] = load_borrow [[PBOBJ]] : $*AnyObject
   // CHECK:   [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
@@ -140,11 +140,11 @@ func opt_to_static_method(_ obj: AnyObject) {
 func opt_to_property(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK:   [[INT_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK:   [[INT_BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   project_box [[INT_BOX]]
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
@@ -168,14 +168,14 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
-  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
-  // CHECK:   alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK:   alloc_box ${ var Int }
   // CHECK:   project_box
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
@@ -200,11 +200,11 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
-  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
@@ -228,13 +228,13 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
 func downcast(_ obj: AnyObject) -> X {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $X
-  // CHECK:   destroy_value [[OBJ_BOX]] : $<τ_0_0> { var τ_0_0 } <AnyObject>
+  // CHECK:   destroy_value [[OBJ_BOX]] : ${ var AnyObject }
   // CHECK:   destroy_value %0
   // CHECK:   return [[X]] : $X
   return obj as! X

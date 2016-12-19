@@ -133,6 +133,8 @@ function(_add_variant_c_compile_link_flags)
     list(APPEND result "-DLLVM_ON_WIN32")
     list(APPEND result "-D_CRT_SECURE_NO_WARNINGS")
     list(APPEND result "-D_CRT_NONSTDC_NO_WARNINGS")
+    # TODO(compnerd) permit building for different families
+    list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
     # TODO(compnerd) handle /MT
     list(APPEND result "-D_DLL")
     list(APPEND result "-fms-compatibility-version=1900")
@@ -708,6 +710,8 @@ function(_add_swift_library_single target name)
   handle_swift_sources(
       swift_object_dependency_target
       swift_module_dependency_target
+      swift_sib_dependency_target
+      swift_sibgen_dependency_target
       SWIFTLIB_SINGLE_SOURCES
       SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS
@@ -730,12 +734,22 @@ function(_add_swift_library_single target name)
 
   # If there were any swift sources, then a .swiftmodule may have been created.
   # If that is the case, then add a target which is an alias of the module files.
+  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
   if(NOT "${SWIFTLIB_SINGLE_MODULE_TARGET}" STREQUAL "" AND NOT "${swift_module_dependency_target}" STREQUAL "")
     add_custom_target("${SWIFTLIB_SINGLE_MODULE_TARGET}"
-                      DEPENDS ${swift_module_dependency_target})
+      DEPENDS ${swift_module_dependency_target})
   endif()
 
-  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
+  if (swift_sib_dependency_target)
+    add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sib
+      ${swift_sib_dependency_target})
+  endif()
+
+  if (swift_sibgen_dependency_target)
+    add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibgen
+      ${swift_sibgen_dependency_target})
+  endif()
+
   set(SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS)
   foreach(object_library ${SWIFTLIB_SINGLE_INCORPORATE_OBJECT_LIBRARIES})
     list(APPEND SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS
@@ -1809,6 +1823,8 @@ function(_add_swift_executable_single name)
   handle_swift_sources(
       dependency_target
       unused_module_dependency_target
+      unused_sib_dependency_target
+      unused_sibgen_dependency_target
       SWIFTEXE_SINGLE_SOURCES SWIFTEXE_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS
         ${SWIFTEXE_SINGLE_DEPENDS}

@@ -163,5 +163,5 @@ protected:
                          bool LeaveOriginal);
 };
 
-} // End namespace swift.
+} // end namespace swift
 #endif

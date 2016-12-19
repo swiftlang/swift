@@ -22,7 +22,6 @@
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/LazyResolver.h"
@@ -37,7 +36,6 @@
 namespace swift {
   enum class AccessSemantics : unsigned char;
   class ApplyExpr;
-  class ArchetypeBuilder;
   class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
@@ -1495,28 +1493,10 @@ public:
   }
 
   /// Retrieve the generic signature for this type.
-  GenericSignature *getGenericSignature() const {
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv->getGenericSignature();
-
-    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return genericSig;
-
-    return nullptr;
-  }
+  GenericSignature *getGenericSignature() const;
 
   /// Retrieve the generic context for this type.
-  GenericEnvironment *getGenericEnvironment() const {
-    // Fast case: we already have a generic environment.
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv;
-
-    // If we only have a generic signature, build the generic environment.
-    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return getLazyGenericEnvironmentSlow();
-
-    return nullptr;
-  }
+  GenericEnvironment *getGenericEnvironment() const;
 
   /// Set a lazy generic environment.
   void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
@@ -1524,15 +1504,7 @@ public:
                                  uint64_t genericEnvData);
 
   /// Set the generic context of this extension.
-  void setGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert((GenericSigOrEnv.isNull() ||
-            getGenericSignature()->getCanonicalSignature() ==
-              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-           "set a generic environment with a different generic signature");
-    this->GenericSigOrEnv = genericEnv;
-    if (genericEnv)
-      genericEnv->setOwningDeclContext(this);
-  }
+  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   /// Retrieve the type being extended.
   Type getExtendedType() const { return ExtendedType.getType(); }
@@ -2322,28 +2294,10 @@ public:
   }
 
   /// Retrieve the generic signature for this type.
-  GenericSignature *getGenericSignature() const {
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv->getGenericSignature();
-
-    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return genericSig;
-
-    return nullptr;
-  }
+  GenericSignature *getGenericSignature() const;
 
   /// Retrieve the generic context for this type.
-  GenericEnvironment *getGenericEnvironment() const {
-    // Fast case: we already have a generic environment.
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv;
-
-    // If we only have a generic signature, build the generic environment.
-    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return getLazyGenericEnvironmentSlow();
-
-    return nullptr;
-  }
+  GenericEnvironment *getGenericEnvironment() const;
 
   void setIsValidatingGenericSignature(bool validating=true) {
     ValidatingGenericSignature = validating;
@@ -2359,16 +2313,7 @@ public:
                                  uint64_t genericEnvData);
 
   /// Set the generic context of this function.
-  void setGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert((GenericSigOrEnv.isNull() ||
-            getGenericSignature()->getCanonicalSignature() ==
-              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-           "set a generic environment with a different generic signature");
-    this->GenericSigOrEnv = genericEnv;
-
-    if (genericEnv)
-      genericEnv->setOwningDeclContext(this);
-  }
+  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   // Resolve ambiguity due to multiple base classes.
   using TypeDecl::getASTContext;
@@ -4051,7 +3996,7 @@ public:
     return OverriddenDecl;
   }
   void setOverriddenDecl(AbstractStorageDecl *over) {
-    // FIXME: Hack due to broken class circulatity checking.
+    // FIXME: Hack due to broken class circularity checking.
     if (over == this) return;
     OverriddenDecl = over;
     over->setIsOverridden();
@@ -4642,28 +4587,10 @@ public:
   bool isTransparent() const;
 
   /// Retrieve the generic signature for this function.
-  GenericSignature *getGenericSignature() const {
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv->getGenericSignature();
-
-    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return genericSig;
-
-    return nullptr;
-  }
+  GenericSignature *getGenericSignature() const;
 
   /// Retrieve the generic context for this function.
-  GenericEnvironment *getGenericEnvironment() const {
-    // Fast case: we already have a generic environment.
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv;
-
-    // If we only have a generic signature, build the generic environment.
-    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return getLazyGenericEnvironmentSlow();
-
-    return nullptr;
-  }
+  GenericEnvironment *getGenericEnvironment() const;
 
   /// Set a lazy generic environment.
   void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
@@ -4671,16 +4598,7 @@ public:
                                  uint64_t genericEnvData);
 
   /// Set the generic context of this function.
-  void setGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert((GenericSigOrEnv.isNull() ||
-            getGenericSignature()->getCanonicalSignature() ==
-              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-           "set a generic environment with a different generic signature");
-    this->GenericSigOrEnv = genericEnv;
-
-    if (genericEnv)
-      genericEnv->setOwningDeclContext(this);
-  }
+  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   // Expose our import as member status
   bool isImportAsMember() const { return IAMStatus.isImportAsMember(); }
@@ -5168,7 +5086,7 @@ public:
     return OverriddenOrBehaviorParamDecl.dyn_cast<FuncDecl *>();
   }
   void setOverriddenDecl(FuncDecl *over) {
-    // FIXME: Hack due to broken class circulatity checking.
+    // FIXME: Hack due to broken class circularity checking.
     if (over == this) return;
 
     // A function cannot be an override if it is also a derived global decl
@@ -5598,7 +5516,7 @@ public:
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(ConstructorDecl *over) {
-    // FIXME: Hack due to broken class circulatity checking.
+    // FIXME: Hack due to broken class circularity checking.
     if (over == this) return;
 
     OverriddenDecl = over;

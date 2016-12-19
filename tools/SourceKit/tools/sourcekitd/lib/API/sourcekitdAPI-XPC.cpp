@@ -145,7 +145,7 @@ public:
     : RequestResponsePrinterBase(OS, Indent) { }
 };
 
-} // anonymous namespace.
+} // anonymous namespace
 
 void sourcekitd::printRequestObject(sourcekitd_object_t Obj, raw_ostream &OS) {
   if (!Obj) {

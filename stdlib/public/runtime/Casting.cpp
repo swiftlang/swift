@@ -2010,7 +2010,7 @@ struct OptionalCastResult {
   const Metadata* payloadType;
 };
 
-}
+} // end anonymous namespace
 
 /// Handle optional unwrapping of the cast source.
 /// \returns {true, nullptr} if the cast succeeds without unwrapping.

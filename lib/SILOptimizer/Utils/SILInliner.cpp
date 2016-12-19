@@ -137,7 +137,8 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
                            SILFunction::iterator(ReturnToBB));
 
     // Create an argument on the return-to BB representing the returned value.
-    auto *RetArg = ReturnToBB->createArgument(AI.getInstruction()->getType());
+    auto *RetArg =
+        ReturnToBB->createPHIArgument(AI.getInstruction()->getType());
     // Replace all uses of the ApplyInst with the new argument.
     AI.getInstruction()->replaceAllUsesWith(RetArg);
   }
@@ -407,7 +408,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 
       return InlineCost::Expensive;
     }
-    case ValueKind::SILArgument:
+    case ValueKind::SILPHIArgument:
+    case ValueKind::SILFunctionArgument:
     case ValueKind::SILUndef:
       llvm_unreachable("Only instructions should be passed into this "
                        "function.");

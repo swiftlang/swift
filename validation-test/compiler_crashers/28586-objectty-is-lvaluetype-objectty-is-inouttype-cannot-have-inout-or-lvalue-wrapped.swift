@@ -7,4 +7,4 @@
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-enum e:A.a>protocol A{class a<T>
+var f={$0=(&[(

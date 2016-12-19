@@ -18,6 +18,7 @@
 #include "ImporterImpl.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -78,7 +79,7 @@ enum class MakeStructRawValuedFlags {
   IsImplicit = 0x04,
 };
 using MakeStructRawValuedOptions = OptionSet<MakeStructRawValuedFlags>;
-}
+} // end anonymous namespace
 
 static MakeStructRawValuedOptions
 getDefaultMakeStructRawValuedOptions() {
@@ -928,7 +929,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
 
     // Construct the left-hand reference to self.
     Expr *lhs = new (context) DeclRefExpr(constructor->getImplicitSelfDecl(),
-                                          DeclNameLoc(), /*implicit=*/true);
+                                          DeclNameLoc(), /*Implicit=*/true);
 
     // Construct the right-hand call to Builtin.zeroInitializer.
     Identifier zeroInitID = context.getIdentifier("zeroInitializer");
@@ -1304,7 +1305,7 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
 
   // 'self'
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), dc);
-  auto elementTy = ArchetypeBuilder::mapTypeIntoContext(dc, elementInterfaceTy);
+  auto elementTy = dc->mapTypeIntoContext(elementInterfaceTy);
 
   auto paramVarDecl =
       new (C) ParamDecl(/*isLet=*/false, SourceLoc(), SourceLoc(), Identifier(),
@@ -1419,13 +1420,13 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
   clang::VersionTuple noVersion;
   auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
                                       targetPlatform(C.LangOpts),
-                                      /*message=*/StringRef(),
-                                      /*rename=*/StringRef(),
+                                      /*Message=*/StringRef(),
+                                      /*Rename=*/StringRef(),
                                       info.getOSVersion().getLowerEndpoint(),
-                                      /*deprecated=*/noVersion,
-                                      /*obsoleted=*/noVersion,
+                                      /*Deprecated=*/noVersion,
+                                      /*Obsoleted=*/noVersion,
                                       PlatformAgnosticAvailabilityKind::None,
-                                      /*implicit=*/false);
+                                      /*Implicit=*/false);
 
   decl->getAttrs().add(AvAttr);
 }
@@ -1496,7 +1497,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
       isStatic,
-      /*isLet=*/false, SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
+      /*IsLet=*/false, SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setAccessibility(Accessibility::Public);
 
@@ -3194,7 +3195,7 @@ namespace {
         if (forceClassMethod)
           return nullptr;
 
-        return importConstructor(decl, dc, /*isImplicit=*/false, None,
+        return importConstructor(decl, dc, /*implicit=*/false, None,
                                  /*required=*/false);
       }
 
@@ -3794,7 +3795,7 @@ namespace {
       auto createRootClass = [=](DeclContext *dc = nullptr) -> ClassDecl * {
         if (!dc) {
           dc = Impl.getClangModuleForDecl(decl->getCanonicalDecl(),
-                                          /*forwardDeclaration=*/true);
+                                          /*allowForwardDeclaration=*/true);
         }
 
         auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
@@ -3913,8 +3914,7 @@ namespace {
                                          isInSystemModule(dc),
                                          /*isFullyBridgeable*/false);
         if (superclassType) {
-          superclassType =
-              ArchetypeBuilder::mapTypeOutOfContext(result, superclassType);
+          superclassType = result->mapTypeOutOfContext(superclassType);
           assert(superclassType->is<ClassType>() ||
                  superclassType->is<BoundGenericClassType>());
           inheritedTypes.push_back(TypeLoc::withoutLoc(superclassType));
@@ -4117,7 +4117,7 @@ namespace {
           decl->isClassProperty(), /*IsLet*/ false,
           Impl.importSourceLoc(decl->getLocation()),
           name, type, dc);
-      result->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(dc, type));
+      result->setInterfaceType(dc->mapTypeOutOfContext(type));
 
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
@@ -4230,7 +4230,7 @@ namespace {
       return nullptr;
     }
   };
-}
+} // end anonymous namespace
 
 /// Try to strip "Mutable" out of a type name.
 static clang::IdentifierInfo *
@@ -4389,8 +4389,7 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
       genericParams = generic->getGenericParams();
       genericEnv = generic->getGenericEnvironment();
 
-      underlyingType =
-          ArchetypeBuilder::mapTypeIntoContext(generic, underlyingType);
+      underlyingType = generic->mapTypeIntoContext(underlyingType);
     }
   }
 
@@ -4735,7 +4734,7 @@ SwiftDeclConverter::importGlobalAsInitializer(const clang::FunctionDecl *decl,
     // argument label
     auto *paramDecl =
         new (Impl.SwiftContext) ParamDecl(
-            /*IsLet=*/true, SourceLoc(), SourceLoc(), argNames.front(),
+            /*isLet=*/true, SourceLoc(), SourceLoc(), argNames.front(),
             SourceLoc(), argNames.front(), Impl.SwiftContext.TheEmptyTupleType,
             dc);
     paramDecl->setInterfaceType(Impl.SwiftContext.TheEmptyTupleType);
@@ -4750,8 +4749,8 @@ SwiftDeclConverter::importGlobalAsInitializer(const clang::FunctionDecl *decl,
     return nullptr;
 
   bool selfIsInOut = !dc->getDeclaredInterfaceType()->hasReferenceSemantics();
-  auto selfParam = ParamDecl::createSelf(SourceLoc(), dc, /*static=*/false,
-                                         /*inout=*/selfIsInOut);
+  auto selfParam = ParamDecl::createSelf(SourceLoc(), dc, /*isStatic=*/false,
+                                         /*isInOut=*/selfIsInOut);
 
   OptionalTypeKind initOptionality;
   auto resultType = Impl.importFunctionReturnType(
@@ -5407,7 +5406,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   // If this initializer is required, add the appropriate attribute.
   if (required) {
     result->getAttrs().add(new (Impl.SwiftContext)
-                               RequiredAttr(/*implicit=*/true));
+                               RequiredAttr(/*IsImplicit=*/true));
   }
 
   // Record the error convention.
@@ -5466,7 +5465,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
     if (memberCtor->isRequired() &&
         !ctor->getAttrs().hasAttribute<RequiredAttr>()) {
       ctor->getAttrs().add(new (Impl.SwiftContext)
-                               RequiredAttr(/*implicit=*/true));
+                               RequiredAttr(/*IsImplicit=*/true));
     }
   }
 }
@@ -5642,8 +5641,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
                        ->getResult()
                        ->castTo<AnyFunctionType>()
                        ->getResult();
-  auto elementContextTy = ArchetypeBuilder::mapTypeIntoContext(
-      getter, elementTy);
+  auto elementContextTy = getter->mapTypeIntoContext(elementTy);
 
   // Local function to mark the setter unavailable.
   auto makeSetterUnavailable = [&] {
@@ -6416,7 +6414,7 @@ void ClangImporter::Implementation::importAttributes(
                                           platformK.getValue(),
                                           message, swiftReplacement,
                                           introduced, deprecated, obsoleted,
-                                          PlatformAgnostic, /*implicit=*/false);
+                                          PlatformAgnostic, /*Implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
     }
@@ -6670,7 +6668,7 @@ void ClangImporter::Implementation::finishProtocolConformance(
       if (auto ctor = dyn_cast_or_null<ConstructorDecl>(witness)) {
         if (!ctor->getAttrs().hasAttribute<RequiredAttr>()) {
           ctor->getAttrs().add(
-            new (SwiftContext) RequiredAttr(/*implicit=*/true));
+            new (SwiftContext) RequiredAttr(/*IsImplicit=*/true));
         }
       }
     }
@@ -7225,7 +7223,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
                                     Instance->getSourceManager(),
                                     "loading members for");
 
-  // TODO: accomodate deprecated versions as well
+  // TODO: accommodate deprecated versions as well
   SwiftDeclConverter converter(*this, CurrentVersion);
   SwiftDeclConverter swift2Converter(*this, ImportNameVersion::Swift2);
 

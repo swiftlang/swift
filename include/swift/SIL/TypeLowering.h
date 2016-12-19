@@ -795,6 +795,20 @@ public:
   CanSILFunctionType
   getUncachedSILFunctionTypeForConstant(SILDeclRef constant,
                                   CanAnyFunctionType origInterfaceType);
+  
+  /// Get the boxed interface type to use for a capture of the given decl.
+  CanSILBoxType
+  getInterfaceBoxTypeForCapture(ValueDecl *captured,
+                                CanType loweredInterfaceType,
+                                bool isMutable);
+  /// Get the boxed contextual type to use for a capture of the given decl
+  /// in the given generic environment.
+  CanSILBoxType
+  getContextBoxTypeForCapture(ValueDecl *captured,
+                              CanType loweredContextType,
+                              GenericEnvironment *env,
+                              bool isMutable);
+
 private:
   CanType getLoweredRValueType(AbstractionPattern origType, CanType substType,
                                unsigned uncurryLevel);

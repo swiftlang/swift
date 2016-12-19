@@ -121,7 +121,7 @@ void emitDeallocatePartialClassInstance(IRGenFunction &IGF,
 OwnedAddress
 emitAllocateBox(IRGenFunction &IGF,
                 CanSILBoxType boxType,
-                CanSILBoxType boxInterfaceType,
+                GenericEnvironment *env,
                 const llvm::Twine &name);
 
 /// Deallocate a box whose value is uninitialized.

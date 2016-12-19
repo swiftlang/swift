@@ -555,7 +555,7 @@ bool TopDownRefCountState::initWithMutatorInst(
 }
 
 /// Initialize this ref count state with the @owned Arg at +1.
-void TopDownRefCountState::initWithArg(SILArgument *Arg) {
+void TopDownRefCountState::initWithArg(SILFunctionArgument *Arg) {
   LatState = LatticeState::Incremented;
   Transition = RCStateTransition(Arg);
   assert(Transition.getKind() == RCStateTransitionKind::StrongEntrance &&

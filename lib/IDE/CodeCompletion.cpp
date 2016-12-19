@@ -1661,7 +1661,7 @@ private:
           expectedType->lookThroughAllAnyOptionalTypes()
               ->is<AnyFunctionType>() &&
           calculateTypeRelationForDecl(D, expectedType, isImplicitlyCurriedIM,
-                                       /*UseFuncResult=*/false) >=
+                                       /*UseFuncResultType=*/false) >=
               CodeCompletionResult::ExpectedTypeRelation::Convertible) {
         return true;
       }
@@ -1985,16 +1985,15 @@ public:
             MaybeNominalType->getAnyOptionalObjectType())
           MaybeNominalType = MaybeNominalType->getAnyOptionalObjectType();
 
-        // For dynamic lookup don't substitute in the base type
+        // For dynamic lookup don't substitute in the base type.
         if (MaybeNominalType->isAnyObject())
           return T;
 
         // For everything else, substitute in the base type.
-        //
+        auto Subs = MaybeNominalType->getMemberSubstitutions(VD);
+
         // Pass in DesugarMemberTypes so that we see the actual
         // concrete type witnesses instead of type alias types.
-        auto Subs = MaybeNominalType->getMemberSubstitutions(
-            VD->getDeclContext());
         T = T.subst(M, Subs, (SubstFlags::DesugarMemberTypes |
                               SubstFlags::UseErrorType));
       }
@@ -2268,7 +2267,7 @@ public:
       SemanticContextKind::ExpressionSpecific, ExpectedTypes);
     Builder.addTextChunk("available");
     Builder.addLeftParen();
-    Builder.addSimpleTypedParameter("Platform", /*isVarArg=*/true);
+    Builder.addSimpleTypedParameter("Platform", /*IsVarArg=*/true);
     Builder.addComma();
     Builder.addTextChunk("*");
     Builder.addRightParen();
@@ -2288,7 +2287,7 @@ public:
     else
       Builder.addTextChunk("selector");
     Builder.addLeftParen();
-    Builder.addSimpleTypedParameter("@objc method", /*isVarArg=*/false);
+    Builder.addSimpleTypedParameter("@objc method", /*IsVarArg=*/false);
     Builder.addRightParen();
   }
 
@@ -2311,7 +2310,7 @@ public:
       Builder.addTextChunk("keyPath");
     Builder.addLeftParen();
     Builder.addSimpleTypedParameter("@objc property sequence",
-                                    /*isVarArg=*/false);
+                                    /*IsVarArg=*/false);
     Builder.addRightParen();
   }
 
@@ -3099,11 +3098,11 @@ public:
       DeclContext *DC;
       if (VD) {
         DC = VD->getInnermostDeclContext();
-        this->ExprType = ArchetypeBuilder::mapTypeIntoContext(DC, ExprType);
+        this->ExprType = DC->mapTypeIntoContext(ExprType);
       } else if (auto NTD = ExprType->getRValueType()->getRValueInstanceType()
           ->getAnyNominal()) {
         DC = NTD;
-        this->ExprType = ArchetypeBuilder::mapTypeIntoContext(DC, ExprType);
+        this->ExprType = DC->mapTypeIntoContext(ExprType);
       }
     }
 
@@ -4343,7 +4342,7 @@ static void addSelectorModifierKeywords(CodeCompletionResultSink &sink) {
     Builder.setKeywordKind(Kind);
     Builder.addTextChunk(Name);
     Builder.addCallParameterColon();
-    Builder.addSimpleTypedParameter("@objc property", /*isVarArg=*/false);
+    Builder.addSimpleTypedParameter("@objc property", /*IsVarArg=*/false);
   };
 
   addKeyword("getter", CodeCompletionKeywordKind::None);

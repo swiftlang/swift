@@ -32,10 +32,10 @@ func consumeAddressOnly(_: AddressOnly) {}
 // CHECK: sil hidden @_TF7if_expr19addr_only_ternary_1
 func addr_only_ternary_1(x: Bool) -> AddressOnly {
   // CHECK: bb0([[RET:%.*]] : $*AddressOnly, {{.*}}):
-  // CHECK: [[a:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <AddressOnly>, var, name "a"
+  // CHECK: [[a:%[0-9]+]] = alloc_box ${ var AddressOnly }, var, name "a"
   // CHECK: [[PBa:%.*]] = project_box [[a]]
   var a : AddressOnly = A()
-  // CHECK: [[b:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <AddressOnly>, var, name "b"
+  // CHECK: [[b:%[0-9]+]] = alloc_box ${ var AddressOnly }, var, name "b"
   // CHECK: [[PBb:%.*]] = project_box [[b]]
   var b : AddressOnly = B()
 

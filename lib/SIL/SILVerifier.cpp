@@ -50,6 +50,10 @@ static llvm::cl::opt<bool> SkipUnreachableMustBeLastErrors(
 // prevent release builds from triggering spurious unused variable warnings.
 #ifndef NDEBUG
 
+//===----------------------------------------------------------------------===//
+//                                SILVerifier
+//===----------------------------------------------------------------------===//
+
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
@@ -69,6 +73,7 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
 }
 
 namespace {
+
 /// Metaprogramming-friendly base class.
 template <class Impl>
 class SILVerifierBase : public SILVisitor<Impl> {
@@ -231,14 +236,6 @@ public:
     // TODO: We should compare generic signatures. Class and witness methods
     // allow variance in "self"-fulfilled parameters; other functions must
     // match exactly.
-    auto signature1 = type1->getGenericSignature();
-    auto signature2 = type2->getGenericSignature();
-
-    auto getAnyOptionalObjectTypeInContext = [&](CanGenericSignature sig,
-                                                 SILType type) {
-      Lowering::GenericContextScope context(F.getModule().Types, sig);
-      return type.getAnyOptionalObjectType();
-    };
 
     // TODO: More sophisticated param and return ABI compatibility rules could
     // diverge.
@@ -292,8 +289,8 @@ public:
           continue;
         
         // Optional and IUO are interchangeable if their elements are.
-        auto aObject = getAnyOptionalObjectTypeInContext(signature1, aa);
-        auto bObject = getAnyOptionalObjectTypeInContext(signature2, bb);
+        auto aObject = aa.getAnyOptionalObjectType();
+        auto bObject = bb.getAnyOptionalObjectType();
         if (aObject && bObject
             && areABICompatibleParamsOrReturns(aObject, bObject))
           continue;
@@ -440,6 +437,7 @@ public:
 
   void visitSILArgument(SILArgument *arg) {
     checkLegalType(arg->getFunction(), arg, nullptr);
+    checkValueBaseOwnership(arg);
   }
 
   void visitSILInstruction(SILInstruction *I) {
@@ -451,6 +449,31 @@ public:
     checkInstructionsSILLocation(I);
 
     checkLegalType(I->getFunction(), I, I);
+
+    // Check ownership.
+    SILFunction *F = I->getFunction();
+    assert(F && "Expected value base with parent function");
+
+    // Check ownership.
+    checkValueBaseOwnership(I);
+  }
+
+  void checkValueBaseOwnership(ValueBase *V) {
+    // If ownership is not enabled, bail.
+    if (!isSILOwnershipEnabled())
+      return;
+
+    // If V does not have a value, bail.
+    if (!V->hasValue())
+      return;
+
+    SILFunction *F = V->getFunction();
+    assert(F && "Expected value base with parent function");
+    // If we do not have qualified ownership, then do not verify value base
+    // ownership.
+    if (!F->hasQualifiedOwnership())
+      return;
+    SILValue(V).verifyOwnership();
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -3121,7 +3144,7 @@ public:
               ->isBindableTo(bbArgTy.getSwiftRValueType(), nullptr),
             "bb argument for dynamic_method_br must be of the method's type");
   }
-  
+
   void checkProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
     require(PBSI->getOperand()->getType().isAddress(),
             "operand must be an address");
@@ -3548,6 +3571,10 @@ public:
 #undef require
 #undef requireObjectType
 #endif //NDEBUG
+
+//===----------------------------------------------------------------------===//
+//                     Out of Line Verifier Run Functions
+//===----------------------------------------------------------------------===//
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.

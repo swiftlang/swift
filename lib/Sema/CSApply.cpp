@@ -17,7 +17,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/StringExtras.h"
@@ -3774,7 +3773,7 @@ namespace {
       SuspiciousOptionalInjections.push_back(injection);
     }
   };
-}
+} // end anonymous namespace
 
 
 /// Resolve a locator to the specific declaration it references, if possible.
@@ -4077,31 +4076,31 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   case DefaultArgumentKind::Column:
     init = new (tc.Context) MagicIdentifierLiteralExpr(
                               MagicIdentifierLiteralExpr::Column, loc,
-                              /*Implicit=*/true);
+                              /*implicit=*/true);
     break;
 
   case DefaultArgumentKind::File:
     init = new (tc.Context) MagicIdentifierLiteralExpr(
                               MagicIdentifierLiteralExpr::File, loc,
-                              /*Implicit=*/true);
+                              /*implicit=*/true);
     break;
     
   case DefaultArgumentKind::Line:
     init = new (tc.Context) MagicIdentifierLiteralExpr(
                               MagicIdentifierLiteralExpr::Line, loc,
-                              /*Implicit=*/true);
+                              /*implicit=*/true);
     break;
       
   case DefaultArgumentKind::Function:
     init = new (tc.Context) MagicIdentifierLiteralExpr(
                               MagicIdentifierLiteralExpr::Function, loc,
-                              /*Implicit=*/true);
+                              /*implicit=*/true);
     break;
 
   case DefaultArgumentKind::DSOHandle:
     init = new (tc.Context) MagicIdentifierLiteralExpr(
                               MagicIdentifierLiteralExpr::DSOHandle, loc,
-                              /*Implicit=*/true);
+                              /*implicit=*/true);
     break;
 
   case DefaultArgumentKind::Nil:
@@ -6346,7 +6345,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
   Expr *declRef = buildMemberRef(fn,
                                  selected->openedFullType,
-                                 /*DotLoc=*/SourceLoc(),
+                                 /*dotLoc=*/SourceLoc(),
                                  decl, DeclNameLoc(fn->getEndLoc()),
                                  selected->openedType,
                                  locator,
@@ -6523,7 +6522,7 @@ namespace {
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
-    ~ExprWalker() {
+    ~ExprWalker() override {
       // If we're re-typechecking an expression for diagnostics, don't
       // visit closures that have non-single expression bodies.
       if (Rewriter.SkipClosures)
@@ -6614,7 +6613,7 @@ namespace {
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
-}
+} // end anonymous namespace
 
 Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
   // Can't load from an inout value.

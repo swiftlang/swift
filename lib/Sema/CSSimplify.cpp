@@ -2983,8 +2983,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
                   fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
           
             auto argType = fnType->getInput()->getWithoutParens();
-            argType = ArchetypeBuilder::mapTypeIntoContext(
-                ctor.Decl->getInnermostDeclContext(), argType);
+            argType = ctor.Decl->getInnermostDeclContext()
+                ->mapTypeIntoContext(argType);
             if (argType->isEqual(favoredType))
               result.FavoredChoice = result.ViableCandidates.size();
           }

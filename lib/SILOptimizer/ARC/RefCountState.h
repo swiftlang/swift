@@ -336,7 +336,7 @@ public:
                            RCIdentityFunctionInfo *RCFI);
 
   /// Initialize the state given the consumed argument Arg.
-  void initWithArg(SILArgument *Arg);
+  void initWithArg(SILFunctionArgument *Arg);
 
   /// Initialize this RefCountState with an instruction which introduces a new
   /// ref count at +1.

@@ -32,7 +32,7 @@ namespace {
                                  CanType bridgedError) const = 0;
     virtual void emitRelease(SILGenFunction &gen, SILLocation loc) const = 0;
   };
-}
+} // end anonymous namespace
 
 /// Emit a store of a native error to the foreign-error slot.
 static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
@@ -57,7 +57,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
 
     // If we have the slot, emit a store to it.
     gen.B.emitBlock(hasSlotBB);
-    SILValue slot = hasSlotBB->createArgument(errorPtrObjectTy);
+    SILValue slot = hasSlotBB->createPHIArgument(errorPtrObjectTy);
     emitStoreToForeignErrorSlot(gen, loc, slot, errorSrc);
     gen.B.createBranch(loc, contBB);
 
@@ -168,7 +168,7 @@ namespace {
     void emitRelease(SILGenFunction &gen, SILLocation loc) const override {
     }
   };
-}
+} // end anonymous namespace
 
 /// Given that we are throwing a native error, turn it into a bridged
 /// error, dispose of it in the correct way, and create the appropriate
@@ -383,7 +383,7 @@ emitResultIsNilErrorCheck(SILGenFunction &gen, SILLocation loc,
   // In the continuation block, take ownership of the now non-optional
   // result value.
   gen.B.emitBlock(contBB);
-  SILValue objectResult = contBB->createArgument(resultObjectType);
+  SILValue objectResult = contBB->createPHIArgument(resultObjectType);
   return gen.emitManagedRValueWithCleanup(objectResult);
 }
 
@@ -401,7 +401,7 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
 
   // Switch on the optional error.
   SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
-  errorBB->createArgument(optionalError->getType().unwrapAnyOptionalType());
+  errorBB->createPHIArgument(optionalError->getType().unwrapAnyOptionalType());
   SILBasicBlock *contBB = gen.createBasicBlock();
   gen.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,
                          { { ctx.getOptionalSomeDecl(), errorBB },

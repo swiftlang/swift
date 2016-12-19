@@ -442,7 +442,7 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
     return Impl.Allocator;
 
   case AllocationArena::ConstraintSolver:
-    assert(Impl.CurrentConstraintSolverArena.get() != nullptr);
+    assert(Impl.CurrentConstraintSolverArena != nullptr);
     return Impl.CurrentConstraintSolverArena->Allocator;
   }
   llvm_unreachable("bad AllocationArena");
@@ -460,10 +460,6 @@ void ASTContext::setLazyResolver(LazyResolver *resolver) {
   } else {
     assert(Impl.Resolver != nullptr && "no resolver to remove");
     Impl.Resolver = resolver;
-
-    // DelayedConformanceDiags callbacks contain pointers to the TypeChecker, so
-    // they must be removed when the TypeChecker goes away.
-    Impl.DelayedConformanceDiags.clear();
   }
 }
 
@@ -1683,7 +1679,7 @@ namespace {
       return OrderDeclarations(SrcMgr)(lhs, rhs);
     }
   };
-}
+} // end anonymous namespace
 
 /// Compute the information used to describe an Objective-C redeclaration.
 std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
@@ -2413,22 +2409,6 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
   }
 
   return objcName;
-}
-
-void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
-                                      unsigned indent) const {
-  dumpArchetypeContext(archetype, llvm::errs(), indent);
-}
-
-void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
-                                      llvm::raw_ostream &os,
-                                      unsigned indent) const {
-  if (archetype->isOpenedExistential())
-    return;
-
-  if (auto env = archetype->getGenericEnvironment())
-    if (auto owningDC = env->getOwningDeclContext())
-      owningDC->printContext(os, indent);
 }
 
 //===----------------------------------------------------------------------===//
@@ -3487,7 +3467,7 @@ public:
   raw_capturing_ostream(CapturingTypeCheckerDebugConsumer &Listener)
       : Listener(Listener) {}
 
-  ~raw_capturing_ostream() {
+  ~raw_capturing_ostream() override {
     flush();
   }
 

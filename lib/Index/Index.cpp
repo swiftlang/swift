@@ -174,7 +174,7 @@ public:
                       unsigned BufferID)
       : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr), BufferID(BufferID),
         enableWarnings(IdxConsumer.enableWarnings()) {}
-  ~IndexSwiftASTWalker() { assert(Cancelled || EntitiesStack.empty()); }
+  ~IndexSwiftASTWalker() override { assert(Cancelled || EntitiesStack.empty()); }
 
   void visitModule(Module &Mod, StringRef Hash);
 
@@ -500,7 +500,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
 
   } else {
     IndexSymbol Info;
-    if (initIndexSymbol(D, Loc, /*isRef=*/false, Info))
+    if (initIndexSymbol(D, Loc, /*IsRef=*/false, Info))
       return false;
 
     return startEntity(D, Info);
@@ -523,7 +523,7 @@ bool IndexSwiftASTWalker::startEntityRef(ValueDecl *D, SourceLoc Loc) {
 
   } else {
     IndexSymbol Info;
-    if (initIndexSymbol(D, Loc, /*isRef=*/true, Info))
+    if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
       return false;
 
     return startEntity(D, Info);
@@ -545,7 +545,7 @@ bool IndexSwiftASTWalker::passRelated(ValueDecl *D, SourceLoc Loc) {
     return false;
 
   IndexSymbol Info;
-  if (initIndexSymbol(D, Loc, /*isRef=*/true, Info))
+  if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return false;
 
   if (!IdxConsumer.recordRelatedEntity(Info)) {
@@ -663,7 +663,7 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
     return true;
 
   IndexSymbol Info;
-  if (initIndexSymbol(NTD, Loc, /*isRef=*/false, Info))
+  if (initIndexSymbol(NTD, Loc, /*IsRef=*/false, Info))
     return true;
 
   Info.kind = getSymbolKindForDecl(D);

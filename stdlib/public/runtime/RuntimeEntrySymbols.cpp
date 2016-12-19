@@ -79,5 +79,5 @@ namespace swift {
 // This is done only for entry points using a new calling convention or
 // for those entry points which explicitly require it.
 #include "swift/Runtime/RuntimeFunctions.def"
-}
+} // namespace swift
 

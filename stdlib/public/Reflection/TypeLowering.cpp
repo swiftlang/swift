@@ -190,7 +190,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
   PrintTypeInfo(OS, Indent).print(*this);
@@ -1288,5 +1288,5 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   swift_unreachable("Unhandled FieldDescriptorKind in switch.");
 }
 
-}  // namespace reflection
-}  // namespace swift
+} // namespace reflection
+} // namespace swift

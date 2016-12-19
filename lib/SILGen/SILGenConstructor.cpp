@@ -42,9 +42,8 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
                                DC);
   VD->setInterfaceType(metatype);
 
-  gen.AllocatorMetatype =
-      gen.F.begin()->createArgument(
-          gen.getLoweredType(DC->mapTypeIntoContext(metatype)), VD);
+  gen.AllocatorMetatype = gen.F.begin()->createFunctionArgument(
+      gen.getLoweredType(DC->mapTypeIntoContext(metatype)), VD);
 
   return gen.AllocatorMetatype;
 }
@@ -70,7 +69,8 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
                                  AC.getIdentifier("$implicit_value"), Type(),
                                  DC);
     VD->setInterfaceType(interfaceType);
-    SILValue arg = gen.F.begin()->createArgument(gen.getLoweredType(type), VD);
+    SILValue arg =
+        gen.F.begin()->createFunctionArgument(gen.getLoweredType(type), VD);
     return RValue(gen, loc, type, gen.emitManagedRValueWithCleanup(arg));
   }
 }
@@ -96,7 +96,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
                                  AC.getIdentifier("$return_value"), Type(),
                                  ctor);
     VD->setInterfaceType(selfIfaceTyCan);
-    resultSlot = gen.F.begin()->createArgument(selfTy, VD);
+    resultSlot = gen.F.begin()->createFunctionArgument(selfTy, VD);
   }
 
   // Emit the elementwise arguments.
@@ -228,8 +228,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // failure.
   SILBasicBlock *failureExitBB = nullptr;
   SILArgument *failureExitArg = nullptr;
-  auto resultType = ArchetypeBuilder::mapTypeIntoContext(
-      ctor, ctor->getResultInterfaceType());
+  auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
   auto &resultLowering = getTypeLowering(resultType);
 
   if (ctor->getFailability() != OTK_None) {
@@ -253,7 +252,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     } else {
       // Pass 'nil' as the return value to the exit BB.
       failureExitArg =
-          failureExitBB->createArgument(resultLowering.getLoweredType());
+          failureExitBB->createPHIArgument(resultLowering.getLoweredType());
       SILValue nilResult =
         B.createEnum(ctor, {}, getASTContext().getOptionalNoneDecl(),
                      resultLowering.getLoweredType());
@@ -383,7 +382,8 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
                                  AC.getIdentifier("$return_value"), Type(),
                                  element->getDeclContext());
     VD->setInterfaceType(CanInOutType::get(enumIfaceTy));
-    auto resultSlot = F.begin()->createArgument(enumTI.getLoweredType(), VD);
+    auto resultSlot =
+        F.begin()->createFunctionArgument(enumTI.getLoweredType(), VD);
     dest = std::unique_ptr<Initialization>(
         new KnownAddressInitialization(resultSlot));
   }
@@ -579,7 +579,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
              TupleType::getEmpty(F.getASTContext()), ctor, ctor->hasThrows());
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
-  SILValue selfArg = F.begin()->createArgument(selfTy, selfDecl);
+  SILValue selfArg = F.begin()->createFunctionArgument(selfTy, selfDecl);
 
   if (!NeedsBoxForSelf) {
     SILLocation PrologueLoc(selfDecl);
@@ -612,8 +612,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   prepareEpilog(Type(), ctor->hasThrows(),
                 CleanupLocation::get(endOfInitLoc));
 
-  auto resultType = ArchetypeBuilder::mapTypeIntoContext(
-      ctor, ctor->getResultInterfaceType());
+  auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -632,7 +631,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
     failureExitBB = createBasicBlock();
     failureExitArg =
-        failureExitBB->createArgument(resultLowering.getLoweredType());
+        failureExitBB->createPHIArgument(resultLowering.getLoweredType());
 
     Cleanups.emitCleanupsForReturn(ctor);
     SILValue nilResult = B.createEnum(loc, {},
@@ -875,10 +874,8 @@ static SILValue getBehaviorSetterFn(SILGenFunction &gen, VarDecl *behaviorVar) {
 static Type getInitializationTypeInContext(
     DeclContext *fromDC, DeclContext *toDC,
     Expr *init) {
-  auto interfaceType =
-      ArchetypeBuilder::mapTypeOutOfContext(fromDC, init->getType());
-  auto resultType =
-      ArchetypeBuilder::mapTypeIntoContext(toDC, interfaceType);
+  auto interfaceType = fromDC->mapTypeOutOfContext(init->getType());
+  auto resultType = toDC->mapTypeIntoContext(interfaceType);
 
   return resultType;
 }
@@ -990,7 +987,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   // Emit 'self', then mark it uninitialized.
   auto selfDecl = cd->getDestructor()->getImplicitSelfDecl();
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
-  SILValue selfArg = F.begin()->createArgument(selfTy, selfDecl);
+  SILValue selfArg = F.begin()->createFunctionArgument(selfTy, selfDecl);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
   B.createDebugValue(PrologueLoc, selfArg);

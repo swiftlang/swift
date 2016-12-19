@@ -614,7 +614,7 @@ public:
   }
 };
 
-}  // namespace
+} // end anonymous namespace
 
 void TypeChecker::maybeDiagnoseCaptures(Expr *E, AnyFunctionRef AFR) {
   if (!AFR.getCaptureInfo().hasBeenComputed()) {

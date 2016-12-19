@@ -265,7 +265,7 @@ namespace {
       assert(TheType.is<TupleType>());
     }
 
-    llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) {
+    llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
       // Fetch the metadata as a tuple type.  We cache this because
       // we might repeatedly need the bitcast.
       auto metadata = IGF.emitTypeMetadataRefForLayout(TheType);
@@ -368,7 +368,7 @@ namespace {
                           LayoutStrategy::Universal, fieldTypes);
     }
   };
-}
+} // end anonymous namespace
 
 const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
   TupleTypeBuilder builder(IGM, SILType::getPrimitiveAddressType(CanType(tuple)));

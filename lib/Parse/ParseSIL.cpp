@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -57,7 +56,7 @@ namespace swift {
     
     DiagnosticEngine *Diags = nullptr;
   };
-}
+} // namespace swift
 
 SILParserState::SILParserState(SILModule *M) : M(M) {
   S = M ? new SILParserTUState(*M) : nullptr;
@@ -307,7 +306,7 @@ namespace {
     Optional<llvm::coverage::Counter>
     parseSILCoverageExpr(llvm::coverage::CounterExpressionBuilder &Builder);
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
                                    const Diagnostic &D) {
@@ -830,7 +829,7 @@ bool SILParser::parseASTType(CanType &result) {
   ParserResult<TypeRepr> parsedType = P.parseType();
   if (parsedType.isNull()) return true;
   TypeLoc loc = parsedType.get();
-  if (performTypeLocChecking(loc, /*isSILType=*/ false))
+  if (performTypeLocChecking(loc, /*IsSILType=*/ false))
     return true;
   result = loc.getType()->getCanonicalType();
   // Invoke the callback on the parsed type.
@@ -885,7 +884,7 @@ bool SILParser::parseSILType(SILType &Result,
       : C(C), SF(SF)
     {}
     
-    bool walkToTypeReprPre(TypeRepr *T) {
+    bool walkToTypeReprPre(TypeRepr *T) override {
       if (auto fnType = dyn_cast<FunctionTypeRepr>(T)) {
         if (auto generics = fnType->getGenericParams()) {
           auto env = handleSILGenericParams(C, generics, SF);
@@ -913,7 +912,7 @@ bool SILParser::parseSILType(SILType &Result,
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), inoutLoc, attrs);
 
-  if (performTypeLocChecking(Ty, /*isSILType=*/true, nullptr))
+  if (performTypeLocChecking(Ty, /*IsSILType=*/true, nullptr))
     return true;
 
   Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),
@@ -1169,18 +1168,21 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   OpcodeName = P.Tok.getText();
   // Parse this textually to avoid Swift keywords (like 'return') from
   // interfering with opcode recognition.
-  Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
+  Optional<ValueKind> MaybeOpcode =
+      llvm::StringSwitch<Optional<ValueKind>>(OpcodeName)
 #define INST(Id, Parent, TextualName, MemBehavior, MayRelease)                 \
   .Case(#TextualName, ValueKind::Id)
 #include "swift/SIL/SILNodes.def"
-               .Default(ValueKind::SILArgument);
+          .Default(None);
 
-  if (Opcode != ValueKind::SILArgument) {
-    P.consumeToken();
-    return false;
+  if (!MaybeOpcode) {
+    P.diagnose(OpcodeLoc, diag::expected_sil_instr_opcode);
+    return true;
   }
-  P.diagnose(OpcodeLoc, diag::expected_sil_instr_opcode);
-  return true;
+
+  Opcode = MaybeOpcode.getValue();
+  P.consumeToken();
+  return false;
 }
 
 static bool peekSILDebugLocation(Parser &P) {
@@ -1266,7 +1268,7 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
     if (TyR.isNull())
       return true;
     TypeLoc Ty = TyR.get();
-    if (performTypeLocChecking(Ty, /*isSILType=*/ false, GenericEnv))
+    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, GenericEnv))
       return true;
     parsed.push_back({Loc, Ty.getType()});
   } while (P.consumeIf(tok::comma));
@@ -1557,7 +1559,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   // opcode we find.
   SILInstruction *ResultVal;
   switch (Opcode) {
-  case ValueKind::SILArgument:
+  case ValueKind::SILPHIArgument:
+  case ValueKind::SILFunctionArgument:
   case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
@@ -2943,7 +2946,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       }
     }
 
-    if (performTypeLocChecking(Ty, /*isSILType=*/ false, genericEnv))
+    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, genericEnv))
       return true;
 
     if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
@@ -3940,7 +3943,11 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
       return true;
 
     BB = getBBForDefinition(BBName, NameLoc);
-    
+    // For now, since we always assume that PHIArguments have
+    // ValueOwnershipKind::Any, do not parse or do anything special. Eventually
+    // we will parse the convention.
+    bool IsEntry = BB->isEntry();
+
     // If there is a basic block argument list, process it.
     if (P.consumeIf(tok::l_paren)) {
       do {
@@ -3952,7 +3959,11 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
             P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
             parseSILType(Ty))
           return true;
-        auto Arg = BB->createArgument(Ty);
+        SILArgument *Arg;
+        if (IsEntry)
+          Arg = BB->createFunctionArgument(Ty);
+        else
+          Arg = BB->createPHIArgument(Ty);
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));
       
@@ -4421,7 +4432,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
   if (TyR.isNull())
     return nullptr;
   TypeLoc Ty = TyR.get();
-  if (performTypeLocChecking(Ty, /*isSILType=*/ false, witnessEnv))
+  if (performTypeLocChecking(Ty, /*IsSILType=*/ false, witnessEnv))
     return nullptr;
   auto ConformingTy = Ty.getType();
 

@@ -610,9 +610,8 @@ namespace {
         auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
         auto overloadType = overloadChoice.getDecl()->getInterfaceType();
         auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
-        resultType = ArchetypeBuilder::mapTypeIntoContext(
-            overloadChoice.getDecl()->getInnermostDeclContext(),
-            resultType);
+        resultType = overloadChoice.getDecl()->getInnermostDeclContext()
+            ->mapTypeIntoContext(resultType);
         CS.setFavoredType(expr, resultType.getPointer());
       }
 
@@ -755,10 +754,10 @@ namespace {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
       
-      Type paramTy = ArchetypeBuilder::mapTypeIntoContext(
-          value->getInnermostDeclContext(), fnTy->getInput());
-      auto resultTy = ArchetypeBuilder::mapTypeIntoContext(
-          value->getInnermostDeclContext(), fnTy->getResult());
+      Type paramTy = value->getInnermostDeclContext()
+          ->mapTypeIntoContext(fnTy->getInput());
+      auto resultTy = value->getInnermostDeclContext()
+          ->mapTypeIntoContext(fnTy->getResult());
       auto contextualTy = CS.getContextualType(expr);
 
       return isFavoredParamAndArg(
@@ -832,8 +831,8 @@ namespace {
           }
         }
         Type paramTy = fnTy->getInput();
-        paramTy = ArchetypeBuilder::mapTypeIntoContext(
-            value->getInnermostDeclContext(), paramTy);
+        paramTy = value->getInnermostDeclContext()
+            ->mapTypeIntoContext(paramTy);
         
         return favoredTy->isEqual(paramTy);
       };
@@ -919,8 +918,8 @@ namespace {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
       
-      Type paramTy = ArchetypeBuilder::mapTypeIntoContext(
-          value->getInnermostDeclContext(), fnTy->getInput());
+      Type paramTy = value->getInnermostDeclContext()
+          ->mapTypeIntoContext(fnTy->getInput());
       auto paramTupleTy = paramTy->getAs<TupleType>();
       if (!paramTupleTy || paramTupleTy->getNumElements() != 2)
         return false;
@@ -928,8 +927,8 @@ namespace {
       auto firstParamTy = paramTupleTy->getElement(0).getType();
       auto secondParamTy = paramTupleTy->getElement(1).getType();
       
-      auto resultTy = ArchetypeBuilder::mapTypeIntoContext(
-          value->getInnermostDeclContext(), fnTy->getResult());
+      auto resultTy = value->getInnermostDeclContext()
+          ->mapTypeIntoContext(fnTy->getResult());
       auto contextualTy = CS.getContextualType(expr);
       
       return
@@ -992,7 +991,7 @@ namespace {
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
-}
+} // end anonymous namespace
 
 namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
@@ -1330,8 +1329,11 @@ namespace {
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         if (VD->getInterfaceType() &&
             !VD->getInterfaceType()->is<TypeVariableType>()) {
-          auto type = VD->getDeclContext()->mapTypeIntoContext(
-              VD->getInterfaceType());
+          // FIXME: ParamDecls in closures shouldn't get an interface type
+          // until the constraint system has been solved.
+          auto type = VD->getInterfaceType();
+          if (type->hasTypeParameter())
+            type = VD->getDeclContext()->mapTypeIntoContext(type);
           CS.setFavoredType(E, type.getPointer());
         }
       }
@@ -2328,7 +2330,7 @@ namespace {
             if (FD->getHaveFoundCommonOverloadReturnType()) {
               outputTy = FD->getInterfaceType()->getAs<AnyFunctionType>()
                   ->getResult();
-              outputTy = ArchetypeBuilder::mapTypeIntoContext(FD, outputTy);
+              outputTy = FD->mapTypeIntoContext(outputTy);
             }
             
           } else {
@@ -2348,8 +2350,7 @@ namespace {
                 }
                 
                 resultType = OFT->getResult();
-                resultType = ArchetypeBuilder::mapTypeIntoContext(
-                    OFD, resultType);
+                resultType = OFD->mapTypeIntoContext(resultType);
                 
                 if (commonType.isNull()) {
                   commonType = resultType;
@@ -3018,7 +3019,7 @@ class InferUnresolvedMemberConstraintGenerator : public ConstraintGenerator {
 public:
   InferUnresolvedMemberConstraintGenerator(Expr *Target, ConstraintSystem &CS) :
     ConstraintGenerator(CS), Target(Target), VT(nullptr) {};
-  virtual ~InferUnresolvedMemberConstraintGenerator() = default;
+  ~InferUnresolvedMemberConstraintGenerator() override = default;
 
   Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *Expr) override {
     if (Target != Expr) {
@@ -3134,7 +3135,7 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   SmallVector<Type, 3> TypeScratch;
 
   // Prepare type substitution map.
-  TypeSubstitutionMap Substitutions = BaseTy->getMemberSubstitutions(ED);
+  TypeSubstitutionMap Substitutions = BaseTy->getContextSubstitutions(ED);
   auto resolveType = [&](Type Ty) {
     return Ty.subst(DC.getParentModule(), Substitutions);
   };

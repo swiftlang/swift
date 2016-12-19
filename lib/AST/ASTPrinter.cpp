@@ -17,7 +17,6 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -227,7 +226,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     // declaration.
     TypeSubstitutionMap subMap;
     if (!BaseType->isAnyExistentialType())
-      subMap = BaseType->getMemberSubstitutions(Ext);
+      subMap = BaseType->getContextSubstitutions(Ext);
     auto *M = DC->getParentModule();
 
     assert(Ext->getGenericSignature() && "No generic signature.");
@@ -855,8 +854,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       if (T->hasArchetype()) {
         // Get the interface type, since TypeLocs still have
         // contextual types in them.
-        T = ArchetypeBuilder::mapTypeOutOfContext(
-            Current->getInnermostDeclContext(), T);
+        T = Current->getInnermostDeclContext()->mapTypeOutOfContext(T);
       }
 
       // Get the innermost nominal type context.
@@ -867,7 +865,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
         DC = Current->getDeclContext();
 
       // Get the substitutions from our base type.
-      auto subMap = CurrentType->getMemberSubstitutions(DC);
+      auto subMap = CurrentType->getContextSubstitutions(DC);
       auto *M = DC->getParentModule();
       T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
     }
@@ -1265,7 +1263,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
   if (CurrentType) {
     if (!CurrentType->isAnyExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
-      subMap = CurrentType->getMemberSubstitutions(DC);
+      subMap = CurrentType->getContextSubstitutions(DC);
       M = DC->getParentModule();
     }
   }
@@ -2513,7 +2511,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                              ? parameterListTypes[CurrPattern]
                              : nullptr;
     printParameterList(BodyParams[CurrPattern], paramListType,
-                       /*Curried=*/CurrPattern > 0,
+                       /*isCurried=*/CurrPattern > 0,
                        [&]()->bool {
       return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault();
     });
@@ -2764,7 +2762,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer << "subscript";
   }, [&] { // Parameters
     printParameterList(decl->getIndices(), decl->getIndicesInterfaceType(),
-                       /*Curried=*/false,
+                       /*isCurried=*/false,
                        /*isAPINameByDefault*/[]()->bool{return false;});
   });
   Printer << " -> ";

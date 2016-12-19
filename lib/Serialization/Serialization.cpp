@@ -163,7 +163,7 @@ namespace llvm {
       return lhs == rhs;
     }
   };
-}
+} // namespace llvm
 
 static Module *getModule(ModuleOrSourceFile DC) {
   if (auto M = DC.dyn_cast<Module *>())
@@ -215,7 +215,7 @@ namespace {
     FuncDecl *Address = nullptr, *MutableAddress = nullptr;
     FuncDecl *WillSet = nullptr, *DidSet = nullptr;
   };
-}
+} // end anonymous namespace
 
 static StorageKind getRawStorageKind(AbstractStorageDecl::StorageKindTy kind) {
   switch (kind) {
@@ -1142,9 +1142,11 @@ void Serializer::writeNormalConformance(
       // If there is no witness, we're done.
       if (!witness.getDecl()) return;
 
-      if (auto genericSig = witness.requiresSubstitution() 
-                              ? witness.getSyntheticSignature()
+      if (auto genericEnv = witness.requiresSubstitution() 
+                              ? witness.getSyntheticEnvironment()
                               : nullptr) {
+        auto *genericSig = genericEnv->getGenericSignature();
+
         // Generic parameters.
         data.push_back(genericSig->getGenericParams().size());
         for (auto gp : genericSig->getGenericParams())
@@ -1207,9 +1209,11 @@ void Serializer::writeNormalConformance(
    // Bail out early for simple witnesses.
    if (!witness.getDecl()) return;
 
-   if (auto genericSig = witness.requiresSubstitution() 
-                           ? witness.getSyntheticSignature()
+   if (auto genericEnv = witness.requiresSubstitution() 
+                           ? witness.getSyntheticEnvironment()
                            : nullptr) {
+     auto *genericSig = genericEnv->getGenericSignature();
+
      // Write the generic requirements of the synthetic environment.
      writeGenericRequirements(genericSig->getRequirements(),
                               DeclTypeAbbrCodes);
@@ -4279,11 +4283,11 @@ withOutputFile(ASTContext &ctx, StringRef outputPath,
     std::error_code EC;
     std::unique_ptr<llvm::raw_pwrite_stream> out =
       Clang.createOutputFile(outputPath, EC,
-                             /*binary=*/true,
-                             /*removeOnSignal=*/true,
+                             /*Binary=*/true,
+                             /*RemoveFileOnSignal=*/true,
                              /*inputPath=*/"",
                              path::extension(outputPath),
-                             /*temporary=*/true,
+                             /*UseTemporary=*/true,
                              /*createDirs=*/false,
                              /*finalPath=*/nullptr,
                              &tmpFilePath);

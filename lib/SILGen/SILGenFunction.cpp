@@ -335,7 +335,11 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // since we could conceivably forward the copied value into the
         // closure context and pass it down to the partially applied function
         // in-place.
-        auto boxTy = SILBoxType::get(vl.value->getType().getSwiftRValueType());
+        // TODO: Use immutable box for immutable captures.
+        auto boxTy = SGM.Types.getContextBoxTypeForCapture(vd,
+                                       vl.value->getType().getSwiftRValueType(),
+                                       F.getGenericEnvironment(),
+                                       /*mutable*/ true);
         
         AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
@@ -465,8 +469,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
   emitProlog(fd, fd->getParameterLists(), fd->getResultInterfaceType(),
              fd->hasThrows());
-  Type resultTy = ArchetypeBuilder::mapTypeIntoContext(
-      fd, fd->getResultInterfaceType());
+  Type resultTy = fd->mapTypeIntoContext(fd->getResultInterfaceType());
   prepareEpilog(resultTy, fd->hasThrows(), CleanupLocation(fd));
 
   emitProfilerIncrement(fd->getBody());
@@ -692,7 +695,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
                                SmallVectorImpl<SILValue> &args,
                                CapturedValue capture) {
   auto addSILArgument = [&](SILType t, ValueDecl *d) {
-    args.push_back(gen.F.begin()->createArgument(t, d));
+    args.push_back(gen.F.begin()->createFunctionArgument(t, d));
   };
 
   auto *vd = capture.getDecl();
@@ -708,13 +711,14 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   }
 
   case CaptureKind::Box: {
-    auto *var = dyn_cast<VarDecl>(vd);
-    SILType ty = gen.getLoweredType(var->getType()->getRValueType())
-      .getAddressType();
     // Forward the captured owning box.
-    SILType boxTy = SILType::getPrimitiveObjectType(
-        SILBoxType::get(ty.getSwiftRValueType()));
-    addSILArgument(boxTy, vd);
+    auto *var = cast<VarDecl>(vd);
+    auto boxTy = gen.SGM.Types
+      .getInterfaceBoxTypeForCapture(vd,
+                                     gen.getLoweredType(var->getType())
+                                        .getSwiftRValueType(),
+                                     /*mutable*/ true);
+    addSILArgument(SILType::getPrimitiveObjectType(boxTy), vd);
     break;
   }
 
@@ -793,10 +797,9 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
     F.setBare(IsBare);
     auto selfMetaTy = vd->getInterfaceType()->getAs<AnyFunctionType>()
         ->getInput();
-    selfMetaTy = ArchetypeBuilder::mapTypeIntoContext(
-        vd->getInnermostDeclContext(), selfMetaTy);
+    selfMetaTy = vd->getInnermostDeclContext()->mapTypeIntoContext(selfMetaTy);
     auto metatypeVal =
-        F.begin()->createArgument(getLoweredLoadableType(selfMetaTy));
+        F.begin()->createFunctionArgument(getLoweredLoadableType(selfMetaTy));
     curriedArgs.push_back(metatypeVal);
 
   } else if (auto fd = dyn_cast<AbstractFunctionDecl>(vd)) {

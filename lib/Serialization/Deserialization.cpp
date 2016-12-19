@@ -14,6 +14,7 @@
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -61,7 +62,7 @@ namespace {
       llvm_unreachable("Unhandled RecordKind in switch.");
     }
 
-    virtual void print(raw_ostream &os) const override {
+    void print(raw_ostream &os) const override {
       if (!DeclOrOffset.isComplete()) {
         os << "While deserializing decl #" << ID << " ("
            << getRecordKindString(Kind) << ")";
@@ -223,7 +224,7 @@ namespace {
       path.push_back({ PathPiece::Kind::Unknown, kind });
     }
 
-    virtual void print(raw_ostream &os) const override {
+    void print(raw_ostream &os) const override {
       os << "Cross-reference to module '" << baseM.getName() << "'\n";
       for (auto &piece : path) {
         os << "\t... ";
@@ -1021,13 +1022,16 @@ ModuleFile::readGenericSignatureOrEnvironment(
         Identifier name = getIdentifier(rawParamIDs[i]);
         auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
 
-        auto paramDecl = createDecl<GenericTypeParamDecl>(getAssociatedModule(),
-                                                          name,
-                                                          SourceLoc(),
-                                                          paramTy->getDepth(),
-                                                          paramTy->getIndex());
-        paramTy = paramDecl->getDeclaredInterfaceType()
-                   ->castTo<GenericTypeParamType>();
+        if (!name.empty()) {
+          auto paramDecl =
+            createDecl<GenericTypeParamDecl>(getAssociatedModule(),
+                                             name,
+                                             SourceLoc(),
+                                             paramTy->getDepth(),
+                                             paramTy->getIndex());
+          paramTy = paramDecl->getDeclaredInterfaceType()
+                     ->castTo<GenericTypeParamType>();
+        }
 
         paramTypes.push_back(paramTy);
 
@@ -2569,7 +2573,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       createDecl<ConstructorDecl>(name, SourceLoc(),
                                   failability, /*FailabilityLoc=*/SourceLoc(),
                                   /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-                                  /*bodyParams=*/nullptr, nullptr,
+                                  /*BodyParams=*/nullptr, nullptr,
                                   genericParams, parent);
     declOrOffset = ctor;
 

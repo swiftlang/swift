@@ -89,7 +89,7 @@ namespace {
     /// Only intended for source files.
     llvm::SmallDenseMap<const Job *, bool, 16> UnfinishedCommands;
   };
-}
+} // end anonymous namespace
 
 Compilation::~Compilation() = default;
 

@@ -68,6 +68,7 @@ namespace swift {
   enum class SILArgumentConvention : uint8_t;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
+  enum class ValueOwnershipKind : uint8_t;
 
   enum class TypeKind {
 #define TYPE(id, parent) id,
@@ -839,7 +840,14 @@ public:
   /// the context of the extension above will produce substitutions T
   /// -> Int and U -> String suitable for mapping the type of
   /// \c SomeArray.
-  TypeSubstitutionMap getMemberSubstitutions(const DeclContext *dc);
+  TypeSubstitutionMap getContextSubstitutions(const DeclContext *dc);
+
+  /// Get the substitutions to apply to the type of the given member as seen
+  /// from this base type.
+  ///
+  /// If the member has its own generic parameters, they will remain unchanged
+  /// by the substitution.
+  TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member);
 
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
@@ -872,12 +880,6 @@ public:
   /// \returns the resulting member type.
   Type getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
                        LazyResolver *resolver, Type memberType = Type());
-
-  /// Given the type of a member from a particular declaration context,
-  /// substitute in the types from the given base type (this) to produce
-  /// the resulting member type.
-  Type getTypeOfMember(ModuleDecl *module, Type memberType,
-                       const DeclContext *memberDC);
 
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the
@@ -2922,6 +2924,8 @@ public:
     type.print(out);
     return out;
   }
+
+  ValueOwnershipKind getOwnershipKind(SILModule &) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;

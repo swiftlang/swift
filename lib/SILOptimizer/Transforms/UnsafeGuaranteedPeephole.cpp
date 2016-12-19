@@ -187,7 +187,7 @@ class UnsafeGuaranteedPeephole : public swift::SILFunctionTransform {
 
   StringRef getName() override { return "UnsafeGuaranteed Peephole"; }
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 SILTransform *swift::createUnsafeGuaranteedPeephole() {
   return new UnsafeGuaranteedPeephole();

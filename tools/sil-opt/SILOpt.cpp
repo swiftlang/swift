@@ -172,7 +172,7 @@ AssumeUnqualifiedOwnershipWhenParsing(
 static void runCommandLineSelectedPasses(SILModule *Module) {
   SILPassManager PM(Module);
   PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
-      SILPassPipelinePlan::ExecutionKind::UntilFixPoint, Passes));
+      SILPassPipelinePlan::ExecutionKind::OneIteration, Passes));
   if (Module->getOptions().VerifyAll)
     Module->verify();
 }
@@ -297,8 +297,8 @@ int main(int argc, char **argv) {
   if (HasSerializedAST) {
     assert(!CI.hasSILModule() &&
            "performSema() should not create a SILModule.");
-    CI.setSILModule(SILModule::createEmptyModule(CI.getMainModule(),
-                                                 CI.getSILOptions()));
+    CI.setSILModule(SILModule::createEmptyModule(
+        CI.getMainModule(), CI.getSILOptions(), PerformWMO));
     std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
         CI.getASTContext(), CI.getSILModule(), nullptr);
 

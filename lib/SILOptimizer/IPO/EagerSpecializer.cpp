@@ -113,7 +113,7 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
       // Forward the existing return argument to a new BBArg.
       MergedBB = RetBB->split(RetInst->getIterator());
       SILValue OldRetVal = RetInst->getOperand(0);
-      RetInst->setOperand(0, MergedBB->createArgument(OldRetVal->getType()));
+      RetInst->setOperand(0, MergedBB->createPHIArgument(OldRetVal->getType()));
       Builder.setInsertionPoint(RetBB);
       Builder.createBranch(Loc, MergedBB, {OldRetVal});
     }
@@ -165,7 +165,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
     // Emit the rethrow logic.
     Builder.emitBlock(ErrorBB);
     SILValue Error =
-        ErrorBB->createArgument(CanSILFuncTy->getErrorResult().getSILType());
+        ErrorBB->createPHIArgument(CanSILFuncTy->getErrorResult().getSILType());
 
     Builder.createBuiltin(Loc,
                           Builder.getASTContext().getIdentifier("willThrow"),
@@ -180,7 +180,8 @@ emitApplyWithRethrow(SILBuilder &Builder,
   // result value.
   Builder.clearInsertionPoint();
   Builder.emitBlock(NormalBB);
-  return Builder.getInsertionBB()->createArgument(CanSILFuncTy->getSILResult());
+  return Builder.getInsertionBB()->createPHIArgument(
+      CanSILFuncTy->getSILResult());
 }
 
 /// Emits code to invoke the specified nonpolymorphic CalleeFunc using the
@@ -240,11 +241,11 @@ protected:
   void emitTypeCheck(SILBasicBlock *FailedTypeCheckBB,
                      SubstitutableType *ParamTy, Type SubTy);
 
-  SILValue emitArgumentCast(SILArgument *OrigArg, unsigned Idx);
-  
+  SILValue emitArgumentCast(SILFunctionArgument *OrigArg, unsigned Idx);
+
   SILValue emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs);
 };
-}
+} // end anonymous namespace
 
 /// Inserts type checks in the original generic function for dispatching to the
 /// given specialized function. Converts call arguments. Emits an invocation of
@@ -358,7 +359,8 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
 }
 
 /// Cast a generic argument to its specialized type.
-SILValue EagerDispatch::emitArgumentCast(SILArgument *OrigArg, unsigned Idx) {
+SILValue EagerDispatch::emitArgumentCast(SILFunctionArgument *OrigArg,
+                                         unsigned Idx) {
 
   auto CastTy = ReInfo.getSubstitutedType()->getSILArgumentType(Idx);
   assert(CastTy.isAddress() ==
@@ -380,7 +382,7 @@ SILValue EagerDispatch::emitArgumentCast(SILArgument *OrigArg, unsigned Idx) {
 /// has a direct result.
 SILValue EagerDispatch::
 emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
-  auto OrigArgs = GenericFunc->getArguments();
+  auto OrigArgs = GenericFunc->begin()->getFunctionArguments();
   assert(OrigArgs.size() == ReInfo.getNumArguments() && "signature mismatch");
   
   CallArgs.reserve(OrigArgs.size());
@@ -422,7 +424,7 @@ public:
 
   StringRef getName() override { return "Eager Specializer"; }
 };
-}
+} // end anonymous namespace
 
 /// Specializes a generic function for a concrete type list.
 static SILFunction *eagerSpecialize(SILFunction *GenericFunc,

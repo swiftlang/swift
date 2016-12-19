@@ -257,6 +257,7 @@ public:
   }
 };
 
-} } // end namespace swift::constraints
+} // end namespace constraints
+} // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_OVERLOADCHOICE_H

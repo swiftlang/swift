@@ -130,7 +130,7 @@ public:
     emitPreamble();
   }
 
-  ~SerializedDiagnosticConsumer() {
+  ~SerializedDiagnosticConsumer() override {
     // FIXME: we may not wish to put this in a destructor.
     // That's not what clang does.
 
@@ -148,7 +148,7 @@ public:
     State->OS.reset(nullptr);
   }
 
-  virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                 DiagnosticKind Kind, llvm::StringRef Text,
                                 const DiagnosticInfo &Info) override;
 
@@ -192,13 +192,14 @@ private:
                              DiagnosticKind Kind,
                              StringRef Text, const DiagnosticInfo &Info);
 };
-}
+} // end anonymous namespace
 
 namespace swift { namespace serialized_diagnostics {
   DiagnosticConsumer *createConsumer(std::unique_ptr<llvm::raw_ostream> OS) {
     return new SerializedDiagnosticConsumer(std::move(OS));
   }
-}}
+} // namespace serialized_diagnostics
+} // namespace swift
 
 unsigned SerializedDiagnosticConsumer::getEmitFile(StringRef Filename) {
   // NOTE: Using Filename.data() here relies on SourceMgr using

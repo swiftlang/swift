@@ -86,9 +86,8 @@ static bool isKnownSafe(BottomUpDataflowRCStateVisitor<ARCState> *State,
 
   // A guaranteed function argument is guaranteed to outlive the function we are
   // processing. So bottom up for such a parameter, we are always known safe.
-  if (auto *Arg = dyn_cast<SILArgument>(Op)) {
-    if (Arg->isFunctionArg() &&
-        Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed)) {
+  if (auto *Arg = dyn_cast<SILFunctionArgument>(Op)) {
+    if (Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed)) {
       return true;
     }
   }
@@ -96,9 +95,8 @@ static bool isKnownSafe(BottomUpDataflowRCStateVisitor<ARCState> *State,
   // If Op is a load from an in_guaranteed parameter, it is guaranteed as well.
   if (auto *LI = dyn_cast<LoadInst>(Op)) {
     SILValue RCIdentity = State->RCFI->getRCIdentityRoot(LI->getOperand());
-    if (auto *Arg = dyn_cast<SILArgument>(RCIdentity)) {
-      if (Arg->isFunctionArg() &&
-          Arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)) {
+    if (auto *Arg = dyn_cast<SILFunctionArgument>(RCIdentity)) {
+      if (Arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)) {
         return true;
       }
     }
@@ -264,8 +262,8 @@ TopDownDataflowRCStateVisitor<ARCState>::visitStrongIncrement(ValueBase *V) {
 
 template <class ARCState>
 typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
-TopDownDataflowRCStateVisitor<ARCState>::
-visitStrongEntranceArgument(SILArgument *Arg) {
+TopDownDataflowRCStateVisitor<ARCState>::visitStrongEntranceArgument(
+    SILFunctionArgument *Arg) {
   DEBUG(llvm::dbgs() << "VISITING ENTRANCE ARGUMENT: " << *Arg);
 
   if (!Arg->hasConvention(SILArgumentConvention::Direct_Owned)) {
@@ -343,7 +341,7 @@ template <class ARCState>
 typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
 TopDownDataflowRCStateVisitor<ARCState>::
 visitStrongEntrance(ValueBase *V) {
-  if (auto *Arg = dyn_cast<SILArgument>(V))
+  if (auto *Arg = dyn_cast<SILFunctionArgument>(V))
     return visitStrongEntranceArgument(Arg);
 
   if (auto *AI = dyn_cast<ApplyInst>(V))
@@ -372,4 +370,4 @@ template class BottomUpDataflowRCStateVisitor<ARCRegionState>;
 template class TopDownDataflowRCStateVisitor<ARCBBState>;
 template class TopDownDataflowRCStateVisitor<ARCRegionState>;
 
-} // end swift namespace
+} // namespace swift

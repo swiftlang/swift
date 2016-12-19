@@ -55,7 +55,7 @@ public:
   TestOptTable() : OptTable(InfoTable, llvm::array_lengthof(InfoTable)){}
 };
 
-} // namespace anonymous
+} // end anonymous namespace
 
 static std::pair<unsigned, unsigned> parseLineCol(StringRef LineCol) {
   unsigned Line, Col;

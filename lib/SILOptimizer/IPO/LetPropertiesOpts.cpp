@@ -123,7 +123,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
   }
 };
 
-} // namespace
+} // end anonymous namespace
 
 #ifndef NDEBUG
 // For debugging only.
@@ -610,7 +610,7 @@ class LetPropertiesOptPass : public SILModuleTransform
     return "SIL Let Properties Optimization";
   }
 };
-} // anonymous
+} // end anonymous namespace
 
 SILTransform *swift::createLetPropertiesOpt() {
   return new LetPropertiesOptPass();
