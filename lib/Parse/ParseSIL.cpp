@@ -874,7 +874,7 @@ bool SILParser::parseSILType(SILType &Result,
 
   if (TyR.isNull())
     return true;
-  
+
   // Resolve the generic environments for parsed generic function and box types.
   class HandleSILGenericParamsWalker : public ASTWalker {
     ASTContext &C;

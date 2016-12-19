@@ -1037,7 +1037,7 @@ RequirementEnvironment::RequirementEnvironment(
     conformanceSig = conformanceSig->getCanonicalSignature();
     allGenericParams.append(conformanceSig->getGenericParams().begin(),
                             conformanceSig->getGenericParams().end());
-    builder.addGenericSignature(conformanceSig);
+    builder.addGenericSignature(conformanceSig, req);
     depth = allGenericParams.back()->getDepth() + 1;
   }
 
@@ -1082,7 +1082,7 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
-  RequirementSource source(RequirementSource::Explicit, SourceLoc());
+  RequirementSource source(RequirementSource::Explicit, SourceLoc(), req);
   for (auto &reqReq : reqSig->getRequirements()) {
     switch (reqReq.getKind()) {
     case RequirementKind::Conformance: {
