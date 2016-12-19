@@ -112,6 +112,10 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
                       &unsatisfiedDependency)) {
     inherited->setInvalidType(getASTContext());
   }
+
+  auto type = inherited->getType();
+  if (!type.isNull())
+    inherited->setType(dc->mapTypeOutOfContext(type));
 }
 
 bool IterativeTypeChecker::breakCycleForResolveInheritedClauseEntry(
