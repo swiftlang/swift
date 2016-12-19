@@ -16,6 +16,7 @@
 
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"

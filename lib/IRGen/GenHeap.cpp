@@ -24,6 +24,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 
 #include "Explosion.h"

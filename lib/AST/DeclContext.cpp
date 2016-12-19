@@ -14,6 +14,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/DenseMap.h"
@@ -295,12 +296,12 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
 }
 
 Type DeclContext::mapTypeIntoContext(Type type) const {
-  return ArchetypeBuilder::mapTypeIntoContext(
+  return GenericEnvironment::mapTypeIntoContext(
       getParentModule(), getGenericEnvironmentOfContext(), type);
 }
 
 Type DeclContext::mapTypeOutOfContext(Type type) const {
-  return ArchetypeBuilder::mapTypeOutOfContext(
+  return GenericEnvironment::mapTypeOutOfContext(
       getGenericEnvironmentOfContext(), type);
 }
 

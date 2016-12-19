@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"

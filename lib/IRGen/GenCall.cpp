@@ -24,8 +24,8 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Fallthrough.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "llvm/IR/CallSite.h"
 
 #include "CallEmission.h"

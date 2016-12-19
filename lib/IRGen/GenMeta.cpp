@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
@@ -236,7 +235,7 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   array = IGF.Builder.CreateElementBitCast(array, IGF.IGM.TypeMetadataPtrTy);
 
   auto getInContext = [&](CanType type) -> CanType {
-    return ArchetypeBuilder::mapTypeIntoContext(typeDecl, type)
+    return typeDecl->mapTypeIntoContext(type)
              ->getCanonicalType();
   };
 
@@ -2781,7 +2780,7 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
     auto declCtxt = type;
     if (auto generics = declCtxt->getGenericSignatureOfContext()) {
       auto getInContext = [&](CanType type) -> CanType {
-        return ArchetypeBuilder::mapTypeIntoContext(declCtxt, type)
+        return declCtxt->mapTypeIntoContext(type)
             ->getCanonicalType();
       };
       bindArchetypeAccessPaths(IGF, generics, getInContext);
@@ -3658,9 +3657,7 @@ namespace {
         return;
       }
 
-      Type superclassTy
-        = ArchetypeBuilder::mapTypeIntoContext(Target,
-                                               Target->getSuperclass());
+      Type superclassTy = Target->mapTypeIntoContext(Target->getSuperclass());
 
       if (!addReferenceToHeapMetadata(superclassTy->getCanonicalType(),
                                       /*allowUninit*/ false)) {
@@ -3799,7 +3796,7 @@ namespace {
       llvm::Value *superMetadata;
       if (Target->hasSuperclass()) {
         Type superclass = Target->getSuperclass();
-        superclass = ArchetypeBuilder::mapTypeIntoContext(Target, superclass);
+        superclass = Target->mapTypeIntoContext(superclass);
         superMetadata =
           emitClassHeapMetadataRef(IGF, superclass->getCanonicalType(),
                                    MetadataValueType::ObjCClass);

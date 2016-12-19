@@ -14,6 +14,7 @@
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"

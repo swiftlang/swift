@@ -3098,11 +3098,11 @@ public:
       DeclContext *DC;
       if (VD) {
         DC = VD->getInnermostDeclContext();
-        this->ExprType = ArchetypeBuilder::mapTypeIntoContext(DC, ExprType);
+        this->ExprType = DC->mapTypeIntoContext(ExprType);
       } else if (auto NTD = ExprType->getRValueType()->getRValueInstanceType()
           ->getAnyNominal()) {
         DC = NTD;
-        this->ExprType = ArchetypeBuilder::mapTypeIntoContext(DC, ExprType);
+        this->ExprType = DC->mapTypeIntoContext(ExprType);
       }
     }
 

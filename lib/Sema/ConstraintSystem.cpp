@@ -1085,8 +1085,7 @@ ConstraintSystem::getTypeOfMemberReference(
     Type memberTy = isTypeReference
         ? assocType->getDeclaredInterfaceType()
         : assocType->getInterfaceType();
-    memberTy = ArchetypeBuilder::mapTypeIntoContext(
-        assocType->getProtocol(), memberTy);
+    memberTy = assocType->getProtocol()->mapTypeIntoContext(memberTy);
     auto openedType = FunctionType::get(baseObjTy, memberTy);
     return { openedType, memberTy };
   }

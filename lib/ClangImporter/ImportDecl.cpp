@@ -18,6 +18,7 @@
 #include "ImporterImpl.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -1304,7 +1305,7 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
 
   // 'self'
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), dc);
-  auto elementTy = ArchetypeBuilder::mapTypeIntoContext(dc, elementInterfaceTy);
+  auto elementTy = dc->mapTypeIntoContext(elementInterfaceTy);
 
   auto paramVarDecl =
       new (C) ParamDecl(/*isLet=*/false, SourceLoc(), SourceLoc(), Identifier(),
@@ -3913,8 +3914,7 @@ namespace {
                                          isInSystemModule(dc),
                                          /*isFullyBridgeable*/false);
         if (superclassType) {
-          superclassType =
-              ArchetypeBuilder::mapTypeOutOfContext(result, superclassType);
+          superclassType = result->mapTypeOutOfContext(superclassType);
           assert(superclassType->is<ClassType>() ||
                  superclassType->is<BoundGenericClassType>());
           inheritedTypes.push_back(TypeLoc::withoutLoc(superclassType));
@@ -4117,7 +4117,7 @@ namespace {
           decl->isClassProperty(), /*IsLet*/ false,
           Impl.importSourceLoc(decl->getLocation()),
           name, type, dc);
-      result->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(dc, type));
+      result->setInterfaceType(dc->mapTypeOutOfContext(type));
 
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
@@ -4389,8 +4389,7 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
       genericParams = generic->getGenericParams();
       genericEnv = generic->getGenericEnvironment();
 
-      underlyingType =
-          ArchetypeBuilder::mapTypeIntoContext(generic, underlyingType);
+      underlyingType = generic->mapTypeIntoContext(underlyingType);
     }
   }
 
@@ -5642,8 +5641,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
                        ->getResult()
                        ->castTo<AnyFunctionType>()
                        ->getResult();
-  auto elementContextTy = ArchetypeBuilder::mapTypeIntoContext(
-      getter, elementTy);
+  auto elementContextTy = getter->mapTypeIntoContext(elementTy);
 
   // Local function to mark the setter unavailable.
   auto makeSetterUnavailable = [&] {

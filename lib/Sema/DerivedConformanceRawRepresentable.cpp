@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
@@ -57,8 +56,7 @@ static Type deriveRawRepresentable_Raw(TypeChecker &tc, Decl *parentDecl,
   //   typealias Raw = SomeType
   // }
   auto rawInterfaceType = enumDecl->getRawType();
-  return ArchetypeBuilder::mapTypeIntoContext(cast<DeclContext>(parentDecl),
-                                              rawInterfaceType);
+  return cast<DeclContext>(parentDecl)->mapTypeIntoContext(rawInterfaceType);
 }
 
 static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
@@ -82,7 +80,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
-  rawTy = ArchetypeBuilder::mapTypeIntoContext(toRawDecl, rawTy);
+  rawTy = toRawDecl->mapTypeIntoContext(rawTy);
 
   for (auto elt : enumDecl->getAllElements()) {
     assert(elt->getTypeCheckedRawValueExpr() &&
@@ -183,7 +181,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
-  rawTy = ArchetypeBuilder::mapTypeIntoContext(initDecl, rawTy);
+  rawTy = initDecl->mapTypeIntoContext(rawTy);
   
   for (auto elt : enumDecl->getAllElements()) {
     assert(elt->getTypeCheckedRawValueExpr() &&
@@ -336,7 +334,7 @@ static bool canSynthesizeRawRepresentable(TypeChecker &tc, Decl *parentDecl, Enu
   if (!rawType)
     return false;
   auto parentDC = cast<DeclContext>(parentDecl);
-  rawType       = ArchetypeBuilder::mapTypeIntoContext(parentDC, rawType);
+  rawType       = parentDC->mapTypeIntoContext(rawType);
 
   if (!enumDecl->getInherited().empty() &&
       enumDecl->getInherited().front().isError())

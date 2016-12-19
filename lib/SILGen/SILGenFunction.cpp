@@ -469,8 +469,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
   emitProlog(fd, fd->getParameterLists(), fd->getResultInterfaceType(),
              fd->hasThrows());
-  Type resultTy = ArchetypeBuilder::mapTypeIntoContext(
-      fd, fd->getResultInterfaceType());
+  Type resultTy = fd->mapTypeIntoContext(fd->getResultInterfaceType());
   prepareEpilog(resultTy, fd->hasThrows(), CleanupLocation(fd));
 
   emitProfilerIncrement(fd->getBody());
@@ -798,8 +797,7 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
     F.setBare(IsBare);
     auto selfMetaTy = vd->getInterfaceType()->getAs<AnyFunctionType>()
         ->getInput();
-    selfMetaTy = ArchetypeBuilder::mapTypeIntoContext(
-        vd->getInnermostDeclContext(), selfMetaTy);
+    selfMetaTy = vd->getInnermostDeclContext()->mapTypeIntoContext(selfMetaTy);
     auto metatypeVal =
         F.begin()->createFunctionArgument(getLoweredLoadableType(selfMetaTy));
     curriedArgs.push_back(metatypeVal);

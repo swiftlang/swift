@@ -320,8 +320,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   ValueDecl *decl = declRef.getDecl();
   
   if (!ncRefType) {
-    ncRefType = ArchetypeBuilder::mapTypeIntoContext(
-        decl->getInnermostDeclContext(),
+    ncRefType = decl->getInnermostDeclContext()->mapTypeIntoContext(
         decl->getInterfaceType());
   }
   CanType refType = ncRefType->getCanonicalType();

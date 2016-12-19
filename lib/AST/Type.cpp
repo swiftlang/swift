@@ -16,7 +16,6 @@
 
 #include "swift/AST/Types.h"
 #include "ForeignRepresentationInfo.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"

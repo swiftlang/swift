@@ -16,7 +16,6 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -729,6 +728,38 @@ void ExtensionDecl::setGenericParams(GenericParamList *params) {
     for (auto param : *GenericParams)
       param->setDeclContext(this);
   }
+}
+
+GenericSignature *ExtensionDecl::getGenericSignature() const {
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv->getGenericSignature();
+
+  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return genericSig;
+
+  return nullptr;
+}
+
+GenericEnvironment *ExtensionDecl::getGenericEnvironment() const {
+  // Fast case: we already have a generic environment.
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv;
+
+  // If we only have a generic signature, build the generic environment.
+  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return getLazyGenericEnvironmentSlow();
+
+  return nullptr;
+}
+
+void ExtensionDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
+  assert((GenericSigOrEnv.isNull() ||
+          getGenericSignature()->getCanonicalSignature() ==
+            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+         "set a generic environment with a different generic signature");
+  this->GenericSigOrEnv = genericEnv;
+  if (genericEnv)
+    genericEnv->setOwningDeclContext(this);
 }
 
 GenericEnvironment *
@@ -2163,6 +2194,40 @@ void GenericTypeDecl::setGenericParams(GenericParamList *params) {
   if (params)
     for (auto Param : *params)
       Param->setDeclContext(this);
+}
+
+GenericSignature *GenericTypeDecl::getGenericSignature() const {
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv->getGenericSignature();
+
+  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return genericSig;
+
+  return nullptr;
+}
+
+GenericEnvironment *GenericTypeDecl::getGenericEnvironment() const {
+  // Fast case: we already have a generic environment.
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv;
+
+  // If we only have a generic signature, build the generic environment.
+  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return getLazyGenericEnvironmentSlow();
+
+  return nullptr;
+}
+
+/// Set the generic context of this function.
+void GenericTypeDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
+  assert((GenericSigOrEnv.isNull() ||
+          getGenericSignature()->getCanonicalSignature() ==
+            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+         "set a generic environment with a different generic signature");
+  this->GenericSigOrEnv = genericEnv;
+
+  if (genericEnv)
+    genericEnv->setOwningDeclContext(this);
 }
 
 GenericEnvironment *
@@ -3979,6 +4044,40 @@ SourceRange SubscriptDecl::getSourceRange() const {
   if (getBracesRange().isValid())
     return { getSubscriptLoc(), getBracesRange().End };
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
+}
+
+GenericSignature *AbstractFunctionDecl::getGenericSignature() const {
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv->getGenericSignature();
+
+  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return genericSig;
+
+  return nullptr;
+}
+
+GenericEnvironment *AbstractFunctionDecl::getGenericEnvironment() const {
+  // Fast case: we already have a generic environment.
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv;
+
+  // If we only have a generic signature, build the generic environment.
+  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return getLazyGenericEnvironmentSlow();
+
+  return nullptr;
+}
+
+void
+AbstractFunctionDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
+  assert((GenericSigOrEnv.isNull() ||
+          getGenericSignature()->getCanonicalSignature() ==
+            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+         "set a generic environment with a different generic signature");
+  this->GenericSigOrEnv = genericEnv;
+
+  if (genericEnv)
+    genericEnv->setOwningDeclContext(this);
 }
 
 GenericEnvironment *

@@ -108,7 +108,7 @@ Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
       !dc->isValidGenericContext())
     return dc->getSelfInterfaceType();
 
-  return ArchetypeBuilder::mapTypeIntoContext(
+  return GenericEnvironment::mapTypeIntoContext(
       dc->getParentModule(), GenericEnv,
       dc->getSelfInterfaceType());
 }
@@ -122,7 +122,7 @@ Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
     return dc->mapTypeIntoContext(paramDecl->getDeclaredInterfaceType());
   }
 
-  return ArchetypeBuilder::mapTypeIntoContext(
+  return GenericEnvironment::mapTypeIntoContext(
       dc->getParentModule(), GenericEnv,
       decl->getDeclaredInterfaceType());
 }
@@ -137,8 +137,8 @@ void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type)
   // When type checking functions, the CompleteGenericTypeResolver sets
   // the interface type.
   if (!decl->hasInterfaceType())
-    decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(GenericEnv,
-                                                                 type));
+    decl->setInterfaceType(GenericEnvironment::mapTypeOutOfContext(
+        GenericEnv, type));
 }
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(

@@ -2299,8 +2299,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 
   // Record the type witness.
-  auto *archetype = ArchetypeBuilder::mapTypeIntoContext(
-      Conformance->getProtocol(), assocType->getDeclaredInterfaceType())
+  auto *archetype = Conformance->getProtocol()->mapTypeIntoContext(
+      assocType->getDeclaredInterfaceType())
           ->getAs<ArchetypeType>();
   if (archetype)
     Conformance->setTypeWitness(
@@ -3328,12 +3328,12 @@ void ConformanceChecker::resolveTypeWitnesses() {
     // Create a set of type substitutions for all known associated type.
     // FIXME: Base this on dependent types rather than archetypes?
     TypeSubstitutionMap substitutions;
-    substitutions[ArchetypeBuilder::mapTypeIntoContext(Proto, selfType)
-        ->getCanonicalType()->castTo<ArchetypeType>()] = Adoptee;
+    substitutions[Proto->mapTypeIntoContext(selfType)
+        ->castTo<ArchetypeType>()] = Adoptee;
     for (auto member : Proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        auto archetype = ArchetypeBuilder::mapTypeIntoContext(
-            Proto, assocType->getDeclaredInterfaceType())
+        auto archetype = Proto->mapTypeIntoContext(
+            assocType->getDeclaredInterfaceType())
                 ->getAs<ArchetypeType>();
         if (!archetype)
           continue;

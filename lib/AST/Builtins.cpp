@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AST.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/GenericEnvironment.h"
