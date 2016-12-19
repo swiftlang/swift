@@ -632,8 +632,10 @@ void swift::irgen::deleteIRGenModule(
 static void runIRGenPreparePasses(SILModule &Module,
                                   irgen::IRGenModule &IRModule) {
   SILPassManager PM(&Module, &IRModule);
-  PM.registerIRGenPass(swift::PassKind::AllocStackHoisting,
-                       createAllocStackHoisting());
+#define PASS(ID, Name, Description)
+#define IRGEN_PASS(ID, Name, Description)                                      \
+    PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());
+#include "swift/SILOptimizer/PassManager/Passes.def"
   PM.executePassPipelinePlan(
       SILPassPipelinePlan::getIRGenPreparePassPipeline());
 }
