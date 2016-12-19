@@ -40,3 +40,8 @@ docs/_build
 CMakeCache.txt
 CMakeFiles
 .atom-build.json
+
+#==============================================================================#
+# Ignore compile database
+#==============================================================================#
+compile_commands.json
