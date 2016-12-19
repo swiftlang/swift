@@ -1354,6 +1354,8 @@ void Remangler::mangleProtocolConformance(Node *node) {
     Ty = Ty->getChild(1).get();
   }
   mangle(Ty);
+  if (node->getNumChildren() == 4)
+    mangleChildNode(node, 3);
   manglePureProtocol(node->getChild(1).get());
   mangleChildNode(node, 2);
   if (GenSig)

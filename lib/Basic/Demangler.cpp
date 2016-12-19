@@ -1020,12 +1020,20 @@ NodePointer Demangler::popProtocolConformance() {
   NodePointer Module = popModule();
   NodePointer Proto = popProtocol();
   NodePointer Type = popNode(Node::Kind::Type);
+  NodePointer Ident;
+  if (!Type) {
+    // Property behavior conformance
+    Ident = popNode(Node::Kind::Identifier);
+    Type = popNode(Node::Kind::Type);
+  }
   if (GenSig) {
     Type = createType(createWithChildren(Node::Kind::DependentGenericType,
                                          GenSig, Type));
   }
-  return createWithChildren(Node::Kind::ProtocolConformance,
-                            Type, Proto, Module);
+  NodePointer Conf = createWithChildren(Node::Kind::ProtocolConformance,
+                                        Type, Proto, Module);
+  addChild(Conf, Ident);
+  return Conf;
 }
 
 NodePointer Demangler::demangleThunkOrSpecialization() {
