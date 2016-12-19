@@ -80,3 +80,6 @@ try #if false // expected-error {{expected expression}}
 func fn_j() {}
 #endif
 fn_j() // OK
+
+#if foo || bar || nonExistant() // expected-error {{expected only one argument to platform condition}}
+#endif
