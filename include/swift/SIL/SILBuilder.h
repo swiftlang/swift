@@ -1648,6 +1648,11 @@ private:
       InsertedInstrs->push_back(TheInst);
 
     BB->insert(InsertPt, TheInst);
+// TODO: We really shouldn't be creating instructions unless we are going to
+// insert them into a block... This failed in SimplifyCFG.
+#ifndef NDEBUG
+    TheInst->verifyOperandOwnership();
+#endif
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
