@@ -1461,6 +1461,32 @@ ${mutatingOperationComment(x.operator)}
   static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
 
+  /// Returns the inverse of the bits set in the argument.
+  ///
+  /// The bitwise NOT operator (`~`) is a prefix operator that returns a value
+  /// in which all the bits of its argument are flipped: Bits that are `1` in
+  /// the argument are `0` in the result, and bits that are `0` in the argument
+  /// are `1` in the result. This is equivalent to the inverse of a set. For
+  /// example:
+  ///
+  ///     let x: UInt8 = 5        // 0b00000101
+  ///     let notX = ~x           // 0b11111010
+  ///
+  /// Performing a bitwise NOT operation on 0 returns a value with every bit
+  /// set to `1`.
+  ///
+  ///     let allOnes = ~UInt8.min   // 0b11111111
+  ///
+  /// - Complexity: O(1).
+  static prefix func ~ (_ x: Self) -> Self
+
+% for x in binaryBitwise + maskingShifts:
+${operationComment(x.operator)}
+  // FIXME(integers): revisit the doc comment
+  static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
+  static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
+% end
+
   /// Returns the quotient and remainder of this value divided by the given
   /// value.
   ///
@@ -1513,6 +1539,35 @@ extension BinaryInteger {
     -> (quotient: Self, remainder: Self) {
     return (self / rhs, self % rhs)
   }
+
+  % for x in binaryBitwise + maskingShifts:
+
+  @_transparent
+  public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
+    return lhs
+  }
+
+  % end
+
+  % for x in maskingShifts:
+
+${operatorComment(x.operator)}
+  public static func ${x.operator} <
+    Other : BinaryInteger
+  >(lhs: Self, rhs: Other) -> Self {
+    return lhs ${x.operator} Self(extendingOrTruncating: rhs)
+  }
+
+  @_transparent
+  public static func ${x.operator}= <
+    Other : BinaryInteger
+  >(lhs: inout Self, rhs: Other) {
+    lhs = lhs ${x.operator} rhs
+  }
+
+  % end
 }
 
 // Strideable conformance
@@ -1875,32 +1930,6 @@ ${overflowOperationComment(x.operator)}
   ) -> (partialValue: Self, overflow: ArithmeticOverflow)
 % end
 
-  /// Returns the inverse of the bits set in the argument.
-  ///
-  /// The bitwise NOT operator (`~`) is a prefix operator that returns a value
-  /// in which all the bits of its argument are flipped: Bits that are `1` in
-  /// the argument are `0` in the result, and bits that are `0` in the argument
-  /// are `1` in the result. This is equivalent to the inverse of a set. For
-  /// example:
-  ///
-  ///     let x: UInt8 = 5        // 0b00000101
-  ///     let notX = ~x           // 0b11111010
-  ///
-  /// Performing a bitwise NOT operation on 0 returns a value with every bit
-  /// set to `1`.
-  ///
-  ///     let allOnes = ~UInt8.min   // 0b11111111
-  ///
-  /// - Complexity: O(1).
-  static prefix func ~ (_ x: Self) -> Self
-
-% for x in binaryBitwise + maskingShifts:
-${operationComment(x.operator)}
-  // FIXME(integers): revisit the doc comment
-  static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
-  static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
-% end
-
   /// Returns a tuple containing the high and low parts of the result of
   /// multiplying its arguments.
   ///
@@ -1987,37 +2016,12 @@ extension FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 extension FixedWidthInteger {
-  @inline(__always)
+  @_transparent
   public static prefix func ~ (x: Self) -> Self {
     return 0 &- x &- 1
   }
 
-  % for x in binaryBitwise + maskingShifts:
-
-  @_transparent
-  public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
-    var lhs = lhs
-    lhs ${x.operator}= rhs
-    return lhs
-  }
-
-  % end
-
   % for x in maskingShifts:
-
-${operatorComment(x.operator)}
-  public static func ${x.operator} <
-    Other : BinaryInteger
-  >(lhs: Self, rhs: Other) -> Self {
-    return lhs ${x.operator} Self(extendingOrTruncating: rhs)
-  }
-
-  @_transparent
-  public static func ${x.operator}= <
-    Other : BinaryInteger
-  >(lhs: inout Self, rhs: Other) {
-    lhs = lhs ${x.operator} rhs
-  }
 
 //===----------------------------------------------------------------------===//
 //=== "Smart ${x.description}", supporting overshifts and negative shifts -===//
