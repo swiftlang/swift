@@ -28,7 +28,7 @@
 #include <condition_variable>
 #include <new>
 #include <cctype>
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
 #define NOMINMAX
