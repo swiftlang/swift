@@ -1790,8 +1790,7 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
             return None;
           }
 
-          auto *M = Context.getModule({ { argumentIdent, UDRE->getLoc() } });
-          return (M && !M->failedToLoad());
+          return Context.canImportModule({ argumentIdent, UDRE->getLoc() });
         }
 
         if (!fullCheck) {

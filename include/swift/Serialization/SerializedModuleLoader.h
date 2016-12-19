@@ -48,6 +48,13 @@ public:
   SerializedModuleLoader &operator=(const SerializedModuleLoader &) = delete;
   SerializedModuleLoader &operator=(SerializedModuleLoader &&) = delete;
 
+  /// \brief Check whether the module with a given name can be imported without
+  /// importing it.
+  ///
+  /// Note that even if this check succeeds, errors may still occur if the
+  /// module is loaded in full.
+  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
+
   /// \brief Import a module with the given module path.
   ///
   /// \param importLoc The location of the 'import' keyword.
