@@ -172,7 +172,7 @@ AssumeUnqualifiedOwnershipWhenParsing(
 static void runCommandLineSelectedPasses(SILModule *Module) {
   SILPassManager PM(Module);
   PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
-      SILPassPipelinePlan::ExecutionKind::UntilFixPoint, Passes));
+      SILPassPipelinePlan::ExecutionKind::OneIteration, Passes));
   if (Module->getOptions().VerifyAll)
     Module->verify();
 }
