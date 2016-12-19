@@ -1595,13 +1595,13 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
 
         if (name.equals("||")) {
           result = disjoin(result, rhs);
-          if (result.getValueOr(true))
+          if (result.getValueOr(false))
             break;
         }
 
         if (name.equals("&&")) {
           result = conjoin(result, rhs);
-          if (!result.getValueOr(false))
+          if (!result.getValueOr(true))
             break;
         }
       } else {
