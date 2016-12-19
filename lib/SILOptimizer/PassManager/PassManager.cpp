@@ -511,34 +511,6 @@ void SILPassManager::runOneIteration() {
   }
 }
 
-void SILPassManager::run() {
-  const SILOptions &Options = getOptions();
-  (void) Options;
-
-  if (SILPrintAll) {
-    if (SILPrintOnlyFun.empty() && SILPrintOnlyFuns.empty()) {
-      llvm::dbgs() << "*** SIL module before transformation ("
-                   << NumOptimizationIterations << ") ***\n";
-      Mod->dump(Options.EmitVerboseSIL);
-    } else {
-      for (auto &F : *Mod) {
-        if (!SILPrintOnlyFun.empty() && F.getName().str() == SILPrintOnlyFun) {
-          llvm::dbgs() << "*** SIL function before transformation ("
-                       << NumOptimizationIterations << ") ***\n";
-          F.dump(Options.EmitVerboseSIL);
-        }
-        if (!SILPrintOnlyFuns.empty() &&
-            F.getName().find(SILPrintOnlyFuns, 0) != StringRef::npos) {
-          llvm::dbgs() << "*** SIL function before transformation ("
-                       << NumOptimizationIterations << ") ***\n";
-          F.dump(Options.EmitVerboseSIL);
-        }
-      }
-    }
-  }
-  runOneIteration();
-}
-
 /// D'tor.
 SILPassManager::~SILPassManager() {
   // Free all transformations.
