@@ -119,7 +119,7 @@ void Partition::assignStackLocation(
   auto *AssignedLoc = Elts[0];
 
   // Move this assigned location to the beginning of the entry block.
-  auto *EntryBB = AssignedLoc->getFunction()->entryBB();
+  auto *EntryBB = AssignedLoc->getFunction()->getEntryBlock();
   AssignedLoc->removeFromParent();
   EntryBB->push_front(AssignedLoc);
 
@@ -382,7 +382,7 @@ void HoistAllocStack::hoist() {
     Merger.mergeSlots();
   } else {
     // Hoist alloc_stacks to the entry block and delete dealloc_stacks.
-    auto *EntryBB = F->entryBB();
+    auto *EntryBB = F->getEntryBlock();
     for (auto *AllocStack : AllocStackToHoist) {
       // Insert at the beginning of the entry block.
       AllocStack->removeFromParent();

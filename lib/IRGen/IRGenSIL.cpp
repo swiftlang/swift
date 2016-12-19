@@ -3530,7 +3530,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   (void) Decl;
 
   bool isEntryBlock =
-      i->getParentBlock() == i->getFunction()->entryBB();
+      i->getParentBlock() == i->getFunction()->getEntryBlock();
   auto addr =
       type.allocateStack(*this, i->getElementType(), isEntryBlock, dbgname);
 
