@@ -41,6 +41,14 @@ protocol Racoon {
   }
 }
 
+enum SillyRawEnum : SillyProtocol.InnerClass {}
+// expected-error@-1 {{raw type 'SillyProtocol.InnerClass' is not expressible by any literal}}
+// expected-error@-2 {{'SillyRawEnum' declares raw type 'SillyProtocol.InnerClass', but does not conform to RawRepresentable and conformance could not be synthesized}}
+
+protocol SillyProtocol {
+  class InnerClass<T> {} // expected-error {{type 'InnerClass' cannot be nested in protocol 'SillyProtocol'}}
+}
+
 enum OuterEnum {
   protocol C {} // expected-error{{protocol 'C' cannot be nested inside another declaration}}
   // expected-note@-1{{'C' previously declared here}}

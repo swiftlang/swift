@@ -340,7 +340,9 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // existential type, because we have no way to represent such types.
       //
       // This is diagnosed further on down in resolveNestedIdentTypeComponent().
-      if (type->isExistentialType()) {
+      if (type->isExistentialType() &&
+          (isa<TypeAliasDecl>(typeDecl) ||
+           isa<AssociatedTypeDecl>(typeDecl))) {
         auto memberType = typeDecl->getInterfaceType()->getRValueInstanceType();
 
         if (memberType->hasTypeParameter()) {
