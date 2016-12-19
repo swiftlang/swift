@@ -463,7 +463,8 @@ static void
 findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
                         OpaqueValue *&outValue, const Metadata *&outType,
                         bool &inoutCanTake,
-                        bool isTargetTypeAnyObject) {
+                        bool isTargetTypeAnyObject,
+                        bool isTargetExistentialMetatype) {
   switch (type->getKind()) {
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
@@ -476,6 +477,13 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
   }
 
   case MetadataKind::Existential: {
+    // We can't drill through existential containers unless the result is an
+    // existential metatype.
+    if (!isTargetExistentialMetatype) {
+      outValue = value;
+      outType = type;
+      return;
+    }
     auto existentialType = cast<ExistentialTypeMetadata>(type);
     
     switch (existentialType->getRepresentation()) {
@@ -499,7 +507,7 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
         // inline value buffer storage.
         outValue = value;
         outType = 0;
-        inoutCanTake= true;
+        inoutCanTake = true;
         return;
       }
       OpaqueValue *innerValue
@@ -507,7 +515,8 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
       inoutCanTake &= existentialType->mayTakeValue(value);
 
       return findDynamicValueAndType(innerValue, innerType,
-                                     outValue, outType, inoutCanTake, false);
+                                     outValue, outType, inoutCanTake, false,
+                                     isTargetExistentialMetatype);
     }
     }
   }
@@ -538,11 +547,14 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
 }
 
 extern "C" const Metadata *
-swift::swift_getDynamicType(OpaqueValue *value, const Metadata *self) {
+swift::swift_getDynamicType(OpaqueValue *value, const Metadata *self,
+                            bool existentialMetatype) {
   OpaqueValue *outValue;
   const Metadata *outType;
   bool canTake = false;
-  findDynamicValueAndType(value, self, outValue, outType, canTake, false);
+  findDynamicValueAndType(value, self, outValue, outType, canTake,
+                          /*isAnyObject*/ false,
+                          existentialMetatype);
   return outType;
 }
 
@@ -784,7 +796,8 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   // We don't care what the target type of a cast from class to AnyObject is.
   // srcDynamicType will be set to a nullptr in this case to save a lookup.
   findDynamicValueAndType(src, srcType, srcDynamicValue, srcDynamicType,
-                          canConsumeDynamicValue, isTargetTypeAnyObject);
+                          canConsumeDynamicValue, isTargetTypeAnyObject,
+                          /*isExistentialMetatype*/ true);
 
   // Recursive casts on the dynamic value should not destroy the source
   // if findDynamicValueAndType doesn't allow it.

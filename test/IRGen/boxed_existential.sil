@@ -107,7 +107,7 @@ entry(%b : $Error):
   // CHECK: [[ADDR:%.*]] = load {{.*}} [[OUT_ADDR]]
   // CHECK: [[OUT_TYPE:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 1
   // CHECK: [[TYPE:%.*]] = load {{.*}} [[OUT_TYPE]]
-  // CHECK: [[DYNAMIC_TYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[ADDR]], %swift.type* [[TYPE]])
+  // CHECK: [[DYNAMIC_TYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[ADDR]], %swift.type* [[TYPE]], i1 true)
   // CHECK: [[OUT_WITNESS:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 2
   // CHECK: [[WITNESS:%.*]] = load {{.*}} [[OUT_WITNESS]]
   %m = existential_metatype $@thick Error.Type, %b : $Error
