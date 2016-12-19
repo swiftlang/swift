@@ -72,6 +72,59 @@ func _insertionSort<C>(
   }
 }
 
+/// Sorts the elements at indices `a`, `b`, and `c`. Stable.
+///
+/// - Precondition: `a < b && b < c`
+/// - Postcondition: `elements[a] <= elements[b] && elements[b] <= elements[c]`
+public // @testable
+func _sort3<C>(
+  _ elements: inout C,
+  _ a: C.Index, _ b: C.Index, _ c: C.Index
+  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+)
+  where
+  C : MutableCollection & RandomAccessCollection
+  ${"" if p else ", C.Iterator.Element : Comparable"}
+{
+  // Possible starting states for elements at a, b, and c:
+  // 123, 132, 213, 231, 312, 321, 112, 121, 211, 122, 212, 221, 111
+
+  switch (${cmp("elements[b]", "elements[a]", p)},
+    ${cmp("elements[c]", "elements[b]", p)}) {
+  case (false, false):
+    // 0 swaps: 123, 112, 122, 111
+    break
+
+  case (true, true):
+    // 1 swap: 321->123
+    swap(&elements[a], &elements[c])
+
+  case (true, false):
+    // 1 swap: 213, 212 --- 2 swaps: 312, 211
+    // 213->123, 212->122 --- 312->132, 211->121
+    swap(&elements[a], &elements[b])
+    if ${cmp("elements[c]", "elements[b]", p)} {
+      // 132->123, 121->112
+      swap(&elements[b], &elements[c])
+    }
+
+  case (false, true):
+    // 1 swap: 132, 121 --- 2 swaps: 231, 221
+    // 132->123, 121->112 --- 231->213, 221->212
+    swap(&elements[b], &elements[c])
+    if ${cmp("elements[b]", "elements[a]", p)} {
+      // 213->123, 212->122
+      swap(&elements[a], &elements[b])
+    }
+  }
+}
+
+/// Reorders `elements` and returns an index `p` such that every element in
+/// `elements[range.lowerBound..<p]` is less than every element in
+/// `elements[p..<range.upperBound]`.
+///
+/// - Precondition: The count of `range` must be >= 3:
+///   `elements.distance(from: range.lowerBound, to: range.upperBound) >= 3`
 func _partition<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -79,49 +132,43 @@ func _partition<C>(
 ) -> C.Index
   where
   C : MutableCollection & RandomAccessCollection
-  ${"" if p else ", C.Iterator.Element : Comparable"} {
-
+  ${"" if p else ", C.Iterator.Element : Comparable"}
+{
   var lo = range.lowerBound
-  var hi = range.upperBound
+  var hi = elements.index(before: range.upperBound)
 
-  if lo == hi {
-    return lo
-  }
-
-  // The first element is the pivot.
-  let pivot = elements[range.lowerBound]
+  // Sort the first, middle, and last elements, then use the middle value
+  // as the pivot for the partition.
+  let half = elements.distance(from: lo, to: hi) / 2
+  let mid = elements.index(lo, offsetBy: half)
+  _sort3(&elements, lo, mid, hi
+    ${", by: areInIncreasingOrder" if p else ""})
+  let pivot = elements[mid]
 
   // Loop invariants:
   // * lo < hi
-  // * elements[i] < pivot, for i in range.lowerBound+1..lo
-  // * pivot <= elements[i] for i in hi..range.upperBound
-
-Loop: while true {
-  FindLo: repeat {
+  // * elements[i] < pivot, for i in range.lowerBound..<lo
+  // * pivot <= elements[i] for i in hi..<range.upperBound
+  Loop: while true {
+    FindLo: do {
       elements.formIndex(after: &lo)
       while lo != hi {
         if !${cmp("elements[lo]", "pivot", p)} { break FindLo }
         elements.formIndex(after: &lo)
       }
       break Loop
-    } while false
+    }
 
-  FindHi: repeat {
+    FindHi: do {
       elements.formIndex(before: &hi)
       while hi != lo {
         if ${cmp("elements[hi]", "pivot", p)} { break FindHi }
         elements.formIndex(before: &hi)
       }
       break Loop
-    } while false
+    }
 
     swap(&elements[lo], &elements[hi])
-  }
-
-  elements.formIndex(before: &lo)
-  if lo != range.lowerBound {
-    // swap the pivot into place
-    swap(&elements[lo], &elements[range.lowerBound])
   }
 
   return lo
@@ -190,7 +237,7 @@ func _introSortImpl<C>(
     depthLimit: depthLimit &- 1)
   _introSortImpl(
     &elements,
-    subRange: (elements.index(after: partIdx))..<range.upperBound,
+    subRange: partIdx..<range.upperBound,
     ${"by: areInIncreasingOrder, " if p else ""}
     depthLimit: depthLimit &- 1)
 }
@@ -234,6 +281,7 @@ func _siftDown<C>(
       ${", by: areInIncreasingOrder" if p else ""})
   }
 }
+
 func _heapify<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -262,6 +310,7 @@ func _heapify<C>(
       ${", by: areInIncreasingOrder" if p else ""})
   }
 }
+
 func _heapSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
