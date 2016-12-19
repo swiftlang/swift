@@ -248,9 +248,6 @@ if True:
 ///     print(emptyDoubles[0])
 ///     // Triggers runtime error: Index out of range
 ///
-/// See the `Sequence`, `Collection`, and `RangeReplaceableCollection`
-/// protocols for more methods available to arrays.
-///
 /// Adding and Removing Elements
 /// ============================
 ///
@@ -553,9 +550,8 @@ public struct ${Self}<Element>
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
@@ -564,8 +560,6 @@ public struct ${Self}<Element>
   ///   this is the same value as the result of `n` calls to `index(after:)`.
   ///   If `n` is negative, this is the same value as the result of `-n` calls
   ///   to `index(before:)`.
-  ///
-  /// - Complexity: O(1)
   public func index(_ i: Int, offsetBy n: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
@@ -600,9 +594,9 @@ public struct ${Self}<Element>
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
@@ -615,7 +609,6 @@ public struct ${Self}<Element>
   ///   the method returns `nil`.
   ///
   /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
-  /// - Complexity: O(1)
   public func index(
     _ i: Int, offsetBy n: Int, limitedBy limit: Int
   ) -> Int? {
@@ -1216,7 +1209,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// If you implement a custom data structure backed by an array that grows
   /// dynamically, naively calling the `reserveCapacity(_:)` method can lead
   /// to worse than expected performance. Arrays need to follow a geometric
-  /// allocation pattern for appending elements to have amortized
+  /// allocation pattern for appending elements to achieve amortized
   /// constant-time performance. The `Array` type's `append(_:)` and
   /// `append(contentsOf:)` methods take care of this detail for you, but
   /// `reserveCapacity(_:)` allocates only as much space as you tell it to
