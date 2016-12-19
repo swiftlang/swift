@@ -112,7 +112,6 @@ func _assertionFailure(
 @inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailure(
-  // FIXME(ABI)#19 : add argument labels to conform to API guidelines.
   _ prefix: StaticString, _ message: String,
   file: StaticString, line: UInt,
   flags: UInt32
