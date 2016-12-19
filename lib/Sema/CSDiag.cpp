@@ -7042,7 +7042,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           auto *generic =
               dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
-          if (hasArchetype(generic, Archetype)) {
+          if (generic && hasArchetype(generic, Archetype)) {
             FoundDecl = generic;
             FoundGenericTypeBase = ident;
             return false;
