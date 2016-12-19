@@ -17,7 +17,6 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -855,8 +854,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       if (T->hasArchetype()) {
         // Get the interface type, since TypeLocs still have
         // contextual types in them.
-        T = ArchetypeBuilder::mapTypeOutOfContext(
-            Current->getInnermostDeclContext(), T);
+        T = Current->getInnermostDeclContext()->mapTypeOutOfContext(T);
       }
 
       // Get the innermost nominal type context.

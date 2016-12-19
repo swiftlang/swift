@@ -12,13 +12,13 @@
 
 #define DEBUG_TYPE "libsil"
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
@@ -1619,8 +1619,7 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                                      ASTContext &context) {
   auto *DC = VD->getDeclContext();
   CanType resultTy =
-      ArchetypeBuilder::mapTypeOutOfContext(
-          DC, VD->getParentInitializer()->getType())
+      DC->mapTypeOutOfContext(VD->getParentInitializer()->getType())
           ->getCanonicalType();
   GenericSignature *sig = DC->getGenericSignatureOfContext();
 
@@ -1791,7 +1790,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
       // FIXME: Closures could have an interface type computed by Sema.
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       funcTy = cast<AnyFunctionType>(
-          ArchetypeBuilder::mapTypeOutOfContext(ACE->getParent(), funcTy)
+          ACE->mapTypeOutOfContext(funcTy)
               ->getCanonicalType());
       return getFunctionInterfaceTypeWithCaptures(funcTy, ACE);
     }

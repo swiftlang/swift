@@ -17,7 +17,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/StringExtras.h"

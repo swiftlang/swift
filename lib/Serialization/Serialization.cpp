@@ -1142,9 +1142,11 @@ void Serializer::writeNormalConformance(
       // If there is no witness, we're done.
       if (!witness.getDecl()) return;
 
-      if (auto genericSig = witness.requiresSubstitution() 
-                              ? witness.getSyntheticSignature()
+      if (auto genericEnv = witness.requiresSubstitution() 
+                              ? witness.getSyntheticEnvironment()
                               : nullptr) {
+        auto *genericSig = genericEnv->getGenericSignature();
+
         // Generic parameters.
         data.push_back(genericSig->getGenericParams().size());
         for (auto gp : genericSig->getGenericParams())
@@ -1207,9 +1209,11 @@ void Serializer::writeNormalConformance(
    // Bail out early for simple witnesses.
    if (!witness.getDecl()) return;
 
-   if (auto genericSig = witness.requiresSubstitution() 
-                           ? witness.getSyntheticSignature()
+   if (auto genericEnv = witness.requiresSubstitution() 
+                           ? witness.getSyntheticEnvironment()
                            : nullptr) {
+     auto *genericSig = genericEnv->getGenericSignature();
+
      // Write the generic requirements of the synthetic environment.
      writeGenericRequirements(genericSig->getRequirements(),
                               DeclTypeAbbrCodes);

@@ -17,7 +17,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"

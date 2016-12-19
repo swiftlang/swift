@@ -16,7 +16,6 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -705,7 +704,7 @@ struct ASTNodeBase {};
       Type resultType;
       if (FuncDecl *FD = dyn_cast<FuncDecl>(func)) {
         resultType = FD->getResultInterfaceType();
-        resultType = ArchetypeBuilder::mapTypeIntoContext(FD, resultType);
+        resultType = FD->mapTypeIntoContext(resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
       } else {
@@ -1739,8 +1738,7 @@ struct ASTNodeBase {};
       Type typeForAccessors =
           var->getInterfaceType()->getReferenceStorageReferent();
       typeForAccessors =
-          ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
-                                               typeForAccessors);
+          var->getDeclContext()->mapTypeIntoContext(typeForAccessors);
       if (const FuncDecl *getter = var->getGetter()) {
         if (getter->getParameterLists().back()->size() != 0) {
           Out << "property getter has parameters\n";
@@ -1748,8 +1746,7 @@ struct ASTNodeBase {};
         }
         Type getterResultType = getter->getResultInterfaceType();
         getterResultType =
-            ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
-                                                 getterResultType);
+            var->getDeclContext()->mapTypeIntoContext(getterResultType);
         if (!getterResultType->isEqual(typeForAccessors)) {
           Out << "property and getter have mismatched types: '";
           typeForAccessors.print(Out);
@@ -1775,8 +1772,7 @@ struct ASTNodeBase {};
         }
         const ParamDecl *param = setter->getParameterLists().back()->get(0);
         Type paramType = param->getInterfaceType();
-        paramType = ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
-                                                         paramType);
+        paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
         if (!paramType->isEqual(typeForAccessors)) {
           Out << "property and setter param have mismatched types: '";
           typeForAccessors.print(Out);

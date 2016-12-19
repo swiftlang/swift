@@ -1107,7 +1107,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
 
     // Find the archetype information.
     const DeclContext *DC = DeclCtx;
-    auto GTPT = ArchetypeBuilder::mapTypeOutOfContext(DC, archetype)
+    auto GTPT = DC->mapTypeOutOfContext(archetype)
         ->castTo<GenericTypeParamType>();
 
     if (DWARFMangling) {
@@ -1511,7 +1511,7 @@ void Mangler::mangleClosureComponents(Type Ty, unsigned discriminator,
   if (!Ty)
     Ty = ErrorType::get(localContext->getASTContext());
 
-  Ty = ArchetypeBuilder::mapTypeOutOfContext(parentContext, Ty);
+  Ty = parentContext->mapTypeOutOfContext(Ty);
   mangleType(Ty->getCanonicalType(), /*uncurry*/ 0);
 }
 

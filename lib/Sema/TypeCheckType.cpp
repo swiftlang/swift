@@ -2186,11 +2186,10 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericEnv = repr->getGenericEnvironment()) {
-    auto *genericSig = repr->getGenericSignature();
-    assert(genericSig != nullptr && "Did not call handleSILGenericParams()?");
-    inputTy = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, inputTy);
-    outputTy = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, outputTy);
-    return GenericFunctionType::get(genericSig, inputTy, outputTy, extInfo);
+    inputTy = genericEnv->mapTypeOutOfContext(inputTy);
+    outputTy = genericEnv->mapTypeOutOfContext(outputTy);
+    return GenericFunctionType::get(genericEnv->getGenericSignature(),
+                                    inputTy, outputTy, extInfo);
   }
 
   auto fnTy = FunctionType::get(inputTy, outputTy, extInfo);
@@ -2240,11 +2239,11 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
       fields.push_back({fieldTy->getCanonicalType(), fieldRepr.Mutable});
     }
   }
-  
+
   // Substitute out parsed context types into interface types.
   CanGenericSignature genericSig;
   if (auto *genericEnv = repr->getGenericEnvironment()) {
-    genericSig = repr->getGenericSignature()->getCanonicalSignature();
+    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
     
     for (auto &field : fields) {
       auto transTy = genericEnv->mapTypeOutOfContext(field.getLoweredType());
@@ -2377,23 +2376,22 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   SmallVector<SILResultInfo, 4> interfaceResults;
   Optional<SILResultInfo> interfaceErrorResult;
   if (auto *genericEnv = repr->getGenericEnvironment()) {
-    genericSig = repr->getGenericSignature()->getCanonicalSignature();
+    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
  
     for (auto &param : params) {
-      auto transParamType = ArchetypeBuilder::mapTypeOutOfContext(
-          genericEnv, param.getType())->getCanonicalType();
+      auto transParamType = genericEnv->mapTypeOutOfContext(
+          param.getType())->getCanonicalType();
       interfaceParams.push_back(param.getWithType(transParamType));
     }
     for (auto &result : results) {
-      auto transResultType =
-        ArchetypeBuilder::mapTypeOutOfContext(
-          genericEnv, result.getType())->getCanonicalType();
+      auto transResultType = genericEnv->mapTypeOutOfContext(
+          result.getType())->getCanonicalType();
       interfaceResults.push_back(result.getWithType(transResultType));
     }
 
     if (errorResult) {
-      auto transErrorResultType = ArchetypeBuilder::mapTypeOutOfContext(
-          genericEnv, errorResult->getType())->getCanonicalType();
+      auto transErrorResultType = genericEnv->mapTypeOutOfContext(
+          errorResult->getType())->getCanonicalType();
       interfaceErrorResult =
         errorResult->getWithType(transErrorResultType);
     }

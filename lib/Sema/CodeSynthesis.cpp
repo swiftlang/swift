@@ -2008,8 +2008,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // immediate superclass.
   Type superclassTyInCtor = superclassCtor->getDeclContext()->getDeclaredTypeOfContext();
   Type superclassTy = classDecl->getSuperclass();
-  Type superclassTyInContext = ArchetypeBuilder::mapTypeIntoContext(
-      classDecl, superclassTy);
+  Type superclassTyInContext = classDecl->mapTypeIntoContext(superclassTy);
   NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
   if (superclassTyInCtor->getAnyNominal() != superclassDecl) {
     return nullptr;
@@ -2047,8 +2046,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
       // Map it to an interface type in terms of the derived class
       // generic signature.
-      decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
-          classDecl, paramSubstTy));
+      decl->setInterfaceType(classDecl->mapTypeOutOfContext(paramSubstTy));
     }
   } else {
     for (auto *decl : *bodyParams) {

@@ -228,8 +228,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // failure.
   SILBasicBlock *failureExitBB = nullptr;
   SILArgument *failureExitArg = nullptr;
-  auto resultType = ArchetypeBuilder::mapTypeIntoContext(
-      ctor, ctor->getResultInterfaceType());
+  auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
   auto &resultLowering = getTypeLowering(resultType);
 
   if (ctor->getFailability() != OTK_None) {
@@ -613,8 +612,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   prepareEpilog(Type(), ctor->hasThrows(),
                 CleanupLocation::get(endOfInitLoc));
 
-  auto resultType = ArchetypeBuilder::mapTypeIntoContext(
-      ctor, ctor->getResultInterfaceType());
+  auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -876,10 +874,8 @@ static SILValue getBehaviorSetterFn(SILGenFunction &gen, VarDecl *behaviorVar) {
 static Type getInitializationTypeInContext(
     DeclContext *fromDC, DeclContext *toDC,
     Expr *init) {
-  auto interfaceType =
-      ArchetypeBuilder::mapTypeOutOfContext(fromDC, init->getType());
-  auto resultType =
-      ArchetypeBuilder::mapTypeIntoContext(toDC, interfaceType);
+  auto interfaceType = fromDC->mapTypeOutOfContext(init->getType());
+  auto resultType = toDC->mapTypeIntoContext(interfaceType);
 
   return resultType;
 }

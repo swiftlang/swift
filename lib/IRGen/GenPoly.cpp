@@ -18,6 +18,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"

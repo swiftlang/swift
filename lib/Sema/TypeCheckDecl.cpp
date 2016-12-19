@@ -389,7 +389,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     // the only time we get an interface type here is with invalid
     // circular cases. That should be diagnosed elsewhere.
     if (inheritedTy->hasArchetype() && !isa<GenericTypeParamDecl>(decl))
-      inheritedTy = ArchetypeBuilder::mapTypeOutOfContext(DC, inheritedTy);
+      inheritedTy = DC->mapTypeOutOfContext(inheritedTy);
 
     // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
@@ -2627,7 +2627,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   }
 
   if (ED->getGenericEnvironmentOfContext() != nullptr)
-    rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, rawTy);
+    rawTy = ED->mapTypeIntoContext(rawTy);
   if (rawTy->hasError())
     return;
 
@@ -6359,7 +6359,6 @@ public:
 
     configureImplicitSelf(TC, CD);
 
-    Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
       // Write up generic parameters and check the generic parameter list.
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
@@ -7965,7 +7964,7 @@ void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
     assert(elt->hasRawValueExpr());
     if (elt->getTypeCheckedRawValueExpr()) continue;
     Expr *typeChecked = elt->getRawValueExpr();
-    Type rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
+    Type rawTy = ED->mapTypeIntoContext(ED->getRawType());
     bool error = typeCheckExpression(typeChecked, ED, 
                                      TypeLoc::withoutLoc(rawTy),
                                      CTP_EnumCaseRawValue);

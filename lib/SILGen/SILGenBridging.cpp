@@ -13,7 +13,6 @@
 #include "SILGenFunction.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -1328,7 +1327,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     fnType = fnType->substGenericArgs(SGM.M, subs);
 
     auto substResultTy =
-        ArchetypeBuilder::mapTypeIntoContext(fd, nativeFormalResultTy)
+        fd->mapTypeIntoContext(nativeFormalResultTy)
             ->getCanonicalType();
 
     auto resultMV = emitApply(fd, ManagedValue::forUnmanaged(fn),

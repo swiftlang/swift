@@ -14,7 +14,6 @@
 //  stored properties and enum cases for use with reflection.
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -902,8 +901,8 @@ emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
                                 const Substitution &Sub,
                                 const TypeDecl *TD) -> bool {
 
-    auto Subst = ArchetypeBuilder::mapTypeOutOfContext(
-      Conformance->getDeclContext(), Sub.getReplacement());
+    auto Subst = Conformance->getDeclContext()->mapTypeOutOfContext(
+        Sub.getReplacement());
 
     AssociatedTypes.push_back({
       AssocTy->getNameStr(),

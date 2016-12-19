@@ -158,15 +158,6 @@ public:
     return getDeclRef().getSubstitutions();
   }
 
-  /// Retrieve the generic signature of the synthetic environment.
-  GenericSignature *getSyntheticSignature() const {
-    assert(requiresSubstitution() && "No substitutions required for witness");
-    if (auto *env = getSyntheticEnvironment())
-      return env->getGenericSignature();
-    else
-      return nullptr;
-  }
-
   /// Retrieve the synthetic generic environment.
   GenericEnvironment *getSyntheticEnvironment() const {
     assert(requiresSubstitution() && "No substitutions required for witness");

@@ -1549,7 +1549,7 @@ Type ClangImporter::Implementation::importFunctionReturnType(
   if (!type)
     return type;
 
-  return ArchetypeBuilder::mapTypeOutOfContext(dc, type);
+  return dc->mapTypeOutOfContext(type);
 }
 
 Type ClangImporter::Implementation::
@@ -1645,7 +1645,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         importSourceLoc(param->getLocation()), bodyName, swiftParamTy,
         ImportedHeaderUnit);
     paramInfo->setInterfaceType(
-        ArchetypeBuilder::mapTypeOutOfContext(dc, swiftParamTy));
+        dc->mapTypeOutOfContext(swiftParamTy));
 
     if (addNoEscapeAttr)
       paramInfo->getAttrs().add(new (SwiftContext)
@@ -1875,7 +1875,7 @@ Type ClangImporter::Implementation::importMethodType(
   auto mapTypeIntoContext = [&](Type type) -> Type {
     if (dc != origDC) {
       // Replace origDC's archetypes with interface types.
-      type = ArchetypeBuilder::mapTypeOutOfContext(origDC, type);
+      type = origDC->mapTypeOutOfContext(type);
 
       // Get the substitutions that we need to access a member of
       // 'origDC' on 'dc'.
@@ -2084,7 +2084,7 @@ Type ClangImporter::Implementation::importMethodType(
                                            bodyName, swiftParamTy,
                                            ImportedHeaderUnit);
     paramInfo->setInterfaceType(
-        ArchetypeBuilder::mapTypeOutOfContext(dc, swiftParamTy));
+        dc->mapTypeOutOfContext(swiftParamTy));
 
     if (addNoEscapeAttr) {
       paramInfo->getAttrs().add(
@@ -2150,7 +2150,7 @@ Type ClangImporter::Implementation::importMethodType(
     extInfo = extInfo.withThrows(true);
   }
  
-  swiftResultTy = ArchetypeBuilder::mapTypeOutOfContext(dc, swiftResultTy);
+  swiftResultTy = dc->mapTypeOutOfContext(swiftResultTy);
 
   // Form the function type.
   return FunctionType::get(
