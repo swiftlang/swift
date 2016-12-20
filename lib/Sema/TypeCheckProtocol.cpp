@@ -4351,9 +4351,25 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
         enumDecl->derivesProtocolConformance(Proto) && enumDecl->hasRawType()) {
 
+      auto rawType = enumDecl->getRawType();
+
       TC.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                   diag::enum_raw_type_nonconforming_and_nonsynthable,
-                  T, enumDecl->getRawType());
+                  T, rawType);
+
+      // If the reason is that the raw type does not conform to
+      // Equatable, say so.
+      auto equatableProto = TC.getProtocol(enumDecl->getLoc(),
+                                           KnownProtocolKind::Equatable);
+      if (!equatableProto)
+        return;
+
+      if (!TC.conformsToProtocol(rawType, equatableProto, enumDecl, None)) {
+        SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
+        TC.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
+        return;
+      }
+
       return;
     }
   }
