@@ -2040,6 +2040,32 @@ ${overflowOperationComment(x.operator)}
   ///     // x == 31
   ///     // x.leadingZeros == 3
   var leadingZeros: Int { get }
+
+  /// Creates an integer from its big-endian representation, changing the
+  /// byte order if necessary.
+  init(bigEndian value: Self)
+  /// Creates an integer from its little-endian representation, changing the
+  /// byte order if necessary.
+  init(littleEndian value: Self)
+
+  /// The big-endian representation of this integer.
+  ///
+  /// If necessary, the byte order of this value is reversed from the typical
+  /// byte order of this integer type. On a big-endian platform, for any
+  /// integer `x`, `x == x.bigEndian`.
+  ///
+  /// - SeeAlso: `littleEndian`
+  var bigEndian: Self { get }
+  /// The little-endian representation of this integer.
+  ///
+  /// If necessary, the byte order of this value is reversed from the typical
+  /// byte order of this integer type. On a little-endian platform, for any
+  /// integer `x`, `x == x.littleEndian`.
+  ///
+  /// - SeeAlso: `bigEndian`
+  var littleEndian: Self { get }
+  /// A representation of this integer with the byte order swapped.
+  var byteSwapped: Self { get }
 }
 
 extension FixedWidthInteger {
@@ -2758,27 +2784,34 @@ public struct ${Self}
 %   end
   }
 
-%  if bits > 8:
   /// Creates an integer from its big-endian representation, changing the
   /// byte order if necessary.
   @_transparent
   public init(bigEndian value: ${Self}) {
+%   if bits <= 8:
+    self = value
+%   else:
 #if _endian(big)
     self = value
 #else
     self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
 #endif
+%   end
   }
 
   /// Creates an integer from its little-endian representation, changing the
   /// byte order if necessary.
   @_transparent
   public init(littleEndian value: ${Self}) {
+%   if bits <= 8:
+    self = value
+%   else:
 #if _endian(little)
     self = value
 #else
     self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
 #endif
+%   end
   }
 
   /// The big-endian representation of this integer.
@@ -2789,11 +2822,15 @@ public struct ${Self}
   ///
   /// - SeeAlso: `littleEndian`
   public var bigEndian: ${Self} {
+%   if bits <= 8:
+    return self
+%   else:
 #if _endian(big)
     return self
 #else
     return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
 #endif
+%   end
   }
 
   /// The little-endian representation of this integer.
@@ -2804,18 +2841,25 @@ public struct ${Self}
   ///
   /// - SeeAlso: `bigEndian`
   public var littleEndian: ${Self} {
+%   if bits <= 8:
+    return self
+%   else:
 #if _endian(little)
     return self
 #else
     return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
 #endif
+%   end
   }
 
   /// A representation of this integer with the byte order swapped.
   public var byteSwapped: ${Self} {
+%   if bits <= 8:
+    return self
+%   else:
     return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
+%   end
   }
-%  end
 
   // Implementation details
 
