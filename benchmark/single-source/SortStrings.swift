@@ -1030,6 +1030,13 @@ public func run_SortStrings(_ N: Int) {
   }
 }
 
+public func run_SortSortedStrings(_ N: Int) {
+  let sortedBenchmarkWords = stringBenchmarkWords.sorted()
+  for _ in 1...5*N {
+    benchSortStrings(sortedBenchmarkWords)
+  }
+}
+
 var stringBenchmarkWordsUnicode: [String] = [
   "❄️woodshed",
   "❄️lakism",
