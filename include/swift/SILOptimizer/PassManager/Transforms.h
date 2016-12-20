@@ -116,6 +116,12 @@ namespace swift {
   protected:
     SILFunction *getFunction() { return F; }
 
+    irgen::IRGenModule *getIRGenModule() {
+      auto *Mod = PM->getIRGenModule();
+      assert(Mod && "Expecting a valid module");
+      return Mod;
+    }
+
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
       PM->invalidateAnalysis(F, K);
     }
