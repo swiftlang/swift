@@ -1809,6 +1809,51 @@ extension BinaryInteger {
 }
 
 //===----------------------------------------------------------------------===//
+//===--- BinaryInteger smart shifts ---------------------------------------===//
+//===----------------------------------------------------------------------===//
+// FIXME(integers): uncomment once <rdar://problem/29643515> gets fixed
+#if false
+extension BinaryInteger {
+%   for x in maskingShifts:
+  @_transparent
+  public static func ${x.nonMaskingOperator} <
+    Other : BinaryInteger
+  >(lhs: Self, rhs: Other) -> Self {
+    var lhs = lhs
+    lhs ${x.nonMaskingOperator}= rhs
+    return lhs
+  }
+
+  // It is hard to imagine overshift to the left in an arbitrarily sized
+  // integer, but shifting too far to the right and negative shift cases are
+  // supported.
+%     reversedOperator = x.operator.translate(maketrans('<>', '><'))
+%     isRightShift = '>' in x.operator
+  @_transparent
+  public static func ${x.nonMaskingOperator}= <
+    Other : BinaryInteger
+  >(lhs: inout Self, rhs: Other) {
+    if rhs < (0 as Other) {
+      lhs ${reversedOperator}= (0 - rhs)
+      return
+    }
+%     if isRightShift:
+    let overshift = Self.isSigned
+      ? (lhs < (0 as Self) ? ~(0 as Self) : 0 )
+      : 0
+    if rhs > lhs.bitWidth {
+      lhs = overshift
+      return
+    }
+%     end
+    lhs ${x.operator}= Self(extendingOrTruncating: rhs)
+  }
+%   end
+}
+#endif
+
+
+//===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
