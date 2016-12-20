@@ -207,10 +207,17 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   for (auto *VD : DeclaredDecls) {
     OS << "<Declared>" << VD->getNameStr() << "</Declared>\n";
   }
-  for (auto *VD : ReferencedDecls) {
-    OS << "<Referenced>" << VD->getNameStr() << "</Referenced>\n";
+  for (auto &RD : ReferencedDecls) {
+    OS << "<Referenced>" << RD.VD->getNameStr() << "</Referenced>";
+    OS << "<Type>";
+    RD.Ty->print(OS);
+    OS << "</Type>\n";
   }
   OS << "<end>\n";
+}
+
+bool ReferencedDecl::operator==(const ReferencedDecl& Other) {
+  return VD == Other.VD && Ty.getPointer() == Other.Ty.getPointer();
 }
 
 struct RangeResolver::Implementation {
@@ -243,13 +250,7 @@ private:
   }
 
   std::vector<ValueDecl*> DeclaredDecls;
-  std::vector<ValueDecl*> ReferencedDecls;
-
-  void pushBackDeclUniquely(std::vector<ValueDecl*> &Bag, ValueDecl* VD) {
-    if (std::find(Bag.begin(), Bag.end(), VD) == Bag.end()) {
-      Bag.push_back(VD);
-    }
-  }
+  std::vector<ReferencedDecl> ReferencedDecls;
 
   ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {
     assert(!Node.isNull());
@@ -341,6 +342,8 @@ public:
 
   static Implementation *createInstance(SourceFile &File, SourceLoc Start,
                                         SourceLoc End) {
+    if (Start.isInvalid() || End.isInvalid())
+      return nullptr;
     SourceManager &SM = File.getASTContext().SourceMgr;
     unsigned BufferId = File.getBufferID().getValue();
     unsigned StartOff = SM.getLocOffsetInBuffer(Start, BufferId);
@@ -355,7 +358,7 @@ public:
     if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
       if (isContainedInSelection(CharSourceRange(SM, VD->getStartLoc(),
                                                  VD->getEndLoc())))
-        pushBackDeclUniquely(DeclaredDecls, VD);
+        DeclaredDecls.push_back(VD);
     }
 
     auto &DCInfo = getCurrentDC();
@@ -400,7 +403,7 @@ public:
     return ResolvedRangeInfo();
   }
 
-  void analyzeDeclRef(ValueDecl *VD, CharSourceRange Range) {
+  void analyzeDeclRef(ValueDecl *VD, CharSourceRange Range, Type Ty) {
     if (!isContainedInSelection(Range))
       return;
 
@@ -409,7 +412,10 @@ public:
       return;
 
     // Collect referenced decls in the range.
-    pushBackDeclUniquely(ReferencedDecls, VD);
+    ReferencedDecl RD(VD, Ty);
+    if (std::find(ReferencedDecls.begin(), ReferencedDecls.end(), RD) ==
+          ReferencedDecls.end())
+      ReferencedDecls.push_back(RD);
   }
 
 private:
@@ -483,7 +489,7 @@ bool RangeResolver::walkToDeclPost(Decl *D) {
 bool RangeResolver::
 visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
                    Type T) {
-  Impl->analyzeDeclRef(D, Range);
+  Impl->analyzeDeclRef(D, Range, T);
   return true;
 }
 
