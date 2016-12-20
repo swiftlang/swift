@@ -3464,6 +3464,7 @@ public:
       : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
 
   void visit(Decl *decl) {
+    PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
 
@@ -6570,7 +6571,6 @@ bool TypeChecker::isAvailabilitySafeForConformance(
 }
 
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
-  PrettyStackTraceDecl StackTrace("type-checking", D);
   checkForForbiddenPrefix(D);
   bool isSecondPass =
     !isFirstPass && D->getDeclContext()->isModuleScopeContext();
@@ -6755,6 +6755,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   // check that validateDecl() returned a fully-formed decl.
   if (D->isBeingValidated())
     return;
+
+  PrettyStackTraceDecl StackTrace("validating", D);
 
   if (hasEnabledForbiddenTypecheckPrefix())
     checkForForbiddenPrefix(D);

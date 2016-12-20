@@ -79,3 +79,15 @@ func f5<T, U>(x: T, y: U) {
     typealias U = Int
   }
 }
+
+// Issue with gatherAllSubstitutions().
+struct OuterGenericStruct<A> {
+  class MiddleNonGenericClass {
+    func nonGenericFunction() {
+      class InnerGenericClass<T> : MiddleNonGenericClass {
+      // expected-error@-1 {{type 'InnerGenericClass' cannot be nested in generic function 'nonGenericFunction'}}
+        override init() { super.init() }
+      }
+    }
+  }
+}

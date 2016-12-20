@@ -221,38 +221,41 @@ findDeclContextForType(TypeChecker &TC,
 
   bool needsBaseType = (ownerDC->isTypeContext() &&
                         !isa<GenericTypeParamDecl>(typeDecl));
-  NominalTypeDecl *ownerNominal = nullptr;
-  if (needsBaseType) {
-    ownerNominal = ownerDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *ownerNominal =
+      ownerDC->getAsNominalTypeOrNominalTypeExtensionContext();
 
-    // We might have an invalid extension that didn't resolve.
-    if (ownerNominal == nullptr)
+  // We might have an invalid extension that didn't resolve.
+  if (needsBaseType && ownerNominal == nullptr)
+    return std::make_tuple(nullptr, nullptr, false);
+
+  // First, check for containment in one of our parent contexts.
+  for (auto parentDC = fromDC; !parentDC->isModuleContext();
+       parentDC = parentDC->getParent()) {
+    auto parentNominal =
+        parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
+
+    if (ownerDC == parentDC)
+      return std::make_tuple(parentDC, parentNominal, true);
+
+    // FIXME: Horrible hack. Don't allow us to reference a generic parameter
+    // from a context outside a ProtocolDecl.
+    if (isa<ProtocolDecl>(parentDC) && isa<GenericTypeParamDecl>(typeDecl))
       return std::make_tuple(nullptr, nullptr, false);
   }
 
+  if (!needsBaseType) {
+    assert(false && "Should have found non-type context by now");
+    return std::make_tuple(nullptr, nullptr, false);
+  }
+
+  // Now, search the supertypes or refined protocols of each parent
+  // context.
   for (auto parentDC = fromDC; !parentDC->isModuleContext();
        parentDC = parentDC->getParent()) {
-
-    // If we're not computing a base type, we just have to check for
-    // containment in one of our parent contexts.
-    if (!needsBaseType) {
-      if (ownerDC == parentDC)
-        return std::make_tuple(ownerDC, nullptr, true);
-
-      // FIXME: Horrible hack. Don't allow us to reference a generic parameter
-      // or from a context outside a ProtocolDecl.
-      if (isa<ProtocolDecl>(parentDC) && isa<GenericTypeParamDecl>(typeDecl))
-        return std::make_tuple(nullptr, nullptr, false);
-
-      continue;
-    }
-
     // For the next steps we need our parentDC to be a type context
     if (!parentDC->isTypeContext())
       continue;
 
-    // Search the type of this context and its supertypes (if its a
-    // class) or refined protocols (if its a protocol).
     llvm::SmallPtrSet<const NominalTypeDecl *, 8> visited;
     llvm::SmallVector<const NominalTypeDecl *, 8> stack;
 
@@ -314,9 +317,9 @@ findDeclContextForType(TypeChecker &TC,
       }
     }
 
-    // FIXME: Horrible hack. Don't allow us to reference an associated type
-    // from a context outside a ProtocolDecl.
-    if (isa<ProtocolDecl>(parentDC) && isa<AssociatedTypeDecl>(typeDecl))
+    // FIXME: Horrible hack. Don't allow us to reference a generic parameter
+    // or associated type from a context outside a ProtocolDecl.
+    if (isa<ProtocolDecl>(parentDC) && isa<AbstractTypeParamDecl>(typeDecl))
       return std::make_tuple(nullptr, nullptr, false);
   }
 
