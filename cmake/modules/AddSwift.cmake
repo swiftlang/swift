@@ -230,6 +230,7 @@ function(_add_variant_c_compile_flags)
       list(APPEND result "-D_MDd")
       list(APPEND result -Xclang;--dependent-lib=msvcrtd)
     endif()
+    list(APPEND result -fno-pic)
   endif()
 
   if(CFLAGS_ENABLE_ASSERTIONS)
