@@ -2242,9 +2242,20 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
 
+    // FIXME: Use the canonical type here in order to minimize circularity
+    // issues at deserialization time. A known problematic case here is
+    // "extension of typealias Foo"; "typealias Foo = SomeKit.Bar"; and then
+    // trying to import Bar accidentally asking for all of its extensions
+    // (perhaps because we're searching for a conformance).
+    //
+    // We could limit this to only the problematic cases, but it seems like a
+    // simpler user model to just always desugar extension types.
+    baseTy = baseTy->getCanonicalType();
+
     // Make sure the base type has registered itself as a provider of generic
     // parameters.
-    (void)addDeclRef(baseTy->getAnyNominal());
+    auto baseNominal = baseTy->getAnyNominal();
+    (void)addDeclRef(baseNominal);
 
     auto conformances = extension->getLocalConformances(
                           ConformanceLookupKind::All,
@@ -2265,7 +2276,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 inheritedTypes);
 
     bool isClassExtension = false;
-    if (auto baseNominal = baseTy->getAnyNominal()) {
+    if (baseNominal) {
       isClassExtension = isa<ClassDecl>(baseNominal) ||
                          isa<ProtocolDecl>(baseNominal);
     }
