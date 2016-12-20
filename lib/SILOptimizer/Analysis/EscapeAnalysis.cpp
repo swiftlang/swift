@@ -109,7 +109,7 @@ getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded) {
   
   CGNode * &Node = Values2Nodes[V];
   if (!Node) {
-    if (auto *Arg = dyn_cast<SILFunctionArgument>(V)) {
+    if (isa<SILFunctionArgument>(V)) {
       Node = allocNode(V, NodeType::Argument);
       if (!isSummaryGraph)
         Node->mergeEscapeState(EscapeState::Arguments);
