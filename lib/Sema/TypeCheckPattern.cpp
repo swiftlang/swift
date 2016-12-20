@@ -1295,7 +1295,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                              /*suppressDiagnostics=*/ type->hasError());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
-      return false;
+      return true;
     case CheckedCastKind::Coercion:
       // If this is an 'as' pattern coercing between two different types, then
       // it is "useful" because it is providing a different type to the
