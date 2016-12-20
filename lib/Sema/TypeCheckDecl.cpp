@@ -2275,6 +2275,12 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     if (VD->isLet() && !isNSManaged) return;
   }
 
+  // Accessors should not infer 'dynamic' on their own; they can get it from
+  // their storage decls.
+  if (auto FD = dyn_cast<FuncDecl>(D))
+    if (FD->isAccessor())
+      return;
+
   // The presence of 'final' on a class prevents 'dynamic'.
   auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
   if (!classDecl) return;
@@ -3859,6 +3865,9 @@ public:
       if (isObjC && !TC.isRepresentableInObjC(SD, *isObjC))
         isObjC = None;
       markAsObjC(TC, SD, isObjC);
+
+      // Infer 'dynamic' before touching accessors.
+      inferDynamic(TC.Context, SD);
     }
 
     if (SD->hasAccessorFunctions())
@@ -3886,8 +3895,6 @@ public:
         !SD->getSetter()->getBody()) {
       synthesizeSetterForMutableAddressedStorage(SD, TC);
     }
-
-    inferDynamic(TC.Context, SD);
 
     TC.checkDeclAttributes(SD);
   }
@@ -4819,21 +4826,18 @@ public:
         // The only additional condition we need to check is if the var decl
         // had an @objc or @iboutlet property.
 
-        ValueDecl *prop = cast<ValueDecl>(FD->getAccessorStorageDecl());
+        AbstractStorageDecl *storage = FD->getAccessorStorageDecl();
         // Validate the subscript or property because it might not be type
         // checked yet.
-        if (isa<SubscriptDecl>(prop))
-          TC.validateDecl(prop);
-        else if (isa<VarDecl>(prop))
-          TC.validateDecl(prop);
+        TC.validateDecl(storage);
 
-        if (prop->getAttrs().hasAttribute<NonObjCAttr>())
+        if (storage->getAttrs().hasAttribute<NonObjCAttr>())
           isObjC = None;
-        else if (!isObjC && prop->isObjC())
+        else if (!isObjC && storage->isObjC())
           isObjC = ObjCReason::DoNotDiagnose;
 
-        // If the property is dynamic, propagate to this accessor.
-        if (isObjC && prop->isDynamic() && !FD->isDynamic())
+        // If the storage is dynamic, propagate to this accessor.
+        if (isObjC && storage->isDynamic() && !FD->isDynamic())
           FD->getAttrs().add(new (TC.Context) DynamicAttr(/*implicit*/ true));
       }
 
@@ -7065,6 +7069,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
         markAsObjC(*this, VD, isObjC);
 
+        // Infer 'dynamic' before touching accessors.
         inferDynamic(Context, VD);
 
         // If this variable is a class member, mark it final if the
