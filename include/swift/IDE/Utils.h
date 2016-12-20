@@ -205,15 +205,23 @@ enum class RangeKind : int8_t{
   MultiStatement,
 };
 
+struct ReferencedDecl {
+  ValueDecl *VD;
+  Type Ty;
+  ReferencedDecl(ValueDecl* VD, Type Ty) : VD(VD), Ty(Ty) {}
+  ReferencedDecl() : ReferencedDecl(nullptr, Type()) {}
+  bool operator==(const ReferencedDecl& other);
+};
+
 struct ResolvedRangeInfo {
   RangeKind Kind;
   Type Ty;
   StringRef Content;
   ArrayRef<ValueDecl*> DeclaredDecls;
-  ArrayRef<ValueDecl*> ReferencedDecls;
+  ArrayRef<ReferencedDecl> ReferencedDecls;
   ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content,
                     ArrayRef<ValueDecl*> DeclaredDecls,
-                    ArrayRef<ValueDecl*> ReferencedDecls): Kind(Kind),
+                    ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
                       Ty(Ty), Content(Content), DeclaredDecls(DeclaredDecls),
                       ReferencedDecls(ReferencedDecls) {}
   ResolvedRangeInfo() :
