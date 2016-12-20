@@ -55,6 +55,16 @@ namespace constraints {
 typedef llvm::DenseMap<SubstitutableType *,
                        SmallVector<ProtocolConformance *, 2>> ConformanceMap;
 
+/// Special-case type checking semantics for certain declarations.
+enum class DeclTypeCheckingSemantics {
+  /// A normal declaration.
+  Normal,
+  
+  /// The type(of:) declaration, which performs a "dynamic type" operation,
+  /// with different behavior for existential and non-existential arguments.
+  TypeOf,
+};
+
 /// The result of name lookup.
 class LookupResult {
 public:
@@ -2060,6 +2070,10 @@ public:
 
   void noteTypoCorrection(DeclName name, DeclNameLoc nameLoc,
                           const LookupResult::Result &suggestion);
+  
+  /// Check if the given decl has a @_semantics attribute that gives it
+  /// special case type-checking behavior.
+  DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
 };
 
 /// \brief RAII object that cleans up the given expression if not explicitly

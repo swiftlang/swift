@@ -968,6 +968,11 @@ getMagicIdentifierLiteralKind(tok Kind) {
 
 /// See if type(of: <expr>) can be parsed backtracking on failure.
 static bool canParseTypeOf(Parser &P) {
+  // We parsed `type(of:)` as a special syntactic form in Swift 3. In Swift 4
+  // it is handled by overload resolution.
+  if (!P.Context.LangOpts.isSwiftVersion3())
+    return false;
+
   if (!(P.Tok.getText() == "type" && P.peekToken().is(tok::l_paren))) {
     return false;
   }

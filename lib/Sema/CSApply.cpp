@@ -387,7 +387,7 @@ namespace {
                        AccessSemantics semantics) {
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
-
+      
       // If this is a member of a nominal type, build a reference to the
       // member with an implied base type.
       if (decl->getDeclContext()->isTypeContext() && isa<FuncDecl>(decl)) {
@@ -5230,6 +5230,16 @@ ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) 
   return closureExpr;
 }
 
+// Look through sugar and DotSyntaxBaseIgnoredExprs.
+static Expr *
+getSemanticExprForDeclOrMemberRef(Expr *expr) {
+  auto semanticExpr = expr->getSemanticsProvidingExpr();
+  while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(semanticExpr)){
+    semanticExpr = ignoredBase->getRHS()->getSemanticsProvidingExpr();
+  }
+  return semanticExpr;
+}
+
 static void
 maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
                                            AnyFunctionType *toType) {
@@ -5252,11 +5262,7 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
     // Can convert a decl ref to a global or local function that doesn't
     // capture context. Look through ignored bases too.
     // TODO: Look through static method applications to the type.
-    auto semanticExpr = expr->getSemanticsProvidingExpr();
-    while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(semanticExpr)){
-      semanticExpr = ignoredBase->getRHS()->getSemanticsProvidingExpr();
-    }
-    
+    auto semanticExpr = getSemanticExprForDeclOrMemberRef(expr);
     auto maybeDiagnoseFunctionRef = [&](FuncDecl *fn) {
       // TODO: We could allow static (or class final) functions too by
       // "capturing" the metatype in a thunk.
@@ -6330,12 +6336,48 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   TypeChecker &tc = cs.getTypeChecker();
   
   auto fn = apply->getFn();
-  
+
+  auto finishApplyOfDeclWithSpecialTypeCheckingSemantics
+    = [&](ApplyExpr *apply,
+          ValueDecl *decl,
+          Type openedType) -> Expr* {
+      switch (cs.TC.getDeclTypeCheckingSemantics(decl)) {
+      case DeclTypeCheckingSemantics::TypeOf: {
+        // Resolve into a DynamicTypeExpr.
+        auto arg = apply->getArg();
+        if (auto tuple = dyn_cast<TupleExpr>(arg))
+          arg = tuple->getElements()[0];
+        auto replacement = new (cs.getASTContext())
+          DynamicTypeExpr(apply->getFn()->getLoc(),
+                          apply->getArg()->getStartLoc(),
+                          arg,
+                          apply->getArg()->getEndLoc(),
+                          Type());
+        cs.setType(replacement, simplifyType(openedType));
+        return replacement;
+      }
+      
+      case DeclTypeCheckingSemantics::Normal:
+        return nullptr;
+      }
+    };
+
   // The function is always an rvalue.
   fn = cs.coerceToRValue(fn);
   assert(fn && "Rvalue conversion failed?");
   if (!fn)
     return nullptr;
+  
+  // Resolve applications of decls with special semantics.
+  if (auto declRef =
+      dyn_cast<DeclRefExpr>(getSemanticExprForDeclOrMemberRef(fn))) {
+    if (auto special =
+        finishApplyOfDeclWithSpecialTypeCheckingSemantics(apply,
+                                                          declRef->getDecl(),
+                                                          openedType)) {
+      return special;
+    }
+  }
   
   // Handle applications that look through ImplicitlyUnwrappedOptional<T>.
   if (auto fnTy = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(fn)))

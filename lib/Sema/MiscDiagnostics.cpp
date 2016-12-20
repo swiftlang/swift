@@ -258,6 +258,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
+        
+        // Verify that special decls are eliminated.
+        checkForDeclWithSpecialTypeCheckingSemantics(DRE);
       }
       if (auto *MRE = dyn_cast<MemberRefExpr>(Base)) {
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
@@ -636,6 +639,17 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         TC.diagnose(DRE->getLoc(), topLevelDiag,
                     namePlusDot, k, pair.first->getName())
           .fixItInsert(DRE->getStartLoc(), namePlusDot);
+      }
+    }
+    
+    void checkForDeclWithSpecialTypeCheckingSemantics(const DeclRefExpr *DRE) {
+      // Referencing type(of:) and other decls with special type-checking
+      // behavior as functions is not implemented. Maybe we could wrap up the
+      // special-case behavior in a closure someday...
+      if (TC.getDeclTypeCheckingSemantics(DRE->getDecl())
+            != DeclTypeCheckingSemantics::Normal) {
+        TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
+                    DRE->getDecl()->getName());
       }
     }
     
