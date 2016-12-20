@@ -3246,9 +3246,9 @@ bool TypeChecker::isRepresentableInObjC(
     return false;
 
   if (AFD->isOperator()) {
-    assert(isa<ProtocolDecl>(AFD->getDeclContext()) &&
-           "all other cases should be caught earlier");
-    diagnose(AFD, diag::objc_operator_proto);
+    diagnose(AFD, (isa<ProtocolDecl>(AFD->getDeclContext())
+                   ? diag::objc_operator_proto
+                   : diag::objc_operator));
     return false;
   }
 
