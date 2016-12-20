@@ -1145,7 +1145,7 @@ protected:
         Cache(caches[File]),
         Scope(AccessScope::getPublic()) {}
 
-  bool visitDecl(ValueDecl *VD) {
+  bool visitDecl(ValueDecl *VD, bool isInParameter = false) {
     if (!VD || isa<GenericTypeParamDecl>(VD))
       return true;
 
@@ -1156,11 +1156,22 @@ protected:
         return true;
     }
 
-    // Simulation for Swift 3 bug.
-    if (isa<TypeAliasDecl>(VD) &&
-        VD->getInterfaceType()->hasTypeParameter() &&
-        Context.isSwiftVersion3())
-      return true;
+    // Simulation for Swift 3 bugs where typealiases got canonicalized away and
+    // thus a reference to a private typealias would not be diagnosed.
+    if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
+      if (Context.isSwiftVersion3()) {
+        // - If the typealias was a dependent type, Swift 3 resolved it down to
+        //   its underlying type.
+        if (VD->getInterfaceType()->hasTypeParameter())
+          return true;
+        // - If the typealias was a function type in parameter position, Swift 3
+        //   would rebuild the type to mark it non-escaping, losing the sugar.
+        if (isInParameter &&
+            TAD->getDeclaredInterfaceType()->getAs<AnyFunctionType>()) {
+          return true;
+        }
+      }
+    }
 
     auto cached = Cache.find(VD);
     if (cached != Cache.end()) {
@@ -1179,27 +1190,52 @@ protected:
 };
 
 class TypeReprAccessScopeChecker : private ASTWalker, AccessScopeChecker {
+  SmallVector<const TypeRepr *, 4> ParamParents;
+
   TypeReprAccessScopeChecker(const DeclContext *useDC,
-                             decltype(TypeChecker::TypeAccessScopeCache) &caches)
-      : AccessScopeChecker(useDC, caches) {}
+                             decltype(TypeChecker::TypeAccessScopeCache) &caches,
+                             bool isParameter)
+      : AccessScopeChecker(useDC, caches) {
+    if (isParameter)
+      ParamParents.push_back(nullptr);
+  }
+
+  bool isParamParent(const TypeRepr *TR) const {
+    return !ParamParents.empty() && ParamParents.back() == TR;
+  }
 
   bool walkToTypeReprPre(TypeRepr *TR) override {
-    auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR);
-    if (!CITR)
-      return true;
+    if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR)) {
+      return visitDecl(CITR->getBoundDecl(),
+                       isParamParent(Parent.getAsTypeRepr()));
+    }
 
-    return visitDecl(CITR->getBoundDecl());
+    auto parentTR = Parent.getAsTypeRepr();
+    if (auto parentFn = dyn_cast_or_null<FunctionTypeRepr>(parentTR)) {
+      // The argument tuple for a function is a parent of parameter TRs.
+      if (parentFn->getArgsTypeRepr() == TR)
+        ParamParents.push_back(TR);
+    } else if (isa<CompoundIdentTypeRepr>(TR) && isParamParent(parentTR)) {
+      // Compound TRs that would have been parameter TRs contain parameter
+      // TRs.
+      ParamParents.push_back(TR);
+    }
+
+    return true;
   }
 
   bool walkToTypeReprPost(TypeRepr *TR) override {
+    if (isParamParent(TR))
+      ParamParents.pop_back();
     return Scope.hasValue();
   }
 
 public:
   static Optional<AccessScope>
   getAccessScope(TypeRepr *TR, const DeclContext *useDC,
-                 decltype(TypeChecker::TypeAccessScopeCache) &caches) {
-    TypeReprAccessScopeChecker checker(useDC, caches);
+                 decltype(TypeChecker::TypeAccessScopeCache) &caches,
+                 bool isParameter) {
+    TypeReprAccessScopeChecker checker(useDC, caches, isParameter);
     TR->walk(checker);
     return checker.Scope;
   }
@@ -1262,7 +1298,8 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
       auto accessScope =
           TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(),
                                                      ED->getDeclContext(),
-                                                     TypeAccessScopeCache);
+                                                     TypeAccessScopeCache,
+                                                     /*isParameter*/false);
       // This is an error case and will be diagnosed elsewhere.
       if (!accessScope.hasValue())
         return Accessibility::Public;
@@ -1475,7 +1512,7 @@ enum class DowngradeToWarning: bool {
 /// is never null.
 static void checkTypeAccessibilityImpl(
     TypeChecker &TC, TypeLoc TL, AccessScope contextAccessScope,
-    const DeclContext *useDC,
+    const DeclContext *useDC, bool isParameter,
     llvm::function_ref<void(AccessScope, const TypeRepr *)> diagnose) {
   if (!TC.getLangOpts().EnableAccessControl)
     return;
@@ -1493,7 +1530,8 @@ static void checkTypeAccessibilityImpl(
   auto typeAccessScope =
     (TL.getTypeRepr()
      ? TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(), useDC,
-                                                  TC.TypeAccessScopeCache)
+                                                  TC.TypeAccessScopeCache,
+                                                  isParameter)
      : TypeAccessScopeChecker::getAccessScope(TL.getType(), useDC,
                                               TC.TypeAccessScopeCache));
 
@@ -1528,9 +1566,18 @@ static void checkTypeAccessibility(
     TypeChecker &TC, TypeLoc TL, const ValueDecl *context,
     llvm::function_ref<void(AccessScope, const TypeRepr *,
                             DowngradeToWarning)> diagnose) {
+  const DeclContext *DC = context->getDeclContext();
+  bool isParam = false;
+  if (auto *param = dyn_cast<ParamDecl>(context)) {
+    isParam = true;
+    context = dyn_cast<AbstractFunctionDecl>(DC);
+    if (!context)
+      context = cast<SubscriptDecl>(DC);
+    DC = context->getDeclContext();
+  }
+
   AccessScope contextAccessScope = context->getFormalAccessScope();
-  checkTypeAccessibilityImpl(TC, TL, contextAccessScope,
-                             context->getDeclContext(),
+  checkTypeAccessibilityImpl(TC, TL, contextAccessScope, DC, isParam,
                              [=](AccessScope requiredAccessScope,
                                  const TypeRepr *offendingTR) {
     auto downgradeToWarning = DowngradeToWarning::No;
@@ -1591,6 +1638,7 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
     assert(param->getInherited().size() == 1);
     checkTypeAccessibilityImpl(TC, param->getInherited().front(), accessScope,
                                owner->getDeclContext(),
+                               /*isParameter*/false,
                                [&](AccessScope typeAccessScope,
                                    const TypeRepr *thisComplainRepr) {
       if (typeAccessScope.isChildOf(minAccessScope) ||
@@ -1618,18 +1666,18 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
     case RequirementReprKind::TypeConstraint:
       checkTypeAccessibilityImpl(TC, requirement.getSubjectLoc(),
                                  accessScope, owner->getDeclContext(),
-                                 callback);
+                                 /*isParameter*/false, callback);
       checkTypeAccessibilityImpl(TC, requirement.getConstraintLoc(),
                                  accessScope, owner->getDeclContext(),
-                                 callback);
+                                 /*isParameter*/false, callback);
       break;
     case RequirementReprKind::SameType:
       checkTypeAccessibilityImpl(TC, requirement.getFirstTypeLoc(),
                                  accessScope, owner->getDeclContext(),
-                                 callback);
+                                 /*isParameter*/false, callback);
       checkTypeAccessibilityImpl(TC, requirement.getSecondTypeLoc(),
                                  accessScope, owner->getDeclContext(),
-                                 callback);
+                                 /*isParameter*/false, callback);
       break;
     }
   }
@@ -1975,7 +2023,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     bool problemIsElement = false;
 
     for (auto &P : *SD->getIndices()) {
-      checkTypeAccessibility(TC, P->getTypeLoc(), SD,
+      checkTypeAccessibility(TC, P->getTypeLoc(), P,
                              [&](AccessScope typeAccessScope,
                                  const TypeRepr *thisComplainRepr,
                                  DowngradeToWarning downgradeDiag) {
@@ -2047,7 +2095,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 
     for (auto *PL : fn->getParameterLists().slice(isTypeContext)) {
       for (auto &P : *PL) {
-        checkTypeAccessibility(TC, P->getTypeLoc(), fn,
+        checkTypeAccessibility(TC, P->getTypeLoc(), P,
                                [&](AccessScope typeAccessScope,
                                    const TypeRepr *thisComplainRepr,
                                    DowngradeToWarning downgradeDiag) {
