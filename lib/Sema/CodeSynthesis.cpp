@@ -262,7 +262,7 @@ static void maybeMarkTransparent(FuncDecl *accessor,
                                  AbstractStorageDecl *storage,
                                  TypeChecker &TC) {
   auto *DC = storage->getDeclContext();
-  if (isa<ProtocolDecl>(DC))
+  if (isa<ProtocolDecl>(DC) || isa<ClassDecl>(DC))
     return;
 
   auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
