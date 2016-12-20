@@ -5,13 +5,24 @@
 
 enum E {
   case A, B, C
+
+  static func testE(e: E) {
+    switch e {
+    case A<UndefinedTy>(): // expected-warning {{cannot specialize enum case; ignoring generic argument, which will be rejected in future version of Swift}} {{11-24=}}
+      break
+    case B<Int>(): // expected-warning {{cannot specialize enum case; ignoring generic argument, which will be rejected in future version of Swift}} {{11-16=}}
+      break
+    default:
+      break;
+    }
+  }
 }
 
 func testE(e: E) {
   switch e {
-  case E.A<UndefinedTy>(): // Ok.
+  case E.A<UndefinedTy>(): // expected-warning {{cannot specialize enum case; ignoring generic argument, which will be rejected in future version of Swift}} {{11-24=}}
     break
-  case E.B<Int>(): // Ok.
+  case E.B<Int>(): // expected-warning {{cannot specialize enum case; ignoring generic argument, which will be rejected in future version of Swift}} {{11-16=}}
     break
   case E.C(): // Ok.
     break

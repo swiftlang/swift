@@ -5,6 +5,17 @@
 
 enum E {
   case A, B, C
+
+  static func testE(e: E) {
+    switch e {
+    case A<UndefinedTy>(): // expected-error {{use of undeclared type 'UndefinedTy'}}
+      break
+    case B<Int>(): // expected-error {{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
+      break
+    default:
+      break;
+    }
+  }
 }
 
 func testE(e: E) {
