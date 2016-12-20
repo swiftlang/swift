@@ -78,3 +78,16 @@ class CaptureListInLazyProperty {
 }
 
 
+// Crash when initializer expression is type-checked both to infer the
+// property type and also as part of the getter
+class WeShouldNotReTypeCheckStatements {
+  lazy var firstCase = {
+    _ = nil // expected-error {{'nil' requires a contextual type}}
+    _ = ()
+  }
+
+  lazy var secondCase = {
+    _ = ()
+    _ = ()
+  }
+}

@@ -1810,13 +1810,14 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
 }
 
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
-                                   DeclContext *DC) {
+                                   DeclContext *DC, bool skipClosures) {
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
     Pattern *&pattern;
     Expr *&initializer;
     DeclContext *DC;
+    bool skipClosures;
 
     /// The locator we're using.
     ConstraintLocator *Locator;
@@ -1826,8 +1827,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     
   public:
     explicit BindingListener(Pattern *&pattern, Expr *&initializer,
-                             DeclContext *DC)
-      : pattern(pattern), initializer(initializer), DC(DC) { }
+                             DeclContext *DC, bool skipClosures)
+      : pattern(pattern), initializer(initializer), DC(DC),
+        skipClosures(skipClosures) { }
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
@@ -1855,7 +1857,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       // Convert the initializer to the type of the pattern.
       // ignoreTopLevelInjection = Binding->isConditional()
       expr = solution.coerceToType(expr, InitType, Locator,
-                                   false /* ignoreTopLevelInjection */);
+                                   false /* ignoreTopLevelInjection */,
+                                   skipClosures);
       if (!expr) {
         return nullptr;
       }
@@ -1882,7 +1885,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   };
 
   assert(initializer && "type-checking an uninitialized binding?");
-  BindingListener listener(pattern, initializer, DC);
+  BindingListener listener(pattern, initializer, DC, skipClosures);
 
   TypeLoc contextualType;
   auto contextualPurpose = CTP_Unused;
@@ -1903,9 +1906,13 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   }
     
   // Type-check the initializer.
+  TypeCheckExprOptions flags = TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
+  if (skipClosures)
+    flags |= TypeCheckExprFlags::SkipMultiStmtClosures;
+
   bool hadError = typeCheckExpression(initializer, DC, contextualType,
                                      contextualPurpose,
-                                     TypeCheckExprFlags::ConvertTypeIsOnlyAHint,
+                                     flags,
                                      &listener);
 
   if (hadError && !pattern->hasType()) {
@@ -1924,7 +1931,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 }
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
-                                          unsigned patternNumber) {
+                                          unsigned patternNumber,
+                                          bool skipClosures) {
 
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
@@ -1944,7 +1952,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
       DC = initContext;
   }
 
-  bool hadError = typeCheckBinding(pattern, init, DC);
+  bool hadError = typeCheckBinding(pattern, init, DC, skipClosures);
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
@@ -2271,7 +2279,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     // If the pattern didn't get a type, it's because we ran into some
     // unknown types along the way. We'll need to check the initializer.
     auto init = elt.getInitializer();
-    hadError |= typeCheckBinding(pattern, init, dc);
+    hadError |= typeCheckBinding(pattern, init, dc, /*skipClosures*/false);
     elt.setPattern(pattern);
     elt.setInitializer(init);
     hadAnyFalsable |= pattern->isRefutablePattern();
@@ -2505,7 +2513,9 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   // Perform the conversion.
   Expr *result = solution.coerceToType(expr, type,
                                        cs.getConstraintLocator(expr),
-                                       false, typeFromPattern);
+                                       /*ignoreTopLevelInjection*/false,
+                                       /*skipClosures*/false,
+                                       typeFromPattern);
   if (!result) {
     return true;
   }
