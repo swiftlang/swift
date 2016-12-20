@@ -104,12 +104,12 @@ static bool areTreesEqual(Demangle::NodePointer Old, Demangle::NodePointer New) 
   return true;
 }
 
-static bool containsDependentAssociatedTypeRef(Demangle::NodePointer Nd) {
-  if (Nd->getKind() == Demangle::Node::Kind::DependentAssociatedTypeRef)
+static bool treeContains(Demangle::NodePointer Nd, Demangle::Node::Kind Kind) {
+  if (Nd->getKind() == Kind)
     return true;
 
   for (auto Child : *Nd) {
-    if (containsDependentAssociatedTypeRef(Child))
+    if (treeContains(Child, Kind))
       return true;
   }
   return false;
@@ -164,7 +164,13 @@ std::string NewMangling::selectMangling(const std::string &Old,
   NodePointer OldNode = demangleSymbolAsNode(Old);
   NodePointer NewNode = demangleSymbolAsNode(New);
 
-  if (OldNode) {
+  if (StringRef(New).startswith(MANGLING_PREFIX_STR) &&
+      (!NewNode || treeContains(NewNode, Demangle::Node::Kind::Suffix))) {
+    llvm::errs() << "Can't demangle " << New << '\n';
+    assert(false);
+  }
+  
+  if (OldNode && !treeContains(OldNode, Demangle::Node::Kind::Suffix)) {
     if (!areTreesEqual(OldNode, NewNode)) {
       llvm::errs() << "Mangling differs at #" << numCmp << ":\n"
                       "old: " << Old << "\n"
@@ -180,7 +186,8 @@ std::string NewMangling::selectMangling(const std::string &Old,
       std::string Remangled = mangleNodeNew(NewNode);
       if (New != Remangled) {
         bool isEqual = false;
-        if (containsDependentAssociatedTypeRef(NewNode) ||
+        if (treeContains(NewNode,
+                         Demangle::Node::Kind::DependentAssociatedTypeRef) ||
             // Does the mangling contain an identifier which is the name of
             // an old-mangled function?
             New.find("_T") != std::string::npos) {
