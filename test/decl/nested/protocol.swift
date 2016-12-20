@@ -22,10 +22,18 @@ class OuterGenericClass<T> {
 protocol OuterProtocol {
   associatedtype Hen
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+  // expected-note@-1 {{did you mean 'InnerProtocol'?}}
     associatedtype Rooster
     func flip(_ r: Rooster)
     func flop(_ h: Hen)
   }
+}
+
+struct ConformsToOuterProtocol : OuterProtocol {
+  typealias Hen = Int
+
+  func f() { let _ = InnerProtocol.self }
+  // expected-error@-1 {{use of unresolved identifier 'InnerProtocol'}}
 }
 
 protocol Racoon {

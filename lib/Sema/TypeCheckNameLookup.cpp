@@ -150,7 +150,7 @@ namespace {
         }
 
         // Dig out the witness.
-        ValueDecl *witness;
+        ValueDecl *witness = nullptr;
         auto concrete = conformance->getConcrete();
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
           // If we're validating the protocol recursively, bail out.
@@ -159,14 +159,7 @@ namespace {
 
           witness = concrete->getTypeWitnessSubstAndDecl(assocType, &TC)
             .second;
-        } else if (isa<TypeAliasDecl>(found)) {
-          // No witness for typealiases. This means typealiases in
-          // protocols cannot be found if PerformConformanceCheck
-          // is on.
-          //
-          // FIXME: Fix this.
-          return;
-        } else {
+        } else if (TC.isRequirement(found)) {
           witness = concrete->getWitness(found, &TC).getDecl();
         }
 

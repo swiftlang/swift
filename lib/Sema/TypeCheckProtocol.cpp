@@ -3969,17 +3969,6 @@ void ConformanceChecker::resolveSingleTypeWitness(
   }
 }
 
-// Not all protocol members are requirements.
-static bool isRequirement(ValueDecl *requirement) {
-  if (auto *FD = dyn_cast<FuncDecl>(requirement))
-    if (FD->isAccessor())
-      return false;
-  if (isa<TypeAliasDecl>(requirement) ||
-      isa<NominalTypeDecl>(requirement))
-    return false;
-  return true;
-}
-
 void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Not a value witness");
   assert(!Conformance->hasWitness(requirement) && "Already resolved");
@@ -3998,7 +3987,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     return;
   }
 
-  if (!isRequirement(requirement))
+  if (!TC.isRequirement(requirement))
     return;
 
   // Resolve all associated types before trying to resolve this witness.
@@ -4147,7 +4136,7 @@ void ConformanceChecker::checkConformance() {
       continue;
 
     // Type aliases don't have requirements themselves.
-    if (!isRequirement(requirement))
+    if (!TC.isRequirement(requirement))
       continue;
 
     /// Local function to finalize the witness.
@@ -5562,6 +5551,17 @@ void DefaultWitnessChecker::recordWitness(
     TC.synthesizeWitnessAccessorsForStorage(
                                         cast<AbstractStorageDecl>(requirement),
                                         storage);
+}
+
+// Not all protocol members are requirements.
+bool TypeChecker::isRequirement(ValueDecl *requirement) {
+  if (auto *FD = dyn_cast<FuncDecl>(requirement))
+    if (FD->isAccessor())
+      return false;
+  if (isa<TypeAliasDecl>(requirement) ||
+      isa<NominalTypeDecl>(requirement))
+    return false;
+  return true;
 }
 
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
