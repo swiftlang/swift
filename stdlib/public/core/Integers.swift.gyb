@@ -1429,15 +1429,6 @@ public protocol BinaryInteger :
   /// types.
   var bitWidth : Int { get }
 
-  /// The number of bits required to represent this value in a signed type
-  /// using two's complement representation.
-  ///
-  /// The value of this property is always at least 1.
-  // FIXME(integers): do we still need it once the preconditions in init() and
-  // init(exactly:) changed to compare to min and max instead of counting the
-  // required number of bits.
-  var minimumSignedRepresentationBitWidth: Int { get }
-
   /// The number of trailing zeros in this value's binary representation.
   ///
   /// For example, in a fixed-width integer type with a `bitWidth` value of 8,
@@ -2647,17 +2638,6 @@ public struct ${Self}
   public static var bitWidth : Int { return ${bits} }
 
   public var bitWidth: Int { return ${bits} }
-
-  @_transparent
-  public var minimumSignedRepresentationBitWidth: Int {
-% if signed:
-    let x = self < 0 ? ~self : self
-    return (x == 0) ? 1 : (${Self}.bitWidth - x.leadingZeros + 1)
-% else:
-    return (self == 0) ? 1 : (${Self}.bitWidth - self.leadingZeros + 1)
-% end
-  }
-
 
   @_transparent
   public var leadingZeros: Int {
