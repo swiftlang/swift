@@ -252,20 +252,36 @@ private:
   std::vector<ValueDecl*> DeclaredDecls;
   std::vector<ReferencedDecl> ReferencedDecls;
 
+  /// Collect the type that an ASTNode should be evaluated to.
+  Type resolveNodeType(ASTNode N) {
+    if (N.is<Stmt*>()) {
+      if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
+        return resolveNodeType(RS->getResult());
+      }
+      // For other statements, the type should be void.
+      return Ctx.getVoidDecl()->getDeclaredInterfaceType();
+    } else if (N.is<Expr*>()) {
+      return N.get<Expr*>()->getType();
+    }
+    return Type();
+  }
+
   ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {
     assert(!Node.isNull());
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
-                               Node.get<Expr*>()->getType(), Content,
+                               resolveNodeType(Node), Content,
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
-      return ResolvedRangeInfo(RangeKind::SingleStatement, Type(), Content,
-                               DeclaredDecls, ReferencedDecls);
+      return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
+                               Content, llvm::makeArrayRef(DeclaredDecls),
+                               llvm::makeArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
       return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content,
-                               DeclaredDecls, ReferencedDecls);
+                               llvm::makeArrayRef(DeclaredDecls),
+                               llvm::makeArrayRef(ReferencedDecls));
     }
   }
 
@@ -380,7 +396,9 @@ public:
     }
 
     if (!DCInfo.StartMatches.empty() && !DCInfo.EndMatches.empty()) {
-      Result = {RangeKind::MultiStatement, Type(), Content,
+      Result = {RangeKind::MultiStatement,
+                /* Last node has the type */
+                resolveNodeType(DCInfo.EndMatches.back()), Content,
                 llvm::makeArrayRef(DeclaredDecls),
                 llvm::makeArrayRef(ReferencedDecls)};
       return;
