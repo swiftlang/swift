@@ -717,7 +717,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
     auto argIndex = O->getOperandNumber()-1;
     auto convention =
       AI->getSubstCalleeType()->getSILArgumentConvention(argIndex);
-    if (isIndirectConvention(convention)) {
+    if (convention.isIndirectConvention()) {
       Mutations.push_back(AI);
       return true;
     }

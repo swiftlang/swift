@@ -194,8 +194,8 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
 
       // apply instructions do not capture the pointer when it is passed
       // indirectly
-      if (isIndirectConvention(
-            apply->getArgumentConvention(UI->getOperandNumber()-1)))
+      if (apply->getArgumentConvention(UI->getOperandNumber() - 1)
+              .isIndirectConvention())
         continue;
 
       // Optionally drill down into an apply to see if the operand is

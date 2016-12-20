@@ -65,7 +65,7 @@ namespace swift {
   class ValueDecl;
   class ModuleDecl;
   class ProtocolConformance;
-  enum class SILArgumentConvention : uint8_t;
+  struct SILArgumentConvention;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
   enum class ValueOwnershipKind : uint8_t;
