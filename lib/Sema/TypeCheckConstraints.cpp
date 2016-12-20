@@ -925,7 +925,7 @@ namespace {
       // like - `_? = <value>`, since it doesn't really make
       // sense to have optional assignment to discarded LValue which can
       // never be optional, we can remove BOE from the tree and avoid
-      // generating any of the uncessary constraints.
+      // generating any of the unnecessary constraints.
       if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
         if (auto DAE = dyn_cast<DiscardAssignmentExpr>(BOE->getSubExpr()))
           return DAE;
