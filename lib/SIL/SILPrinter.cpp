@@ -2088,13 +2088,8 @@ void SILModule::print(SILPrintContext &PrintCtx, Module *M,
     break;
   }
   
-  OS << "\n\nimport Builtin\n";
-
-  // If we are compiling stdlib, do not try to import ourselves
-  if (!M->isStdlibModule())
-    OS << "import " << STDLIB_NAME << "\n";
-
-  OS << "import SwiftShims" << "\n\n";
+  OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
+     << "\nimport SwiftShims" << "\n\n";
 
   // Print the declarations and types from the origin module, unless we're not
   // in whole-module mode.
