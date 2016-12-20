@@ -298,17 +298,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
                                                NameLookupOptions options) {
   LookupTypeResult result;
 
-  // Look through an inout type.
-  if (auto inout = type->getAs<InOutType>())
-    type = inout->getObjectType();
+  // Structural types do not have member types.
+  if (!type->is<ArchetypeType>() &&
+      !type->isExistentialType() &&
+      !type->getAnyNominal() &&
+      !type->is<ModuleType>())
+    return result;
 
-  // Look through the metatype.
-  if (auto metaT = type->getAs<AnyMetatypeType>())
-    type = metaT->getInstanceType();
-  
-  // Callers must cope with dependent types directly.  
-  assert(!type->isTypeParameter());
-         
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
   NLOptions subOptions = NL_QualifiedDefault | NL_OnlyTypes;
