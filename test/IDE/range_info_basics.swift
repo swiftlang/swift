@@ -67,6 +67,7 @@ func foo4(s: S1) -> Int {
 // CHECK4: <Kind>MultiStatement</Kind>
 // CHECK4-NEXT: <Content>aaa = aaa + 3
 // CHECK4-NEXT: if aaa == 3 { aaa = 4 }</Content>
+// CHECK4-NEXT: <Type>Void</Type>
 // CHECK4-NEXT: <Referenced>aaa</Referenced><Type>@lvalue Int</Type>
 // CHECK4-NEXT: <end>
 
@@ -74,12 +75,14 @@ func foo4(s: S1) -> Int {
 // CHECK5-NEXT: <Content>aaa = aaa + 3
 // CHECK5-NEXT: if aaa == 3 { aaa = 4 }
 // CHECK5-NEXT: return aaa</Content>
+// CHECK5-NEXT: <Type>Int</Type>
 // CHECK5-NEXT: <Referenced>aaa</Referenced><Type>@lvalue Int</Type>
 // CHECK5-NEXT: <end>
 
 // CHECK6: <Kind>MultiStatement</Kind>
 // CHECK6-NEXT: if aaa == 3 { aaa = 4 }
 // CHECK6-NEXT: return aaa</Content>
+// CHECK6-NEXT: <Type>Int</Type>
 // CHECK6-NEXT: <Referenced>aaa</Referenced><Type>@lvalue Int</Type>
 // CHECK6-NEXT: <end>
 
@@ -88,6 +91,7 @@ func foo4(s: S1) -> Int {
 // CHECK7-NEXT:   let c = a.byteSwapped
 // CHECK7-NEXT:   b = b.bigEndian.bigEndian.byteSwapped
 // CHECK7-NEXT:   print(b + c)</Content>
+// CHECK7-NEXT: <Type>()</Type>
 // CHECK7-NEXT: <Declared>b</Declared>
 // CHECK7-NEXT: <Declared>c</Declared>
 // CHECK7-NEXT: <Referenced>a</Referenced><Type>Int</Type>
@@ -98,6 +102,7 @@ func foo4(s: S1) -> Int {
 // CHECK8-NEXT: <Content>let c = s.foo() + b
 // CHECK8-NEXT:   s = s.increment()
 // CHECK8-NEXT:   return c + b</Content>
+// CHECK8-NEXT: <Type>Int</Type>
 // CHECK8-NEXT: <Declared>c</Declared>
 // CHECK8-NEXT: <Referenced>s</Referenced><Type>@lvalue S1</Type>
 // CHECK8-NEXT: <Referenced>foo</Referenced><Type>(S1) -> () -> Int</Type>
@@ -109,6 +114,7 @@ func foo4(s: S1) -> Int {
 // CHECK9-NEXT: <Content>let b = s.a
 // CHECK9-NEXT:   let c = s.foo() + b
 // CHECK9-NEXT:   return c + b</Content>
+// CHECK9-NEXT: <Type>Int</Type>
 // CHECK9-NEXT: <Declared>b</Declared>
 // CHECK9-NEXT: <Declared>c</Declared>
 // CHECK9-NEXT: <Referenced>s</Referenced><Type>S1</Type>
