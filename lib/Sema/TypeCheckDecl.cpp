@@ -2227,6 +2227,12 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     if (VD->isLet() && !isNSManaged) return;
   }
 
+  // Accessors should not infer 'dynamic' on their own; they can get it from
+  // their storage decls.
+  if (auto FD = dyn_cast<FuncDecl>(D))
+    if (FD->isAccessor())
+      return;
+
   // The presence of 'final' on a class prevents 'dynamic'.
   auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
   if (!classDecl) return;
@@ -3810,6 +3816,9 @@ public:
       if (isObjC && !TC.isRepresentableInObjC(SD, *isObjC))
         isObjC = None;
       markAsObjC(TC, SD, isObjC);
+
+      // Infer 'dynamic' before touching accessors.
+      inferDynamic(TC.Context, SD);
     }
 
     if (SD->hasAccessorFunctions())
@@ -3837,8 +3846,6 @@ public:
         !SD->getSetter()->getBody()) {
       synthesizeSetterForMutableAddressedStorage(SD, TC);
     }
-
-    inferDynamic(TC.Context, SD);
 
     TC.checkDeclAttributes(SD);
   }
@@ -7015,6 +7022,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
         markAsObjC(*this, VD, isObjC);
 
+        // Infer 'dynamic' before touching accessors.
         inferDynamic(Context, VD);
 
         // If this variable is a class member, mark it final if the
