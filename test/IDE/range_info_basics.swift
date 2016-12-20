@@ -9,6 +9,13 @@ func foo1() -> Int { return 0 }
 class C { func foo() {} }
 struct S { func foo() {} }
 
+func foo2() {
+  let a = 3
+  var b = a.bigEndian
+  let c = a.byteSwapped
+  b = b.bigEndian.bigEndian.byteSwapped
+  print(b + c)
+}
 
 // RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
@@ -16,6 +23,7 @@ struct S { func foo() {} }
 // RUN: %target-swift-ide-test -range -pos=3:1 -end-pos=4:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK4
 // RUN: %target-swift-ide-test -range -pos=3:1 -end-pos=5:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK5
 // RUN: %target-swift-ide-test -range -pos=4:1 -end-pos=5:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK6
+// RUN: %target-swift-ide-test -range -pos=14:1 -end-pos=17:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK7
 
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
@@ -35,25 +43,29 @@ struct S { func foo() {} }
 // CHECK4: <Kind>MultiStatement</Kind>
 // CHECK4-NEXT: <Content>aaa = aaa + 3
 // CHECK4-NEXT: if aaa == 3 { aaa = 4 }</Content>
-// CHECK4-NEXT: <Declared>foo</Declared>
 // CHECK4-NEXT: <Referenced>aaa</Referenced>
-// CHECK4-NEXT: <Referenced>+</Referenced>
 // CHECK4-NEXT: <end>
 
 // CHECK5: <Kind>MultiStatement</Kind>
 // CHECK5-NEXT: <Content>aaa = aaa + 3
 // CHECK5-NEXT: if aaa == 3 { aaa = 4 }
 // CHECK5-NEXT: return aaa</Content>
-// CHECK5-NEXT: <Declared>foo</Declared>
 // CHECK5-NEXT: <Referenced>aaa</Referenced>
-// CHECK5-NEXT: <Referenced>+</Referenced>
-// CHECK5-NEXT: <Referenced>==</Referenced>
 // CHECK5-NEXT: <end>
 
 // CHECK6: <Kind>MultiStatement</Kind>
 // CHECK6-NEXT: if aaa == 3 { aaa = 4 }
 // CHECK6-NEXT: return aaa</Content>
-// CHECK6-NEXT: <Declared>foo</Declared>
 // CHECK6-NEXT: <Referenced>aaa</Referenced>
-// CHECK6-NEXT: <Referenced>==</Referenced>
 // CHECK6-NEXT: <end>
+
+// CHECK7: <Kind>MultiStatement</Kind>
+// CHECK7-NEXT: <Content>var b = a.bigEndian
+// CHECK7-NEXT:   let c = a.byteSwapped
+// CHECK7-NEXT:   b = b.bigEndian.bigEndian.byteSwapped
+// CHECK7-NEXT:   print(b + c)</Content>
+// CHECK7-NEXT: <Declared>b</Declared>
+// CHECK7-NEXT: <Declared>c</Declared>
+// CHECK7-NEXT: <Referenced>a</Referenced>
+// CHECK7-NEXT: <Referenced>b</Referenced>
+// CHECK7-NEXT: <end>
