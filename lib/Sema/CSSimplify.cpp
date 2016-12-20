@@ -2466,22 +2466,9 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   case CheckedCastKind::ArrayDowncast: {
     auto fromBaseType = *isArrayType(fromType);
     auto toBaseType = *isArrayType(toType);
-    
-    // FIXME: Deal with from/to base types that haven't been solved
-    // down to type variables yet.
 
-    // Check whether we need to bridge through an Objective-C class.
-    if (auto classType = TC.getDynamicBridgedThroughObjCClass(DC,
-                                                              fromBaseType,
-                                                              toBaseType)) {
-      // The class we're bridging through must be a subtype of the type we're
-      // coming from.
-      return matchTypes(classType, fromBaseType, ConstraintKind::Subtype,
-                        subflags, locator);
-    }
-
-    return matchTypes(toBaseType, fromBaseType, ConstraintKind::Subtype,
-                      subflags, locator);
+    return simplifyCheckedCastConstraint(fromBaseType, toBaseType, subflags,
+                                         locator);
   }
   case CheckedCastKind::DictionaryDowncast: {
     Type fromKeyType, fromValueType;
@@ -2489,66 +2476,23 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
     Type toKeyType, toValueType;
     std::tie(toKeyType, toValueType) = *isDictionaryType(toType);
-    
-    // FIXME: Deal with from/to base types that haven't been solved
-    // down to type variables yet.
 
-    // Check whether we need to bridge the key through an Objective-C class.
-    if (auto bridgedKey = TC.getDynamicBridgedThroughObjCClass(DC,
-                                                               fromKeyType,
-                                                               toKeyType)) {
-      toKeyType = bridgedKey;
-    }
-
-    // Perform subtype check on the possibly-bridged-through key type.
-    auto result = matchTypes(toKeyType, fromKeyType, ConstraintKind::Subtype,
-                             subflags, locator);
-    if (result == SolutionKind::Error)
-      return result;
-
-    // Check whether we need to bridge the value through an Objective-C class.
-    if (auto bridgedValue = TC.getDynamicBridgedThroughObjCClass(DC,
-                                                                 fromValueType,
-                                                                 toValueType)) {
-      toValueType = bridgedValue;
-    }
-
-    // Perform subtype check on the possibly-bridged-through value type.
-    switch (matchTypes(toValueType, fromValueType, ConstraintKind::Subtype, 
-                       subflags, locator)) {
-    case SolutionKind::Solved:
-      return result;
-
-    case SolutionKind::Unsolved:
-      return SolutionKind::Solved;
-
-    case SolutionKind::Error:
+    if (simplifyCheckedCastConstraint(fromKeyType, toKeyType, subflags,
+                                      locator) == SolutionKind::Error)
       return SolutionKind::Error;
-    }
+
+
+    return simplifyCheckedCastConstraint(fromValueType, toValueType, subflags,
+                                         locator);
   }
 
   case CheckedCastKind::SetDowncast: {
     auto fromBaseType = *isSetType(fromType);
     auto toBaseType = *isSetType(toType);
-    // FIXME: Deal with from/to base types that haven't been solved
-    // down to type variables yet.
-
-    // Check whether we need to bridge through an Objective-C class.
-    if (auto classType = TC.getDynamicBridgedThroughObjCClass(DC,
-                                                              fromBaseType,
-                                                              toBaseType)) {
-      // The class we're bridging through must be a subtype of the type we're
-      // coming from.
-      addConstraint(ConstraintKind::Subtype, classType,
-                    fromBaseType, locator);
-      return SolutionKind::Solved;
-    }
-
-    addConstraint(ConstraintKind::Subtype, toBaseType,
-                  fromBaseType, locator);
-    return SolutionKind::Solved;
+    return simplifyCheckedCastConstraint(fromBaseType, toBaseType, subflags,
+                                         locator);
   }
-      
+
   case CheckedCastKind::ValueCast: {
     // If casting among classes, and there are open
     // type variables remaining, introduce a subtype constraint to help resolve

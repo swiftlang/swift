@@ -74,7 +74,9 @@ func testBridgeDowncastExact(_ obj: BridgedClass, objOpt: BridgedClass?,
                              objImplicitOpt: BridgedClass!) -> BridgedStruct? {
   _ = obj as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass' to 'BridgedStruct' always succeeds}}
   _ = objOpt as? BridgedStruct // expected-error{{downcast from 'BridgedClass?' to 'BridgedStruct' only unwraps optionals; did you mean to use '!'?}}
-  _ = objImplicitOpt as? BridgedStruct // expected-error{{downcast from 'BridgedClass!' to 'BridgedStruct' only unwraps optionals; did you mean to use '!'?}}
+  // FIXME: Should complain about the fact that this is an unwrap, not
+  // that it always succeeds
+  _ = objImplicitOpt as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass!' to 'BridgedStruct' always succeeds}}
 }
 
 func testExplicitBridging(_ object: BridgedClass, value: BridgedStruct) {

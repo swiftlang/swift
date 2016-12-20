@@ -3363,7 +3363,6 @@ namespace {
         tc.diagnose(expr->getLoc(), diag::conditional_downcast_coercion,
                     cs.getType(sub), toType);
 
-
         // Transmute the checked cast into a coercion expression.
         auto *coerce = new (tc.Context) CoerceExpr(sub, expr->getLoc(),
                                                    expr->getCastTypeLoc());
@@ -3374,10 +3373,14 @@ namespace {
         if (!result)
           return nullptr;
 
-        // Wrap the result in an optional.
-        return cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(
-                                result,
-                                OptionalType::get(toType)));
+        // Wrap the result in an optional. Mark the optional injection as
+        // explicit, because the user did in fact write the '?' as part of
+        // 'as?', even though it wasn't necessary.
+        result = new (tc.Context) InjectIntoOptionalExpr(
+                                                     result,
+                                                     OptionalType::get(toType));
+        result->setImplicit(false);
+        return cs.cacheType(result);
       }
 
       // Valid casts.

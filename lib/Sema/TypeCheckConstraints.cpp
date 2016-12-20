@@ -2851,6 +2851,19 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   Type origFromType = fromType;
   Type origToType = toType;
 
+  // Local function to indicate failure.
+  auto failed = [&] {
+    if (suppressDiagnostics) {
+      return CheckedCastKind::Unresolved;
+    }
+
+    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+      .highlight(diagFromRange)
+      .highlight(diagToRange);
+
+    return CheckedCastKind::ValueCast;
+  };
+
   // Strip optional wrappers off of the destination type in sync with
   // stripping them off the origin type.
   while (auto toValueType = toType->getAnyOptionalObjectType()) {
@@ -2898,19 +2911,123 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // Check for casts between specific concrete types that cannot succeed.
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
 
-  if (cs.isArrayType(toType) && cs.isArrayType(fromType)) {
-    return CheckedCastKind::ArrayDowncast;
+  if (auto toElementType = cs.isArrayType(toType)) {
+    if (auto fromElementType = cs.isArrayType(fromType)) {
+      switch (typeCheckCheckedCast(*fromElementType, *toElementType, dc,
+                                   SourceLoc(), SourceRange(), SourceRange(),
+                                   nullptr, /*suppressDiagnostics=*/true)) {
+      case CheckedCastKind::Coercion:
+        return CheckedCastKind::Coercion;
+
+      case CheckedCastKind::BridgingCast:
+        return CheckedCastKind::BridgingCast;
+
+      case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::BridgeFromObjectiveC:
+      case CheckedCastKind::DictionaryDowncast:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::ValueCast:
+        return CheckedCastKind::ArrayDowncast;
+
+      case CheckedCastKind::Unresolved:
+        return failed();
+      }
+    }
   }
 
-  if (cs.isDictionaryType(toType) && cs.isDictionaryType(fromType))
-    return CheckedCastKind::DictionaryDowncast;
+  if (auto toKeyValue = cs.isDictionaryType(toType)) {
+    if (auto fromKeyValue = cs.isDictionaryType(fromType)) {
+      bool hasCoercion = false;
+      bool hasBridgingConversion = false;
+      bool hasCast = false;
+      switch (typeCheckCheckedCast(fromKeyValue->first, toKeyValue->first, dc,
+                                   SourceLoc(), SourceRange(), SourceRange(),
+                                   nullptr, /*suppressDiagnostics=*/true)) {
+      case CheckedCastKind::Coercion:
+        hasCoercion = true;
+        break;
 
-  if (cs.isSetType(toType) && cs.isSetType(fromType))
-    return CheckedCastKind::SetDowncast;
+      case CheckedCastKind::BridgingCast:
+        hasBridgingConversion = true;
+        break;
+
+      case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::BridgeFromObjectiveC:
+      case CheckedCastKind::DictionaryDowncast:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::ValueCast:
+        hasCast = true;
+        break;
+
+      case CheckedCastKind::Unresolved:
+        return failed();
+      }
+
+      switch (typeCheckCheckedCast(fromKeyValue->second, toKeyValue->second, dc,
+                                   SourceLoc(), SourceRange(), SourceRange(),
+                                   nullptr, /*suppressDiagnostics=*/true)) {
+      case CheckedCastKind::Coercion:
+        hasCoercion = true;
+        break;
+
+      case CheckedCastKind::BridgingCast:
+        hasBridgingConversion = true;
+        break;
+
+      case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::BridgeFromObjectiveC:
+      case CheckedCastKind::DictionaryDowncast:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::ValueCast:
+        hasCast = true;
+        break;
+
+      case CheckedCastKind::Unresolved:
+        return failed();
+      }
+
+      if (hasCast) return CheckedCastKind::DictionaryDowncast;
+      if (hasBridgingConversion) return CheckedCastKind::BridgingCast;
+      assert(hasCoercion && "Not a coercion?");
+      return CheckedCastKind::Coercion;
+    }
+  }
+
+  if (auto toElementType = cs.isSetType(toType)) {
+    if (auto fromElementType = cs.isSetType(fromType)) {
+      switch (typeCheckCheckedCast(*fromElementType, *toElementType, dc,
+                                   SourceLoc(), SourceRange(), SourceRange(),
+                                   nullptr, /*suppressDiagnostics=*/true)) {
+      case CheckedCastKind::Coercion:
+        return CheckedCastKind::Coercion;
+
+      case CheckedCastKind::BridgingCast:
+        return CheckedCastKind::BridgingCast;
+
+      case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::BridgeFromObjectiveC:
+      case CheckedCastKind::DictionaryDowncast:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::ValueCast:
+        return CheckedCastKind::SetDowncast;
+
+      case CheckedCastKind::Unresolved:
+        return failed();
+      }
+    }
+  }
 
   // If we can bridge through an Objective-C class, do so.
-  if (Type objCClass = getDynamicBridgedThroughObjCClass(dc, fromType, toType)){
-    if (isSubtypeOf(objCClass, fromType, dc))
+  if (Type bridgedToClass = getDynamicBridgedThroughObjCClass(dc, fromType,
+                                                              toType)) {
+    if (isSubtypeOf(bridgedToClass, fromType, dc))
+      return CheckedCastKind::BridgeFromObjectiveC;
+  }
+
+  // If we can bridge through an Objective-C class, do so.
+  if (Type bridgedFromClass = getDynamicBridgedThroughObjCClass(dc, toType,
+                                                                fromType)) {
+    if (isSubtypeOf(toType, bridgedFromClass, dc))
       return CheckedCastKind::BridgeFromObjectiveC;
   }
 
