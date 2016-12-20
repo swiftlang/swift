@@ -812,6 +812,13 @@ public struct ${Self}<Pointee>
   /// With pointers `p` and `q`, the result of `p.distance(to: q)` is
   /// equivalent to `q - p`.
   ///
+  /// Typed pointers are required to be properly aligned for their `Pointee`
+  /// type. Proper alignment ensures that the result of `distance(to:)`
+  /// accurately measures the distance between the two pointers, counted in
+  /// strides of `Pointee`. To find the distance in bytes between two
+  /// pointers, convert them to `UnsafeRawPointer` instances before calling
+  /// `distance(to:)`.
+  ///
   /// - Parameter end: The pointer to calculate the distance to.
   /// - Returns: The distance from this pointer to `end`, in strides of the
   ///   pointer's `Pointee` type. To access the stride, use
@@ -969,6 +976,13 @@ extension ${Self} {
 
   /// Returns the distance between two pointers, counted as instances of the
   /// pointers' `Pointee` type.
+  ///
+  /// Typed pointers are required to be properly aligned for their `Pointee`
+  /// type. Proper alignment ensures that the result of the subtraction
+  /// operator (`-`) accurately measures the distance between the two
+  /// pointers, counted in strides of `Pointee`. To find the distance in bytes
+  /// between two pointers, convert them to `UnsafeRawPointer` instances
+  /// before subtracting.
   ///
   /// - Parameters:
   ///   - lhs: A pointer.
