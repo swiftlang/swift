@@ -1814,9 +1814,6 @@ public:
                          const NormalProtocolConformance *conformance,
                          ProtocolDecl *inherited) override;
 
-  Type resolveMemberType(DeclContext *dc, Type type,
-                         Identifier name) override;
-
   bool isCIntegerType(const DeclContext *DC, Type T);
   bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                              ObjCReason Reason,

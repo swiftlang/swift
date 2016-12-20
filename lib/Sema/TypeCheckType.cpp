@@ -2981,16 +2981,6 @@ Type TypeChecker::getSuperClassOf(Type type) {
   return type->getSuperclass(this);
 }
 
-Type TypeChecker::resolveMemberType(DeclContext *dc, Type type,
-                                    Identifier name) {
-  LookupTypeResult memberTypes = lookupMemberType(dc, type, name);
-  if (!memberTypes)
-    return Type();
-
-  // FIXME: Detect ambiguities here?
-  return memberTypes.back().second;
-}
-
 static void lookupAndAddLibraryTypes(TypeChecker &TC,
                                      Module *Stdlib,
                                      ArrayRef<Identifier> TypeNames,
