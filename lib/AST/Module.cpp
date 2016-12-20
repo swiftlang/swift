@@ -817,11 +817,6 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
       // the specialized conformance.
       auto substitutions = type->gatherAllSubstitutions(this, resolver,
                                                         explicitConformanceDC);
-      
-      for (auto sub : substitutions) {
-        if (sub.getReplacement()->hasError())
-          return None;
-      }
 
       // Create the specialized conformance entry.
       auto result = ctx.getSpecializedConformance(type, conformance,

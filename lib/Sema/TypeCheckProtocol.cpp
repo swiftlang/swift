@@ -2828,6 +2828,18 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
   for (auto reqProto : assocType->getConformingProtocols()) {
     if (!tc.conformsToProtocol(type, reqProto, dc, None))
       return reqProto;
+
+    // FIXME: Why is conformsToProtocol() not enough? The stdlib doesn't
+    // build unless we fail here while inferring an associated type
+    // somewhere.
+    if (type->isSpecialized()) {
+      auto substitutions = type->gatherAllSubstitutions(
+          dc->getParentModule(), &tc);
+      for (auto sub : substitutions) {
+        if (sub.getReplacement()->hasError())
+          return reqProto;
+      }
+    }
   }
 
   // Success!
