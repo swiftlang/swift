@@ -349,16 +349,21 @@ public:
   }
 
   void analyze(ASTNode Node) {
+    Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
+
     // Collect declared decls in the range.
-    if (Node.is<Decl*>()) {
-      if (auto *VD = dyn_cast<ValueDecl>(Node.get<Decl*>())) {
+    if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
+      if (isContainedInSelection(CharSourceRange(SM, VD->getStartLoc(),
+                                                 VD->getEndLoc())))
         pushBackDeclUniquely(DeclaredDecls, VD);
-      }
     }
 
     auto &DCInfo = getCurrentDC();
     switch (getRangeMatchKind(Node.getSourceRange())) {
     case RangeMatchKind::NoneMatch:
+      // PatternBindingDecl is not visited; we need to explicitly analyze here.
+      if (auto *VA = dyn_cast_or_null<VarDecl>(D))
+        analyze(VA->getParentPatternBinding());
       return;
     case RangeMatchKind::RangeMatch:
       Result = getSingleNodeKind(Node);
@@ -398,6 +403,11 @@ public:
   void analyzeDeclRef(ValueDecl *VD, CharSourceRange Range) {
     if (!isContainedInSelection(Range))
       return;
+
+    // If the VD is declared outside of current file, exclude such decl.
+    if (VD->getDeclContext()->getParentSourceFile() != &File)
+      return;
+
     // Collect referenced decls in the range.
     pushBackDeclUniquely(ReferencedDecls, VD);
   }
