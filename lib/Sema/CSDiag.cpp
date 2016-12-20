@@ -3235,7 +3235,8 @@ namespace {
       
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getInterfaceType()->hasError());
+          if (D->hasInterfaceType())
+            D->setInvalid(D->getInterfaceType()->hasError());
       
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
@@ -3279,7 +3280,8 @@ namespace {
 
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getInterfaceType()->hasError());
+          if (D->hasInterfaceType())
+            D->setInvalid(D->getInterfaceType()->hasError());
     }
   };
 } // end anonymous namespace
