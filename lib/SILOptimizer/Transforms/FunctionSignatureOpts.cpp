@@ -364,8 +364,16 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   }
 
   OldFM.mangle();
-  std::string Old = OldFM.getMangler().finalize();
-  std::string New = NewFM.mangle();
+  SILModule &M = F->getModule();
+  std::string Old = getUniqueName(OldFM.getMangler().finalize(), M);
+
+  int UniqueID = 0;
+  std::string New;
+  do {
+    New = NewFM.mangle(UniqueID);
+    ++UniqueID;
+  } while (M.lookUpFunction(New));
+
   return NewMangling::selectMangling(Old, New);
 }
 
@@ -472,7 +480,7 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
 void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Create the optimized function !
   SILModule &M = F->getModule();
-  std::string Name = getUniqueName(createOptimizedSILFunctionName(), M);
+  std::string Name = createOptimizedSILFunctionName();
   SILLinkage linkage = F->getLinkage();
   if (isAvailableExternally(linkage))
     linkage = SILLinkage::Shared;

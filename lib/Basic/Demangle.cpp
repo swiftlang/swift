@@ -3610,12 +3610,22 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     NodePointer child0 = pointer->getChild(0);
     NodePointer child1 = pointer->getChild(1);
     NodePointer child2 = pointer->getChild(2);
-    print(child0);
-    if (Options.DisplayProtocolConformances) {
+    if (pointer->getNumChildren() == 4) {
+      // TODO: check if this is correct
+      Printer << "property behavior storage of ";
+      print(child2);
+      Printer << " in ";
+      print(child0);
       Printer << " : ";
       print(child1);
-      Printer << " in ";
-      print(child2);
+    } else {
+      print(child0);
+      if (Options.DisplayProtocolConformances) {
+        Printer << " : ";
+        print(child1);
+        Printer << " in ";
+        print(child2);
+      }
     }
     return;
   }

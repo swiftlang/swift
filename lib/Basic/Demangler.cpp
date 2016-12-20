@@ -858,9 +858,13 @@ NodePointer Demangler::demangleMetatype() {
     case 'A':
       return createWithChild(Node::Kind::ReflectionMetadataAssocTypeDescriptor,
                              popProtocolConformance());
-    case 'C':
+    case 'C': {
+      NodePointer Ty = popNode(Node::Kind::Type);
+      if (!Ty || !isNominal(Ty->getChild(0)->getKind()))
+        return nullptr;
       return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
-                             popNode(isNominal));
+                             Ty->getChild(0));
+    }
     default:
       return nullptr;
   }
@@ -1016,12 +1020,20 @@ NodePointer Demangler::popProtocolConformance() {
   NodePointer Module = popModule();
   NodePointer Proto = popProtocol();
   NodePointer Type = popNode(Node::Kind::Type);
+  NodePointer Ident;
+  if (!Type) {
+    // Property behavior conformance
+    Ident = popNode(Node::Kind::Identifier);
+    Type = popNode(Node::Kind::Type);
+  }
   if (GenSig) {
     Type = createType(createWithChildren(Node::Kind::DependentGenericType,
                                          GenSig, Type));
   }
-  return createWithChildren(Node::Kind::ProtocolConformance,
-                            Type, Proto, Module);
+  NodePointer Conf = createWithChildren(Node::Kind::ProtocolConformance,
+                                        Type, Proto, Module);
+  addChild(Conf, Ident);
+  return Conf;
 }
 
 NodePointer Demangler::demangleThunkOrSpecialization() {
@@ -1089,7 +1101,7 @@ NodePointer Demangler::demangleGenericSpecialization(Node::Kind SpecKind) {
 
 NodePointer Demangler::demangleFunctionSpecialization() {
   NodePointer Spec = demangleSpecAttributes(
-                                  Node::Kind::FunctionSignatureSpecialization);
+        Node::Kind::FunctionSignatureSpecialization, /*demangleUniqueID*/ true);
   unsigned ParamIdx = 0;
   while (Spec && !nextIf('_')) {
     Spec = addChild(Spec, demangleFuncSpecParam(ParamIdx));
@@ -1226,14 +1238,26 @@ NodePointer Demangler::addFuncSpecParamNumber(NodePointer Param,
      Node::Kind::FunctionSignatureSpecializationParamPayload, Str));
 }
 
-NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
-  NodePointer SpecNd = NodeFactory::create(SpecKind);
-  if (nextIf('q'))
-    SpecNd->addChild(NodeFactory::create(Node::Kind::SpecializationIsFragile));
+NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind,
+                                              bool demangleUniqueID) {
+  bool isFragile = nextIf('q');
 
   int PassID = (int)nextChar() - '0';
   if (PassID < 0 || PassID > 9)
     return nullptr;
+
+  int Idx = -1;
+  if (demangleUniqueID)
+    Idx = demangleNatural();
+
+  NodePointer SpecNd;
+  if (Idx >= 0) {
+    SpecNd = NodeFactory::create(SpecKind, Idx);
+  } else {
+    SpecNd = NodeFactory::create(SpecKind);
+  }
+  if (isFragile)
+    SpecNd->addChild(NodeFactory::create(Node::Kind::SpecializationIsFragile));
 
   SpecNd->addChild(NodeFactory::create(Node::Kind::SpecializationPassID,
                                        PassID));
