@@ -460,8 +460,47 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
 
   /// ExternalFunctionDefinitionsElimination pass does not take functions
   /// reachable via vtables and witness_tables into account when computing
-  /// a function liveness information.
+  /// a function liveness information. The only exceptions are external
+  /// transparent functions, because bodies of external transparent functions
+  /// should never be removed.
   void findAnchorsInTables() override {
+    // Check vtable methods.
+    for (SILVTable &vTable : Module->getVTableList()) {
+      for (auto &entry : vTable.getEntries()) {
+        SILFunction *F = entry.second;
+        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
+          ensureAlive(F);
+      }
+    }
+
+    // Check witness methods.
+    for (SILWitnessTable &WT : Module->getWitnessTableList()) {
+      bool tableIsAlive = isVisibleExternally(WT.getConformance()->getProtocol());
+      for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
+        if (entry.getKind() != SILWitnessTable::Method)
+          continue;
+
+        auto methodWitness = entry.getMethodWitness();
+        SILFunction *F = methodWitness.Witness;
+        if (!F)
+          continue;
+        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
+          ensureAlive(F);
+      }
+    }
+
+    // Check default witness methods.
+    for (SILDefaultWitnessTable &WT : Module->getDefaultWitnessTableList()) {
+      for (const SILDefaultWitnessTable::Entry &entry : WT.getEntries()) {
+        if (!entry.isValid())
+          continue;
+
+        SILFunction *F = entry.getWitness();
+        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
+          ensureAlive(F);
+      }
+    }
+
   }
 
   bool findAliveFunctions() {
