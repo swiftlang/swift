@@ -1288,10 +1288,14 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 
 
     CheckedCastKind castKind
-      = typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(), dc,
+      = typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(),
+                             type->hasError()
+                               ? CheckedCastContextKind::None
+                               : CheckedCastContextKind::IsPattern,
+                             dc,
                              IP->getLoc(),
-                             IP->getLoc(),IP->getCastTypeLoc().getSourceRange(),
-                             /*suppressDiagnostics=*/ type->hasError());
+                             nullptr,
+                             IP->getCastTypeLoc().getSourceRange());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
       return true;
@@ -1400,10 +1404,12 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       // Otherwise, see if we can introduce a cast pattern to get from an
       // existential pattern type to the enum type.
       else if (type->isAnyExistentialType()) {
-        auto foundCastKind = typeCheckCheckedCast(type, parentTy, dc,
-                                                  SourceLoc(),
-                                                  SourceRange(), SourceRange(),
-                                                  /*suppress diags*/ false);
+        auto foundCastKind =
+          typeCheckCheckedCast(type, parentTy,
+                               CheckedCastContextKind::EnumElementPattern,
+                               dc,
+                               EEP->getLoc(),
+                               nullptr, SourceRange());
         // If the cast failed, we can't resolve the pattern.
         if (foundCastKind < CheckedCastKind::First_Resolved)
           return true;

@@ -473,6 +473,23 @@ inline ConformanceCheckOptions operator|(ConformanceCheckFlags lhs,
   return ConformanceCheckOptions(lhs) | rhs;
 }
 
+/// Describes the kind of checked cast operation being performed.
+enum class CheckedCastContextKind {
+  /// None: we're just establishing how to perform the checked cast. This
+  /// is useful when we don't care to produce any diagnostics.
+  None,
+  /// A forced cast, with "as!".
+  ForcedCast,
+  /// A conditional cast, with "as?".
+  ConditionalCast,
+  /// An "is" expression.
+  IsExpr,
+  /// An "is" pattern.
+  IsPattern,
+  /// An enum-element pattern.
+  EnumElementPattern,
+};
+
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker final : public LazyResolver {
@@ -883,8 +900,12 @@ public:
   ///
   /// \param dc The context of the conversion.
   ///
+  /// \param unwrappedIUO If non-null, will be set to indicate whether the
+  /// conversion force-unwrapped an implicitly-unwrapped optional.
+  ///
   /// \returns true if \c t1 can be implicitly converted to \c t2.
-  bool isConvertibleTo(Type t1, Type t2, DeclContext *dc);
+  bool isConvertibleTo(Type t1, Type t2, DeclContext *dc,
+                       bool *unwrappedIUO = nullptr);
 
   /// \brief Determine whether one type is explicitly convertible to another,
   /// i.e. using an 'as' expression.
@@ -906,8 +927,12 @@ public:
   ///
   /// \param dc The context of the conversion.
   ///
+  /// \param unwrappedIUO If non-null, will be set to indicate whether the
+  /// conversion force-unwrapped an implicitly-unwrapped optional.
+  ///
   /// \returns true if \c t1 can be explicitly converted to \c t2.
-  bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc);
+  bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc,
+                       bool *unwrappedIUO = nullptr);
 
   /// \brief Return true if performing a checked cast from one type to another
   /// with the "as!" operator could possibly succeed.
@@ -931,10 +956,14 @@ public:
   ///
   /// \param dc The context of the conversion.
   ///
+  /// \param unwrappedIUO   If non-null, will be set to \c true if the coercion
+  /// or bridge operation force-unwraps an implicitly-unwrapped optional.
+  ///
   /// \returns true if \c t1 and \c t2 satisfy the constraint.
   bool typesSatisfyConstraint(Type t1, Type t2,
                               constraints::ConstraintKind kind,
-                              DeclContext *dc);
+                              DeclContext *dc,
+                              bool *unwrappedIUO = nullptr);
 
   /// \brief Determine whether one type would be a valid substitution for an
   /// archetype.
@@ -1346,22 +1375,19 @@ public:
   /// \param toType         The destination type of the cast.
   /// \param dc             The context of the cast.
   /// \param diagLoc        The location at which to report diagnostics.
-  /// \param diagFromRange  The source range of the input operand of the cast.
+  /// \param fromExpr       The expression describing the input operand.
   /// \param diagToRange    The source range of the destination type.
-  /// \param suppressDiagnostics
-  ///                       True if the type check should simply fail instead
-  ///                       of printing diagnostics.
   ///
   /// \returns a CheckedCastKind indicating the semantics of the cast. If the
   /// cast is invalid, Unresolved is returned. If the cast represents an implicit
   /// conversion, Coercion is returned.
   CheckedCastKind typeCheckCheckedCast(Type fromType,
                                        Type toType,
+                                       CheckedCastContextKind contextKind,
                                        DeclContext *dc,
                                        SourceLoc diagLoc,
-                                       SourceRange diagFromRange,
-                                       SourceRange diagToRange,
-                                       bool suppressDiagnostics);
+                                       Expr *fromExpr,
+                                       SourceRange diagToRange);
 
   /// Find the Objective-C class that bridges between a value of the given
   /// dynamic type and the given value type.

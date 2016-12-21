@@ -3852,10 +3852,11 @@ addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem *CS,
   toType = toType->lookThroughAllAnyOptionalTypes();
 
   CheckedCastKind Kind =
-    CS->getTypeChecker().typeCheckCheckedCast(fromType, toType, CS->DC,
-                                              SourceLoc(), SourceRange(),
-                                              SourceRange(),
-                                              /*suppressDiagnostics*/ true);
+    CS->getTypeChecker().typeCheckCheckedCast(fromType, toType,
+                                              CheckedCastContextKind::None,
+                                              CS->DC,
+                                              SourceLoc(), nullptr,
+                                              SourceRange());
   if (Kind != CheckedCastKind::Unresolved) {
     SmallString<32> buffer;
     llvm::raw_svector_ostream OS(buffer);

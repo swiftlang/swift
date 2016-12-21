@@ -2948,17 +2948,19 @@ namespace {
       // Set the type we checked against.
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
       auto fromType = cs.getType(sub);
+      auto castContextKind =
+          SuppressDiagnostics ? CheckedCastContextKind::None
+                              : CheckedCastContextKind::IsExpr;
       auto castKind = tc.typeCheckCheckedCast(
-                        fromType, toType, cs.DC,
-                        expr->getLoc(),
-                        sub->getSourceRange(),
-                        expr->getCastTypeLoc().getSourceRange(),
-                        SuppressDiagnostics);
+                        fromType, toType, castContextKind, cs.DC,
+                        expr->getLoc(), sub,
+                        expr->getCastTypeLoc().getSourceRange());
 
       switch (castKind) {
       case CheckedCastKind::Unresolved:
-        // Invalid type check.
-        return nullptr;
+        expr->setCastKind(CheckedCastKind::ValueCast);
+        break;
+          
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCast:
         // Check is trivially true.
@@ -3012,7 +3014,7 @@ namespace {
           cast->setImplicit();
 
         // Type-check this conditional case.
-        Expr *result = visitConditionalCheckedCastExpr(cast);
+        Expr *result = visitConditionalCheckedCastExpr(cast, true);
         if (!result)
           return nullptr;
 
@@ -3222,7 +3224,10 @@ namespace {
       // or a bridging conversion.
       auto locator = cs.getConstraintLocator(expr);
       if (!choice) {
-        choice = solution.getDisjunctionChoice(locator);
+        if (tc.Context.LangOpts.EnableObjCInterop)
+          choice = solution.getDisjunctionChoice(locator);
+        else
+          choice = 0;
       }
 
       // Handle the coercion/bridging of the underlying subexpression, where
@@ -3268,13 +3273,15 @@ namespace {
         return nullptr;
       expr->setSubExpr(sub);
 
+      auto castContextKind =
+          SuppressDiagnostics ? CheckedCastContextKind::None
+                              : CheckedCastContextKind::ForcedCast;
+
       auto fromType = cs.getType(sub);
       auto castKind = tc.typeCheckCheckedCast(
-                        fromType, toType, cs.DC,
-                        expr->getLoc(),
-                        sub->getSourceRange(),
-                        expr->getCastTypeLoc().getSourceRange(),
-                        SuppressDiagnostics);
+                        fromType, toType, castContextKind, cs.DC,
+                        expr->getLoc(), sub,
+                        expr->getCastTypeLoc().getSourceRange());
       switch (castKind) {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -3318,7 +3325,8 @@ namespace {
                                     OptionalBindingsCastKind::Forced);
     }
 
-    Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
+    Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr,
+                                          bool isInsideIsExpr = false) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
       checkForImportedUsedConformances(toType);
@@ -3331,17 +3339,23 @@ namespace {
         return nullptr;
       expr->setSubExpr(sub);
 
+
+      auto castContextKind =
+          (SuppressDiagnostics || isInsideIsExpr)
+            ? CheckedCastContextKind::None
+            : CheckedCastContextKind::ConditionalCast;
+
       auto fromType = cs.getType(sub);
       auto castKind = tc.typeCheckCheckedCast(
-                        fromType, toType, cs.DC,
-                        expr->getLoc(),
-                        sub->getSourceRange(),
-                        expr->getCastTypeLoc().getSourceRange(),
-                        SuppressDiagnostics);
+                        fromType, toType, castContextKind, cs.DC,
+                        expr->getLoc(), sub,
+                        expr->getCastTypeLoc().getSourceRange());
       switch (castKind) {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
-        return nullptr;
+        expr->setCastKind(CheckedCastKind::ValueCast);
+        break;
+
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCast: {
         if (SuppressDiagnostics)
@@ -5280,9 +5294,9 @@ buildElementConversion(ExprRewriter &rewriter,
 
   auto &tc = rewriter.getConstraintSystem().getTypeChecker();
   if (bridged &&
-      tc.typeCheckCheckedCast(srcType, destType, cs.DC, SourceLoc(),
-                              SourceRange(), SourceRange(),
-                              /*suppressDiagnostics=*/true)
+      tc.typeCheckCheckedCast(srcType, destType,
+                              CheckedCastContextKind::None, cs.DC,
+                              SourceLoc(), nullptr, SourceRange())
         != CheckedCastKind::Coercion) {
     conversion = rewriter.buildObjCBridgeExpr(opaque, destType,
            locator.withPathElement(
@@ -6893,11 +6907,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
       auto toType =
         solution.simplifyType(TC, coerceExpr->getCastTypeLoc().getType());
       auto castKind = TC.typeCheckCheckedCast(
-                        fromType, toType, DC,
-                        coerceExpr->getLoc(),
-                        subExpr->getSourceRange(),
-                        coerceExpr->getCastTypeLoc().getSourceRange(),
-                        /*suppressDiagnostics=*/ true);
+                        fromType, toType, CheckedCastContextKind::None, DC,
+                        coerceExpr->getLoc(), subExpr,
+                        coerceExpr->getCastTypeLoc().getSourceRange());
 
       switch (castKind) {
       // Invalid cast.

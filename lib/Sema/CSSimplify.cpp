@@ -4185,7 +4185,8 @@ void ConstraintSystem::addExplicitConversionConstraint(
   }
 
   addDisjunctionConstraint(constraints, locator,
-                           allowFixes ? RememberChoice : ForgetChoice);
+    getASTContext().LangOpts.EnableObjCInterop && allowFixes ? RememberChoice
+                                                             : ForgetChoice);
 }
 
 ConstraintSystem::SolutionKind

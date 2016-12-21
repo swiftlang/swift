@@ -7,7 +7,8 @@ import CoreGraphics
 
 var roomName : String?
 
-if let realRoomName = roomName as! NSString { // expected-error {{downcast from 'String?' to 'NSString' only unwraps optionals; did you mean to use '!'?}}
+if let realRoomName = roomName as! NSString { // expected-warning{{forced cast from 'String?' to 'NSString' only unwraps and bridges; did you mean to use '!' with 'as'?}}
+// expected-error@-1{{initializer for conditional binding must have Optional type, not 'NSString'}}
 
 }
 
