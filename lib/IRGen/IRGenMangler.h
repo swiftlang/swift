@@ -147,6 +147,19 @@ public:
     return mangleNominalTypeSymbol(Decl, "MC");
   }
 
+  std::string mangleOutlinedCopyFunction(const NominalTypeDecl *Decl) {
+    beginMangling();
+    appendNominalType(Decl);
+    appendOperator("Wy");
+    return finalize();
+  }
+  std::string mangleOutlinedConsumeFunction(const NominalTypeDecl *Decl) {
+    beginMangling();
+    appendNominalType(Decl);
+    appendOperator("We");
+    return finalize();
+  }
+
   std::string manglePartialApplyForwarder(StringRef FuncName);
 
 protected:

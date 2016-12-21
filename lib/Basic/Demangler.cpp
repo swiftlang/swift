@@ -1320,6 +1320,14 @@ NodePointer Demangler::demangleWitness() {
       return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
                                 Conf, Name, ProtoTy);
     }
+    case 'y': {
+      return createWithChild(Node::Kind::OutlinedCopy,
+                             popNode(Node::Kind::Type));
+    }
+    case 'e': {
+      return createWithChild(Node::Kind::OutlinedConsume,
+                             popNode(Node::Kind::Type));
+    }
     default:
       return nullptr;
   }

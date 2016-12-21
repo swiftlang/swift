@@ -8,8 +8,8 @@
 // CHECK: [[C:%C4weak1C]] = type <{ [[REF:%swift.refcounted]] }>
 // CHECK: [[A:%V4weak1A]] = type <{ [[WEAK:%swift.weak]] }>
 // CHECK: [[WEAK]] = type
-// CHECK: [[B:%V4weak1B]] = type <{ { [[WEAK]], i8** } }>
 // CHECK: [[UNKNOWN:%objc_object]] = type opaque
+// CHECK: [[B:%V4weak1B]] = type <{ { [[WEAK]], i8** } }>
 
 sil_stage canonical
 
@@ -76,8 +76,7 @@ bb0(%0 : $*B, %1 : $Optional<P>):
 // CHECK-NEXT: store i8** [[TMPTAB]], i8*** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_unknownWeakAssign([[WEAK]]* [[T0]], [[UNKNOWN]]* [[TMPOBJ]])
-// CHECK: [[RECOMPUTED_TMPOBJ:%.*]] = inttoptr {{.*}} to %objc_object*
-// CHECK: call void @swift_unknownRelease(%objc_object* [[RECOMPUTED_TMPOBJ]])
+// CHECK: call void @_T0SqWe
 
 sil @test_weak_alloc_stack : $@convention(thin) (Optional<P>) -> () {
 bb0(%0 : $Optional<P>):
