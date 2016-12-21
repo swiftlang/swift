@@ -206,6 +206,11 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     Ty->print(OS);
     OS << "</Type>\n";
   }
+
+  OS << "<Context>";
+  printContext(OS, RangeContext);
+  OS << "</Context>\n";
+
   for (auto *VD : DeclaredDecls) {
     OS << "<Declared>" << VD->getNameStr() << "</Declared>\n";
   }
@@ -273,15 +278,18 @@ private:
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
                                resolveNodeType(Node), Content,
+                               getImmediateContext(),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
       return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
-                               Content, llvm::makeArrayRef(DeclaredDecls),
+                               Content, getImmediateContext(),
+                               llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
       return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content,
+                               getImmediateContext(),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     }
@@ -330,6 +338,14 @@ private:
       }
     }
     return SourceLoc();
+  }
+
+  DeclContext *getImmediateContext() {
+    for (auto It = ContextStack.rbegin(); It != ContextStack.rend(); It ++) {
+      if (auto *DC = It->Parent.getAsDeclContext())
+        return DC;
+    }
+    return static_cast<DeclContext*>(&File);
   }
 
   Implementation(SourceFile &File, SourceLoc Start, SourceLoc End) :
@@ -401,6 +417,7 @@ public:
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */
                 resolveNodeType(DCInfo.EndMatches.back()), Content,
+                getImmediateContext(),
                 llvm::makeArrayRef(DeclaredDecls),
                 llvm::makeArrayRef(ReferencedDecls)};
       return;

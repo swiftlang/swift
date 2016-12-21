@@ -220,13 +220,16 @@ struct ResolvedRangeInfo {
   StringRef Content;
   ArrayRef<ValueDecl*> DeclaredDecls;
   ArrayRef<ReferencedDecl> ReferencedDecls;
+  DeclContext* RangeContext;
   ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content,
+                    DeclContext* RangeContext,
                     ArrayRef<ValueDecl*> DeclaredDecls,
                     ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
                       Ty(Ty), Content(Content), DeclaredDecls(DeclaredDecls),
-                      ReferencedDecls(ReferencedDecls) {}
+                      ReferencedDecls(ReferencedDecls),
+                      RangeContext(RangeContext) {}
   ResolvedRangeInfo() :
-    ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef(), {}, {}) {}
+    ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef(), nullptr, {}, {}) {}
   void print(llvm::raw_ostream &OS);
 };
 
