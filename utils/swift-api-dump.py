@@ -92,6 +92,9 @@ def create_parser():
                         help='Suppress printing of status messages.')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Print extra information.')
+    parser.add_argument('-r',  '--resource-dir',
+                        help='Path to a resource directory that contains ' +
+                             'Swift module files.')
     parser.add_argument('-F', '--framework-dir', action='append',
                         help='Add additional framework directories')
     parser.add_argument('-iframework', '--system-framework-dir',
@@ -240,7 +243,8 @@ def collect_frameworks(sdk):
 
 
 def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module,
-                                target, output_dir, quiet, verbose):
+                                resource_dir, target, output_dir, quiet,
+                                verbose):
 
     # Determine the SDK root and collect the set of frameworks.
     (frameworks, sdk_root) = collect_frameworks(sdk)
@@ -258,6 +262,8 @@ def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module,
     # Create the sets of arguments to dump_module_api.
     results = []
     cmd = cmd_common + ['-sdk', sdk_root, '-target', sdk_target]
+    if resource_dir:
+        cmd = cmd.extend(['-resource_dir', resource_dir])
     if module:
         results.append(
             (cmd, cmd_extra_args, sdk_output_dir, module, quiet, verbose))
