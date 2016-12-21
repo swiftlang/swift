@@ -205,3 +205,28 @@ bb3:
   %3 = tuple ()
   return %3 : $()
 }
+
+// CHECK-LABEL: sil @dont_crash_on_unreachable
+// CHECK: bb0({{.*}}):
+// CHECK: alloc_stack
+// CHECK: bb1:
+// CHECK-NOT: alloc_stack
+// CHECK: bb2:
+// CHECK: bb3:
+// CHECK:   unreachable
+
+sil @dont_crash_on_unreachable : $@convention(thin) <T> (@in T, Builtin.Int1) -> Never {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+bb1:
+  %2 = alloc_stack $T
+  copy_addr [take] %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  br bb3
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+bb3:
+  %3 = builtin "int_trap"() : $()
+  unreachable
+}
