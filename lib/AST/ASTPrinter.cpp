@@ -50,7 +50,6 @@
 #include <queue>
 
 using namespace swift;
-namespace swift {
 
 struct SynthesizedExtensionAnalyzer::Implementation {
   static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
@@ -429,7 +428,6 @@ hasMergeGroup(MergeGroupKind Kind) {
   }
   return false;
 }
-} // end anonymous namespace
 
 PrintOptions PrintOptions::printTypeInterface(Type T) {
   PrintOptions result = printInterface();
