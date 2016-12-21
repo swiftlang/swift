@@ -5,7 +5,7 @@
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target arm64-apple-tvos9.0 %s  | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_tvOS %s
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target i386-apple-watchos2.0 %s   | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_watchOS_SIM %s
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target armv7k-apple-watchos2.0 %s | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_watchOS %s
-// RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=ASAN_LINUX %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=ASAN_LINUX %s
 
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=thread -target x86_64-apple-macosx10.9 %s | %FileCheck -check-prefix=TSAN -check-prefix=TSAN_OSX %s
 // RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=thread -target x86-apple-macosx10.9 %s 2>&1 | %FileCheck -check-prefix=TSAN_OSX_32 %s
@@ -15,11 +15,19 @@
 // RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=thread -target arm64-apple-tvos9.0 %s 2>&1 | %FileCheck -check-prefix=TSAN_tvOS %s
 // RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=thread -target i386-apple-watchos2.0 %s 2>&1 | %FileCheck -check-prefix=TSAN_watchOS_SIM %s
 // RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=thread -target armv7k-apple-watchos2.0 %s 2>&1  | %FileCheck -check-prefix=TSAN_watchOS %s
-// RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=thread -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=TSAN_LINUX %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=thread -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=TSAN_LINUX %s
 
 // RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address,unknown %s 2>&1 | %FileCheck -check-prefix=BADARG %s
 // RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -sanitize=unknown %s 2>&1 | %FileCheck -check-prefix=BADARG %s
 // RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address,thread %s 2>&1 | %FileCheck -check-prefix=INCOMPATIBLESANITIZERS %s
+
+/*
+ * Make sure we don't accidentally add the sanitizer library path when building libraries or modules
+ */
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -emit-library -sanitize=address -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck --implicit-check-not=ASAN_LINUX %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -emit-module -sanitize=address -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck --implicit-check-not=ASAN_LINUX %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -emit-library -sanitize=thread -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck --implicit-check-not=TSAN_LINUX %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -emit-module -sanitize=thread -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck --implicit-check-not=TSAN_LINUX %s
 
 // ASAN: swift
 // ASAN: -sanitize=address
@@ -31,7 +39,7 @@
 // ASAN_tvOS: lib/swift/clang/lib/darwin/libclang_rt.asan_tvos_dynamic.dylib
 // ASAN_watchOS_SIM: lib/swift/clang/lib/darwin/libclang_rt.asan_watchossim_dynamic.dylib
 // ASAN_watchOS: lib/swift/clang/lib/darwin/libclang_rt.asan_watchos_dynamic.dylib
-// ASAN_LINUX: unsupported option '-sanitize=address' for target 'x86_64-unknown-linux-gnu'
+// ASAN_LINUX: lib/swift/clang/lib/linux/libclang_rt.asan-x86_64.a
 
 // ASAN: -rpath @executable_path
 
@@ -46,7 +54,7 @@
 // TSAN_tvOS: unsupported option '-sanitize=thread' for target 'arm64-apple-tvos9.0'
 // TSAN_watchOS_SIM: unsupported option '-sanitize=thread' for target 'i386-apple-watchos2.0'
 // TSAN_watchOS: unsupported option '-sanitize=thread' for target 'armv7k-apple-watchos2.0'
-// TSAN_LINUX: unsupported option '-sanitize=thread' for target 'x86_64-unknown-linux-gnu'
+// TSAN_LINUX: lib/swift/clang/lib/linux/libclang_rt.tsan-x86_64.a
 
 // TSAN: -rpath @executable_path
 

@@ -974,6 +974,15 @@ static void getClangLibraryPathOnDarwin(SmallVectorImpl<char> &libPath,
   llvm::sys::path::append(libPath, "clang", "lib", "darwin");
 }
 
+static void getClangLibraryPathOnLinux(SmallVectorImpl<char> &libPath,
+                                        const ArgList &args,
+                                        const ToolChain &TC) {
+  getRuntimeLibraryPath(libPath, args, TC);
+  // Remove platform name.
+  llvm::sys::path::remove_filename(libPath);
+  llvm::sys::path::append(libPath, "clang", "lib", "linux");
+}
+
 /// Get the runtime library link path for static linking,
 /// which is platform-specific and found relative to the compiler.
 static void getRuntimeStaticLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
@@ -1041,12 +1050,27 @@ getSanitizerRuntimeLibNameForDarwin(StringRef Sanitizer, const llvm::Triple &Tri
       + getDarwinLibraryNameSuffixForTriple(Triple) + "_dynamic.dylib").str();
 }
 
+static std::string
+getSanitizerRuntimeLibNameForLinux(StringRef Sanitizer, const llvm::Triple &Triple) {
+  return (Twine("libclang_rt.") + Sanitizer + "-" +
+                       Triple.getArchName() + ".a").str();
+}
+
 bool toolchains::Darwin::sanitizerRuntimeLibExists(
     const ArgList &args, StringRef sanitizer) const {
   SmallString<128> sanitizerLibPath;
   getClangLibraryPathOnDarwin(sanitizerLibPath, args, *this);
   llvm::sys::path::append(sanitizerLibPath,
       getSanitizerRuntimeLibNameForDarwin(sanitizer, this->getTriple()));
+  return llvm::sys::fs::exists(sanitizerLibPath.str());
+}
+
+bool toolchains::GenericUnix::sanitizerRuntimeLibExists(
+    const ArgList &args, StringRef sanitizer) const {
+  SmallString<128> sanitizerLibPath;
+  getClangLibraryPathOnLinux(sanitizerLibPath, args, *this);
+  llvm::sys::path::append(sanitizerLibPath,
+      getSanitizerRuntimeLibNameForLinux(sanitizer, this->getTriple()));
   return llvm::sys::fs::exists(sanitizerLibPath.str());
 }
 
@@ -1082,6 +1106,20 @@ addLinkRuntimeLibForDarwin(const ArgList &Args, ArgStringList &Arguments,
 }
 
 static void
+addLinkRuntimeLibForLinux(const ArgList &Args, ArgStringList &Arguments,
+                           StringRef LinuxLibName,
+                           const ToolChain &TC) {
+  SmallString<128> Dir;
+  getRuntimeLibraryPath(Dir, Args, TC);
+  // Remove platform name.
+  llvm::sys::path::remove_filename(Dir);
+  llvm::sys::path::append(Dir, "clang", "lib", "linux");
+  SmallString<128> P(Dir);
+  llvm::sys::path::append(P, LinuxLibName);
+  Arguments.push_back(Args.MakeArgString(P));
+}
+
+static void
 addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
                                  ArgStringList &Arguments,
                                  StringRef Sanitizer, const ToolChain &TC) {
@@ -1094,6 +1132,28 @@ addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
   addLinkRuntimeLibForDarwin(Args, Arguments,
       getSanitizerRuntimeLibNameForDarwin(Sanitizer, TC.getTriple()),
       /*AddRPath=*/ true, TC);
+}
+
+static void
+addLinkSanitizerLibArgsForLinux(const ArgList &Args,
+                                 ArgStringList &Arguments,
+                                 StringRef Sanitizer, const ToolChain &TC) {
+
+     addLinkRuntimeLibForLinux(Args, Arguments,
+         getSanitizerRuntimeLibNameForLinux(Sanitizer, TC.getTriple()), TC);
+
+	//Code here from https://github.com/apple/swift-clang/blob/ab3cbe7/lib/Driver/Tools.cpp#L3264-L3276
+    // There's no libpthread or librt on RTEMS.
+    if (TC.getTriple().getOS() != llvm::Triple::RTEMS) {
+      Arguments.push_back("-lpthread");
+      Arguments.push_back("-lrt");
+    }
+    Arguments.push_back("-lm");
+    // There's no libdl on FreeBSD or RTEMS.
+    if (TC.getTriple().getOS() != llvm::Triple::FreeBSD &&
+        TC.getTriple().getOS() != llvm::Triple::RTEMS)
+      Arguments.push_back("-ldl");
+	
 }
 
 ToolChain::InvocationInfo
@@ -1582,10 +1642,20 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath));
     Arguments.push_back("-lswiftCore");
   }
-
-
+  
   // Explicitly pass the target to the linker
   Arguments.push_back(context.Args.MakeArgString("--target=" + getTriple().str()));
+
+  if (getTriple().getOS() == llvm::Triple::Linux) {
+    //Make sure we only add SanitizerLibs for executables
+    if (job.getKind() == LinkKind::Executable) {
+      if (context.OI.SelectedSanitizer == SanitizerKind::Address) 
+        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "asan", *this);
+
+      if (context.OI.SelectedSanitizer == SanitizerKind::Thread) 
+        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
+    }
+  }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
     SmallString<128> LibProfile(SharedRuntimeLibPath);

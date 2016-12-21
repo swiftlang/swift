@@ -143,8 +143,7 @@ SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
     return kind;
 
   // Check if the target is supported for this sanitizer.
-  // None of the sanitizers work on Linux right now.
-  if (!Triple.isOSDarwin()) {
+  if (!(Triple.isOSDarwin() || Triple.isOSLinux())) {
     SmallString<128> b;
     Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
       (A->getOption().getPrefixedName() + toStringRef(kind)).toStringRef(b),
