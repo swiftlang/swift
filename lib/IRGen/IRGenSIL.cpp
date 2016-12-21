@@ -529,9 +529,6 @@ public:
     return getLoweredValue(v).getStackAddress();
   }
 
-  Address getLoweredContainerOfAddress(SILValue v) {
-    return getLoweredValue(v).getContainerOfAddress();
-  }
   /// Add the unmanaged LLVM values lowered from a SIL value to an explosion.
   void getLoweredExplosion(SILValue v, Explosion &e) {
     getLoweredValue(v).getExplosion(*this, e);
