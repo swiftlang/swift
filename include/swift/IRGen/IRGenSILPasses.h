@@ -1,4 +1,4 @@
-//===--- IRGenSILPasses.cpp - The IRGen Prepare SIL Passes ----------------===//
+//===--- IRGenSILPasses.h - The IRGen Prepare SIL Passes --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -160,7 +160,7 @@ namespace {
 /// Compute liveness for the partition to allow for an interference check
 /// between two alloc_stack instructions.
 ///
-/// For now now liveness is computed and  this just performs a simple check
+/// For now liveness is computed and this just performs a simple check
 /// whether two regions of alloc_stack instructions might overlap.
 class Liveness {
 public:
@@ -290,7 +290,7 @@ void MergeStackSlots::mergeSlots() {
         }
         // No interference add the current alloc_stack to the candidate
         // partition.
-        if (InterferesWithCandidateP == false) {
+        if (!InterferesWithCandidateP) {
           CandidateP.Elts.push_back(CurAllocStack);
           FoundAPartition = true;
           break;
@@ -298,7 +298,7 @@ void MergeStackSlots::mergeSlots() {
         // Otherwise, we look at the next partition.
       }
       // If not partition was found add a new one.
-      if (FoundAPartition == false) {
+      if (!FoundAPartition) {
         DisjointPartitions.push_back(Partition(CurAllocStack));
       }
     }
