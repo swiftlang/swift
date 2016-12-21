@@ -4110,8 +4110,6 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "set_downcast";
   case CheckedCastKind::BridgingCast:
     return "bridging_cast";
-  case CheckedCastKind::BridgeFromObjectiveC:
-    return "bridge_from_objc";
   }
   llvm_unreachable("bad checked cast name");
 }

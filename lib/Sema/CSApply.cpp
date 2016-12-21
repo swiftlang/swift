@@ -2981,7 +2981,6 @@ namespace {
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::BridgeFromObjectiveC:
         // Valid checks.
         expr->setCastKind(castKind);
         break;
@@ -3318,7 +3317,6 @@ namespace {
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::ValueCast:
-      case CheckedCastKind::BridgeFromObjectiveC:
         expr->setCastKind(castKind);
         break;
       }
@@ -3388,7 +3386,6 @@ namespace {
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::ValueCast:
-      case CheckedCastKind::BridgeFromObjectiveC:
         expr->setCastKind(castKind);
         break;
       }
@@ -6930,7 +6927,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::ValueCast:
-      case CheckedCastKind::BridgeFromObjectiveC:
         TC.diagnose(coerceExpr->getLoc(), diag::missing_forced_downcast,
                     fromType, toType)
           .highlight(coerceExpr->getSourceRange())

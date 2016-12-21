@@ -1319,7 +1319,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                subOptions|TR_FromNonInferredPattern);
 
     case CheckedCastKind::ValueCast:
-    case CheckedCastKind::BridgeFromObjectiveC:
       IP->setCastKind(castKind);
       break;
     }

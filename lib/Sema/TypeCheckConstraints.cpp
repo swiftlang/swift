@@ -2923,7 +2923,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         return CheckedCastKind::BridgingCast;
 
       case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::BridgeFromObjectiveC:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::ValueCast:
@@ -2952,7 +2951,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         break;
 
       case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::BridgeFromObjectiveC:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::ValueCast:
@@ -2975,7 +2973,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         break;
 
       case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::BridgeFromObjectiveC:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::ValueCast:
@@ -3005,7 +3002,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         return CheckedCastKind::BridgingCast;
 
       case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::BridgeFromObjectiveC:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::ValueCast:
@@ -3021,14 +3017,14 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (Type bridgedToClass = getDynamicBridgedThroughObjCClass(dc, fromType,
                                                               toType)) {
     if (isSubtypeOf(bridgedToClass, fromType, dc))
-      return CheckedCastKind::BridgeFromObjectiveC;
+      return CheckedCastKind::ValueCast;
   }
 
   // If we can bridge through an Objective-C class, do so.
   if (Type bridgedFromClass = getDynamicBridgedThroughObjCClass(dc, toType,
                                                                 fromType)) {
     if (isSubtypeOf(toType, bridgedFromClass, dc))
-      return CheckedCastKind::BridgeFromObjectiveC;
+      return CheckedCastKind::ValueCast;
   }
 
   // Strip metatypes. If we can cast two types, we can cast their metatypes.

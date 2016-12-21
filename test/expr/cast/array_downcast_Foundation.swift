@@ -37,7 +37,7 @@ func testDowncastNSArrayToArray(nsarray: NSArray) {
 func testDowncastOptionalObject(obj: AnyObject?!) -> [String]? {
   // CHECK: (optional_evaluation_expr implicit type='[String]?'
   // CHECK-NEXT: (inject_into_optional implicit type='[String]?'
-  // CHECK: (forced_checked_cast_expr type='[String]'{{.*bridge_from_objc}}
+  // CHECK: (forced_checked_cast_expr type='[String]'{{.*value_cast}}
   // CHECK: (bind_optional_expr implicit type='AnyObject'
   // CHECK-NEXT: (force_value_expr implicit type='AnyObject?'
   // CHECK-NEXT: (declref_expr type='AnyObject?!' 
@@ -51,7 +51,7 @@ func testDowncastOptionalObjectConditional(obj: AnyObject?!) -> [String]?? {
   // CHECK-NEXT: (optional_evaluation_expr implicit type='[String]?'
   // CHECK-NEXT: (inject_into_optional implicit type='[String]?'
   // CHECK-NEXT: (bind_optional_expr implicit type='[String]'
-  // CHECK-NEXT: (conditional_checked_cast_expr type='[String]?' {{.*bridge_from_objc}} writtenType='[String]?'
+  // CHECK-NEXT: (conditional_checked_cast_expr type='[String]?' {{.*value_cast}} writtenType='[String]?'
   // CHECK-NEXT: (bind_optional_expr implicit type='AnyObject'
   // CHECK-NEXT: (bind_optional_expr implicit type='AnyObject?'
   // CHECK-NEXT: (declref_expr type='AnyObject?!'

@@ -2380,12 +2380,6 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
     return CheckedCastKind::SetDowncast;
   }
 
-  // If we can bridge through an Objective-C class, do so.
-  auto &tc = cs->getTypeChecker();
-  if (tc.getDynamicBridgedThroughObjCClass(cs->DC, fromType, toType)) {
-    return CheckedCastKind::BridgeFromObjectiveC;
-  }
-
   return CheckedCastKind::ValueCast;
 }
 
@@ -2504,21 +2498,6 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                     getConstraintLocator(locator));
     }
       
-    return SolutionKind::Solved;
-  }
-
-  case CheckedCastKind::BridgeFromObjectiveC: {
-    // This existential-to-concrete cast might bridge through an Objective-C
-    // class type.
-    Type objCClass = TC.getDynamicBridgedThroughObjCClass(DC,
-                                                          fromType,
-                                                          toType);
-    assert(objCClass && "Type must be bridged");
-    (void)objCClass;
-    // Otherwise no constraint is necessary; as long as both objCClass and
-    // fromType are Objective-C types, they can't have any open type variables,
-    // and conversion between unrelated classes will be diagnosed in
-    // typeCheckCheckedCast.
     return SolutionKind::Solved;
   }
 
