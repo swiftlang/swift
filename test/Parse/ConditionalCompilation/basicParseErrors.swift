@@ -81,5 +81,5 @@ func fn_j() {}
 #endif
 fn_j() // OK
 
-#if foo || bar || nonExistant() // expected-error {{expected only one argument to platform condition}}
+#if foo || bar || nonExistent() // expected-error {{expected only one argument to platform condition}}
 #endif
