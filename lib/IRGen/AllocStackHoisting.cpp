@@ -79,7 +79,7 @@ public:
   Partition() {}
 
   /// Assign a single alloc_stack instruction to all the alloc_stacks in the
-  /// partiion.
+  /// partition.
   ///
   /// This assumes that the live ranges of the alloc_stack instructions are
   /// non-overlapping.
@@ -111,7 +111,7 @@ insertDeallocStackAtEndOf(SmallVectorImpl<SILInstruction *> &FunctionExits,
 }
 
 /// Assign a single alloc_stack instruction to all the alloc_stacks in the
-/// partiion.
+/// partition.
 void Partition::assignStackLocation(
     SmallVectorImpl<SILInstruction *> &FunctionExits) {
   assert(!Elts.empty() && "Must have a least one location");
@@ -262,14 +262,14 @@ void MergeStackSlots::mergeSlots() {
   for (auto &PartitionOfOneType : PartitionByType) {
     Liveness Live(PartitionOfOneType);
 
-    // Paritions that are know to contain non-overlapping alloc_stack
+    // Partitions that are know to contain non-overlapping alloc_stack
     // live-ranges.
     SmallVector<Partition, 4> DisjointPartitions(1, Partition());
 
     // Look at all the alloc_stacks of one type.
     for (auto *CurAllocStack : PartitionOfOneType.Elts) {
       bool FoundAPartition = false;
-      // Check if we can add it to an existing parition that we have show to be
+      // Check if we can add it to an existing partition that we have show to be
       // non-interfering.
       for (auto &CandidateP : DisjointPartitions) {
         // If the candidate partition is empty (the very first time we look at an
@@ -282,8 +282,8 @@ void MergeStackSlots::mergeSlots() {
         // Otherwise, we check interference of the current alloc_stack with the
         // candidate partition.
         bool InterferesWithCandidateP = false;
-        for (auto *AllocStackInParition : CandidateP.Elts) {
-          if (Live.mayOverlap(AllocStackInParition, CurAllocStack)) {
+        for (auto *AllocStackInPartition : CandidateP.Elts) {
+          if (Live.mayOverlap(AllocStackInPartition, CurAllocStack)) {
             InterferesWithCandidateP = true;
             break;
           }
