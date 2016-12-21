@@ -1,4 +1,4 @@
-//===---------IRGenPublic.h - Public interface to IRGen ---------*- C++ -*-===//
+//===--- IRGenPublic.h - Public interface to IRGen --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
