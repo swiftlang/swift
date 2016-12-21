@@ -1473,12 +1473,16 @@ static void emitDirectExternalArgument(IRGenFunction &IGF,
   }
 
   // Otherwise, we need to coerce through memory.
+  Address temporary;
+  Size tempSize;
+  std::tie(temporary, tempSize) =
+      allocateForCoercion(IGF, argTI.getStorageType(), toTy, "coerced-arg");
+  IGF.Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Store to a temporary.
-  Address temporary = argTI.allocateStack(IGF, argType,
-                                          false,
-                                          "coerced-arg").getAddress();
-  argTI.initializeFromParams(IGF, in, temporary, argType);
+  Address tempOfArgTy = IGF.Builder.CreateBitCast(
+      temporary, argTI.getStorageType()->getPointerTo());
+  argTI.initializeFromParams(IGF, in, tempOfArgTy, argType);
 
   // Bitcast the temporary to the expected type.
   Address coercedAddr =
@@ -1498,7 +1502,7 @@ static void emitDirectExternalArgument(IRGenFunction &IGF,
     out.add(IGF.Builder.CreateLoad(coercedAddr));
   }
 
-  argTI.deallocateStack(IGF, StackAddress(temporary), argType);
+  IGF.Builder.CreateLifetimeEnd(temporary, tempSize);
 }
 
 namespace {
