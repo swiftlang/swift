@@ -281,7 +281,7 @@ public:
 
 private:
   /// The Swift lookup table for the bridging header.
-  SwiftLookupTable BridgingHeaderLookupTable;
+  std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
 
   /// The Swift lookup tables, per module.
   ///
