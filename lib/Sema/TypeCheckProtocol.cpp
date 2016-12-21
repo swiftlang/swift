@@ -79,12 +79,6 @@ namespace {
                            ValueDecl *req,
                            ProtocolConformance *conformance);
 
-    /// Retrieve the generic signature of the synthetic environment.
-    GenericSignature *getSyntheticSignature() const {
-      assert(valid && "Already stole from this generic environment");
-      return syntheticSignature;
-    }
-
     /// Retrieve the synthetic generic environment.
     GenericEnvironment *getSyntheticEnvironment() const {
       assert(valid && "Already stole from this generic environment");
