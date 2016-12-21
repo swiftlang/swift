@@ -3114,7 +3114,7 @@ namespace {
     /// The importer should use this rather than adding the attribute directly.
     void addObjCAttribute(ValueDecl *decl, Optional<ObjCSelector> name) {
       auto &ctx = Impl.SwiftContext;
-      decl->getAttrs().add(ObjCAttr::create(ctx, name, /*implicit=*/true));
+      decl->getAttrs().add(ObjCAttr::create(ctx, name, /*implicitName=*/true));
 
       // If the declaration we attached the 'objc' attribute to is within a
       // class, record it in the class.

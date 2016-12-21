@@ -710,7 +710,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
 }
 
 Type TypeBase::getUnlabeledType(ASTContext &Context) {
-  return getStrippedType(Context, Type(this), /*labels=*/true);
+  return getStrippedType(Context, Type(this), /*stripLabels=*/true);
 }
 
 Type TypeBase::getWithoutParens() {

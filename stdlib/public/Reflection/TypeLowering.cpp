@@ -890,7 +890,7 @@ public:
     // NoPayloadEnumImplStrategy
     if (PayloadCases.empty()) {
       Kind = RecordKind::NoPayloadEnum;
-      Size += getNumTagBytes(/*payloadSize=*/0,
+      Size += getNumTagBytes(/*size=*/0,
                              NoPayloadCases,
                              /*payloadCases=*/0);
 

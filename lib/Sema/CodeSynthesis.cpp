@@ -565,7 +565,7 @@ static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
   DC->lookupQualified(ModuleType::get(foundation),
                       ctx.getSwiftId(KnownFoundationEntity::NSCopying),
                       NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                      /*resolver=*/nullptr,
+                      /*typeResolver=*/nullptr,
                       results);
 
   if (results.size() != 1)

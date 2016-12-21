@@ -514,7 +514,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         if (protocol != P)
           continue;
 
-        if (!isRelatedType(type, metadata, /*isMetadata=*/true))
+        if (!isRelatedType(type, metadata, /*candidateIsMetadata=*/true))
           continue;
 
         // Store the type-protocol pair in the cache.
@@ -538,7 +538,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         if (protocol != P)
           continue;
 
-        if (!isRelatedType(type, R, /*isMetadata=*/false))
+        if (!isRelatedType(type, R, /*candidateIsMetadata=*/false))
           continue;
 
         // Store the type-protocol pair in the cache.

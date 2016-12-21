@@ -4063,7 +4063,7 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
       if (isDerivedTopLevel) {
         topLevelDecls[memberValue->getName()].push_back({
           /*ignored*/0,
-          S.addDeclRef(memberValue, /*force=*/true)
+          S.addDeclRef(memberValue, /*forceSerialization=*/true)
         });
       } else if (memberValue->isOperator()) {
         // Add operator methods.
@@ -4296,11 +4296,11 @@ withOutputFile(ASTContext &ctx, StringRef outputPath,
       Clang.createOutputFile(outputPath, EC,
                              /*Binary=*/true,
                              /*RemoveFileOnSignal=*/true,
-                             /*inputPath=*/"",
+                             /*BaseInput=*/"",
                              path::extension(outputPath),
                              /*UseTemporary=*/true,
-                             /*createDirs=*/false,
-                             /*finalPath=*/nullptr,
+                             /*CreateMissingDirectories=*/false,
+                             /*ResultPathName=*/nullptr,
                              &tmpFilePath);
 
     if (!out) {

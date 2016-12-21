@@ -2035,7 +2035,7 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
   SwiftRootClass->computeType();
   SwiftRootClass->setIsObjC(true);
   SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
-                                                         /*implicit=*/true));
+    /*isNameImplicit=*/true));
   SwiftRootClass->setImplicit();
   SwiftRootClass->setAccessibility(Accessibility::Open);
   

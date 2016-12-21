@@ -404,7 +404,7 @@ getProtocolRequirementDocComment(swift::markup::MarkupContext &MC,
       SmallVector<ValueDecl *, 2> Members;
       P->lookupQualified(P->getDeclaredType(), VD->getFullName(),
                          NLOptions::NL_ProtocolMembers,
-                         /*resolver=*/nullptr, Members);
+                         /*typeResolver=*/nullptr, Members);
     SmallVector<const ValueDecl *, 1> ProtocolRequirements;
     for (auto Member : Members)
       if (!Member->isDefinition())
