@@ -248,3 +248,9 @@ enum SR2057 {
 let sr2057: SR2057?
 if case .foo = sr2057 { } // expected-error{{enum case 'foo' not found in type 'SR2057?'}}
 
+
+// Invalid 'is' pattern
+class SomeClass {}
+if case let doesNotExist as SomeClass:AlsoDoesNotExist {}
+// expected-error@-1 {{use of undeclared type 'AlsoDoesNotExist'}}
+// expected-error@-2 {{variable binding in a condition requires an initializer}}

@@ -796,15 +796,12 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 }
 
 bool ExtensionDecl::isConstrainedExtension() const {
-  auto nominal = getExtendedType()->getAnyNominal();
-
-  // Error case: erroneous extension.
-  if (!nominal)
-    return false;
-
   // Non-generic extension.
   if (!getGenericSignature())
     return false;
+
+  auto nominal = getExtendedType()->getAnyNominal();
+  assert(nominal);
 
   // If the generic signature differs from that of the nominal type, it's a
   // constrained extension.

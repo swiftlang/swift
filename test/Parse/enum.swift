@@ -144,7 +144,7 @@ enum RawTypeNotFirst : RawTypeNotFirstProtocol, Int { // expected-error {{raw ty
 }
 
 enum ExpressibleByRawTypeNotLiteral : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by any literal}}
-  // expected-error@-1{{'ExpressibleByRawTypeNotLiteral' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}}
+  // expected-error@-1{{'ExpressibleByRawTypeNotLiteral' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error@-1 {{RawRepresentable conformance cannot be synthesized because raw type 'Array<Int>' is not Equatable}}
   case Ladd, Elliott, Sixteenth, Harrison
 }
 
@@ -167,7 +167,7 @@ enum RawTypeCircularityB : RawTypeCircularityA, ExpressibleByIntegerLiteral { //
 struct ExpressibleByFloatLiteralOnly : ExpressibleByFloatLiteral {
     init(floatLiteral: Double) {}
 }
-enum ExpressibleByRawTypeNotIntegerLiteral : ExpressibleByFloatLiteralOnly { // expected-error {{'ExpressibleByRawTypeNotIntegerLiteral' declares raw type 'ExpressibleByFloatLiteralOnly', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error {{RawRepresentable 'init' cannot be synthesized because raw type 'ExpressibleByFloatLiteralOnly' is not Equatable}}
+enum ExpressibleByRawTypeNotIntegerLiteral : ExpressibleByFloatLiteralOnly { // expected-error {{'ExpressibleByRawTypeNotIntegerLiteral' declares raw type 'ExpressibleByFloatLiteralOnly', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error {{RawRepresentable conformance cannot be synthesized because raw type 'ExpressibleByFloatLiteralOnly' is not Equatable}}
   case Everett // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Flanders
 }

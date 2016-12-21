@@ -6895,11 +6895,12 @@ Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
 Expr *Solution::coerceToType(Expr *expr, Type toType,
                              ConstraintLocator *locator,
                              bool ignoreTopLevelInjection,
+                             bool skipClosures,
                              Optional<Pattern*> typeFromPattern) const {
   auto &cs = getConstraintSystem();
   ExprRewriter rewriter(cs, *this,
                         /*suppressDiagnostics=*/false,
-                        /*skipClosures=*/false);
+                        /*skipClosures=*/skipClosures);
   Expr *result = rewriter.coerceToType(expr, toType, locator, typeFromPattern);
   if (!result)
     return nullptr;

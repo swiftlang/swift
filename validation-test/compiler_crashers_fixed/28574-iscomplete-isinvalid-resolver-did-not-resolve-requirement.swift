@@ -5,7 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
+// RUN: not %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-class A{let:e=0
-enum e:A
+class d:A{var f{{_=A{}}}}protocol A{protocol A

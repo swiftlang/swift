@@ -808,6 +808,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    relookupOptions |= NameLookupFlags::OnlyTypes;
     LookupResult inaccessibleResults =
         tc.lookupUnqualified(lookupDC, comp->getIdentifier(), comp->getIdLoc(),
                              relookupOptions);
@@ -899,10 +900,12 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     auto lazyResolver = tc.Context.getLazyResolver();
     if (auto superClass = parentType->getSuperclass(lazyResolver)) {
       if (superClass->isEqual(parentType)) {
-        auto decl = parentType->castTo<NominalType>()->getDecl();
-        tc.diagnose(decl->getLoc(), diag::circular_class_inheritance,
-                    decl->getNameStr());
-        return ErrorType::get(tc.Context);
+        auto decl = parentType->getAnyNominal();
+        if (decl) {
+          tc.diagnose(decl->getLoc(), diag::circular_class_inheritance,
+                      decl->getNameStr());
+          return ErrorType::get(tc.Context);
+        }
       }
     }
 
@@ -2978,16 +2981,6 @@ Type TypeChecker::getSuperClassOf(Type type) {
   return type->getSuperclass(this);
 }
 
-Type TypeChecker::resolveMemberType(DeclContext *dc, Type type,
-                                    Identifier name) {
-  LookupTypeResult memberTypes = lookupMemberType(dc, type, name);
-  if (!memberTypes)
-    return Type();
-
-  // FIXME: Detect ambiguities here?
-  return memberTypes.back().second;
-}
-
 static void lookupAndAddLibraryTypes(TypeChecker &TC,
                                      Module *Stdlib,
                                      ArrayRef<Identifier> TypeNames,
@@ -3253,9 +3246,9 @@ bool TypeChecker::isRepresentableInObjC(
     return false;
 
   if (AFD->isOperator()) {
-    assert(isa<ProtocolDecl>(AFD->getDeclContext()) &&
-           "all other cases should be caught earlier");
-    diagnose(AFD, diag::objc_operator_proto);
+    diagnose(AFD, (isa<ProtocolDecl>(AFD->getDeclContext())
+                   ? diag::objc_operator_proto
+                   : diag::objc_operator));
     return false;
   }
 
@@ -3331,7 +3324,8 @@ bool TypeChecker::isRepresentableInObjC(
 
   if (auto FD = dyn_cast<FuncDecl>(AFD)) {
     Type ResultType = FD->getResultInterfaceType();
-    if (!ResultType->isVoid() &&
+    if (!ResultType->hasError() &&
+        !ResultType->isVoid() &&
         !ResultType->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                        const_cast<FuncDecl *>(FD))) {
       if (Diagnose) {

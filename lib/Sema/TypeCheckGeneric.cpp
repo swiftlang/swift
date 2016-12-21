@@ -655,6 +655,7 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
         // Produce an error that this generic parameter cannot be bound.
         diagnose(paramDecl->getLoc(), diag::unreferenced_generic_parameter,
                  paramDecl->getNameStr());
+        func->setInterfaceType(ErrorType::get(Context));
         func->setInvalid();
       }
     }

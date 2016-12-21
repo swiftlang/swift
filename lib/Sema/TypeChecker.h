@@ -1000,6 +1000,9 @@ public:
   /// Introduce the accessors for a 'lazy' variable.
   void introduceLazyVarAccessors(VarDecl *var) override;
 
+  // Not all protocol members are requirements.
+  bool isRequirement(ValueDecl *requirement);
+
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
@@ -1417,8 +1420,10 @@ public:
 
   
   /// Type-check an initialized variable pattern declaration.
-  bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
-  bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
+  bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC,
+                        bool skipClosures);
+  bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
+                               bool skipClosures);
 
   /// Type-check a for-each loop's pattern binding and sequence together.
   bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
@@ -1813,9 +1818,6 @@ public:
   ProtocolConformance *resolveInheritedConformance(
                          const NormalProtocolConformance *conformance,
                          ProtocolDecl *inherited) override;
-
-  Type resolveMemberType(DeclContext *dc, Type type,
-                         Identifier name) override;
 
   bool isCIntegerType(const DeclContext *DC, Type T);
   bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,

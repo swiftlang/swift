@@ -150,7 +150,7 @@ namespace {
         }
 
         // Dig out the witness.
-        ValueDecl *witness;
+        ValueDecl *witness = nullptr;
         auto concrete = conformance->getConcrete();
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
           // If we're validating the protocol recursively, bail out.
@@ -159,14 +159,7 @@ namespace {
 
           witness = concrete->getTypeWitnessSubstAndDecl(assocType, &TC)
             .second;
-        } else if (isa<TypeAliasDecl>(found)) {
-          // No witness for typealiases. This means typealiases in
-          // protocols cannot be found if PerformConformanceCheck
-          // is on.
-          //
-          // FIXME: Fix this.
-          return;
-        } else {
+        } else if (TC.isRequirement(found)) {
           witness = concrete->getWitness(found, &TC).getDecl();
         }
 
@@ -298,17 +291,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
                                                NameLookupOptions options) {
   LookupTypeResult result;
 
-  // Look through an inout type.
-  if (auto inout = type->getAs<InOutType>())
-    type = inout->getObjectType();
+  // Structural types do not have member types.
+  if (!type->is<ArchetypeType>() &&
+      !type->isExistentialType() &&
+      !type->getAnyNominal() &&
+      !type->is<ModuleType>())
+    return result;
 
-  // Look through the metatype.
-  if (auto metaT = type->getAs<AnyMetatypeType>())
-    type = metaT->getInstanceType();
-  
-  // Callers must cope with dependent types directly.  
-  assert(!type->isTypeParameter());
-         
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
   NLOptions subOptions = NL_QualifiedDefault | NL_OnlyTypes;

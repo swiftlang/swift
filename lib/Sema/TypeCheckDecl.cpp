@@ -1059,9 +1059,14 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 
   // If the pattern didn't get a type or if it contains an unbound generic type,
   // we'll need to check the initializer.
-  if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType())
-    if (tc.typeCheckPatternBinding(binding, entryNumber))
+  if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
+    bool skipClosures = false;
+    if (auto var = binding->getSingleVar())
+      skipClosures = var->getAttrs().hasAttribute<LazyAttr>();
+
+    if (tc.typeCheckPatternBinding(binding, entryNumber, skipClosures))
       return;
+  }
 
   // If the pattern binding appears in a type or library file context, then
   // it must bind at least one variable.
@@ -3694,7 +3699,7 @@ public:
     if (!IsFirstPass) {
       for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
         if (!PBD->isInitializerChecked(i) && PBD->getInit(i))
-          TC.typeCheckPatternBinding(PBD, i);
+          TC.typeCheckPatternBinding(PBD, i, /*skipClosures*/false);
       }
     }
 
@@ -3725,7 +3730,7 @@ public:
             // If we got a default initializer, install it and re-type-check it
             // to make sure it is properly coerced to the pattern type.
             PBD->setInit(i, defaultInit);
-            TC.typeCheckPatternBinding(PBD, i);
+            TC.typeCheckPatternBinding(PBD, i, /*skipClosures*/false);
           }
         }
       }
@@ -8046,8 +8051,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     } else if (auto *func = dyn_cast<FuncDecl>(D)) {
       if (!checkObjCDeclContext(D))
         error = diag::invalid_objc_decl_context;
-      else if (func->isOperator())
-        error = diag::objc_operator;
       else if (func->isAccessor() && !func->isGetterOrSetter())
         error = diag::objc_observing_accessor;
     } else if (isa<ConstructorDecl>(D) ||

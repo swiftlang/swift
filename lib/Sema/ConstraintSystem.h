@@ -566,6 +566,9 @@ public:
   /// on a suspicious top-level optional injection (because the caller already
   /// diagnosed it).
   ///
+  /// \param skipClosures Whether to skip bodies of non-single expression
+  /// closures.
+  ///
   /// \param typeFromPattern Optionally, the caller can specify the pattern
   /// from where the toType is derived, so that we can deliver better fixit.
   ///
@@ -573,6 +576,7 @@ public:
   Expr *coerceToType(Expr *expr, Type toType,
                      ConstraintLocator *locator,
                      bool ignoreTopLevelInjection = false,
+                     bool skipClosures = false,
                      Optional<Pattern*> typeFromPattern = None) const;
 
   /// \brief Convert the given expression to a logic value.

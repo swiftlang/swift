@@ -667,7 +667,7 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
 }
 
 void DeclContext::dumpContext() const {
-  printContext(llvm::outs());
+  printContext(llvm::errs());
 }
 
 template <typename DCType>
@@ -728,7 +728,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   case DeclContextKind::AbstractFunctionDecl:
     Kind = "AbstractFunctionDecl";
     break;
-    case DeclContextKind::SubscriptDecl:  Kind = "SubscriptDecl"; break;
+  case DeclContextKind::SubscriptDecl:    Kind = "SubscriptDecl"; break;
   }
   OS.indent(Depth*2 + indent) << "0x" << (void*)this << " " << Kind;
 
