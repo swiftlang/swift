@@ -577,7 +577,7 @@ public:
     return FunctionAsEscapingArg[decl];
   }
 
-  /// Record an occurrence of  a function that captures inout values as a return
+  /// Record an occurrence of a function that captures inout values as a return
   /// value
   ///
   /// \param decl the function that occurs as a return value.

@@ -1061,7 +1061,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
       return false;
     }
 
-    // This is a scalar-to-tuple conversion. Add the  name.  We "know"
+    // This is a scalar-to-tuple conversion. Add the name. We "know"
     // that we're inside a ParenExpr, because ParenExprs are required
     // by the syntax and locator resolution looks through on level of
     // them.
