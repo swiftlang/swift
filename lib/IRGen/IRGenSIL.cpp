@@ -267,6 +267,13 @@ public:
     assert(containedAddress.getContainer().isValid() && "address has no container");
     return containedAddress.getContainer();
   }
+
+  Address getAddressInContainer() const {
+    assert(kind == Kind::ContainedAddress);
+    assert(containedAddress.getContainer().isValid() &&
+           "address has no container");
+    return containedAddress.getAddress();
+  }
   
   void getExplosion(IRGenFunction &IGF, Explosion &ex) const;
   
@@ -512,7 +519,10 @@ public:
   /// Get the Address of a SIL value of address type, which must have been
   /// lowered.
   Address getLoweredAddress(SILValue v) {
-    return getLoweredValue(v).getAddress();
+    if (getLoweredValue(v).kind == LoweredValue::Kind::Address)
+      return getLoweredValue(v).getAddress();
+    else
+      return getLoweredValue(v).getAddressInContainer();
   }
 
   StackAddress getLoweredStackAddress(SILValue v) {
