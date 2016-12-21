@@ -121,25 +121,14 @@ protected:
 
   template <class T>
   bool doTypeCheck(ASTContext &Ctx, DeclContext *DC, Added<T *> &parsedExpr) {
-    DiagnosticEngine diags(Ctx.SourceMgr);
-    ErrorGatherer errorGatherer(diags);
-
-    TypeChecker TC(Ctx, diags);
-
     Expr *E = *parsedExpr;
-    TC.typeCheckExpression(E, DC);
+    bool result = doTypeCheckImpl(Ctx, DC, E);
     parsedExpr = Added<T *>(dyn_cast<T>(E));
-
-    if (*parsedExpr) {
-      ErrorFinder errorFinder;
-      parsedExpr->walk(errorFinder);
-      if (!errorFinder.hadError() && !errorGatherer.hadError()) {
-        return true;
-      }
-    }
-
-    return false;
+    return result;
   }
+  
+private:
+  bool doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC, Expr * &parsedExpr);
 };
 }
 }

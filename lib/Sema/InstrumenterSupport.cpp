@@ -21,3 +21,23 @@ using namespace swift;
 using namespace swift::instrumenter_support;
 
 void InstrumenterBase::anchor() {}
+
+bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
+                                       Expr * &parsedExpr) {
+  DiagnosticEngine diags(Ctx.SourceMgr);
+  ErrorGatherer errorGatherer(diags);
+
+  TypeChecker TC(Ctx, diags);
+
+  TC.typeCheckExpression(parsedExpr, DC);
+
+  if (parsedExpr) {
+    ErrorFinder errorFinder;
+    parsedExpr->walk(errorFinder);
+    if (!errorFinder.hadError() && !errorGatherer.hadError()) {
+      return true;
+    }
+  }
+
+  return false;
+}
