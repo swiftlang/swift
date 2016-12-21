@@ -1719,7 +1719,7 @@ namespace {
       
       if (!MaxIntegerTypeDecl) {
         SmallVector<ValueDecl *, 1> lookupResults;
-        tc.getStdlibModule(dc)->lookupValue(/*filter=*/{},
+        tc.getStdlibModule(dc)->lookupValue(/*AccessPath=*/{},
                                             tc.Context.Id_MaxBuiltinIntegerType,
                                             NLKind::QualifiedLookup,
                                             lookupResults);
@@ -1814,7 +1814,7 @@ namespace {
       // FIXME: Cache name lookup.
       if (!MaxFloatTypeDecl) {
         SmallVector<ValueDecl *, 1> lookupResults;
-        tc.getStdlibModule(dc)->lookupValue(/*filter=*/{},
+        tc.getStdlibModule(dc)->lookupValue(/*AccessPath=*/{},
                                             tc.Context.Id_MaxBuiltinFloatType,
                                             NLKind::QualifiedLookup,
                                             lookupResults);

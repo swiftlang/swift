@@ -462,9 +462,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     if (Name.isOperator()) {
       if (!isCascadingUse.hasValue()) {
         DeclContext *innermostDC =
-            lookupScope->getInnermostEnclosingDeclContext();
+          lookupScope->getInnermostEnclosingDeclContext();
         isCascadingUse =
-          innermostDC->isCascadingContextForLookup(/*excludeFunctions=*/true);
+          innermostDC->isCascadingContextForLookup(
+            /*functionsAreNonCascading=*/true);
       }
 
       lookupScope = &sourceFile.getScope();
@@ -502,7 +503,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // If we haven't determined whether we have a cascading use, do so now.
         if (!isCascadingUse.hasValue()) {
           isCascadingUse =
-            dc->isCascadingContextForLookup(/*excludeFunctions=*/false);
+            dc->isCascadingContextForLookup(/*functionsAreNonCascading=*/false);
         }
 
         // Pattern binding initializers are only interesting insofar as they
@@ -662,7 +663,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     if (Name.isOperator()) {
       if (!isCascadingUse.hasValue()) {
         isCascadingUse =
-          DC->isCascadingContextForLookup(/*excludeFunctions=*/true);
+          DC->isCascadingContextForLookup(/*functionsAreNonCascading=*/true);
       }
       DC = DC->getModuleScopeContext();
 
@@ -1342,7 +1343,7 @@ bool DeclContext::lookupQualified(Type type,
   auto checkLookupCascading = [this, options]() -> Optional<bool> {
     switch (static_cast<unsigned>(options & NL_KnownDependencyMask)) {
     case 0:
-      return isCascadingContextForLookup(/*excludeFunctions=*/false);
+      return isCascadingContextForLookup(/*functionsAreNonCascading=*/false);
     case NL_KnownNonCascadingDependency:
       return false;
     case NL_KnownCascadingDependency:

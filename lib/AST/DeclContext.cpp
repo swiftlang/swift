@@ -917,7 +917,7 @@ void IterableDeclContext::loadAllMembers() const {
   // Don't try to load all members re-entrant-ly.
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
-                                                            /*loader=*/nullptr);
+    /*lazyLoader=*/nullptr);
   FirstDeclAndLazyMembers.setInt(false);
 
   const Decl *container = nullptr;

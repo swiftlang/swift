@@ -721,7 +721,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     auto openedType = openFunctionType(
             func->getInterfaceType()->castTo<AnyFunctionType>(),
-            /*numRemovedArgumentLabels=*/0,
+            /*numArgumentLabelsToRemove=*/0,
             locator, replacements,
             func->getInnermostDeclContext(),
             func->getDeclContext(),

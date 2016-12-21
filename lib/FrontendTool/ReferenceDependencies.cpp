@@ -99,11 +99,12 @@ static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
 }
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
-  Mangle::Mangler mangler(/*debug style=*/false, /*Unicode=*/true);
+  Mangle::Mangler mangler(/*debug style=*/false, /*usePunycode=*/true);
   mangler.mangleContext(type);
   std::string Old = mangler.finalize();
 
-  NewMangling::ASTMangler NewMangler(/*debug style=*/false, /*Unicode=*/true);
+  NewMangling::ASTMangler NewMangler(/*debug style=*/false,
+                                     /*usePunycode=*/true);
   std::string New = NewMangler.mangleTypeAsContextUSR(type);
 
   return NewMangling::selectMangling(Old, New);
