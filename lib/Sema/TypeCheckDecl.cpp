@@ -1573,7 +1573,7 @@ static void checkTypeAccessibility(
                             DowngradeToWarning)> diagnose) {
   const DeclContext *DC = context->getDeclContext();
   bool isParam = false;
-  if (auto *param = dyn_cast<ParamDecl>(context)) {
+  if (isa<ParamDecl>(context)) {
     isParam = true;
     context = dyn_cast<AbstractFunctionDecl>(DC);
     if (!context)
