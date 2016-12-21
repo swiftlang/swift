@@ -423,7 +423,12 @@ public:
     return ResolvedRangeInfo();
   }
 
-  void analyzeDeclRef(ValueDecl *VD, CharSourceRange Range, Type Ty) {
+  void analyzeDeclRef(ValueDecl *VD, CharSourceRange Range, Type Ty,
+                      SemaReferenceKind Kind) {
+    // Only collect decl ref.
+    if (Kind != SemaReferenceKind::DeclRef)
+      return;
+
     if (!isContainedInSelection(Range))
       return;
 
@@ -509,7 +514,7 @@ bool RangeResolver::walkToDeclPost(Decl *D) {
 bool RangeResolver::
 visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
                    Type T, SemaReferenceKind Kind) {
-  Impl->analyzeDeclRef(D, Range, T);
+  Impl->analyzeDeclRef(D, Range, T, Kind);
   return true;
 }
 

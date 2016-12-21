@@ -39,6 +39,19 @@ func foo4(s: S1) -> Int {
   return c + b
 }
 
+class C1 {
+  func getC() -> C1 { return self }
+  func take(another : C1) -> C1 {return another }
+  let c = C1()
+}
+
+func foo5(c : C1) -> C1 {
+  let a = c.c.getC().c.getC().getC().getC()
+  let b = a.c.c.c.c.getC().getC()
+  let d = a.c.getC().getC().c.c
+  return a.take(another: b).take(another: d)
+}
+
 // RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
 // RUN: %target-swift-ide-test -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
@@ -48,6 +61,9 @@ func foo4(s: S1) -> Int {
 // RUN: %target-swift-ide-test -range -pos=14:1 -end-pos=17:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK7
 // RUN: %target-swift-ide-test -range -pos=31:1 -end-pos=33:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK8
 // RUN: %target-swift-ide-test -range -pos=37:1 -end-pos=39:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK9
+// RUN: %target-swift-ide-test -range -pos=49:1 -end-pos=50:34 -source-filename %s | %FileCheck %s -check-prefix=CHECK10
+// RUN: %target-swift-ide-test -range -pos=49:1 -end-pos=51:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK11
+// RUN: %target-swift-ide-test -range -pos=49:1 -end-pos=52:45 -source-filename %s | %FileCheck %s -check-prefix=CHECK12
 
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
@@ -105,9 +121,7 @@ func foo4(s: S1) -> Int {
 // CHECK8-NEXT: <Type>Int</Type>
 // CHECK8-NEXT: <Declared>c</Declared>
 // CHECK8-NEXT: <Referenced>s</Referenced><Type>@lvalue S1</Type>
-// CHECK8-NEXT: <Referenced>foo</Referenced><Type>(S1) -> () -> Int</Type>
 // CHECK8-NEXT: <Referenced>b</Referenced><Type>Int</Type>
-// CHECK8-NEXT: <Referenced>increment</Referenced><Type>(inout S1) -> () -> S1</Type>
 // CHECK8-NEXT: <end>
 
 // CHECK9: <Kind>MultiStatement</Kind>
@@ -118,7 +132,37 @@ func foo4(s: S1) -> Int {
 // CHECK9-NEXT: <Declared>b</Declared>
 // CHECK9-NEXT: <Declared>c</Declared>
 // CHECK9-NEXT: <Referenced>s</Referenced><Type>S1</Type>
-// CHECK9-NEXT: <Referenced>a</Referenced><Type>Int</Type>
-// CHECK9-NEXT: <Referenced>foo</Referenced><Type>(S1) -> () -> Int</Type>
 // CHECK9-NEXT: <Referenced>b</Referenced><Type>Int</Type>
 // CHECK9-NEXT: <end>
+
+// CHECK10: <Kind>MultiStatement</Kind>
+// CHECK10-NEXT: <Content>let a = c.c.getC().c.getC().getC().getC()
+// CHECK10-NEXT:   let b = a.c.c.c.c.getC().getC()</Content>
+// CHECK10-NEXT: <Declared>a</Declared>
+// CHECK10-NEXT: <Declared>b</Declared>
+// CHECK10-NEXT: <Referenced>c</Referenced><Type>C1</Type>
+// CHECK10-NEXT: <end>
+
+// CHECK11: <Kind>MultiStatement</Kind>
+// CHECK11-NEXT: <Content>let a = c.c.getC().c.getC().getC().getC()
+// CHECK11-NEXT:   let b = a.c.c.c.c.getC().getC()
+// CHECK11-NEXT:   let d = a.c.getC().getC().c.c</Content>
+// CHECK11-NEXT: <Declared>a</Declared>
+// CHECK11-NEXT: <Declared>b</Declared>
+// CHECK11-NEXT: <Declared>d</Declared>
+// CHECK11-NEXT: <Referenced>c</Referenced><Type>C1</Type>
+// CHECK11-NEXT: <Referenced>a</Referenced><Type>C1</Type>
+// CHECK11-NEXT: <end>
+
+// CHECK12: <Kind>MultiStatement</Kind>
+// CHECK12-NEXT: <Content>let a = c.c.getC().c.getC().getC().getC()
+// CHECK12-NEXT:   let b = a.c.c.c.c.getC().getC()
+// CHECK12-NEXT:   let d = a.c.getC().getC().c.c
+// CHECK12-NEXT:   return a.take(another: b).take(another: d)</Content>
+// CHECK12-NEXT: <Type>C1</Type>
+// CHECK12-NEXT: <Declared>a</Declared>
+// CHECK12-NEXT: <Declared>b</Declared>
+// CHECK12-NEXT: <Declared>d</Declared>
+// CHECK12-NEXT: <Referenced>c</Referenced><Type>C1</Type>
+// CHECK12-NEXT: <Referenced>a</Referenced><Type>C1</Type>
+// CHECK12-NEXT: <end>

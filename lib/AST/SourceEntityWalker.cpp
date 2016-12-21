@@ -192,6 +192,14 @@ Stmt *SemaAnnotator::walkToStmtPost(Stmt *S) {
   return Continue ? S : nullptr;
 }
 
+static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
+  if (auto SA = dyn_cast_or_null<SelfApplyExpr>(Parent)) {
+    if (SA->getFn() == E)
+      return SemaReferenceKind::DeclMemberRef;
+  }
+  return SemaReferenceKind::DeclRef;
+}
+
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (isDone())
     return { false, nullptr };
@@ -212,7 +220,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         return { false, nullptr };
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
                               DRE->getNameLoc(),
-                              SemaReferenceKind::DeclRef)) {
+                              getReferenceKind(Parent.getAsExpr(), E))) {
       return { false, nullptr };
     }
   } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(E)) {
