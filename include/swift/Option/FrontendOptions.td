@@ -278,6 +278,9 @@ def playground_high_performance : Flag<["-"], "playground-high-performance">,
 def disable_playground_transform : Flag<["-"], "disable-playground-transform">,
   HelpText<"Disable playground transformation">;
 
+def pc_macro : Flag<["-"], "pc-macro">,
+  HelpText<"Apply the 'program counter simulation' macro">;
+
 def use_jit : Flag<["-"], "use-jit">,
   HelpText<"Register Objective-C classes as if the JIT were in use">;
 
