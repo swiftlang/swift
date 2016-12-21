@@ -93,7 +93,8 @@ bool SemaLocResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
 bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
-  return visitDeclReference(D, Range, nullptr, Type());
+  return visitDeclReference(D, Range, nullptr, Type(),
+                            SemaReferenceKind::SubscriptRef);
 }
 
 SemaToken SemaLocResolver::resolve(SourceLoc Loc) {
@@ -146,7 +147,8 @@ bool SemaLocResolver::walkToStmtPost(Stmt *S) {
 }
 
 bool SemaLocResolver::visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                                         TypeDecl *CtorTyRef, Type T) {
+                                         TypeDecl *CtorTyRef, Type T,
+                                         SemaReferenceKind Kind) {
   if (isDone())
     return false;
   return !tryResolve(D, CtorTyRef, Range.getStart(), /*IsRef=*/true, T);
@@ -506,7 +508,7 @@ bool RangeResolver::walkToDeclPost(Decl *D) {
 
 bool RangeResolver::
 visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
-                   Type T) {
+                   Type T, SemaReferenceKind Kind) {
   Impl->analyzeDeclRef(D, Range, T);
   return true;
 }
