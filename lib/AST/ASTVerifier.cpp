@@ -2331,7 +2331,7 @@ struct ASTNodeBase {};
     void verifyChecked(ClassDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ClassDecl", CD);
       
-      if (!CD->hasLazyMembers()) {
+      if (!CD->hasLazyMembers() && !CD->hasClangNode()) {
         unsigned NumDestructors = 0;
         for (auto Member : CD->getMembers()) {
           if (isa<DestructorDecl>(Member)) {
@@ -2343,11 +2343,11 @@ struct ASTNodeBase {};
                  "explicitly provided or created by the type checker";
           abort();
         }
-      }
-      
-      if (!CD->hasDestructor()) {
-        Out << "every class's 'has destructor' bit must be set";
-        abort();
+
+        if (!CD->hasDestructor()) {
+          Out << "every class's 'has destructor' bit must be set";
+          abort();
+        }
       }
 
       verifyCheckedBase(CD);
