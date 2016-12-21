@@ -16,6 +16,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
@@ -116,6 +117,8 @@ const {
     // The record does not apply to a single type.
     return nullptr;
   }
+
+  swift_unreachable("Unhandled TypeMetadataRecordKind in switch.");
 }
 
 template<>
@@ -129,6 +132,8 @@ const {
   case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     return getWitnessTableAccessor()(type);
   }
+
+  swift_unreachable("Unhandled ProtocolConformanceReferenceKind in switch.");
 }
 
 namespace {

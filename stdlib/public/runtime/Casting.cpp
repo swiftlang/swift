@@ -18,6 +18,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
@@ -1011,6 +1012,8 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     return true;
   }
   }
+
+  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 /******************************************************************************/
@@ -1272,6 +1275,8 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
       return nullptr;
     return origSourceType;
   }
+
+  swift_unreachable("Unhandled MetdataKind in switch.");
 }
 
 const Metadata *
@@ -1382,6 +1387,8 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
       swift_dynamicCastFailure(sourceType, targetType);
     return origSourceType;
   }
+
+  swift_unreachable("Unhandled MetdataKind in switch.");
 }
 
 /******************************************************************************/
@@ -1515,6 +1522,8 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
     return result;
   }
   }
+
+  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 static void unwrapExistential(OpaqueValue *src,
@@ -1984,6 +1993,8 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
   case MetadataKind::Tuple:
     return _fail(src, srcType, targetType, flags);
   }
+
+  swift_unreachable("Unhandled MetdataKind in switch.");
 }
 
 /******************************************************************************/
