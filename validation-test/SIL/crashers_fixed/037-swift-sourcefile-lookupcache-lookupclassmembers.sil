@@ -1,5 +1,4 @@
 // RUN: not %target-sil-opt %s
-// REQUIRES: asserts
 {
 ()AnyObject
 .n
