@@ -29,8 +29,8 @@ bool swift::isNotAliasingArgument(SILValue V,
   if (!Arg)
     return false;
 
-  return isNotAliasedIndirectParameter(Arg->getArgumentConvention(),
-                                       isInoutAliasing);
+  SILArgumentConvention Conv = Arg->getArgumentConvention();
+  return Conv.isNotAliasedIndirectParameter(isInoutAliasing);
 }
 
 /// Check if the parameter \V is based on a local object, e.g. it is an

@@ -147,13 +147,13 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
                                                      SILValue Address,
                                                      Operand *&Oper) {
   Oper = nullptr;
-  SILArgumentConvention Conv;
   auto Args = Apply->getArgumentOperands();
+  llvm::Optional<unsigned> FoundArgIdx;
   for (auto ArgIdx : indices(Args)) {
     if (Args[ArgIdx].get() != Address)
       continue;
 
-    Conv = Apply->getArgumentConvention(ArgIdx);
+    FoundArgIdx = ArgIdx;
     assert(!Oper && "Address can only be passed once as an indirection.");
     Oper = &Args[ArgIdx];
 #ifndef NDEBUG
@@ -161,7 +161,7 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
 #endif
   }
   assert(Oper && "Address value not passed as an argument to this call.");
-  return Conv;
+  return Apply->getArgumentConvention(FoundArgIdx.getValue());
 }
 
 //===----------------------------------------------------------------------===//
@@ -457,10 +457,11 @@ bool CopyForwarding::collectUsers() {
       /// object. However, we can rely on a subsequent mark_dependent
       /// instruction to take that object as an operand, causing it to escape
       /// for the purpose of this analysis.
-      assert(isIndirectConvention(
-                Apply->getSubstCalleeType()->getSILArgumentConvention(
-                    UI->getOperandNumber() - Apply->getArgumentOperandNumber()))
-             && "copy_addr location should be passed indirect");
+      assert(Apply->getSubstCalleeType()
+                 ->getSILArgumentConvention(UI->getOperandNumber() -
+                                            Apply->getArgumentOperandNumber())
+                 .isIndirectConvention() &&
+             "copy_addr location should be passed indirect");
       SrcUserInsts.insert(Apply);
       continue;
     }
