@@ -153,7 +153,6 @@ static SILInstruction *getSingleDeallocStack(AllocStackInst *ASI) {
       return nullptr;
     }
   }
-  assert(Dealloc != nullptr);
   return Dealloc;
 }
 
