@@ -3855,7 +3855,6 @@ addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem *CS,
     CS->getTypeChecker().typeCheckCheckedCast(fromType, toType, CS->DC,
                                               SourceLoc(), SourceRange(),
                                               SourceRange(),
-                                              [](Type T) { return false; },
                                               /*suppressDiagnostics*/ true);
   if (Kind != CheckedCastKind::Unresolved) {
     SmallString<32> buffer;

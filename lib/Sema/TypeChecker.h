@@ -1348,8 +1348,6 @@ public:
   /// \param diagLoc        The location at which to report diagnostics.
   /// \param diagFromRange  The source range of the input operand of the cast.
   /// \param diagToRange    The source range of the destination type.
-  /// \param convertToType  A callback called when an implicit conversion
-  ///                       to an intermediate type is needed.
   /// \param suppressDiagnostics
   ///                       True if the type check should simply fail instead
   ///                       of printing diagnostics.
@@ -1363,7 +1361,6 @@ public:
                                        SourceLoc diagLoc,
                                        SourceRange diagFromRange,
                                        SourceRange diagToRange,
-                                       std::function<bool(Type)> convertToType,
                                        bool suppressDiagnostics);
 
   /// Find the Objective-C class that bridges between a value of the given

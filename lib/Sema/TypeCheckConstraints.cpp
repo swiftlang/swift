@@ -2390,7 +2390,6 @@ bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc) {
 bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
   auto kind = typeCheckCheckedCast(t1, t2, dc,
                                    SourceLoc(), SourceRange(), SourceRange(),
-                                   /*convertToType=*/ nullptr,
                                    /*suppressDiagnostics=*/ true);
   return (kind != CheckedCastKind::Unresolved);
 }
@@ -2837,7 +2836,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  SourceLoc diagLoc,
                                  SourceRange diagFromRange,
                                  SourceRange diagToRange,
-                                 std::function<bool (Type)> convertToType,
                                  bool suppressDiagnostics) {
   // If the from/to types are equivalent or convertible, this is a coercion.
   if (fromType->isEqual(toType) || isConvertibleTo(fromType, toType, dc)) {
@@ -2915,7 +2913,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     if (auto fromElementType = cs.isArrayType(fromType)) {
       switch (typeCheckCheckedCast(*fromElementType, *toElementType, dc,
                                    SourceLoc(), SourceRange(), SourceRange(),
-                                   nullptr, /*suppressDiagnostics=*/true)) {
+                                   /*suppressDiagnostics=*/true)) {
       case CheckedCastKind::Coercion:
         return CheckedCastKind::Coercion;
 
@@ -2941,7 +2939,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       bool hasCast = false;
       switch (typeCheckCheckedCast(fromKeyValue->first, toKeyValue->first, dc,
                                    SourceLoc(), SourceRange(), SourceRange(),
-                                   nullptr, /*suppressDiagnostics=*/true)) {
+                                   /*suppressDiagnostics=*/true)) {
       case CheckedCastKind::Coercion:
         hasCoercion = true;
         break;
@@ -2963,7 +2961,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
       switch (typeCheckCheckedCast(fromKeyValue->second, toKeyValue->second, dc,
                                    SourceLoc(), SourceRange(), SourceRange(),
-                                   nullptr, /*suppressDiagnostics=*/true)) {
+                                   /*suppressDiagnostics=*/true)) {
       case CheckedCastKind::Coercion:
         hasCoercion = true;
         break;
@@ -2994,7 +2992,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     if (auto fromElementType = cs.isSetType(fromType)) {
       switch (typeCheckCheckedCast(*fromElementType, *toElementType, dc,
                                    SourceLoc(), SourceRange(), SourceRange(),
-                                   nullptr, /*suppressDiagnostics=*/true)) {
+                                   /*suppressDiagnostics=*/true)) {
       case CheckedCastKind::Coercion:
         return CheckedCastKind::Coercion;
 

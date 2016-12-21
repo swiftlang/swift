@@ -1291,7 +1291,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       = typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(), dc,
                              IP->getLoc(),
                              IP->getLoc(),IP->getCastTypeLoc().getSourceRange(),
-                             [](Type) { return false; },
                              /*suppressDiagnostics=*/ type->hasError());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
@@ -1404,7 +1403,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         auto foundCastKind = typeCheckCheckedCast(type, parentTy, dc,
                                                   SourceLoc(),
                                                   SourceRange(), SourceRange(),
-                                                  [](Type) { return false; },
                                                   /*suppress diags*/ false);
         // If the cast failed, we can't resolve the pattern.
         if (foundCastKind < CheckedCastKind::First_Resolved)

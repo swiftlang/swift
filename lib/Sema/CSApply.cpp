@@ -2953,9 +2953,6 @@ namespace {
                         expr->getLoc(),
                         sub->getSourceRange(),
                         expr->getCastTypeLoc().getSourceRange(),
-                        [&](Type commonTy) -> bool {
-                          return tc.convertToType(sub, commonTy, cs.DC);
-                        },
                         SuppressDiagnostics);
 
       switch (castKind) {
@@ -3277,10 +3274,6 @@ namespace {
                         expr->getLoc(),
                         sub->getSourceRange(),
                         expr->getCastTypeLoc().getSourceRange(),
-                        [&](Type commonTy) -> bool {
-                          return tc.convertToType(sub, commonTy,
-                                                 cs.DC);
-                        },
                         SuppressDiagnostics);
       switch (castKind) {
         /// Invalid cast.
@@ -3344,10 +3337,6 @@ namespace {
                         expr->getLoc(),
                         sub->getSourceRange(),
                         expr->getCastTypeLoc().getSourceRange(),
-                        [&](Type commonTy) -> bool {
-                          return tc.convertToType(sub, commonTy,
-                                                 cs.DC);
-                        },
                         SuppressDiagnostics);
       switch (castKind) {
         /// Invalid cast.
@@ -5292,7 +5281,7 @@ buildElementConversion(ExprRewriter &rewriter,
   auto &tc = rewriter.getConstraintSystem().getTypeChecker();
   if (bridged &&
       tc.typeCheckCheckedCast(srcType, destType, cs.DC, SourceLoc(),
-                              SourceRange(), SourceRange(), nullptr,
+                              SourceRange(), SourceRange(),
                               /*suppressDiagnostics=*/true)
         != CheckedCastKind::Coercion) {
     conversion = rewriter.buildObjCBridgeExpr(opaque, destType,
@@ -6908,9 +6897,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
                         coerceExpr->getLoc(),
                         subExpr->getSourceRange(),
                         coerceExpr->getCastTypeLoc().getSourceRange(),
-                        [&](Type commonTy) -> bool {
-                          return TC.convertToType(subExpr, commonTy, DC);
-                        },
                         /*suppressDiagnostics=*/ true);
 
       switch (castKind) {
