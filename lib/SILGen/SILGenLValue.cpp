@@ -2206,7 +2206,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
 
   // NSString * must be bridged to String.
   if (storageType.getSwiftRValueType() == gen.SGM.Types.getNSStringType()) {
-    auto nsstr = gen.B.createLoadBorrow(loc, src);
+    auto nsstr = gen.B.createLoad(loc, src, LoadOwnershipQualifier::Copy);
     auto str = gen.emitBridgedToNativeValue(loc,
                                 ManagedValue::forUnmanaged(nsstr),
                                 SILFunctionTypeRepresentation::CFunctionPointer,
