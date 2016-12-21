@@ -3847,20 +3847,25 @@ static bool tryIntegerCastFixIts(InFlightDiagnostic &diag,
 static bool
 addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem *CS,
                    Type fromType, Type toType, Expr *expr) {
+  // Look through optional types; casts can add them, but can't remove extra
+  // ones.
+  toType = toType->lookThroughAllAnyOptionalTypes();
+
   CheckedCastKind Kind =
-    CS->getTypeChecker().typeCheckCheckedCast(fromType, toType, CS->DC,
-                                              SourceLoc(), SourceRange(),
-                                              SourceRange(),
-                                              [](Type T) { return false; },
-                                              /*suppressDiagnostics*/ true);
+    CS->getTypeChecker().typeCheckCheckedCast(fromType, toType,
+                                              CheckedCastContextKind::None,
+                                              CS->DC,
+                                              SourceLoc(), nullptr,
+                                              SourceRange());
   if (Kind != CheckedCastKind::Unresolved) {
     SmallString<32> buffer;
     llvm::raw_svector_ostream OS(buffer);
     toType->print(OS);
+    bool canUseAs = Kind == CheckedCastKind::Coercion ||
+      Kind == CheckedCastKind::BridgingCast;
     diag.fixItInsert(Lexer::getLocForEndOfToken(CS->DC->getASTContext().SourceMgr,
                                                 expr->getEndLoc()),
-                     (llvm::Twine(Kind == CheckedCastKind::Coercion ? " as " :
-                                                                      " as! ") +
+                     (llvm::Twine(canUseAs ? " as " : " as! ") +
                       OS.str()).str());
     return true;
   }

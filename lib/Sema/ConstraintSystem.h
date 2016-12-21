@@ -1584,6 +1584,11 @@ public:
     }
   }
 
+  /// Add an explicit conversion constraint (e.g., \c 'x as T').
+  void addExplicitConversionConstraint(Type fromType, Type toType,
+                                       bool allowFixes,
+                                       ConstraintLocatorBuilder locator);
+
   /// \brief Add a disjunction constraint.
   void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
                                 ConstraintLocatorBuilder locator,
@@ -1753,15 +1758,17 @@ public:
   /// viable solution.
   void setMustBeMaterializableRecursive(Type type);
   
-  /// \brief Determine if the type in question is an Array<T>.
-  bool isArrayType(Type t);
+  /// Determine if the type in question is an Array<T> and, if so, provide the
+  /// element type of the array.
+  static Optional<Type> isArrayType(Type type);
 
   /// Determine whether the given type is a dictionary and, if so, provide the
   /// key and value types for the dictionary.
-  Optional<std::pair<Type, Type>> isDictionaryType(Type type);
+  static Optional<std::pair<Type, Type>> isDictionaryType(Type type);
 
-  /// \brief Determine if the type in question is a Set<T>.
-  bool isSetType(Type t);
+  /// Determine if the type in question is a Set<T> and, if so, provide the
+  /// element type of the set.
+  static Optional<Type> isSetType(Type t);
 
   /// \brief Determine if the type in question is AnyHashable.
   bool isAnyHashableType(Type t);
@@ -2168,6 +2175,12 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
+  /// \brief Attempt to simplify the BridgingConversion constraint.
+  SolutionKind simplifyBridgingConstraint(Type type1,
+                                         Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
   /// \brief Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
                                       Type type1,
@@ -2369,16 +2382,6 @@ public:
   /// expression, producing a fully type-checked expression.
   Expr *applySolutionShallow(const Solution &solution, Expr *expr,
                              bool suppressDiagnostics);
-  
-  /// Extract the base type from an array or slice type.
-  /// \param type The array type to inspect.
-  /// \returns the base type of the array.
-  Type getBaseTypeForArrayType(TypeBase *type);
-
-  /// Extract the base type from a set type.
-  /// \param type The set type to inspect.
-  /// \returns the base type of the set.
-  Type getBaseTypeForSetType(TypeBase *type);
   
   /// \brief Set whether or not the expression being solved is too complex and
   /// has exceeded the solver's memory threshold.

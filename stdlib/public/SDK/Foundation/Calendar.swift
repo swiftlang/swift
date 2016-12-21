@@ -415,7 +415,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(of: Calendar._toCalendarUnit([component]), start: &nsDate, interval: &ti, for: date) }) {
-            start = nsDate as! Date
+            start = nsDate! as Date
             interval = ti
             return true
         } else {
@@ -693,7 +693,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(ofWeekendStart: &nsDate, interval: &ti, containing: date) }) {
-            start = nsDate as! Date
+            start = nsDate! as Date
             interval = ti
             return true
         } else {
@@ -710,7 +710,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(ofWeekendStart: &nsDate, interval: &ti, containing: date) }) {
-            return DateInterval(start: nsDate as! Date, duration: ti)
+            return DateInterval(start: nsDate! as Date, duration: ti)
         } else {
             return nil
         }
@@ -734,7 +734,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.nextWeekendStart(&nsDate, interval: &ti, options: direction == .backward ? [.searchBackwards] : [], after: date) }) {
-            start = nsDate as! Date
+            start = nsDate! as Date
             interval = ti
             return true
         } else {
@@ -757,7 +757,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         var ti : TimeInterval = 0
         if _handle.map({ $0.nextWeekendStart(&nsDate, interval: &ti, options: direction == .backward ? [.searchBackwards] : [], after: date) }) {
             /// WARNING: searching backwards is totally broken! 26643365
-            return DateInterval(start: nsDate as! Date, duration: ti)
+            return DateInterval(start: nsDate! as Date, duration: ti)
         } else {
             return nil
         }

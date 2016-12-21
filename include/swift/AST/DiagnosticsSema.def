@@ -749,16 +749,32 @@ WARNING(isa_is_foreign_check,none,
 WARNING(conditional_downcast_coercion,none,
       "conditional cast from %0 to %1 always succeeds",
       (Type, Type))
+
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
 
 WARNING(forced_downcast_coercion,none,
       "forced cast from %0 to %1 always succeeds; did you mean to use 'as'?",
       (Type, Type))
-ERROR(downcast_same_type,none,
-      "downcast from %0 to %1 only unwraps optionals; did you mean to use "
-      "'%2'?",
-      (Type, Type, StringRef))
+
+// Note: the Boolean at the end indicates whether bridging is required after
+// the cast.
+WARNING(downcast_same_type,none,
+        "forced cast from %0 to %1 %select{only unwraps optionals|only unwraps "
+        "and bridges}3; did you mean to use '%2'%select{| with 'as'}3?",
+        (Type, Type, StringRef, bool))
+
+// The unsigned value can be 0 (types are equal), 1 (types implicitly convert),
+// or 2 (types bridge).
+WARNING(conditional_downcast_same_type,none,
+        "conditional downcast from %0 to %1 %select{does nothing|"
+        "is equivalent to an implicit conversion to an optional %1|is a "
+        "bridging conversion; did you mean to use 'as'?}2",
+        (Type, Type, unsigned))
+WARNING(is_expr_same_type,none,
+        "checking a value with optional type %0 against dynamic type %1 "
+        "succeeds whenever the value is non-'nil'; did you mean to use "
+        "'!= nil'?", (Type, Type))
 WARNING(downcast_to_unrelated,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
 ERROR(downcast_to_more_optional,none,

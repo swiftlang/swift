@@ -1288,15 +1288,19 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 
 
     CheckedCastKind castKind
-      = typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(), dc,
+      = typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(),
+                             type->hasError()
+                               ? CheckedCastContextKind::None
+                               : CheckedCastContextKind::IsPattern,
+                             dc,
                              IP->getLoc(),
-                             IP->getLoc(),IP->getCastTypeLoc().getSourceRange(),
-                             [](Type) { return false; },
-                             /*suppressDiagnostics=*/ type->hasError());
+                             nullptr,
+                             IP->getCastTypeLoc().getSourceRange());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
       return true;
     case CheckedCastKind::Coercion:
+    case CheckedCastKind::BridgingCast:
       // If this is an 'as' pattern coercing between two different types, then
       // it is "useful" because it is providing a different type to the
       // sub-pattern.  If this is an 'is' pattern or an 'as' pattern where the
@@ -1318,7 +1322,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                subOptions|TR_FromNonInferredPattern);
 
     case CheckedCastKind::ValueCast:
-    case CheckedCastKind::BridgeFromObjectiveC:
       IP->setCastKind(castKind);
       break;
     }
@@ -1401,11 +1404,12 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       // Otherwise, see if we can introduce a cast pattern to get from an
       // existential pattern type to the enum type.
       else if (type->isAnyExistentialType()) {
-        auto foundCastKind = typeCheckCheckedCast(type, parentTy, dc,
-                                                  SourceLoc(),
-                                                  SourceRange(), SourceRange(),
-                                                  [](Type) { return false; },
-                                                  /*suppress diags*/ false);
+        auto foundCastKind =
+          typeCheckCheckedCast(type, parentTy,
+                               CheckedCastContextKind::EnumElementPattern,
+                               dc,
+                               EEP->getLoc(),
+                               nullptr, SourceRange());
         // If the cast failed, we can't resolve the pattern.
         if (foundCastKind < CheckedCastKind::First_Resolved)
           return true;

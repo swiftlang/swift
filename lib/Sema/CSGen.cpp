@@ -1678,12 +1678,13 @@ namespace {
       Type contextualArrayElementType = nullptr;
       
       // If a contextual type exists for this expression, apply it directly.
-      if (contextualType && CS.isArrayType(contextualType)) {
+      Optional<Type> arrayElementType;
+      if (contextualType &&
+          (arrayElementType = ConstraintSystem::isArrayType(contextualType))) {
         // Is the array type a contextual type
         contextualArrayType = contextualType;
-        contextualArrayElementType =
-            CS.getBaseTypeForArrayType(contextualType.getPointer());
-        
+        contextualArrayElementType = *arrayElementType;
+
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredType(),
                          locator);
@@ -2521,25 +2522,8 @@ namespace {
       auto fromType = CS.getType(expr->getSubExpr());
       auto locator = CS.getConstraintLocator(expr);
 
-      if (CS.shouldAttemptFixes()) {
-        Constraint *coerceConstraint =
-          Constraint::create(CS, ConstraintKind::ExplicitConversion,
-                             fromType, toType, DeclName(),
-                             FunctionRefKind::Compound,
-                             locator);
-        Constraint *downcastConstraint =
-          Constraint::createFixed(CS, ConstraintKind::CheckedCast,
-                                  FixKind::CoerceToCheckedCast, fromType,
-                                  toType, locator);
-        coerceConstraint->setFavored();
-        auto constraints = { coerceConstraint, downcastConstraint };
-        CS.addDisjunctionConstraint(constraints, locator, RememberChoice);
-      } else {
-        // The source type can be explicitly converted to the destination type.
-        CS.addConstraint(ConstraintKind::ExplicitConversion, fromType, toType,
-                         locator);
-      }
-
+      CS.addExplicitConversionConstraint(fromType, toType, /*allowFixes=*/true,
+                                         locator);
       return toType;
     }
 

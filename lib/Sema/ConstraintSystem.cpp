@@ -521,37 +521,33 @@ Type ConstraintSystem::openFunctionType(
   return removeArgumentLabels(type, numArgumentLabelsToRemove);
 }
 
-bool ConstraintSystem::isArrayType(Type t) {
-  t = t->getDesugaredType();
-  
-  // ArraySliceType<T> desugars to Array<T>.
-  if (isa<ArraySliceType>(t.getPointer()))
-    return true;
-  if (auto boundStruct = dyn_cast<BoundGenericStructType>(t.getPointer())) {
-    return boundStruct->getDecl() == TC.Context.getArrayDecl();
-  }
-  
-  return false;
-}
-
-Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
+Optional<Type> ConstraintSystem::isArrayType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
-    if (boundStruct->getDecl() != TC.Context.getDictionaryDecl())
-      return None;
-
-    auto genericArgs = boundStruct->getGenericArgs();
-    return std::make_pair(genericArgs[0], genericArgs[1]);
+    if (boundStruct->getDecl() == type->getASTContext().getArrayDecl())
+      return boundStruct->getGenericArgs()[0];
   }
 
   return None;
 }
 
-bool ConstraintSystem::isSetType(Type type) {
+Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
-    return boundStruct->getDecl() == TC.Context.getSetDecl();
+    if (boundStruct->getDecl() == type->getASTContext().getDictionaryDecl()) {
+      auto genericArgs = boundStruct->getGenericArgs();
+      return std::make_pair(genericArgs[0], genericArgs[1]);
+    }
   }
 
-  return false;
+  return None;
+}
+
+Optional<Type> ConstraintSystem::isSetType(Type type) {
+  if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
+    if (boundStruct->getDecl() == type->getASTContext().getSetDecl())
+      return boundStruct->getGenericArgs()[0];
+  }
+
+  return None;
 }
 
 bool ConstraintSystem::isAnyHashableType(Type type) {

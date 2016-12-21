@@ -2361,31 +2361,46 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 }
 
 bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
-                                         ConstraintKind kind, DeclContext *dc) {
+                                         ConstraintKind kind, DeclContext *dc,
+                                         bool *unwrappedIUO) {
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
   cs.addConstraint(kind, type1, type2, cs.getConstraintLocator(nullptr));
-  return cs.solveSingle().hasValue();
+  if (auto solution = cs.solveSingle()) {
+    if (unwrappedIUO)
+      *unwrappedIUO = solution->getFixedScore().Data[SK_ForceUnchecked] > 0;
+
+    return true;
+  }
+
+  return false;
 }
 
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
   return typesSatisfyConstraint(type1, type2, ConstraintKind::Subtype, dc);
 }
 
-bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
-  return typesSatisfyConstraint(type1, type2, ConstraintKind::Conversion, dc);
+bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc,
+                                  bool *unwrappedIUO) {
+  return typesSatisfyConstraint(type1, type2, ConstraintKind::Conversion, dc,
+                                unwrappedIUO);
 }
 
 bool TypeChecker::isExplicitlyConvertibleTo(Type type1, Type type2,
                                             DeclContext *dc) {
-  return typesSatisfyConstraint(type1, type2,
-                                ConstraintKind::ExplicitConversion, dc);
+  return typesSatisfyConstraint(type1, type2, ConstraintKind::Conversion, dc) ||
+    isObjCBridgedTo(type1, type2, dc);
+}
+
+bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc,
+                                  bool *unwrappedIUO) {
+  return (Context.LangOpts.EnableObjCInterop &&
+   typesSatisfyConstraint(type1, type2, ConstraintKind::BridgingConversion,
+                          dc, unwrappedIUO));
 }
 
 bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
-  auto kind = typeCheckCheckedCast(t1, t2, dc,
-                                   SourceLoc(), SourceRange(), SourceRange(),
-                                   /*convertToType=*/ nullptr,
-                                   /*suppressDiagnostics=*/ true);
+  auto kind = typeCheckCheckedCast(t1, t2, CheckedCastContextKind::None, dc,
+                                   SourceLoc(), nullptr, SourceRange());
   return (kind != CheckedCastKind::Unresolved);
 }
 
@@ -2485,7 +2500,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  cs.addConstraint(ConstraintKind::ExplicitConversion, cs.getType(expr), type,
+  cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr), type,
                    cs.getConstraintLocator(expr));
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -2827,21 +2842,45 @@ void ConstraintSystem::print(raw_ostream &out) {
 /// Determine the semantics of a checked cast operation.
 CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  Type toType,
+                                 CheckedCastContextKind contextKind,
                                  DeclContext *dc,
                                  SourceLoc diagLoc,
-                                 SourceRange diagFromRange,
-                                 SourceRange diagToRange,
-                                 std::function<bool (Type)> convertToType,
-                                 bool suppressDiagnostics) {
-  // If the from/to types are equivalent or explicitly convertible,
-  // this is a coercion.
+                                 Expr *fromExpr,
+                                 SourceRange diagToRange) {
+  SourceRange diagFromRange;
+  if (fromExpr)
+    diagFromRange = fromExpr->getSourceRange();
+  
+  // If the from/to types are equivalent or convertible, this is a coercion.
+  bool unwrappedIUO = false;
   if (fromType->isEqual(toType) ||
-      isExplicitlyConvertibleTo(fromType, toType, dc)) {
+      (isConvertibleTo(fromType, toType, dc, &unwrappedIUO) &&
+       !unwrappedIUO)) {
     return CheckedCastKind::Coercion;
   }
 
+  // Check for a bridging conversion.
+  if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO)
+    return CheckedCastKind::BridgingCast;
+
   Type origFromType = fromType;
   Type origToType = toType;
+
+  // Determine whether we should suppress diagnostics.
+  bool suppressDiagnostics = (contextKind == CheckedCastContextKind::None);
+
+  // Local function to indicate failure.
+  auto failed = [&] {
+    if (suppressDiagnostics) {
+      return CheckedCastKind::Unresolved;
+    }
+
+    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+      .highlight(diagFromRange)
+      .highlight(diagToRange);
+
+    return CheckedCastKind::ValueCast;
+  };
 
   // Strip optional wrappers off of the destination type in sync with
   // stripping them off the origin type.
@@ -2871,19 +2910,261 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     ++extraFromOptionals;
   }
 
-  // If the unwrapped from/to types are equivalent, this isn't a real
+  // If the unwrapped from/to types are equivalent or bridged, this isn't a real
   // downcast. Complain.
-  if (fromType->isEqual(toType)) {
+  if (fromType->isEqual(toType) ||
+      isExplicitlyConvertibleTo(fromType, toType, dc)) {
     assert(extraFromOptionals > 0 && "No extra 'from' optionals?");
     
     // FIXME: Add a Fix-It, when the caller provides us with enough information.
     if (!suppressDiagnostics) {
-      diagnose(diagLoc, diag::downcast_same_type,
-               origFromType, origToType, std::string(extraFromOptionals, '!'))
-        .highlight(diagFromRange)
-        .highlight(diagToRange);
+      bool isBridged =
+        !fromType->isEqual(toType) && !isConvertibleTo(fromType, toType, dc);
+
+      switch (contextKind) {
+      case CheckedCastContextKind::None:
+        llvm_unreachable("suppressing diagnostics");
+
+      case CheckedCastContextKind::ForcedCast: {
+        auto diag = diagnose(diagLoc, diag::downcast_same_type,
+                             origFromType, origToType,
+                             std::string(extraFromOptionals, '!'),
+                             isBridged);
+        diag.highlight(diagFromRange);
+        diag.highlight(diagToRange);
+
+        /// Add the '!''s needed to adjust the type.
+        diag.fixItInsertAfter(diagFromRange.End,
+                              std::string(extraFromOptionals, '!'));
+        if (isBridged) {
+          // If it's bridged, we still need the 'as' to perform the bridging.
+          diag.fixItReplaceChars(diagLoc, diagLoc.getAdvancedLocOrInvalid(3),
+                                 "as");
+        } else {
+          // Otherwise, implicit conversions will handle it in most cases.
+          SourceLoc afterExprLoc = Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                                              diagFromRange.End);
+
+          diag.fixItRemove(SourceRange(afterExprLoc, diagToRange.End));
+        }
+        break;
+      }
+
+      case CheckedCastContextKind::ConditionalCast:
+        // If we're only unwrapping a single optional, that optional value is
+        // effectively carried through to the underlying conversion, making this
+        // the moral equivalent of a map. Complain that one can do this with
+        // 'as' more effectively.
+        if (extraFromOptionals == 1) {
+          // A single optional is carried through. It's better to use 'as' to
+          // the appropriate optional type.
+          auto diag = diagnose(diagLoc, diag::conditional_downcast_same_type,
+                               origFromType, origToType,
+                               fromType->isEqual(toType) ? 0
+                                             : isBridged ? 2
+                                             : 1);
+          diag.highlight(diagFromRange);
+          diag.highlight(diagToRange);
+
+          if (isBridged) {
+            // For a bridged cast, replace the 'as?' with 'as'.
+            diag.fixItReplaceChars(diagLoc, diagLoc.getAdvancedLocOrInvalid(3),
+                                   "as");
+
+            // Make sure we'll cast to the appropriately-optional type by adding
+            // the '?'.
+            // FIXME: Parenthesize!
+            diag.fixItInsertAfter(diagToRange.End, "?");
+          } else {
+            // Just remove the cast; implicit conversions will handle it.
+            SourceLoc afterExprLoc =
+              Lexer::getLocForEndOfToken(Context.SourceMgr, diagFromRange.End);
+
+            if (afterExprLoc.isValid() && diagToRange.isValid())
+              diag.fixItRemove(SourceRange(afterExprLoc, diagToRange.End));
+          }
+        }
+
+        // If there is more than one extra optional, don't do anything: this
+        // conditional cast is trying to unwrap some levels of optional;
+        // let the runtime handle it.
+        break;
+
+      case CheckedCastContextKind::IsExpr:
+        // If we're only unwrapping a single optional, we could have just
+        // checked for 'nil'.
+        if (extraFromOptionals == 1) {
+          auto diag = diagnose(diagLoc, diag::is_expr_same_type,
+                               origFromType, origToType);
+          diag.highlight(diagFromRange);
+          diag.highlight(diagToRange);
+
+          diag.fixItReplace(SourceRange(diagLoc, diagToRange.End), "!= nil");
+
+          // Add parentheses if needed.
+          if (!fromExpr->canAppendCallParentheses()) {
+            diag.fixItInsert(fromExpr->getStartLoc(), "(");
+            diag.fixItInsertAfter(fromExpr->getEndLoc(), ")");
+          }
+        }
+
+        // If there is more than one extra optional, don't do anything: this
+        // is performing a deeper check that the runtime will handle.
+        break;
+
+      case CheckedCastContextKind::IsPattern:
+      case CheckedCastContextKind::EnumElementPattern:
+        // Note: Don't diagnose these, because the code is testing whether
+        // the optionals can be unwrapped.
+        break;
+      }
     }
-    return CheckedCastKind::Unresolved;
+
+    // Treat this as a value cast so we preserve the semantics.
+    return CheckedCastKind::ValueCast;
+  }
+
+  // Check for casts between specific concrete types that cannot succeed.
+  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
+
+  if (auto toElementType = cs.isArrayType(toType)) {
+    if (auto fromElementType = cs.isArrayType(fromType)) {
+      switch (typeCheckCheckedCast(*fromElementType, *toElementType,
+                                   CheckedCastContextKind::None, dc,
+                                   SourceLoc(), nullptr, SourceRange())) {
+      case CheckedCastKind::Coercion:
+        return CheckedCastKind::Coercion;
+
+      case CheckedCastKind::BridgingCast:
+        return CheckedCastKind::BridgingCast;
+
+      case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::DictionaryDowncast:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::ValueCast:
+        return CheckedCastKind::ArrayDowncast;
+
+      case CheckedCastKind::Unresolved:
+        return failed();
+      }
+    }
+  }
+
+  if (auto toKeyValue = cs.isDictionaryType(toType)) {
+    if (auto fromKeyValue = cs.isDictionaryType(fromType)) {
+      bool hasCoercion = false;
+      bool hasBridgingConversion = false;
+      bool hasCast = false;
+      switch (typeCheckCheckedCast(fromKeyValue->first, toKeyValue->first,
+                                   CheckedCastContextKind::None, dc,
+                                   SourceLoc(), nullptr, SourceRange())) {
+      case CheckedCastKind::Coercion:
+        hasCoercion = true;
+        break;
+
+      case CheckedCastKind::BridgingCast:
+        hasBridgingConversion = true;
+        break;
+
+      case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::DictionaryDowncast:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::ValueCast:
+        hasCast = true;
+        break;
+
+      case CheckedCastKind::Unresolved:
+        return failed();
+      }
+
+      switch (typeCheckCheckedCast(fromKeyValue->second, toKeyValue->second,
+                                   CheckedCastContextKind::None, dc,
+                                   SourceLoc(), nullptr, SourceRange())) {
+      case CheckedCastKind::Coercion:
+        hasCoercion = true;
+        break;
+
+      case CheckedCastKind::BridgingCast:
+        hasBridgingConversion = true;
+        break;
+
+      case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::DictionaryDowncast:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::ValueCast:
+        hasCast = true;
+        break;
+
+      case CheckedCastKind::Unresolved:
+        return failed();
+      }
+
+      if (hasCast) return CheckedCastKind::DictionaryDowncast;
+      if (hasBridgingConversion) return CheckedCastKind::BridgingCast;
+      assert(hasCoercion && "Not a coercion?");
+      return CheckedCastKind::Coercion;
+    }
+  }
+
+  if (auto toElementType = cs.isSetType(toType)) {
+    if (auto fromElementType = cs.isSetType(fromType)) {
+      switch (typeCheckCheckedCast(*fromElementType, *toElementType,
+                                   CheckedCastContextKind::None, dc,
+                                   SourceLoc(), nullptr, SourceRange())) {
+      case CheckedCastKind::Coercion:
+        return CheckedCastKind::Coercion;
+
+      case CheckedCastKind::BridgingCast:
+        return CheckedCastKind::BridgingCast;
+
+      case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::DictionaryDowncast:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::ValueCast:
+        return CheckedCastKind::SetDowncast;
+
+      case CheckedCastKind::Unresolved:
+        return failed();
+      }
+    }
+  }
+
+  // If we can bridge through an Objective-C class, do so.
+  if (Type bridgedToClass = getDynamicBridgedThroughObjCClass(dc, fromType,
+                                                              toType)) {
+    switch (typeCheckCheckedCast(bridgedToClass, fromType,
+                                 CheckedCastContextKind::None, dc, SourceLoc(),
+                                 nullptr, SourceRange())) {
+    case CheckedCastKind::ArrayDowncast:
+    case CheckedCastKind::BridgingCast:
+    case CheckedCastKind::Coercion:
+    case CheckedCastKind::DictionaryDowncast:
+    case CheckedCastKind::SetDowncast:
+    case CheckedCastKind::ValueCast:
+      return CheckedCastKind::ValueCast;
+
+    case CheckedCastKind::Unresolved:
+      break;
+    }
+  }
+
+  // If we can bridge through an Objective-C class, do so.
+  if (Type bridgedFromClass = getDynamicBridgedThroughObjCClass(dc, toType,
+                                                                fromType)) {
+    switch (typeCheckCheckedCast(toType, bridgedFromClass,
+                                 CheckedCastContextKind::None, dc, SourceLoc(),
+                                 nullptr, SourceRange())) {
+    case CheckedCastKind::ArrayDowncast:
+    case CheckedCastKind::BridgingCast:
+    case CheckedCastKind::Coercion:
+    case CheckedCastKind::DictionaryDowncast:
+    case CheckedCastKind::SetDowncast:
+    case CheckedCastKind::ValueCast:
+      return CheckedCastKind::ValueCast;
+
+    case CheckedCastKind::Unresolved:
+      break;
+    }
   }
 
   // Strip metatypes. If we can cast two types, we can cast their metatypes.
@@ -2936,20 +3217,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (toExistential || fromExistential || fromArchetype || toArchetype)
     return CheckedCastKind::ValueCast;
 
-  // Check for casts between concrete types that cannot succeed.
-
-  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
-  
-  if (cs.isArrayType(toType) && cs.isArrayType(fromType)) {
-    return CheckedCastKind::ArrayDowncast;
-  }
-
-  if (cs.isDictionaryType(toType) && cs.isDictionaryType(fromType))
-    return CheckedCastKind::DictionaryDowncast;
-
-  if (cs.isSetType(toType) && cs.isSetType(fromType))
-    return CheckedCastKind::SetDowncast;
-
   if (cs.isAnyHashableType(toType) || cs.isAnyHashableType(fromType)) {
     return CheckedCastKind::ValueCast;
   }
@@ -2959,13 +3226,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (isSubtypeOf(toType, fromType, dc)) {
     return CheckedCastKind::ValueCast;
   }
-
-  // If we can bridge through an Objective-C class, do so.
-  if (Type objCClass = getDynamicBridgedThroughObjCClass(dc, fromType, toType)){
-    if (isSubtypeOf(objCClass, fromType, dc))
-      return CheckedCastKind::BridgeFromObjectiveC;
-  }
-
+  
   // Objective-C metaclasses are subclasses of NSObject in the ObjC runtime,
   // so casts from NSObject to potentially-class metatypes may succeed.
   if (auto nsObject = cs.TC.getNSObjectType(dc)) {
@@ -3010,15 +3271,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     if (fromType->getClassOrBoundGenericClass() == clas)
       return CheckedCastKind::ValueCast;
   }
-  
-  if (suppressDiagnostics) {
-    return CheckedCastKind::Unresolved;
-  }
-  diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
-    .highlight(diagFromRange)
-    .highlight(diagToRange);
 
-  return CheckedCastKind::ValueCast;
+  return failed();
 }
 
 /// If the expression is an implicit call to _forceBridgeFromObjectiveC or

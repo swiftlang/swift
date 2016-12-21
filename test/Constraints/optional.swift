@@ -66,13 +66,13 @@ func test5() -> Int? {
 func test6<T>(_ x : T) {
   // FIXME: this code should work; T could be Int? or Int??
   // or something like that at runtime.  rdar://16374053
-  let y = x as? Int? // expected-error {{cannot downcast from 'T' to a more optional type 'Int?'}}
+  _ = x as? Int? // expected-error {{cannot downcast from 'T' to a more optional type 'Int?'}}
 }
 
 class B : A { }
 
 func test7(_ x : A) {
-  let y = x as? B? // expected-error{{cannot downcast from 'A' to a more optional type 'B?'}}
+  _ = x as? B? // expected-error{{cannot downcast from 'A' to a more optional type 'B?'}}
 }
 
 func test8(_ x : AnyObject?) {

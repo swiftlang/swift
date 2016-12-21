@@ -83,11 +83,10 @@ enum class CheckedCastKind : unsigned {
   DictionaryDowncast,
   // A downcast from a set type to another set type.
   SetDowncast,
-  /// A downcast from an object of class or Objective-C existential
-  /// type to its bridged value type.
-  BridgeFromObjectiveC,
+  /// A bridging cast.
+  BridgingCast,
 
-  Last_CheckedCastKind = BridgeFromObjectiveC,
+  Last_CheckedCastKind = BridgingCast,
 };
 
 enum class AccessSemantics : unsigned char {

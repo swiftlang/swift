@@ -701,7 +701,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::Subtype:
     return true;
   case ConstraintKind::Bind:
@@ -828,7 +828,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
-    case ConstraintKind::ExplicitConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
@@ -841,6 +840,10 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // FIXME: Relational constraints for which we could perhaps do better
       // than the default.
       break;
+
+    case ConstraintKind::BridgingConversion:
+      // Nothing to infer from bridging conversions.
+      continue;
 
     case ConstraintKind::DynamicTypeOf:
       // Constraints from which we can't do anything.

@@ -66,9 +66,8 @@ enum class ConstraintKind : char {
   Subtype,
   /// \brief The first type is convertible to the second type.
   Conversion,
-  /// \brief The first type is convertible to the second type using an 'as'
-  /// statement. This differs from 'Conversion' in that it also allows bridging.
-  ExplicitConversion,
+  /// \brief The first type can be bridged to the second type.
+  BridgingConversion,
   /// \brief The first type is the element of an argument tuple that is
   /// convertible to the second type (which represents the corresponding
   /// parameter type).
@@ -200,10 +199,6 @@ enum class ConversionRestrictionKind {
   SetUpcast,
   /// T:Hashable -> AnyHashable conversion.
   HashableToAnyHashable,
-  /// Implicit bridging from a value type to an Objective-C class.
-  BridgeToObjC,
-  /// Explicit bridging from an Objective-C class to a value type.
-  BridgeFromObjC,
   /// Implicit conversion from a CF type to its toll-free-bridged Objective-C
   /// class type.
   CFTollFreeBridgeToObjC,
@@ -466,7 +461,7 @@ public:
     case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
-    case ConstraintKind::ExplicitConversion:
+    case ConstraintKind::BridgingConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
