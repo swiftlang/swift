@@ -83,9 +83,23 @@ static void addCommonFrontendArgs(const ToolChain &TC,
                                   const CommandOutput &output,
                                   const ArgList &inputArgs,
                                   ArgStringList &arguments) {
-  arguments.push_back("-target");
-  arguments.push_back(inputArgs.MakeArgString(TC.getTriple().str()));
   const llvm::Triple &Triple = TC.getTriple();
+
+  // Only pass -target to the REPL or immediate modes if it was explicitly
+  // specified on the command line.
+  switch (OI.CompilerMode) {
+  case OutputInfo::Mode::REPL:
+  case OutputInfo::Mode::Immediate:
+    if (!inputArgs.hasArg(options::OPT_target))
+      break;
+    LLVM_FALLTHROUGH;
+  case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::SingleCompile:
+  case OutputInfo::Mode::UpdateCode:
+    arguments.push_back("-target");
+    arguments.push_back(inputArgs.MakeArgString(Triple.str()));
+    break;
+  }
 
   // Enable address top-byte ignored in the ARM64 backend.
   if (Triple.getArch() == llvm::Triple::aarch64) {

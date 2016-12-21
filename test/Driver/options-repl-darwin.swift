@@ -1,4 +1,4 @@
-// XFAIL: freebsd, linux
+// REQUIRES: OS=macosx
 
 // Test LLDB detection, first in a clean environment, then in one that looks
 // like the Xcode installation environment. We use hard links to make sure
@@ -29,6 +29,5 @@
 
 // LLDB: lldb{{"?}} "--repl=
 // LLDB-NOT: -module-name
-// LLDB: -target {{[^ "]+}}
-// LLDB-NOT: -module-name
+// LLDB-NOT: -target
 // LLDB: "
