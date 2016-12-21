@@ -75,6 +75,8 @@ CalleeCache::getOrCreateCalleesForMethod(SILDeclRef Decl) {
 /// Update the callees for each method of a given class, along with
 /// all the overridden methods from superclasses.
 void CalleeCache::computeClassMethodCalleesForClass(ClassDecl *CD) {
+  assert(!CD->hasClangNode());
+
   for (auto *Member : CD->getMembers()) {
     auto *AFD = dyn_cast<AbstractFunctionDecl>(Member);
     if (!AFD)
@@ -229,7 +231,7 @@ CalleeList CalleeCache::getCalleeList(SILInstruction *I) const {
                                     ->getAnyOptionalObjectType()
                                     .getCanonicalTypeOrNull());
   auto Class = Ty.getSwiftRValueType().getClassOrBoundGenericClass();
-  if (!Class || !Class->hasDestructor())
+  if (!Class || Class->hasClangNode() || !Class->hasDestructor())
     return CalleeList();
   auto Destructor = Class->getDestructor();
   return getCalleeList(Destructor);
