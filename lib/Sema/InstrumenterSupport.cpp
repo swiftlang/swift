@@ -20,6 +20,55 @@
 using namespace swift;
 using namespace swift::instrumenter_support;
 
+namespace {
+
+class ErrorGatherer : public DiagnosticConsumer {
+private:
+  bool error = false;
+  DiagnosticEngine &diags;
+
+public:
+  ErrorGatherer(DiagnosticEngine &diags) : diags(diags) {
+    diags.addConsumer(*this);
+  }
+  ~ErrorGatherer() override { diags.takeConsumers(); }
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+                        DiagnosticKind Kind, StringRef Text,
+                        const DiagnosticInfo &Info) override {
+    if (Kind == swift::DiagnosticKind::Error) {
+      error = true;
+    }
+    llvm::errs() << Text << "\n";
+  }
+  bool hadError() { return error; }
+};
+
+
+class ErrorFinder : public ASTWalker {
+  bool error = false;
+
+public:
+  ErrorFinder() {}
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->hasError()) {
+      error = true;
+      return {false, E};
+    }
+    return {true, E};
+  }
+  bool walkToDeclPre(Decl *D) override {
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+      if (!VD->hasInterfaceType() || VD->getInterfaceType()->hasError()) {
+        error = true;
+        return false;
+      }
+    }
+    return true;
+  }
+  bool hadError() { return error; }
+};
+}
+
 void InstrumenterBase::anchor() {}
 
 bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
