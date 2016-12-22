@@ -2788,6 +2788,8 @@ getWitnessFunctionType(SILGenModule &SGM,
   case WitnessDispatchKind::Class:
     return SGM.Types.getConstantOverrideType(witness);
   }
+
+  llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
 }
 
 static SILValue
@@ -2808,6 +2810,8 @@ getWitnessFunctionRef(SILGenFunction &gen,
     SILValue selfPtr = witnessParams.back().getValue();
     return gen.B.createClassMethod(loc, selfPtr, witness);
   }
+
+  llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
 }
 
 static CanType dropLastElement(CanType type) {

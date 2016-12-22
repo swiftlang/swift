@@ -140,6 +140,8 @@ public:
     case ImplodeKind::Copy:
       return v.copyUnmanaged(gen, l).forward(gen);
     }
+
+    llvm_unreachable("Unhandled ImplodeKind in switch.");
   }
 
   ImplodeLoadableTupleValue(ArrayRef<ManagedValue> values,

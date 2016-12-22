@@ -667,6 +667,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     return manageBufferForExprResult(existential, existentialTL, C);
   }
   }
+
+  llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
 }
 
 ManagedValue SILGenFunction::emitClassMetatypeToObject(SILLocation loc,

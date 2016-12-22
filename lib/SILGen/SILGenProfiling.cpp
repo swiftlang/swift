@@ -226,6 +226,8 @@ public:
     case Kind::Ref:
       return LHS->expand(Builder, Counters);
     }
+
+    llvm_unreachable("Unhandled Kind in switch.");
   }
 };
 
@@ -694,6 +696,8 @@ getEquivalentPGOLinkage(FormalLinkage Linkage) {
   case FormalLinkage::Private:
     return llvm::GlobalValue::PrivateLinkage;
   }
+
+  llvm_unreachable("Unhandled FormalLinkage in switch.");
 }
 
 void SILGenProfiling::assignRegionCounters(Decl *Root) {
