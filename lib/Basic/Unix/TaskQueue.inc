@@ -35,7 +35,10 @@
 #if !defined(__APPLE__)
 extern char **environ;
 #else
-#include <crt_externs.h> // for _NSGetEnviron
+extern "C" {
+  // _NSGetEnviron is from crt_externs.h which is missing in the iOS SDK.
+  extern char ***_NSGetEnviron(void);
+}
 #endif
 
 namespace swift {
