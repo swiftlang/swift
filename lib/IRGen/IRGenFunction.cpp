@@ -47,14 +47,6 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
     IGM.DebugInfo->pushLoc();
   }
 
-  // Apply sanitizer attributes to the function.
-  // TODO: Check if the function is ASan black listed either in the external
-  // file or via annotations.
-  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Address)
-    Fn->addFnAttr(llvm::Attribute::SanitizeAddress);
-  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
-    Fn->addFnAttr(llvm::Attribute::SanitizeThread);
-
   emitPrologue();
 }
 
