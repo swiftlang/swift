@@ -227,6 +227,11 @@ public:
 /// in "Notification", or it there would be nothing left.
 StringRef stripNotification(StringRef name);
 
+/// Find the swift_name attribute associated with this declaration, if any,
+/// appropriate for \p version.
+const clang::SwiftNameAttr *findSwiftNameAttr(const clang::Decl *decl,
+                                              ImportNameVersion version);
+
 /// Class to determine the Swift name of foreign entities. Currently fairly
 /// stateless and borrows from the ClangImporter::Implementation, but in the
 /// future will be more self-contained and encapsulated.
