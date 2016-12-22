@@ -72,7 +72,7 @@ static std::string getClonedName(PartialApplyInst *PAI, IsFragile_t Fragile,
                                  SILFunction *F) {
 
   Mangle::Mangler M;
-  auto P = SpecializationPass::CapturePropagation;
+  auto P = Demangle::SpecializationPass::CapturePropagation;
   FunctionSignatureSpecializationMangler OldMangler(P, M, Fragile, F);
   NewMangling::FunctionSignatureSpecializationMangler NewMangler(P, Fragile, F);
 

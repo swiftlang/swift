@@ -387,7 +387,7 @@ static std::string getSpecializedName(SILFunction *F,
                                       IsFragile_t Fragile,
                                       IndicesSet &PromotableIndices) {
   Mangle::Mangler M;
-  auto P = SpecializationPass::CapturePromotion;
+  auto P = Demangle::SpecializationPass::CapturePromotion;
   FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
   NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
   CanSILFunctionType FTy = F->getLoweredFunctionType();

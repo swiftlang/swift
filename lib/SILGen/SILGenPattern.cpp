@@ -222,6 +222,8 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Var:
     return isWildcardPattern(p->getSemanticsProvidingPattern());
   }
+
+  llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
 /// Check to see if the given pattern is a specializing pattern,
@@ -284,6 +286,8 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
   case PatternKind::Typed:
     llvm_unreachable("not semantic");
   }
+
+  llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
 namespace {

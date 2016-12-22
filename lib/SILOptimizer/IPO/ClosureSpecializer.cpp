@@ -398,7 +398,7 @@ IsFragile_t CallSiteDescriptor::isFragile() const {
 
 std::string CallSiteDescriptor::createName() const {
   Mangle::Mangler M;
-  auto P = SpecializationPass::ClosureSpecializer;
+  auto P = Demangle::SpecializationPass::ClosureSpecializer;
   FunctionSignatureSpecializationMangler OldFSSM(P, M, isFragile(),
                                                  getApplyCallee());
   NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, isFragile(),

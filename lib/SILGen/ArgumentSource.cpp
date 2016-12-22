@@ -57,6 +57,8 @@ bool ArgumentSource::requiresCalleeToEvaluate() {
   case Kind::Expr:
     return isa<TupleShuffleExpr>(asKnownExpr());
   }
+
+  llvm_unreachable("Unhandled Kind in switch.");
 }
 
 RValue ArgumentSource::getAsRValue(SILGenFunction &gen, SGFContext C) && {
