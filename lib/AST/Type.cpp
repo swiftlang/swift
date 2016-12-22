@@ -1564,7 +1564,8 @@ bool TypeBase::isSpelledLike(Type other) {
 }
 
 Type TypeBase::getSuperclass(LazyResolver *resolver) {
-  ClassDecl *classDecl = getClassOrBoundGenericClass();
+  auto *nominalDecl = getAnyNominal();
+  auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
 
   // Handle some special non-class types here.
   if (!classDecl) {
@@ -1585,7 +1586,8 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
   Type superclassTy = classDecl->getSuperclass();
 
   // If there's no superclass, or it is fully concrete, we're done.
-  if (!superclassTy || !superclassTy->hasTypeParameter())
+  if (!superclassTy || !superclassTy->hasTypeParameter() ||
+      hasUnboundGenericType())
     return superclassTy;
 
   // Gather substitutions from the self type, and apply them to the original
