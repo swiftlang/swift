@@ -1048,7 +1048,7 @@ void Decl::dump(raw_ostream &OS, unsigned Indent) const {
 }
 
 /// Print the given declaration context (with its parents).
-static void printContext(raw_ostream &os, DeclContext *dc) {
+void swift::printContext(raw_ostream &os, DeclContext *dc) {
   if (auto parent = dc->getParent()) {
     printContext(os, parent);
     os << '.';

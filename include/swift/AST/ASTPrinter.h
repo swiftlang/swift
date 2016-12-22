@@ -296,6 +296,7 @@ public:
 bool shouldPrint(const Decl *D, PrintOptions &Options);
 bool shouldPrintPattern(const Pattern *P, PrintOptions &Options);
 
+void printContext(raw_ostream &os, DeclContext *dc);
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_ASTPRINTER_H
