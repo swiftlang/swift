@@ -12,6 +12,10 @@
 
 #include "swift/Frontend/Frontend.h"
 
+#if __APPLE__
+# include "AppleHostVersionDetection.h"
+#endif
+
 #include "swift/Strings.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
@@ -904,6 +908,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
   }
+#if __APPLE__
+  else if (FrontendOpts.actionIsImmediate()) {
+    clang::VersionTuple currentOSVersion = inferAppleHostOSVersion();
+    if (currentOSVersion.getMajor() != 0) {
+      llvm::Triple::OSType currentOS = Target.getOS();
+      if (currentOS == llvm::Triple::Darwin)
+        currentOS = llvm::Triple::MacOSX;
+
+      SmallString<16> newOSBuf;
+      llvm::raw_svector_ostream newOS(newOSBuf);
+      newOS << llvm::Triple::getOSTypeName(currentOS) << currentOSVersion;
+      Target.setOSName(newOS.str());
+    }
+  }
+#endif
 
   Opts.EnableObjCInterop = Target.isOSDarwin();
   if (auto A = Args.getLastArg(OPT_enable_objc_interop,
