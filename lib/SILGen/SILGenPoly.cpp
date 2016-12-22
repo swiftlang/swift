@@ -876,17 +876,49 @@ namespace {
         // Tuple types are subtypes of their optionals
         if (auto outputObjectType =
               outputSubstType.getAnyOptionalObjectType()) {
-          // The input is exploded and the output is an optional tuple.
-          // Translate values and collect them into a single optional
-          // payload.
-          auto outputTupleType = cast<TupleType>(outputObjectType);
+          auto outputOrigObjectType = outputOrigType.getAnyOptionalObjectType();
 
-          return translateAndImplodeIntoOptional(inputOrigType,
-                                                 inputTupleType,
-                                  outputOrigType.getAnyOptionalObjectType(),
-                                                 outputTupleType);
+          if (auto outputTupleType = dyn_cast<TupleType>(outputObjectType)) {
+            // The input is exploded and the output is an optional tuple.
+            // Translate values and collect them into a single optional
+            // payload.
 
-          // FIXME: optional of Any (ugh...)
+            auto result =
+                translateAndImplodeIntoOptional(inputOrigType,
+                                                inputTupleType,
+                                                outputOrigObjectType,
+                                                outputTupleType);
+            Outputs.push_back(result);
+            return;
+          }
+
+          // Tuple types are subtypes of optionals of Any, too.
+          assert(outputObjectType->isAny());
+
+          // First, construct the existential.
+          auto result =
+              translateAndImplodeIntoAny(inputOrigType,
+                                         inputTupleType,
+                                         outputOrigObjectType,
+                                         outputObjectType);
+
+          // Now, convert it to an optional.
+          translateSingle(outputOrigObjectType, outputObjectType,
+                          outputOrigType, outputSubstType,
+                          result, claimNextOutputType());
+          return;
+        }
+
+        if (outputSubstType->isAny()) {
+          claimNextOutputType();
+
+          auto result =
+              translateAndImplodeIntoAny(inputOrigType,
+                                         inputTupleType,
+                                         outputOrigType,
+                                         outputSubstType);
+          Outputs.push_back(result);
+          return;
         }
 
         if (outputTupleType) {
@@ -908,7 +940,6 @@ namespace {
           return;
         }
 
-        // FIXME: Tuple-to-Any conversions
         llvm_unreachable("Unhandled conversion from exploded tuple");
       }
 
@@ -995,10 +1026,11 @@ namespace {
 
     /// Handle a tuple that has been exploded in the input but wrapped in
     /// an optional in the output.
-    void translateAndImplodeIntoOptional(AbstractionPattern inputOrigType,
-                                         CanTupleType inputTupleType,
-                                         AbstractionPattern outputOrigType,
-                                         CanTupleType outputTupleType) {
+    ManagedValue
+    translateAndImplodeIntoOptional(AbstractionPattern inputOrigType,
+                                    CanTupleType inputTupleType,
+                                    AbstractionPattern outputOrigType,
+                                    CanTupleType outputTupleType) {
       assert(!inputTupleType->hasInOut() &&
              !outputTupleType->hasInOut());
       assert(inputTupleType->getNumElements() ==
@@ -1018,7 +1050,7 @@ namespace {
         optionalTy = SGF.F.mapTypeIntoContext(optionalTy);
         auto optional = SGF.B.createEnum(Loc, payload.getValue(),
                                          someDecl, optionalTy);
-        Outputs.push_back(ManagedValue(optional, payload.getCleanup()));
+        return ManagedValue(optional, payload.getCleanup());
       } else {
         auto optionalBuf = SGF.emitTemporaryAllocation(Loc, optionalTy);
         auto tupleBuf = SGF.B.createInitEnumDataAddr(Loc, optionalBuf, someDecl,
@@ -1033,10 +1065,38 @@ namespace {
         SGF.B.createInjectEnumAddr(Loc, optionalBuf, someDecl);
 
         auto payload = tupleTemp->getManagedAddress();
-        Outputs.push_back(ManagedValue(optionalBuf, payload.getCleanup()));
+        return ManagedValue(optionalBuf, payload.getCleanup());
       }
     }
-  
+
+    /// Handle a tuple that has been exploded in the input but wrapped
+    /// in an existential in the output.
+    ManagedValue
+    translateAndImplodeIntoAny(AbstractionPattern inputOrigType,
+                               CanTupleType inputTupleType,
+                               AbstractionPattern outputOrigType,
+                               CanType outputSubstType) {
+      auto existentialTy = SGF.getLoweredType(outputOrigType, outputSubstType);
+      auto existentialBuf = SGF.emitTemporaryAllocation(Loc, existentialTy);
+
+      auto opaque = AbstractionPattern::getOpaque();
+      auto &concreteTL = SGF.getTypeLowering(opaque, inputTupleType);
+
+      auto tupleBuf =
+        SGF.B.createInitExistentialAddr(Loc, existentialBuf,
+                                        inputTupleType,
+                                        concreteTL.getLoweredType(),
+                                        /*conformances=*/{});
+
+      auto tupleTemp = SGF.useBufferAsTemporary(tupleBuf, concreteTL);
+      translateAndImplodeInto(inputOrigType, inputTupleType,
+                              opaque, inputTupleType,
+                              *tupleTemp);
+
+      auto payload = tupleTemp->getManagedAddress();
+      return ManagedValue(existentialBuf, payload.getCleanup());
+    }
+
     /// Handle a tuple that has been exploded in both the input and
     /// the output.
     void translateParallelExploded(AbstractionPattern inputOrigType,
@@ -1643,11 +1703,10 @@ void ResultPlanner::plan(AbstractionPattern innerOrigType,
                          CanType outerSubstType,
                          PlanData &planData) {
   // The substituted types must match up in tuple-ness and arity.
-  // (Existential erasure could complicate this if we add that as a subtyping
-  // relationship.)
   assert(isa<TupleType>(innerSubstType) == isa<TupleType>(outerSubstType) ||
          (isa<TupleType>(innerSubstType) &&
-          outerSubstType->getAnyOptionalObjectType()));
+          (outerSubstType->isAny() ||
+           outerSubstType->getAnyOptionalObjectType())));
   assert(!isa<TupleType>(outerSubstType) ||
          cast<TupleType>(innerSubstType)->getNumElements() ==
            cast<TupleType>(outerSubstType)->getNumElements());
@@ -1772,26 +1831,40 @@ ResultPlanner::planTupleIntoIndirectResult(AbstractionPattern innerOrigType,
     // Figure out what kind of optional it is.
     CanType outerSubstObjectType =
       outerSubstType.getAnyOptionalObjectType();
-    assert(outerSubstObjectType &&
-           "inner type was a tuple but outer type was neither a tuple nor "
-           "optional");
-    auto someDecl = Gen.getASTContext().getOptionalSomeDecl();
+    if (outerSubstObjectType) {
+      auto someDecl = Gen.getASTContext().getOptionalSomeDecl();
 
-    // Prepare the value slot in the optional value.
-    SILType outerObjectType =
-      outerResultAddr->getType().getAnyOptionalObjectType();
-    SILValue outerObjectResultAddr
-      = Gen.B.createInitEnumDataAddr(Loc, outerResultAddr, someDecl,
-                                     outerObjectType);
+      // Prepare the value slot in the optional value.
+      SILType outerObjectType =
+        outerResultAddr->getType().getAnyOptionalObjectType();
+      SILValue outerObjectResultAddr
+        = Gen.B.createInitEnumDataAddr(Loc, outerResultAddr, someDecl,
+                                       outerObjectType);
+
+      // Emit into that address.
+      planTupleIntoIndirectResult(innerOrigType, innerSubstType,
+                                  outerOrigType.getAnyOptionalObjectType(),
+                                  outerSubstObjectType,
+                                  planData, outerObjectResultAddr);
+
+      // Add an operation to finish the enum initialization.
+      addInjectOptionalIndirect(someDecl, outerResultAddr);
+      return;
+    }
+
+    assert(outerSubstType->isAny());
+
+    // Prepare the value slot in the existential.
+    auto opaque = AbstractionPattern::getOpaque();
+    SILValue outerConcreteResultAddr
+      = Gen.B.createInitExistentialAddr(Loc, outerResultAddr, innerSubstType,
+                                        Gen.getLoweredType(opaque, innerSubstType),
+                                        /*conformances=*/{});
 
     // Emit into that address.
     planTupleIntoIndirectResult(innerOrigType, innerSubstType,
-                                outerOrigType.getAnyOptionalObjectType(),
-                                outerSubstObjectType,
-                                planData, outerObjectResultAddr);
-
-    // Add an operation to finish the enum initialization.
-    addInjectOptionalIndirect(someDecl, outerResultAddr);
+                                innerOrigType, innerSubstType,
+                                planData, outerConcreteResultAddr);
     return;
   }
 
