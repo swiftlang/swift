@@ -81,17 +81,24 @@ func optionalityMatchingCastsIUO(f: CGFloat?!, n: NSNumber?!) {
   let _ = n as! CGFloat? // expected-warning{{forced cast from 'NSNumber?!' to 'CGFloat?' only unwraps and bridges; did you mean to use '!' with 'as'?}}
 }
 
-func optionalityMismatchingCasts(f: CGFloat???, n: NSNumber???) {
-  let _ = f as NSNumber?? // expected-error{{'CGFloat???' is not convertible to 'NSNumber??'; did you mean to use 'as!' to force downcast?}}
-  let _ = f as NSNumber???? // expected-error{{cannot convert value of type 'CGFloat???' to type 'NSNumber????' in coercion}}
-  let _ = n as CGFloat?? // expected-error{{'NSNumber???' is not convertible to 'CGFloat??'; did you mean to use 'as!' to force downcast?}}
-  let _ = n as CGFloat???? // expected-error{{cannot convert value of type 'NSNumber???' to type 'CGFloat????' in coercion}}
+func optionalityMismatchingCasts(f: CGFloat, n: NSNumber, fooo: CGFloat???, 
+                                 nooo: NSNumber???) {
+  _ = f as NSNumber?
+  _ = f as NSNumber??
+  _ = n as CGFloat?
+  _ = n as CGFloat??
+  let _ = fooo as NSNumber?? // expected-error{{'CGFloat???' is not convertible to 'NSNumber??'; did you mean to use 'as!' to force downcast?}}
+  let _ = fooo as NSNumber???? // okay: injects extra optionals
+  let _ = nooo as CGFloat?? // expected-error{{'NSNumber???' is not convertible to 'CGFloat??'; did you mean to use 'as!' to force downcast?}}
+  let _ = nooo as CGFloat???? // okay: injects extra optionals
 }
 
-func anyObjectCasts(xo: [Int]?, xooo: [Int]???) {
+func anyObjectCasts(xo: [Int]?, xooo: [Int]???, x: [Int]) {
+  _ = x as AnyObject
+  _ = x as AnyObject?
   _ = xo as AnyObject
   _ = xo as AnyObject?
   _ = xooo as AnyObject??
   _ = xooo as AnyObject???
-  _ = xooo as AnyObject???? // expected-error{{cannot convert value of type '[Int]???' to type 'AnyObject????' in coercion}}
+  _ = xooo as AnyObject???? // okay: injects extra optionals
 }

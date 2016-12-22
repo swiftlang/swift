@@ -3085,6 +3085,34 @@ namespace {
                            srcOptionals.end());
       }
 
+      // When performing a bridging operation, if the destination type
+      // is more optional than the source, we'll add extra optional injections
+      // at the end.
+      SmallVector<Type, 4> destOptionalInjections;
+      if (castKind == OptionalBindingsCastKind::Bridged &&
+          destOptionals.size() > srcOptionals.size()) {
+        // Remove the extra optionals from destOptionals, but keep them around
+        // separately so we can perform the injections on the final result of
+        // the cast.
+        auto cutPoint = destOptionals.end() - srcOptionals.size();
+        destOptionalInjections.append(destOptionals.begin(), cutPoint);
+        destOptionals.erase(destOptionals.begin(), cutPoint);
+
+        finalResultType = destOptionals.empty() ? destValueType
+                                                : destOptionals.front();
+      }
+
+      // Local function to add the optional injections to final result.
+      auto addFinalOptionalInjections = [&](Expr *result) {
+        for (auto destType : reversed(destOptionalInjections)) {
+          result =
+            cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(result,
+                                                                 destType));
+        }
+
+        return result;
+      };
+
       // Complain about conditional casts to foreign class types; they can't
       // actually be conditionally checked.
       if (castKind == OptionalBindingsCastKind::Conditional) {
@@ -3107,7 +3135,7 @@ namespace {
       // and we don't need any bridging.
       if (srcOptionals.empty()) {
         cs.setType(cast, finalResultType);
-        return cast;
+        return addFinalOptionalInjections(cast);
       }
 
       // If this is a conditional cast, the result type will always
@@ -3198,7 +3226,7 @@ namespace {
                                                               finalResultType));
       }
 
-      return result;
+      return addFinalOptionalInjections(result);
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {

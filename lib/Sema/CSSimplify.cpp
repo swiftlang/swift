@@ -3328,10 +3328,19 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     return SolutionKind::Error;
   }
 
+  // Local function to count the optional injections that will be performed
+  // after the bridging conversion.
+  auto countOptionalInjections = [&] {
+    if (numToOptionals > numFromOptionals)
+      increaseScore(SK_ValueToOptional, numToOptionals - numFromOptionals);
+  };
+
   // Anything can be explicitly converted to AnyObject using the universal
-  // bridging conversion. We allow this so long as we have at least as many
-  // optionals in the source as in the destination.
-  if (unwrappedToType->isAnyObject() && numFromOptionals >= numToOptionals) {
+  // bridging conversion. This allows both extraneous optionals in the source
+  // (because optionals themselves can be boxed for AnyObject) and in the
+  // destination (we'll perform the extra injections at the end).
+  if (unwrappedToType->isAnyObject()) {
+    countOptionalInjections();
     return SolutionKind::Solved;
   }
 
@@ -3346,8 +3355,9 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     }
   }
 
-  // # of optionals must match for bridging conversions.
-  if (numToOptionals != numFromOptionals) {
+  // The source cannot be more optional than the destination, because bridging
+  // conversions don't allow us to implicitly check for a value in the optional.
+  if (numFromOptionals > numToOptionals) {
     return SolutionKind::Error;
   }
 
@@ -3357,6 +3367,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
         != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
       !flags.contains(TMF_ApplyingOperatorParameter) &&
       unwrappedToType->isBridgeableObjectType()) {
+    countOptionalInjections();
     if (Type classType = TC.Context.getBridgedToObjC(DC, unwrappedFromType)) {
       return matchTypes(classType, unwrappedToType, ConstraintKind::Subtype, subflags,
                         locator);
@@ -3427,6 +3438,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
             == ConstraintSystem::SolutionKind::Error)
         return SolutionKind::Error;
 
+      countOptionalInjections();
       return matchTypes(unwrappedFromType, objcClass, ConstraintKind::Subtype,
                         subflags, locator);
     }
@@ -3435,6 +3447,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   // Bridging the elements of an array.
   if (auto fromElement = isArrayType(unwrappedFromType)) {
     if (auto toElement = isArrayType(unwrappedToType)) {
+      countOptionalInjections();
       return simplifyBridgingConstraint(
                                       *fromElement, *toElement, subflags,
                                       locator.withPathElement(
@@ -3453,6 +3466,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                                       /*allowFixes=*/false,
                                       locator.withPathElement(
                                         LocatorPathElt::getGenericArgument(0)));
+      countOptionalInjections();
       return SolutionKind::Solved;
     }
   }
@@ -3460,6 +3474,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   // Bridging the elements of a set.
   if (auto fromElement = isSetType(unwrappedFromType)) {
     if (auto toElement = isSetType(unwrappedToType)) {
+      countOptionalInjections();
       return simplifyBridgingConstraint(
                                       *fromElement, *toElement, subflags,
                                       locator.withPathElement(
