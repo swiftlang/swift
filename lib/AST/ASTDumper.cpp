@@ -1853,7 +1853,7 @@ public:
   }
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
     printCommon(E, "tuple_shuffle_expr");
-    if (E->isSourceScalar()) OS << " sourceIsScalar";
+    if (E->isSourceScalar()) OS << " source_is_scalar";
     OS << " elements=[";
     for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
       if (i) OS << ", ";
@@ -1867,6 +1867,12 @@ public:
                },
                [&] { OS << ", "; });
     OS << "]";
+
+    if (auto defaultArgsOwner = E->getDefaultArgsOwner()) {
+      OS << " default_args_owner=";
+      defaultArgsOwner.dump(OS);
+      dump(defaultArgsOwner.getSubstitutions());
+    }
 
     OS << "\n";
     printRec(E->getSubExpr());
