@@ -1639,7 +1639,7 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   }
   ++ImportNameNumCacheMisses;
   auto res = importNameImpl(decl, version);
-  res.info.version = version;
+  res.setVersion(version);
   importNameCache[key] = res;
   return res;
 }
