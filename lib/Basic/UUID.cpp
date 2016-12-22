@@ -20,7 +20,8 @@
 // WIN32 doesn't natively support <uuid/uuid.h>. Instead, we use Win32 APIs.
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
-#include <rpc.h>
+#define NOMINMAX
+#include <objbase.h>
 #include <string>
 #else
 #include <uuid/uuid.h>
@@ -31,7 +32,7 @@ using namespace swift;
 swift::UUID::UUID(FromRandom_t) {
 #if defined(_WIN32)
   ::UUID uuid;
-  UuidCreate(&uuid);
+  ::CoCreateGuid(&uuid);
 
   memcpy(Value, &uuid, Size);
 #else
@@ -42,7 +43,7 @@ swift::UUID::UUID(FromRandom_t) {
 swift::UUID::UUID(FromTime_t) {
 #if defined(_WIN32)
   ::UUID uuid;
-  UuidCreate(&uuid);
+  ::CoCreateGuid(&uuid);
 
   memcpy(Value, &uuid, Size);
 #else
