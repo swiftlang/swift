@@ -576,8 +576,10 @@ ${genericParam}, S : ${TraversalCollection}
 %       end
       let expectedSlice = expectedArray[startNumericIndex..<endNumericIndex]
       let slice = sliceable[start..<end]
-      //FIXME!!!: expectEqual(start, slice.startIndex)
-      //FIXME!!!: expectEqual(end, slice.endIndex)
+      // For every possible slice, verify that the slice's bounds are identical
+      // to the indices used to form the slice.
+      expectEqual(start, slice.startIndex)
+      expectEqual(end, slice.endIndex)
 
       _checkOneLevelOf${Traversal}Collection(expectedSlice, slice, ${trace},
         resiliencyChecks: resiliencyChecks,
