@@ -325,7 +325,6 @@ class DeadFunctionElimination : FunctionLivenessComputation {
 
     // Check witness methods.
     for (SILWitnessTable &WT : Module->getWitnessTableList()) {
-      bool tableIsAlive = isVisibleExternally(WT.getConformance()->getProtocol());
       for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
         if (entry.getKind() != SILWitnessTable::Method)
           continue;
