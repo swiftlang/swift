@@ -923,7 +923,7 @@ public:
     // going to change, make sure the mangler is aware of all the changes done
     // to the function.
     Mangle::Mangler M;
-    auto P = SpecializationPass::FunctionSignatureOpts;
+    auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
     FunctionSignatureSpecializationMangler OldFM(P, M, F->isFragile(), F);
     NewMangling::FunctionSignatureSpecializationMangler NewFM(P, F->isFragile(),
                                                               F);

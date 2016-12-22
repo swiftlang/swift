@@ -95,7 +95,7 @@ std::string PartialSpecializationMangler::mangle() {
 //===----------------------------------------------------------------------===//
 
 FunctionSignatureSpecializationMangler::
-FunctionSignatureSpecializationMangler(SpecializationPass P,
+FunctionSignatureSpecializationMangler(Demangle::SpecializationPass P,
                                        IsFragile_t Fragile, SILFunction *F)
   : SpecializationMangler(P, Fragile, F) {
   for (unsigned i = 0, e = F->getLoweredFunctionType()->getNumSILArguments();

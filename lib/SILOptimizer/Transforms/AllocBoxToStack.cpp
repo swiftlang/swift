@@ -521,7 +521,7 @@ static std::string getClonedName(SILFunction *F,
                                  IsFragile_t Fragile,
                                  ParamIndexList &PromotedParamIndices) {
   Mangle::Mangler M;
-  auto P = SpecializationPass::AllocBoxToStack;
+  auto P = Demangle::SpecializationPass::AllocBoxToStack;
   FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
   NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
   for (unsigned i : PromotedParamIndices) {

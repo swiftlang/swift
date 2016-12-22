@@ -48,7 +48,6 @@ public:
   SILPassPipelinePlan() = default;
   ~SILPassPipelinePlan() = default;
   SILPassPipelinePlan(const SILPassPipelinePlan &) = default;
-  SILPassPipelinePlan(SILPassPipelinePlan &&) = delete;
 
 // Each pass gets its own add-function.
 #define PASS(ID, NAME, DESCRIPTION)                                            \
