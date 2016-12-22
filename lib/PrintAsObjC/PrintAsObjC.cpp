@@ -29,6 +29,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -114,14 +115,15 @@ static StringRef getNameForObjC(const ValueDecl *VD,
   return VD->getName().str();
 }
 
-/// Returns true if the given selector might be mistaken for an init method
+/// Returns true if the given selector might be classified as an init method
 /// by Objective-C ARC.
-static bool isMistakableForInit(ObjCSelector selector) {
+static bool looksLikeInitMethod(ObjCSelector selector) {
   ArrayRef<Identifier> selectorPieces = selector.getSelectorPieces();
   assert(!selectorPieces.empty());
-  return selectorPieces.front().str().startswith("init");
+  auto firstPiece = selectorPieces.front().str();
+  if (!firstPiece.startswith("init")) return false;
+  return !(firstPiece.size() > 4 && clang::isLowercase(firstPiece[4]));
 }
-
 
 namespace {
 using DelayedMemberSet = llvm::SmallSetVector<const ValueDecl *, 32>;
@@ -541,8 +543,11 @@ private:
           !isa<ProtocolDecl>(ctor->getDeclContext())) {
         os << " OBJC_DESIGNATED_INITIALIZER";
       }
+      if (!looksLikeInitMethod(AFD->getObjCSelector())) {
+        os << " SWIFT_METHOD_FAMILY(init)";
+      }
     } else {
-      if (isMistakableForInit(AFD->getObjCSelector())) {
+      if (looksLikeInitMethod(AFD->getObjCSelector())) {
         os << " SWIFT_METHOD_FAMILY(none)";
       }
       if (!methodTy->getResult()->isVoid() &&
@@ -766,9 +771,9 @@ private:
       }
     } else {
       os << "\n";
-      if (isMistakableForInit(VD->getObjCGetterSelector()))
+      if (looksLikeInitMethod(VD->getObjCGetterSelector()))
         printAbstractFunctionAsMethod(VD->getGetter(), false);
-      if (isSettable && isMistakableForInit(VD->getObjCSetterSelector()))
+      if (isSettable && looksLikeInitMethod(VD->getObjCSetterSelector()))
         printAbstractFunctionAsMethod(VD->getSetter(), false);
     }
   }
