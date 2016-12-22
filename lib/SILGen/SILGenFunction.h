@@ -1597,6 +1597,11 @@ public:
                                               CanType concreteFormalType,
                                               ExistentialRepresentation repr);
 
+  /// Enter a cleanup to emit an EndBorrow stating that \p borrowed (the
+  /// borrowed entity) is no longer borrowed from \p borrowee, the original
+  /// value.
+  CleanupHandle enterEndBorrowCleanup(SILValue borrowee, SILValue borrowed);
+
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E, AccessKind accessKind);
 
