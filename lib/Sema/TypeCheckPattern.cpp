@@ -499,6 +499,15 @@ public:
   //   of the type.
   Pattern *visitCallExpr(CallExpr *ce) {
     GenericTypeToArchetypeResolver resolver(DC);
+
+    if (!TC.Context.isSwiftVersion3()) {
+      // swift(>=4) mode.
+      // Specialized call are not allowed anyway.
+      // Let it be diagnosed as a expression.
+      // for Swift3 mode, see 'diagnoseSpecialized' below.
+      if (isa<UnresolvedSpecializeExpr>(ce->getFn()))
+        return nullptr;
+    }
     
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ce->getFn()))
@@ -506,6 +515,26 @@ public:
     
     if (components.empty())
       return nullptr;
+
+    // Helper function to diagnose specialzed-enum case for Swift3.
+    auto diagnoseSpecialized = [&]() {
+      auto generic = dyn_cast<GenericIdentTypeRepr>(components.back());
+      if (!generic)
+        return;
+
+      assert(TC.Context.isSwiftVersion3() && "should be handled above");
+
+      // Swift3 used to ignore the last generic argument clause:
+      //   EnumTy.CaseVal<SomeType>()
+      // used to be wrongfully converted to
+      //   (pattern_enum_element type='EnumTy' EnumTy.CaseVal
+      //     (pattern_tuple type='()' names=))
+      // To keep source compatibility, just emit a warning with fix-it.
+      TC.diagnose(generic->getAngleBrackets().Start,
+                  diag::swift3_ignore_specialized_enum_element_call)
+        .fixItRemove(generic->getAngleBrackets());
+    };
+
     auto *repr = IdentTypeRepr::create(TC.Context, components);
     
     // If we had a single component, try looking up an enum element in context.
@@ -517,6 +546,8 @@ public:
       
       if (!referencedElement)
         return nullptr;
+
+      diagnoseSpecialized();
       
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
@@ -555,6 +586,8 @@ public:
                                 tailComponent->getLoc());
     if (!referencedElement)
       return nullptr;
+
+    diagnoseSpecialized();
     
     // Build a TypeRepr from the head of the full path.
     TypeLoc loc;
