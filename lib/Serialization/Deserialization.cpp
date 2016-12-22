@@ -4006,7 +4006,7 @@ Type ModuleFile::getType(TypeID TID) {
       }
       
       bool ok = true;
-      sig->getSubstitutions(*getAssociatedModule(), mappings,
+      sig->getSubstitutions(mappings,
         [&](CanType depTy, Type replacementTy, ProtocolType *proto)
         -> ProtocolConformanceRef {
           if (replacementTy->is<SubstitutableType>()

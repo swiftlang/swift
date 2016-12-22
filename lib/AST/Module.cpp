@@ -649,7 +649,7 @@ TypeBase::gatherAllSubstitutions(Module *module,
       };
 
   SmallVector<Substitution, 4> result;
-  genericSig->getSubstitutions(*module, substitutions,
+  genericSig->getSubstitutions(substitutions,
                                lookupConformanceFn,
                                result);
 

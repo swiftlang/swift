@@ -289,17 +289,15 @@ SmallVector<Type, 4> GenericSignature::getAllDependentTypes() const {
 }
 
 void GenericSignature::
-getSubstitutions(ModuleDecl &mod,
-                 const TypeSubstitutionMap &subs,
+getSubstitutions(const TypeSubstitutionMap &subs,
                  GenericSignature::LookupConformanceFn lookupConformance,
                  SmallVectorImpl<Substitution> &result) const {
-  getSubstitutions(mod, QueryTypeSubstitutionMap{subs}, lookupConformance,
+  getSubstitutions(QueryTypeSubstitutionMap{subs}, lookupConformance,
                    result);
 }
 
 void GenericSignature::
-getSubstitutions(ModuleDecl &mod,
-                 TypeSubstitutionFn subs,
+getSubstitutions(TypeSubstitutionFn subs,
                  GenericSignature::LookupConformanceFn lookupConformance,
                  SmallVectorImpl<Substitution> &result) const {
   // Enumerate all of the requirements that require substitution.
@@ -307,8 +305,7 @@ getSubstitutions(ModuleDecl &mod,
     auto &ctx = getASTContext();
 
     // Compute the replacement type.
-    Type currentReplacement = depTy.subst(subs,
-                                          LookUpConformanceInModule(&mod));
+    Type currentReplacement = depTy.subst(subs, lookupConformance);
     if (!currentReplacement)
       currentReplacement = ErrorType::get(depTy);
 
@@ -334,8 +331,7 @@ getSubstitutions(ModuleDecl &mod,
 }
 
 void GenericSignature::
-getSubstitutions(ModuleDecl &mod,
-                 const SubstitutionMap &subMap,
+getSubstitutions(const SubstitutionMap &subMap,
                  SmallVectorImpl<Substitution> &result) const {
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
@@ -343,7 +339,7 @@ getSubstitutions(ModuleDecl &mod,
         return subMap.lookupConformance(original, protoType->getDecl());
       };
 
-  getSubstitutions(mod, subMap.getMap(), lookupConformanceFn, result);
+  getSubstitutions(subMap.getMap(), lookupConformanceFn, result);
 }
 
 bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {

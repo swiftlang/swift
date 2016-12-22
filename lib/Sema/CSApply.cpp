@@ -97,7 +97,6 @@ Type Solution::computeSubstitutions(
       getFixedType(opened.second);
   }
 
-  auto mod = getConstraintSystem().DC->getParentModule();
   GenericSignature *sig;
   if (auto genericFn = origType->getAs<GenericFunctionType>()) {
     sig = genericFn->getGenericSignature();
@@ -121,7 +120,7 @@ Type Solution::computeSubstitutions(
                                   ConformanceCheckFlags::Used));
   };
 
-  sig->getSubstitutions(*mod, subs, lookupConformanceFn, result);
+  sig->getSubstitutions(subs, lookupConformanceFn, result);
   return type;
 }
 

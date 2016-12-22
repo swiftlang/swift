@@ -505,9 +505,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ArrayRef<Substitution> subs;
   // Call the initializer.
   ArrayRef<Substitution> forwardingSubs;
-  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
-    forwardingSubs = genericEnv->getForwardingSubstitutions(SGM.SwiftModule);
-  }
+  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext())
+    forwardingSubs = genericEnv->getForwardingSubstitutions();
   std::tie(initVal, initTy, subs)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
 
@@ -910,7 +909,6 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
           // replacement types are the archetypes of the initializer itself.
           SmallVector<Substitution, 4> subsVec;
           typeGenericSig->getSubstitutions(
-                       *SGM.SwiftModule,
                        [&](SubstitutableType *type) {
                          if (auto gp = type->getAs<GenericTypeParamType>()) {
                            return genericEnv->mapTypeIntoContext(gp);

@@ -236,7 +236,7 @@ public:
                      ArrayRef<Substitution> subs,
                      SubstitutionMap &subMap) const;
 
-  ArrayRef<Substitution> getForwardingSubstitutions(ModuleDecl *M) const;
+  ArrayRef<Substitution> getForwardingSubstitutions() const;
 
   void dump() const;
 };

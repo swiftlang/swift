@@ -2277,7 +2277,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     }
     
     bool ok = true;
-    genericSig->getSubstitutions(*DC->getParentModule(), genericArgMap,
+    genericSig->getSubstitutions(genericArgMap,
       [&](CanType depTy, Type replacement, ProtocolType *proto)
       -> ProtocolConformanceRef {
         auto result = TC.conformsToProtocol(replacement, proto->getDecl(), DC,

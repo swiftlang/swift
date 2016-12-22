@@ -493,7 +493,7 @@ getSubstitutionsForCallee(SILModule &M,
 
   // Build the new substitutions using the base method signature.
   auto baseCalleeSig = baseCalleeType->getGenericSignature();
-  baseCalleeSig->getSubstitutions(*M.getSwiftModule(), subMap, newSubs);
+  baseCalleeSig->getSubstitutions(subMap, newSubs);
 }
 
 SILFunction *swift::getTargetClassMethod(SILModule &M,
@@ -906,8 +906,7 @@ static void getWitnessMethodSubstitutions(
 
   // Now, apply both sets of substitutions computed above to the
   // forwarding substitutions of the witness thunk.
-  witnessThunkSig->getSubstitutions(*M.getSwiftModule(),
-                                    subMap, newSubs);
+  witnessThunkSig->getSubstitutions(subMap, newSubs);
 }
 
 static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,

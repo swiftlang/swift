@@ -320,7 +320,7 @@ GenericTypeParamType *GenericEnvironment::getSugaredType(
 }
 
 ArrayRef<Substitution>
-GenericEnvironment::getForwardingSubstitutions(ModuleDecl *M) const {
+GenericEnvironment::getForwardingSubstitutions() const {
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
       -> Optional<ProtocolConformanceRef> {
@@ -328,8 +328,7 @@ GenericEnvironment::getForwardingSubstitutions(ModuleDecl *M) const {
       };
 
   SmallVector<Substitution, 4> result;
-  getGenericSignature()->getSubstitutions(*M,
-                                          QueryInterfaceTypeSubstitutions(this),
+  getGenericSignature()->getSubstitutions(QueryInterfaceTypeSubstitutions(this),
                                           lookupConformanceFn, result);
   return getGenericSignature()->getASTContext().AllocateCopy(result);
 }

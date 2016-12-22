@@ -849,9 +849,8 @@ namespace {
         entityType = decl->getInterfaceType();
         auto *DC = decl->getInnermostDeclContext();
         if (auto *GFT = entityType->getAs<GenericFunctionType>()) {
-          auto *M = DC->getParentModule();
           auto subs = DC->getGenericEnvironmentOfContext()
-              ->getForwardingSubstitutions(M);
+              ->getForwardingSubstitutions();
           entityType = GFT->substGenericArgs(subs);
         } else {
           if (auto objType =

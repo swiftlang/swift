@@ -826,9 +826,8 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
   // Forward substitutions.
   ArrayRef<Substitution> subs;
   auto constantInfo = getConstantInfo(to);
-  if (auto *env = constantInfo.GenericEnv) {
-    subs = env->getForwardingSubstitutions(SGM.SwiftModule);
-  }
+  if (auto *env = constantInfo.GenericEnv)
+    subs = env->getForwardingSubstitutions();
 
   SILValue toFn = getNextUncurryLevelRef(*this, vd, to, from.isDirectReference,
                                          curriedArgs, subs);
