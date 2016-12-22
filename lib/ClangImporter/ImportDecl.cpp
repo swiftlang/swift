@@ -2897,13 +2897,11 @@ namespace {
       ParameterList *bodyParams = nullptr;
       Type type = Impl.importFunctionType(dc,
                                           decl,
-                                          decl->getReturnType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
                                           decl->isVariadic(),
-                                          decl->isNoReturn(),
                                           isInSystemModule(dc),
-                                          hasCustomName, bodyParams, name);
+                                          name, bodyParams);
       if (!type)
         return nullptr;
 
@@ -4754,8 +4752,8 @@ SwiftDeclConverter::importGlobalAsInitializer(const clang::FunctionDecl *decl,
                                          /*isInOut=*/selfIsInOut);
 
   OptionalTypeKind initOptionality;
-  auto resultType = Impl.importFunctionReturnType(
-      dc, decl, decl->getReturnType(), allowNSUIntegerAsInt);
+  auto resultType = Impl.importFunctionReturnType(dc, decl,
+                                                  allowNSUIntegerAsInt);
   (void)resultType->getAnyOptionalObjectType(initOptionality);
 
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
@@ -4823,8 +4821,8 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(const clang::FunctionDecl *decl,
   bodyParams.push_back(getNonSelfParamList(
       dc, decl, selfIdx, name.getArgumentNames(), allowNSUIntegerAsInt, !name));
 
-  auto swiftResultTy = Impl.importFunctionReturnType(
-      dc, decl, decl->getReturnType(), allowNSUIntegerAsInt);
+  auto swiftResultTy = Impl.importFunctionReturnType(dc, decl,
+                                                     allowNSUIntegerAsInt);
   auto fnType =
       ParameterList::getFullInterfaceType(swiftResultTy, bodyParams, C);
 

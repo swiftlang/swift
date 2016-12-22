@@ -914,31 +914,31 @@ public:
   /// function declaration, because it produces a function type whose input
   /// tuple has argument names.
   ///
+  /// \param dc The context the function is being imported into.
   /// \param clangDecl The underlying declaration, if any; should only be
   ///   considered for any attributes it might carry.
-  /// \param resultType The result type of the function.
   /// \param params The parameter types to the function.
   /// \param isVariadic Whether the function is variadic.
-  /// \param isNoReturn Whether the function is noreturn.
-  /// \param parameterList The parameters visible inside the function body.
+  /// \param isFromSystemModule Whether to apply special rules that only apply
+  ///   to system APIs.
+  /// \param name The name of the function.
+  /// \param[out] parameterList The parameters visible inside the function body.
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
   Type importFunctionType(DeclContext *dc,
                           const clang::FunctionDecl *clangDecl,
-                          clang::QualType resultType,
                           ArrayRef<const clang::ParmVarDecl *> params,
-                          bool isVariadic, bool isNoReturn,
+                          bool isVariadic,
                           bool isFromSystemModule,
-                          bool hasCustomName,
-                          ParameterList *&parameterList,
-                          DeclName &name);
+                          DeclName name,
+                          ParameterList *&parameterList);
 
   /// \brief Import the given function return type.
   ///
+  /// \param dc The context the function is being imported into.
   /// \param clangDecl The underlying declaration, if any; should only be
   ///   considered for any attributes it might carry.
-  /// \param resultType The result type of the function.
   /// \param allowNSUIntegerAsInt If true, NSUInteger will be imported as Int
   ///        in certain contexts. If false, it will always be imported as UInt.
   ///
@@ -946,7 +946,6 @@ public:
   /// imported.
   Type importFunctionReturnType(DeclContext *dc,
                                 const clang::FunctionDecl *clangDecl,
-                                clang::QualType resultType,
                                 bool allowNSUIntegerAsInt);
 
   /// \brief Import the parameter list for a function
