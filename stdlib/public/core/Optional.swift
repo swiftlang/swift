@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that can represent either a wrapped value or `nil`, the absence of a
+/// A type that represents either a wrapped value or `nil`, the absence of a
 /// value.
 ///
 /// You use the `Optional` type whenever you use optional values, even if you
