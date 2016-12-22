@@ -342,10 +342,6 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
 
   SF.addImports(ImportedModules);
 
-  // FIXME: This algorithm has quadratic memory usage.  (In practice,
-  // import statements after the first "chunk" should be rare, though.)
-  // FIXME: Can we make this more efficient?
-
   SF.ASTStage = SourceFile::NameBound;
   verify(SF);
 }
