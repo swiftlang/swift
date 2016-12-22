@@ -693,6 +693,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -818,6 +819,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -945,6 +947,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -1011,6 +1014,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -1437,6 +1441,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::Defaultable:
     case ConstraintKind::Disjunction:
     case ConstraintKind::DynamicTypeOf:
+    case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::SelfObjectOfProtocol:
@@ -3486,6 +3491,60 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyEscapableFunctionOfConstraint(
+                                        Type type1, Type type2,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+
+  // Local function to form an unsolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::EscapableFunctionOf,
+                           type1, type2,
+                           DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+
+  type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
+  if (auto fn2 = type2->getAs<FunctionType>()) {
+    // We should have the noescape end of the relation.
+    if (!fn2->getExtInfo().isNoEscape())
+      return SolutionKind::Error;
+    // Solve forward by binding the other type variable to the escapable
+    // variation of this type.
+    auto fn1 = fn2->withExtInfo(fn2->getExtInfo().withNoEscape(false));
+    return matchTypes(type1, fn1, ConstraintKind::Bind, subflags, locator);
+  }
+  if (!type2->isTypeVariableOrMember())
+    // We definitely don't have a function, so bail.
+    return SolutionKind::Error;
+  
+  type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
+  if (auto fn1 = type1->getAs<FunctionType>()) {
+    // We should have the escaping end of the relation.
+    if (fn1->getExtInfo().isNoEscape())
+      return SolutionKind::Error;
+    
+    // Solve backward by binding the other type variable to the noescape
+    // variation of this type.
+    auto fn2 = fn1->withExtInfo(fn1->getExtInfo().withNoEscape(true));
+    return matchTypes(type2, fn2, ConstraintKind::Bind, subflags, locator);
+  }
+  if (!type1->isTypeVariableOrMember())
+    // We definitely don't have a function, so bail.
+    return SolutionKind::Error;
+
+  return formUnsolved();
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(
                                            Type type1,
                                            Type type2,
@@ -4114,6 +4173,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::DynamicTypeOf:
     return simplifyDynamicTypeOfConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::EscapableFunctionOf:
+    return simplifyEscapableFunctionOfConstraint(first, second,
+                                                 subflags, locator);
+
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -4256,6 +4319,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                            constraint.getSecondType(),
                                            None,
                                            constraint.getLocator());
+
+  case ConstraintKind::EscapableFunctionOf:
+    return simplifyEscapableFunctionOfConstraint(constraint.getFirstType(),
+                                                 constraint.getSecondType(),
+                                                 None,
+                                                 constraint.getLocator());
 
   case ConstraintKind::BindOverload:
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),

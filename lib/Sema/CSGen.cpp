@@ -2669,6 +2669,9 @@ namespace {
     Type visitOpenExistentialExpr(OpenExistentialExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
+    Type visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
     
     Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
       // Should already be type-checked.

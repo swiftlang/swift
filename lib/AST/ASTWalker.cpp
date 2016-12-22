@@ -848,6 +848,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     E->setSubExpr(sub);
     return E;
   }
+
+  Expr *visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *E) {
+    Expr *closure = doIt(E->getNonescapingClosureValue());
+    if (!closure) return nullptr;
+
+    Expr *sub = doIt(E->getSubExpr());
+    if (!sub) return nullptr;
+
+    E->setNonescapingClosureValue(closure);
+    E->setSubExpr(sub);
+    return E;
+  }
   
   Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);

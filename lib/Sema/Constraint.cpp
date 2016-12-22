@@ -66,6 +66,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OptionalObject:
     assert(!First.isNull());
     assert(!Second.isNull());
@@ -162,6 +163,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::OptionalObject:
@@ -238,6 +240,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::SelfObjectOfProtocol: Out << " Self type of "; break;
   case ConstraintKind::ApplicableFunction: Out << " applicable fn "; break;
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
+  case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OptionalObject:
       Out << " optional with object type "; break;
   case ConstraintKind::BindOverload: {
@@ -467,6 +470,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::Defaultable:
     constraint->getSecondType()->getTypeVariables(typeVars);

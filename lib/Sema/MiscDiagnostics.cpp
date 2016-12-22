@@ -276,6 +276,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             AcceptableInOutExprs.insert(IOE);
       }
 
+      // Check decl refs in withoutActuallyEscaping blocks.
+      if (auto MakeEsc = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
+        if (auto DRE =
+              dyn_cast<DeclRefExpr>(MakeEsc->getNonescapingClosureValue()))
+          checkNoEscapeParameterUse(DRE, MakeEsc);
+      }
 
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
@@ -481,8 +487,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // The only valid use of the noescape parameter is an immediate call,
       // either as the callee or as an argument (in which case, the typechecker
-      // validates that the noescape bit didn't get stripped off).
-      if (ParentExpr && isa<ApplyExpr>(ParentExpr)) // param()
+      // validates that the noescape bit didn't get stripped off), or as
+      // a special case, in the binding of a withoutActuallyEscaping block.
+      if (ParentExpr
+          && (isa<ApplyExpr>(ParentExpr) // param()
+              || isa<MakeTemporarilyEscapableExpr>(ParentExpr)))
         return;
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,

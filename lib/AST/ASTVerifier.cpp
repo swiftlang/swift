@@ -567,6 +567,7 @@ struct ASTNodeBase {};
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
 
+      assert(!OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues[expr->getOpaqueValue()] = 0;
       assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==0);
       OpenedExistentialArchetypes.insert(expr->getOpenedArchetype());
@@ -574,9 +575,24 @@ struct ASTNodeBase {};
     }
 
     void cleanup(OpenExistentialExpr *expr) {
+      assert(OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues.erase(expr->getOpaqueValue());
       assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==1);
       OpenedExistentialArchetypes.erase(expr->getOpenedArchetype());
+    }
+
+    bool shouldVerify(MakeTemporarilyEscapableExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+      
+      assert(!OpaqueValues.count(expr->getOpaqueValue()));
+      OpaqueValues[expr->getOpaqueValue()] = 0;
+      return true;
+    }
+    
+    void cleanup(MakeTemporarilyEscapableExpr *expr) {
+      assert(OpaqueValues.count(expr->getOpaqueValue()));
+      OpaqueValues.erase(expr->getOpaqueValue());
     }
 
     // Keep a stack of the currently-live optional evaluations.
@@ -1631,6 +1647,48 @@ struct ASTNodeBase {};
         abort();
       }
       verifyCheckedBase(E);
+    }
+    
+    void verifyChecked(MakeTemporarilyEscapableExpr *E) {
+      PrettyStackTraceExpr debugStack(
+        Ctx, "verifying MakeTemporarilyEscapableExpr", E);
+      
+      // Expression type should match subexpression.
+      if (!E->getType()->isEqual(E->getSubExpr()->getType())) {
+        Out << "MakeTemporarilyEscapableExpr type does not match subexpression";
+        abort();
+      }
+      
+      // Closure and opaque value should both be functions, with the closure
+      // noescape and the opaque value escapable but otherwise matching.
+      auto closureFnTy = E->getNonescapingClosureValue()->getType()
+        ->getAs<FunctionType>();
+      if (!closureFnTy) {
+        Out << "MakeTemporarilyEscapableExpr closure type is not a closure";
+        abort();
+      }
+      auto opaqueValueFnTy = E->getOpaqueValue()->getType()
+        ->getAs<FunctionType>();
+      if (!opaqueValueFnTy) {
+        Out<<"MakeTemporarilyEscapableExpr opaque value type is not a closure";
+        abort();
+      }
+      if (!closureFnTy->isNoEscape()) {
+        Out << "MakeTemporarilyEscapableExpr closure type should be noescape";
+        abort();
+      }
+      if (opaqueValueFnTy->isNoEscape()) {
+        Out << "MakeTemporarilyEscapableExpr opaque value type should be "
+               "escaping";
+        abort();
+      }
+      if (!closureFnTy->isEqual(
+            opaqueValueFnTy->withExtInfo(opaqueValueFnTy->getExtInfo()
+                                                        .withNoEscape()))) {
+        Out << "MakeTemporarilyEscapableExpr closure and opaque value type "
+               "don't match";
+        abort();
+      }
     }
 
     static bool hasEnclosingFunctionContext(DeclContext *dc) {

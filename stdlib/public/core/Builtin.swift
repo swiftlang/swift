@@ -657,3 +657,80 @@ public func type<Type, Metatype>(of: Type) -> Metatype {
   Builtin.unreachable()
 }
 
+/// Allows a nonescaping closure to temporarily be used as if it were
+/// allowed to escape.
+///
+/// This is useful when you need to pass a closure to an API that can't
+/// statically guarantee the closure won't escape when used in a way that
+/// won't allow it to escape in practice, such as in a lazy collection
+/// view:
+///
+/// ```
+/// func allValues(in array: [Int], matchPredicate: (Int) -> Bool) -> Bool {
+///   // Error because `lazy.filter` may escape the closure if the `lazy`
+///   // collection is persisted; however, in this case, we discard the
+///   // lazy collection immediately before returning.
+///   return array.lazy.filter { !matchPredicate($0) }.isEmpty
+/// }
+/// ```
+///
+/// or with `async`:
+///
+/// ```
+/// func perform(_ f: () -> Void, simultaneouslyWith g: () -> Void,
+///              on queue: DispatchQueue) {
+///   // Error: `async` normally escapes the closure, but in this case
+///   // we explicitly barrier before the closure would escape
+///   queue.async(f)
+///   queue.async(g)
+///   queue.sync(flags: .barrier) {}
+/// }
+/// ```
+///
+/// `withoutActuallyEscaping` provides a temporarily-escapable copy of the
+/// closure that can be used in these situations:
+///
+/// ```
+/// func allValues(in array: [Int], matchPredicate: (Int) -> Bool) -> Bool {
+///   return withoutActuallyEscaping(matchPredicate) { escapablePredicate in
+///     array.lazy.filter { !escapableMatchPredicate($0) }.isEmpty
+///   }
+/// }
+///
+/// func perform(_ f: () -> Void, simultaneouslyWith g: () -> Void,
+///              on queue: DispatchQueue) {
+///   withoutActuallyEscaping(f) { escapableF in
+///     withoutActuallyEscaping(g) { escapableG in
+///       queue.async(escapableF)
+///       queue.async(escapableG)
+///       queue.sync(flags: .barrier) {}
+///     }
+///   }
+/// }
+/// ```
+///
+/// - Parameter closure: A non-escaping closure value that will be made
+///   escapable for the duration of the execution of the `do` block.
+/// - Parameter do: A code block that will be immediately executed, receiving
+///   an escapable copy of `closure` as an argument.
+/// - Returns: the forwarded return value from the `do` block.
+/// - Remark: It is undefined behavior for the escapable closure to be stored,
+///   referenced, or executed after `withoutActuallyEscaping` returns. A
+///   future version of Swift will introduce a dynamic check to trap if
+///   the escapable closure is still referenced at the point
+///   `withoutActuallyEscaping` returns.
+@_transparent
+@_semantics("typechecker.withoutActuallyEscaping(_:do:)")
+public func withoutActuallyEscaping<ClosureType, ResultType>(
+  _ closure: ClosureType,
+  do: (_ escapingClosure: ClosureType) throws -> ResultType
+) rethrows -> ResultType {
+  // This implementation is never used, since calls to
+  // `Swift.withoutActuallyEscaping(_:do:)` are resolved as a special case by
+  // the type checker.
+  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: 'withoutActuallyEscaping(_:do:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+

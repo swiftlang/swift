@@ -3512,6 +3512,10 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
     
+    Expr *visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *expr){
+      llvm_unreachable("Already type-checked");
+    }
+    
     Expr *visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
       // Should already be type-checked.
       return simplifyExprType(expr);
@@ -6347,13 +6351,50 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         auto arg = apply->getArg();
         if (auto tuple = dyn_cast<TupleExpr>(arg))
           arg = tuple->getElements()[0];
-        auto replacement = new (cs.getASTContext())
+        auto replacement = new (tc.Context)
           DynamicTypeExpr(apply->getFn()->getLoc(),
                           apply->getArg()->getStartLoc(),
                           arg,
                           apply->getArg()->getEndLoc(),
                           Type());
         cs.setType(replacement, simplifyType(openedType));
+        return replacement;
+      }
+      
+      case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
+        // Resolve into a MakeTemporarilyEscapingExpr.
+        auto arg = cast<TupleExpr>(apply->getArg());
+        assert(arg->getNumElements() == 2 && "should have two arguments");
+        auto nonescaping = arg->getElements()[0];
+        auto body = arg->getElements()[1];
+        auto bodyFnTy = body->getType()->castTo<FunctionType>();
+        auto escapableType = bodyFnTy->getInput();
+        auto resultType = bodyFnTy->getResult();
+        
+        // The body is immediately called, so is obviously noescape.
+        bodyFnTy = cast<FunctionType>(
+          bodyFnTy->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
+        body = coerceToType(body, bodyFnTy, locator);
+        assert(body && "can't make nonescaping?!");
+        
+        auto escapable = new (tc.Context)
+          OpaqueValueExpr(apply->getFn()->getLoc(), Type());
+        cs.setType(escapable, escapableType);
+        
+        auto callSubExpr = CallExpr::create(tc.Context, body, escapable,
+                                            {}, {},
+                                            /*trailing closure*/ false,
+                                            /*implicit*/ true);
+        cs.setType(callSubExpr, resultType);
+        
+        auto replacement = new (tc.Context)
+          MakeTemporarilyEscapableExpr(apply->getFn()->getLoc(),
+                                       apply->getArg()->getStartLoc(),
+                                       nonescaping,
+                                       callSubExpr,
+                                       apply->getArg()->getEndLoc(),
+                                       escapable);
+        cs.setType(replacement, resultType);
         return replacement;
       }
       

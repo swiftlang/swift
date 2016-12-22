@@ -1335,7 +1335,7 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
   case DeclTypeCheckingSemantics::Normal:
     return false;
     
-  case DeclTypeCheckingSemantics::TypeOf:
+  case DeclTypeCheckingSemantics::TypeOf: {
     // Proceed with a "DynamicType" operation. This produces an existential
     // metatype from existentials, or a concrete metatype from non-
     // existentials (as seen from the current abstraction level), which can't
@@ -1353,6 +1353,40 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     refType = FunctionType::get(inputTuple, output);
     openedFullType = refType;
     return true;
+  }
+  case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
+    // Proceed with a "WithoutActuallyEscaping" operation. The body closure
+    // receives a copy of the argument closure that is temporarily made
+    // @escaping.
+    auto noescapeClosure = CS.createTypeVariable(
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+    auto escapeClosure = CS.createTypeVariable(
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+    CS.addConstraint(ConstraintKind::EscapableFunctionOf,
+         escapeClosure, noescapeClosure,
+         CS.getConstraintLocator(locator, ConstraintLocator::RvalueAdjustment));
+    auto result = CS.createTypeVariable(
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult), 0);
+    auto bodyClosure = FunctionType::get(
+      ParenType::get(CS.getASTContext(), escapeClosure), result,
+      FunctionType::ExtInfo(FunctionType::Representation::Swift,
+                            /*autoclosure*/ false,
+                            /*noescape*/ true,
+                            /*throws*/ true));
+    TupleTypeElt argTupleElts[] = {
+      TupleTypeElt(noescapeClosure),
+      TupleTypeElt(bodyClosure, CS.getASTContext().getIdentifier("do")),
+    };
+    
+    auto argTuple = TupleType::get(argTupleElts, CS.getASTContext());
+    refType = FunctionType::get(argTuple, result,
+      FunctionType::ExtInfo(FunctionType::Representation::Swift,
+                            /*autoclosure*/ false,
+                            /*noescape*/ false,
+                            /*throws*/ true));
+    openedFullType = refType;
+    return true;
+  }
   }
 }
 

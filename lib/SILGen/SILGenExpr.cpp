@@ -240,6 +240,8 @@ namespace {
                           unsigned numOptionalEvaluations,
                           SGFContext C);
     RValue visitOpenExistentialExpr(OpenExistentialExpr *E, SGFContext C);
+    RValue visitMakeTemporarilyEscapableExpr(
+                                 MakeTemporarilyEscapableExpr *E, SGFContext C);
 
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
 
@@ -3188,6 +3190,12 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
                                              [&](Expr *subExpr) -> RValue {
                                                return visit(subExpr, C);
                                              });
+}
+
+RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
+    MakeTemporarilyEscapableExpr *E,
+    SGFContext C) {
+  llvm_unreachable("not implemented yet");
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {

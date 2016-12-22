@@ -2241,6 +2241,15 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *E) {
+    printCommon(E, "make_temporarily_escapable_expr") << '\n';
+    printRec(E->getOpaqueValue());
+    OS << '\n';
+    printRec(E->getNonescapingClosureValue());
+    OS << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
     printCommon(E, "editor_placeholder_expr") << '\n';
     auto *TyR = E->getTypeLoc().getTypeRepr();

@@ -63,6 +63,10 @@ enum class DeclTypeCheckingSemantics {
   /// The type(of:) declaration, which performs a "dynamic type" operation,
   /// with different behavior for existential and non-existential arguments.
   TypeOf,
+  
+  /// The withoutActuallyEscaping(_:do:) declaration, which makes a nonescaping
+  /// closure temporarily escapable.
+  WithoutActuallyEscaping,
 };
 
 /// The result of name lookup.
