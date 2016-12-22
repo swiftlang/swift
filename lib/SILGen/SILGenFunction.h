@@ -1158,6 +1158,26 @@ public:
   ManagedValue emitManagedLoadCopy(SILLocation loc, SILValue v,
                                    const TypeLowering &lowering);
 
+  ManagedValue emitManagedStoreBorrow(SILLocation loc, SILValue v,
+                                      SILValue addr);
+  ManagedValue emitManagedStoreBorrow(SILLocation loc, SILValue v,
+                                      SILValue addr,
+                                      const TypeLowering &lowering);
+
+  ManagedValue emitManagedLoadBorrow(SILLocation loc, SILValue v);
+  ManagedValue emitManagedLoadBorrow(SILLocation loc, SILValue v,
+                                     const TypeLowering &lowering);
+
+  ManagedValue emitManagedBeginBorrow(SILLocation loc, SILValue v,
+                                      const TypeLowering &lowering);
+  ManagedValue emitManagedBeginBorrow(SILLocation loc, SILValue v);
+
+  ManagedValue emitManagedBorrowedRValueWithCleanup(SILValue borrowee,
+                                                    SILValue borrower);
+  ManagedValue
+  emitManagedBorrowedRValueWithCleanup(SILValue borrowee, SILValue borrower,
+                                       const TypeLowering &lowering);
+
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
   ManagedValue emitManagedRValueWithCleanup(SILValue v,
                                             const TypeLowering &lowering);
