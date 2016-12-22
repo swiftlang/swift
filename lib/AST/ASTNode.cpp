@@ -46,7 +46,7 @@ DeclContext *ASTNode::getAsDeclContext() const {
   if (Expr *E = this->dyn_cast<Expr*>()) {
     if (isa<AbstractClosureExpr>(E))
       return static_cast<AbstractClosureExpr*>(E);
-  } else if (Stmt *S = this->dyn_cast<Stmt*>()) {
+  } else if (is<Stmt*>()) {
     return nullptr;
   } else if (Decl *D = this->dyn_cast<Decl*>()) {
     if (isa<DeclContext>(D))
