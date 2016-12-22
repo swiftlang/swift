@@ -10,13 +10,11 @@ swift_install_in_component(compiler
 
 # Create a compatibility symlink.
 
-add_custom_command(TARGET swiftDemangle POST_BUILD
-    COMMAND
-      "${CMAKE_COMMAND}" "-E" "create_symlink"
-      "libswiftDemangle.dylib"
-      "libfunctionNameDemangle.dylib"
-    WORKING_DIRECTORY "${SWIFT_LIBRARY_OUTPUT_INTDIR}"
-    COMMENT "Creating compatibility symlink for functionNameDemangle.dylib")
+swift_create_post_build_symlink(sourcekitd
+  IS_DIRECTORY
+  SOURCE "${SWIFTLIB_DIR}"
+  DESTINATION "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}/swift"
+  COMMENT "Creating compatibility symlink for functionNameDemangle.dylib")
 
 swift_install_in_component(compiler
     FILES "${SWIFT_LIBRARY_OUTPUT_INTDIR}/libfunctionNameDemangle.dylib"

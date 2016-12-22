@@ -123,3 +123,31 @@ function(set_with_default variable value)
     set(${variable} ${SWD_DEFAULT} PARENT_SCOPE)
   endif()
 endfunction()
+
+function(swift_create_post_build_symlink target)
+  set(options IS_DIRECTORY)
+  set(oneValueArgs SOURCE DESTINATION WORKING_DIRECTORY COMMENT)
+  cmake_parse_arguments(CS
+    "${options}"
+    "${oneValueArgs}"
+    ""
+    ${ARGN})
+
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    if(CS_IS_DIRECTORY)
+      set(cmake_symlink_option "copy_directory")
+    else()
+      set(cmake_symlink_option "copy_if_different")
+    endif()
+  else()
+      set(cmake_symlink_option "create_symlink")
+  endif()
+
+  add_custom_command(TARGET "${target}" POST_BUILD
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
+      "${CS_SOURCE}"
+      "${CS_DESTINATION}"
+    WORKING_DIRECTORY "${CS_WORKING_DIRECTORY}"
+    COMMENT "${CS_COMMENT}")
+endfunction()
