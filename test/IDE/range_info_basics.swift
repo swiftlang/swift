@@ -87,6 +87,7 @@ func foo6() -> Int {
 // RUN: %target-swift-ide-test -range -pos=57:1 -end-pos=69:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK14
 // RUN: %target-swift-ide-test -range -pos=63:1 -end-pos=66:44 -source-filename %s | %FileCheck %s -check-prefix=CHECK15
 // RUN: %target-swift-ide-test -range -pos=63:1 -end-pos=68:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK16
+// RUN: %target-swift-ide-test -range -pos=67:1 -end-pos=67:19 -source-filename %s | %FileCheck %s -check-prefix=CHECK17
 
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
@@ -98,12 +99,14 @@ func foo6() -> Int {
 // CHECK2-NEXT: <Content>class C { func foo() {} }</Content>
 // CHECK2-NEXT: <Context>swift_ide_test.(file)</Context>
 // CHECK2-NEXT: <Declared>C</Declared>
+// CHECK2-NEXT: <Declared>foo</Declared>
 // CHECK2-NEXT: <end>
 
 // CHECK3: <Kind>SingleDecl</Kind>
 // CHECK3-NEXT: <Content>struct S { func foo() {} }</Content>
 // CHECK3-NEXT: <Context>swift_ide_test.(file)</Context>
 // CHECK3-NEXT: <Declared>S</Declared>
+// CHECK3-NEXT: <Declared>foo</Declared>
 // CHECK3-NEXT: <end>
 
 // CHECK4: <Kind>MultiStatement</Kind>
@@ -142,6 +145,7 @@ func foo6() -> Int {
 // CHECK7-NEXT: <Declared>c</Declared>
 // CHECK7-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK7-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
+// CHECK7-NEXT: <Referenced>c</Referenced><Type>Int</Type>
 // CHECK7-NEXT: <end>
 
 // CHECK8: <Kind>MultiStatement</Kind>
@@ -153,6 +157,7 @@ func foo6() -> Int {
 // CHECK8-NEXT: <Declared>c</Declared>
 // CHECK8-NEXT: <Referenced>s</Referenced><Type>@lvalue S1</Type>
 // CHECK8-NEXT: <Referenced>b</Referenced><Type>Int</Type>
+// CHECK8-NEXT: <Referenced>c</Referenced><Type>Int</Type>
 // CHECK8-NEXT: <end>
 
 // CHECK9: <Kind>MultiStatement</Kind>
@@ -165,6 +170,7 @@ func foo6() -> Int {
 // CHECK9-NEXT: <Declared>c</Declared>
 // CHECK9-NEXT: <Referenced>s</Referenced><Type>S1</Type>
 // CHECK9-NEXT: <Referenced>b</Referenced><Type>Int</Type>
+// CHECK9-NEXT: <Referenced>c</Referenced><Type>Int</Type>
 // CHECK9-NEXT: <end>
 
 // CHECK10: <Kind>MultiStatement</Kind>
@@ -174,6 +180,7 @@ func foo6() -> Int {
 // CHECK10-NEXT: <Declared>a</Declared>
 // CHECK10-NEXT: <Declared>b</Declared>
 // CHECK10-NEXT: <Referenced>c</Referenced><Type>C1</Type>
+// CHECK10-NEXT: <Referenced>a</Referenced><Type>C1</Type>
 // CHECK10-NEXT: <end>
 
 // CHECK11: <Kind>MultiStatement</Kind>
@@ -200,6 +207,8 @@ func foo6() -> Int {
 // CHECK12-NEXT: <Declared>d</Declared>
 // CHECK12-NEXT: <Referenced>c</Referenced><Type>C1</Type>
 // CHECK12-NEXT: <Referenced>a</Referenced><Type>C1</Type>
+// CHECK12-NEXT: <Referenced>b</Referenced><Type>C1</Type>
+// CHECK12-NEXT: <Referenced>d</Referenced><Type>C1</Type>
 // CHECK12-NEXT: <end>
 
 // CHECK13: <Kind>MultiStatement</Kind>
@@ -215,6 +224,7 @@ func foo6() -> Int {
 // CHECK13-NEXT: <Declared>c</Declared>
 // CHECK13-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK13-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
+// CHECK13-NEXT: <Referenced>c</Referenced><Type>Int</Type>
 // CHECK13-NEXT: <end>
 
 // CHECK14: <Kind>MultiStatement</Kind>
@@ -236,6 +246,12 @@ func foo6() -> Int {
 // CHECK14-NEXT: <Declared>a</Declared>
 // CHECK14-NEXT: <Declared>b</Declared>
 // CHECK14-NEXT: <Declared>c</Declared>
+// CHECK14-NEXT: <Declared>a</Declared>
+// CHECK14-NEXT: <Declared>b</Declared>
+// CHECK14-NEXT: <Declared>c</Declared>
+// CHECK14-NEXT: <Referenced>a</Referenced><Type>Int</Type>
+// CHECK14-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
+// CHECK14-NEXT: <Referenced>c</Referenced><Type>Int</Type>
 // CHECK14-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK14-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK14-NEXT: <Referenced>c</Referenced><Type>Int</Type>
@@ -252,6 +268,7 @@ func foo6() -> Int {
 // CHECK15-NEXT: <Declared>b</Declared>
 // CHECK15-NEXT: <Declared>c</Declared>
 // CHECK15-NEXT: <Referenced>a</Referenced><Type>Int</Type>
+// CHECK15-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK15-NEXT: <end>
 
 // CHECK16: <Kind>MultiStatement</Kind>
@@ -270,3 +287,11 @@ func foo6() -> Int {
 // CHECK16-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK16-NEXT: <Referenced>c</Referenced><Type>Int</Type>
 // CHECK16-NEXT: <end>
+
+// CHECK17: <Kind>SingleExpression</Kind>
+// CHECK17-NEXT: <Content>print(b + c)</Content>
+// CHECK17-NEXT: <Type>()</Type>
+// CHECK17-NEXT: <Context>swift_ide_test.(file).func decl.explicit closure discriminator=0.explicit closure discriminator=0</Context>
+// CHECK17-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
+// CHECK17-NEXT: <Referenced>c</Referenced><Type>Int</Type>
+// CHECK17-NEXT: <end>

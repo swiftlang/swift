@@ -478,6 +478,16 @@ bool SourceEntityWalker::walk(Module &Mod) {
   return Mod.walk(Annotator);
 }
 
+bool SourceEntityWalker::walk(Stmt *S) {
+  SemaAnnotator Annotator(*this);
+  return S->walk(Annotator);
+}
+
+bool SourceEntityWalker::walk(Expr *E) {
+  SemaAnnotator Annotator(*this);
+  return E->walk(Annotator);
+}
+
 bool SourceEntityWalker::walk(Decl *D) {
   SemaAnnotator Annotator(*this);
   return D->walk(Annotator);

@@ -211,8 +211,8 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   printContext(OS, RangeContext);
   OS << "</Context>\n";
 
-  for (auto *VD : DeclaredDecls) {
-    OS << "<Declared>" << VD->getNameStr() << "</Declared>\n";
+  for (auto &VD : DeclaredDecls) {
+    OS << "<Declared>" << VD.VD->getNameStr() << "</Declared>\n";
   }
   for (auto &RD : ReferencedDecls) {
     OS << "<Referenced>" << RD.VD->getNameStr() << "</Referenced>";
@@ -221,6 +221,10 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     OS << "</Type>\n";
   }
   OS << "<end>\n";
+}
+
+bool DeclaredDecl::operator==(const DeclaredDecl& Other) {
+  return VD == Other.VD;
 }
 
 bool ReferencedDecl::operator==(const ReferencedDecl& Other) {
@@ -256,7 +260,7 @@ private:
     return ContextStack.back();
   }
 
-  std::vector<ValueDecl*> DeclaredDecls;
+  std::vector<DeclaredDecl> DeclaredDecls;
   std::vector<ReferencedDecl> ReferencedDecls;
 
   /// Collect the type that an ASTNode should be evaluated to.
@@ -385,16 +389,36 @@ public:
     return createInstance(File, StartOff, EndOff - StartOff);
   }
 
-  void analyze(ASTNode Node) {
-    Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
-
+  void analyzeDecl(Decl *D) {
     // Collect declared decls in the range.
     if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
       if (isContainedInSelection(CharSourceRange(SM, VD->getStartLoc(),
                                                  VD->getEndLoc())))
-        DeclaredDecls.push_back(VD);
+        if(std::find(DeclaredDecls.begin(), DeclaredDecls.end(),
+                     DeclaredDecl(VD)) == DeclaredDecls.end())
+          DeclaredDecls.push_back(VD);
     }
+  }
 
+  class CompleteWalker : public SourceEntityWalker {
+    Implementation *Impl;
+    bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+      Impl->analyzeDecl(D);
+      return true;
+    }
+    bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                            TypeDecl *CtorTyRef, Type T,
+                            SemaReferenceKind Kind) override {
+      Impl->analyzeDeclRef(D, Range, T, Kind);
+      return true;
+    }
+  public:
+    CompleteWalker(Implementation *Impl) : Impl(Impl) {}
+  };
+
+  void analyze(ASTNode Node) {
+    Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
+    analyzeDecl(D);
     auto &DCInfo = getCurrentDC();
     switch (getRangeMatchKind(Node.getSourceRange())) {
     case RangeMatchKind::NoneMatch:
@@ -402,9 +426,13 @@ public:
       if (auto *VA = dyn_cast_or_null<VarDecl>(D))
         analyze(VA->getParentPatternBinding());
       return;
-    case RangeMatchKind::RangeMatch:
+    case RangeMatchKind::RangeMatch: {
+      // Visit the content of this node thoroughly, because the walker may
+      // abort early.
+      Node.walk(CompleteWalker(this));
       Result = getSingleNodeKind(Node);
       return;
+    }
     case RangeMatchKind::StartMatch:
       DCInfo.StartMatches.emplace_back(Node);
       break;
@@ -414,6 +442,8 @@ public:
     }
 
     if (!DCInfo.StartMatches.empty() && !DCInfo.EndMatches.empty()) {
+      // Visit the last node since it may have interesting information.
+      DCInfo.EndMatches.back().walk(CompleteWalker(this));
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */
                 resolveNodeType(DCInfo.EndMatches.back()), Content,
@@ -425,9 +455,7 @@ public:
   }
 
   bool shouldEnter(ASTNode Node) {
-    if (hasResult())
-      return false;
-    if (SM.isBeforeInBuffer(End, Node.getSourceRange().Start))
+   if (SM.isBeforeInBuffer(End, Node.getSourceRange().Start))
       return false;
     if (SM.isBeforeInBuffer(Node.getSourceRange().End, Start))
       return false;
