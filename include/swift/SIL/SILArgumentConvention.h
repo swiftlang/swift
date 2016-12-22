@@ -34,7 +34,7 @@ enum class InoutAliasingAssumption {
 /// By design, this is exactly the same as ParameterConvention, plus
 /// Indirect_Out.
 struct SILArgumentConvention {
-  enum : uint8_t {
+  enum ConventionType : uint8_t {
     Indirect_In,
     Indirect_In_Guaranteed,
     Indirect_Inout,
@@ -79,7 +79,7 @@ struct SILArgumentConvention {
     llvm_unreachable("covered switch isn't covered?!");
   }
 
-  operator decltype(Value)() const { return Value; }
+  operator ConventionType() const { return Value; }
 
   bool isIndirectConvention() const {
     return Value <= SILArgumentConvention::Indirect_Out;
