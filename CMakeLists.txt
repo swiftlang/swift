@@ -13,6 +13,7 @@ set_property(GLOBAL PROPERTY JOB_POOL_LINK local_jobs)
 
 # First include general CMake utilities.
 include(SwiftUtils)
+include(CheckSymbolExists)
 
 #
 # User-configurable options that control the inclusion and default build
@@ -804,6 +805,8 @@ find_package(LibXml2)
 if(LIBXML2_FOUND)
   set(SWIFT_HAVE_LIBXML 1)
 endif()
+
+check_symbol_exists(el_wgets "histedit.h" HAVE_UNICODE_LIBEDIT)
 
 if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")
