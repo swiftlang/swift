@@ -102,7 +102,6 @@ public struct Unsafe${Mutable}RawBufferPointer
 
   public typealias Index = Int
   public typealias IndexDistance = Int
-  public typealias SubSequence = ${Self}
 
   /// An iterator over the bytes viewed by a raw buffer pointer.
   @_fixed_layout
@@ -403,13 +402,13 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// - Parameter bounds: The range of byte offsets to access. The upper and
   ///   lower bounds of the range must be in the range `0...count`.
   @_inlineable
-  public subscript(bounds: Range<Int>) -> Unsafe${Mutable}RawBufferPointer {
+  public subscript(
+    bounds: Range<Int>
+  ) -> ${Mutable}RandomAccessSlice<Unsafe${Mutable}RawBufferPointer> {
     get {
       _debugPrecondition(bounds.lowerBound >= startIndex)
       _debugPrecondition(bounds.upperBound <= endIndex)
-      return Unsafe${Mutable}RawBufferPointer(
-        start: baseAddress.map { $0 + bounds.lowerBound },
-        count: bounds.count)
+      return ${Mutable}RandomAccessSlice(base: self, bounds: bounds)
     }
 %  if mutable:
     nonmutating set {
@@ -419,7 +418,7 @@ public struct Unsafe${Mutable}RawBufferPointer
 
       if newValue.count > 0 {
         (baseAddress! + bounds.lowerBound).copyBytes(
-          from: newValue.baseAddress!,
+          from: newValue.base.baseAddress! + newValue.startIndex,
           count: newValue.count)
       }
     }

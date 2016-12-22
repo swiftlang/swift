@@ -47,32 +47,21 @@ var UnsafeMutableRawBufferPointerTestSuite = TestSuite("UnsafeMutableRawBufferPo
 %   Raw = 'Raw' if IsRaw else ''
 %   Element = 'UInt8' if IsRaw else 'Float'
 
-%   if IsRaw:
 ${SelfName}TestSuite.test("AssociatedTypes") {
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: ${SelfType}.self,
+%   if IsRaw:
     iteratorType: ${SelfType}.Iterator.self,
-    subSequenceType: ${SelfType}.self,
+%   else:
+    iteratorType: IndexingIterator<${SelfType}>.self,
+%   end
+    subSequenceType: ${'Mutable' if IsMutable else ''}RandomAccessSlice<${SelfType}>.self,
     indexType: Int.self,
     indexDistanceType: Int.self,
     indicesType: CountableRange<Int>.self)
 
   expect${'Mutable' if IsMutable else ''}CollectionType(${SelfType}.self)
 }
-%   else: # !IsRaw
-${SelfName}TestSuite.test("AssociatedTypes") {
-  typealias Subject = ${SelfName}<OpaqueValue<Int>>
-  expectRandomAccessCollectionAssociatedTypes(
-    collectionType: Subject.self,
-    iteratorType: IndexingIterator<Subject>.self,
-    subSequenceType: ${'Mutable' if IsMutable else ''}RandomAccessSlice<Subject>.self,
-    indexType: Int.self,
-    indexDistanceType: Int.self,
-    indicesType: CountableRange<Int>.self)
-
-  expect${'Mutable' if IsMutable else ''}CollectionType(Subject.self)
-}
-%   end # !IsRaw
 
 // Allocate two buffers. Initialize one and copy it into the other. Pass those
 // to the specified generic collection test function `checkBuffers`.
@@ -454,7 +443,7 @@ struct SubscriptSetTest : SubscriptTest {
   func replacementValuesSlice(
     from memory: UnsafeMutableRawPointer,
     replacementValues: [OpaqueValue<Int>]
-  ) -> UnsafeMutableRawBufferPointer
+  ) -> UnsafeMutableRawBufferPointer.SubSequence
   {
     for (i, value) in replacementValues.enumerated() {
       memory.initializeMemory(
