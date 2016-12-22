@@ -872,8 +872,8 @@ static SILValue getBehaviorSetterFn(SILGenFunction &gen, VarDecl *behaviorVar) {
 
 static Type getInitializationTypeInContext(
     DeclContext *fromDC, DeclContext *toDC,
-    Expr *init) {
-  auto interfaceType = fromDC->mapTypeOutOfContext(init->getType());
+    Pattern *pattern) {
+  auto interfaceType = fromDC->mapTypeOutOfContext(pattern->getType());
   auto resultType = toDC->mapTypeIntoContext(interfaceType);
 
   return resultType;
@@ -929,7 +929,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // Get the type of the initialization result, in terms
         // of the constructor context's archetypes.
         CanType resultType = getInitializationTypeInContext(
-            pbd->getDeclContext(), dc, init)->getCanonicalType();
+            pbd->getDeclContext(), dc, entry.getPattern())->getCanonicalType();
         AbstractionPattern origResultType(resultType);
 
         // FIXME: Can emitMemberInit() share code with
