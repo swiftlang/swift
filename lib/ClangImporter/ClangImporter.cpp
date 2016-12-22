@@ -327,8 +327,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
           // Enable modules
           "-fmodules",
           "-Werror=non-modular-include-in-framework-module",
-          // Enable implicit module maps (implied by "-fmodules")
-          "-fimplicit-module-maps",
           "-Xclang", "-fmodule-feature", "-Xclang", "swift",
 
           // Don't emit LLVM IR.
