@@ -37,8 +37,8 @@ public struct UnsafeBufferPointerIterator<Element>
 /// elements stored contiguously in memory.
 ///
 /// You can use an `${Self}` instance in low level operations to eliminate
-/// uniqueness checks and release mode bounds checks. Bounds checks are always
-/// performed in debug mode.
+/// uniqueness checks and, in release mode, bounds checks. Bounds checks are
+/// always performed in debug mode.
 ///
 /// ${Self} Semantics
 /// =================
