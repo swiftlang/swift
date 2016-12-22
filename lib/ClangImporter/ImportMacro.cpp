@@ -65,6 +65,7 @@ parseNumericLiteral(ClangImporter::Implementation &impl,
   return nullptr;
 }
 
+// FIXME: Duplicated from ImportDecl.cpp.
 static bool isInSystemModule(DeclContext *D) {
   if (cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule())
     return true;

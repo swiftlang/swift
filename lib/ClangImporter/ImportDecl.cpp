@@ -3302,29 +3302,31 @@ namespace {
       }
 
       SpecialMethodKind kind = SpecialMethodKind::Regular;
-      // FIXME: This doesn't handle implicit properties.
-      if (decl->isPropertyAccessor())
-        kind = SpecialMethodKind::PropertyAccessor;
-      else if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
+      if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.
-      DeclName name = importedName.getDeclName();
       Optional<ForeignErrorConvention> errorConvention;
       bodyParams.push_back(nullptr);
-      auto type = Impl.importMethodType(dc,
-                                        decl,
-                                        decl->getReturnType(),
-                                        { decl->param_begin(),
-                                          decl->param_size() },
-                                        decl->isVariadic(),
-                                        decl->hasAttr<clang::NoReturnAttr>(),
-                                        isInSystemModule(dc),
-                                        &bodyParams.back(),
-                                        importedName,
-                                        name,
-                                        errorConvention,
-                                        kind);
+      Type type;
+      if (decl->isPropertyAccessor()) {
+        const clang::ObjCPropertyDecl *prop = decl->findPropertyDecl();
+        if (!prop)
+          return nullptr;
+        // If the matching property is in a superclass, or if the getter and
+        // setter are redeclared in a potentially incompatible way, bail out.
+        if (prop->getGetterMethodDecl() != decl &&
+            prop->getSetterMethodDecl() != decl)
+          return nullptr;
+        type = Impl.importAccessorMethodType(dc, prop, decl,
+                                             isInSystemModule(dc),
+                                             &bodyParams.back());
+      } else {
+        type = Impl.importMethodType(dc, decl, decl->parameters(),
+                                     decl->isVariadic(), isInSystemModule(dc),
+                                     &bodyParams.back(), importedName,
+                                     errorConvention, kind);
+      }
       if (!type)
         return nullptr;
 
@@ -3341,11 +3343,10 @@ namespace {
 
       auto result = FuncDecl::create(
           Impl.SwiftContext, /*StaticLoc=*/SourceLoc(),
-          StaticSpellingKind::None,
-          /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
+          StaticSpellingKind::None, /*FuncLoc=*/SourceLoc(),
+          importedName.getDeclName(), /*NameLoc=*/SourceLoc(),
           /*Throws=*/importedName.getErrorInfo().hasValue(),
-          /*ThrowsLoc=*/SourceLoc(),
-          /*AccessorKeywordLoc=*/SourceLoc(),
+          /*ThrowsLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
           /*GenericParams=*/nullptr, bodyParams, TypeLoc(), dc, decl);
 
       result->setAccessibility(getOverridableAccessibility(dc));
@@ -5232,12 +5233,10 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Import the type that this method will have.
   Optional<ForeignErrorConvention> errorConvention;
-  DeclName name = importedName.getDeclName();
   bodyParams.push_back(nullptr);
   auto type = Impl.importMethodType(
-      dc, objcMethod, objcMethod->getReturnType(), args, variadic,
-      objcMethod->hasAttr<clang::NoReturnAttr>(), isInSystemModule(dc),
-      &bodyParams.back(), importedName, name, errorConvention,
+      dc, objcMethod, args, variadic, isInSystemModule(dc),
+      &bodyParams.back(), importedName, errorConvention,
       SpecialMethodKind::Constructor);
   if (!type)
     return nullptr;
@@ -5265,7 +5264,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
                             ->getResult()
                             ->castTo<AnyFunctionType>()
                             ->getInput();
-  for (auto other : ownerNominal->lookupDirect(name)) {
+  for (auto other : ownerNominal->lookupDirect(importedName.getDeclName())) {
     auto ctor = dyn_cast<ConstructorDecl>(other);
     if (!ctor || ctor->isInvalid() ||
         ctor->getAttrs().isUnavailable(Impl.SwiftContext) ||
@@ -5342,8 +5341,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Create the actual constructor.
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-      objcMethod, Accessibility::Public, name, /*NameLoc=*/SourceLoc(),
-      failability, /*FailabilityLoc=*/SourceLoc(),
+      objcMethod, Accessibility::Public, importedName.getDeclName(),
+      /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().hasValue(),
       /*ThrowsLoc=*/SourceLoc(), selfVar, bodyParams.back(),
       /*GenericParams=*/nullptr, dc);

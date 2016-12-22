@@ -211,7 +211,6 @@ enum class MappedTypeNameKind {
 enum class SpecialMethodKind {
   Regular,
   Constructor,
-  PropertyAccessor,
   NSDictionarySubscriptGetter
 };
 
@@ -979,41 +978,53 @@ public:
                        StringRef argumentLabel, bool isFirstParameter,
                        bool isLastParameter, importer::NameImporter &);
 
-  /// \brief Import the type of an Objective-C method.
+  /// Import the type of an Objective-C method.
   ///
-  /// This routine should be preferred when importing function types for
-  /// which we have actual function parameters, e.g., when dealing with a
-  /// function declaration, because it produces a function type whose input
-  /// tuple has argument names.
+  /// Note that this is not appropriate to use for property accessor methods.
+  /// Use #importAccessorMethodType instead.
   ///
-  /// \param clangDecl The underlying declaration, if any; should only be
-  ///   considered for any attributes it might carry.
-  /// \param resultType The result type of the function.
-  /// \param params The parameter types to the function.
+  /// \param dc The context the method is being imported into.
+  /// \param clangDecl The underlying declaration.
+  /// \param params The parameter types to the function. Note that this may not
+  ///   include all parameters defined on the ObjCMethodDecl.
   /// \param isVariadic Whether the function is variadic.
-  /// \param isNoReturn Whether the function is noreturn.
   /// \param isFromSystemModule Whether to apply special rules that only apply
   ///   to system APIs.
-  /// \param bodyParams The patterns visible inside the function body.
-  ///   whether the created arg/body patterns are different (selector-style).
-  /// \param importedName The name of the imported method.
-  /// \param errorConvention Information about the method's error conventions.
+  /// \param[out] bodyParams The patterns visible inside the function body.
+  /// \param importedName How to import the name of the method.
+  /// \param[out] errorConvention Whether and how the method throws NSErrors.
   /// \param kind Controls whether we're building a type for a method that
-  ///        needs special handling.
+  ///   needs special handling.
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
   Type importMethodType(const DeclContext *dc,
                         const clang::ObjCMethodDecl *clangDecl,
-                        clang::QualType resultType,
                         ArrayRef<const clang::ParmVarDecl *> params,
-                        bool isVariadic, bool isNoReturn,
+                        bool isVariadic,
                         bool isFromSystemModule,
                         ParameterList **bodyParams,
                         importer::ImportedName importedName,
-                        DeclName &name,
                         Optional<ForeignErrorConvention> &errorConvention,
                         SpecialMethodKind kind);
+
+  /// Import the type of an Objective-C method that will be imported as an
+  /// accessor for \p property.
+  ///
+  /// \param dc The context the method is being imported into.
+  /// \param property The property the method will be an accessor for.
+  /// \param clangDecl The underlying declaration.
+  /// \param isFromSystemModule Whether to apply special rules that only apply
+  ///   to system APIs.
+  /// \param[out] params The patterns visible inside the function body.
+  ///
+  /// \returns the imported function type, or null if the type cannot be
+  /// imported.
+  Type importAccessorMethodType(const DeclContext *dc,
+                                const clang::ObjCPropertyDecl *property,
+                                const clang::ObjCMethodDecl *clangDecl,
+                                bool isFromSystemModule,
+                                ParameterList **params);
 
   /// \brief Determine whether the given typedef-name is "special", meaning
   /// that it has performed some non-trivial mapping of its underlying type
