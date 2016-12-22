@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-sil
+// RUN: %target-swift-frontend %s -emit-sil
 
 // Submitted by https://github.com/deville (Andrii Chernenko)
 
