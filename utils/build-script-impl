@@ -78,6 +78,7 @@ KNOWN_SETTINGS=(
     playgroundlogger-build-type "Debug"          "the build variant for PlaygroundLogger"
     playgroundsupport-build-type "Debug"         "the build variant for PlaygroundSupport"
     xctest-build-type           "Debug"          "the build variant for xctest"
+    swiftpm-build-type          "Debug"          "the build variant for swiftpm"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
     cmake                       ""               "path to the cmake binary"
@@ -1755,6 +1756,10 @@ function set_swiftpm_bootstrap_command() {
         exit 1
     fi
     swiftpm_bootstrap_command=("${SWIFTPM_SOURCE_DIR}/Utilities/bootstrap" "${swiftpm_bootstrap_options[@]}")
+    # Add --release if we have to build in release mode.
+    if [[ "${SWIFTPM_BUILD_TYPE}" ==  "Release" ]] ; then
+        swiftpm_bootstrap_command+=(--release)
+    fi
     if [[ "${VERBOSE_BUILD}" ]] ; then
         swiftpm_bootstrap_command+=(-v)
     fi
