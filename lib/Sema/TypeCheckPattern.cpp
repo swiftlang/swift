@@ -504,7 +504,8 @@ public:
       // swift(>=4) mode.
       // Specialized call are not allowed anyway.
       // Let it be diagnosed as a expression.
-      // for Swift3 mode, see 'diagnoseSpecialized' below.
+      // For Swift3 mode, we emit warnings just before constructing the
+      // enum-element-pattern below.
       if (isa<UnresolvedSpecializeExpr>(ce->getFn()))
         return nullptr;
     }
@@ -516,12 +517,45 @@ public:
     if (components.empty())
       return nullptr;
 
-    // Helper function to diagnose specialzed-enum case for Swift3.
-    auto diagnoseSpecialized = [&]() {
-      auto generic = dyn_cast<GenericIdentTypeRepr>(components.back());
-      if (!generic)
-        return;
+    auto tailComponent = components.pop_back_val();
+    EnumElementDecl *referencedElement = nullptr;
+    TypeLoc loc;
 
+    if (components.empty()) {
+      // Only one component. Try looking up an enum element in context.
+      referencedElement
+        = lookupUnqualifiedEnumMemberElement(TC, DC,
+                                             tailComponent->getIdentifier(),
+                                             tailComponent->getLoc());
+      if (!referencedElement)
+        return nullptr;
+
+      auto *enumDecl = referencedElement->getParentEnum();
+      loc = TypeLoc::withoutLoc(enumDecl->getDeclaredTypeInContext());
+    } else {
+      // Otherwise, see whether we had an enum type as the penultimate
+      // component, and look up an element inside it.
+      auto *prefixRepr = IdentTypeRepr::create(TC.Context, components);
+      // See first if the entire repr resolves to a type.
+      Type enumTy = TC.resolveIdentifierType(DC, prefixRepr,
+                                             TR_AllowUnboundGenerics,
+                                             /*diagnoseErrors*/false, &resolver,
+                                             nullptr);
+      if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
+        return nullptr;
+
+      referencedElement
+        = lookupEnumMemberElement(TC, DC, enumTy,
+                                  tailComponent->getIdentifier(),
+                                  tailComponent->getLoc());
+      if (!referencedElement)
+        return nullptr;
+
+      loc = TypeLoc(prefixRepr);
+      loc.setType(enumTy);
+    }
+
+    if (auto generic = dyn_cast<GenericIdentTypeRepr>(tailComponent)) {
       assert(TC.Context.isSwiftVersion3() && "should be handled above");
 
       // Swift3 used to ignore the last generic argument clause:
@@ -533,74 +567,8 @@ public:
       TC.diagnose(generic->getAngleBrackets().Start,
                   diag::swift3_ignore_specialized_enum_element_call)
         .fixItRemove(generic->getAngleBrackets());
-    };
-
-    auto *repr = IdentTypeRepr::create(TC.Context, components);
-    
-    // If we had a single component, try looking up an enum element in context.
-    if (auto compId = dyn_cast<ComponentIdentTypeRepr>(repr)) {
-      // Try looking up an enum element in context.
-      EnumElementDecl *referencedElement
-        = lookupUnqualifiedEnumMemberElement(TC, DC, compId->getIdentifier(),
-                                             repr->getLoc());
-      
-      if (!referencedElement)
-        return nullptr;
-
-      diagnoseSpecialized();
-      
-      auto *enumDecl = referencedElement->getParentEnum();
-      auto enumTy = enumDecl->getDeclaredTypeInContext();
-      TypeLoc loc = TypeLoc::withoutLoc(enumTy);
-
-      auto *subPattern = getSubExprPattern(ce->getArg());
-      return new (TC.Context) EnumElementPattern(loc,
-                                                 SourceLoc(),
-                                                 compId->getIdLoc(),
-                                                 compId->getIdentifier(),
-                                                 referencedElement,
-                                                 subPattern);
     }
-    
-    // Otherwise, see whether we had an enum type as the penultimate component,
-    // and look up an element inside it.
-    auto *prefixRepr = IdentTypeRepr::create(
-                         TC.Context,
-                         llvm::makeArrayRef(components.data(),
-                                            components.size() - 1));
 
-    // See first if the entire repr resolves to a type.
-    Type enumTy = TC.resolveIdentifierType(DC, prefixRepr,
-                                           TR_AllowUnboundGenerics,
-                                           /*diagnoseErrors*/false, &resolver,
-                                           nullptr);
-    auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
-    if (!enumDecl)
-      return nullptr;
-
-    auto compoundR = cast<CompoundIdentTypeRepr>(repr);
-    auto tailComponent = compoundR->Components.back();
-
-    EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, DC, enumTy, tailComponent->getIdentifier(),
-                                tailComponent->getLoc());
-    if (!referencedElement)
-      return nullptr;
-
-    diagnoseSpecialized();
-    
-    // Build a TypeRepr from the head of the full path.
-    TypeLoc loc;
-    IdentTypeRepr *subRepr;
-    auto headComps =
-      compoundR->Components.slice(0, compoundR->Components.size() - 1);
-    if (headComps.size() == 1)
-      subRepr = headComps.front();
-    else
-      subRepr = new (TC.Context) CompoundIdentTypeRepr(headComps);
-    loc = TypeLoc(subRepr);
-    loc.setType(enumTy);
-    
     auto *subPattern = getSubExprPattern(ce->getArg());
     return new (TC.Context) EnumElementPattern(loc,
                                                SourceLoc(),
