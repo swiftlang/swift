@@ -455,7 +455,9 @@ public:
   }
 
   bool shouldEnter(ASTNode Node) {
-   if (SM.isBeforeInBuffer(End, Node.getSourceRange().Start))
+    if (hasResult())
+      return false;
+    if (SM.isBeforeInBuffer(End, Node.getSourceRange().Start))
       return false;
     if (SM.isBeforeInBuffer(Node.getSourceRange().End, Start))
       return false;
