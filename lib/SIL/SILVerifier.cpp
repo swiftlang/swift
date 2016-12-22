@@ -473,7 +473,7 @@ public:
     // ownership.
     if (!F->hasQualifiedOwnership())
       return;
-    SILValue(V).verifyOwnership();
+    SILValue(V).verifyOwnership(F->getModule());
   }
 
   void checkSILInstruction(SILInstruction *I) {

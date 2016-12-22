@@ -266,7 +266,7 @@ public:
   ValueOwnershipKind getOwnershipKind() const;
 
   /// Verify that this SILValue and its uses respects ownership invariants.
-  void verifyOwnership() const;
+  void verifyOwnership(SILModule &Mod) const;
 };
 
 /// A formal SIL reference to a value, suitable for use as a stored
