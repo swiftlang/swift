@@ -107,6 +107,10 @@ public:
     return Data.get<SpecializedDeclRef *>()->getDecl();
   }
 
+  /// Retrieve a reference to the declaration this one overrides.
+  ConcreteDeclRef
+  getOverriddenDecl(ASTContext &ctx, LazyResolver *resolver) const;
+
   /// Determine whether this reference specializes the declaration to which
   /// it refers.
   bool isSpecialized() const { return Data.is<SpecializedDeclRef *>(); }

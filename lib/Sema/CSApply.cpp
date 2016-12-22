@@ -4172,7 +4172,7 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
 
   case DefaultArgumentKind::Inherited:
     // Update the owner to reflect inheritance here.
-    owner = ownerFn->getOverriddenDecl();
+    owner = owner.getOverriddenDecl(tc.Context, &tc);
     return getCallerDefaultArg(cs, dc, loc, owner, index);
 
   case DefaultArgumentKind::Column:
