@@ -2400,7 +2400,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   
   // Instantiate the layout with identity substitutions.
   SmallVector<Substitution, 4> genericArgs;
-  signature->getSubstitutions(*M.getSwiftModule(),
+  signature->getSubstitutions(
     [&](SubstitutableType* type) -> Type {
       return signature->getCanonicalTypeInContext(type,
                                                   *M.getSwiftModule());

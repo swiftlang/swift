@@ -97,7 +97,6 @@ Type Solution::computeSubstitutions(
       getFixedType(opened.second);
   }
 
-  auto mod = getConstraintSystem().DC->getParentModule();
   GenericSignature *sig;
   if (auto genericFn = origType->getAs<GenericFunctionType>()) {
     sig = genericFn->getGenericSignature();
@@ -121,7 +120,7 @@ Type Solution::computeSubstitutions(
                                   ConformanceCheckFlags::Used));
   };
 
-  sig->getSubstitutions(*mod, subs, lookupConformanceFn, result);
+  sig->getSubstitutions(subs, lookupConformanceFn, result);
   return type;
 }
 
@@ -4173,7 +4172,7 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
 
   case DefaultArgumentKind::Inherited:
     // Update the owner to reflect inheritance here.
-    owner = ownerFn->getOverriddenDecl();
+    owner = owner.getOverriddenDecl(tc.Context, &tc);
     return getCallerDefaultArg(cs, dc, loc, owner, index);
 
   case DefaultArgumentKind::Column:

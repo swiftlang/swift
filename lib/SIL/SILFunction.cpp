@@ -554,8 +554,6 @@ ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
   if (!env)
     return {};
 
-  auto *M = getModule().getSwiftModule();
-  ForwardingSubs = env->getForwardingSubstitutions(M);
-
+  ForwardingSubs = env->getForwardingSubstitutions();
   return *ForwardingSubs;
 }

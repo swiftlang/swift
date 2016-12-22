@@ -2045,7 +2045,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
 
   auto overrideInterfaceTy =
       selfInterfaceTy->adjustSuperclassMemberDeclType(
-          derived.getDecl(), base.getDecl(), baseInterfaceTy,
+          base.getDecl(), derived.getDecl(), baseInterfaceTy,
           /*resolver=*/nullptr);
 
   // Copy generic signature from derived to the override type, to handle

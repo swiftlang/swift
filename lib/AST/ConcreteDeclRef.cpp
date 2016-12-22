@@ -30,6 +30,29 @@ ConcreteDeclRef::SpecializedDeclRef::create(
   return new (memory) SpecializedDeclRef(decl, substitutions);
 }
 
+ConcreteDeclRef
+ConcreteDeclRef::getOverriddenDecl(ASTContext &ctx,
+                                   LazyResolver *resolver) const {
+  auto *derivedDecl = getDecl();
+  auto *baseDecl = derivedDecl->getOverriddenDecl();
+
+  auto *baseSig = baseDecl->getInnermostDeclContext()
+      ->getGenericSignatureOfContext();
+  auto *derivedSig = derivedDecl->getInnermostDeclContext()
+      ->getGenericSignatureOfContext();
+
+  SmallVector<Substitution, 4> subs = {};
+  if (baseSig) {
+    SubstitutionMap subMap;
+    if (derivedSig)
+      derivedSig->getSubstitutionMap(getSubstitutions(), subMap);
+    subMap = SubstitutionMap::getOverrideSubstitutions(
+        baseDecl, derivedDecl, subMap, resolver);
+    baseSig->getSubstitutions(subMap, subs);
+  }
+  return ConcreteDeclRef(ctx, baseDecl, subs);
+}
+
 void ConcreteDeclRef::dump(raw_ostream &os) {
   if (!getDecl()) {
     os << "**NULL**";
