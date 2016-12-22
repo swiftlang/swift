@@ -4946,6 +4946,8 @@ public:
       auto parentFunc = cast<FuncDecl>(parentDecl);
       if (func->isStatic() != parentFunc->isStatic())
         return false;
+      if (!!func->getGenericParams() != !!parentFunc->getGenericParams())
+        return false;
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       auto parentVar = cast<VarDecl>(parentDecl);
       if (var->isStatic() != parentVar->isStatic())
@@ -4991,7 +4993,7 @@ public:
                               bool treatIUOResultAsError) {
     bool emittedError = false;
     Type plainParentTy = owningTy->adjustSuperclassMemberDeclType(
-        member, parentMember, parentMember->getInterfaceType(), &TC);
+        parentMember, member, parentMember->getInterfaceType(), &TC);
     const auto *parentTy = plainParentTy->castTo<AnyFunctionType>();
     if (isa<AbstractFunctionDecl>(parentMember))
       parentTy = parentTy->getResult()->castTo<AnyFunctionType>();
@@ -5429,7 +5431,7 @@ public:
         // Check whether the types are identical.
         // FIXME: It's wrong to use the uncurried types here for methods.
         auto parentDeclTy = owningTy->adjustSuperclassMemberDeclType(
-            decl, parentDecl, parentDecl->getInterfaceType(), &TC);
+            parentDecl, decl, parentDecl->getInterfaceType(), &TC);
         parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
         if (method) {
           parentDeclTy = parentDeclTy->castTo<AnyFunctionType>()->getResult();
@@ -5688,7 +5690,7 @@ public:
       } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
         auto propertyTy = property->getInterfaceType();
         auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
-            decl, matchDecl, matchDecl->getInterfaceType(), &TC);
+            matchDecl, decl, matchDecl->getInterfaceType(), &TC);
         
         if (!propertyTy->canOverride(parentPropertyTy,
                                      OverrideMatchMode::Strict,

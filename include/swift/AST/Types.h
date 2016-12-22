@@ -884,8 +884,8 @@ public:
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the
   /// 'self' argument type as appropriate.
-  Type adjustSuperclassMemberDeclType(const ValueDecl *decl,
-                                      const ValueDecl *parentDecl,
+  Type adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
+                                      const ValueDecl *derivedDecl,
                                       Type memberType,
                                       LazyResolver *resolver);
 
