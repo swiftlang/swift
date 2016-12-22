@@ -27,6 +27,7 @@
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -1426,7 +1427,7 @@ static SelectorFamily getSelectorFamily(Identifier name) {
     if (!text.startswith(prefix)) return false;
     if (text.size() == prefix.size()) return true;
     assert(text.size() > prefix.size());
-    return !islower(text[prefix.size()]);
+    return !clang::isLowercase(text[prefix.size()]);
   };
 
   auto result = SelectorFamily::None;

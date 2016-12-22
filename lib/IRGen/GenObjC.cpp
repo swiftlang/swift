@@ -21,6 +21,7 @@
 #include "llvm/IR/InlineAsm.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/CharInfo.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 
 #include "swift/AST/Decl.h"
@@ -569,7 +570,7 @@ namespace {
       if (!text.startswith(prefix)) return false;
       if (text.size() == prefix.size()) return true;
       assert(text.size() > prefix.size());
-      return !islower(text[prefix.size()]);
+      return !clang::isLowercase(text[prefix.size()]);
     }
 
 #undef FOREACH_FAMILY
