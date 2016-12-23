@@ -2007,15 +2007,6 @@ public:
                                        TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
 
-  /// \brief Subroutine of \c matchTypes(), which extracts a scalar value from
-  /// a single-element tuple type.
-  ///
-  /// \returns the result of performing the tuple-to-scalar conversion.
-  SolutionKind matchTupleToScalarTypes(TupleType *tuple1, Type type2,
-                                       ConstraintKind kind,
-                                       TypeMatchOptions flags,
-                                       ConstraintLocatorBuilder locator);
-
   /// \brief Subroutine of \c matchTypes(), which matches up two function
   /// types.
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,

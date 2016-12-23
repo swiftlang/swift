@@ -498,6 +498,11 @@ func fn(x: Int) {
   }
 }
 
+func bad_if() {
+  if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
+  if (x: false) {} // expected-error {{'(x: Bool)' is not convertible to 'Bool'}}
+  if (x: 1) {} // expected-error {{'(x: Int)' is not convertible to 'Bool'}}
+}
 
 // Errors in case syntax
 class
