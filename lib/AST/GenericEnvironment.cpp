@@ -351,14 +351,18 @@ getSubstitutionMap(ModuleDecl *mod,
     auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
                                  LookUpConformanceInModule(mod),
                                  SubstOptions());
-    auto *archetype = contextTy->castTo<ArchetypeType>();
 
     auto sub = subs.front();
     subs = subs.slice(1);
 
     // Record the replacement type and its conformances.
-    result.addSubstitution(CanType(archetype), sub.getReplacement());
-    result.addConformances(CanType(archetype), sub.getConformances());
+    if (auto *archetype = contextTy->getAs<ArchetypeType>()) {
+      result.addSubstitution(CanType(archetype), sub.getReplacement());
+      result.addConformances(CanType(archetype), sub.getConformances());
+      continue;
+    }
+
+    assert(contextTy->is<ErrorType>());
   }
 
   for (auto reqt : getGenericSignature()->getRequirements()) {
