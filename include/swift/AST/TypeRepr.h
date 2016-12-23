@@ -309,6 +309,10 @@ public:
     : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
       GenericArgs(GenericArgs), AngleBrackets(AngleBrackets) {
     assert(!GenericArgs.empty());
+#ifndef NDEBUG
+    for (auto arg : GenericArgs)
+      assert(arg != nullptr);
+#endif
   }
 
   ArrayRef<TypeRepr*> getGenericArgs() const { return GenericArgs; }

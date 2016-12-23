@@ -3140,61 +3140,66 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   // owner or pinned owner.
   } else if (Kind == AccessorKind::IsAddressor ||
              Kind == AccessorKind::IsMutableAddressor) {
-    // Construct "Unsafe{,Mutable}Pointer<T>".
-    
-    TypeRepr *args[] = { ElementTy.clone(P->Context).getTypeRepr() };
 
-    // FIXME: the fact that this could resolve in the local scope is dumb.
-    bool isMutable = (Kind == AccessorKind::IsMutableAddressor);
-    Identifier name = P->Context.getIdentifier(
-                    isMutable ? "UnsafeMutablePointer" : "UnsafePointer");
+    // If we don't have a declared type, we will diagnose later,
+    // so skip this to avoid crashing.
+    if (ElementTy.getTypeRepr()) {
+      // Construct "Unsafe{,Mutable}Pointer<T>".
+      
+      TypeRepr *args[] = { ElementTy.clone(P->Context).getTypeRepr() };
 
-    TypeRepr *resultType =
-      new (P->Context) GenericIdentTypeRepr(SourceLoc(), name,
-                                            P->Context.AllocateCopy(args),
-                                            SourceRange());
+      // FIXME: the fact that this could resolve in the local scope is dumb.
+      bool isMutable = (Kind == AccessorKind::IsMutableAddressor);
+      Identifier name = P->Context.getIdentifier(
+                      isMutable ? "UnsafeMutablePointer" : "UnsafePointer");
 
-    auto makeKnownType = [&](Type type) -> TypeRepr* {
-      return new (P->Context) FixedTypeRepr(type, SourceLoc());
-    };
-    auto makePairType = [&](TypeRepr *fst, TypeRepr *snd) -> TypeRepr* {
-      return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange());
-    };
+      TypeRepr *resultType =
+        new (P->Context) GenericIdentTypeRepr(SourceLoc(), name,
+                                              P->Context.AllocateCopy(args),
+                                              SourceRange());
 
-    switch (addressorKind) {
-    case AddressorKind::NotAddressor:
-      llvm_unreachable("not an addressor!");
+      auto makeKnownType = [&](Type type) -> TypeRepr* {
+        return new (P->Context) FixedTypeRepr(type, SourceLoc());
+      };
+      auto makePairType = [&](TypeRepr *fst, TypeRepr *snd) -> TypeRepr* {
+        return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange());
+      };
 
-    // For unsafe addressors, that's all we've got.
-    case AddressorKind::Unsafe:
-      break;
+      switch (addressorKind) {
+      case AddressorKind::NotAddressor:
+        llvm_unreachable("not an addressor!");
 
-    // For non-native owning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, Builtin.UnknownObject)
-    case AddressorKind::Owning:
-      resultType = makePairType(resultType,
-                                makeKnownType(P->Context.TheUnknownObjectType));
-      break;
+      // For unsafe addressors, that's all we've got.
+      case AddressorKind::Unsafe:
+        break;
 
-    // For native owning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
-    case AddressorKind::NativeOwning:
-      resultType = makePairType(resultType,
-                                makeKnownType(P->Context.TheNativeObjectType));
-      break;
+      // For non-native owning addressors, the return type is actually
+      //   (Unsafe{,Mutable}Pointer<T>, Builtin.UnknownObject)
+      case AddressorKind::Owning:
+        resultType = makePairType(resultType,
+                                  makeKnownType(P->Context.TheUnknownObjectType));
+        break;
 
-    // For native pinning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
-    case AddressorKind::NativePinning: {
-      auto optNativePtr = new (P->Context) OptionalTypeRepr(
-          makeKnownType(P->Context.TheNativeObjectType),
-          SourceLoc());
-      resultType = makePairType(resultType, optNativePtr);
-      break;
+      // For native owning addressors, the return type is actually
+      //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
+      case AddressorKind::NativeOwning:
+        resultType = makePairType(resultType,
+                                  makeKnownType(P->Context.TheNativeObjectType));
+        break;
+
+      // For native pinning addressors, the return type is actually
+      //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
+      case AddressorKind::NativePinning: {
+        auto optNativePtr = new (P->Context) OptionalTypeRepr(
+            makeKnownType(P->Context.TheNativeObjectType),
+            SourceLoc());
+        resultType = makePairType(resultType, optNativePtr);
+        break;
+      }
+      }
+
+      ReturnType = resultType;
     }
-    }
-
-    ReturnType = resultType;
 
   // Everything else returns ().
   } else {
