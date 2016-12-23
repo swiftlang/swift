@@ -29,8 +29,6 @@
 // CHECK-NEXT:     TU: CFTypeRef
 // CHECK-NEXT:   NSAccessibility:
 // CHECK-NEXT:     TU: NSAccessibility{{$}}
-// CHECK-NEXT:   NSError:
-// CHECK-NEXT:     TU: NSError
 // CHECK-NEXT:   NSErrorImports:
 // CHECK-NEXT:     TU: NSErrorImports
 // CHECK-NEXT:   SNCollision:
