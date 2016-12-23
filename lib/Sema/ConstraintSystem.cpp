@@ -962,6 +962,25 @@ void ConstraintSystem::openGeneric(
       break;
     }
 
+    case RequirementKind::Layout: {
+      auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
+      auto proto = req.getSecondType()->castTo<ProtocolType>();
+      auto protoDecl = proto->getDecl();
+
+      // Determine whether this is the protocol 'Self' constraint we should
+      // skip.
+      if (skipProtocolSelfConstraint &&
+          protoDecl == outerDC &&
+          (protoDecl->getSelfInterfaceType()->getCanonicalType() ==
+           req.getFirstType()->getCanonicalType())) {
+        break;
+      }
+
+      addConstraint(ConstraintKind::Layout, subjectTy, proto,
+                    locatorPtr);
+      break;
+    }
+
     case RequirementKind::Superclass: {
       auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
       auto boundTy = req.getSecondType().transform(replaceDependentTypes);

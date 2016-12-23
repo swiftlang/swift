@@ -121,9 +121,8 @@ public:
                           ArrayRef<Substitution> ParamSubs);
 
   /// Constructs the ReabstractionInfo for generic function \p Orig with
-  /// additional requirements.
-  /// If specialization is not possible getSpecializedType() will return an
-  /// invalid type.
+  /// additional requirements. Requirements may contain new layout,
+  /// conformances or same concrete type requirements.
   ReabstractionInfo(SILFunction *Orig, ArrayRef<Requirement> Requirements);
 
   /// Does the \p ArgIdx refer to an indirect out-parameter?

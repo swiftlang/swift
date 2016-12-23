@@ -2332,7 +2332,34 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
 
 void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
-  SILPrinter(Ctx).printSubstitutions(getSubstitutions());
+  // Print other types as their Swift representation.
+  PrintOptions SubPrinter = PrintOptions::printSIL();
+  auto exported = isExported() ? "true" : "false";
+  auto kind = isPartialSpecialization() ? "partial" : "full";
+
+  OS << "exported: " << exported << ", ";
+  OS << "kind: " << kind << ", ";
+
+  if (!getRequirements().empty()) {
+    OS << "where ";
+    SILFunction *F = getFunction();
+    assert(F);
+    auto GenericEnv = F->getGenericEnvironment();
+    assert(GenericEnv);
+    auto *SM = F->getModule().getSwiftModule();
+    interleave(getRequirements(),
+               [&](Requirement req) {
+                 // Use GenericEnvironment to produce user-friendly
+                 // names instead of something like t_0_0.
+                 auto FirstTy = GenericEnv->mapTypeOutOfContext(
+                     GenericEnv->mapTypeIntoContext(SM, req.getFirstType()));
+                 auto SecondTy = GenericEnv->mapTypeOutOfContext(
+                     GenericEnv->mapTypeIntoContext(SM, req.getSecondType()));
+                 Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+                 ReqWithDecls.print(OS, SubPrinter);
+               },
+               [&] { OS << ", "; });
+  }
 }
 
 //===----------------------------------------------------------------------===//

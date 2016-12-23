@@ -1739,7 +1739,6 @@ sil [readonly] @read_only_guaranteed : $@convention(thin) (@guaranteed ZZZ) -> (
 
 //CHECK-LABEL: sil @test_delete_readonly_in
 //CHECK: bb0(%0 : $*SSS):
-//CHECK-NEXT: destroy_addr %0
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
 sil @test_delete_readonly_in : $@convention(thin) (@in SSS) -> () {

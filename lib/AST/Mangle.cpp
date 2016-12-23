@@ -531,6 +531,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
       for (auto &reqt : sig->getRequirements()) {
         switch (reqt.getKind()) {
         case RequirementKind::Conformance:
+        case RequirementKind::Layout:
         case RequirementKind::Superclass:
           // We don't need the requirement if the constrained type is above the
           // method depth.
@@ -660,6 +661,20 @@ mangle_requirements:
         didMangleRequirement = true;
       }
       // Protocol constraints are the common case, so mangle them more
+      // efficiently.
+      // TODO: We could golf this a little more by assuming the first type
+      // is a dependent type.
+      mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
+      mangleProtocolName(
+                      reqt.getSecondType()->castTo<ProtocolType>()->getDecl());
+      break;
+
+    case RequirementKind::Layout:
+      if (!didMangleRequirement) {
+        Buffer << 'R';
+        didMangleRequirement = true;
+      }
+      // Layout constraints are the common case, so mangle them more
       // efficiently.
       // TODO: We could golf this a little more by assuming the first type
       // is a dependent type.

@@ -139,6 +139,12 @@ void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
   };
 
   switch (getKind()) {
+  case RequirementReprKind::LayoutConstraint:
+    printTy(getSubjectLoc());
+    out << " : ";
+    printTy(getLayoutConstraintLoc());
+    break;
+
   case RequirementReprKind::TypeConstraint:
     printTy(getSubjectLoc());
     out << " : ";

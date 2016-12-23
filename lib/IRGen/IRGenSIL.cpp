@@ -3538,7 +3538,18 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 }
 
 void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
+  /*
+  LayoutConstraintInfo LayoutInfo =
+      i->getElementType().getSwiftRValueType().getLayoutConstraintInfo();
+  const TypeInfo &type = getTypeInfo(
+      (LayoutInfo > LayoutConstraintInfo::UnknownLayout &&
+       LayoutInfo < LayoutConstraintInfo::Trivial)
+          ? SILType::getBuiltinIntegerType((unsigned)LayoutInfo * 8,
+                                           i->getModule().getASTContext())
+          : i->getElementType());
+  */
   const TypeInfo &type = getTypeInfo(i->getElementType());
+
 
   // Derive name from SIL location.
   VarDecl *Decl = i->getDecl();
@@ -3611,6 +3622,13 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
 
 void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   auto allocatedType = i->getOperand()->getType();
+/*
+  LayoutConstraintInfo LayoutInfo =
+      allocatedType.getSwiftRValueType().getLayoutConstraintInfo();
+  if (LayoutInfo > LayoutConstraintInfo::UnknownLayout &&
+      LayoutInfo < LayoutConstraintInfo::Trivial)
+    return;
+*/
   const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
   StackAddress stackAddr = getLoweredStackAddress(i->getOperand());
 
@@ -4588,6 +4606,40 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   Address src = getLoweredAddress(i->getSrc());
   // See whether we have a deferred fixed-size buffer initialization.
   auto &loweredDest = getLoweredValue(i->getDest());
+
+#if 0
+  // Check if it is a copy.with a trivial layout.
+  auto LayoutInfo = addrTy.getSwiftRValueType().getLayoutConstraintInfo();
+  if (LayoutInfo > LayoutConstraintInfo::UnknownLayout &&
+      LayoutInfo < LayoutConstraintInfo::Trivial) {
+    // Simply load the value from src and store it in the dst.
+
+    // Load
+    Explosion loweredSrcLoad;
+    SILType objType = SILType::getBuiltinIntegerType(
+        (unsigned)LayoutInfo * 8, i->getModule().getASTContext());
+
+    const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
+    const auto &addrTypeInfo =
+        cast<LoadableTypeInfo>(getTypeInfo(objType.getAddressType()));
+    // cast src to objType*
+    auto srcCast = Builder.CreateBitCast(
+        src, llvm::PointerType::getUnqual(addrTypeInfo.getStorageType()));
+    typeInfo.loadAsTake(*this, srcCast, loweredSrcLoad);
+
+    // Store
+    Address dest = loweredDest.isUnallocatedAddressInBuffer()
+                       ? loweredDest.getContainerOfAddress()
+                       : loweredDest.getAddress();
+    // cast src to objType*
+    auto destCast = Builder.CreateBitCast(
+        dest, llvm::PointerType::getUnqual(addrTypeInfo.getStorageType()));
+
+    typeInfo.initialize(*this, loweredSrcLoad, destCast);
+    return;
+  }
+#endif
+
   if (loweredDest.isUnallocatedAddressInBuffer()) {
     assert(i->isInitializationOfDest()
            && "need to initialize an unallocated buffer");
@@ -4625,6 +4677,20 @@ void IRGenSILFunction::visitBindMemoryInst(swift::BindMemoryInst *) {}
 void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   SILType addrTy = i->getOperand()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
+
+#if 0
+  // Try to fold a destroy_addr of a dynamic alloc_stack into a single
+  // destroyBuffer operation.
+  if (!isa<FixedTypeInfo>(addrTI) &&
+      !addrTy.getObjectType().isTrivial(IGM.getSILModule())) {
+    // If we can find a matching dealloc stack, just set an emission note
+    // on it; that will cause it to destroy the current value.
+    if (auto deallocStack = findPairedDeallocStackForDestroyAddr(i)) {
+      addEmissionNote(deallocStack);
+      return;
+    }
+  }
+#endif
 
   // Otherwise, do the normal thing.
   Address base = getLoweredAddress(i->getOperand());

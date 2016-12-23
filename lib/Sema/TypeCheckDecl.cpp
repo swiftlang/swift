@@ -546,11 +546,9 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     }
 
     proto->setInheritedProtocols(Context.AllocateCopy(allProtocols));
-    return;
   }
-
   // Set the superclass.
-  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+  else if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     classDecl->setSuperclass(superclassTy);
   } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
     enumDecl->setRawType(superclassTy);
@@ -1338,6 +1336,10 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
         maxAccess = std::min(getTypeAccess(req.getSubjectLoc()), maxAccess);
         maxAccess = std::min(getTypeAccess(req.getConstraintLoc()), maxAccess);
         break;
+      case RequirementReprKind::LayoutConstraint:
+        maxAccess = std::min(getTypeAccess(req.getSubjectLoc()), maxAccess);
+        maxAccess = std::min(getTypeAccess(req.getLayoutConstraintLoc()), maxAccess);
+        break;
       case RequirementReprKind::SameType:
         maxAccess = std::min(getTypeAccess(req.getFirstTypeLoc()), maxAccess);
         maxAccess = std::min(getTypeAccess(req.getSecondTypeLoc()), maxAccess);
@@ -1683,6 +1685,14 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
                                  accessScope, owner->getDeclContext(),
                                  /*isParameter*/false, callback);
       checkTypeAccessibilityImpl(TC, requirement.getConstraintLoc(),
+                                 accessScope, owner->getDeclContext(),
+                                 /*isParameter*/false, callback);
+      break;
+    case RequirementReprKind::LayoutConstraint:
+      checkTypeAccessibilityImpl(TC, requirement.getSubjectLoc(),
+                                 accessScope, owner->getDeclContext(),
+                                 /*isParameter*/false, callback);
+      checkTypeAccessibilityImpl(TC, requirement.getLayoutConstraintLoc(),
                                  accessScope, owner->getDeclContext(),
                                  /*isParameter*/false, callback);
       break;
@@ -3562,6 +3572,34 @@ public:
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
+
+    // Check that a set of all protocols this type conforms to valid.
+    if (IsSecondPass || !(IsFirstPass || IsSecondPass)) {
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(decl)) {
+        auto protocols = NTD->getAllProtocols();
+        ProtocolDecl *lastLayoutConstraint = nullptr;
+
+        for (auto proto : protocols) {
+          // Check if it is a layout constraint protocol and there is
+          // another layout constraint protocol already present.
+          auto protoLayoutInfo = getLayoutConstraintInfo(proto->getDeclaredType());
+          if (protoLayoutInfo.isKnownLayout()) {
+            if (!lastLayoutConstraint) {
+              lastLayoutConstraint = proto;
+              continue;
+            }
+
+            if (lastLayoutConstraint == proto)
+              continue;
+            // There are multiple layout constraints.
+            TC.diagnose(decl->getLoc(), diag::mutiple_layout_constraints,
+                        proto->getDeclaredType(),
+                        lastLayoutConstraint->getDeclaredType());
+            decl->setInvalid(true);
+          }
+        }
+      }
+    }
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       checkRedeclaration(TC, VD);

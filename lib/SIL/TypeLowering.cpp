@@ -317,9 +317,22 @@ namespace {
     RetTy visitArchetypeType(CanArchetypeType type) {
       if (type->requiresClass()) {
         return asImpl().handleReference(type);
-      } else {
-        return asImpl().handleAddressOnly(type);
       }
+
+      auto LayoutInfo = getLayoutConstraintInfo(type);
+      if (LayoutInfo.isFixedSizeTrivial()) {
+        return asImpl().handleTrivial(type);
+      }
+
+      if (LayoutInfo.isAddressOnlyTrivial()) {
+        return asImpl().handleTrivial(
+            type, TypeLowering::IsAddressOnly_t::IsAddressOnly);
+      }
+
+      if (LayoutInfo.isRefCountedObject())
+        return asImpl().handleReference(type);
+
+      return asImpl().handleAddressOnly(type);
     }
 
     RetTy visitExistentialType(CanType type) {
@@ -412,7 +425,10 @@ namespace {
     LoweredTypeKind handleAggWithReference(CanType type) {
       return LoweredTypeKind::AggWithReference;
     }
-    LoweredTypeKind handleTrivial(CanType type) {
+    LoweredTypeKind
+    handleTrivial(CanType type,
+                  TypeLowering::IsAddressOnly_t addressOnly =
+                      TypeLowering::IsAddressOnly_t::IsNotAddressOnly) {
       return LoweredTypeKind::Trivial;
     }
     LoweredTypeKind handleAddressOnly(CanType type) {
@@ -1049,6 +1065,71 @@ namespace {
     }
   };
 
+  /// A class for trivial, address-only types.
+  class AddressOnlyTrivialTypeLowering : public TypeLowering {
+  public:
+    AddressOnlyTrivialTypeLowering(SILType type)
+      : TypeLowering(type, IsTrivial, IsAddressOnly, IsNotReferenceCounted)
+    {}
+
+    void emitCopyInto(SILBuilder &B, SILLocation loc,
+                      SILValue src, SILValue dest, IsTake_t isTake,
+                      IsInitialization_t isInit) const override {
+      B.createCopyAddr(loc, src, dest, isTake, isInit);
+    }
+
+    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
+                            SILValue addr, IsTake_t isTake) const override {
+      llvm_unreachable("calling emitLoadOfCopy on non-loadable type");
+    }
+
+    void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
+                         SILValue newValue, SILValue addr,
+                         IsInitialization_t isInit) const override {
+      llvm_unreachable("calling emitStoreOfCopy on non-loadable type");
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitStore on non-loadable type");
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitLoad on non-loadable type");
+    }
+
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+    }
+
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+    }
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
+                                 LoweringStyle style) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+  };
+
+
   /// Build the appropriate TypeLowering subclass for the given type,
   /// which is assumed to already have been lowered.
   class LowerType
@@ -1062,11 +1143,16 @@ namespace {
       : TypeClassifierBase(TC.M, Sig, Expansion),
         TC(TC), Dependent(Dependent) {}
 
-    const TypeLowering *handleTrivial(CanType type) {
+    const TypeLowering *
+    handleTrivial(CanType type,
+                  TypeLowering::IsAddressOnly_t addressOnly =
+                      TypeLowering::IsAddressOnly_t::IsNotAddressOnly) {
       auto silType = SILType::getPrimitiveObjectType(type);
-      return new (TC, Dependent) TrivialTypeLowering(silType);
+      if (addressOnly == TypeLowering::IsAddressOnly_t::IsNotAddressOnly)
+        return new (TC, Dependent) TrivialTypeLowering(silType);
+      return new (TC, Dependent) AddressOnlyTrivialTypeLowering(silType);
     }
-  
+
     const TypeLowering *handleReference(CanType type) {
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC, Dependent) ReferenceTypeLowering(silType);

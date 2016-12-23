@@ -243,7 +243,14 @@ public:
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
   void addRequirement(const Requirement &req, RequirementSource source);
-  
+
+  bool addLayoutRequirement(PotentialArchetype *PAT, ProtocolDecl *Proto,
+                            RequirementSource Source);
+
+  bool addLayoutRequirement(PotentialArchetype *PAT, ProtocolDecl *Proto,
+                            RequirementSource Source,
+                            llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
+
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
 

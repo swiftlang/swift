@@ -112,6 +112,14 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   if (!I->mayHaveSideEffects())
     return true;
 
+  // destroy_addr on a trivial type is a NOP. Such an instruction may
+  // be produced by the specialization of generics when a type
+  // has a trivial layout constraint.
+  if (auto *DAI = dyn_cast<DestroyAddrInst>(I)) {
+    if (DAI->getOperand()->getType().isTrivial(I->getModule()))
+      return true;
+  }
+
   return false;
 }
 

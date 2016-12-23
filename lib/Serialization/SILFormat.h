@@ -257,8 +257,8 @@ namespace sil_block {
 
   using SILSpecializeAttrLayout =
       BCRecordLayout<SIL_SPECIALIZE_ATTR,
-                     BCFixed<5> // number of substitutions
-                     // followed by bound generic substitutions
+                     BCFixed<1>, // exported
+                     BCFixed<1> // specialization kind
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.

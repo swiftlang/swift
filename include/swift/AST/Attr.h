@@ -28,6 +28,7 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/AST/Requirement.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -40,6 +41,8 @@ class ASTContext;
 struct PrintOptions;
 class Decl;
 class ClassDecl;
+class GenericFunctionType;
+class TrailingWhereClause;
 struct TypeLoc;
 
 /// TypeAttributes - These are attributes that may be applied to types.
@@ -1024,33 +1027,83 @@ public:
   }
 };
 
+class AbstractFunctionDecl;
+
 /// The @_specialize attribute, which forces specialization on the specified
 /// type list.
 class SpecializeAttr : public DeclAttribute {
-  unsigned numTypes;
-  ConcreteDeclRef specializedDecl;
+public:
+  enum class SpecializationKind {
+    Full,
+    Partial
+  };
 
-  TypeLoc *getTypeLocData() {
-    return reinterpret_cast<TypeLoc *>(this + 1);
+private:
+  AbstractFunctionDecl *F;
+  unsigned numRequirements;
+  TrailingWhereClause *trailingWhereClause;
+  SpecializationKind kind;
+  bool exported;
+
+  Requirement *getRequirementsData() {
+    return reinterpret_cast<Requirement *>(this+1);
   }
 
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
-                 ArrayRef<TypeLoc> typeLocs);
+                 TrailingWhereClause *clause, bool exported,
+                 SpecializationKind kind);
+
+  SpecializeAttr(SourceLoc atLoc, SourceRange Range,
+                 ArrayRef<Requirement> requirements,
+                 bool exported,
+                 SpecializationKind kind);
 
 public:
   static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
-                                SourceRange Range, ArrayRef<TypeLoc> typeLocs);
+                                SourceRange Range, TrailingWhereClause *clause,
+                                bool exported, SpecializationKind kind);
 
-  ArrayRef<TypeLoc> getTypeLocs() const;
+  static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
+                                SourceRange Range,
+                                ArrayRef<Requirement> requirement,
+                                bool exported, SpecializationKind kind);
 
-  MutableArrayRef<TypeLoc> getTypeLocs();
+  TrailingWhereClause *getTrailingWhereClause() const;
 
-  ConcreteDeclRef getConcreteDecl() const { return specializedDecl; }
+  ArrayRef<Requirement> getRequirements() const;
 
-  void setConcreteDecl(ConcreteDeclRef ref) { specializedDecl = ref; }
+  MutableArrayRef<Requirement> getRequirements() {
+    return { getRequirementsData(), numRequirements };
+  }
+
+  void setRequirements(ASTContext &Ctx, ArrayRef<Requirement> requirements);
+
+  bool isExported() const {
+    return exported;
+  }
+
+  SpecializationKind getSpecializationKind() const {
+    return kind;
+  }
+
+  bool isFullSpecialization() const {
+    return kind == SpecializationKind::Full;
+  }
+
+  bool isPartialSpecialization() const {
+    return kind == SpecializationKind::Partial;
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Specialize;
+  }
+
+  AbstractFunctionDecl *getDecl() const {
+    return F;
+  }
+
+  void setDecl(AbstractFunctionDecl *FD) {
+    F = FD;
   }
 };
 

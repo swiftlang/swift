@@ -274,9 +274,21 @@ ParserStatus Parser::parseGenericWhereClause(
         break;
       }
 
-      // Add the requirement.
-      Requirements.push_back(RequirementRepr::getTypeConstraint(FirstType.get(),
-                                                     ColonLoc, Protocol.get()));
+      // Check if it is a special pseudo-protocol used to express
+      // layout constraints
+      if (isLayoutConstraintType(Protocol.get())) {
+        // TODO: Check if layout constraints are allowed in the
+        // current context. They should be allowed only in @_specialized
+        // attributes for now.
+
+        // Add the layout requirement.
+        Requirements.push_back(RequirementRepr::getLayoutConstraint(
+            FirstType.get(), ColonLoc, Protocol.get()));
+      } else {
+        // Add the requirement.
+        Requirements.push_back(RequirementRepr::getTypeConstraint(
+            FirstType.get(), ColonLoc, Protocol.get()));
+      }
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
       // A same-type-requirement

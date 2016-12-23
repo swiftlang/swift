@@ -35,6 +35,9 @@ enum class RequirementKind : unsigned {
   /// A same-type requirement T == U, where T and U are types that shall be
   /// equivalent.
   SameType,
+  /// A layout bound T : L, where T is a type that depends on a generic
+  /// parameter and L is some layout specification that should bound T.
+  Layout,
 
   // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
   // when adding enumerators.
@@ -43,7 +46,7 @@ enum class RequirementKind : unsigned {
 /// \brief A single requirement placed on the type parameters (or associated
 /// types thereof) of a
 class Requirement {
-  llvm::PointerIntPair<Type, 2, RequirementKind> FirstTypeAndKind;
+  llvm::PointerIntPair<Type, 3, RequirementKind> FirstTypeAndKind;
   Type SecondType;
 
 public:
@@ -69,6 +72,7 @@ public:
 
   void dump() const;
   void print(raw_ostream &os, const PrintOptions &opts) const;
+  void print(ASTPrinter &printer, const PrintOptions &opts) const;
 };
 
 } // end namespace swift

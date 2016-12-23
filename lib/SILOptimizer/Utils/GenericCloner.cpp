@@ -73,6 +73,10 @@ void GenericCloner::populateCloned() {
     SILArgument *OrigArg = *I;
     RegularLocation Loc((Decl *)OrigArg->getDecl());
     AllocStackInst *ASI = nullptr;
+    // TODO: Special handling of archetypes with have constraint layouts.
+    // Arguments of these types are passed by reference, but we can
+    // load them at the beginning of the entry blocks and consider them
+    // to be values for the rest of the function.
     SILType mappedType = remapType(OrigArg->getType());
     if (ReInfo.isArgConverted(ArgIdx)) {
       // We need an alloc_stack as a replacement for the indirect parameter.

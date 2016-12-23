@@ -93,7 +93,8 @@
     "Builtin.swift",
     "VarArgs.swift",
     "CTypes.swift",
-    "MemoryLayout.swift"
+    "MemoryLayout.swift",
+    "TypeLayoutConstraints.swift"
   ],
   "Reflection": [
     "Dump.swift",

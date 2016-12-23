@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
@@ -440,9 +441,39 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
   case DAK_Specialize: {
     Printer << "@" << getAttrName() << "(";
     auto *attr = cast<SpecializeAttr>(this);
-    interleave(attr->getTypeLocs(),
-               [&](TypeLoc tyLoc){ tyLoc.getType().print(Printer, Options); },
-               [&]{ Printer << ", "; });
+    auto exported = attr->isExported() ? "true" : "false";
+    auto kind = attr->isPartialSpecialization() ? "partial" : "full";
+
+    Printer << "exported: "<<  exported << ", ";
+    Printer << "kind: " << kind << ", ";
+
+    if (!attr->getRequirements().empty()) {
+      Printer << "where ";
+    }
+    std::function<Type(Type)> GetInterfaceType;
+    auto *FnDecl = attr->getDecl();
+    if (!FnDecl)
+      GetInterfaceType = [](Type Ty) -> Type { return Ty; };
+    else {
+      // Use GenericEnvironment to produce user-friendly
+      // names instead of something like t_0_0.
+      auto *GenericEnv = FnDecl->getGenericEnvironment();
+      auto *SM = FnDecl->getModuleContext();
+      assert(GenericEnv);
+      GetInterfaceType = [=](Type Ty) -> Type {
+        return GenericEnv->mapTypeOutOfContext(
+            GenericEnv->mapTypeIntoContext(SM, Ty));
+      };
+    }
+    interleave(attr->getRequirements(),
+               [&](Requirement req) {
+                 auto FirstTy = GetInterfaceType(req.getFirstType());
+                 auto SecondTy = GetInterfaceType(req.getSecondType());
+                 Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+                 ReqWithDecls.print(Printer, Options);
+               },
+               [&] { Printer << ", "; });
+
     Printer << ")";
     break;
   }
@@ -768,25 +799,65 @@ const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
 }
 
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
-                               ArrayRef<TypeLoc> typeLocs)
+                               TrailingWhereClause *clause,
+                               bool exported,
+                               SpecializationKind kind)
     : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false),
-      numTypes(typeLocs.size())
-{
-  std::copy(typeLocs.begin(), typeLocs.end(), getTypeLocData());
+      F(nullptr), numRequirements(0), trailingWhereClause(clause),
+      kind(kind), exported(exported) {
 }
 
-ArrayRef<TypeLoc> SpecializeAttr::getTypeLocs() const {
-  return const_cast<SpecializeAttr*>(this)->getTypeLocs();
+SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
+                               ArrayRef<Requirement> requirements,
+                               bool exported,
+                               SpecializationKind kind)
+    : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false),
+      F(nullptr), numRequirements(0), kind(kind), exported(exported) {
+  numRequirements = requirements.size();
+  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
 }
 
-MutableArrayRef<TypeLoc> SpecializeAttr::getTypeLocs() {
-  return { this->getTypeLocData(), numTypes };
+void SpecializeAttr::setRequirements(ASTContext &Ctx,
+                                     ArrayRef<Requirement> requirements) {
+  unsigned numClauseRequirements =
+      (trailingWhereClause) ? trailingWhereClause->getRequirements().size() : 0;
+  assert(requirements.size() <= numClauseRequirements);
+  if (!numClauseRequirements)
+    return;
+  numRequirements = requirements.size();
+  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
+}
+
+ArrayRef<Requirement> SpecializeAttr::getRequirements() const {
+  return const_cast<SpecializeAttr*>(this)->getRequirements();
+}
+
+TrailingWhereClause *SpecializeAttr::getTrailingWhereClause() const {
+  return trailingWhereClause;
 }
 
 SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
-                                       ArrayRef<TypeLoc> typeLocs) {
-  unsigned size = sizeof(SpecializeAttr) + (typeLocs.size() * sizeof(TypeLoc));
+                                       TrailingWhereClause *clause,
+                                       bool exported,
+                                       SpecializationKind kind) {
+  unsigned numRequirements = (clause) ? clause->getRequirements().size() : 0;
+  unsigned size =
+      sizeof(SpecializeAttr) + (numRequirements * sizeof(Requirement));
   void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
-  return new (mem) SpecializeAttr(atLoc, range, typeLocs);
+  return new (mem)
+      SpecializeAttr(atLoc, range, clause, exported, kind);
+}
+
+SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
+                                       SourceRange range,
+                                       ArrayRef<Requirement> requirements,
+                                       bool exported,
+                                       SpecializationKind kind) {
+  unsigned numRequirements = requirements.size();
+  unsigned size =
+      sizeof(SpecializeAttr) + (numRequirements * sizeof(Requirement));
+  void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
+  return new (mem)
+      SpecializeAttr(atLoc, range, requirements, exported, kind);
 }

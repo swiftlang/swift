@@ -697,6 +697,12 @@ public:
   bool parseDeclAttributeList(DeclAttributes &Attributes,
                               bool &FoundCodeCompletionToken);
 
+  /// Parse the @_specialize attribute.
+  /// \p closingBrace is the expected closing brace, which can be either ) or ]
+  /// \p Attr is where to store the parsed attribute
+  bool parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
+                                      SourceLoc Loc, SpecializeAttr *&Attr);
+
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 

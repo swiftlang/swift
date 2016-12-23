@@ -16,11 +16,14 @@
 
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/ClangImporter/ClangModule.h" // FIXME: SDK overlay semantics
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -1397,128 +1400,345 @@ AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
   }
 }
 
-/// Check that the @_specialize type list has the correct number of entries.
-/// Resolve each type in the list to a concrete type.
-/// Create a Substitution list mapping each nested archetype to a concrete
-/// type, and resolve conformances for each generic parameter requirement.
-/// Store the Substitution list in a ConcreteDeclRef attached to the attribute.
+/// Collect all used generic parameter types from a given type.
+static void collectUsedGenericParameters(
+    Type Ty, SmallPtrSet<TypeBase *, 4> &ConstrainedGenericParams) {
+  if (!Ty->hasTypeParameter())
+    return;
+
+  // Add used generic parameters/archetypes.
+  Ty.visit([&](Type Ty) {
+    if (auto GP = dyn_cast<GenericTypeParamType>(Ty->getCanonicalType())) {
+      ConstrainedGenericParams.insert(GP);
+    }
+  });
+}
+
+/// Perform some sanity checks for the requirements provided by
+/// the @_specialize attribute.
+static void
+checkSpecializeAttrRequirements(SpecializeAttr *attr,
+                                AbstractFunctionDecl *FD,
+                                ArrayRef<RequirementRepr> requirements,
+                                TypeChecker &TC) {
+  SmallPtrSet<TypeBase *, 4> constrainedGenericParams;
+  auto genericSig = FD->getGenericSignature();
+  bool isInvalidAttr = false;
+
+  // TODO: Check that requirements are defined only on
+  // generic parameter types and not on their associated or dependent types or
+  // other generic types using these parameters.
+  for (auto &req : requirements) {
+    if (req.getKind() == RequirementReprKind::SameType) {
+      auto firstType = req.getFirstType();
+      auto secondType = req.getSecondType();
+
+      if (!firstType || firstType->is<ErrorType>() ||
+          firstType->hasArchetype()) {
+        isInvalidAttr = true;
+        continue;
+      }
+
+      if (!secondType || secondType->is<ErrorType>() ||
+          secondType->hasArchetype()) {
+        isInvalidAttr = true;
+        continue;
+      }
+
+      collectUsedGenericParameters(firstType, constrainedGenericParams);
+      collectUsedGenericParameters(secondType, constrainedGenericParams);
+
+      // One of the types should be concrete and the other one should not.
+      bool isFirstTypeNonConcrete = firstType->hasTypeParameter();
+      bool isSecondTypeNonConcrete = secondType->hasTypeParameter();
+
+      if (isFirstTypeNonConcrete && isSecondTypeNonConcrete) {
+        TC.diagnose(attr->getLocation(),
+                    diag::specialize_attr_non_concrete_same_type_req)
+            .highlight(req.getSourceRange());
+        continue;
+      }
+      if (!(isFirstTypeNonConcrete ^ isSecondTypeNonConcrete)) {
+        TC.diagnose(attr->getLocation(),
+                    diag::specialize_attr_only_one_concrete_same_type_req)
+            .highlight(req.getSourceRange());
+        continue;
+      }
+      if (isFirstTypeNonConcrete) {
+        if (!isa<GenericTypeParamType>(firstType->getCanonicalType())) {
+          TC.diagnose(attr->getLocation(),
+                      diag::specialize_attr_only_generic_param_req)
+              .highlight(req.getFirstTypeRepr()->getSourceRange());
+        }
+      }
+      if (isSecondTypeNonConcrete) {
+        if (!isa<GenericTypeParamType>(secondType->getCanonicalType())) {
+          TC.diagnose(attr->getLocation(),
+                      diag::specialize_attr_only_generic_param_req)
+              .highlight(req.getSecondTypeRepr()->getSourceRange());
+        }
+      }
+      continue;
+    }
+
+    if (req.getKind() == RequirementReprKind::LayoutConstraint ||
+        req.getKind() == RequirementReprKind::TypeConstraint) {
+      auto subjectType = req.getSubject();
+      auto constraint = (req.getKind() == RequirementReprKind::TypeConstraint)
+                            ? req.getConstraint()
+                            : req.getLayoutConstraint();
+
+      // Skip any unknown or error types.
+      if (!subjectType || subjectType->is<ErrorType>() ||
+          subjectType->hasArchetype()) {
+        isInvalidAttr = true;
+        continue;
+      }
+
+      if (!constraint || constraint->is<ErrorType>() ||
+          constraint->hasArchetype()) {
+        isInvalidAttr = true;
+        continue;
+      }
+
+      auto nominalTy = constraint->getNominalOrBoundGenericNominal();
+      if (!nominalTy) {
+        TC.diagnose(attr->getLocation(),
+                    diag::specialize_attr_non_nominal_type_constraint_req)
+            .highlight(req.getSourceRange());
+        continue;
+      }
+
+      auto proto = dyn_cast<ProtocolDecl>(nominalTy);
+      if (!proto) {
+        TC.diagnose(attr->getLocation(),
+                    diag::specialize_attr_non_protocol_type_constraint_req)
+            .highlight(req.getSourceRange());
+      }
+      // TODO: Check that it is one of the compiler known protocols used for
+      // pre-specializations.
+      bool isSubjectNonConcrete = subjectType->hasTypeParameter();
+
+      if (isSubjectNonConcrete) {
+        collectUsedGenericParameters(subjectType, constrainedGenericParams);
+        if (!isa<GenericTypeParamType>(subjectType->getCanonicalType())) {
+          TC.diagnose(attr->getLocation(),
+                      diag::specialize_attr_only_generic_param_req)
+              .highlight(req.getSubjectRepr()->getSourceRange());
+        }
+      }
+
+      if (req.getKind() == RequirementReprKind::TypeConstraint) {
+        TC.diagnose(attr->getLocation(),
+                    diag::specialize_attr_unsupported_kind_of_req)
+            .highlight(req.getSourceRange());
+      }
+      continue;
+    }
+
+    TC.diagnose(attr->getLocation(),
+                diag::specialize_attr_unsupported_kind_of_req)
+        .highlight(req.getSourceRange());
+  }
+
+  if (isInvalidAttr) {
+    attr->setInvalid();
+  }
+
+  if (!attr->isFullSpecialization())
+    return;
+
+  if (constrainedGenericParams.size() == genericSig->getGenericParams().size())
+    return;
+
+  TC.diagnose(
+      attr->getLocation(), diag::specialize_attr_type_parameter_count_mismatch,
+      genericSig->getGenericParams().size(), constrainedGenericParams.size(),
+      constrainedGenericParams.size() < genericSig->getGenericParams().size());
+
+  if (constrainedGenericParams.size() < genericSig->getGenericParams().size()) {
+    // Figure out which archetypes are not constrained.
+    for (auto gp : genericSig->getGenericParams()) {
+      if (constrainedGenericParams.count(gp->getCanonicalType().getPointer()))
+        continue;
+      auto gpDecl = gp->getDecl();
+      if (gpDecl) {
+        TC.diagnose(attr->getLocation(),
+                    diag::specialize_attr_missing_constraint,
+                    gpDecl->getFullName());
+      }
+    }
+  }
+}
+
+/// Type check that a set of requirements provided by @_specialize.
+/// Store the set of requirements in the attribute.
 void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   DeclContext *DC = D->getDeclContext();
   auto *FD = cast<AbstractFunctionDecl>(D);
   auto *genericSig = FD->getGenericSignature();
+  auto *genericEnv = FD->getGenericEnvironment();
+  auto *trailingWhereClause = attr->getTrailingWhereClause();
 
-  unsigned numTypes = 0;
-  if (genericSig)
-    numTypes = genericSig->getGenericParams().size();
-  if (numTypes != attr->getTypeLocs().size()) {
-    TC.diagnose(attr->getLocation(), diag::type_parameter_count_mismatch,
-                FD->getName(), numTypes, attr->getTypeLocs().size(),
-                numTypes > attr->getTypeLocs().size());
-    attr->setInvalid();
+  if (!trailingWhereClause) {
+    // Report a missing "where" clause.
+    TC.diagnose(attr->getLocation(), diag::specialize_missing_where_clause);
     return;
   }
-  // Initialize each TypeLoc in this attribute with a concrete type,
-  // and populate a substitution map from GenericTypeParamType to concrete Type.
-  SubstitutionMap subMap;
-  for (unsigned paramIdx = 0; paramIdx < numTypes; ++paramIdx) {
 
-    auto *genericTypeParamTy = genericSig->getGenericParams()[paramIdx];
-    auto &tl = attr->getTypeLocs()[paramIdx];
-
-    auto ty = TC.resolveType(tl.getTypeRepr(), DC, None);
-    if (!ty || ty->hasError()) {
-      attr->setInvalid();
-      return;
-    }
-
-    if (ty->hasArchetype()) {
-      TC.diagnose(attr->getLocation(),
-                  diag::cannot_partially_specialize_generic_function);
-      attr->setInvalid();
-      return;
-    }
-
-    tl.setType(ty, /*validated=*/true);
-    subMap.addSubstitution(
-        cast<GenericTypeParamType>(genericTypeParamTy->getCanonicalType()), ty);
+  if (trailingWhereClause->getRequirements().empty()) {
+    // Report an empty "where" clause.
+    TC.diagnose(attr->getLocation(), diag::specialize_empty_where_clause);
+    return;
   }
 
-  // Capture the conformances needed for the substitution map.
-  CanType currentType;
-  SmallVector<ProtocolConformanceRef, 4> currentConformances;
-  auto flushConformances = [&] {
-    subMap.addConformances(currentType,
-                           TC.Context.AllocateCopy(currentConformances));
-    currentConformances.clear();
-  };
+  if (!genericSig) {
+    // Only generic functions are permitted to have trailing where clauses.
+    TC.diagnose(attr->getLocation(),
+                diag::specialize_attr_nongeneric_trailing_where, FD->getName())
+        .highlight(trailingWhereClause->getSourceRange());
+    return;
+  }
 
-  for (const auto &req : genericSig->getRequirements()) {
-    // If we're on to a new dependent type, flush the conformances gathered
-    // thus far.
-    CanType canFirstType = req.getFirstType()->getCanonicalType();
-    if (canFirstType != currentType) {
-      if (currentType) flushConformances();
-      currentType = canFirstType;
+  // Form a new generic signature based on the old one.
+  ArchetypeBuilder Builder(*DC->getParentModule());
+
+  // First, add the old generic signature.
+  Builder.addGenericSignature(genericSig);
+
+  SmallVector<Requirement, 4> convertedRequirements;
+  SmallVector<RequirementRepr, 4> resolvedRequirements;
+
+  // Add all requirements from the "where" clause to the old signature
+  // to check if there are any inconsistencies.
+  auto options = TypeResolutionOptions();
+  for (auto &req : trailingWhereClause->getRequirements()) {
+    if (req.getKind() == RequirementReprKind::SameType) {
+      auto firstType = TC.resolveType(req.getFirstTypeRepr(), FD, options);
+      auto secondType = TC.resolveType(req.getSecondTypeRepr(), FD, options);
+
+      // Skip any unknown or error types.
+      if (!firstType || firstType->is<ErrorType>() || !secondType ||
+          secondType->is<ErrorType>())
+        continue;
+
+      RequirementSource source(RequirementSource::Kind::Explicit,
+                               req.getEqualLoc());
+      // Map types to their interface types.
+      auto interfaceFirstType = genericEnv->mapTypeOutOfContext(firstType);
+      auto interfaceSecondType = genericEnv->mapTypeOutOfContext(secondType);
+
+      Type genericType;
+      Type concreteType;
+      if (interfaceFirstType->hasTypeParameter()) {
+        genericType = interfaceFirstType;
+        concreteType = interfaceSecondType;
+      } else {
+        genericType = interfaceSecondType;
+        concreteType = interfaceFirstType;
+      }
+      // Add a resolved requirement.
+      if (interfaceFirstType->hasTypeParameter()) {
+        resolvedRequirements.push_back(RequirementRepr::getSameType(
+            TypeLoc(req.getFirstTypeRepr(), genericType), req.getEqualLoc(),
+            TypeLoc(req.getSecondTypeRepr(), concreteType)));
+      } else {
+        resolvedRequirements.push_back(RequirementRepr::getSameType(
+            TypeLoc(req.getFirstTypeRepr(), concreteType), req.getEqualLoc(),
+            TypeLoc(req.getSecondTypeRepr(), genericType)));
+      }
+      // Builder.addSameTypeRequirementToConcrete(pa, concreteType, source);
+      Builder.addRequirement(resolvedRequirements.back());
+
+      // Convert the requirement into a form which uses canonical interface
+      // types.
+      Requirement convertedRequirement(RequirementKind::SameType,
+                                       genericType->getCanonicalType(),
+                                       concreteType->getCanonicalType());
+      convertedRequirements.push_back(convertedRequirement);
+      continue;
     }
 
-    switch (req.getKind()) {
-    case RequirementKind::Conformance: {
-      // Get the conformance and record it.
-      auto firstType = req.getFirstType().subst(subMap);
-      auto protoType = req.getSecondType()->castTo<ProtocolType>();
-      auto conformance =
-        TC.conformsToProtocol(firstType,
-                              protoType->getDecl(),
-                              DC,
-                              (ConformanceCheckFlags::InExpression|
-                               ConformanceCheckFlags::Used));
-      if (!conformance) {
-        TC.diagnose(attr->getLocation(),
-                    diag::cannot_convert_argument_value_protocol,
-                    firstType, protoType);
-        attr->setInvalid();
-        return;
-      }
+    if (req.getKind() == RequirementReprKind::LayoutConstraint) {
+      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, options);
+      auto layoutConstraint = TC.resolveType(
+          req.getLayoutConstraintLoc().getTypeRepr(), FD, options);
 
-      currentConformances.push_back(*conformance);
-      break;
+      // Skip any unknown or error types.
+      if (!subjectType || subjectType->is<ErrorType>() ||
+          !layoutConstraint || layoutConstraint->is<ErrorType>())
+        continue;
+
+      // Map types to their interface types.
+      auto interfaceSubjectType = genericEnv->mapTypeOutOfContext(subjectType);
+
+      auto interfaceLayoutConstraint =
+          genericEnv->mapTypeOutOfContext(layoutConstraint);
+
+      // Re-create a requirement using the resolved interface types.
+      auto resolvedReq = RequirementRepr::getLayoutConstraint(
+          TypeLoc(req.getSubjectRepr(), interfaceSubjectType),
+          req.getColonLoc(),
+          TypeLoc(req.getLayoutConstraintRepr(), interfaceLayoutConstraint));
+
+      // Add a resolved requirement.
+      Builder.addRequirement(resolvedReq);
+      resolvedRequirements.push_back(resolvedReq);
+
+      // Convert the requirement into a form which uses canonical interface
+      // types.
+      Requirement convertedRequirement(
+          RequirementKind::Layout,
+          interfaceSubjectType->getCanonicalType(),
+          interfaceLayoutConstraint->getCanonicalType());
+      convertedRequirements.push_back(convertedRequirement);
+      continue;
     }
-    case RequirementKind::Superclass: {
-      // Superclass requirements aren't recorded in substitutions.
-      auto firstTy = req.getFirstType().subst(subMap);
-      auto superTy = req.getSecondType().subst(subMap);
-      if (!TC.isSubtypeOf(firstTy, superTy, DC)) {
-        TC.diagnose(attr->getLocation(), diag::type_does_not_inherit,
-                    FD->getInterfaceType(), firstTy, superTy);
-        attr->setInvalid();
-        return;
-      }
-      break;
-    }
-    case RequirementKind::SameType: {
-      // Same-type requirements are type checked but not recorded in
-      // substitutions.
-      auto firstTy = req.getFirstType().subst(subMap);
-      auto sameTy = req.getSecondType().subst(subMap);
-      if (!firstTy->isEqual(sameTy)) {
-        TC.diagnose(attr->getLocation(), diag::types_not_equal,
-                    FD->getInterfaceType(), firstTy, sameTy);
-        attr->setInvalid();
-        return;
-      }
-      break;
-    }
+
+    if (req.getKind() == RequirementReprKind::TypeConstraint) {
+      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, options);
+      auto constraint = TC.resolveType(
+          req.getConstraintLoc().getTypeRepr(), FD, options);
+
+      // Skip any unknown or error types.
+      if (!subjectType || subjectType->is<ErrorType>() ||
+          !constraint || constraint->is<ErrorType>())
+        continue;
+
+      // Map types to their interface types.
+      auto interfaceSubjectType = genericEnv->mapTypeOutOfContext(subjectType);
+
+      auto interfaceLayoutConstraint =
+          genericEnv->mapTypeOutOfContext(constraint);
+
+      // Re-create a requirement using the resolved interface types.
+      auto resolvedReq = RequirementRepr::getTypeConstraint(
+          TypeLoc(req.getSubjectRepr(), interfaceSubjectType),
+          req.getColonLoc(),
+          TypeLoc(req.getConstraintRepr(), interfaceLayoutConstraint));
+
+      // Add a resolved requirement.
+      Builder.addRequirement(resolvedReq);
+      resolvedRequirements.push_back(resolvedReq);
+
+      // Convert the requirement into a form which uses canonical interface
+      // types.
+      Requirement convertedRequirement(
+          RequirementKind::Conformance,
+          interfaceSubjectType->getCanonicalType(),
+          interfaceLayoutConstraint->getCanonicalType());
+      convertedRequirements.push_back(convertedRequirement);
+      continue;
     }
   }
-  if (currentType) flushConformances();
 
-  // Compute the substitutions.
-  SmallVector<Substitution, 4> substitutions;
-  genericSig->getSubstitutions(subMap, substitutions);
+  // Check the validity of provided requirements.
+  checkSpecializeAttrRequirements(attr, FD, resolvedRequirements, TC);
 
-  // Package the Substitution list in the SpecializeAttr's ConcreteDeclRef.
-  attr->setConcreteDecl(
-    ConcreteDeclRef(DC->getASTContext(), FD, substitutions));
+  // Store converted requirements in the attribute so that they are
+  // serialized later.
+  attr->setRequirements(DC->getASTContext(), convertedRequirements);
+  attr->setDecl(FD);
 }
 
 void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {

@@ -1574,10 +1574,15 @@ ERROR(recursive_superclass_constraint,none,
       "superclass constraint %0 is recursive", (Type))
 ERROR(requires_same_type_conflict,none,
       "generic parameter %0 cannot be equal to both %1 and %2",
-      (Identifier, Type, Type))
+      (StringRef, Type, Type))
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
+ERROR(mutiple_layout_constraints,none,
+      "multiple layout constraints cannot be used at the same time: %0 and %1",
+      (Type, Type))
+NOTE(previous_layout_constraint, none,
+    "previous layout constraint declaration %0 was here", (Type))
 
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{"
@@ -3323,6 +3328,35 @@ NOTE(resilience_decl_declared_here,
      none, "%0 %1 is not '@_versioned' or public", (DescriptiveDeclKind, DeclName))
 
 #undef FRAGILE_FUNC_KIND
+
+//------------------------------------------------------------------------------
+// Variable usage diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(specialize_attr_nongeneric_trailing_where,none,
+      "trailing 'where' clause in @_specialize attribute of non-generic function %0", (Identifier))
+ERROR(specialize_missing_where_clause,none,
+      "missing 'where' clause in @_specialize attribute", ())
+ERROR(specialize_empty_where_clause,none,
+      "empty 'where' clause in @_specialize attribute", ())
+ERROR(specialize_attr_non_concrete_same_type_req,none,
+      "Only concrete type same-type requirements are supported by @_specialize attribute", ())
+ERROR(specialize_attr_only_generic_param_req,none,
+      "Only requirements on generic parameters are supported by @_specialize attribute", ())
+ERROR(specialize_attr_only_one_concrete_same_type_req,none,
+      "Only one concrete type should be used in the same-type requirement in @_specialize attribute", ())
+ERROR(specialize_attr_non_nominal_type_constraint_req,none,
+      "Only conformances to nominal types are supported by @_specialize attribute", ())
+ERROR(specialize_attr_non_protocol_type_constraint_req,none,
+      "Only conformances to protocol types are supported by @_specialize attribute", ())
+ERROR(specialize_attr_type_parameter_count_mismatch,none,
+      "%select{too many|too few}2 type parameters are specified "
+      "in @_specialize attribute (got %1, but expected %0)",
+      (unsigned, unsigned, bool))
+ERROR(specialize_attr_missing_constraint,none,
+      "Missing constraint for %0 in @_specialize attribute", (DeclName))
+ERROR(specialize_attr_unsupported_kind_of_req,none,
+      "Only same-type and layout requirements are supported by @_specialize attribute", ())
 
 //------------------------------------------------------------------------------
 // Variable usage diagnostics

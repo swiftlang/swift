@@ -966,6 +966,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
 
   switch (kind) {
   CASE(Conformance)
+  CASE(Layout)
   CASE(Superclass)
   CASE(SameType)
   }
@@ -1964,11 +1965,12 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 
   case DAK_Specialize: {
     auto abbrCode = DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
-    SmallVector<TypeID, 8> typeIDs;
-    for (auto tl : cast<SpecializeAttr>(DA)->getTypeLocs())
-      typeIDs.push_back(addTypeRef(tl.getType()));
+    auto SA = cast<SpecializeAttr>(DA);
 
-    SpecializeDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode, typeIDs);
+    SpecializeDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                         (unsigned)SA->isExported(),
+                                         (unsigned)SA->getSpecializationKind());
+    writeGenericRequirements(SA->getRequirements(), DeclTypeAbbrCodes);
     return;
   }
   }

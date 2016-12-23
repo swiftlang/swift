@@ -317,6 +317,33 @@ void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
       break;
     }
 
+    case RequirementReprKind::LayoutConstraint: {
+      // Validate the types.
+      if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
+        req.setInvalid();
+        continue;
+      }
+
+      if (validateType(req.getLayoutConstraintLoc(), lookupDC, options,
+                       resolver)) {
+        req.setInvalid();
+        continue;
+      }
+
+      // FIXME: Feels too early to perform this check.
+      if (!req.getLayoutConstraint()->isExistentialType() &&
+          !req.getLayoutConstraint()->getClassOrBoundGenericClass()) {
+        diagnose(genericParams->getWhereLoc(),
+                 diag::requires_conformance_nonprotocol,
+                 req.getSubjectLoc(), req.getLayoutConstraintLoc());
+        req.getLayoutConstraintLoc().setInvalidType(Context);
+        req.setInvalid();
+        continue;
+      }
+
+      break;
+    }
+
     case RequirementReprKind::SameType:
       if (validateType(req.getFirstTypeLoc(), lookupDC, options,
                        resolver)) {
@@ -764,6 +791,96 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
   tl.setType(Type(), /*validated=*/false);
 }
 
+#if 0
+/// Finalize the given generic parameter list, assigning archetypes to
+/// the generic parameters.
+void
+TypeChecker::finalizeGenericParamList(GenericParamList *genericParams,
+                                      GenericSignature *genericSig,
+                                      GenericEnvironment *genericEnv,
+                                      DeclContext *dc) {
+  Accessibility access;
+  if (auto *fd = dyn_cast<FuncDecl>(dc))
+    access = fd->getFormalAccess();
+  else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
+    access = nominal->getFormalAccess();
+  else
+    access = Accessibility::Internal;
+  access = std::max(access, Accessibility::Internal);
+
+  for (auto GP : *genericParams) {
+    checkInheritanceClause(GP);
+    if (!GP->hasAccessibility())
+      GP->setAccessibility(access);
+  }
+
+#ifndef NDEBUG
+  // Record archetype contexts.
+  for (auto *paramTy : genericSig->getInnermostGenericParams()) {
+    auto contextTy = genericEnv->mapTypeIntoContext(paramTy);
+    if (auto *archetype = contextTy->getAs<ArchetypeType>())
+      if (Context.ArchetypeContexts.count(archetype) == 0)
+        Context.ArchetypeContexts[archetype] = dc;
+  }
+#endif
+
+  // Replace the generic parameters with their archetypes throughout the
+  // types in the requirements.
+  // FIXME: This should not be necessary at this level; it is a transitional
+  // step.
+  for (auto &Req : genericParams->getRequirements()) {
+    if (Req.isInvalid())
+      continue;
+
+    switch (Req.getKind()) {
+    case RequirementReprKind::TypeConstraint: {
+      revertDependentTypeLoc(Req.getSubjectLoc());
+      if (validateType(Req.getSubjectLoc(), dc)) {
+        Req.setInvalid();
+        continue;
+      }
+
+      revertDependentTypeLoc(Req.getConstraintLoc());
+      if (validateType(Req.getConstraintLoc(), dc)) {
+        Req.setInvalid();
+        continue;
+      }
+      break;
+    }
+
+    case RequirementReprKind::LayoutConstraint: {
+      revertDependentTypeLoc(Req.getSubjectLoc());
+      if (validateType(Req.getSubjectLoc(), dc)) {
+        Req.setInvalid();
+        continue;
+      }
+
+      revertDependentTypeLoc(Req.getLayoutConstraintLoc());
+      if (validateType(Req.getLayoutConstraintLoc(), dc)) {
+        Req.setInvalid();
+        continue;
+      }
+      break;
+    }
+
+    case RequirementReprKind::SameType:
+      revertDependentTypeLoc(Req.getFirstTypeLoc());
+      if (validateType(Req.getFirstTypeLoc(), dc)) {
+        Req.setInvalid();
+        continue;
+      }
+
+      revertDependentTypeLoc(Req.getSecondTypeLoc());
+      if (validateType(Req.getSecondTypeLoc(), dc)) {
+        Req.setInvalid();
+        continue;
+      }
+      break;
+    }
+  }
+}
+
+#endif
 /// Revert the dependent types within the given generic parameter list.
 void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   // Revert the inherited clause of the generic parameter list.
@@ -784,7 +901,11 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
       revertDependentTypeLoc(req.getConstraintLoc());
       break;
     }
-
+    case RequirementReprKind::LayoutConstraint: {
+      revertDependentTypeLoc(req.getSubjectLoc());
+      revertDependentTypeLoc(req.getLayoutConstraintLoc());
+      break;
+    }
     case RequirementReprKind::SameType:
       revertDependentTypeLoc(req.getFirstTypeLoc());
       revertDependentTypeLoc(req.getSecondTypeLoc());
@@ -906,6 +1027,29 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
 
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
+      // Protocol conformance requirements.
+      auto proto = secondType->castTo<ProtocolType>();
+      // FIXME: This should track whether this should result in a private
+      // or non-private dependency.
+      // FIXME: Do we really need "used" at this point?
+      // FIXME: Poor location information. How much better can we do here?
+      auto result = conformsToProtocol(
+          firstType, proto->getDecl(), dc,
+          ConformanceCheckFlags::Used, loc,
+          unsatisfiedDependency);
+
+      // Unsatisfied dependency case.
+      if (result.first)
+        return std::make_pair(true, false);
+
+      // Conformance check failure case.
+      if (!result.second)
+        return std::make_pair(false, false);
+
+      continue;
+    }
+
+    case RequirementKind::Layout: {
       // Protocol conformance requirements.
       auto proto = secondType->castTo<ProtocolType>();
       // FIXME: This should track whether this should result in a private

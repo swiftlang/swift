@@ -909,6 +909,10 @@ enum class RequirementReprKind : unsigned {
   /// equivalent.
   SameType,
 
+  /// A layout bound T : L, where T is a type that depends on a generic
+  /// parameter and L is some layout specification that should bound T.
+  LayoutConstraint,
+
   // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
   // when adding enumerators.
 };
@@ -964,6 +968,21 @@ public:
     return { EqualLoc, RequirementReprKind::SameType, FirstType, SecondType };
   }
 
+  /// \brief Construct a new layout-constraint requirement.
+  ///
+  /// \param Subject The type that must conform to the given layout 
+  /// requirment.
+  /// \param ColonLoc The location of the ':', or an invalid location if
+  /// this requirement was implied.
+  /// \param Constraint The layout requirement to which the
+  /// subject must conform.
+  static RequirementRepr getLayoutConstraint(TypeLoc Subject,
+                                             SourceLoc ColonLoc,
+                                             TypeLoc Constraint) {
+    return {ColonLoc, RequirementReprKind::LayoutConstraint, Subject,
+            Constraint};
+  }
+
   /// \brief Determine the kind of requirement
   RequirementReprKind getKind() const { return Kind; }
 
@@ -976,22 +995,26 @@ public:
   /// \brief For a type-bound requirement, return the subject of the
   /// conformance relationship.
   Type getSubject() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
+    assert(getKind() == RequirementReprKind::TypeConstraint ||
+           getKind() == RequirementReprKind::LayoutConstraint);
     return Types[0].getType();
   }
 
   TypeRepr *getSubjectRepr() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
+    assert(getKind() == RequirementReprKind::TypeConstraint ||
+           getKind() == RequirementReprKind::LayoutConstraint);
     return Types[0].getTypeRepr();
   }
 
   TypeLoc &getSubjectLoc() {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
+    assert(getKind() == RequirementReprKind::TypeConstraint ||
+           getKind() == RequirementReprKind::LayoutConstraint);
     return Types[0];
   }
 
   const TypeLoc &getSubjectLoc() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
+    assert(getKind() == RequirementReprKind::TypeConstraint ||
+           getKind() == RequirementReprKind::LayoutConstraint);
     return Types[0];
   }
 
@@ -1000,6 +1023,11 @@ public:
   Type getConstraint() const {
     assert(getKind() == RequirementReprKind::TypeConstraint);
     return Types[1].getType();
+  }
+
+  TypeRepr *getConstraintRepr() const {
+    assert(getKind() == RequirementReprKind::TypeConstraint);
+    return Types[1].getTypeRepr();
   }
 
   TypeLoc &getConstraintLoc() {
@@ -1012,10 +1040,31 @@ public:
     return Types[1];
   }
 
+  Type getLayoutConstraint() const {
+    assert(getKind() == RequirementReprKind::LayoutConstraint);
+    return Types[1].getType();
+  }
+
+  TypeRepr *getLayoutConstraintRepr() const {
+    assert(getKind() == RequirementReprKind::LayoutConstraint);
+    return Types[1].getTypeRepr();
+  }
+
+  TypeLoc &getLayoutConstraintLoc() {
+    assert(getKind() == RequirementReprKind::LayoutConstraint);
+    return Types[1];
+  }
+
+  const TypeLoc &getLayoutConstraintLoc() const {
+    assert(getKind() == RequirementReprKind::LayoutConstraint);
+    return Types[1];
+  }
+
   /// \brief Retrieve the location of the ':' in an explicitly-written
   /// conformance requirement.
   SourceLoc getColonLoc() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
+    assert(getKind() == RequirementReprKind::TypeConstraint ||
+           getKind() == RequirementReprKind::LayoutConstraint);
     return SeparatorLoc;
   }
 
