@@ -885,8 +885,10 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     memberLookupOptions |= NameLookupFlags::KnownPrivate;
     memberLookupOptions -= NameLookupFlags::OnlyTypes;
 
-    memberLookup = tc.lookupMember(dc, parentType, comp->getIdentifier(),
-                                   memberLookupOptions);
+    if (parentType->mayHaveMemberTypes()) {
+      memberLookup = tc.lookupMember(dc, parentType, comp->getIdentifier(),
+                                     memberLookupOptions);
+    }
 
     // Looks like this is not a member type, but simply a member of parent type.
     if (!memberLookup.empty()) {

@@ -311,10 +311,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   LookupTypeResult result;
 
   // Structural types do not have member types.
-  if (!type->is<ArchetypeType>() &&
-      !type->isExistentialType() &&
-      !type->getAnyNominal() &&
-      !type->is<ModuleType>())
+  if (!type->mayHaveMemberTypes())
     return result;
 
   // Look for members with the given name.
