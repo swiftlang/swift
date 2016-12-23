@@ -2043,11 +2043,8 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       return interfaceType;
 
     auto *genericEnv = decl->getGenericEnvironmentOfContext();
-    if (genericEnv == nullptr)
-      return ErrorType::get(ctx);
-
-    return genericEnv->mapTypeIntoContext(decl->getModuleContext(),
-                                          interfaceType)->getCanonicalType();
+    return GenericEnvironment::mapTypeIntoContext(
+        decl->getModuleContext(), genericEnv, interfaceType);
   }
 
   // Get the parent type.
@@ -2064,8 +2061,10 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       Ty = dc->getDeclaredInterfaceType();
       break;
     }
-    if (!Ty || Ty->hasError())
-      return Ty;
+    if (!Ty)
+      return Type();
+    if (Ty->is<ErrorType>())
+      Ty = Type();
   }
 
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
