@@ -3932,14 +3932,14 @@ public:
       TC.validateDecl(assocType);
   }
 
-  bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
+  void checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
     // We don't support protocols outside the top level of a file.
     if (isa<ProtocolDecl>(NTD) &&
         !NTD->getParent()->isModuleScopeContext()) {
       TC.diagnose(NTD->getLoc(),
                   diag::unsupported_nested_protocol,
                   NTD->getName());
-      return true;
+      return;
     }
 
     // We don't support nested types in generics yet.
@@ -3957,8 +3957,6 @@ public:
                       NTD->getName(),
                       proto->getName());
         }
-        NTD->setInvalid();
-        return true;
       }
 
       if (DC->isLocalContext() && DC->isGenericContext()) {
@@ -3968,11 +3966,9 @@ public:
                       diag::unsupported_type_nested_in_generic_function,
                       NTD->getName(),
                       AFD->getName());
-          return true;
         }
       }
     }
-    return false;
   }
 
   void visitEnumDecl(EnumDecl *ED) {
