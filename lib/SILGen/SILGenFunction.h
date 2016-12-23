@@ -1545,7 +1545,6 @@ public:
     llvm_unreachable("Not yet implemented");
   }
 
-  void visitNominalTypeDecl(NominalTypeDecl *D);
   void visitFuncDecl(FuncDecl *D);
   void visitPatternBindingDecl(PatternBindingDecl *D);
 
@@ -1554,6 +1553,10 @@ public:
   std::unique_ptr<Initialization>
   emitPatternBindingInitialization(Pattern *P, JumpDest failureDest);
     
+  void visitNominalTypeDecl(NominalTypeDecl *D) {
+    // No lowering support needed.
+  }
+
   void visitTypeAliasDecl(TypeAliasDecl *D) {
     // No lowering support needed.
   }
