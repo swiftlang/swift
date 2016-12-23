@@ -2678,7 +2678,6 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
 namespace {
   class PrintIndexDataConsumer : public IndexDataConsumer {
     raw_ostream &OS;
-    int indent = 0;
     bool firstSourceEntity = true;
 
     void anchor() {}
@@ -2697,14 +2696,9 @@ namespace {
   public:
     PrintIndexDataConsumer(raw_ostream &OS) : OS(OS) {}
 
-    void failed(StringRef error) {
-      // TODO
-    }
+    void failed(StringRef error) {}
 
-    bool recordHash(StringRef hash, bool isKnown) {
-      // TODO
-      return true;
-    }
+    bool recordHash(StringRef hash, bool isKnown) { return true; }
     bool startDependency(SymbolKind kind, StringRef name, StringRef path,
                          bool isSystem, StringRef hash) {
       OS << getSymbolKindString(kind) << " | ";
@@ -2716,33 +2710,26 @@ namespace {
       return true;
     }
 
-    bool startSourceEntity(const IndexSymbol &symbol) {
+    Action startSourceEntity(const IndexSymbol &symbol) {
       if (firstSourceEntity) {
         firstSourceEntity = false;
         OS << "------------\n";
       }
-      OS << std::string(indent * 2, ' ');
       OS << symbol.line << ':' << symbol.column << " | ";
       printSymbolKind(symbol.kind, symbol.subKinds);
       OS << " | " << symbol.name << " | " << symbol.USR << " | ";
       clang::index::printSymbolRoles(symbol.roles, OS);
-      OS << " | rel: 0\n";
-      ++indent;
+      OS << " | rel: " << symbol.Relations.size() << "\n";
 
-      return true;
+      for (auto Relation : symbol.Relations) {
+        OS << "  ";
+        clang::index::printSymbolRoles(Relation.roles, OS);
+        OS << " | " << Relation.name << " | " << Relation.USR << "\n";
+      }
+      return Continue;
     }
-    bool recordRelatedEntity(const IndexSymbol &symbol) {
-      OS << std::string(indent * 2, ' ');
-      OS << "rel " << symbol.line << ':' << symbol.column << " | ";
-      printSymbolKind(symbol.kind, symbol.subKinds);
-      OS << " | " << symbol.name << " | " << symbol.USR << " | ";
-      clang::index::printSymbolRoles(symbol.roles, OS);
-      OS << '\n';
-      return true;
-    }
-    virtual bool finishSourceEntity(SymbolKind kind, SymbolSubKindSet subKinds,
+    bool finishSourceEntity(SymbolKind kind, SymbolSubKindSet subKinds,
                                     SymbolRoleSet roles) {
-      --indent;
       return true;
     }
 
