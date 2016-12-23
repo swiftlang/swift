@@ -58,6 +58,12 @@ enum class ImportNameVersion : unsigned {
 };
 enum { NumImportNameVersions = 4 };
 
+static inline void
+forEachImportNameVersion(llvm::function_ref<void(ImportNameVersion)> action) {
+  for (unsigned raw = 0; raw < NumImportNameVersions; ++raw)
+    action(static_cast<ImportNameVersion>(raw));
+}
+
 /// Map a language version into an import name version
 ImportNameVersion nameVersionFromOptions(const LangOptions &langOpts);
 

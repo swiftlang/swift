@@ -37,6 +37,10 @@
 // CHECK-NEXT:     TU: SNCollision{{$}}
 // CHECK-NEXT:   SNCollisionProtocol:
 // CHECK-NEXT:     TU: SNCollision{{$}}
+// CHECK-NEXT:   SNSomeClass:
+// CHECK-NEXT:     TU: SNSomeClass
+// CHECK-NEXT:   SNSomeProtocol:
+// CHECK-NEXT:     TU: SNSomeProtocol
 // CHECK-NEXT:   SomeClass:
 // CHECK-NEXT:     TU: SNSomeClass
 // CHECK-NEXT:   SomeProtocol:
@@ -51,11 +55,17 @@
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports badPointerMethodAndReturnError:]
 // CHECK-NEXT:   blockMethod:
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports blockMethodAndReturnError:]
+// CHECK-NEXT:   buildWithUnsignedChar:
+// CHECK-NEXT:     SNSomeClass: +[SNSomeClass buildWithUnsignedChar:]
 // CHECK-NEXT:   categoryMethodWith:
+// CHECK-NEXT:     SNSomeClass: -[SNSomeClass categoryMethodWithX:y:], -[SNSomeClass categoryMethodWithX:y:z:]
+// CHECK-NEXT:   categoryMethodWithX:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass categoryMethodWithX:y:], -[SNSomeClass categoryMethodWithX:y:z:]
 // CHECK:        doubleProperty:
 // CHECK-NEXT:     SNSomeClass: SNSomeClass.doubleProperty
 // CHECK-NEXT:   extensionMethodWith:
+// CHECK-NEXT:     SNSomeClass: -[SNSomeClass extensionMethodWithX:y:]
+// CHECK-NEXT:   extensionMethodWithX:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass extensionMethodWithX:y:]
 // CHECK:        floatProperty:
 // CHECK-NEXT:     SNSomeClass: SNSomeClass.floatProperty
@@ -67,8 +77,12 @@
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports initAndReturnError:], -[NSErrorImports initWithFloat:error:]
 // CHECK-NEXT:   instanceMethodWith:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass instanceMethodWithX:Y:Z:]
+// CHECK-NEXT:   instanceMethodWithX:
+// CHECK-NEXT:     SNSomeClass: -[SNSomeClass instanceMethodWithX:Y:Z:]
 // CHECK:        method:
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodAndReturnError:], -[NSErrorImports methodWithFloat:error:]
+// CHECK:        methodWithFloat:
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]
 // CHECK:        objectAtIndexedSubscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 // CHECK-NEXT:   optSetter:
@@ -77,12 +91,18 @@
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports pointerMethodAndReturnError:]
 // CHECK-NEXT:   protoInstanceMethodWith:
 // CHECK-NEXT:     SNSomeProtocol: -[SNSomeProtocol protoInstanceMethodWithX:y:]
+// CHECK-NEXT:   protoInstanceMethodWithX:
+// CHECK-NEXT:     SNSomeProtocol: -[SNSomeProtocol protoInstanceMethodWithX:y:]
 // CHECK:        reqSetter:
 // CHECK-NEXT:     SNCollision: SNCollision.reqSetter
 // CHECK-NEXT:   selectorMethod:
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports selectorMethodAndReturnError:]
 // CHECK-NEXT:   setAccessibilityFloat:
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility setAccessibilityFloat:]
+// CHECK-NEXT:  someClassWithDouble:
+// CHECK-NEXT:    SNSomeClass: +[SNSomeClass someClassWithDouble:]
+// CHECK-NEXT:  someClassWithTry:
+// CHECK-NEXT:    SNSomeClass: +[SNSomeClass someClassWithTry:]
 // CHECK-NEXT:   subscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 

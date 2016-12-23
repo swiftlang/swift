@@ -1541,8 +1541,12 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   }
 
   // If we have a name to import as, add this entry to the table.
-  if (auto importedName =
-          nameImporter.importName(named, ImportNameVersion::Swift3)) {
+  // FIXME: It doesn't actually matter which version we use here, but it should
+  // probably follow the ASTContext anyway.
+  ImportNameVersion currentVersion = ImportNameVersion::Swift3;
+  if (auto importedName = nameImporter.importName(named, currentVersion)) {
+    SmallPtrSet<DeclName, 8> distinctNames;
+    distinctNames.insert(importedName.getDeclName());
     table.addEntry(importedName.getDeclName(), named,
                    importedName.getEffectiveContext());
 
@@ -1553,14 +1557,19 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
                               ArrayRef<Identifier>()),
                      named, importedName.getEffectiveContext());
 
-    // Import the Swift 2 name of this entity, and record it as well if it is
-    // different.
-    if (auto swift2Name =
-            nameImporter.importName(named, ImportNameVersion::Swift2)) {
-      if (swift2Name.getDeclName() != importedName.getDeclName())
-        table.addEntry(swift2Name.getDeclName(), named,
-                       swift2Name.getEffectiveContext());
-    }
+    forEachImportNameVersion([&] (ImportNameVersion alternateVersion) {
+      if (alternateVersion == currentVersion)
+        return;
+      auto alternateName = nameImporter.importName(named, alternateVersion);
+      if (!alternateName)
+        return;
+      // FIXME: What if the DeclNames are the same but the contexts are
+      // different?
+      if (distinctNames.insert(alternateName.getDeclName()).second) {
+        table.addEntry(alternateName.getDeclName(), named,
+                       alternateName.getEffectiveContext());
+      }
+    });
   } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
     // If the category is invalid, don't add it.
     if (category->isInvalidDecl())
