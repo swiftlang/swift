@@ -1222,7 +1222,7 @@ matchWitness(TypeChecker &tc,
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfReference(witness,
                                  /*isTypeReference=*/false,
-                                 /*isDynamicResult=*/false,
+                                 /*isSpecialized=*/false,
                                  FunctionRefKind::DoubleApply,
                                  witnessLocator,
                                  /*base=*/nullptr);
@@ -2839,7 +2839,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
   // Look for a member type with the same name as the associated type.
   auto candidates = TC.lookupMemberType(DC, Adoptee, assocType->getName(),
-                                        /*lookupOptions=*/None);
+                                        /*lookup=*/None);
 
   // If there aren't any candidates, we're done.
   if (!candidates) {

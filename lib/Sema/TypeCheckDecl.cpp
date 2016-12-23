@@ -2488,11 +2488,11 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   if (requirementObjCName) {
     if (attr)
       const_cast<ObjCAttr *>(attr)->setName(*requirementObjCName,
-                                            /*implicitName=*/true);
+                                            /*implicit=*/true);
     else
       decl->getAttrs().add(
         ObjCAttr::create(tc.Context, *requirementObjCName,
-                         /*isNameImplicit=*/true));
+                         /*implicitName=*/true));
   }
 }
 
