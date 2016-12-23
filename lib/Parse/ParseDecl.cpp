@@ -607,8 +607,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     
     StringRef alignmentText = Tok.getText();
     unsigned alignmentValue;
-    if (alignmentText.getAsInteger(0, alignmentValue))
-      llvm_unreachable("not valid integer literal token?!");
+    if (alignmentText.getAsInteger(0, alignmentValue)) {
+      diagnose(Loc, diag::alignment_must_be_positive_integer);
+      return false;
+    }
     
     consumeToken(tok::integer_literal);
     
