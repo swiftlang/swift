@@ -3567,7 +3567,8 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   if (auto *VP = dyn_cast<VarPattern>(Pat))
     Pat = VP->getSubPattern();
   if (auto *TP = dyn_cast<TypedPattern>(Pat))
-    return TP->getTypeLoc().getTypeRepr()->getSourceRange();
+    if (auto typeRepr = TP->getTypeLoc().getTypeRepr())
+      return typeRepr->getSourceRange();
 
   return SourceRange();
 }

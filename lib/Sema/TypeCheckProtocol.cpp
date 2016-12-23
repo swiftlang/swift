@@ -1081,7 +1081,8 @@ RequirementEnvironment::RequirementEnvironment(
     switch (reqReq.getKind()) {
     case RequirementKind::Conformance: {
       // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
+      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
+                                               SubstFlags::UseErrorType);
       if (!first->isTypeParameter()) break;
 
       builder.addRequirement(Requirement(RequirementKind::Conformance,
@@ -1092,8 +1093,10 @@ RequirementEnvironment::RequirementEnvironment(
 
     case RequirementKind::Superclass: {
       // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
-      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap);
+      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
+                                               SubstFlags::UseErrorType);
+      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap,
+                                                 SubstFlags::UseErrorType);
 
       if (!first->isTypeParameter()) break;
 
@@ -1105,8 +1108,10 @@ RequirementEnvironment::RequirementEnvironment(
 
     case RequirementKind::SameType: {
       // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
-      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap);
+      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
+                                               SubstFlags::UseErrorType);
+      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap,
+                                                 SubstFlags::UseErrorType);
 
       // FIXME: We really want to check hasTypeParameter here, but the
       // ArchetypeBuilder isn't ready for that.
