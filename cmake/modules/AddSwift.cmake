@@ -465,7 +465,7 @@ endfunction()
 function(swift_target_link_search_directories target directories)
   set(STLD_FLAGS "")
   foreach(directory ${directories})
-    set(STLD_FLAGS " ${CMAKE_LIBRARY_PATH_FLAG}${directory}")
+    set(STLD_FLAGS "${STLD_FLAGS} ${CMAKE_LIBRARY_PATH_FLAG}${directory}")
   endforeach()
   set_property(TARGET ${target} APPEND_STRING PROPERTY LINK_FLAGS ${STLD_FLAGS})
 endfunction()
@@ -1109,7 +1109,7 @@ function(_add_swift_library_single target name)
       COMPILE_FLAGS " ${c_compile_flags}")
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
-  swift_target_link_search_directories(${target} ${library_search_directories})
+  swift_target_link_search_directories("${target}" "${library_search_directories}")
 
   # Adjust the linked libraries for windows targets.  On Windows, the link is
   # performed against the import library, and the runtime uses the dll.  Not
@@ -1165,8 +1165,7 @@ function(_add_swift_library_single target name)
         "${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
-    swift_target_link_search_directories(${target_static}
-      ${library_search_directories})
+    swift_target_link_search_directories("${target_static}" "${library_search_directories}")
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
