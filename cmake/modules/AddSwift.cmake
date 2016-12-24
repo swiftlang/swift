@@ -293,7 +293,7 @@ endfunction()
 function(_add_variant_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
   DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
-  RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LIBRARY_SEARCH_DIRECTORIES)
+  RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME)
   cmake_parse_arguments(LFLAGS
     ""
     "${oneValueArgs}"
@@ -309,7 +309,7 @@ function(_add_variant_link_flags)
   endif()
 
   set(result ${${LFLAGS_RESULT_VAR_NAME}})
-  set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES}})
+  set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
 
   _add_variant_c_compile_link_flags(
     SDK "${LFLAGS_SDK}"
@@ -365,7 +365,7 @@ function(_add_variant_link_flags)
   endif()
 
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
-  set("${LFLAGS_LIBRARY_SEARCH_DIRECTORIES}" "${library_search_directories}" PARENT_SCOPE)
+  set("${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}" "${library_search_directories}" PARENT_SCOPE)
 endfunction()
 
 # Look up extra flags for a module that matches a regexp.
@@ -1055,7 +1055,7 @@ function(_add_swift_library_single target name)
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
     RESULT_VAR_NAME link_flags
-    LIBRARY_SEARCH_DIRECTORIES library_search_directories
+    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
       )
 
   if(SWIFT_ENABLE_GOLD_LINKER AND
