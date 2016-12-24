@@ -5,6 +5,9 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-{class A{let f={return 0 &+ 1 a}}s
+// RUN: not %target-swift-frontend %s -emit-ir
+// REQUIRES: asserts
+{_{return 1 + 2
+A{
+}}
+[_

@@ -5,10 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-// REQUIRES: asserts
-// REQUIRES: deterministic-behavior
-{_{return 1 + 2
-A{
-}}
-[_
+// RUN: not %target-swift-frontend %s -emit-ir
+guard{{return $0
+== Int
+p
