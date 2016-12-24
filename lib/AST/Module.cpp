@@ -761,11 +761,8 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
   // intended type might have.
-  if (type->is<UnresolvedType>()) {
-    return ProtocolConformanceRef(
-             ctx.getConformance(type, protocol, protocol->getLoc(), this,
-                                ProtocolConformanceState::Complete));
-  }
+  if (type->is<UnresolvedType>())
+    return ProtocolConformanceRef(protocol);
 
   auto nominal = type->getAnyNominal();
 

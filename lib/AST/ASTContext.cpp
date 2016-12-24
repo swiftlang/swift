@@ -1395,6 +1395,8 @@ ASTContext::getConformance(Type conformingType,
                            SourceLoc loc,
                            DeclContext *dc,
                            ProtocolConformanceState state) {
+  assert(dc->isTypeContext());
+
   llvm::FoldingSetNodeID id;
   NormalProtocolConformance::Profile(id, protocol, dc);
 
