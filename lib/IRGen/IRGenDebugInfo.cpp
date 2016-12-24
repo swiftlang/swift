@@ -1016,8 +1016,8 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(
 
   // Emit it as global variable of the current module.
   auto *Expr = Var ? nullptr : DBuilder.createConstantValueExpression(0);
-  auto *GV = DBuilder.createGlobalVariable(MainModule, Name, LinkageName, File,
-                                           L.Line, Ty, IsLocalToUnit, Expr);
+  auto *GV = DBuilder.createGlobalVariableExpression(
+      MainModule, Name, LinkageName, File, L.Line, Ty, IsLocalToUnit, Expr);
   if (Var)
     Var->addDebugInfo(GV);
 }
