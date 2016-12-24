@@ -1786,6 +1786,10 @@ function(_add_swift_executable_single name)
   set(c_compile_flags)
   set(link_flags)
 
+  # Prepare linker search directories.
+  set(library_search_directories
+        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+
   # Add variant-specific flags.
   _add_variant_c_compile_flags(
     SDK "${SWIFTEXE_SINGLE_SDK}"
@@ -1803,7 +1807,8 @@ function(_add_swift_executable_single name)
     ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     LTO_OBJECT_NAME "${name}-${SWIFTEXE_SINGLE_SDK}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
-    RESULT_VAR_NAME link_flags)
+    RESULT_VAR_NAME link_flags
+    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
 
   if(SWIFTEXE_SINGLE_DISABLE_ASLR)
     list(APPEND link_flags "-Wl,-no_pie")
@@ -1870,8 +1875,7 @@ function(_add_swift_executable_single name)
 
   set_property(TARGET ${name} APPEND_STRING PROPERTY
       COMPILE_FLAGS " ${c_compile_flags}")
-  swift_target_link_search_directories(${name}
-      "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+  swift_target_link_search_directories("${name}" "${library_search_directories}")
   set_property(TARGET ${name} APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
   if (SWIFT_PARALLEL_LINK_JOBS)
