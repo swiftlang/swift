@@ -701,9 +701,7 @@ namespace {
       Type resultTy;
       resultTy = cs.getType(result);
       if (resultTy->hasOpenedExistential(record.Archetype)) {
-        Type erasedTy = resultTy->eraseOpenedExistential(
-                          innerCS.DC->getParentModule(),
-                          record.Archetype);
+        Type erasedTy = resultTy->eraseOpenedExistential(record.Archetype);
         result = coerceToType(result, erasedTy, nullptr);
       }
 
@@ -725,22 +723,6 @@ namespace {
 
       OpenedExistentials.pop_back();
       return true;
-    }
-
-    /// Is the given function a constructor of a class or protocol?
-    /// Such functions are subject to DynamicSelf manipulations.
-    ///
-    /// We want to avoid taking the DynamicSelf paths for other
-    /// constructors for two reasons:
-    ///   - it's an unnecessary cost
-    ///   - optionality preservation has a problem with constructors on
-    ///     optional types
-    static bool isPolymorphicConstructor(AbstractFunctionDecl *fn) {
-      if (!isa<ConstructorDecl>(fn))
-        return false;
-      auto *parent =
-        fn->getParent()->getAsNominalTypeOrNominalTypeExtensionContext();
-      return parent && (isa<ClassDecl>(parent) || isa<ProtocolDecl>(parent));
     }
 
     /// \brief Build a new member reference with the given base and member.
@@ -781,12 +763,10 @@ namespace {
         }
       }
 
-      // Produce a reference to the member, the type of the container it
-      // resides in, and the type produced by the reference itself.
-      Type containerTy;
+      // Produce a reference to the member and the type produced by the
+      // reference itself.
       ConcreteDeclRef memberRef;
       Type refTy;
-      Type dynamicSelfFnType;
       if (member->getInterfaceType()->is<GenericFunctionType>() ||
           openedFullType->hasTypeVariable()) {
         // We require substitutions. Figure out what they are.
@@ -805,18 +785,30 @@ namespace {
                   substitutions);
 
         memberRef = ConcreteDeclRef(context, member, substitutions);
-
-        if (auto openedFullFnType = openedFullType->getAs<FunctionType>()) {
-          auto openedBaseType = openedFullFnType->getInput()
-                                  ->getRValueInstanceType();
-          containerTy = solution.simplifyType(tc, openedBaseType);
-        }
       } else {
         // No substitutions required; the declaration reference is simple.
-        containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
         memberRef = member;
         refTy = openedFullType;
       }
+
+      // If we're referring to the member of a module, it's just a simple
+      // reference.
+      if (baseTy->is<ModuleType>()) {
+        assert(semantics == AccessSemantics::Ordinary &&
+               "Direct property access doesn't make sense for this");
+        auto ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
+        cs.setType(ref, refTy);
+        ref->setFunctionRefKind(functionRefKind);
+        return cs.cacheType(new (context)
+                                DotSyntaxBaseIgnoredExpr(base, dotLoc, ref));
+      }
+
+      // Produce a reference to the type of the container the member
+      // resides in.
+      Type containerTy =
+          openedFullType->castTo<FunctionType>()
+              ->getInput()->getRValueInstanceType();
+      containerTy = solution.simplifyType(tc, containerTy);
 
       // If we opened up an existential when referencing this member, update
       // the base accordingly.
@@ -833,59 +825,22 @@ namespace {
 
       // If this is a method whose result type is dynamic Self, or a
       // construction, replace the result type with the actual object type.
-      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-        if ((isa<FuncDecl>(func) &&
-             (cast<FuncDecl>(func)->hasDynamicSelf() ||
-              (openedExistential &&
-               cast<FuncDecl>(func)->hasArchetypeSelf()))) ||
-            isPolymorphicConstructor(func)) {
-          refTy = refTy->replaceCovariantResultType(containerTy,
-                    func->getNumParameterLists());
-          dynamicSelfFnType = refTy->replaceCovariantResultType(
-                                baseTy,
-                                func->getNumParameterLists());
-
-          if (openedExistential) {
-            // Replace the covariant result type in the opened type. We need to
-            // handle dynamic member references, which wrap the function type
-            // in an optional.
-            OptionalTypeKind optKind;
-            if (auto optObject = openedType->getAnyOptionalObjectType(optKind))
-              openedType = optObject;
-            openedType = openedType->replaceCovariantResultType(
-                           baseTy,
-                           func->getNumParameterLists()-1);
-            if (optKind != OptionalTypeKind::OTK_None)
-              openedType = OptionalType::get(optKind, openedType);
+      Type dynamicSelfFnType;
+      if (!member->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+        if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+          if ((isa<FuncDecl>(func) &&
+               cast<FuncDecl>(func)->hasDynamicSelf()) ||
+              (isa<ConstructorDecl>(func) &&
+               containerTy->getClassOrBoundGenericClass())) {
+            refTy = refTy->replaceCovariantResultType(
+                containerTy, func->getNumParameterLists());
+            if (!baseTy->isEqual(containerTy)) {
+              dynamicSelfFnType = refTy->replaceCovariantResultType(
+                  baseTy, func->getNumParameterLists());
+            }
           }
-
-          // If the type after replacing DynamicSelf with the provided base
-          // type is no different, we don't need to perform a conversion here.
-          if (refTy->isEqual(dynamicSelfFnType))
-            dynamicSelfFnType = nullptr;
         }
       }
-
-      // If we're referring to the member of a module, it's just a simple
-      // reference.
-      if (baseTy->is<ModuleType>()) {
-        assert(semantics == AccessSemantics::Ordinary &&
-               "Direct property access doesn't make sense for this");
-        assert(!dynamicSelfFnType && "No reference type to convert to");
-        auto ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
-        cs.setType(ref, refTy);
-        ref->setFunctionRefKind(functionRefKind);
-        return cs.cacheType(new (context)
-                                DotSyntaxBaseIgnoredExpr(base, dotLoc, ref));
-      }
-
-      // Otherwise, we're referring to a member of a type.
-      Type selfTy;
-      if (isa<ProtocolDecl>(member->getDeclContext()) &&
-          (baseTy->is<ArchetypeType>() || baseTy->isExistentialType()))
-        selfTy = baseTy;
-      else
-        selfTy = containerTy;
 
       // References to properties with accessors and storage usually go
       // through the accessors, but sometimes are direct.
@@ -900,6 +855,7 @@ namespace {
 
         // If the base is already an lvalue with the right base type, we can
         // pass it as an inout qualified type.
+        Type selfTy = containerTy;
         if (selfTy->isEqual(baseTy))
           if (cs.getType(base)->is<LValueType>())
             selfTy = InOutType::get(selfTy);
@@ -909,7 +865,7 @@ namespace {
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
         base = coerceToType(base,
-                            MetatypeType::get(selfTy),
+                            MetatypeType::get(containerTy),
                             locator.withPathElement(
                               ConstraintLocator::MemberRefBase));
         if (!base)
@@ -935,9 +891,7 @@ namespace {
         // existential.
         if (openedExistential &&
             refType->hasOpenedExistential(knownOpened->second)) {
-          refType = refType->eraseOpenedExistential(
-                      cs.DC->getParentModule(),
-                      knownOpened->second);
+          refType = refType->eraseOpenedExistential(knownOpened->second);
         }
 
         cs.setType(ref, refType);

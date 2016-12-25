@@ -2890,16 +2890,6 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
   }
 }
 
-bool FuncDecl::hasArchetypeSelf() const {
-  if (auto proto = getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
-    return proto->findProtocolSelfReferences(this,
-                                             /*allowCovariantParameters=*/true,
-                                             /*skipAssocTypes=*/true).result;
-  }
-
-  return false;
-}
-
 bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
   // If the member type uses 'Self' in non-covariant position,
   // we cannot use the existential type.
