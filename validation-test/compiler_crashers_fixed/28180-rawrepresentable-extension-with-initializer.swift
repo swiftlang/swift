@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -typecheck
+// RUN: not %target-swift-frontend %s -typecheck
 
 // ASAN Output: stack-overflow on address 0x7fff31bf3ff8 (pc 0x0000022f8f44 bp 0x7fff31bf49d0 sp 0x7fff31bf4000 T0)
 

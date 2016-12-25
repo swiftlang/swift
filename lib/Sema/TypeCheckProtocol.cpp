@@ -3405,6 +3405,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // Local function that folds dependent member types with non-dependent
   // bases into actual member references.
   std::function<Type(Type)> foldDependentMemberTypes;
+  llvm::DenseSet<AssociatedTypeDecl *> recursionCheck;
   foldDependentMemberTypes = [&](Type type) -> Type {
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
       auto baseTy = depMemTy->getBase().transform(foldDependentMemberTypes);
@@ -3414,6 +3415,11 @@ void ConformanceChecker::resolveTypeWitnesses() {
       auto assocType = depMemTy->getAssocType();
       if (!assocType)
         return nullptr;
+
+      if (!recursionCheck.insert(assocType).second)
+        return nullptr;
+
+      SWIFT_DEFER { recursionCheck.erase(assocType); };
 
       // Try to substitute into the base type.
       if (Type result = depMemTy->substBaseType(DC->getParentModule(), baseTy)){
