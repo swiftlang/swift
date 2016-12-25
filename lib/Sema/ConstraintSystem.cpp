@@ -417,8 +417,9 @@ namespace {
           cs.TC.diagnose(unboundDecl, diag::circular_reference);
           return ErrorType::get(type);
         }
-        
-        
+
+        llvm::DenseMap<CanType, TypeVariableType *> unboundReplacements;
+
         // Open up the generic type.
         cs.openGeneric(unboundDecl->getInnermostDeclContext(),
                        unboundDecl->getDeclContext(),
@@ -426,15 +427,15 @@ namespace {
                        unboundDecl->getGenericRequirements(),
                        /*skipProtocolSelfConstraint=*/false,
                        locator,
-                       replacements);
+                       unboundReplacements);
         
         // Map the generic parameters to their corresponding type variables.
         llvm::SmallVector<TypeLoc, 4> arguments;
         for (auto gp : unboundDecl->getInnermostGenericParamTypes()) {
-          assert(replacements.count(gp->getCanonicalType()) &&
+          auto found = unboundReplacements.find(gp->getCanonicalType());
+          assert(found != unboundReplacements.end() &&
                  "Missing generic parameter?");
-          arguments.push_back(TypeLoc::withoutLoc(
-                              replacements[gp->getCanonicalType()]));
+          arguments.push_back(TypeLoc::withoutLoc(found->second));
         }
 
         // FIXME: For some reason we can end up with unbound->getDecl()
@@ -929,7 +930,10 @@ void ConstraintSystem::openGeneric(
     auto typeVar = createTypeVariable(locatorPtr,
                                       TVO_PrefersSubtypeBinding |
                                       TVO_MustBeMaterializable);
-    replacements[gp->getCanonicalType()] = typeVar;
+    auto result = replacements.insert(
+        std::make_pair(gp->getCanonicalType(), typeVar));
+    assert(result.second);
+    (void) result;
   }
 
   ReplaceDependentTypes replaceDependentTypes(*this, locator, replacements);
