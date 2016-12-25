@@ -829,8 +829,9 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
       // Constructors and destructors don't have 'self' in parameter patterns.
       if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD))
-        Consumer.foundDecl(const_cast<ParamDecl*>(AFD->getImplicitSelfDecl()),
-                           DeclVisibilityKind::FunctionParameter);
+        if (auto *selfParam = AFD->getImplicitSelfDecl())
+          Consumer.foundDecl(const_cast<ParamDecl*>(selfParam),
+                             DeclVisibilityKind::FunctionParameter);
 
       if (AFD->getDeclContext()->isTypeContext()) {
         ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();

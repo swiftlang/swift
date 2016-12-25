@@ -3626,10 +3626,11 @@ Pattern *VarDecl::getParentPattern() const {
 }
 
 bool VarDecl::isSelfParameter() const {
-  // Note: we need to check the isImplicit() bit here to make sure that we
-  // don't classify explicit parameters declared with `self` as the self param.
-  return isa<ParamDecl>(this) && getName() == getASTContext().Id_self &&
-         isImplicit();
+  if (isa<ParamDecl>(this))
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(getDeclContext()))
+      return AFD->getImplicitSelfDecl() == this;
+
+  return false;
 }
 
 /// Return true if this stored property needs to be accessed with getters and
@@ -4189,14 +4190,19 @@ void AbstractFunctionDecl::setGenericParams(GenericParamList *GP) {
 /// Note that some functions don't have an implicit 'self' decl, for example,
 /// free functions.  In this case nullptr is returned.
 ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
-  auto paramLists = getParameterLists();
-  if (paramLists.empty())
+  if (!getDeclContext()->isTypeContext())
     return nullptr;
 
   // "self" is always the first parameter list.
-  if (paramLists[0]->size() == 1 && paramLists[0]->get(0)->isSelfParameter())
-    return paramLists[0]->get(0);
-  return nullptr;
+  auto paramLists = getParameterLists();
+  assert(paramLists.size() >= 1);
+  assert(paramLists[0]->size() == 1);
+
+  auto selfParam = paramLists[0]->get(0);
+  assert(selfParam->getName() == getASTContext().Id_self);
+  assert(selfParam->isImplicit());
+
+  return selfParam;
 }
 
 std::pair<DefaultArgumentKind, Type>
