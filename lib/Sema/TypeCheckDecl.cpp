@@ -3557,7 +3557,7 @@ public:
       }
     }
 
-    if (IsSecondPass && !IsFirstPass) {
+    if (!IsFirstPass) {
       TC.checkUnsupportedProtocolType(decl);
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         TC.checkDeclCircularity(nominal);

@@ -100,3 +100,17 @@ func genericFunction<T>(t: T) {
   // expected-error@-1 {{type 'Second' cannot be nested in generic function 'genericFunction'}}
   // expected-error@-2 2 {{circular class inheritance Second}}
 }
+
+// Spurious "Self or associated type requirements" diagnostic.
+protocol ProtoWithAssocType {
+  associatedtype T = Int
+}
+
+func freeFunction() {
+  struct ConformingType : ProtoWithAssocType {
+    typealias T = Int
+
+    func method() -> ProtoWithAssocType {}
+    // expected-error@-1 {{can only be used as a generic constraint because it has Self or associated type requirements}}
+  }
+}
