@@ -603,6 +603,11 @@ namespace {
         prev = result;
       }
 
+      // Invalid case -- direct call of a metatype. Has one less argument
+      // application because there's no ".init".
+      if (isa<ApplyExpr>(ExprStack.back()))
+        argCount--;
+
       return argCount;
     }
 
@@ -685,7 +690,7 @@ namespace {
         return false;
 
       auto &record = OpenedExistentials.back();
-      assert(record.Depth <= ExprStack.size() - 1);
+      assert(record.Depth <= ExprStack.size());
 
       if (!force && record.Depth < ExprStack.size() - 1)
         return false;

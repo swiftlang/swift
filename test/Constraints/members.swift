@@ -286,9 +286,23 @@ func existential(_ p: P) {
 }
 
 func staticExistential(_ p: P.Type, pp: P.Protocol) {
+  let _ = p() // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  let _ = p().bar // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  let _ = p().bar(1) // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+
   let ppp: P = p.init()
+
+  _ = pp() // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}} // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  _ = pp().bar // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}} // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  _ = pp().bar(2) // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}} // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+
   _ = pp.init() // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
+  _ = pp.init().bar // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
+  _ = pp.init().bar(3) // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
+
   _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = P().bar // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = P().bar(4) // expected-error{{protocol type 'P' cannot be instantiated}}
 
   // Instance member of metatype
   let _: (P) -> (Int) -> () = P.bar
