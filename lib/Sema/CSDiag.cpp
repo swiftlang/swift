@@ -670,8 +670,10 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     std::string message = "'";
     message += VD->getName().str().str();
     message += "'";
- 
-    if (VD->isImplicit())
+
+    if (VD->isCaptureList())
+      message += " is an immutable capture";
+    else if (VD->isImplicit())
       message += " is immutable";
     else if (VD->isLet())
       message += " is a 'let' constant";
@@ -684,7 +686,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     }
     TC.diagnose(loc, diagID, message)
       .highlight(immInfo.first->getSourceRange());
-    
+
     // If this is a simple variable marked with a 'let', emit a note to fixit
     // hint it to 'var'.
     VD->emitLetToVarNoteIfSimple(CS.DC);

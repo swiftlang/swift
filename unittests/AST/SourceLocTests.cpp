@@ -151,7 +151,9 @@ TEST(SourceLoc, StmtConditionElement) {
                         .addMemBufferCopy("if let x = Optional.some(1) { }");
   SourceLoc start = C.Ctx.SourceMgr.getLocForBufferStart(bufferID);
   
-  auto vardecl = new (C.Ctx) VarDecl( false, true, start.getAdvancedLoc(7)
+  auto vardecl = new (C.Ctx) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                     /*IsCaptureList*/false,
+                                     start.getAdvancedLoc(7)
                                     , C.Ctx.getIdentifier("x")
                                     , Type()
                                     , nullptr);

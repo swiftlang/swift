@@ -310,9 +310,9 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
 
   // Create the meta-variable, let the typechecker name it.
   Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
-  VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
-                                      E->getStartLoc(), name,
-                                      E->getType(), &SF);
+  VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                      /*IsCaptureList*/false, E->getStartLoc(),
+                                      name, E->getType(), &SF);
   vd->setInterfaceType(E->getType());
   SF.Decls.push_back(vd);
 
@@ -383,12 +383,12 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
 
     // Create the meta-variable, let the typechecker name it.
     Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
-    VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
+    VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                        /*IsCaptureList*/false,
                                         PBD->getStartLoc(), name,
                                         pattern->getType(), &SF);
     vd->setInterfaceType(pattern->getType());
     SF.Decls.push_back(vd);
-    
 
     // Create a PatternBindingDecl to bind the expression into the decl.
     Pattern *metavarPat = new (Context) NamedPattern(vd);
