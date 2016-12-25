@@ -5,5 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-struct g{var E=(_=nil)}
+// RUN: not %target-swift-frontend %s -emit-ir
+!(_=nil){}
