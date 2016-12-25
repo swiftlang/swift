@@ -681,7 +681,8 @@ struct ASTNodeBase {};
         }
       }
       
-      if (D->getAttrs().hasAttribute<OverrideAttr>()) {
+      if (D->didEarlyAttrValidation() &&
+          D->getAttrs().hasAttribute<OverrideAttr>()) {
         if (!D->isInvalid() && D->hasInterfaceType() &&
             !isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
