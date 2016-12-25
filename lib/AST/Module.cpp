@@ -602,6 +602,12 @@ TypeBase::gatherAllSubstitutions(Module *module,
       continue;
     }
 
+    if (auto protocol = parent->getAs<ProtocolType>()) {
+      parent = protocol->getParent();
+      lastGenericIndex--;
+      continue;
+    }
+
     if (auto nominal = parent->getAs<NominalType>()) {
       parent = nominal->getParent();
       continue;
