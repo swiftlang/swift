@@ -3179,12 +3179,9 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
 
   TypeSubstitutionMap substitutions;
 
-  // If the member is not part of a type, there's nothing to substitute.
-  if (!memberDC->isTypeContext())
-    return substitutions;
-
   // Compute the set of member substitutions to apply.
-  substitutions = getContextSubstitutions(memberDC);
+  if (memberDC->isTypeContext())
+    substitutions = getContextSubstitutions(memberDC);
 
   // If the member itself is generic, preserve its generic parameters.
   // We need this since code completion and diagnostics want to be able
@@ -3213,12 +3210,7 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
 
   assert(memberType);
 
-  // Compute the set of member substitutions to apply.
   auto substitutions = getMemberSubstitutions(member);
-  if (substitutions.empty())
-    return memberType;
-
-  // Perform the substitutions.
   return memberType.subst(module, substitutions, SubstFlags::UseErrorType);
 }
 

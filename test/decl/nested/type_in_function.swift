@@ -90,6 +90,13 @@ struct OuterGenericStruct<A> {
       }
     }
   }
+
+  func middleFunction() {
+    struct ConformingType : Racoon {
+    // expected-error@-1 {{type 'ConformingType' cannot be nested in generic function 'middleFunction'}}
+      typealias Stripes = A
+    }
+  }
 }
 
 // Issue with diagnoseUnknownType().
