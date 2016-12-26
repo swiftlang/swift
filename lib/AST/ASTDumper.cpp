@@ -847,13 +847,15 @@ namespace {
     }
 
     void printParameterList(const ParameterList *params) {
-      OS.indent(Indent) << "(parameter_list";
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      PrintWithColorRAII(OS, ParameterColor) << "parameter_list";
       Indent += 2;
       for (auto P : *params) {
         OS << '\n';
         printParameter(P);
       }
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
       Indent -= 2;
     }
 
