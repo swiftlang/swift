@@ -33,15 +33,39 @@
 
 using namespace swift;
 
-#define DEF_COLOR(NAME, COLOR)\
-static const llvm::raw_ostream::Colors NAME##Color = llvm::raw_ostream::COLOR;
+struct TerminalColor {
+  llvm::raw_ostream::Colors Color;
+  bool Bold;
+};
 
-DEF_COLOR(Func, YELLOW)
-DEF_COLOR(Extension, MAGENTA)
-DEF_COLOR(Pattern, RED)
-DEF_COLOR(TypeRepr, GREEN)
-DEF_COLOR(Type, BLUE)
-DEF_COLOR(TypeField, CYAN)
+#define DEF_COLOR(NAME, COLOR, BOLD) \
+static const TerminalColor NAME##Color = { llvm::raw_ostream::COLOR, BOLD };
+
+DEF_COLOR(Func, YELLOW, false)
+DEF_COLOR(Range, YELLOW, false)
+DEF_COLOR(Accessibility, YELLOW, false)
+DEF_COLOR(ASTNode, YELLOW, true)
+DEF_COLOR(Parameter, YELLOW, false)
+DEF_COLOR(Extension, MAGENTA, false)
+DEF_COLOR(Pattern, RED, true)
+DEF_COLOR(Override, RED, false)
+DEF_COLOR(Stmt, RED, true)
+DEF_COLOR(Captures, RED, false)
+DEF_COLOR(Arguments, RED, false)
+DEF_COLOR(TypeRepr, GREEN, false)
+DEF_COLOR(LiteralValue, GREEN, false)
+DEF_COLOR(Decl, GREEN, true)
+DEF_COLOR(Parenthesis, BLUE, false)
+DEF_COLOR(Type, BLUE, false)
+DEF_COLOR(Discriminator, BLUE, false)
+DEF_COLOR(InterfaceType, GREEN, false)
+DEF_COLOR(Identifier, GREEN, false)
+DEF_COLOR(Expr, MAGENTA, true)
+DEF_COLOR(ExprModifier, CYAN, false)
+DEF_COLOR(DeclModifier, CYAN, false)
+DEF_COLOR(ClosureModifier, CYAN, false)
+DEF_COLOR(TypeField, CYAN, false)
+DEF_COLOR(Location, CYAN, false)
 
 #undef DEF_COLOR
 
@@ -51,27 +75,26 @@ namespace {
   class PrintWithColorRAII {
     raw_ostream &OS;
     bool ShowColors;
-    
+
   public:
-    PrintWithColorRAII(raw_ostream &os, llvm::raw_ostream::Colors color)
+    PrintWithColorRAII(raw_ostream &os, TerminalColor color)
     : OS(os), ShowColors(false)
     {
       if (&os == &llvm::errs() || &os == &llvm::outs())
         ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
-      
-      if (ShowColors) {
-        if (auto str = llvm::sys::Process::OutputColor(color, false, false)) {
-          OS << str;
-        }
-      }
+
+      if (ShowColors)
+        OS.changeColor(color.Color, color.Bold);
     }
-    
+
     ~PrintWithColorRAII() {
       if (ShowColors) {
         OS.resetColor();
       }
     }
-    
+
+    raw_ostream &getOS() const { return OS; }
+
     template<typename T>
     friend raw_ostream &operator<<(PrintWithColorRAII &&printer,
                                    const T &value){
