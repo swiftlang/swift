@@ -253,28 +253,17 @@ namespace {
     }
 
     raw_ostream &printCommon(Pattern *P, const char *Name) {
-      OS.indent(Indent) << '(';
-
-      // Support optional color output.
-      if (ShowColors) {
-        if (const char *CStr =
-            llvm::sys::Process::OutputColor(PatternColor, false, false)) {
-          OS << CStr;
-        }
-      }
-
-      OS << Name;
-
-      if (ShowColors)
-        OS.resetColor();
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      PrintWithColorRAII(OS, PatternColor) << Name;
 
       if (P->isImplicit())
-        OS << " implicit";
+        PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
 
       if (P->hasType()) {
-        OS << " type='";
-        P->getType().print(OS);
-        OS << '\'';
+        PrintWithColorRAII(OS, TypeColor) << " type='";
+        P->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
+        PrintWithColorRAII(OS, TypeColor) << "'";
       }
       return OS;
     }
@@ -282,7 +271,7 @@ namespace {
     void visitParenPattern(ParenPattern *P) {
       printCommon(P, "pattern_paren") << '\n';
       printRec(P->getSubPattern());
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitTuplePattern(TuplePattern *P) {
       printCommon(P, "pattern_tuple");
@@ -299,13 +288,16 @@ namespace {
         OS << '\n';
         printRec(elt.getPattern());
       }
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitNamedPattern(NamedPattern *P) {
-      printCommon(P, "pattern_named")<< " '" << P->getNameStr() << "')";
+      printCommon(P, "pattern_named");
+      PrintWithColorRAII(OS, IdentifierColor) << " '" << P->getNameStr() << "'";
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitAnyPattern(AnyPattern *P) {
-      printCommon(P, "pattern_any") << ')';
+      printCommon(P, "pattern_any");
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitTypedPattern(TypedPattern *P) {
       printCommon(P, "pattern_typed") << '\n';
@@ -314,18 +306,18 @@ namespace {
         OS << '\n';
         printRec(P->getTypeLoc().getTypeRepr());
       }
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    
+
     void visitIsPattern(IsPattern *P) {
-      printCommon(P, "pattern_is") 
+      printCommon(P, "pattern_is")
         << ' ' << getCheckedCastKindName(P->getCastKind()) << ' ';
       P->getCastTypeLoc().getType().print(OS);
       if (auto sub = P->getSubPattern()) {
         OS << '\n';
         printRec(sub);
       }
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitExprPattern(ExprPattern *P) {
       printCommon(P, "pattern_expr");
@@ -334,30 +326,31 @@ namespace {
         printRec(m);
       else
         printRec(P->getSubExpr());
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitVarPattern(VarPattern *P) {
       printCommon(P, P->isLet() ? "pattern_let" : "pattern_var");
       OS << '\n';
       printRec(P->getSubPattern());
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitEnumElementPattern(EnumElementPattern *P) {
       printCommon(P, "pattern_enum_element");
       OS << ' ';
-      P->getParentType().getType().print(OS);
-      OS << '.' << P->getName();
+      P->getParentType().getType().print(
+        PrintWithColorRAII(OS, TypeColor).getOS());
+      PrintWithColorRAII(OS, IdentifierColor) << '.' << P->getName();
       if (P->hasSubPattern()) {
         OS << '\n';
         printRec(P->getSubPattern());
       }
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitOptionalSomePattern(OptionalSomePattern *P) {
       printCommon(P, "optional_some_element");
       OS << '\n';
       printRec(P->getSubPattern());
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitBoolPattern(BoolPattern *P) {
       printCommon(P, "pattern_bool");
@@ -1108,11 +1101,15 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
 
   case DeclContextKind::AbstractClosureExpr: {
     auto *ACE = cast<AbstractClosureExpr>(dc);
-    if (isa<ClosureExpr>(ACE))
-      os << "explicit closure discriminator=";
-    if (isa<AutoClosureExpr>(ACE))
-      os << "autoclosure discriminator=";
-    os << ACE->getDiscriminator();
+    if (isa<ClosureExpr>(ACE)) {
+      PrintWithColorRAII(os, DiscriminatorColor)
+        << "explicit closure discriminator=";
+    }
+    if (isa<AutoClosureExpr>(ACE)) {
+      PrintWithColorRAII(os, DiscriminatorColor)
+        << "autoclosure discriminator=";
+    }
+    PrintWithColorRAII(os, DiscriminatorColor) << ACE->getDiscriminator();
     break;
   }
 
@@ -1232,24 +1229,28 @@ public:
   void printRec(const Pattern *P) {
     PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
   }
-  
+
   void printRec(StmtConditionElement C) {
     switch (C.getKind()) {
     case StmtConditionElement::CK_Boolean:
       return printRec(C.getBoolean());
     case StmtConditionElement::CK_PatternBinding:
       Indent += 2;
-      OS.indent(Indent) << "(pattern\n";
-      
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      PrintWithColorRAII(OS, PatternColor) << "pattern\n";
+
       printRec(C.getPattern());
       OS << "\n";
       printRec(C.getInitializer());
-      OS << ")";
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
       Indent -= 2;
       break;
     case StmtConditionElement::CK_Availability:
       Indent += 2;
-      OS.indent(Indent) << "(#available\n";
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      OS << "#available\n";
       for (auto *Query : C.getAvailability()->getQueries()) {
         OS << '\n';
         switch (Query->getKind()) {
@@ -1264,7 +1265,7 @@ public:
           break;
         }
       }
-      OS << ")";
+      PrintWithColorRAII(OS, ParenthesisColor) << ")";
       Indent -= 2;
       break;
     }
