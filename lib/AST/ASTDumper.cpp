@@ -388,25 +388,13 @@ namespace {
     }
 
     void printCommon(Decl *D, const char *Name,
-                     llvm::Optional<llvm::raw_ostream::Colors> Color =
-                      llvm::Optional<llvm::raw_ostream::Colors>()) {
-      OS.indent(Indent) << '(';
-
-      // Support optional color output.
-      if (ShowColors && Color.hasValue()) {
-        if (const char *CStr =
-            llvm::sys::Process::OutputColor(Color.getValue(), false, false)) {
-          OS << CStr;
-        }
-      }
-
-      OS << Name;
-
-      if (ShowColors)
-        OS.resetColor();
+                     TerminalColor Color = DeclColor) {
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      PrintWithColorRAII(OS, Color) << Name;
 
       if (D->isImplicit())
-        OS << " implicit";
+        PrintWithColorRAII(OS, DeclModifierColor) << " implicit";
     }
 
     void printInherited(ArrayRef<TypeLoc> Inherited) {
@@ -482,19 +470,24 @@ namespace {
     }
 
     void printDeclName(const ValueDecl *D) {
-      if (D->getFullName())
-        OS << '\"' << D->getFullName() << '\"';
-      else
-        OS << "'anonname=" << (const void*)D << '\'';
+      if (D->getFullName()) {
+        PrintWithColorRAII(OS, IdentifierColor)
+          << '\"' << D->getFullName() << '\"';
+      } else {
+        PrintWithColorRAII(OS, IdentifierColor)
+          << "'anonname=" << (const void*)D << '\'';
+      }
     }
 
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
-      OS << " type='";
-      if (TAD->getUnderlyingTypeLoc().getType())
-        OS << TAD->getUnderlyingTypeLoc().getType().getString();
-      else
-        OS << "<<<unresolved>>>";
+      PrintWithColorRAII(OS, TypeColor) << " type='";
+      if (TAD->getUnderlyingTypeLoc().getType()) {
+        PrintWithColorRAII(OS, TypeColor)
+          << TAD->getUnderlyingTypeLoc().getType().getString();
+      } else {
+        PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
+      }
       printInherited(TAD->getInherited());
       OS << "')";
     }
@@ -534,9 +527,8 @@ namespace {
     }
 
     void printCommon(ValueDecl *VD, const char *Name,
-                     llvm::Optional<llvm::raw_ostream::Colors> Color =
-                      llvm::Optional<llvm::raw_ostream::Colors>()) {
-      printCommon((Decl*)VD, Name);
+                     TerminalColor Color = DeclColor) {
+      printCommon((Decl*)VD, Name, Color);
 
       OS << ' ';
       printDeclName(VD);
@@ -546,44 +538,45 @@ namespace {
         printGenericParameters(OS, GTD->getGenericParams());
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
-        OS << " type='";
+        PrintWithColorRAII(OS, TypeColor) << " type='";
         if (var->hasType())
-          var->getType().print(OS);
+          var->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
         else
-          OS << "<null type>";
-        OS << '\'';
+          PrintWithColorRAII(OS, TypeColor) << "<null type>";
+        PrintWithColorRAII(OS, TypeColor) << "'";
       }
 
       if (VD->hasInterfaceType()) {
-        OS << " interface type='";
-        VD->getInterfaceType()->print(OS);
-        OS << '\'';
+        PrintWithColorRAII(OS, InterfaceTypeColor) << " interface type='";
+        VD->getInterfaceType()->print(
+            PrintWithColorRAII(OS, InterfaceTypeColor).getOS());
+        PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
       }
 
       if (VD->hasAccessibility()) {
-        OS << " access=";
+        PrintWithColorRAII(OS, AccessibilityColor) << " access=";
         switch (VD->getFormalAccess()) {
         case Accessibility::Private:
-          OS << "private";
+          PrintWithColorRAII(OS, AccessibilityColor) << "private";
           break;
         case Accessibility::FilePrivate:
-          OS << "fileprivate";
+          PrintWithColorRAII(OS, AccessibilityColor) << "fileprivate";
           break;
         case Accessibility::Internal:
-          OS << "internal";
+          PrintWithColorRAII(OS, AccessibilityColor) << "internal";
           break;
         case Accessibility::Public:
-          OS << "public";
+          PrintWithColorRAII(OS, AccessibilityColor) << "public";
           break;
         case Accessibility::Open:
-          OS << "open";
+          PrintWithColorRAII(OS, AccessibilityColor) << "open";
           break;
         }
       }
 
       if (auto Overridden = VD->getOverriddenDecl()) {
-        OS << " override=";
-        Overridden->dumpRef(OS);
+        PrintWithColorRAII(OS, OverrideColor) << " override=";
+        Overridden->dumpRef(PrintWithColorRAII(OS, OverrideColor).getOS());
       }
 
       if (VD->isFinal())
@@ -593,8 +586,7 @@ namespace {
     }
 
     void printCommon(NominalTypeDecl *NTD, const char *Name,
-                     llvm::Optional<llvm::raw_ostream::Colors> Color =
-                      llvm::Optional<llvm::raw_ostream::Colors>()) {
+                     TerminalColor Color = DeclColor) {
       printCommon((ValueDecl *)NTD, Name, Color);
 
       if (NTD->hasInterfaceType()) {
@@ -614,23 +606,24 @@ namespace {
         OS << '\n';
         printRec(D);
       }
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
       if (VD->isStatic())
-        OS << " type";
+        PrintWithColorRAII(OS, DeclModifierColor) << " type";
       if (VD->isLet())
-        OS << " let";
+        PrintWithColorRAII(OS, DeclModifierColor) << " let";
       if (VD->hasNonPatternBindingInit())
-        OS << " non_pattern_init";
-      OS << " storage_kind=" << getStorageKindName(VD->getStorageKind());
+        PrintWithColorRAII(OS, DeclModifierColor) << " non_pattern_init";
+      PrintWithColorRAII(OS, DeclModifierColor)
+        << " storage_kind=" << getStorageKindName(VD->getStorageKind());
       if (VD->getAttrs().hasAttribute<LazyAttr>())
-        OS << " lazy";
+        PrintWithColorRAII(OS, DeclModifierColor) << " lazy";
 
       printAccessors(VD);
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void printAccessors(AbstractStorageDecl *D) {
@@ -678,7 +671,7 @@ namespace {
         OS << '\n';
         printRec(D);
       }
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitEnumDecl(EnumDecl *ED) {
@@ -688,12 +681,12 @@ namespace {
         OS << '\n';
         printRec(D);
       }
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitEnumElementDecl(EnumElementDecl *EED) {
       printCommon(EED, "enum_element_decl");
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitStructDecl(StructDecl *SD) {
@@ -718,7 +711,7 @@ namespace {
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
-      
+
       for (auto entry : PBD->getPatternList()) {
         OS << '\n';
         printRec(entry.getPattern());
@@ -727,16 +720,16 @@ namespace {
           printRec(entry.getInit());
         }
       }
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitSubscriptDecl(SubscriptDecl *SD) {
       printCommon(SD, "subscript_decl");
       OS << " storage_kind=" << getStorageKindName(SD->getStorageKind());
       printAccessors(SD);
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    
+
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type) {
       printCommon(D, Type, FuncColor);
       if (!D->getCaptureInfo().isTrivial()) {
@@ -780,30 +773,32 @@ namespace {
           OS << ",resulttype=" << fec->getResultType().getString();
       }
     }
-    
+
     void printParameter(const ParamDecl *P) {
-      OS.indent(Indent) << "(parameter ";
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      PrintWithColorRAII(OS, ParameterColor) << "parameter ";
       printDeclName(P);
       if (!P->getArgumentName().empty())
-        OS << " apiName=" << P->getArgumentName();
-      
+        PrintWithColorRAII(OS, IdentifierColor)
+          << " apiName=" << P->getArgumentName();
+
       if (P->hasType()) {
-        OS << " type=";
-        OS << '\'';
-        P->getType().print(OS);
-        OS << '\'';
+        PrintWithColorRAII(OS, TypeColor) << " type='";
+        P->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
+        PrintWithColorRAII(OS, TypeColor) << "'";
       }
-      
+
       if (P->hasInterfaceType()) {
-        OS << " interface type=";
-        OS << '\'';
-        P->getInterfaceType().print(OS);
-        OS << '\'';
+        PrintWithColorRAII(OS, InterfaceTypeColor) << " interface type='";
+        P->getInterfaceType().print(
+            PrintWithColorRAII(OS, InterfaceTypeColor).getOS());
+        PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
       }
-      
+
       if (!P->isLet())
         OS << " mutable";
-      
+
       if (P->isVariadic())
         OS << " variadic";
 
@@ -840,15 +835,14 @@ namespace {
         printField("default_arg", "normal");
         break;
       }
-      
+
       if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
         printRec(init);
       }
-      
-      OS << ')';
+
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    
 
     void printParameterList(const ParameterList *params) {
       OS.indent(Indent) << "(parameter_list";
@@ -873,9 +867,10 @@ namespace {
           OS << '\n';
           Indent += 2;
           OS.indent(Indent);
-          OS << "(result\n";
+          PrintWithColorRAII(OS, ParenthesisColor) << '(';
+          OS << "result\n";
           printRec(FD->getBodyResultTypeLoc().getTypeRepr());
-          OS << ')';
+          PrintWithColorRAII(OS, ParenthesisColor) << ')';
           Indent -= 2;
         }
       }
@@ -884,7 +879,7 @@ namespace {
         printRec(Body);
       }
      }
-    
+
     void visitFuncDecl(FuncDecl *FD) {
       printCommonAFD(FD, "func_decl");
       if (FD->isStatic())
@@ -903,62 +898,65 @@ namespace {
 
         OS << "_for=" << ASD->getFullName();
       }
-      
+
       for (auto VD: FD->getSatisfiedProtocolRequirements()) {
         OS << '\n';
-        OS.indent(Indent+2) << "(conformance ";
+        OS.indent(Indent+2);
+        PrintWithColorRAII(OS, ParenthesisColor) << '(';
+        OS << "conformance ";
         VD->dumpRef(OS);
-        OS << ')';
+        PrintWithColorRAII(OS, ParenthesisColor) << ')';
       }
 
       printAbstractFunctionDecl(FD);
 
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
      }
 
     void visitConstructorDecl(ConstructorDecl *CD) {
       printCommonAFD(CD, "constructor_decl");
       if (CD->isRequired())
-        OS << " required";
+        PrintWithColorRAII(OS, DeclModifierColor) << " required";
       switch (CD->getInitKind()) {
       case CtorInitializerKind::Designated:
-        OS << " designated";
+        PrintWithColorRAII(OS, DeclModifierColor) << " designated";
         break;
 
       case CtorInitializerKind::Convenience:
-        OS << " convenience";
+        PrintWithColorRAII(OS, DeclModifierColor) << " convenience";
         break;
 
       case CtorInitializerKind::ConvenienceFactory:
-        OS << " convenience_factory";
+        PrintWithColorRAII(OS, DeclModifierColor) << " convenience_factory";
         break;
 
       case CtorInitializerKind::Factory:
-        OS << " factory";
+        PrintWithColorRAII(OS, DeclModifierColor) << " factory";
         break;
       }
-      
+
       switch (CD->getFailability()) {
       case OTK_None:
         break;
 
       case OTK_Optional:
-        OS << " failable=Optional";
+        PrintWithColorRAII(OS, DeclModifierColor) << " failable=Optional";
         break;
 
       case OTK_ImplicitlyUnwrappedOptional:
-        OS << " failable=ImplicitlyUnwrappedOptional";
+        PrintWithColorRAII(OS, DeclModifierColor)
+          << " failable=ImplicitlyUnwrappedOptional";
         break;
       }
 
       printAbstractFunctionDecl(CD);
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitDestructorDecl(DestructorDecl *DD) {
       printCommonAFD(DD, "destructor_decl");
       printAbstractFunctionDecl(DD);
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
@@ -967,27 +965,35 @@ namespace {
         OS << "\n";
         printRec(TLCD->getBody());
       }
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    
+
     void visitIfConfigDecl(IfConfigDecl *ICD) {
-      OS.indent(Indent) << "(#if_decl\n";
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      OS << "#if_decl\n";
       Indent += 2;
       for (auto &Clause : ICD->getClauses()) {
-        OS.indent(Indent) << (Clause.Cond ? "(#if:\n" : "\n(#else:\n");
-        if (Clause.Cond)
+        if (Clause.Cond) {
+          PrintWithColorRAII(OS, ParenthesisColor) << '(';
+          OS << "#if:\n";
           printRec(Clause.Cond);
-        
+        } else {
+          OS << '\n';
+          PrintWithColorRAII(OS, ParenthesisColor) << '(';
+          OS << "#else:\n";
+        }
+
         for (auto D : Clause.Members) {
           OS << '\n';
           printRec(D);
         }
 
-        OS << ')';
+        PrintWithColorRAII(OS, ParenthesisColor) << ')';
       }
-    
+
       Indent -= 2;
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
@@ -1017,31 +1023,33 @@ namespace {
       printRelations("higherThan", PGD->getHigherThan());
       printRelations("lowerThan", PGD->getLowerThan());
 
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    
+
     void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
       printCommon(IOD, "infix_operator_decl ");
       OS << IOD->getName() << "\n";
       OS.indent(Indent+2);
       OS << "precedence " << IOD->getPrecedenceGroupName();
       if (!IOD->getPrecedenceGroup()) OS << " <null>";
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    
+
     void visitPrefixOperatorDecl(PrefixOperatorDecl *POD) {
       printCommon(POD, "prefix_operator_decl ");
-      OS << POD->getName() << ')';
+      OS << POD->getName();
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitPostfixOperatorDecl(PostfixOperatorDecl *POD) {
       printCommon(POD, "postfix_operator_decl ");
-      OS << POD->getName() << ')';
+      OS << POD->getName();
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitModuleDecl(ModuleDecl *MD) {
       printCommon(MD, "module");
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
   };
 } // end anonymous namespace
