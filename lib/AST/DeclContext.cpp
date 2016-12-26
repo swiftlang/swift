@@ -458,35 +458,6 @@ bool DeclContext::isGenericContext() const {
   llvm_unreachable("illegal declcontext hierarchy");
 }
 
-bool DeclContext::isValidGenericContext() const {
-  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
-    switch (dc->getContextKind()) {
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-    case DeclContextKind::TopLevelCodeDecl:
-      return false;
-
-    case DeclContextKind::Initializer:
-    case DeclContextKind::AbstractClosureExpr:
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::SubscriptDecl:
-      // Check parent context.
-      continue;
-
-    case DeclContextKind::AbstractFunctionDecl:
-      return cast<AbstractFunctionDecl>(dc)->getGenericEnvironment();
-
-    case DeclContextKind::GenericTypeDecl:
-      return cast<GenericTypeDecl>(dc)->getGenericEnvironment();
-
-    case DeclContextKind::ExtensionDecl:
-      return cast<ExtensionDecl>(dc)->getGenericEnvironment();
-    }
-    llvm_unreachable("bad decl context kind");
-  }
-  llvm_unreachable("illegal declcontext hierarchy");
-}
-
 /// Get the most optimal resilience expansion for the body of this function.
 /// If the body is able to be inlined into functions in other resilience
 /// domains, this ensures that only sufficiently-conservative access patterns

@@ -2284,9 +2284,6 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 
 Type AbstractTypeParamDecl::getSuperclass() const {
   auto *dc = getDeclContext();
-  if (!dc->isValidGenericContext())
-    return nullptr;
-
   auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
     return archetype->getSuperclass();
@@ -2298,9 +2295,6 @@ Type AbstractTypeParamDecl::getSuperclass() const {
 ArrayRef<ProtocolDecl *>
 AbstractTypeParamDecl::getConformingProtocols() const {
   auto *dc = getDeclContext();
-  if (!dc->isValidGenericContext())
-    return {};
-
   auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
     return archetype->getConformsTo();
@@ -3783,15 +3777,8 @@ Type DeclContext::getSelfTypeInContext() const {
   assert(isTypeContext());
 
   // For a protocol or extension thereof, the type is 'Self'.
-  if (getAsProtocolOrProtocolExtensionContext()) {
-    // In the parser, generic parameters won't be wired up yet, just give up on
-    // producing a type.
-    if (!isValidGenericContext())
-      return Type();
-
-    auto *genericEnv = getGenericEnvironmentOfContext();
-    return genericEnv->mapTypeIntoContext(getProtocolSelfType());
-  }
+  if (getAsProtocolOrProtocolExtensionContext())
+    return mapTypeIntoContext(getProtocolSelfType());
   return getDeclaredTypeInContext();
 }
 

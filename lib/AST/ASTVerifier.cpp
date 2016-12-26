@@ -2214,7 +2214,8 @@ struct ASTNodeBase {};
 
       // If the function has a generic interface type, it should also have a
       // generic signature.
-      if (AFD->isGenericContext() != AFD->isValidGenericContext()) {
+      if (AFD->isGenericContext() !=
+          (AFD->getGenericEnvironment() != nullptr)) {
         Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
         abort();

@@ -1107,7 +1107,7 @@ Optional<ArrayRef<Substitution>>
 ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
                                        DeclContext *gpContext) const {
   assert(gpContext && "No generic parameter context");
-  assert(gpContext->isValidGenericContext() &&
+  assert(gpContext->getGenericEnvironmentOfContext() != nullptr &&
          "Not type-checked yet");
   assert(BGT->getGenericArgs().size() == 1);
   Substitution Subst(BGT->getGenericArgs()[0], {});

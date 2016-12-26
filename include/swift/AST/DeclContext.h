@@ -390,11 +390,6 @@ public:
   /// any of its parents have generic parameters.
   bool isGenericContext() const;
 
-  /// Determine whether this declaration context is a generic context that has
-  /// been fully type checked, meaning it has a valid GenericSignature and
-  /// GenericEnvironment.
-  bool isValidGenericContext() const;
-
   /// Determine whether the innermost context is generic.
   bool isInnermostContextGeneric() const;
 

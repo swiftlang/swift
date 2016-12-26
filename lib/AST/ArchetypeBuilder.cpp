@@ -1343,9 +1343,11 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
 
   // If this is an associated type that already has an archetype assigned,
   // use that information.
-  if (isa<AssociatedTypeDecl>(decl) &&
-      decl->getDeclContext()->isValidGenericContext()) {
-    auto *archetype = decl->getDeclContext()->mapTypeIntoContext(
+  auto *genericEnv = decl->getDeclContext()
+      ->getGenericEnvironmentOfContext();
+  if (isa<AssociatedTypeDecl>(decl) && genericEnv != nullptr) {
+    auto *archetype = genericEnv->mapTypeIntoContext(
+        &Mod,
         decl->getDeclaredInterfaceType())
             ->getAs<ArchetypeType>();
 
