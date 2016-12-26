@@ -2634,7 +2634,8 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
     getConcrete()->dump(out, indent);
   } else {
     out.indent(indent) << "(abstract_conformance protocol="
-                       << getAbstract()->getName() << ')';
+                       << getAbstract()->getName();
+    PrintWithColorRAII(out, ParenthesisColor) << ')';
   }
 }
 
@@ -2654,8 +2655,10 @@ void ProtocolConformance::dump() const {
 
 void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   auto printCommon = [&](StringRef kind) {
-    out.indent(indent) << '(' << kind << "_conformance type=" << getType()
-                       << " protocol=" << getProtocol()->getName();
+    out.indent(indent);
+    PrintWithColorRAII(out, ParenthesisColor) << '(';
+    out << kind << "_conformance type=" << getType()
+        << " protocol=" << getProtocol()->getName();
   };
 
   switch (getKind()) {
@@ -2685,7 +2688,7 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   }
   }
 
-  out << ')';
+  PrintWithColorRAII(out, ParenthesisColor) << ')';
 }
 
 //===----------------------------------------------------------------------===//
@@ -2699,7 +2702,8 @@ namespace {
 
     raw_ostream &printCommon(const TypeBase *T, StringRef label,
                              StringRef name) {
-      OS.indent(Indent) << '(';
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
       if (!label.empty()) {
         PrintWithColorRAII(OS, TypeFieldColor) << label;
         OS << "=";
