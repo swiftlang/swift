@@ -598,7 +598,9 @@ namespace {
     }
 
     void visitSourceFile(const SourceFile &SF) {
-      OS.indent(Indent) << "(source_file";
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      PrintWithColorRAII(OS, ASTNodeColor) << "source_file";
       for (Decl *D : SF.Decls) {
         if (D->isImplicit())
           continue;
@@ -1278,13 +1280,15 @@ public:
       break;
     }
   }
-  
+
   void visitBraceStmt(BraceStmt *S) {
     printASTNodes(S->getElements(), "brace_stmt");
   }
 
   void printASTNodes(const ArrayRef<ASTNode> &Elements, StringRef Name) {
-    OS.indent(Indent) << "(" << Name;
+    OS.indent(Indent);
+    PrintWithColorRAII(OS, ParenthesisColor) << "(";
+    PrintWithColorRAII(OS, ASTNodeColor) << Name;
     for (auto Elt : Elements) {
       OS << '\n';
       if (Expr *SubExpr = Elt.dyn_cast<Expr*>())
