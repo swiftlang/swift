@@ -1895,11 +1895,14 @@ public:
       OS << " trailing-closure";
 
     if (E->hasElementNames()) {
-      OS << " names=";
+      PrintWithColorRAII(OS, IdentifierColor) << " names=";
 
       interleave(E->getElementNames(),
-                 [&](Identifier name) { OS << (name.empty()?"''":name.str());},
-                 [&] { OS << ","; });
+                 [&](Identifier name) {
+                   PrintWithColorRAII(OS, IdentifierColor)
+                     << (name.empty()?"''":name.str());
+                 },
+                 [&] { PrintWithColorRAII(OS, IdentifierColor) << ","; });
     }
 
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
