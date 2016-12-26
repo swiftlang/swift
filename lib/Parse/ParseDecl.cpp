@@ -3224,6 +3224,9 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   
   // Reject generic parameters with a specific error.
   if (startsWithLess(Tok)) {
+    // Start a scope that we tear down immediately to prevent the
+    // generic parameters from being visible to name lookup.
+    Scope S(this, ScopeKind::Generics);
     if (auto genericParams = parseGenericParameters().getPtrOrNull()) {
       diagnose(genericParams->getLAngleLoc(),
                diag::associated_type_generic_parameter_list)
