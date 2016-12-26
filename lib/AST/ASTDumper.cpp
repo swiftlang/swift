@@ -2477,20 +2477,9 @@ public:
   void printRec(TypeRepr *T) { PrintTypeRepr(OS, Indent + 2).visit(T); }
 
   raw_ostream &printCommon(TypeRepr *T, const char *Name) {
-    OS.indent(Indent) << '(';
-
-    // Support optional color output.
-    if (ShowColors) {
-      if (const char *CStr =
-          llvm::sys::Process::OutputColor(TypeReprColor, false, false)) {
-        OS << CStr;
-      }
-    }
-
-    OS << Name;
-
-    if (ShowColors)
-      OS.resetColor();
+    OS.indent(Indent);
+    PrintWithColorRAII(OS, ParenthesisColor) << '(';
+    PrintWithColorRAII(OS, TypeReprColor) << Name;
     return OS;
   }
 
@@ -2511,12 +2500,13 @@ public:
     for (auto comp : T->getComponentRange()) {
       OS << '\n';
       printCommon(nullptr, "component");
-      OS << " id='" << comp->getIdentifier() << '\'';
+      PrintWithColorRAII(OS, IdentifierColor)
+        << " id='" << comp->getIdentifier() << '\'';
       OS << " bind=";
       if (comp->isBound())
         comp->getBoundDecl()->dumpRef(OS);
       else OS << "none";
-      OS << ')';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
       if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(comp)) {
         for (auto genArg : GenIdT->getGenericArgs()) {
           OS << '\n';
@@ -2524,7 +2514,7 @@ public:
         }
       }
     }
-    OS << ')';
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
     Indent -= 2;
   }
 
@@ -2534,13 +2524,13 @@ public:
     if (T->throws())
       OS << " throws ";
     OS << '\n'; printRec(T->getResultTypeRepr());
-    OS << ')';
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitArrayTypeRepr(ArrayTypeRepr *T) {
     printCommon(T, "type_array") << '\n';
     printRec(T->getBase());
-    OS << ')';
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitDictionaryTypeRepr(DictionaryTypeRepr *T) {
@@ -2548,7 +2538,7 @@ public:
     printRec(T->getKey());
     OS << '\n';
     printRec(T->getValue());
-    OS << ')';
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitTupleTypeRepr(TupleTypeRepr *T) {
@@ -2570,7 +2560,7 @@ public:
       OS << '\n';
       printRec(elem);
     }
-    OS << ')';
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitCompositionTypeRepr(CompositionTypeRepr *T) {
@@ -2579,25 +2569,25 @@ public:
       OS << '\n';
       printRec(elem);
     }
-    OS << ')';
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
     printCommon(T, "type_metatype") << '\n';
     printRec(T->getBase());
-    OS << ')';
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitProtocolTypeRepr(ProtocolTypeRepr *T) {
     printCommon(T, "type_protocol") << '\n';
     printRec(T->getBase());
-    OS << ')';
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitInOutTypeRepr(InOutTypeRepr *T) {
     printCommon(T, "type_inout") << '\n';
     printRec(T->getBase());
-    OS << ')';
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 };
 
