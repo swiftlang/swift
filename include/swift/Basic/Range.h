@@ -180,6 +180,13 @@ static inline IntRange<unsigned> range(unsigned end) {
   return range(0, end);
 }
 
+/// Returns a reverse Int range (start, end].
+static inline auto reverse_range(unsigned start, unsigned end) ->
+  decltype(reversed(range(start+1, end+1))) {
+  assert(start <= end && "Invalid integral range");
+  return reversed(range(start+1, end+1));
+}
+
 /// A random access range that provides iterators that can be used to iterate
 /// over the (element, index) pairs of a collection.
 template <typename IterTy> class EnumeratorRange {
