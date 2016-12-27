@@ -9,25 +9,27 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-//  This file provides classes and functions for conveniently working
-//  with ranges, 
-//
-//  reversed returns an iterator_range out of the reverse iterators of a type.
-//
-//  map creates an iterator_range which applies a function to all the elements
-//  in another iterator_range.
-//
-//  IntRange is a template class for iterating over a range of
-//  integers.
-//
-//  indices returns the range of indices from [0..size()) on a
-//  subscriptable type.
-//
-//  Note that this is kept in Swift because it's really only useful in
-//  C++11, and there aren't any major open-source subprojects of LLVM
-//  that can use C++11 yet.
-//
+///
+///  \file
+///
+///  This file provides classes and functions for conveniently working
+///  with ranges,
+///
+///  reversed returns an iterator_range out of the reverse iterators of a type.
+///
+///  map creates an iterator_range which applies a function to all the elements
+///  in another iterator_range.
+///
+///  IntRange is a template class for iterating over a range of
+///  integers.
+///
+///  indices returns the range of indices from [0..size()) on a
+///  subscriptable type.
+///
+///  Note that this is kept in Swift because it's really only useful in
+///  C++11, and there aren't any major open-source subprojects of LLVM
+///  that can use C++11 yet.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_BASIC_RANGE_H
