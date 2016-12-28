@@ -914,7 +914,7 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
       Ty->getKind() == TypeKind::Error ||
       ExpectedTy->getKind() == TypeKind::Error)
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
-  if (Ty.getCanonicalTypeOrNull() == ExpectedTy.getCanonicalTypeOrNull())
+  if (Ty->isEqual(ExpectedTy))
     return CodeCompletionResult::ExpectedTypeRelation::Identical;
   if (isConvertibleTo(Ty, ExpectedTy, *DC))
     return CodeCompletionResult::ExpectedTypeRelation::Convertible;

@@ -1512,7 +1512,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     // Create a temporary
     OptionalTy = OptionalType::get(Dest->getType().getSwiftRValueType())
                      ->getImplementationType()
-                     .getCanonicalTypeOrNull();
+                     ->getCanonicalType();
     OptionalTy.getAnyOptionalObjectType(OTK);
     Tmp = Builder.createAllocStack(Loc,
                                    SILType::getPrimitiveObjectType(OptionalTy));

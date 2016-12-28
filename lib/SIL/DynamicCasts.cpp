@@ -637,7 +637,7 @@ swift::classifyDynamicCast(Module *M,
       // If the bridged ObjC type is known, check if
       // source type can be cast into it.
       return classifyDynamicCast(M, source,
-          ObjCTy.getCanonicalTypeOrNull(),
+          ObjCTy->getCanonicalType(),
           /* isSourceTypeExact */ false, isWholeModuleOpts);
     }
     return DynamicCastFeasibility::MaySucceed;
@@ -650,7 +650,7 @@ swift::classifyDynamicCast(Module *M,
       // If the bridged ObjC type is known, check if
       // this type can be cast into target type.
       return classifyDynamicCast(M,
-          ObjCTy.getCanonicalTypeOrNull(),
+          ObjCTy->getCanonicalType(),
           target,
           /* isSourceTypeExact */ false, isWholeModuleOpts);
     }

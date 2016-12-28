@@ -228,8 +228,7 @@ CalleeList CalleeCache::getCalleeList(SILInstruction *I) const {
   auto Ty = I->getOperand(0)->getType();
   while (Ty.getSwiftRValueType()->getAnyOptionalObjectType())
     Ty = M.Types.getLoweredType(Ty.getSwiftRValueType()
-                                    ->getAnyOptionalObjectType()
-                                    .getCanonicalTypeOrNull());
+                                    .getAnyOptionalObjectType());
   auto Class = Ty.getSwiftRValueType().getClassOrBoundGenericClass();
   if (!Class || Class->hasClangNode() || !Class->hasDestructor())
     return CalleeList();

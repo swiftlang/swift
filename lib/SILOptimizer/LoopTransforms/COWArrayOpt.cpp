@@ -1863,10 +1863,7 @@ private:
 
   bool isClassElementTypeArray(SILValue Arr) {
     auto Ty = Arr->getType().getSwiftRValueType();
-    auto Canonical = Ty.getCanonicalTypeOrNull();
-    if (Canonical.isNull())
-      return false;
-    auto *Struct = Canonical->getStructOrBoundGenericStruct();
+    auto *Struct = Ty->getStructOrBoundGenericStruct();
     assert(Struct && "Array must be a struct !?");
     if (Struct) {
       // No point in hoisting generic code.
@@ -1876,11 +1873,8 @@ private:
 
       // Check the array element type parameter.
       bool isClass = false;
-      for (auto TP : BGT->getGenericArgs()) {
-        auto EltTy = TP.getCanonicalTypeOrNull();
-        if (EltTy.isNull())
-          return false;
-        if (!EltTy.hasReferenceSemantics())
+      for (auto EltTy : BGT->getGenericArgs()) {
+        if (!EltTy->hasReferenceSemantics())
           return false;
         isClass = true;
       }

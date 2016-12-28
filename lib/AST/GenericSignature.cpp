@@ -98,9 +98,11 @@ CanGenericSignature GenericSignature::getCanonical(
   SmallVector<Requirement, 8> canonicalRequirements;
   canonicalRequirements.reserve(requirements.size());
   for (auto &reqt : requirements) {
+    auto secondTy = reqt.getSecondType();
     canonicalRequirements.push_back(Requirement(reqt.getKind(),
                               reqt.getFirstType()->getCanonicalType(),
-                              reqt.getSecondType().getCanonicalTypeOrNull()));
+                              secondTy ? secondTy->getCanonicalType()
+                                       : CanType()));
   }
   auto canSig = get(canonicalParams, canonicalRequirements,
                     /*isKnownCanonical=*/true);

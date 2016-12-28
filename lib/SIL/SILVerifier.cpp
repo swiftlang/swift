@@ -642,7 +642,7 @@ public:
       require(isArchetypeValidInFunction(A, F),
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
-      if (auto OpenedA = getOpenedArchetype(t.getCanonicalTypeOrNull())) {
+      if (auto OpenedA = getOpenedArchetypeOf(CanType(A))) {
         auto Def = OpenedArchetypes.getOpenedArchetypeDef(OpenedA);
         require (Def, "Opened archetype should be registered in SILFunction");
         require(I == nullptr || Def == I ||
@@ -767,7 +767,7 @@ public:
   void checkApplyTypeDependentArguments(ApplySite AS) {
     SILInstruction *AI = AS.getInstruction();
 
-    llvm::DenseSet<CanType> FoundOpenedArchetypes;
+    llvm::DenseSet<ArchetypeType *> FoundOpenedArchetypes;
     unsigned hasDynamicSelf = 0;
 
     // Function to collect opened archetypes in FoundOpenedArchetypes and set
@@ -778,11 +778,11 @@ public:
         require(isArchetypeValidInFunction(A, AI->getFunction()),
                 "Archetype to be substituted must be valid in function.");
         // Collect all opened archetypes used in the substitutions list.
-        FoundOpenedArchetypes.insert(Ty.getCanonicalTypeOrNull());
+        FoundOpenedArchetypes.insert(A);
         // Also check that they are properly tracked inside the current
         // function.
         auto Def =
-          OpenedArchetypes.getOpenedArchetypeDef(Ty.getCanonicalTypeOrNull());
+          OpenedArchetypes.getOpenedArchetypeDef(A);
         require(Def, "Opened archetype should be registered in SILFunction");
         require(Def == AI ||
                 Dominance->properlyDominates(cast<SILInstruction>(Def), AI),
@@ -1949,7 +1949,7 @@ public:
             "method's Self parameter should be constrained by protocol");
 
     auto lookupType = AMI->getLookupType();
-    if (getOpenedArchetype(lookupType)) {
+    if (getOpenedArchetypeOf(lookupType)) {
       require(AMI->getTypeDependentOperands().size() == 1,
               "Must have a type dependent operand for the opened archetype");
       verifyOpenedArchetype(AMI, lookupType);
@@ -1969,10 +1969,6 @@ public:
       require(AMI->getModule().lookUpWitnessTable(conformance, false),
               "Could not find witness table for conformance");
     }
-  }
-
-  CanType getOpenedArchetype(CanType t) {
-    return getOpenedArchetypeOf(t);
   }
 
   // Get the expected type of a dynamic method reference.
@@ -2120,7 +2116,7 @@ public:
     require(OEI->getType().isAddress(),
             "open_existential_addr result must be an address");
 
-    auto archetype = getOpenedArchetype(OEI->getType().getSwiftRValueType());
+    auto archetype = getOpenedArchetypeOf(OEI->getType().getSwiftRValueType());
     require(archetype,
         "open_existential_addr result must be an opened existential archetype");
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
@@ -2142,7 +2138,7 @@ public:
     require(OEI->getType().isObject(),
             "open_existential_ref result must be an address");
 
-    auto archetype = getOpenedArchetype(resultInstanceTy);
+    auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_ref result must be an opened existential archetype");
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
@@ -2164,7 +2160,7 @@ public:
     require(OEI->getType().isAddress(),
             "open_existential_box result must be an address");
 
-    auto archetype = getOpenedArchetype(resultInstanceTy);
+    auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box result must be an opened existential archetype");
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
@@ -2209,7 +2205,7 @@ public:
     require(operandInstTy.isExistentialType(),
             "ill-formed existential metatype in open_existential_metatype "
             "operand");
-    auto archetype = getOpenedArchetype(resultInstTy);
+    auto archetype = getOpenedArchetypeOf(resultInstTy);
     require(archetype, "open_existential_metatype result must be an opened "
                        "existential metatype");
     require(
@@ -2426,7 +2422,8 @@ public:
     Ty.visit([&](Type t) {
       SILValue Def;
       if (t->isOpenedExistential()) {
-        Def = OpenedArchetypes.getOpenedArchetypeDef(t);
+        auto *archetypeTy = t->castTo<ArchetypeType>();
+        Def = OpenedArchetypes.getOpenedArchetypeDef(archetypeTy);
         require(Def, "Opened archetype should be registered in SILFunction");
       } else if (t->hasDynamicSelfType()) {
         require(I->getFunction()->hasSelfParam(),
@@ -3449,7 +3446,7 @@ public:
     // OpenedArchetypesDefs are existing instructions
     // belonging to the function F.
     for (auto KV: OpenedArchetypes.getOpenedArchetypeDefs()) {
-      require(getOpenedArchetype(KV.first.getCanonicalTypeOrNull()),
+      require(getOpenedArchetypeOf(KV.first),
               "Only opened archetypes should be registered in SILFunction");
       auto Def = cast<SILInstruction>(KV.second);
       require(Def->getFunction() == F, 
