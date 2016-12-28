@@ -227,8 +227,8 @@ extension UIImage : _ExpressibleByImageLiteral {
     self.init(named: name)
   }
 
-  public required convenience init(imageLiteralResourceName name: String) {
-    self.init(failableImageLiteral: name)
+  public required convenience init(imageLiteralResourceName name: StaticString) {
+    self.init(failableImageLiteral: "\(name)")
   }
 }
 

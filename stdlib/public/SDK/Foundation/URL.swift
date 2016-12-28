@@ -1195,8 +1195,8 @@ extension URL : CustomPlaygroundQuickLookable {
 //===----------------------------------------------------------------------===//
 
 extension URL : _ExpressibleByFileReferenceLiteral {
-  public init(fileReferenceLiteralResourceName name: String) {
-    self = Bundle.main.url(forResource: name, withExtension: nil)!
+  public init(fileReferenceLiteralResourceName name: StaticString) {
+    self = Bundle.main.url(forResource: "\(name)", withExtension: nil)!
   }
 }
 
