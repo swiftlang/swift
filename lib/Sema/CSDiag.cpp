@@ -7195,6 +7195,28 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       auto resultExpr = RS->getResult();
       ConcreteDeclRef decl = nullptr;
 
+      // If return expression uses closure parameters, which have/are
+      // type variables, such means that we won't be be able to
+      // type-check result correctly and, unfornutately,
+      // we are going to leak type variables from the parent
+      // constraint system through declaration types.
+      bool hasUnresolvedParams = false;
+      resultExpr->forEachChildExpr([&](Expr *childExpr) -> Expr *{
+        if (auto DRE = dyn_cast<DeclRefExpr>(resultExpr)) {
+          if (auto param = dyn_cast<ParamDecl>(DRE->getDecl())) {
+            auto paramType = param->getType();
+            if (!paramType || paramType->hasTypeVariable()) {
+              hasUnresolvedParams = true;
+              return nullptr;
+            }
+          }
+        }
+        return childExpr;
+      });
+
+      if (hasUnresolvedParams)
+        continue;
+
       // Obtain type of the result expression without applying solutions,
       // because otherwise this might result in leaking of type variables,
       // since we are not reseting result statement and if expression is
