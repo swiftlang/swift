@@ -297,12 +297,9 @@ public struct URLResourceValues {
             }
         }
         set {
-            if newValue != nil {
-                _set(.quarantinePropertiesKey, newValue: newValue as NSObject?)
-            } else {
-                // Set to NSNull, a special case for deleting quarantine properties
-                _set(.quarantinePropertiesKey, newValue: NSNull())
-            }
+            // Use NSNull for nil, a special case for deleting quarantine
+            // properties
+            _set(.quarantinePropertiesKey, newValue: newValue ?? NSNull())
         }
     }
 #endif
