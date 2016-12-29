@@ -365,7 +365,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Diagnose 'self.init' or 'super.init' nested in another expression.
       if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
-        if (!Parent.isNull() || !IsExprStmt) {
+        bool inDefer = false;
+        auto *innerDecl = DC->getInnermostDeclarationDeclContext();
+        if (auto *FD = dyn_cast_or_null<FuncDecl>(innerDecl)) {
+          inDefer = FD->isDeferBody();
+        }
+
+        if (!Parent.isNull() || !IsExprStmt || inDefer) {
           bool isChainToSuper;
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           TC.diagnose(E->getLoc(), diag::init_delegation_nested,

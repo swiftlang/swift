@@ -346,6 +346,13 @@ class SomeTestClass {
   }
 }
 
+class SomeDerivedClass: SomeTestClass {
+  override init() {
+    defer {
+      super.init() // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    }
+  }
+}
 
 func test_guard(_ x : Int, y : Int??, cond : Bool) {
   
