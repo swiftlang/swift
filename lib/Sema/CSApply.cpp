@@ -685,7 +685,8 @@ namespace {
     }
 
     /// Trying to close the active existential, if there is one.
-    bool closeExistential(Expr *&result, bool force=false) {
+    bool closeExistential(Expr *&result, ConstraintLocatorBuilder locator,
+                          bool force=false) {
       if (OpenedExistentials.empty())
         return false;
 
@@ -702,7 +703,13 @@ namespace {
       resultTy = cs.getType(result);
       if (resultTy->hasOpenedExistential(record.Archetype)) {
         Type erasedTy = resultTy->eraseOpenedExistential(record.Archetype);
-        result = coerceToType(result, erasedTy, nullptr);
+        auto range = result->getSourceRange();
+        result = coerceToType(result, erasedTy, locator);
+        // FIXME: Implement missing tuple-to-tuple conversion
+        if (result == nullptr) {
+          result = new (tc.Context) ErrorExpr(range);
+          result->setType(erasedTy);
+        }
       }
 
       // If the opaque value has an l-value access kind, then
@@ -896,7 +903,7 @@ namespace {
 
         cs.setType(ref, refType);
 
-        closeExistential(ref, /*force=*/openedExistential);
+        closeExistential(ref, locator, /*force=*/openedExistential);
 
         return ref;
       }
@@ -923,7 +930,7 @@ namespace {
         // Skip the synthesized 'self' input type of the opened type.
         cs.setType(memberRefExpr, simplifyType(openedType));
         Expr *result = memberRefExpr;
-        closeExistential(result);
+        closeExistential(result, locator);
         return result;
       }
       
@@ -950,7 +957,7 @@ namespace {
         Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
                                                               ref);
         cs.cacheType(result);
-        closeExistential(result, /*force=*/openedExistential);
+        closeExistential(result, locator, /*force=*/openedExistential);
         return result;
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
@@ -1288,7 +1295,7 @@ namespace {
                                                           isImplicit);
         cs.setType(subscriptExpr, resultTy);
         Expr *result = subscriptExpr;
-        closeExistential(result);
+        closeExistential(result, locator);
         return result;
       }
 
@@ -1327,7 +1334,7 @@ namespace {
         subscriptExpr->setIsSuper(isSuper);
 
         Expr *result = subscriptExpr;
-        closeExistential(result);
+        closeExistential(result, locator);
         return result;
       }
 
@@ -1349,7 +1356,7 @@ namespace {
       cs.setType(subscriptExpr, resultTy);
       subscriptExpr->setIsSuper(isSuper);
       Expr *result = subscriptExpr;
-      closeExistential(result);
+      closeExistential(result, locator);
       return result;
     }
 
@@ -6427,7 +6434,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     Expr *result = tc.substituteInputSugarTypeForResult(apply);
 
     // Try closing the existential, if there is one.
-    closeExistential(result);
+    closeExistential(result, locator);
 
     // If we have a covariant result type, perform the conversion now.
     if (covariantResultType) {
