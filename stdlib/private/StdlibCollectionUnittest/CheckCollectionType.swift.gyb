@@ -502,8 +502,7 @@ internal enum _SubSequenceSubscriptOnRangeMode {
     wrapValueIntoEquatable: @escaping (
       MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
 
-    extractValueFromEquatable: @escaping (
-      CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue,
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
