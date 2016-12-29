@@ -706,7 +706,17 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 extension Data : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     /// A human-readable description for the data.
     public var description: String {
-        return "\(self.count) bytes"
+        return reduce(String()) { (result, nextItem) -> String in
+            
+            let insertSpace = result.characters.count % 9 == 0
+            let hexString = String(format: "%02x", nextItem)
+            
+            if insertSpace {
+                return "\(result) \(hexString)"
+            } else {
+                return "\(result)\(hexString)"
+            }
+        }
     }
     
     /// A human-readable debug description for the data.
