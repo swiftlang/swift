@@ -2314,7 +2314,13 @@ AbstractTypeParamDecl::getConformingProtocols() const {
 
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
                                            SourceLoc nameLoc,
-                                           unsigned depth, unsigned index)
+                                           unsigned index)
+  : GenericTypeParamDecl(dc, name, nameLoc, kInvalidDepth, index) {}
+
+GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
+                                           SourceLoc nameLoc,
+                                           unsigned depth,
+                                           unsigned index)
   : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc),
     Depth(depth), Index(index)
 {

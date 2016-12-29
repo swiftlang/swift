@@ -2508,6 +2508,8 @@ public:
 /// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
 class GenericTypeParamDecl : public AbstractTypeParamDecl {
+  static const unsigned kInvalidDepth = 0xffff;
+
   unsigned Depth : 16;
   unsigned Index : 16;
 
@@ -2521,7 +2523,23 @@ public:
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
+                       unsigned index);
+
+  /// Construct a new generic type parameter.
+  ///
+  /// \param dc The DeclContext in which the generic type parameter's owner
+  /// occurs. This should later be overwritten with the actual declaration
+  /// context that owns the type parameter.
+  ///
+  /// \param name The name of the generic parameter.
+  /// \param nameLoc The location of the name.
+  GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
                        unsigned depth, unsigned index);
+
+  /// Returns true if the depth has already been set.
+  bool hasDepth() const {
+    return Depth != kInvalidDepth;
+  }
 
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
@@ -2533,12 +2551,20 @@ public:
   /// \endcode
   ///
   /// Here 'T' has depth 0 and 'U' has depth 1. Both have index 0.
-  unsigned getDepth() const { return Depth; }
+  unsigned getDepth() const {
+    assert(hasDepth() &&
+           "Depth has not been set yet");
+    return Depth;
+  }
 
   /// Set the depth of this generic type parameter.
   ///
   /// \sa getDepth
-  void setDepth(unsigned depth) { Depth = depth; }
+  void setDepth(unsigned depth) {
+    assert((Depth == kInvalidDepth || Depth == depth) &&
+           "Cannot change depth once set");
+    Depth = depth;
+  }
 
   /// The index of this generic type parameter within its generic parameter
   /// list.
