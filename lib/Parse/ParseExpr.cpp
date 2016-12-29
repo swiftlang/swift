@@ -576,7 +576,7 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     if (Tok.is(tok::r_paren))
       rParenLoc = consumeToken();
     else
-      rParenLoc = Tok.getLoc();
+      rParenLoc = PreviousLoc;
   } else {
     parseMatchingToken(tok::r_paren, rParenLoc,
                        diag::expr_keypath_expected_rparen, lParenLoc);
@@ -654,7 +654,7 @@ ParserResult<Expr> Parser::parseExprSelector() {
   if (subExpr.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
 
-  // Parse the closing ')'
+  // Parse the closing ')'.
   SourceLoc rParenLoc;
   if (subExpr.isParseError()) {
     skipUntilDeclStmtRBrace(tok::r_paren);
