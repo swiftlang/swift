@@ -271,10 +271,13 @@ public func XCTAssertEqual<T : Equatable>(_ expression1: @autoclosure () throws 
   }
 }
 
+// FIXME(ABI): once <rdar://problem/17144340> is implemented, this could be 
+// changed to take two T rather than two T? since Optional<Equatable>: Equatable
 public func XCTAssertEqual<T : Equatable>(_ expression1: @autoclosure () throws -> T?, _ expression2: @autoclosure () throws -> T?, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
     let assertionType = _XCTAssertionType.equal
 
     // evaluate each expression exactly once
+    // FIXME: remove optionality once this is generic over Equatable T
     var expressionValue1Optional: T?
     var expressionValue2Optional: T?
 
@@ -289,9 +292,13 @@ public func XCTAssertEqual<T : Equatable>(_ expression1: @autoclosure () throws 
             // TODO: @auto_string expression1
             // TODO: @auto_string expression2
 
-            let expressionValueStr1 = "\(expressionValue1Optional)"
-            let expressionValueStr2 = "\(expressionValue2Optional)"
+            // once this function is generic over T, it will only print these
+            // values as optional when they are...
+            let expressionValueStr1 = String(describing: expressionValue1Optional)
+            let expressionValueStr2 = String(describing: expressionValue2Optional)
 
+            // FIXME: this file seems to use `as NSString` unnecesarily a lot,
+            // unlesss I'm missing something.
             _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
         }
 
@@ -306,7 +313,8 @@ public func XCTAssertEqual<T : Equatable>(_ expression1: @autoclosure () throws 
     }
 }
 
-// FIXME: Due to <rdar://problem/16768059> we need overrides of XCTAssertEqual for:
+// FIXME(ABI): Due to <rdar://problem/17144340> we need overrides of 
+// XCTAssertEqual for:
 //  ContiguousArray<T>
 //  ArraySlice<T>
 //  Array<T>
@@ -520,8 +528,8 @@ public func XCTAssertNotEqual<T : Equatable>(_ expression1: @autoclosure () thro
             // TODO: @auto_string expression1
             // TODO: @auto_string expression2
 
-            let expressionValueStr1 = "\(expressionValue1Optional)"
-            let expressionValueStr2 = "\(expressionValue2Optional)"
+            let expressionValueStr1 = String(describing: expressionValue1Optional)
+            let expressionValueStr2 = String(describing: expressionValue2Optional)
 
             _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
         }
