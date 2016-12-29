@@ -558,8 +558,9 @@ func callStaticContains(
 }
 
 func callGenericContains<
-  S : Sequence where S.Iterator.Element : Equatable
->(_ sequence: S, _ element: S.Iterator.Element) -> Bool {
+  S : Sequence
+>(_ sequence: S, _ element: S.Iterator.Element) -> Bool
+where S.Iterator.Element : Equatable {
   return sequence.contains(element)
 }
 

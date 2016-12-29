@@ -288,15 +288,16 @@ public struct URLResourceValues {
     @available(OSX 10.10, *)
     public var quarantineProperties: [String : Any]? {
         get {
+            let value = _values[.quarantinePropertiesKey]
             // If a caller has caused us to stash NSNull in the dictionary (via set), make sure to return nil instead of NSNull
-            if let isNull = _values[.quarantinePropertiesKey] as? NSNull {
+            if value is NSNull {
                 return nil
             } else {
-                return _values[.quarantinePropertiesKey] as? [String : Any]
+                return value as? [String : Any]
             }
         }
         set {
-            if let v = newValue {
+            if newValue != nil {
                 _set(.quarantinePropertiesKey, newValue: newValue as NSObject?)
             } else {
                 // Set to NSNull, a special case for deleting quarantine properties
