@@ -298,13 +298,16 @@ extension UnsafeMutableBufferPointer {
   /// written (so `startIndex` if no elements written, `endIndex` if the buffer 
   /// was completely filled).
   ///
-  /// - Precondition: The memory in `self` is uninitialized. The buffer must
-  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
+  /// The region of memory described by the buffer must be sufficient to
+  /// accommodate `source.underestimatedCount`, and it must be uninitialized or
+  /// `ELement` must be a trivial type. After calling `initialize(from:)`, the
+  /// memory in buffer[startIndex..<initializedUpTo] is initialized.
   ///
-  /// - Postcondition: The `Pointee`s at `self[startIndex..<returned index]` are
-  ///   initialized.
-  public func initialize<S: Sequence>(from source: S) -> (S.Iterator, Index)
-    where S.Iterator.Element == Iterator.Element {
+  /// - Parameter source: A collection of elements of the buffer's `Element`
+  ///   type.
+  public func initialize<S: Sequence>(from source: S)
+  -> (unwritten: S.Iterator, initializedUpTo: Index)
+  where S.Iterator.Element == Iterator.Element {
     return source._copyContents(initializing: self)
   }
 }
