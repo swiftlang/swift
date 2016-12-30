@@ -77,6 +77,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
     single-source/RC4
+    single-source/ReversedCollections
     single-source/RGBHistogram
     single-source/RangeAssignment
     single-source/RecursiveOwnedParameter
