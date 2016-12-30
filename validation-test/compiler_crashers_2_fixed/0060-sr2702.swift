@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir
 // RUN: %target-swift-frontend %s -emit-ir -O
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 /// This function returns true if inspectedClass is subclass of wantedSuperclass.
