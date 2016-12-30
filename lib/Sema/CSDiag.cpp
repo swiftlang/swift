@@ -849,9 +849,8 @@ namespace {
         entityType = decl->getInterfaceType();
         auto *DC = decl->getInnermostDeclContext();
         if (auto *GFT = entityType->getAs<GenericFunctionType>()) {
-          auto *M = DC->getParentModule();
           auto subs = DC->getGenericEnvironmentOfContext()
-              ->getForwardingSubstitutions(M);
+              ->getForwardingSubstitutions();
           entityType = GFT->substGenericArgs(subs);
         } else {
           if (auto objType =
@@ -2546,7 +2545,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
 
   // Check if the expression is the matching operator ~=, most often used in
   // case statements. If so, try to provide a single dot fix-it
-  const Expr *contextualTypeNode;
+  const Expr *contextualTypeNode = nullptr;
   for (auto iterateCS = CS; iterateCS; iterateCS = iterateCS->baseCS) {
     contextualTypeNode = iterateCS->getContextualTypeNode();
   }
@@ -3235,7 +3234,8 @@ namespace {
       
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getInterfaceType()->hasError());
+          if (D->hasInterfaceType())
+            D->setInvalid(D->getInterfaceType()->hasError());
       
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
@@ -3279,7 +3279,8 @@ namespace {
 
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getInterfaceType()->hasError());
+          if (D->hasInterfaceType())
+            D->setInvalid(D->getInterfaceType()->hasError());
     }
   };
 } // end anonymous namespace
@@ -3845,20 +3846,25 @@ static bool tryIntegerCastFixIts(InFlightDiagnostic &diag,
 static bool
 addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem *CS,
                    Type fromType, Type toType, Expr *expr) {
+  // Look through optional types; casts can add them, but can't remove extra
+  // ones.
+  toType = toType->lookThroughAllAnyOptionalTypes();
+
   CheckedCastKind Kind =
-    CS->getTypeChecker().typeCheckCheckedCast(fromType, toType, CS->DC,
-                                              SourceLoc(), SourceRange(),
-                                              SourceRange(),
-                                              [](Type T) { return false; },
-                                              /*suppressDiagnostics*/ true);
+    CS->getTypeChecker().typeCheckCheckedCast(fromType, toType,
+                                              CheckedCastContextKind::None,
+                                              CS->DC,
+                                              SourceLoc(), nullptr,
+                                              SourceRange());
   if (Kind != CheckedCastKind::Unresolved) {
     SmallString<32> buffer;
     llvm::raw_svector_ostream OS(buffer);
     toType->print(OS);
+    bool canUseAs = Kind == CheckedCastKind::Coercion ||
+      Kind == CheckedCastKind::BridgingCast;
     diag.fixItInsert(Lexer::getLocForEndOfToken(CS->DC->getASTContext().SourceMgr,
                                                 expr->getEndLoc()),
-                     (llvm::Twine(Kind == CheckedCastKind::Coercion ? " as " :
-                                                                      " as! ") +
+                     (llvm::Twine(canUseAs ? " as " : " as! ") +
                       OS.str()).str());
     return true;
   }
@@ -7042,7 +7048,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           auto *generic =
               dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
-          if (hasArchetype(generic, Archetype)) {
+          if (generic && hasArchetype(generic, Archetype)) {
             FoundDecl = generic;
             FoundGenericTypeBase = ident;
             return false;

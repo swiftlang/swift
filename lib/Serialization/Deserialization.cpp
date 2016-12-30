@@ -14,6 +14,7 @@
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -2768,7 +2769,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
     auto fn = FuncDecl::createDeserialized(
         ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
-        /*FuncLoc=*/SourceLoc(), name, /*nameLoc=*/SourceLoc(),
+        /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
         /*AccessorKeywordLoc=*/SourceLoc(), genericParams,
         numParamPatterns, DC);
@@ -4005,7 +4006,7 @@ Type ModuleFile::getType(TypeID TID) {
       }
       
       bool ok = true;
-      sig->getSubstitutions(*getAssociatedModule(), mappings,
+      sig->getSubstitutions(mappings,
         [&](CanType depTy, Type replacementTy, ProtocolType *proto)
         -> ProtocolConformanceRef {
           if (replacementTy->is<SubstitutableType>()

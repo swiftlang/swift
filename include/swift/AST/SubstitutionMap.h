@@ -71,6 +71,26 @@ public:
   bool empty() const {
     return subMap.empty();
   }
+
+  /// Given that 'derivedDecl' is an override of 'baseDecl' in a subclass,
+  /// and 'derivedSubs' is a set of substitutions written in terms of the
+  /// generic signature of 'derivedDecl', produce a set of substitutions
+  /// written in terms of the generic signature of 'baseDecl'.
+  static SubstitutionMap
+  getOverrideSubstitutions(const ValueDecl *baseDecl,
+                           const ValueDecl *derivedDecl,
+                           Optional<SubstitutionMap> derivedSubs,
+                           LazyResolver *resolver);
+
+  /// Variant of the above for when we have the generic signatures but not
+  /// the decls for 'derived' and 'base'.
+  static SubstitutionMap
+  getOverrideSubstitutions(const ClassDecl *baseClass,
+                           const ClassDecl *derivedClass,
+                           GenericSignature *baseSig,
+                           GenericSignature *derivedSig,
+                           Optional<SubstitutionMap> derivedSubs,
+                           LazyResolver *resolver);
 };
 
 } // end namespace swift

@@ -387,7 +387,7 @@ static std::string getSpecializedName(SILFunction *F,
                                       IsFragile_t Fragile,
                                       IndicesSet &PromotableIndices) {
   Mangle::Mangler M;
-  auto P = SpecializationPass::CapturePromotion;
+  auto P = Demangle::SpecializationPass::CapturePromotion;
   FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
   NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
   CanSILFunctionType FTy = F->getLoweredFunctionType();
@@ -486,7 +486,7 @@ ClosureCloner::populateCloned() {
              && "promoting compound box not implemented");
       auto BoxedTy = BoxTy->getFieldType(Cloned->getModule(),0).getObjectType();
       SILValue MappedValue =
-          ClonedEntryBB->createArgument(BoxedTy, (*I)->getDecl());
+          ClonedEntryBB->createFunctionArgument(BoxedTy, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
       
       // Track the projections of the box.
@@ -497,8 +497,8 @@ ClosureCloner::populateCloned() {
       }
     } else {
       // Otherwise, create a new argument which copies the original argument
-      SILValue MappedValue =
-          ClonedEntryBB->createArgument((*I)->getType(), (*I)->getDecl());
+      SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
+          (*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;
@@ -717,7 +717,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
     auto argIndex = O->getOperandNumber()-1;
     auto convention =
       AI->getSubstCalleeType()->getSILArgumentConvention(argIndex);
-    if (isIndirectConvention(convention)) {
+    if (convention.isIndirectConvention()) {
       Mutations.push_back(AI);
       return true;
     }

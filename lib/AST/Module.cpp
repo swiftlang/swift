@@ -610,16 +610,18 @@ TypeBase::gatherAllSubstitutions(Module *module,
     llvm_unreachable("Not a nominal or bound generic type");
   }
 
+  auto *genericEnv = gpContext->getGenericEnvironmentOfContext();
+
   // Add forwarding substitutions from the outer context if we have
   // a type nested inside a generic function.
   auto *parentDC = gpContext;
   while (parentDC->isTypeContext())
     parentDC = parentDC->getParent();
-  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext()) {
-    for (auto gp : outerEnv->getGenericParams()) {
+  if (auto *outerSig = parentDC->getGenericSignatureOfContext()) {
+    for (auto gp : outerSig->getGenericParams()) {
       auto result = substitutions.insert(
                       {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
-                       outerEnv->mapTypeIntoContext(gp)});
+                       genericEnv->mapTypeIntoContext(gp)});
       assert(result.second);
     }
   }
@@ -647,7 +649,7 @@ TypeBase::gatherAllSubstitutions(Module *module,
       };
 
   SmallVector<Substitution, 4> result;
-  genericSig->getSubstitutions(*module, substitutions,
+  genericSig->getSubstitutions(substitutions,
                                lookupConformanceFn,
                                result);
 

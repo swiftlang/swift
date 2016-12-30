@@ -778,7 +778,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   struct AddressToDeallocate {
     SILType Type;
     const TypeInfo &TI;
-    Address Addr;
+    StackAddress Addr;
   };
   SmallVector<AddressToDeallocate, 4> addressesToDeallocate;
 
@@ -958,14 +958,14 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         // The +1 argument is passed indirectly, so we need to copy into a
         // temporary.
         needsAllocas = true;
-        auto caddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
-        fieldTI.initializeWithCopy(subIGF, caddr.getAddress(), fieldAddr,
-                                   fieldTy);
-        param.add(caddr.getAddressPointer());
+        auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, false, "arg.temp");
+        auto addressPointer = stackAddr.getAddress().getAddress();
+        fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr, fieldTy);
+        param.add(addressPointer);
         
         // Remember to deallocate later.
         addressesToDeallocate.push_back(
-                  AddressToDeallocate{fieldTy, fieldTI, caddr.getContainer()});
+            AddressToDeallocate{fieldTy, fieldTI, stackAddr});
 
         break;
       }

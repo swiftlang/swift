@@ -622,6 +622,7 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
   // Args should be a list of pairs, the first number is a TypeID, the
   // second number is a ValueID.
   SILBasicBlock *CurrentBB = getBBForDefinition(Fn, Prev, BasicBlockID++);
+  bool IsEntry = CurrentBB->isEntry();
   for (unsigned I = 0, E = Args.size(); I < E; I += 3) {
     TypeID TyID = Args[I];
     if (!TyID) return nullptr;
@@ -629,8 +630,13 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     if (!ValId) return nullptr;
 
     auto ArgTy = MF->getType(TyID);
-    auto Arg = CurrentBB->createArgument(
-        getSILType(ArgTy, (SILValueCategory)Args[I + 1]));
+    SILArgument *Arg;
+    SILType SILArgTy = getSILType(ArgTy, (SILValueCategory)Args[I + 1]);
+    if (IsEntry) {
+      Arg = CurrentBB->createFunctionArgument(SILArgTy);
+    } else {
+      Arg = CurrentBB->createPHIArgument(SILArgTy);
+    }
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);
   }

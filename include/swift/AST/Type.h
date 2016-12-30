@@ -71,11 +71,11 @@ struct QueryTypeSubstitutionMap {
 };
 
 /// Function used to resolve conformances.
-using LookupConformanceFn
-  = llvm::function_ref<auto(CanType dependentType,
-                            Type conformingReplacementType,
-                            ProtocolType *conformedProtocol)
-                       -> Optional<ProtocolConformanceRef>>;
+using GenericFunction = auto(CanType dependentType,
+  Type conformingReplacementType,
+  ProtocolType *conformedProtocol)
+  ->Optional<ProtocolConformanceRef>;
+using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
 /// conformance through a module.

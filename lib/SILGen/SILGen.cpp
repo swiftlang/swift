@@ -1290,8 +1290,8 @@ public:
       PrologueLoc.markAsPrologue();
       auto entry = sgm.TopLevelSGF->B.getInsertionBB();
       auto FnTy = sgm.TopLevelSGF->F.getLoweredFunctionType();
-      entry->createArgument(FnTy->getParameters()[0].getSILType());
-      entry->createArgument(FnTy->getParameters()[1].getSILType());
+      entry->createFunctionArgument(FnTy->getParameters()[0].getSILType());
+      entry->createFunctionArgument(FnTy->getParameters()[1].getSILType());
 
       scope.emplace(sgm.TopLevelSGF->Cleanups,
                     CleanupLocation::getModuleCleanupLocation());
@@ -1346,7 +1346,7 @@ public:
         auto returnBB = gen.createBasicBlock();
         if (gen.B.hasValidInsertionPoint())
           gen.B.createBranch(returnLoc, returnBB, returnValue);
-        returnValue = returnBB->createArgument(returnType);
+        returnValue = returnBB->createPHIArgument(returnType);
         gen.B.emitBlock(returnBB);
 
         // Emit the rethrow block.
@@ -1394,8 +1394,8 @@ public:
       SILGenFunction gen(sgm, *toplevel);
       auto entry = gen.B.getInsertionBB();
       auto FnTy = gen.F.getLoweredFunctionType();
-      entry->createArgument(FnTy->getParameters()[0].getSILType());
-      entry->createArgument(FnTy->getParameters()[1].getSILType());
+      entry->createFunctionArgument(FnTy->getParameters()[0].getSILType());
+      entry->createFunctionArgument(FnTy->getParameters()[1].getSILType());
       gen.emitArtificialTopLevel(mainClass);
     }
   }

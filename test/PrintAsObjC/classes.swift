@@ -119,6 +119,8 @@ class DiscardableResult : NSObject {
 // CHECK-NEXT: - (nonnull instancetype)initWithFloat:(float)f;
 // CHECK-NEXT: - (nonnull instancetype)initWithString:(NSString * _Nonnull)s boolean:(BOOL)b;
 // CHECK-NEXT: - (nullable instancetype)initWithBoolean:(BOOL)b;
+// CHECK-NEXT: - (nonnull instancetype)foo_initWithInt:(NSInteger)_ SWIFT_METHOD_FAMILY(init);
+// CHECK-NEXT: - (nonnull instancetype)initializeWithX:(NSInteger)_ SWIFT_METHOD_FAMILY(init);
 // CHECK-NEXT: - (nonnull instancetype)initForFun OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithMoreFun OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun OBJC_DESIGNATED_INITIALIZER;
@@ -132,6 +134,9 @@ class DiscardableResult : NSObject {
   convenience init(string s: String, boolean b: ObjCBool) { self.init() }
 
   convenience init?(boolean b: ObjCBool) { self.init() }
+
+  @objc(foo_initWithInt:) convenience init(foo_int _: Int) { self.init() }
+  @objc(initializeWithX:) convenience init(X _: Int) { self.init() }
 
   init(forFun: ()) { }
 
@@ -209,6 +214,7 @@ class NotObjC {}
 // CHECK-NEXT: - (Methods * _Nullable __unsafe_unretained)unmanaged:(id _Nonnull __unsafe_unretained)_ SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)initAllTheThings SWIFT_METHOD_FAMILY(none);
 // CHECK-NEXT: - (void)initTheOtherThings SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: - (void)initializeEvenMoreThings;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -267,6 +273,7 @@ class NotObjC {}
 
   func initAllTheThings() {}
   @objc(initTheOtherThings) func setUpOtherThings() {}
+  func initializeEvenMoreThings() {}
 }
 
 typealias AliasForNSRect = NSRect

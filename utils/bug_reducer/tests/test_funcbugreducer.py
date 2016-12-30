@@ -54,7 +54,8 @@ class FuncBugReducerTestCase(unittest.TestCase):
 
     def _get_test_file_path(self, module_name):
         return os.path.join(self.file_dir,
-                            '{}_{}.swift'.format(self.root_basename, module_name))
+                            '{}_{}.swift'.format(
+                                self.root_basename, module_name))
 
     def _get_sib_file_path(self, filename):
         (root, ext) = os.path.splitext(filename)
@@ -87,7 +88,8 @@ class FuncBugReducerTestCase(unittest.TestCase):
             '--module-cache=%s' % self.module_cache,
             '--module-name=%s' % name,
             '--work-dir=%s' % self.tmp_dir,
-            '--extra-silopt-arg=-bug-reducer-tester-target-func=__TF_test_target'
+            ('--extra-silopt-arg='
+             '-bug-reducer-tester-target-func=__TF_test_target')
         ]
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")

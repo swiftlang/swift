@@ -13,17 +13,22 @@ class Automorphism : Automorphism { } // expected-error{{circular class inherita
 // FIXME: Useless error
 let _ = A() // expected-error{{'A' cannot be constructed because it has no accessible initializers}}
 
-// This should probably be made to work, but for now test that it produces a crappy
-// diagnostic instead of crashing
-
 class Left : Right.Hand {
   class Hand {}
 }
 
-class Right : Left.Hand { // expected-error {{class 'Hand' is not a member type of 'Left'}}
+class Right : Left.Hand {
   class Hand {}
 }
 
 class Outer {
   class Inner : Outer {}
+}
+
+class Outer2 : Outer2.Inner {
+  class Inner {}
+}
+
+class Outer3 : Outer3.Inner<Int> {
+  class Inner<T> {}
 }

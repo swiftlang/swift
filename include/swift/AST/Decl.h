@@ -22,7 +22,6 @@
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/LazyResolver.h"
@@ -37,7 +36,6 @@
 namespace swift {
   enum class AccessSemantics : unsigned char;
   class ApplyExpr;
-  class ArchetypeBuilder;
   class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
@@ -217,7 +215,7 @@ bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
 class alignas(1 << DeclAlignInBits) Decl {
   class DeclBitfields {
     friend class Decl;
-    unsigned Kind : 8;
+    unsigned Kind : 6;
 
     /// \brief Whether this declaration is invalid.
     unsigned Invalid : 1;
@@ -235,10 +233,10 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// FIXME: This is ugly.
     unsigned EarlyAttrValidation : 1;
     
-    /// \brief Whether or not this declaration is currently being type-checked.
-    unsigned BeingTypeChecked : 1;
+    /// \brief Whether this declaration is currently being validated.
+    unsigned BeingValidated : 1;
   };
-  enum { NumDeclBits = 13 };
+  enum { NumDeclBits = 11 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
   
   class PatternBindingDeclBitfields {
@@ -634,7 +632,7 @@ protected:
     DeclBits.Implicit = false;
     DeclBits.FromClang = false;
     DeclBits.EarlyAttrValidation = false;
-    DeclBits.BeingTypeChecked = false;
+    DeclBits.BeingValidated = false;
   }
 
   ClangNode getClangNodeImpl() const {
@@ -780,12 +778,16 @@ public:
     DeclBits.EarlyAttrValidation = validated;
   }
   
-  /// Whether the declaration is currently being validated.
-  bool isBeingTypeChecked();
-  
+  /// Whether the declaration has a valid interface type and
+  /// generic signature.
+  bool isBeingValidated() const {
+    return DeclBits.BeingValidated;
+  }
+
   /// Toggle whether or not the declaration is being validated.
-  void setIsBeingTypeChecked(bool ibt = true) {
-    DeclBits.BeingTypeChecked = ibt;
+  void setIsBeingValidated(bool ibv = true) {
+    assert(DeclBits.BeingValidated != ibv);
+    DeclBits.BeingValidated = ibv;
   }
 
   /// \returns the unparsed comment attached to this declaration.
@@ -1495,28 +1497,10 @@ public:
   }
 
   /// Retrieve the generic signature for this type.
-  GenericSignature *getGenericSignature() const {
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv->getGenericSignature();
-
-    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return genericSig;
-
-    return nullptr;
-  }
+  GenericSignature *getGenericSignature() const;
 
   /// Retrieve the generic context for this type.
-  GenericEnvironment *getGenericEnvironment() const {
-    // Fast case: we already have a generic environment.
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv;
-
-    // If we only have a generic signature, build the generic environment.
-    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return getLazyGenericEnvironmentSlow();
-
-    return nullptr;
-  }
+  GenericEnvironment *getGenericEnvironment() const;
 
   /// Set a lazy generic environment.
   void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
@@ -1524,15 +1508,7 @@ public:
                                  uint64_t genericEnvData);
 
   /// Set the generic context of this extension.
-  void setGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert((GenericSigOrEnv.isNull() ||
-            getGenericSignature()->getCanonicalSignature() ==
-              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-           "set a generic environment with a different generic signature");
-    this->GenericSigOrEnv = genericEnv;
-    if (genericEnv)
-      genericEnv->setOwningDeclContext(this);
-  }
+  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   /// Retrieve the type being extended.
   Type getExtendedType() const { return ExtendedType.getType(); }
@@ -1550,7 +1526,7 @@ public:
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
-  /// Whether we already validated this extension.
+  /// Whether we started validating this extension.
   bool validated() const {
     return ExtensionDeclBits.Validated;
   }
@@ -1558,6 +1534,11 @@ public:
   /// Set whether we have validated this extension.
   void setValidated(bool validated = true) {
     ExtensionDeclBits.Validated = validated;
+  }
+
+  /// Whether we have fully checked the extension.
+  bool hasValidSignature() const {
+    return validated() && !isBeingValidated();
   }
 
   /// Whether we already type-checked the inheritance clause.
@@ -2139,7 +2120,11 @@ public:
 
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
-  
+
+  bool hasValidSignature() const {
+    return hasInterfaceType() && !isBeingValidated();
+  }
+
   /// isSettable - Determine whether references to this decl may appear
   /// on the left-hand side of an assignment or as the operand of a
   /// `&` or 'inout' operator.
@@ -2285,11 +2270,6 @@ class GenericTypeDecl : public TypeDecl, public DeclContext {
   mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
     GenericSigOrEnv;
 
-  /// \brief Whether or not the generic signature of the type declaration is
-  /// currently being validated.
-  // TODO: Merge into GenericSig bits.
-  unsigned ValidatingGenericSignature = false;
-
   /// Lazily populate the generic environment.
   GenericEnvironment *getLazyGenericEnvironmentSlow() const;
 
@@ -2322,36 +2302,10 @@ public:
   }
 
   /// Retrieve the generic signature for this type.
-  GenericSignature *getGenericSignature() const {
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv->getGenericSignature();
-
-    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return genericSig;
-
-    return nullptr;
-  }
+  GenericSignature *getGenericSignature() const;
 
   /// Retrieve the generic context for this type.
-  GenericEnvironment *getGenericEnvironment() const {
-    // Fast case: we already have a generic environment.
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv;
-
-    // If we only have a generic signature, build the generic environment.
-    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return getLazyGenericEnvironmentSlow();
-
-    return nullptr;
-  }
-
-  void setIsValidatingGenericSignature(bool validating=true) {
-    ValidatingGenericSignature = validating;
-  }
-  
-  bool isValidatingGenericSignature() const {
-    return ValidatingGenericSignature;
-  }
+  GenericEnvironment *getGenericEnvironment() const;
 
   /// Set a lazy generic environment.
   void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
@@ -2359,16 +2313,7 @@ public:
                                  uint64_t genericEnvData);
 
   /// Set the generic context of this function.
-  void setGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert((GenericSigOrEnv.isNull() ||
-            getGenericSignature()->getCanonicalSignature() ==
-              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-           "set a generic environment with a different generic signature");
-    this->GenericSigOrEnv = genericEnv;
-
-    if (genericEnv)
-      genericEnv->setOwningDeclContext(this);
-  }
+  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   // Resolve ambiguity due to multiple base classes.
   using TypeDecl::getASTContext;
@@ -4642,28 +4587,10 @@ public:
   bool isTransparent() const;
 
   /// Retrieve the generic signature for this function.
-  GenericSignature *getGenericSignature() const {
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv->getGenericSignature();
-
-    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return genericSig;
-
-    return nullptr;
-  }
+  GenericSignature *getGenericSignature() const;
 
   /// Retrieve the generic context for this function.
-  GenericEnvironment *getGenericEnvironment() const {
-    // Fast case: we already have a generic environment.
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv;
-
-    // If we only have a generic signature, build the generic environment.
-    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return getLazyGenericEnvironmentSlow();
-
-    return nullptr;
-  }
+  GenericEnvironment *getGenericEnvironment() const;
 
   /// Set a lazy generic environment.
   void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
@@ -4671,16 +4598,7 @@ public:
                                  uint64_t genericEnvData);
 
   /// Set the generic context of this function.
-  void setGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert((GenericSigOrEnv.isNull() ||
-            getGenericSignature()->getCanonicalSignature() ==
-              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-           "set a generic environment with a different generic signature");
-    this->GenericSigOrEnv = genericEnv;
-
-    if (genericEnv)
-      genericEnv->setOwningDeclContext(this);
-  }
+  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   // Expose our import as member status
   bool isImportAsMember() const { return IAMStatus.isImportAsMember(); }

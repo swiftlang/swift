@@ -70,7 +70,7 @@ class Foo {
   // Call from Swift entrypoint with exploded Rect to @objc entrypoint
   // with unexploded ABI-coerced type.
   // x86_64-macosx: define hidden float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(%VSC6MyRect* noalias nocapture dereferenceable({{.*}}), [[SELF:%.*]]*) {{.*}} {
-  // x86_64-macosx: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
+  // x86_64-macosx: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 8
   // x86_64-macosx: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(getXFromRect:)", align 8
   // x86_64-macosx: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to { <2 x float>, <2 x float> }*
   // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 0
@@ -527,18 +527,33 @@ class Foo {
 
 // rdar://17631440 - Expand direct arguments that are coerced to aggregates.
 // x86_64-macosx: define{{( protected)?}} float @_TF8abitypes13testInlineAggFVSC6MyRectSf(%VSC6MyRect* noalias nocapture dereferenceable({{.*}})) {{.*}} {
-// x86_64-macosx: [[COERCED:%.*]] = alloca %VSC6MyRect, align 4
+// x86_64-macosx: [[COERCED:%.*]] = alloca %VSC6MyRect, align 8
 // x86_64-macosx: store float %
 // x86_64-macosx: store float %
 // x86_64-macosx: store float %
 // x86_64-macosx: store float %
 // x86_64-macosx: [[CAST:%.*]] = bitcast %VSC6MyRect* [[COERCED]] to { <2 x float>, <2 x float> }*
 // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 0
-// x86_64-macosx: [[FIRST_HALF:%.*]] = load <2 x float>, <2 x float>* [[T0]], align 4
+// x86_64-macosx: [[FIRST_HALF:%.*]] = load <2 x float>, <2 x float>* [[T0]], align 8
 // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 1
-// x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>, <2 x float>* [[T0]], align 4
+// x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>, <2 x float>* [[T0]], align 8
 // x86_64-macosx: [[RESULT:%.*]] = call float @MyRect_Area(<2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
 // x86_64-macosx: ret float [[RESULT]]
 public func testInlineAgg(_ rect: MyRect) -> Float {
   return MyRect_Area(rect)
+}
+
+// We need to allocate enough memory on the stack to hold the argument value we load.
+// arm64-ios: define void @_TF8abitypes14testBOOLStructFT_T_()
+// arm64-ios:  [[COERCED:%.*]] = alloca i64
+// arm64-ios:  [[STRUCTPTR:%.*]] = bitcast i64* [[COERCED]] to %VSC14FiveByteStruct
+// arm64-ios:  [[PTR0:%.*]] = getelementptr inbounds %VSC14FiveByteStruct, %VSC14FiveByteStruct* [[STRUCTPTR]], {{i.*}} 0, {{i.*}} 0
+// arm64-ios:  [[PTR1:%.*]] = getelementptr inbounds %V10ObjectiveC8ObjCBool, %V10ObjectiveC8ObjCBool* [[PTR0]], {{i.*}} 0, {{i.*}} 0
+// arm64-ios:  [[PTR2:%.*]] = getelementptr inbounds %Sb, %Sb* [[PTR1]], {{i.*}} 0, {{i.*}} 0
+// arm64-ios:  store i1 false, i1* [[PTR2]], align 8
+// arm64-ios:  [[ARG:%.*]] = load i64, i64* [[COERCED]]
+// arm64-ios:  call void bitcast (void ()* @objc_msgSend to void (i8*, i8*, i64)*)(i8* {{.*}}, i8* {{.*}}, i64 [[ARG]])
+public func testBOOLStruct() {
+  let s = FiveByteStruct()
+  MyClass.mymethod(s)
 }

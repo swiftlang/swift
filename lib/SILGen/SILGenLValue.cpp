@@ -957,7 +957,7 @@ namespace {
         auto rawPointerTy = SILType::getRawPointerType(ctx);
 
         // The callback is a BB argument from the switch_enum.
-        SILValue callback = writebackBB->createArgument(rawPointerTy);
+        SILValue callback = writebackBB->createPHIArgument(rawPointerTy);
 
         // Cast the callback to the correct polymorphic function type.
         auto origCallbackFnType = gen.SGM.Types.getMaterializeForSetCallbackType(
@@ -1580,9 +1580,8 @@ ArrayRef<Substitution>
 SILGenModule::getNonMemberVarDeclSubstitutions(VarDecl *var) {
   ArrayRef<Substitution> substitutions;
   auto *dc = var->getDeclContext();
-  if (auto *genericEnv = dc->getGenericEnvironmentOfContext()) {
-    substitutions = genericEnv->getForwardingSubstitutions(SwiftModule);
-  }
+  if (auto *genericEnv = dc->getGenericEnvironmentOfContext())
+    substitutions = genericEnv->getForwardingSubstitutions();
   return substitutions;
 }
 
@@ -2206,7 +2205,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
 
   // NSString * must be bridged to String.
   if (storageType.getSwiftRValueType() == gen.SGM.Types.getNSStringType()) {
-    auto nsstr = gen.B.createLoadBorrow(loc, src);
+    auto nsstr = gen.B.createLoad(loc, src, LoadOwnershipQualifier::Copy);
     auto str = gen.emitBridgedToNativeValue(loc,
                                 ManagedValue::forUnmanaged(nsstr),
                                 SILFunctionTypeRepresentation::CFunctionPointer,

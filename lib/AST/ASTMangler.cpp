@@ -454,7 +454,7 @@ void ASTMangler::appendType(Type type) {
       TypeAliasDecl *decl = NameAliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
         // It's not possible to mangle the context of the builtin module.
-        return appendType(decl->getDeclaredInterfaceType());
+        return appendType(NameAliasTy->getSinglyDesugaredType());
       }
 
       // For the DWARF output we want to mangle the type alias + context,
@@ -586,8 +586,8 @@ void ASTMangler::appendType(Type type) {
 
       // Find the archetype information.
       const DeclContext *DC = DeclCtx;
-      auto GTPT = ArchetypeBuilder::mapTypeOutOfContext(DC, archetype)
-                    ->castTo<GenericTypeParamType>();
+      auto GTPT = DC->mapTypeOutOfContext(archetype)
+          ->castTo<GenericTypeParamType>();
 
       if (DWARFMangling) {
         Buffer << 'q' << Index(GTPT->getIndex());
@@ -1390,7 +1390,7 @@ void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
   if (!Ty)
     Ty = ErrorType::get(localContext->getASTContext());
 
-  Ty = ArchetypeBuilder::mapTypeOutOfContext(parentContext, Ty);
+  Ty = parentContext->mapTypeOutOfContext(Ty);
   appendType(Ty->getCanonicalType());
   appendOperator(isImplicit ? "fu" : "fU", Index(discriminator));
 }
@@ -1676,7 +1676,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   appendDeclName(decl);
 
   ArrayRef<GenericTypeParamType *> genericParams;
-  unsigned initialParamDepth;
+  unsigned initialParamDepth = 0;
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();

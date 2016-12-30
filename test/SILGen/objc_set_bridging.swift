@@ -44,7 +44,7 @@ import gizmo
   var property: Set<Foo> = Set()
 
   // Property getter
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC17objc_set_bridging3Foog8property{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSSet
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_set_bridging3Foog8property{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSSet
   // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
   // CHECK:   [[SELF_COPY]] = copy_value [[SELF]] : $Foo
   // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foog8property{{.*}} : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
@@ -57,7 +57,7 @@ import gizmo
   // CHECK: } // end sil function '_TToFC17objc_set_bridging3Foog8property{{.*}}'
   
   // Property setter
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC17objc_set_bridging3Foos8property{{.*}} : $@convention(objc_method) (NSSet, Foo) -> () {
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_set_bridging3Foos8property{{.*}} : $@convention(objc_method) (NSSet, Foo) -> () {
   // CHECK: bb0([[NSSET:%[0-9]+]] : $NSSet, [[SELF:%[0-9]+]] : $Foo):
   // CHECK:   [[NSSET_COPY:%.*]] = copy_value [[NSSET]] : $NSSet
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
@@ -70,8 +70,8 @@ import gizmo
   // CHECK:   destroy_value [[SELF_COPY]] : $Foo
   // CHECK:   return [[RESULT]] : $()
   
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC17objc_set_bridging3Foog19nonVerbatimProperty{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSSet
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC17objc_set_bridging3Foos19nonVerbatimProperty{{.*}} : $@convention(objc_method) (NSSet, Foo) -> () {
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_set_bridging3Foog19nonVerbatimProperty{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSSet
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_set_bridging3Foos19nonVerbatimProperty{{.*}} : $@convention(objc_method) (NSSet, Foo) -> () {
   @objc var nonVerbatimProperty: Set<String> = Set()
 }
 

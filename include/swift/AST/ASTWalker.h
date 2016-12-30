@@ -27,6 +27,16 @@ class TypeRepr;
 struct TypeLoc;
 class ParameterList;
 
+enum class SemaReferenceKind : uint8_t {
+  ModuleRef = 0,
+  DeclRef,
+  DeclMemberRef,
+  DeclConstructorRef,
+  TypeRef,
+  EnumElementRef,
+  SubscriptRef,
+};
+
 /// \brief An abstract class used to traverse an AST.
 class ASTWalker {
 public:
@@ -188,18 +198,18 @@ public:
   /// the subtree is skipped.
   ///
   virtual bool walkToParameterListPre(ParameterList *PL) { return true; }
-  
+
   /// walkToParameterListPost - This method is called after visiting the
   /// children of a parameter list.  If it returns false, the remaining
   /// traversal is terminated and returns failure.
   virtual bool walkToParameterListPost(ParameterList *PL) { return true; }
- 
-  
+
+
 protected:
   ASTWalker() = default;
   ASTWalker(const ASTWalker &) = default;
   virtual ~ASTWalker() = default;
-  
+
   virtual void anchor();
 };
 

@@ -217,7 +217,7 @@ public protocol _ExpressibleByBuiltinIntegerLiteral {
 /// To add `ExpressibleByIntegerLiteral` conformance to your custom type,
 /// implement the required initializer.
 public protocol ExpressibleByIntegerLiteral {
-  /// A type that can represent an integer literal.
+  /// A type that represents an integer literal.
   ///
   /// The standard library integer and floating-point types are all valid types
   /// for `IntegerLiteralType`.
@@ -260,7 +260,7 @@ public protocol _ExpressibleByBuiltinFloatLiteral {
 /// To add `ExpressibleByFloatLiteral` conformance to your custom type,
 /// implement the required initializer.
 public protocol ExpressibleByFloatLiteral {
-  /// A type that can represent a floating-point literal.
+  /// A type that represents a floating-point literal.
   ///
   /// Valid types for `FloatLiteralType` are `Float`, `Double`, and `Float80`
   /// where available.
@@ -295,7 +295,7 @@ public protocol _ExpressibleByBuiltinBooleanLiteral {
 /// implement the `init(booleanLiteral:)` initializer that creates an instance
 /// of your type with the given Boolean value.
 public protocol ExpressibleByBooleanLiteral {
-  /// A type that can represent a Boolean literal, such as `Bool`.
+  /// A type that represents a Boolean literal, such as `Bool`.
   associatedtype BooleanLiteralType : _ExpressibleByBuiltinBooleanLiteral
 
   /// Creates an instance initialized to the given Boolean value.
@@ -335,7 +335,7 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 /// To add `ExpressibleByUnicodeScalarLiteral` conformance to your custom type,
 /// implement the required initializer.
 public protocol ExpressibleByUnicodeScalarLiteral {
-  /// A type that can represent a Unicode scalar literal.
+  /// A type that represents a Unicode scalar literal.
   ///
   /// Valid types for `UnicodeScalarLiteralType` are `UnicodeScalar`,
   /// `String`, and `StaticString`.
@@ -382,7 +382,7 @@ public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
 public protocol ExpressibleByExtendedGraphemeClusterLiteral
   : ExpressibleByUnicodeScalarLiteral {
 
-  /// A type that can represent an extended grapheme cluster literal.
+  /// A type that represents an extended grapheme cluster literal.
   ///
   /// Valid types for `ExtendedGraphemeClusterLiteralType` are `Character`,
   /// `String`, and `StaticString`.
@@ -430,7 +430,7 @@ public protocol ExpressibleByStringLiteral
   // FIXME: when we have default function implementations in protocols, provide
   // an implementation of init(extendedGraphemeClusterLiteral:).
   
-  /// A type that can represent a string literal.
+  /// A type that represents a string literal.
   ///
   /// Valid types for `StringLiteralType` are `String` and `StaticString`.
   associatedtype StringLiteralType : _ExpressibleByBuiltinStringLiteral

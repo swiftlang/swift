@@ -406,10 +406,8 @@ enum ScoreKind {
   SK_ScalarPointerConversion,
   /// A conversion from an array to a pointer of matching element type.
   SK_ArrayPointerConversion,
-  /// A conversion to an empty existential type ('Any' or '{}').
-  SK_EmptyExistentialConversion,
   
-  SK_LastScoreKind = SK_EmptyExistentialConversion,
+  SK_LastScoreKind = SK_ArrayPointerConversion,
 };
 
 /// The number of score kinds.
@@ -568,6 +566,9 @@ public:
   /// on a suspicious top-level optional injection (because the caller already
   /// diagnosed it).
   ///
+  /// \param skipClosures Whether to skip bodies of non-single expression
+  /// closures.
+  ///
   /// \param typeFromPattern Optionally, the caller can specify the pattern
   /// from where the toType is derived, so that we can deliver better fixit.
   ///
@@ -575,6 +576,7 @@ public:
   Expr *coerceToType(Expr *expr, Type toType,
                      ConstraintLocator *locator,
                      bool ignoreTopLevelInjection = false,
+                     bool skipClosures = false,
                      Optional<Pattern*> typeFromPattern = None) const;
 
   /// \brief Convert the given expression to a logic value.
@@ -1582,6 +1584,11 @@ public:
     }
   }
 
+  /// Add an explicit conversion constraint (e.g., \c 'x as T').
+  void addExplicitConversionConstraint(Type fromType, Type toType,
+                                       bool allowFixes,
+                                       ConstraintLocatorBuilder locator);
+
   /// \brief Add a disjunction constraint.
   void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
                                 ConstraintLocatorBuilder locator,
@@ -1751,15 +1758,17 @@ public:
   /// viable solution.
   void setMustBeMaterializableRecursive(Type type);
   
-  /// \brief Determine if the type in question is an Array<T>.
-  bool isArrayType(Type t);
+  /// Determine if the type in question is an Array<T> and, if so, provide the
+  /// element type of the array.
+  static Optional<Type> isArrayType(Type type);
 
   /// Determine whether the given type is a dictionary and, if so, provide the
   /// key and value types for the dictionary.
-  Optional<std::pair<Type, Type>> isDictionaryType(Type type);
+  static Optional<std::pair<Type, Type>> isDictionaryType(Type type);
 
-  /// \brief Determine if the type in question is a Set<T>.
-  bool isSetType(Type t);
+  /// Determine if the type in question is a Set<T> and, if so, provide the
+  /// element type of the set.
+  static Optional<Type> isSetType(Type t);
 
   /// \brief Determine if the type in question is AnyHashable.
   bool isAnyHashableType(Type t);
@@ -2166,6 +2175,12 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
+  /// \brief Attempt to simplify the BridgingConversion constraint.
+  SolutionKind simplifyBridgingConstraint(Type type1,
+                                         Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
   /// \brief Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
                                       Type type1,
@@ -2328,7 +2343,7 @@ private:
 public:
   /// Increase the score of the given kind for the current (partial) solution
   /// along the.
-  void increaseScore(ScoreKind kind);
+  void increaseScore(ScoreKind kind, unsigned value = 1);
 
   /// Determine whether this solution is guaranteed to be worse than the best
   /// solution found so far.
@@ -2367,16 +2382,6 @@ public:
   /// expression, producing a fully type-checked expression.
   Expr *applySolutionShallow(const Solution &solution, Expr *expr,
                              bool suppressDiagnostics);
-  
-  /// Extract the base type from an array or slice type.
-  /// \param type The array type to inspect.
-  /// \returns the base type of the array.
-  Type getBaseTypeForArrayType(TypeBase *type);
-
-  /// Extract the base type from a set type.
-  /// \param type The set type to inspect.
-  /// \returns the base type of the set.
-  Type getBaseTypeForSetType(TypeBase *type);
   
   /// \brief Set whether or not the expression being solved is too complex and
   /// has exceeded the solver's memory threshold.

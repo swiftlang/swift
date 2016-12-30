@@ -749,16 +749,32 @@ WARNING(isa_is_foreign_check,none,
 WARNING(conditional_downcast_coercion,none,
       "conditional cast from %0 to %1 always succeeds",
       (Type, Type))
+
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
 
 WARNING(forced_downcast_coercion,none,
       "forced cast from %0 to %1 always succeeds; did you mean to use 'as'?",
       (Type, Type))
-ERROR(downcast_same_type,none,
-      "downcast from %0 to %1 only unwraps optionals; did you mean to use "
-      "'%2'?",
-      (Type, Type, StringRef))
+
+// Note: the Boolean at the end indicates whether bridging is required after
+// the cast.
+WARNING(downcast_same_type,none,
+        "forced cast from %0 to %1 %select{only unwraps optionals|only unwraps "
+        "and bridges}3; did you mean to use '%2'%select{| with 'as'}3?",
+        (Type, Type, StringRef, bool))
+
+// The unsigned value can be 0 (types are equal), 1 (types implicitly convert),
+// or 2 (types bridge).
+WARNING(conditional_downcast_same_type,none,
+        "conditional downcast from %0 to %1 %select{does nothing|"
+        "is equivalent to an implicit conversion to an optional %1|is a "
+        "bridging conversion; did you mean to use 'as'?}2",
+        (Type, Type, unsigned))
+WARNING(is_expr_same_type,none,
+        "checking a value with optional type %0 against dynamic type %1 "
+        "succeeds whenever the value is non-'nil'; did you mean to use "
+        "'!= nil'?", (Type, Type))
 WARNING(downcast_to_unrelated,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
 ERROR(downcast_to_more_optional,none,
@@ -1173,8 +1189,6 @@ ERROR(unsupported_nested_protocol,none,
       (Identifier))
 
 // Type aliases
-ERROR(circular_type_alias,none,
-      "type alias %0 circularly references itself", (Identifier))
 ERROR(type_alias_underlying_type_access,none,
       "type alias %select{must be declared %select{"
       "%select{private|fileprivate|internal|PUBLIC}2|private or fileprivate}3"
@@ -1548,7 +1562,7 @@ ERROR(requires_superclass_conflict,none,
       "generic parameter %0 cannot be a subclass of both %1 and %2",
       (Identifier, Type, Type))
 ERROR(recursive_type_reference,none,
-      "type %0 references itself", (Identifier))
+      "%0 %1 references itself", (DescriptiveDeclKind, Identifier))
 ERROR(recursive_requirement_reference,none,
       "type may not reference itself as a requirement",())
 ERROR(recursive_same_type_constraint,none,
@@ -1791,7 +1805,7 @@ ERROR(raw_type_not_literal_convertible,none,
       "raw type %0 is not expressible by any literal",
       (Type))
 ERROR(enum_raw_type_not_equatable,none,
-      "RawRepresentable 'init' cannot be synthesized because raw type %0 is not "
+      "RawRepresentable conformance cannot be synthesized because raw type %0 is not "
       "Equatable", (Type))
 ERROR(enum_raw_type_nonconforming_and_nonsynthable,none,
       "%0 declares raw type %1, but does not conform to RawRepresentable "
@@ -2650,6 +2664,10 @@ NOTE(add_explicit_type_annotation_to_silence,none,
      "add an explicit type annotation to silence this warning", ())
 ERROR(isa_pattern_value,none,
       "downcast pattern value of type %0 cannot be used", (Type))
+
+WARNING(swift3_ignore_specialized_enum_element_call,none,
+        "cannot specialize enum case; ignoring generic argument, "
+        "which will be rejected in future version of Swift", ())
 
 //------------------------------------------------------------------------------
 // Error-handling diagnostics

@@ -493,7 +493,7 @@ getSubstitutionsForCallee(SILModule &M,
 
   // Build the new substitutions using the base method signature.
   auto baseCalleeSig = baseCalleeType->getGenericSignature();
-  baseCalleeSig->getSubstitutions(*M.getSwiftModule(), subMap, newSubs);
+  baseCalleeSig->getSubstitutions(subMap, newSubs);
 }
 
 SILFunction *swift::getTargetClassMethod(SILModule &M,
@@ -667,7 +667,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
       ResultBB = TAI->getNormalBB();
     else {
       ResultBB = B.getFunction().createBasicBlock();
-      ResultBB->createArgument(ResultTy);
+      ResultBB->createPHIArgument(ResultTy);
     }
 
     NormalBB = TAI->getNormalBB();
@@ -677,7 +677,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
       ErrorBB = TAI->getErrorBB();
     else {
       ErrorBB = B.getFunction().createBasicBlock();
-      ErrorBB->createArgument(TAI->getErrorBB()->getArgument(0)->getType());
+      ErrorBB->createPHIArgument(TAI->getErrorBB()->getArgument(0)->getType());
     }
 
     NewAI = B.createTryApply(AI.getLoc(), FRI, SubstCalleeSILType,
@@ -702,7 +702,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
       }
       NormalBB->getArgument(0)->replaceAllUsesWith(
           SILUndef::get(AI.getType(), Mod));
-      NormalBB->replaceArgument(0, ResultTy, nullptr);
+      NormalBB->replacePHIArgument(0, ResultTy);
     }
 
     // The result value is passed as a parameter to the normal block.
@@ -906,8 +906,7 @@ static void getWitnessMethodSubstitutions(
 
   // Now, apply both sets of substitutions computed above to the
   // forwarding substitutions of the witness thunk.
-  witnessThunkSig->getSubstitutions(*M.getSwiftModule(),
-                                    subMap, newSubs);
+  witnessThunkSig->getSubstitutions(subMap, newSubs);
 }
 
 static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,

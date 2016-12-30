@@ -16,6 +16,7 @@
 
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
@@ -162,6 +163,28 @@ bool GenericEnvironment::containsPrimaryArchetype(
                        QueryArchetypeToInterfaceSubstitutions(this)(archetype));
 }
 
+Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M,
+                                            GenericEnvironment *env,
+                                            Type type) {
+  assert(!type->hasArchetype() && "already have a contextual type");
+
+  if (!env)
+    return type.substDependentTypesWithErrorTypes();
+
+  return env->mapTypeIntoContext(M, type);
+}
+
+Type
+GenericEnvironment::mapTypeOutOfContext(GenericEnvironment *env,
+                                        Type type) {
+  assert(!type->hasTypeParameter() && "already have an interface type");
+
+  if (!env)
+    return type.substDependentTypesWithErrorTypes();
+
+  return env->mapTypeOutOfContext(type);
+}
+
 Type GenericEnvironment::mapTypeOutOfContext(Type type) const {
   type = type.subst(QueryArchetypeToInterfaceSubstitutions(this),
                     MakeAbstractConformanceForGenericType(),
@@ -282,7 +305,8 @@ Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
   auto self = const_cast<GenericEnvironment *>(this);
   Type result = QueryInterfaceTypeSubstitutions(self)(type);
-  assert(result && "Missing context type for generic parameter");
+  if (!result)
+    return ErrorType::get(type);
   return result;
 }
 
@@ -296,7 +320,7 @@ GenericTypeParamType *GenericEnvironment::getSugaredType(
 }
 
 ArrayRef<Substitution>
-GenericEnvironment::getForwardingSubstitutions(ModuleDecl *M) const {
+GenericEnvironment::getForwardingSubstitutions() const {
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
       -> Optional<ProtocolConformanceRef> {
@@ -304,8 +328,7 @@ GenericEnvironment::getForwardingSubstitutions(ModuleDecl *M) const {
       };
 
   SmallVector<Substitution, 4> result;
-  getGenericSignature()->getSubstitutions(*M,
-                                          QueryInterfaceTypeSubstitutions(this),
+  getGenericSignature()->getSubstitutions(QueryInterfaceTypeSubstitutions(this),
                                           lookupConformanceFn, result);
   return getGenericSignature()->getASTContext().AllocateCopy(result);
 }

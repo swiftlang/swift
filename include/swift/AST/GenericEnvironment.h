@@ -196,6 +196,15 @@ public:
     return Mem; 
   }
 
+  /// Map an interface type to a contextual type.
+  static Type mapTypeIntoContext(ModuleDecl *M,
+                                 GenericEnvironment *genericEnv,
+                                 Type type);
+
+  /// Map a contextual type to an interface type.
+  static Type mapTypeOutOfContext(GenericEnvironment *genericEnv,
+                                  Type type);
+
   /// Map a contextual type to an interface type.
   Type mapTypeOutOfContext(Type type) const;
 
@@ -227,7 +236,7 @@ public:
                      ArrayRef<Substitution> subs,
                      SubstitutionMap &subMap) const;
 
-  ArrayRef<Substitution> getForwardingSubstitutions(ModuleDecl *M) const;
+  ArrayRef<Substitution> getForwardingSubstitutions() const;
 
   void dump() const;
 };

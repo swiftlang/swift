@@ -195,7 +195,7 @@ public func run_ArrayAppendFromGeneric(_ N: Int) {
   }
 }
 
-// Append an array to an array as a generic range replaceable colleciton.
+// Append an array to an array as a generic range replaceable collection.
 @inline(never)
 public func appendToGeneric<
   R: RangeReplaceableCollection
@@ -218,7 +218,7 @@ public func run_ArrayAppendToGeneric(_ N: Int) {
 }
 
 // Append an array as a generic sequence to an array as a generic range
-// replaceable colleciton.
+// replaceable collection.
 @inline(never)
 public func appendToFromGeneric<
   R: RangeReplaceableCollection, S: Sequence

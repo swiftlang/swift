@@ -16,7 +16,6 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -376,24 +375,6 @@ bool AbstractFunctionDecl::isTransparent() const {
   return false;
 }
 
-bool Decl::isBeingTypeChecked() {
-  auto decl = this;
-  while (true) {
-    if (decl->DeclBits.BeingTypeChecked)
-      return true;
-
-    auto dc = decl->getDeclContext();
-    if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
-      decl = nominal;
-    else if (auto ext = dyn_cast<ExtensionDecl>(dc))
-      decl = ext;
-    else
-      break;
-  }
-
-  return false;
-}
-
 bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   const Decl *D = this;
   if (auto ExtD = dyn_cast<ExtensionDecl>(D))
@@ -731,6 +712,38 @@ void ExtensionDecl::setGenericParams(GenericParamList *params) {
   }
 }
 
+GenericSignature *ExtensionDecl::getGenericSignature() const {
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv->getGenericSignature();
+
+  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return genericSig;
+
+  return nullptr;
+}
+
+GenericEnvironment *ExtensionDecl::getGenericEnvironment() const {
+  // Fast case: we already have a generic environment.
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv;
+
+  // If we only have a generic signature, build the generic environment.
+  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return getLazyGenericEnvironmentSlow();
+
+  return nullptr;
+}
+
+void ExtensionDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
+  assert((GenericSigOrEnv.isNull() ||
+          getGenericSignature()->getCanonicalSignature() ==
+            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+         "set a generic environment with a different generic signature");
+  this->GenericSigOrEnv = genericEnv;
+  if (genericEnv)
+    genericEnv->setOwningDeclContext(this);
+}
+
 GenericEnvironment *
 ExtensionDecl::getLazyGenericEnvironmentSlow() const {
   assert(GenericSigOrEnv.is<GenericSignature *>() &&
@@ -783,15 +796,12 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 }
 
 bool ExtensionDecl::isConstrainedExtension() const {
-  auto nominal = getExtendedType()->getAnyNominal();
-
-  // Error case: erroneous extension.
-  if (!nominal)
-    return false;
-
   // Non-generic extension.
   if (!getGenericSignature())
     return false;
+
+  auto nominal = getExtendedType()->getAnyNominal();
+  assert(nominal);
 
   // If the generic signature differs from that of the nominal type, it's a
   // constrained extension.
@@ -1906,6 +1916,15 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
 
+  if (auto *ATD = dyn_cast<AssociatedTypeDecl>(this)) {
+    auto &ctx = getASTContext();
+    auto selfTy = getDeclContext()->getSelfInterfaceType();
+    if (!selfTy)
+      return ErrorType::get(ctx);
+    return DependentMemberType::get(
+        selfTy, const_cast<AssociatedTypeDecl *>(ATD));
+  }
+
   Type interfaceType = getInterfaceType();
   if (interfaceType.isNull() || interfaceType->is<ErrorType>())
     return interfaceType;
@@ -2165,6 +2184,40 @@ void GenericTypeDecl::setGenericParams(GenericParamList *params) {
       Param->setDeclContext(this);
 }
 
+GenericSignature *GenericTypeDecl::getGenericSignature() const {
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv->getGenericSignature();
+
+  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return genericSig;
+
+  return nullptr;
+}
+
+GenericEnvironment *GenericTypeDecl::getGenericEnvironment() const {
+  // Fast case: we already have a generic environment.
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv;
+
+  // If we only have a generic signature, build the generic environment.
+  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return getLazyGenericEnvironmentSlow();
+
+  return nullptr;
+}
+
+/// Set the generic context of this function.
+void GenericTypeDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
+  assert((GenericSigOrEnv.isNull() ||
+          getGenericSignature()->getCanonicalSignature() ==
+            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+         "set a generic environment with a different generic signature");
+  this->GenericSigOrEnv = genericEnv;
+
+  if (genericEnv)
+    genericEnv->setOwningDeclContext(this);
+}
+
 GenericEnvironment *
 GenericTypeDecl::getLazyGenericEnvironmentSlow() const {
   assert(GenericSigOrEnv.is<GenericSignature *>() &&
@@ -2298,11 +2351,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
 
 void AssociatedTypeDecl::computeType() {
   auto &ctx = getASTContext();
-  auto proto = cast<ProtocolDecl>(getDeclContext());
-  auto selfTy = proto->getSelfInterfaceType();
-  if (!selfTy)
-    selfTy = ErrorType::get(ctx);
-  auto interfaceTy = DependentMemberType::get(selfTy, this);
+  auto interfaceTy = getDeclaredInterfaceType();
   setInterfaceType(MetatypeType::get(interfaceTy, ctx));
 }
 
@@ -2654,7 +2703,7 @@ bool ProtocolDecl::requiresClassSlow() {
   ProtocolDeclBits.RequiresClass = false;
 
   // Ensure that the result cannot change in future.
-  assert(isInheritedProtocolsValid() || isBeingTypeChecked());
+  assert(isInheritedProtocolsValid());
 
   if (getAttrs().hasAttribute<ObjCAttr>() || isObjC()) {
     ProtocolDeclBits.RequiresClass = true;
@@ -3979,6 +4028,40 @@ SourceRange SubscriptDecl::getSourceRange() const {
   if (getBracesRange().isValid())
     return { getSubscriptLoc(), getBracesRange().End };
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
+}
+
+GenericSignature *AbstractFunctionDecl::getGenericSignature() const {
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv->getGenericSignature();
+
+  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return genericSig;
+
+  return nullptr;
+}
+
+GenericEnvironment *AbstractFunctionDecl::getGenericEnvironment() const {
+  // Fast case: we already have a generic environment.
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv;
+
+  // If we only have a generic signature, build the generic environment.
+  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return getLazyGenericEnvironmentSlow();
+
+  return nullptr;
+}
+
+void
+AbstractFunctionDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
+  assert((GenericSigOrEnv.isNull() ||
+          getGenericSignature()->getCanonicalSignature() ==
+            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+         "set a generic environment with a different generic signature");
+  this->GenericSigOrEnv = genericEnv;
+
+  if (genericEnv)
+    genericEnv->setOwningDeclContext(this);
 }
 
 GenericEnvironment *

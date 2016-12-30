@@ -55,7 +55,7 @@ enum class AAKind : unsigned {
 } // end anonymous namespace
 
 static llvm::cl::opt<AAKind>
-DebugAAKinds("aa", llvm::cl::desc("Alias Analysis Kinds:"),
+DebugAAKinds("aa-kind", llvm::cl::desc("Alias Analysis Kinds:"),
              llvm::cl::init(AAKind::All),
              llvm::cl::values(clEnumValN(AAKind::None,
                                          "none",

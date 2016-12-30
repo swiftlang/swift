@@ -420,7 +420,7 @@ public func testCondCastSwiftDoubleToNSNumber() -> NSNumber? {
 }
 
 
-// Check optimization of casts from  Swift Array to NSArray
+// Check optimization of casts from Swift Array to NSArray
 
 var arrInt: [Int] = [1, 2, 3, 4]
 var arrDouble: [Double] = [1.1, 2.2, 3.3, 4.4]
@@ -488,7 +488,7 @@ public func testCondCastSwiftToNSArrayString() -> NSArray? {
 }
 
 
-// Check optimization of casts from  Swift Dict to NSDict
+// Check optimization of casts from Swift Dict to NSDict
 
 var dictInt: [Int: Int] = [1:1, 2:2, 3:3, 4:4]
 var dictDouble: [Double: Double] = [1.1 : 1.1, 2.2 : 2.2, 3.3 : 3.3, 4.4 : 4.4]
@@ -556,7 +556,7 @@ public func testCondCastSwiftToNSDictString() -> NSDictionary? {
 }
 
 
-// Check optimization of casts from  Swift Set to NSSet
+// Check optimization of casts from Swift Set to NSSet
 
 var setInt: Set<Int> = [1, 2, 3, 4]
 var setDouble: Set<Double> = [1.1, 2.2, 3.3, 4.4]

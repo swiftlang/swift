@@ -17,7 +17,6 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -51,7 +50,6 @@
 #include <queue>
 
 using namespace swift;
-namespace swift {
 
 struct SynthesizedExtensionAnalyzer::Implementation {
   static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
@@ -430,7 +428,6 @@ hasMergeGroup(MergeGroupKind Kind) {
   }
   return false;
 }
-} // end anonymous namespace
 
 PrintOptions PrintOptions::printTypeInterface(Type T) {
   PrintOptions result = printInterface();
@@ -855,8 +852,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       if (T->hasArchetype()) {
         // Get the interface type, since TypeLocs still have
         // contextual types in them.
-        T = ArchetypeBuilder::mapTypeOutOfContext(
-            Current->getInnermostDeclContext(), T);
+        T = Current->getInnermostDeclContext()->mapTypeOutOfContext(T);
       }
 
       // Get the innermost nominal type context.
@@ -2513,7 +2509,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                              ? parameterListTypes[CurrPattern]
                              : nullptr;
     printParameterList(BodyParams[CurrPattern], paramListType,
-                       /*Curried=*/CurrPattern > 0,
+                       /*isCurried=*/CurrPattern > 0,
                        [&]()->bool {
       return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault();
     });
@@ -2764,7 +2760,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer << "subscript";
   }, [&] { // Parameters
     printParameterList(decl->getIndices(), decl->getIndicesInterfaceType(),
-                       /*Curried=*/false,
+                       /*isCurried=*/false,
                        /*isAPINameByDefault*/[]()->bool{return false;});
   });
   Printer << " -> ";
@@ -4112,8 +4108,8 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "dictionary_downcast";
   case CheckedCastKind::SetDowncast:
     return "set_downcast";
-  case CheckedCastKind::BridgeFromObjectiveC:
-    return "bridge_from_objc";
+  case CheckedCastKind::BridgingCast:
+    return "bridging_cast";
   }
   llvm_unreachable("bad checked cast name");
 }

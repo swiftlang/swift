@@ -83,7 +83,7 @@ namespace {
       if (!imported)
         return;
       Module *nativeImported = Impl.finishLoadingClangModule(Importer, imported,
-                                                             /*adapter=*/true);
+        /*preferAdapter=*/true);
       Impl.ImportedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
     }
 
@@ -326,10 +326,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
           // Enable modules
           "-fmodules",
-          "-fmodules-validate-system-headers",
           "-Werror=non-modular-include-in-framework-module",
-          // Enable implicit module maps (implied by "-fmodules")
-          "-fimplicit-module-maps",
           "-Xclang", "-fmodule-feature", "-Xclang", "swift",
 
           // Don't emit LLVM IR.
@@ -482,6 +479,10 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     invocationArgStrs.push_back("-fapinotes-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
+  }
+
+  if (!importerOpts.DisableModulesValidateSystemHeaders) {
+    invocationArgStrs.push_back("-fmodules-validate-system-headers");
   }
 
   if (importerOpts.DetailedPreprocessingRecord) {
@@ -843,7 +844,7 @@ bool ClangImporter::Implementation::importHeader(
       static_cast<HeaderParsingASTConsumer &>(Instance->getASTConsumer());
   consumer.reset();
 
-  pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*Loc=*/{});
+  pp.EnterSourceFile(bufferID, /*Dir=*/nullptr, /*Loc=*/{});
   // Force the import to occur.
   pp.LookAhead(0);
 
@@ -906,7 +907,7 @@ bool ClangImporter::importHeader(StringRef header, Module *adapter,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*open=*/true);
+                                                           /*OpenFile=*/true);
   if (headerFile && headerFile->getSize() == expectedSize &&
       headerFile->getModificationTime() == expectedModTime) {
     return importBridgingHeader(header, adapter, diagLoc);
@@ -926,7 +927,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, Module *adapter,
                                          bool trackParsedSymbols) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*open=*/true);
+                                                           /*OpenFile=*/true);
   if (!headerFile) {
     Impl.SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_missing,
                                      header);
@@ -1087,7 +1088,8 @@ Module *ClangImporter::loadModule(
   if (!clangModule)
     return nullptr;
 
-  return Impl.finishLoadingClangModule(*this, clangModule, /*adapter=*/false);
+  return Impl.finishLoadingClangModule(*this, clangModule,
+                                       /*preferAdapter=*/false);
 }
 
 Module *ClangImporter::Implementation::finishLoadingClangModule(
@@ -2165,11 +2167,11 @@ void ClangModuleUnit::lookupObjCMethods(
   auto &clangSema = owner.Impl.getClangSema();
   clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
-                                               /*instance=*/true,
+                                               /*InstanceFirst=*/true,
                                                /*CheckTheOther=*/false);
   clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
-                                               /*instance=*/false,
+                                               /*InstanceFirst=*/false,
                                                /*CheckTheOther=*/false);
 
   // Import the methods.

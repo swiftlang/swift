@@ -223,7 +223,8 @@ private:
   NodePointer addFuncSpecParamNumber(NodePointer Param,
                               FunctionSigSpecializationParamKind Kind);
 
-  NodePointer demangleSpecAttributes(Node::Kind SpecKind);
+  NodePointer demangleSpecAttributes(Node::Kind SpecKind,
+                                     bool demangleUniqueID = false);
 
   NodePointer demangleWitness();
   NodePointer demangleSpecialType();

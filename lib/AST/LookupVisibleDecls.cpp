@@ -337,6 +337,9 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         assert(FD->getImplicitSelfDecl() && "should not find free functions");
         (void)FD;
 
+        if (FD->isInvalid())
+          break;
+
         // Get the type without the first uncurry level with 'self'.
         CanType T = D->getInterfaceType()
                         ->castTo<AnyFunctionType>()
@@ -624,7 +627,7 @@ template <> struct DenseMapInfo<FoundDeclTy> {
   }
 };
 
-} // end llvm namespace
+} // namespace llvm
 
 namespace {
 

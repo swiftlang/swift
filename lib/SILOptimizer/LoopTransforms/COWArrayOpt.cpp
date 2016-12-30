@@ -1982,7 +1982,7 @@ public:
     // Clone the arguments.
     for (auto &Arg : StartBB->getArguments()) {
       SILValue MappedArg =
-          ClonedStartBB->createArgument(getOpType(Arg->getType()));
+          ClonedStartBB->createPHIArgument(getOpType(Arg->getType()));
       ValueMap.insert(std::make_pair(Arg, MappedArg));
     }
 

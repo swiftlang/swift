@@ -748,7 +748,7 @@ public protocol _DefaultCustomPlaygroundQuickLookable {
 /// `DictionaryLiteral`. In particular, to find the value matching a key, you
 /// must search through every element of the collection. The call to
 /// `index(where:)` in the following example must traverse the whole
-/// collection to make sure that no element matches the given predicate:
+/// collection to find the element that matches the predicate:
 ///
 ///     let runner = "Marlies Gohr"
 ///     if let index = recordTimes.index(where: { $0.0 == runner }) {

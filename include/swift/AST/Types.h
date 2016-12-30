@@ -65,9 +65,10 @@ namespace swift {
   class ValueDecl;
   class ModuleDecl;
   class ProtocolConformance;
-  enum class SILArgumentConvention : uint8_t;
+  struct SILArgumentConvention;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
+  enum class ValueOwnershipKind : uint8_t;
 
   enum class TypeKind {
 #define TYPE(id, parent) id,
@@ -883,8 +884,8 @@ public:
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the
   /// 'self' argument type as appropriate.
-  Type adjustSuperclassMemberDeclType(const ValueDecl *decl,
-                                      const ValueDecl *parentDecl,
+  Type adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
+                                      const ValueDecl *derivedDecl,
                                       Type memberType,
                                       LazyResolver *resolver);
 
@@ -2923,6 +2924,8 @@ public:
     type.print(out);
     return out;
   }
+
+  ValueOwnershipKind getOwnershipKind(SILModule &) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;

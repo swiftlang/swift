@@ -128,6 +128,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
     return getMagicFunctionName(cast<EnumElementDecl>(ref.getDecl())
                                   ->getDeclContext());
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
@@ -469,8 +471,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
   emitProlog(fd, fd->getParameterLists(), fd->getResultInterfaceType(),
              fd->hasThrows());
-  Type resultTy = ArchetypeBuilder::mapTypeIntoContext(
-      fd, fd->getResultInterfaceType());
+  Type resultTy = fd->mapTypeIntoContext(fd->getResultInterfaceType());
   prepareEpilog(resultTy, fd->hasThrows(), CleanupLocation(fd));
 
   emitProfilerIncrement(fd->getBody());
@@ -696,7 +697,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
                                SmallVectorImpl<SILValue> &args,
                                CapturedValue capture) {
   auto addSILArgument = [&](SILType t, ValueDecl *d) {
-    args.push_back(gen.F.begin()->createArgument(t, d));
+    args.push_back(gen.F.begin()->createFunctionArgument(t, d));
   };
 
   auto *vd = capture.getDecl();
@@ -798,10 +799,9 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
     F.setBare(IsBare);
     auto selfMetaTy = vd->getInterfaceType()->getAs<AnyFunctionType>()
         ->getInput();
-    selfMetaTy = ArchetypeBuilder::mapTypeIntoContext(
-        vd->getInnermostDeclContext(), selfMetaTy);
+    selfMetaTy = vd->getInnermostDeclContext()->mapTypeIntoContext(selfMetaTy);
     auto metatypeVal =
-        F.begin()->createArgument(getLoweredLoadableType(selfMetaTy));
+        F.begin()->createFunctionArgument(getLoweredLoadableType(selfMetaTy));
     curriedArgs.push_back(metatypeVal);
 
   } else if (auto fd = dyn_cast<AbstractFunctionDecl>(vd)) {
@@ -828,9 +828,8 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
   // Forward substitutions.
   ArrayRef<Substitution> subs;
   auto constantInfo = getConstantInfo(to);
-  if (auto *env = constantInfo.GenericEnv) {
-    subs = env->getForwardingSubstitutions(SGM.SwiftModule);
-  }
+  if (auto *env = constantInfo.GenericEnv)
+    subs = env->getForwardingSubstitutions();
 
   SILValue toFn = getNextUncurryLevelRef(*this, vd, to, from.isDirectReference,
                                          curriedArgs, subs);

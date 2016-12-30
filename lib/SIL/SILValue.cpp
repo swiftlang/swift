@@ -383,8 +383,7 @@ ValueOwnershipKindVisitor::visitSILUndef(SILUndef *Arg) {
 
 ValueOwnershipKind
 ValueOwnershipKindVisitor::visitSILPHIArgument(SILPHIArgument *Arg) {
-  // For now just return undef.
-  return ValueOwnershipKind::Any;
+  return Arg->getOwnershipKind();
 }
 
 ValueOwnershipKind
@@ -419,24 +418,6 @@ ValueOwnershipKindVisitor::visitMarkDependenceInst(MarkDependenceInst *MDI) {
   return MDI->getValue().getOwnershipKind();
 }
 
-static ValueOwnershipKind getResultOwnershipKind(const SILResultInfo &Info,
-                                                 SILModule &M) {
-  SILType Ty = M.Types.getLoweredType(Info.getType());
-  bool IsTrivial = Ty.isTrivial(M);
-  switch (Info.getConvention()) {
-  case ResultConvention::Indirect:
-    return ValueOwnershipKind::Trivial; // Should this be an Any?
-  case ResultConvention::Autoreleased:
-  case ResultConvention::Owned:
-    return ValueOwnershipKind::Owned;
-  case ResultConvention::Unowned:
-  case ResultConvention::UnownedInnerPointer:
-    if (IsTrivial)
-      return ValueOwnershipKind::Trivial;
-    return ValueOwnershipKind::Unowned;
-  }
-}
-
 ValueOwnershipKind
 ValueOwnershipKindVisitor::visitApplyInst(ApplyInst *AI) {
   SILModule &M = AI->getModule();
@@ -447,20 +428,18 @@ ValueOwnershipKindVisitor::visitApplyInst(ApplyInst *AI) {
     return ValueOwnershipKind::Trivial;
 
   // Find the first index where we have a trivial value.
-  auto Iter =
-    find_if(Results,
-            [&M](const SILResultInfo &Info) -> bool {
-              return getResultOwnershipKind(Info, M) != ValueOwnershipKind::Trivial;
-            });
+  auto Iter = find_if(Results, [&M](const SILResultInfo &Info) -> bool {
+    return Info.getOwnershipKind(M) != ValueOwnershipKind::Trivial;
+  });
   // If we have all trivial, then we must be trivial.
   if (Iter == Results.end())
     return ValueOwnershipKind::Trivial;
 
   unsigned Index = std::distance(Results.begin(), Iter);
-  ValueOwnershipKind Base = getResultOwnershipKind(Results[Index], M);
+  ValueOwnershipKind Base = Results[Index].getOwnershipKind(M);
 
   for (const SILResultInfo &ResultInfo : Results.slice(Index+1)) {
-    auto RKind = getResultOwnershipKind(ResultInfo, M);
+    auto RKind = ResultInfo.getOwnershipKind(M);
     if (ValueOwnershipKindMerge(RKind, ValueOwnershipKind::Trivial))
       continue;
 

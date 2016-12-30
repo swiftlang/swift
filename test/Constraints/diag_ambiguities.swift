@@ -28,3 +28,10 @@ C(g) // expected-error{{ambiguous use of 'g'}}
 
 func h<T>(_ x: T) -> () {}
 C(h) // expected-error{{ambiguous use of 'init'}}
+
+func rdar29691909_callee(_ o: AnyObject?) -> Any? { return o } // expected-note {{found this candidate}}
+func rdar29691909_callee(_ o: AnyObject) -> Any { return o } // expected-note {{found this candidate}}
+
+func rdar29691909(o: AnyObject) -> Any? {
+  return rdar29691909_callee(o) // expected-error{{ambiguous use of 'rdar29691909_callee'}}
+}

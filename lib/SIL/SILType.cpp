@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
@@ -580,4 +581,21 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
       .getSwiftRValueType();
   }
   return fieldTy;
+}
+
+ValueOwnershipKind SILResultInfo::getOwnershipKind(SILModule &M) const {
+  SILType Ty = M.Types.getLoweredType(getType());
+  bool IsTrivial = Ty.isTrivial(M);
+  switch (getConvention()) {
+  case ResultConvention::Indirect:
+    return ValueOwnershipKind::Trivial; // Should this be an Any?
+  case ResultConvention::Autoreleased:
+  case ResultConvention::Owned:
+    return ValueOwnershipKind::Owned;
+  case ResultConvention::Unowned:
+  case ResultConvention::UnownedInnerPointer:
+    if (IsTrivial)
+      return ValueOwnershipKind::Trivial;
+    return ValueOwnershipKind::Unowned;
+  }
 }

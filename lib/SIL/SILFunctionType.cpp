@@ -27,6 +27,7 @@
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -106,7 +107,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       SmallVector<ValueDecl *, 2> decls;
       mod->lookupQualified(ModuleType::get(mod), C.getIdentifier(typeName),
                            NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                           /*resolver=*/nullptr, decls);
+                           /*typeResolver=*/nullptr, decls);
       if (decls.size() != 1)
         return CanType();
 
@@ -1426,7 +1427,7 @@ static SelectorFamily getSelectorFamily(Identifier name) {
     if (!text.startswith(prefix)) return false;
     if (text.size() == prefix.size()) return true;
     assert(text.size() > prefix.size());
-    return !islower(text[prefix.size()]);
+    return !clang::isLowercase(text[prefix.size()]);
   };
 
   auto result = SelectorFamily::None;
@@ -2044,7 +2045,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
 
   auto overrideInterfaceTy =
       selfInterfaceTy->adjustSuperclassMemberDeclType(
-          derived.getDecl(), base.getDecl(), baseInterfaceTy,
+          base.getDecl(), derived.getDecl(), baseInterfaceTy,
           /*resolver=*/nullptr);
 
   // Copy generic signature from derived to the override type, to handle

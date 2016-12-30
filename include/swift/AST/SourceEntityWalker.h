@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_SOURCE_ENTITY_WALKER_H
 #define SWIFT_AST_SOURCE_ENTITY_WALKER_H
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -86,7 +87,8 @@ public:
   /// \c ConstructorDecl, to point to the type declaration that the source
   /// refers to.
   virtual bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                                  TypeDecl *CtorTyRef, Type T);
+                                  TypeDecl *CtorTyRef, Type T,
+                                  SemaReferenceKind Kind);
 
   /// This method is called when a ValueDecl for a subscript is referenced in
   /// source. If it returns false, the remaining traversal is terminated

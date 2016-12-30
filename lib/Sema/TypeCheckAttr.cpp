@@ -1513,7 +1513,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
   // Compute the substitutions.
   SmallVector<Substitution, 4> substitutions;
-  genericSig->getSubstitutions(*FD->getParentModule(), subMap, substitutions);
+  genericSig->getSubstitutions(subMap, substitutions);
 
   // Package the Substitution list in the SpecializeAttr's ConcreteDeclRef.
   attr->setConcreteDecl(

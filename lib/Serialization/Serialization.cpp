@@ -1142,9 +1142,11 @@ void Serializer::writeNormalConformance(
       // If there is no witness, we're done.
       if (!witness.getDecl()) return;
 
-      if (auto genericSig = witness.requiresSubstitution() 
-                              ? witness.getSyntheticSignature()
+      if (auto genericEnv = witness.requiresSubstitution() 
+                              ? witness.getSyntheticEnvironment()
                               : nullptr) {
+        auto *genericSig = genericEnv->getGenericSignature();
+
         // Generic parameters.
         data.push_back(genericSig->getGenericParams().size());
         for (auto gp : genericSig->getGenericParams())
@@ -1207,9 +1209,11 @@ void Serializer::writeNormalConformance(
    // Bail out early for simple witnesses.
    if (!witness.getDecl()) return;
 
-   if (auto genericSig = witness.requiresSubstitution() 
-                           ? witness.getSyntheticSignature()
+   if (auto genericEnv = witness.requiresSubstitution() 
+                           ? witness.getSyntheticEnvironment()
                            : nullptr) {
+     auto *genericSig = genericEnv->getGenericSignature();
+
      // Write the generic requirements of the synthetic environment.
      writeGenericRequirements(genericSig->getRequirements(),
                               DeclTypeAbbrCodes);
@@ -2238,9 +2242,20 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
 
+    // FIXME: Use the canonical type here in order to minimize circularity
+    // issues at deserialization time. A known problematic case here is
+    // "extension of typealias Foo"; "typealias Foo = SomeKit.Bar"; and then
+    // trying to import Bar accidentally asking for all of its extensions
+    // (perhaps because we're searching for a conformance).
+    //
+    // We could limit this to only the problematic cases, but it seems like a
+    // simpler user model to just always desugar extension types.
+    baseTy = baseTy->getCanonicalType();
+
     // Make sure the base type has registered itself as a provider of generic
     // parameters.
-    (void)addDeclRef(baseTy->getAnyNominal());
+    auto baseNominal = baseTy->getAnyNominal();
+    (void)addDeclRef(baseNominal);
 
     auto conformances = extension->getLocalConformances(
                           ConformanceLookupKind::All,
@@ -2261,7 +2276,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 inheritedTypes);
 
     bool isClassExtension = false;
-    if (auto baseNominal = baseTy->getAnyNominal()) {
+    if (baseNominal) {
       isClassExtension = isa<ClassDecl>(baseNominal) ||
                          isa<ProtocolDecl>(baseNominal);
     }
@@ -4048,7 +4063,7 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
       if (isDerivedTopLevel) {
         topLevelDecls[memberValue->getName()].push_back({
           /*ignored*/0,
-          S.addDeclRef(memberValue, /*force=*/true)
+          S.addDeclRef(memberValue, /*forceSerialization=*/true)
         });
       } else if (memberValue->isOperator()) {
         // Add operator methods.
@@ -4281,11 +4296,11 @@ withOutputFile(ASTContext &ctx, StringRef outputPath,
       Clang.createOutputFile(outputPath, EC,
                              /*Binary=*/true,
                              /*RemoveFileOnSignal=*/true,
-                             /*inputPath=*/"",
+                             /*BaseInput=*/"",
                              path::extension(outputPath),
                              /*UseTemporary=*/true,
-                             /*createDirs=*/false,
-                             /*finalPath=*/nullptr,
+                             /*CreateMissingDirectories=*/false,
+                             /*ResultPathName=*/nullptr,
                              &tmpFilePath);
 
     if (!out) {

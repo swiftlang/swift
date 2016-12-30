@@ -18,7 +18,6 @@
 #define SWIFT_AST_ASTCONTEXT_H
 
 #include "llvm/Support/DataTypes.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -69,6 +68,7 @@ namespace swift {
   class TypeVariableType;
   class TupleType;
   class FunctionType;
+  class ArchetypeBuilder;
   class ArchetypeType;
   class Identifier;
   class InheritedNameSet;
@@ -825,25 +825,7 @@ private:
                         DeclContext *gpContext,
                         ArrayRef<Substitution> Subs) const;
 
-  /// Retrieve the archetype builder and potential archetype
-  /// corresponding to the given archetype type.
-  ///
-  /// This facility is only used by the archetype builder when forming
-  /// archetypes.a
-  std::pair<ArchetypeBuilder *, ArchetypeBuilder::PotentialArchetype *>
-  getLazyArchetype(const ArchetypeType *archetype);
-
-  /// Register information for a lazily-constructed archetype.
-  void registerLazyArchetype(
-         const ArchetypeType *archetype,
-         ArchetypeBuilder &builder,
-         ArchetypeBuilder::PotentialArchetype *potentialArchetype);
-
-  /// Unregister information about the given lazily-constructed archetype.
-  void unregisterLazyArchetype(const ArchetypeType *archetype);
-
   friend ArchetypeType;
-  friend ArchetypeBuilder::PotentialArchetype;
 
   /// Provide context-level uniquing for SIL lowered type layouts and boxes.
   friend SILLayout;

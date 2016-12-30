@@ -440,31 +440,39 @@ public func == <Header, Element>(
 
 // FIXME: when our calling convention changes to pass self at +0,
 // inout should be dropped from the arguments to these functions.
+// FIXME(docs): isKnownUniquelyReferenced should check weak/unowned counts too, 
+// but currently does not. rdar://problem/29341361
 
-/// Returns a Boolean value indicating whether the given object is a
-/// class instance known to have a single strong reference.
+/// Returns a Boolean value indicating whether the given object is known to
+/// have a single strong reference.
 ///
-/// The `isKnownUniquelyReferenced(_:)` function is useful for implementing
-/// the copy-on-write optimization for the deep storage of value types:
+/// The `isKnownUniquelyReferenced(_:)` function is useful for implementing the
+/// copy-on-write optimization for the deep storage of value types:
 ///
-///     mutating func modifyMe(_ arg: X) {
-///         if isKnownUniquelyReferenced(&myStorage) {
-///             myStorage.modifyInPlace(arg)
-///         } else {
-///             myStorage = self.createModified(myStorage, arg)
+///     mutating func update(withValue value: T) {
+///         if !isKnownUniquelyReferenced(&myStorage) {
+///             myStorage = self.copiedStorage()
 ///         }
+///         myStorage.update(withValue: value)
 ///     }
 ///
-/// Weak references do not affect the result of this function.
+/// `isKnownUniquelyReferenced(_:)` checks only for strong references to the
+/// given object---if `object` has additional weak or unowned references, the
+/// result may still be `true`. Because weak and unowned references cannot be
+/// the only reference to an object, passing a weak or unowned reference as
+/// `object` always results in `false`.
 ///
-/// This function is safe to use for mutating functions in multithreaded code
-/// because a false positive implies that there is already a user-level data
-/// race on the value being mutated.
+/// If the instance passed as `object` is being accessed by multiple threads
+/// simultaneously, this function may still return `true`. Therefore, you must
+/// only call this function from mutating methods with appropriate thread
+/// synchronization. That will ensure that `isKnownUniquelyReferenced(_:)`
+/// only returns `true` when there is really one accessor, or when there is a
+/// race condition, which is already undefined behavior.
 ///
 /// - Parameter object: An instance of a class. This function does *not* modify
 ///   `object`; the use of `inout` is an implementation artifact.
-/// - Returns: `true` if `object` is a known to have a
-///   single strong reference; otherwise, `false`.
+/// - Returns: `true` if `object` is known to have a single strong reference;
+///   otherwise, `false`.
 public func isKnownUniquelyReferenced<T : AnyObject>(_ object: inout T) -> Bool
 {
   return _isUnique(&object)
@@ -474,31 +482,36 @@ internal func _isKnownUniquelyReferencedOrPinned<T : AnyObject>(_ object: inout 
   return _isUniqueOrPinned(&object)
 }
 
-/// Returns a Boolean value indicating whether the given object is a
-/// class instance known to have a single strong reference.
+/// Returns a Boolean value indicating whether the given object is known to
+/// have a single strong reference.
 ///
-/// The `isKnownUniquelyReferenced(_:)` function is useful for implementing
-/// the copy-on-write optimization for the deep storage of value types:
+/// The `isKnownUniquelyReferenced(_:)` function is useful for implementing the
+/// copy-on-write optimization for the deep storage of value types:
 ///
-///     mutating func modifyMe(_ arg: X) {
-///         if isKnownUniquelyReferenced(&myStorage) {
-///             myStorage.modifyInPlace(arg)
-///         } else {
-///             myStorage = self.createModified(myStorage, arg)
+///     mutating func update(withValue value: T) {
+///         if !isKnownUniquelyReferenced(&myStorage) {
+///             myStorage = self.copiedStorage()
 ///         }
+///         myStorage.update(withValue: value)
 ///     }
 ///
-/// Weak references do not affect the result of this function.
+/// `isKnownUniquelyReferenced(_:)` checks only for strong references to the
+/// given object---if `object` has additional weak or unowned references, the
+/// result may still be `true`. Because weak and unowned references cannot be
+/// the only reference to an object, passing a weak or unowned reference as
+/// `object` always results in `false`.
 ///
-/// This function is safe to use for mutating functions in multithreaded code
-/// because a false positive implies that there is already a user-level data
-/// race on the value being mutated.
+/// If the instance passed as `object` is being accessed by multiple threads
+/// simultaneously, this function may still return `true`. Therefore, you must
+/// only call this function from mutating methods with appropriate thread
+/// synchronization. That will ensure that `isKnownUniquelyReferenced(_:)`
+/// only returns `true` when there is really one accessor, or when there is a
+/// race condition, which is already undefined behavior.
 ///
 /// - Parameter object: An instance of a class. This function does *not* modify
 ///   `object`; the use of `inout` is an implementation artifact.
-/// - Returns: `true` if `object` is a known to have a
-///   single strong reference; otherwise, `false`. If `object` is `nil`, the
-///   return value is `false`.
+/// - Returns: `true` if `object` is known to have a single strong reference;
+///   otherwise, `false`. If `object` is `nil`, the return value is `false`.
 public func isKnownUniquelyReferenced<T : AnyObject>(
   _ object: inout T?
 ) -> Bool {

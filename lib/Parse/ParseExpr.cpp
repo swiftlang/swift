@@ -1505,7 +1505,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       }
 
       DeclNameLoc NameLoc;
-      DeclName Name = parseUnqualifiedDeclName(/*allowDot=*/true,
+      DeclName Name = parseUnqualifiedDeclName(/*afterDot=*/true,
                                                NameLoc,
                                                diag::expected_member_name);
       if (!Name) return nullptr;

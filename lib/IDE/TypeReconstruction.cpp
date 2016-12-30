@@ -1843,8 +1843,8 @@ static void VisitNodeQualifiedArchetype(
         if (sig) {
           auto params = sig->getInnermostGenericParams();
           if (index < params.size()) {
-            auto argTy = ArchetypeBuilder::mapTypeIntoContext(
-                dc, params[index])->getAs<ArchetypeType>();
+            auto argTy = dc->mapTypeIntoContext(params[index])
+                ->getAs<ArchetypeType>();
             if (argTy)
               result._types.push_back(argTy);
           }

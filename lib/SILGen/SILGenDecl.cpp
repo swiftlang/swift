@@ -701,7 +701,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   // is not address-only.
   SILValue eltValue;
   if (!value.getType().isAddress())
-    eltValue = contBB->createArgument(eltTy);
+    eltValue = contBB->createPHIArgument(eltTy);
 
   if (subInit == nullptr) {
     // If there is no subinitialization, then we are done matching.  Don't
@@ -1715,7 +1715,6 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   CanAnyFunctionType reqtSubstTy;
   ArrayRef<Substitution> witnessSubs;
   if (witness.requiresSubstitution()) {
-    GenericSignature *genericSig = witness.getSyntheticSignature();;
     genericEnv = witness.getSyntheticEnvironment();
     witnessSubs = witness.getSubstitutions();
 
@@ -1724,7 +1723,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
     auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();
 
-    if (genericSig) {
+    if (genericEnv) {
+      auto *genericSig = genericEnv->getGenericSignature();
       reqtSubstTy = cast<GenericFunctionType>(
         GenericFunctionType::get(genericSig, input, result,
                                  reqtOrigTy->getExtInfo())
@@ -1844,7 +1844,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       selfInterfaceType = proto->getSelfInterfaceType();
     }
 
-    selfType = ArchetypeBuilder::mapTypeIntoContext(
+    selfType = GenericEnvironment::mapTypeIntoContext(
         M.getSwiftModule(), genericEnv, selfInterfaceType);
   }
 
@@ -1989,10 +1989,10 @@ getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
 
     // Substitute context parameters out of the "from" and "to" types.
     auto fromInterfaceType
-        = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, fromType)
+        = GenericEnvironment::mapTypeOutOfContext(genericEnv, fromType)
                 ->getCanonicalType();
     auto toInterfaceType
-        = ArchetypeBuilder::mapTypeOutOfContext(genericEnv, toType)
+        = GenericEnvironment::mapTypeOutOfContext(genericEnv, toType)
                 ->getCanonicalType();
 
     mangler.mangleType(fromInterfaceType, /*uncurry*/ 0);

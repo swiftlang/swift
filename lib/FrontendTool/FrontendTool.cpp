@@ -153,11 +153,11 @@ static bool printAsObjC(const std::string &outputPath, Module *M,
     Clang.createOutputFile(outputPath, EC,
                            /*Binary=*/false,
                            /*RemoveFileOnSignal=*/true,
-                           /*inputPath=*/"",
+                           /*BaseInput=*/"",
                            path::extension(outputPath),
                            /*UseTemporary=*/true,
-                           /*createDirs=*/false,
-                           /*finalPath=*/nullptr,
+                           /*CreateMissingDirectories=*/false,
+                           /*ResultPathName=*/nullptr,
                            &tmpFilePath);
 
   if (!out) {

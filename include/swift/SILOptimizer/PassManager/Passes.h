@@ -23,6 +23,10 @@ namespace swift {
   class SILOptions;
   class SILTransform;
 
+  namespace irgen {
+    class IRGenModule;
+  }
+
   /// \brief Run all the SIL diagnostic passes on \p M.
   ///
   /// \returns true if the diagnostic passes produced an error
@@ -74,6 +78,7 @@ namespace swift {
   StringRef PassKindID(PassKind Kind);
 
 #define PASS(ID, NAME, DESCRIPTION) SILTransform *create##ID();
+#define IRGEN_PASS(ID, NAME, DESCRIPTION)
 #include "Passes.def"
 
 } // end namespace swift

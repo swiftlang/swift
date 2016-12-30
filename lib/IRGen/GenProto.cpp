@@ -1277,8 +1277,7 @@ public:
       auto declCtx = Conformance.getDeclContext();
       if (auto generics = declCtx->getGenericSignatureOfContext()) {
         auto getInContext = [&](CanType type) -> CanType {
-          return ArchetypeBuilder::mapTypeIntoContext(declCtx, type)
-              ->getCanonicalType();
+          return declCtx->mapTypeIntoContext(type)->getCanonicalType();
         };
         bindArchetypeAccessPaths(IGF, generics, getInContext);
       }

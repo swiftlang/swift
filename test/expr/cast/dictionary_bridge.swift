@@ -119,36 +119,51 @@ func testDowncastBridge() {
   _ = dictOB as Dictionary<BridgedToObjC, BridgedToObjC>
 
   // We don't do mixed down/upcasts.
-  _ = dictDO as! Dictionary<BridgedToObjC, BridgedToObjC> // expected-error{{'Dictionary<DerivesObjC, ObjC>' is not convertible to 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
+  _ = dictDO as! Dictionary<BridgedToObjC, BridgedToObjC> // expected-warning{{forced cast from 'Dictionary<DerivesObjC, ObjC>' to 'Dictionary<BridgedToObjC, BridgedToObjC>' always succeeds; did you mean to use 'as'?}}
 }
 
 func testConditionalDowncastBridge() {
-  var dictRR = Dictionary<Root, Root>()
-  var dictRO = Dictionary<Root, ObjC>()
-  var dictOR = Dictionary<ObjC, Root>()
-  var dictOO = Dictionary<ObjC, ObjC>()
-  var dictOD = Dictionary<ObjC, DerivesObjC>()
-  var dictDO = Dictionary<DerivesObjC, ObjC>()
-  var dictDD = Dictionary<DerivesObjC, DerivesObjC>()
+  let dictRR = Dictionary<Root, Root>()
+  let dictRO = Dictionary<Root, ObjC>()
+  let dictOR = Dictionary<ObjC, Root>()
+  let dictOO = Dictionary<ObjC, ObjC>()
+  let dictOD = Dictionary<ObjC, DerivesObjC>()
+  let dictDO = Dictionary<DerivesObjC, ObjC>()
+  let dictDD = Dictionary<DerivesObjC, DerivesObjC>()
 
-  var dictBB = Dictionary<BridgedToObjC, BridgedToObjC>()
-  var dictBO = Dictionary<BridgedToObjC, ObjC>()
-  var dictOB = Dictionary<ObjC, BridgedToObjC>()
+  let dictBB = Dictionary<BridgedToObjC, BridgedToObjC>()
+  let dictBO = Dictionary<BridgedToObjC, ObjC>()
+  let dictOB = Dictionary<ObjC, BridgedToObjC>()
 
   // Downcast to bridged value types.
-  if let d = dictRR as? Dictionary<BridgedToObjC, BridgedToObjC> { }
-  if let d = dictRR as? Dictionary<BridgedToObjC, ObjC> { }
-  if let d = dictRR as? Dictionary<ObjC, BridgedToObjC> { }
+  if let d = dictRR as? Dictionary<BridgedToObjC, BridgedToObjC> { _ = d }
+  if let d = dictRR as? Dictionary<BridgedToObjC, ObjC> { _ = d }
+  if let d = dictRR as? Dictionary<ObjC, BridgedToObjC> { _ = d }
 
-  if let d = dictRO as? Dictionary<BridgedToObjC, BridgedToObjC> { }
-  if let d = dictRO as? Dictionary<BridgedToObjC, ObjC> { }
-  if let d = dictRO as? Dictionary<ObjC, BridgedToObjC> { }
+  if let d = dictRO as? Dictionary<BridgedToObjC, BridgedToObjC> { _ = d }
+  if let d = dictRO as? Dictionary<BridgedToObjC, ObjC> { _ = d }
+  if let d = dictRO as? Dictionary<ObjC, BridgedToObjC> { _ = d }
 
   let d1 = dictBO as Dictionary<BridgedToObjC, BridgedToObjC>
   let d2 = dictOB as Dictionary<BridgedToObjC, BridgedToObjC>
 
-  // We don't do mixed down/upcasts.
-  if let d = dictDO as? Dictionary<BridgedToObjC, BridgedToObjC> { } // expected-error{{'Dictionary<DerivesObjC, ObjC>' is not convertible to 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
+  // Mixed down/upcasts.
+  if let d = dictDO as? Dictionary<BridgedToObjC, BridgedToObjC> { _ = d }
+  // expected-warning@-1{{conditional cast from 'Dictionary<DerivesObjC, ObjC>' to 'Dictionary<BridgedToObjC, BridgedToObjC>' always succeeds}}
+
+  _ = dictRR
+  _ = dictRO
+  _ = dictOR
+  _ = dictOO
+  _ = dictOD
+  _ = dictDO
+  _ = dictDD
+  _ = dictBB
+  _ = dictBO
+  _ = dictOB
+  _ = d1
+  _ = d2
+
 }
 
 

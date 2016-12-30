@@ -16,7 +16,6 @@
 
 #include "swift/AST/Types.h"
 #include "ForeignRepresentationInfo.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
@@ -711,7 +710,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
 }
 
 Type TypeBase::getUnlabeledType(ASTContext &Context) {
-  return getStrippedType(Context, Type(this), /*labels=*/true);
+  return getStrippedType(Context, Type(this), /*stripLabels=*/true);
 }
 
 Type TypeBase::getWithoutParens() {
@@ -1920,8 +1919,11 @@ bool TypeBase::isPotentiallyBridgedValueType() {
   // Error existentials.
   if (isExistentialWithError()) return true;
 
-  // Archetypes.
-  return is<ArchetypeType>();
+  // Archetypes that aren't class-constrained.
+  if (auto archetype = getAs<ArchetypeType>())
+    return !archetype->requiresClass();
+
+  return false;
 }
 
 /// Determine whether this is a representable Objective-C object type.
@@ -3181,41 +3183,22 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
   return memberType.subst(module, substitutions, SubstFlags::UseErrorType);
 }
 
-Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *decl,
-                                              const ValueDecl *parentDecl,
+Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
+                                              const ValueDecl *derivedDecl,
                                               Type memberType,
                                               LazyResolver *resolver) {
-  auto *DC = parentDecl->getDeclContext();
-  auto superclass = getSuperclassForDecl(
-      DC->getAsClassOrClassExtensionContext(), resolver);
-  auto subs = superclass->getContextSubstitutions(DC);
+  auto subs = SubstitutionMap::getOverrideSubstitutions(
+      baseDecl, derivedDecl, /*derivedSubs=*/None, resolver);
+  auto type = memberType.subst(subs);
 
-  if (auto *parentFunc = dyn_cast<AbstractFunctionDecl>(parentDecl)) {
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      auto *genericParams = func->getGenericParams();
-      auto *parentParams = parentFunc->getGenericParams();
-      if (genericParams && parentParams &&
-          genericParams->size() == parentParams->size()) {
-        for (unsigned i = 0, e = genericParams->size(); i < e; i++) {
-          auto paramTy = parentParams->getParams()[i]->getDeclaredInterfaceType()
-          ->getCanonicalType()->castTo<GenericTypeParamType>();
-          subs[paramTy] = genericParams->getParams()[i]
-              ->getDeclaredInterfaceType();
-        }
-      }
-    }
-  }
-
-  auto type = memberType.subst(parentDecl->getModuleContext(), subs);
-
-  if (isa<AbstractFunctionDecl>(parentDecl)) {
+  if (isa<AbstractFunctionDecl>(baseDecl)) {
     type = type->replaceSelfParameterType(this);
-    if (auto func = dyn_cast<FuncDecl>(parentDecl)) {
+    if (auto func = dyn_cast<FuncDecl>(baseDecl)) {
       if (func->hasDynamicSelf()) {
         type = type->replaceCovariantResultType(this,
                                                 func->getNumParameterLists());
       }
-    } else if (isa<ConstructorDecl>(parentDecl)) {
+    } else if (isa<ConstructorDecl>(baseDecl)) {
       type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
     }
   }

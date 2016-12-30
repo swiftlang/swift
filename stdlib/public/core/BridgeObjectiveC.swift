@@ -469,15 +469,20 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
 }
 
 extension UnsafeMutableRawPointer {
-  /// Convert from `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
+  ///
+  /// - Parameter other: The pointer to convert.
   @_transparent
   public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
-  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
   ///
-  /// Returns nil if `other` is nil.
+  /// - Parameter other: The pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
   @_transparent
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -486,15 +491,20 @@ extension UnsafeMutableRawPointer {
 }
 
 extension UnsafeRawPointer {
-  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
+  ///
+  /// - Parameter other: The pointer to convert.
   @_transparent
   public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
-  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
   ///
-  /// Returns nil if `other` is nil.
+  /// - Parameter other: The pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
   @_transparent
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }

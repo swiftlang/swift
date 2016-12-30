@@ -370,7 +370,7 @@ func getHungryCat(_ food: CatFood) throws -> Cat {
     return try dont_make_a_cat()
   }
 }
-// errors.getHungryCat  throws (errors.CatFood) -> errors.Cat
+// errors.getHungryCat throws (errors.CatFood) -> errors.Cat
 // CHECK-LABEL: sil hidden @_TF6errors12getHungryCatFzOS_7CatFoodCS_3Cat : $@convention(thin) (CatFood) -> (@owned Cat, @error Error)
 // CHECK: bb0(%0 : $CatFood):
 // CHECK:   debug_value undef : $Error, var, name "$error", argno 2

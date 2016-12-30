@@ -24,8 +24,8 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Fallthrough.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "llvm/IR/CallSite.h"
 
 #include "CallEmission.h"
@@ -1214,15 +1214,15 @@ void CallEmission::emitToExplosion(Explosion &out) {
   // If the call is naturally to memory, emit it that way and then
   // explode that temporary.
   if (LastArgWritten == 1) {
-    ContainedAddress ctemp = substResultTI.allocateStack(IGF, substResultType,
-                                                         "call.aggresult");
+    StackAddress ctemp = substResultTI.allocateStack(IGF, substResultType,
+                                                     false, "call.aggresult");
     Address temp = ctemp.getAddress();
     emitToMemory(temp, substResultTI);
  
     // We can use a take.
     substResultTI.loadAsTake(IGF, temp, out);
 
-    substResultTI.deallocateStack(IGF, ctemp.getContainer(), substResultType);
+    substResultTI.deallocateStack(IGF, ctemp, substResultType);
     return;
   }
 
@@ -1381,7 +1381,7 @@ static void emitCoerceAndExpand(IRGenFunction &IGF,
 
   // Otherwise, materialize to a temporary.
   Address temporary =
-    paramTI.allocateStack(IGF, paramTy, "coerce-and-expand.temp").getAddress();
+    paramTI.allocateStack(IGF, paramTy, false, "coerce-and-expand.temp").getAddress();
 
   auto coercionTyLayout = IGF.IGM.DataLayout.getStructLayout(coercionTy);
 
@@ -1440,7 +1440,7 @@ static void emitCoerceAndExpand(IRGenFunction &IGF,
     paramTI.loadAsTake(IGF, temporary, out);
   }
 
-  paramTI.deallocateStack(IGF, temporary, paramTy);
+  paramTI.deallocateStack(IGF, StackAddress(temporary), paramTy);
 }
 
 static void emitDirectExternalArgument(IRGenFunction &IGF,
@@ -1473,11 +1473,16 @@ static void emitDirectExternalArgument(IRGenFunction &IGF,
   }
 
   // Otherwise, we need to coerce through memory.
+  Address temporary;
+  Size tempSize;
+  std::tie(temporary, tempSize) =
+      allocateForCoercion(IGF, argTI.getStorageType(), toTy, "coerced-arg");
+  IGF.Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Store to a temporary.
-  Address temporary = argTI.allocateStack(IGF, argType,
-                                          "coerced-arg").getAddress();
-  argTI.initializeFromParams(IGF, in, temporary, argType);
+  Address tempOfArgTy = IGF.Builder.CreateBitCast(
+      temporary, argTI.getStorageType()->getPointerTo());
+  argTI.initializeFromParams(IGF, in, tempOfArgTy, argType);
 
   // Bitcast the temporary to the expected type.
   Address coercedAddr =
@@ -1497,7 +1502,7 @@ static void emitDirectExternalArgument(IRGenFunction &IGF,
     out.add(IGF.Builder.CreateLoad(coercedAddr));
   }
 
-  argTI.deallocateStack(IGF, temporary, argType);
+  IGF.Builder.CreateLifetimeEnd(temporary, tempSize);
 }
 
 namespace {
@@ -1547,7 +1552,7 @@ static void emitClangExpandedArgument(IRGenFunction &IGF,
   }
 
   // Otherwise, materialize to a temporary.
-  Address temp = swiftTI.allocateStack(IGF, swiftType,
+  Address temp = swiftTI.allocateStack(IGF, swiftType, false,
                                        "clang-expand-arg.temp").getAddress();
   swiftTI.initialize(IGF, in, temp);
 
@@ -1569,7 +1574,7 @@ void irgen::emitClangExpandedParameter(IRGenFunction &IGF,
   }
 
   // Otherwise, materialize to a temporary.
-  Address temp = swiftTI.allocateStack(IGF, swiftType,
+  Address temp = swiftTI.allocateStack(IGF, swiftType, false,
                                        "clang-expand-param.temp").getAddress();
   Address castTemp = IGF.Builder.CreateBitCast(temp, IGF.IGM.Int8PtrTy);
   ClangExpandStoreEmitter(IGF, in).visit(clangType, castTemp);
@@ -1652,7 +1657,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     }
     case clang::CodeGen::ABIArgInfo::Indirect: {
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
-      Address addr = ti.allocateStack(IGF, paramType,
+      Address addr = ti.allocateStack(IGF, paramType, false,
                                       "indirect-temporary").getAddress();
       ti.initialize(IGF, in, addr);
 
@@ -1779,7 +1784,7 @@ static void emitDirectForeignParameter(IRGenFunction &IGF,
 
   // Deallocate the temporary.
   // `deallocateStack` emits the lifetime.end marker for us.
-  paramTI.deallocateStack(IGF, temporary, paramType);
+  paramTI.deallocateStack(IGF, StackAddress(temporary), paramType);
 }
 
 void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,

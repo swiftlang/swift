@@ -112,7 +112,7 @@ SourceLoc ClangDiagnosticConsumer::resolveSourceLocation(
     std::unique_ptr<llvm::MemoryBuffer> mirrorBuffer{
       llvm::MemoryBuffer::getMemBuffer(buffer->getBuffer(),
                                        buffer->getBufferIdentifier(),
-                                       /*nullTerminated=*/true)
+                                       /*RequiresNullTerminator=*/true)
     };
     mirrorID = swiftSrcMgr.addNewSourceBuffer(std::move(mirrorBuffer));
     mirroredBuffers[buffer] = mirrorID;

@@ -57,7 +57,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
 
     // If we have the slot, emit a store to it.
     gen.B.emitBlock(hasSlotBB);
-    SILValue slot = hasSlotBB->createArgument(errorPtrObjectTy);
+    SILValue slot = hasSlotBB->createPHIArgument(errorPtrObjectTy);
     emitStoreToForeignErrorSlot(gen, loc, slot, errorSrc);
     gen.B.createBranch(loc, contBB);
 
@@ -383,7 +383,7 @@ emitResultIsNilErrorCheck(SILGenFunction &gen, SILLocation loc,
   // In the continuation block, take ownership of the now non-optional
   // result value.
   gen.B.emitBlock(contBB);
-  SILValue objectResult = contBB->createArgument(resultObjectType);
+  SILValue objectResult = contBB->createPHIArgument(resultObjectType);
   return gen.emitManagedRValueWithCleanup(objectResult);
 }
 
@@ -401,7 +401,7 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
 
   // Switch on the optional error.
   SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
-  errorBB->createArgument(optionalError->getType().unwrapAnyOptionalType());
+  errorBB->createPHIArgument(optionalError->getType().unwrapAnyOptionalType());
   SILBasicBlock *contBB = gen.createBasicBlock();
   gen.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,
                          { { ctx.getOptionalSomeDecl(), errorBB },

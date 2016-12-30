@@ -13,8 +13,10 @@
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
 import Glibc
+#elseif os(Windows)
+import ucrt
 #endif
 
 #if !os(Windows) || CYGWIN
@@ -120,7 +122,11 @@ public func _stdlib_select(
 public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
   var fds: [CInt] = [0, 0]
   let ret = fds.withUnsafeMutableBufferPointer { unsafeFds -> CInt in
-    pipe(unsafeFds.baseAddress)
+#if !os(Windows) || CYGWIN
+    return pipe(unsafeFds.baseAddress)
+#else
+    return _pipe(unsafeFds.baseAddress, 0, 0)
+#endif
   }
   return (readEnd: fds[0], writeEnd: fds[1], error: ret)
 }

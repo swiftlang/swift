@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -47,7 +46,7 @@ namespace swift {
     llvm::DenseMap<Identifier,
                    std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
     /// A list of all functions forward-declared by a sil_scope.
-    std::vector<SILFunction *> PotentialZombieFns;
+    llvm::DenseSet<SILFunction *> PotentialZombieFns;
 
     /// A map from textual .sil scope number to SILDebugScopes.
     llvm::DenseMap<unsigned, SILDebugScope *> ScopeSlots;
@@ -3944,7 +3943,11 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
       return true;
 
     BB = getBBForDefinition(BBName, NameLoc);
-    
+    // For now, since we always assume that PHIArguments have
+    // ValueOwnershipKind::Any, do not parse or do anything special. Eventually
+    // we will parse the convention.
+    bool IsEntry = BB->isEntry();
+
     // If there is a basic block argument list, process it.
     if (P.consumeIf(tok::l_paren)) {
       do {
@@ -3956,7 +3959,11 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
             P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
             parseSILType(Ty))
           return true;
-        auto Arg = BB->createArgument(Ty);
+        SILArgument *Arg;
+        if (IsEntry)
+          Arg = BB->createFunctionArgument(Ty);
+        else
+          Arg = BB->createPHIArgument(Ty);
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));
       
@@ -4965,7 +4972,7 @@ bool Parser::parseSILScope() {
       return true;
     }
     ParentFn = ScopeState.getGlobalNameForReference(FnName, FnTy, FnLoc, true);
-    ScopeState.TUState.PotentialZombieFns.push_back(ParentFn);
+    ScopeState.TUState.PotentialZombieFns.insert(ParentFn);
   }
 
   SILDebugScope *InlinedAt = nullptr;

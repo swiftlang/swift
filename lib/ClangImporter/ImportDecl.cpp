@@ -18,6 +18,7 @@
 #include "ImporterImpl.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -1304,7 +1305,7 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
 
   // 'self'
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), dc);
-  auto elementTy = ArchetypeBuilder::mapTypeIntoContext(dc, elementInterfaceTy);
+  auto elementTy = dc->mapTypeIntoContext(elementInterfaceTy);
 
   auto paramVarDecl =
       new (C) ParamDecl(/*isLet=*/false, SourceLoc(), SourceLoc(), Identifier(),
@@ -3113,7 +3114,7 @@ namespace {
     /// The importer should use this rather than adding the attribute directly.
     void addObjCAttribute(ValueDecl *decl, Optional<ObjCSelector> name) {
       auto &ctx = Impl.SwiftContext;
-      decl->getAttrs().add(ObjCAttr::create(ctx, name, /*implicit=*/true));
+      decl->getAttrs().add(ObjCAttr::create(ctx, name, /*implicitName=*/true));
 
       // If the declaration we attached the 'objc' attribute to is within a
       // class, record it in the class.
@@ -3301,29 +3302,31 @@ namespace {
       }
 
       SpecialMethodKind kind = SpecialMethodKind::Regular;
-      // FIXME: This doesn't handle implicit properties.
-      if (decl->isPropertyAccessor())
-        kind = SpecialMethodKind::PropertyAccessor;
-      else if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
+      if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.
-      DeclName name = importedName.getDeclName();
       Optional<ForeignErrorConvention> errorConvention;
       bodyParams.push_back(nullptr);
-      auto type = Impl.importMethodType(dc,
-                                        decl,
-                                        decl->getReturnType(),
-                                        { decl->param_begin(),
-                                          decl->param_size() },
-                                        decl->isVariadic(),
-                                        decl->hasAttr<clang::NoReturnAttr>(),
-                                        isInSystemModule(dc),
-                                        &bodyParams.back(),
-                                        importedName,
-                                        name,
-                                        errorConvention,
-                                        kind);
+      Type type;
+      if (decl->isPropertyAccessor()) {
+        const clang::ObjCPropertyDecl *prop = decl->findPropertyDecl();
+        if (!prop)
+          return nullptr;
+        // If the matching property is in a superclass, or if the getter and
+        // setter are redeclared in a potentially incompatible way, bail out.
+        if (prop->getGetterMethodDecl() != decl &&
+            prop->getSetterMethodDecl() != decl)
+          return nullptr;
+        type = Impl.importAccessorMethodType(dc, prop, decl,
+                                             isInSystemModule(dc),
+                                             &bodyParams.back());
+      } else {
+        type = Impl.importMethodType(dc, decl, decl->parameters(),
+                                     decl->isVariadic(), isInSystemModule(dc),
+                                     &bodyParams.back(), importedName,
+                                     errorConvention, kind);
+      }
       if (!type)
         return nullptr;
 
@@ -3340,11 +3343,10 @@ namespace {
 
       auto result = FuncDecl::create(
           Impl.SwiftContext, /*StaticLoc=*/SourceLoc(),
-          StaticSpellingKind::None,
-          /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
+          StaticSpellingKind::None, /*FuncLoc=*/SourceLoc(),
+          importedName.getDeclName(), /*NameLoc=*/SourceLoc(),
           /*Throws=*/importedName.getErrorInfo().hasValue(),
-          /*ThrowsLoc=*/SourceLoc(),
-          /*AccessorKeywordLoc=*/SourceLoc(),
+          /*ThrowsLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
           /*GenericParams=*/nullptr, bodyParams, TypeLoc(), dc, decl);
 
       result->setAccessibility(getOverridableAccessibility(dc));
@@ -3913,8 +3915,7 @@ namespace {
                                          isInSystemModule(dc),
                                          /*isFullyBridgeable*/false);
         if (superclassType) {
-          superclassType =
-              ArchetypeBuilder::mapTypeOutOfContext(result, superclassType);
+          superclassType = result->mapTypeOutOfContext(superclassType);
           assert(superclassType->is<ClassType>() ||
                  superclassType->is<BoundGenericClassType>());
           inheritedTypes.push_back(TypeLoc::withoutLoc(superclassType));
@@ -4117,7 +4118,7 @@ namespace {
           decl->isClassProperty(), /*IsLet*/ false,
           Impl.importSourceLoc(decl->getLocation()),
           name, type, dc);
-      result->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(dc, type));
+      result->setInterfaceType(dc->mapTypeOutOfContext(type));
 
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
@@ -4389,8 +4390,7 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
       genericParams = generic->getGenericParams();
       genericEnv = generic->getGenericEnvironment();
 
-      underlyingType =
-          ArchetypeBuilder::mapTypeIntoContext(generic, underlyingType);
+      underlyingType = generic->mapTypeIntoContext(underlyingType);
     }
   }
 
@@ -5233,12 +5233,10 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Import the type that this method will have.
   Optional<ForeignErrorConvention> errorConvention;
-  DeclName name = importedName.getDeclName();
   bodyParams.push_back(nullptr);
   auto type = Impl.importMethodType(
-      dc, objcMethod, objcMethod->getReturnType(), args, variadic,
-      objcMethod->hasAttr<clang::NoReturnAttr>(), isInSystemModule(dc),
-      &bodyParams.back(), importedName, name, errorConvention,
+      dc, objcMethod, args, variadic, isInSystemModule(dc),
+      &bodyParams.back(), importedName, errorConvention,
       SpecialMethodKind::Constructor);
   if (!type)
     return nullptr;
@@ -5266,7 +5264,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
                             ->getResult()
                             ->castTo<AnyFunctionType>()
                             ->getInput();
-  for (auto other : ownerNominal->lookupDirect(name)) {
+  for (auto other : ownerNominal->lookupDirect(importedName.getDeclName())) {
     auto ctor = dyn_cast<ConstructorDecl>(other);
     if (!ctor || ctor->isInvalid() ||
         ctor->getAttrs().isUnavailable(Impl.SwiftContext) ||
@@ -5343,8 +5341,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Create the actual constructor.
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-      objcMethod, Accessibility::Public, name, /*NameLoc=*/SourceLoc(),
-      failability, /*FailabilityLoc=*/SourceLoc(),
+      objcMethod, Accessibility::Public, importedName.getDeclName(),
+      /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().hasValue(),
       /*ThrowsLoc=*/SourceLoc(), selfVar, bodyParams.back(),
       /*GenericParams=*/nullptr, dc);
@@ -5642,8 +5640,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
                        ->getResult()
                        ->castTo<AnyFunctionType>()
                        ->getResult();
-  auto elementContextTy = ArchetypeBuilder::mapTypeIntoContext(
-      getter, elementTy);
+  auto elementContextTy = getter->mapTypeIntoContext(elementTy);
 
   // Local function to mark the setter unavailable.
   auto makeSetterUnavailable = [&] {

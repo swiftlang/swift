@@ -1061,7 +1061,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
       return false;
     }
 
-    // This is a scalar-to-tuple conversion. Add the  name.  We "know"
+    // This is a scalar-to-tuple conversion. Add the name. We "know"
     // that we're inside a ParenExpr, because ParenExprs are required
     // by the syntax and locator resolution looks through on level of
     // them.
@@ -1313,12 +1313,12 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
-      auto resultType = ArchetypeBuilder::mapTypeIntoContext(
-          method, method->getResultInterfaceType());
+      auto resultType = method->mapTypeIntoContext(
+          method->getResultInterfaceType());
 
       auto *baseMethod = cast<FuncDecl>(base);
-      auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
-          baseMethod, baseMethod->getResultInterfaceType());
+      auto baseResultType = baseMethod->mapTypeIntoContext(
+          baseMethod->getResultInterfaceType());
 
       fixedAny |= checkType(resultType, baseResultType,
                             method->getBodyResultTypeLoc().getSourceRange());
@@ -1335,11 +1335,9 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
     });
 
-    auto resultType = ArchetypeBuilder::mapTypeIntoContext(
-        subscript->getDeclContext(),
+    auto resultType = subscript->getDeclContext()->mapTypeIntoContext(
         subscript->getElementInterfaceType());
-    auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
-        baseSubscript->getDeclContext(),
+    auto baseResultType = baseSubscript->getDeclContext()->mapTypeIntoContext(
         baseSubscript->getElementInterfaceType());
     fixedAny |= checkType(resultType, baseResultType,
                           subscript->getElementTypeLoc().getSourceRange());
@@ -4051,7 +4049,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultInterfaceType();
-    resultType = ArchetypeBuilder::mapTypeIntoContext(func, resultType);
+    resultType = func->mapTypeIntoContext(resultType);
     returnsSelf = func->hasDynamicSelf();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;

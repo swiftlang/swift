@@ -72,7 +72,7 @@ static std::string getClonedName(PartialApplyInst *PAI, IsFragile_t Fragile,
                                  SILFunction *F) {
 
   Mangle::Mangler M;
-  auto P = SpecializationPass::CapturePropagation;
+  auto P = Demangle::SpecializationPass::CapturePropagation;
   FunctionSignatureSpecializationMangler OldMangler(P, M, Fragile, F);
   NewMangling::FunctionSignatureSpecializationMangler NewMangler(P, Fragile, F);
 
@@ -181,7 +181,7 @@ void CapturePropagationCloner::cloneBlocks(
 
     SILArgument *Arg = OrigEntryBB->getArgument(ParamIdx);
 
-    SILValue MappedValue = ClonedEntryBB->createArgument(
+    SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
         remapType(Arg->getType()), Arg->getDecl());
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }

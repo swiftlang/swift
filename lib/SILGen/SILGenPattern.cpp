@@ -222,6 +222,8 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Var:
     return isWildcardPattern(p->getSemanticsProvidingPattern());
   }
+
+  llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
 /// Check to see if the given pattern is a specializing pattern,
@@ -284,6 +286,8 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
   case PatternKind::Typed:
     llvm_unreachable("not semantic");
   }
+
+  llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
 namespace {
@@ -1777,7 +1781,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
           eltValue = eltTL->emitLoad(SGF.B, loc, eltValue,
                                      LoadOwnershipQualifier::Take);
       } else {
-        eltValue = caseBB->createArgument(eltTy);
+        eltValue = caseBB->createPHIArgument(eltTy);
       }
 
       origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);
@@ -1968,7 +1972,8 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
       pattern->forEachVariable([&](VarDecl *V) {
         if (!V->hasName())
           return;
-        block->createArgument(SGF.VarLocs[V].value->getType(), V);
+        block->createPHIArgument(SGF.VarLocs[V].value->getType(),
+                                 ValueOwnershipKind::Any, V);
       });
     }
   }

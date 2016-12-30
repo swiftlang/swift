@@ -79,12 +79,6 @@ namespace {
                            ValueDecl *req,
                            ProtocolConformance *conformance);
 
-    /// Retrieve the generic signature of the synthetic environment.
-    GenericSignature *getSyntheticSignature() const {
-      assert(valid && "Already stole from this generic environment");
-      return syntheticSignature;
-    }
-
     /// Retrieve the synthetic generic environment.
     GenericEnvironment *getSyntheticEnvironment() const {
       assert(valid && "Already stole from this generic environment");
@@ -769,7 +763,7 @@ matchWitness(TypeChecker &tc,
     return RequirementMatch(witness, MatchKind::KindConflict);
 
   // If the witness is invalid, record that and stop now.
-  if (witness->isInvalid())
+  if (witness->isInvalid() || !witness->hasValidSignature())
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
   // Get the requirement and witness attributes.
@@ -1377,7 +1371,7 @@ bool WitnessChecker::findBestWitness(
     }
 
     if (!witness->hasInterfaceType())
-      TC.validateDecl(witness, true);
+      TC.validateDecl(witness);
 
     auto match = matchWitness(TC, Proto, conformance, DC,
                               requirement, witness, reqEnvironment);
@@ -2299,8 +2293,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 
   // Record the type witness.
-  auto *archetype = ArchetypeBuilder::mapTypeIntoContext(
-      Conformance->getProtocol(), assocType->getDeclaredInterfaceType())
+  auto *archetype = Conformance->getProtocol()->mapTypeIntoContext(
+      assocType->getDeclaredInterfaceType())
           ->getAs<ArchetypeType>();
   if (archetype)
     Conformance->setTypeWitness(
@@ -2856,6 +2850,11 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   SmallVector<std::pair<TypeDecl *, Type>, 2> viable;
   SmallVector<std::pair<TypeDecl *, NominalTypeDecl *>, 2> nonViable;
   for (auto candidate : candidates) {
+    // Skip nested generic types.
+    if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.first))
+      if (genericDecl->getGenericParams())
+        continue;
+
     // Check this type against the protocol requirements.
     if (auto checkResult = checkTypeWitness(TC, DC, assocType, 
                                             candidate.second)) {
@@ -2990,7 +2989,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
 
     // Validate the requirement.
     TC.validateDecl(req);
-    if (req->isInvalid())
+    if (req->isInvalid() || !req->hasValidSignature())
       continue;
       
     // Check whether any of the associated types we care about are
@@ -3034,16 +3033,10 @@ static Type mapErrorTypeToOriginal(Type type) {
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
-  if (!witness->hasInterfaceType()) {
-    // Don't cause a recursive type-check of the witness.
-    // FIXME: We shouldn't need this.
-    if (witness->isBeingTypeChecked())
-      return Type();
-
+  if (!witness->hasInterfaceType())
     tc.validateDecl(witness);
-  }
 
-  if (witness->isInvalid())
+  if (witness->isInvalid() || !witness->hasValidSignature())
     return Type();
 
   if (!witness->getDeclContext()->isTypeContext()) {
@@ -3328,12 +3321,12 @@ void ConformanceChecker::resolveTypeWitnesses() {
     // Create a set of type substitutions for all known associated type.
     // FIXME: Base this on dependent types rather than archetypes?
     TypeSubstitutionMap substitutions;
-    substitutions[ArchetypeBuilder::mapTypeIntoContext(Proto, selfType)
-        ->getCanonicalType()->castTo<ArchetypeType>()] = Adoptee;
+    substitutions[Proto->mapTypeIntoContext(selfType)
+        ->castTo<ArchetypeType>()] = Adoptee;
     for (auto member : Proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        auto archetype = ArchetypeBuilder::mapTypeIntoContext(
-            Proto, assocType->getDeclaredInterfaceType())
+        auto archetype = Proto->mapTypeIntoContext(
+            assocType->getDeclaredInterfaceType())
                 ->getAs<ArchetypeType>();
         if (!archetype)
           continue;
@@ -3970,17 +3963,6 @@ void ConformanceChecker::resolveSingleTypeWitness(
   }
 }
 
-// Not all protocol members are requirements.
-static bool isRequirement(ValueDecl *requirement) {
-  if (auto *FD = dyn_cast<FuncDecl>(requirement))
-    if (FD->isAccessor())
-      return false;
-  if (isa<TypeAliasDecl>(requirement) ||
-      isa<NominalTypeDecl>(requirement))
-    return false;
-  return true;
-}
-
 void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Not a value witness");
   assert(!Conformance->hasWitness(requirement) && "Already resolved");
@@ -3992,15 +3974,14 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 
   // Make sure we've validated the requirement.
   if (!requirement->hasInterfaceType())
-    TC.validateDecl(requirement, true);
+    TC.validateDecl(requirement);
 
-  if (requirement->isInvalid()) {
-    // FIXME: Note that there is no witness?
+  if (requirement->isInvalid() || !requirement->hasValidSignature()) {
     Conformance->setInvalid();
     return;
   }
 
-  if (!isRequirement(requirement))
+  if (!TC.isRequirement(requirement))
     return;
 
   // Resolve all associated types before trying to resolve this witness.
@@ -4149,7 +4130,7 @@ void ConformanceChecker::checkConformance() {
       continue;
 
     // Type aliases don't have requirements themselves.
-    if (!isRequirement(requirement))
+    if (!TC.isRequirement(requirement))
       continue;
 
     /// Local function to finalize the witness.
@@ -4236,9 +4217,9 @@ void ConformanceChecker::checkConformance() {
 
     // Make sure we've validated the requirement.
     if (!requirement->hasInterfaceType())
-      TC.validateDecl(requirement, true);
+      TC.validateDecl(requirement);
 
-    if (requirement->isInvalid()) {
+    if (requirement->isInvalid() || !requirement->hasValidSignature()) {
       Conformance->setInvalid();
       continue;
     }
@@ -4327,7 +4308,7 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
   // If we're checking conformance of an existential type to a protocol,
   // do a little bit of extra work to produce a better diagnostic.
   if (T->isExistentialType() &&
-      TC.isSubtypeOf(T, Proto->getDeclaredType(), DC)) {
+      TC.containsProtocol(T, Proto, DC, None)) {
 
     if (!T->isObjCExistentialType()) {
       TC.diagnose(ComplainLoc, diag::protocol_does_not_conform_objc,
@@ -4353,9 +4334,25 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
         enumDecl->derivesProtocolConformance(Proto) && enumDecl->hasRawType()) {
 
+      auto rawType = enumDecl->getRawType();
+
       TC.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                   diag::enum_raw_type_nonconforming_and_nonsynthable,
-                  T, enumDecl->getRawType());
+                  T, rawType);
+
+      // If the reason is that the raw type does not conform to
+      // Equatable, say so.
+      auto equatableProto = TC.getProtocol(enumDecl->getLoc(),
+                                           KnownProtocolKind::Equatable);
+      if (!equatableProto)
+        return;
+
+      if (!TC.conformsToProtocol(rawType, equatableProto, enumDecl, None)) {
+        SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
+        TC.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
+        return;
+      }
+
       return;
     }
   }
@@ -4605,31 +4602,77 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
   return lookupResult;
 }
 
+std::pair<bool, Optional<ProtocolConformanceRef>>
+TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
+                                DeclContext *DC,
+                                ConformanceCheckOptions options,
+                                SourceLoc ComplainLoc,
+                                UnsatisfiedDependency *unsatisfiedDependency) {
+  // If we have a callback to report dependencies, do so.
+  // FIXME: Woefully inadequate.
+  if (unsatisfiedDependency) {
+    if (auto *classDecl = dyn_cast_or_null<ClassDecl>(T->getAnyNominal())) {
+      if ((*unsatisfiedDependency)(requestTypeCheckSuperclass(classDecl)))
+        return std::make_pair(true, None);
+    }
+
+    SmallVector<ProtocolDecl *, 2> protos;
+    if (T->isExistentialType(protos)) {
+      bool anyUnsatisfied = false;
+      for (auto *proto : protos) {
+        if ((*unsatisfiedDependency)(requestInheritedProtocols(proto)))
+          anyUnsatisfied = true;
+      }
+      if (anyUnsatisfied)
+        return std::make_pair(true, None);
+    }
+  }
+
+  // Just punt to the older conformsToProtocol() and hope it doesn't
+  // recurse.
+  auto conformance = conformsToProtocol(T, Proto, DC, options, ComplainLoc);
+  return std::make_pair(false, conformance);
+}
+
 /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
 ///
 /// These conformances might not appear in any substitution lists produced
 /// by Sema, since bridging is done at the SILGen level, so we have to
 /// force them here to ensure SILGen can find them.
-void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
-                                                      Type type) {
+bool TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
+                                                      Type type,
+                                 UnsatisfiedDependency *unsatisfiedDependency) {
   class Walker : public TypeWalker {
     TypeChecker &TC;
     DeclContext *DC;
     ProtocolDecl *Proto;
+    UnsatisfiedDependency *Callback;
 
   public:
-    Walker(TypeChecker &tc, DeclContext *dc, ProtocolDecl *proto)
-      : TC(tc), DC(dc), Proto(proto) { }
+    bool WasUnsatisfied;
+
+    Walker(TypeChecker &tc, DeclContext *dc, ProtocolDecl *proto,
+           UnsatisfiedDependency *unsatisfiedDependency)
+      : TC(tc), DC(dc), Proto(proto),
+        Callback(unsatisfiedDependency),
+        WasUnsatisfied(false) { }
 
     Action walkToTypePre(Type ty) override {
-      ConformanceCheckOptions options = ConformanceCheckFlags::InExpression
-          | ConformanceCheckFlags::Used
-          | ConformanceCheckFlags::SuppressDependencyTracking;
+      ConformanceCheckOptions options =
+          (ConformanceCheckFlags::InExpression |
+           ConformanceCheckFlags::Used |
+           ConformanceCheckFlags::SuppressDependencyTracking);
 
       // If we have a nominal type, "use" its conformance to
       // _ObjectiveCBridgeable if it has one.
       if (auto *nominalDecl = ty->getAnyNominal()) {
-        (void)TC.conformsToProtocol(ty, Proto, DC, options);
+        auto result = TC.conformsToProtocol(ty, Proto, DC, options,
+                                            /*ComplainLoc=*/SourceLoc(),
+                                            Callback);
+
+        WasUnsatisfied |= result.first;
+        if (WasUnsatisfied)
+          return Action::Stop;
 
         // Set and Dictionary bridging also requires the conformance
         // of the key type to Hashable.
@@ -4641,7 +4684,14 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
               auto keyType = args[0];
               auto *hashableProto =
                 TC.Context.getProtocol(KnownProtocolKind::Hashable);
-              (void)TC.conformsToProtocol(keyType, hashableProto, DC, options);
+
+              auto result = TC.conformsToProtocol(
+                  keyType, hashableProto, DC, options,
+                  /*ComplainLoc=*/SourceLoc(), Callback);
+
+              WasUnsatisfied |= result.first;
+              if (WasUnsatisfied)
+                return Action::Stop;
             }
           }
         }
@@ -4653,28 +4703,48 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
 
   auto proto = getProtocol(SourceLoc(),
                            KnownProtocolKind::ObjectiveCBridgeable);
-  if (!proto) return;
+  if (!proto) return false;
 
-  type.walk(Walker(*this, dc, proto));
+  Walker walker(*this, dc, proto, unsatisfiedDependency);
+  type.walk(walker);
+  assert(!walker.WasUnsatisfied || unsatisfiedDependency);
+  return walker.WasUnsatisfied;
 }
 
-void TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
-       DeclContext *dc, BoundGenericType *bound) {
+bool TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
+       DeclContext *dc, BoundGenericType *bound,
+       UnsatisfiedDependency *unsatisfiedDependency) {
   auto proto = getProtocol(SourceLoc(),
                            KnownProtocolKind::ObjectiveCBridgeable);
-  if (!proto) return;
+  if (!proto) return false;
 
   // Check whether the bound generic type itself is bridged to
   // Objective-C.
-  ConformanceCheckOptions options = ConformanceCheckFlags::InExpression
-    | ConformanceCheckFlags::SuppressDependencyTracking;
-  if (!conformsToProtocol(bound->getDecl()->getDeclaredType(), proto, dc,
-                          options))
-    return;
+  ConformanceCheckOptions options =
+    (ConformanceCheckFlags::InExpression |
+     ConformanceCheckFlags::SuppressDependencyTracking);
+  auto result = conformsToProtocol(
+      bound->getDecl()->getDeclaredType(), proto, dc,
+      options, /*ComplainLoc=*/SourceLoc(),
+      unsatisfiedDependency);
+
+  // Unsatisfied dependency case.
+  if (result.first)
+    return true;
+
+  // Failure case.
+  if (!result.second)
+    return false;
+
+  bool anyUnsatisfied = false;
 
   // Mark the conformances within the arguments.
-  for (auto arg : bound->getGenericArgs())
-    useObjectiveCBridgeableConformances(dc, arg);
+  for (auto arg : bound->getGenericArgs()) {
+    anyUnsatisfied |= useObjectiveCBridgeableConformances(
+        dc, arg, unsatisfiedDependency);
+  }
+
+  return anyUnsatisfied;
 }
 
 void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
@@ -5475,6 +5545,17 @@ void DefaultWitnessChecker::recordWitness(
     TC.synthesizeWitnessAccessorsForStorage(
                                         cast<AbstractStorageDecl>(requirement),
                                         storage);
+}
+
+// Not all protocol members are requirements.
+bool TypeChecker::isRequirement(ValueDecl *requirement) {
+  if (auto *FD = dyn_cast<FuncDecl>(requirement))
+    if (FD->isAccessor())
+      return false;
+  if (isa<TypeAliasDecl>(requirement) ||
+      isa<NominalTypeDecl>(requirement))
+    return false;
+  return true;
 }
 
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {

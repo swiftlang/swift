@@ -227,6 +227,9 @@ def disable_sil_linking : Flag<["-"], "disable-sil-linking">,
 def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
   HelpText<"Dump Clang diagnostics to stderr">;
 
+def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
+  HelpText<"Disable validating system headers in the Clang importer">;
+
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 
@@ -274,6 +277,9 @@ def playground_high_performance : Flag<["-"], "playground-high-performance">,
 
 def disable_playground_transform : Flag<["-"], "disable-playground-transform">,
   HelpText<"Disable playground transformation">;
+
+def pc_macro : Flag<["-"], "pc-macro">,
+  HelpText<"Apply the 'program counter simulation' macro">;
 
 def use_jit : Flag<["-"], "use-jit">,
   HelpText<"Register Objective-C classes as if the JIT were in use">;
