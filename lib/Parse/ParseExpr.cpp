@@ -2670,7 +2670,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
                                StringRef NewName) {
   auto PoundTok = Tok;
   SourceLoc PoundLoc = consumeToken();
-  // Parse a tuple of args
+  // Parse a tuple of args.
   if (!Tok.is(tok::l_paren)) {
     diagnose(Tok, diag::expected_arg_list_in_object_literal);
     return makeParserError();
@@ -2693,6 +2693,15 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
     return makeParserCodeCompletionResult<Expr>();
   if (status.isError())
     return makeParserError();
+
+  // Arguments must be literals and must not be interpolated string literals.
+  for (auto arg : args) {
+    if (!isa<LiteralExpr>(arg) || isa<InterpolatedStringLiteralExpr>(arg)) {
+      diagnose(arg->getLoc(),
+               diag::expected_uninterpolated_literal_arg_in_object_literal);
+      return makeParserError();
+    }
+  }
 
   // If the legacy name was used (e.g., #Image instead of #imageLiteral)
   // prompt an error and a fixit.
