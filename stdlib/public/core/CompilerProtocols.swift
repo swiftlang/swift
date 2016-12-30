@@ -722,7 +722,7 @@ public protocol _ExpressibleByImageLiteral {
   ///
   /// Do not call this initializer directly. Instead, initialize a variable or
   /// constant using an image literal.
-  init(imageLiteralResourceName path: StaticString)
+  init(imageLiteralResourceName path: String)
 }
 
 /// A type that can be initialized using a file reference literal (e.g.
