@@ -553,12 +553,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
+      auto eTy = E->getType();
       bool isExistential = false;
-      if (auto metaTy = E->getType()->getAs<MetatypeType>())
+      if (auto metaTy = eTy->getAs<MetatypeType>())
         isExistential = metaTy->getInstanceType()->isAnyExistentialType();
       if (!isExistential &&
-          !TC.lookupConstructors(const_cast<DeclContext *>(DC),
-                                 E->getType()).empty()) {
+          !eTy->is<TupleType>() &&
+          !TC.lookupConstructors(const_cast<DeclContext *>(DC), eTy).empty()) {
         TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
           .fixItInsertAfter(E->getEndLoc(), "()");
       }
