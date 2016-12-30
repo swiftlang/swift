@@ -2159,8 +2159,10 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   // @lvalue T, where T is a fresh type variable that will be the object type of
   // this particular expression type.
   if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
+    // Newly allocated type should be explicitly materializable,
+    // it's invalid to use non-materializable types as assignment destination.
     auto objectTv = createTypeVariable(getConstraintLocator(dest),
-                                       /*options=*/0);
+                                       TVO_MustBeMaterializable);
     auto refTv = LValueType::get(objectTv);
     addConstraint(ConstraintKind::Bind, typeVar, refTv,
                   getConstraintLocator(dest));
