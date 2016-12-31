@@ -227,6 +227,11 @@ namespace {
         }
       }
 
+      if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
+        LTI.collectedTypes.insert(CS.getType(FVE).getPointer());
+        return { false, expr };
+      }
+
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
         if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
           if (varDecl->isAnonClosureParam()) {
