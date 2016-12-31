@@ -1235,30 +1235,6 @@ void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
   Types[k.getCachingKey()] = tl;
 }
 
-#ifndef NDEBUG
-/// Is this type a lowered type?
-static bool isLoweredType(CanType type) {
-  if (isa<LValueType>(type) || isa<InOutType>(type))
-    return false;
-  if (isa<AnyFunctionType>(type))
-    return false;
-  if (auto tuple = dyn_cast<TupleType>(type)) {
-    for (auto elt : tuple.getElementTypes())
-      if (!isLoweredType(elt))
-        return false;
-    return true;
-  }
-  OptionalTypeKind optKind;
-  if (auto objectType = type.getAnyOptionalObjectType(optKind)) {
-    return (optKind == OTK_Optional && isLoweredType(objectType));
-  }
-  if (auto meta = dyn_cast<AnyMetatypeType>(type)) {
-    return meta->hasRepresentation();
-  }
-  return true;
-}
-#endif
-
 /// Lower each of the elements of the substituted type according to
 /// the abstraction pattern of the given original type.
 static CanTupleType getLoweredTupleType(TypeConverter &tc,
@@ -1525,7 +1501,7 @@ const TypeLowering &TypeConverter::getTypeLowering(SILType type) {
 const TypeLowering &
 TypeConverter::getTypeLoweringForLoweredType(TypeKey key) {
   auto type = key.SubstType;
-  assert(isLoweredType(type) && "type is not lowered!");
+  assert(type->isLegalSILType() && "type is not lowered!");
   (void)type;
 
   // Re-using uncurry level 0 is reasonable because our uncurrying
@@ -1542,7 +1518,7 @@ TypeConverter::getTypeLoweringForLoweredType(TypeKey key) {
 const TypeLowering &
 TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   assert(!find(key) && "re-entrant or already cached");
-  assert(isLoweredType(key.SubstType) && "type is not already lowered");
+  assert(key.SubstType->isLegalSILType() && "type is not already lowered");
 
 #ifndef NDEBUG
   // Catch reentrancy bugs.

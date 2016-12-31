@@ -207,6 +207,20 @@ class Z {
 
 }
 
+// Make sure we erase dynamic Self in a metatype instance type when
+// performing SIL type substitution.
+
+func makeInstance<T: FactoryBase>(_ cls: T.Type) -> T {
+    return cls.init()
+}
+
+class FactoryBase {
+    required init() { }
+    func before() -> Self {
+        return makeInstance(type(of: self))
+    }
+}
+
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
 // CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1f
 

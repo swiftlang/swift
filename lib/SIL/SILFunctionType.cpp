@@ -2209,6 +2209,28 @@ namespace {
                                            substObjectType));
     }
 
+    /// Metatypes get DynamicSelfType stripped off the instance type.
+    CanType visitMetatypeType(CanMetatypeType origType) {
+      CanType origInstanceType = origType.getInstanceType();
+      CanType substInstanceType = origInstanceType.subst(
+            Subst, Conformances, None)->getCanonicalType();
+
+      // If the substitution didn't change anything, we know that the
+      // original type was a lowered type, so we're good.
+      if (origInstanceType == substInstanceType) {
+        return origType;
+      }
+
+      // If this is a DynamicSelf metatype, turn it into a metatype of the
+      // underlying self type.
+      if (auto dynamicSelf = dyn_cast<DynamicSelfType>(substInstanceType)) {
+        substInstanceType = dynamicSelf.getSelfType();
+      }
+
+      return CanMetatypeType::get(substInstanceType,
+                                  origType->getRepresentation());
+    }
+
     /// Any other type is would be a valid type in the AST.  Just
     /// apply the substitution on the AST level and then lower that.
     CanType visitType(CanType origType) {
