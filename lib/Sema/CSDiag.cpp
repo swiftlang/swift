@@ -1990,8 +1990,10 @@ public:
       TCCOptions options = TCCOptions(),
       ExprTypeCheckListener *listener = nullptr,
       bool allowFreeTypeVariables = true);
-  Expr *typeCheckChildIndependently(Expr *subExpr, TCCOptions options) {
-    return typeCheckChildIndependently(subExpr, Type(), CTP_Unused, options);
+  Expr *typeCheckChildIndependently(Expr *subExpr, TCCOptions options,
+                                    bool allowFreeTypeVariables = true) {
+    return typeCheckChildIndependently(subExpr, Type(), CTP_Unused, options,
+                                       nullptr, allowFreeTypeVariables);
   }
 
   Type getTypeOfTypeCheckedChildIndependently(Expr *subExpr,
@@ -6050,13 +6052,21 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 
   auto destType = destExpr->getType();
   if (destType->is<UnresolvedType>() || destType->hasTypeVariable()) {
-    // If we have no useful type information from the destination, just type
+    // Look closer into why destination has unresolved types since such
+    // means that destination has diagnosible structural problems, and it's
+    // better to diagnose destination (if possible) before moving on to
+    // the source of the assignment.
+    destExpr = typeCheckChildIndependently(
+        destExpr, TCC_AllowLValue | TCC_ForceRecheck, false);
+    if (!destExpr)
+      return true;
+
+    // If re-checking destination didn't produce diagnostic, let's just type
     // check the source without contextual information.  If it succeeds, then we
     // win, but if it fails, we'll have to diagnose this another way.
     return !typeCheckChildIndependently(assignExpr->getSrc());
   }
-  
-  
+
   // If the result type is a non-lvalue, then we are failing because it is
   // immutable and that's not a great thing to assign to.
   if (!destType->isLValueType()) {

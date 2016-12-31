@@ -5,5 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -typecheck
-guard let f=.h.a=[]{
+// RUN: not %target-swift-frontend %s -emit-ir
+// REQUIRES: asserts
+for in.E={return $0 c
