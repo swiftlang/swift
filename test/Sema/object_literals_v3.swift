@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3 %s
+// RUN: %target-typecheck-verify-swift -swift-version 3
 
 struct Path: _ExpressibleByFileReferenceLiteral {
   init(fileReferenceLiteralResourceName: String) {}
