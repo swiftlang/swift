@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4 %s
 // REQUIRES: OS=ios
 
 struct S: _ExpressibleByColorLiteral {

@@ -2694,9 +2694,14 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
   if (status.isError())
     return makeParserError();
 
-  // Arguments must be literals and must not be interpolated string literals.
+  // Args must be literals and must not be interpolated string literals.
   for (auto arg : args) {
     if (!isa<LiteralExpr>(arg) || isa<InterpolatedStringLiteralExpr>(arg)) {
+      if (Context.isSwiftVersion3()) {
+        diagnose(arg->getLoc(),
+               diag::non_literal_or_interpolated_literal_arg_in_object_literal);
+        break;
+      }
       diagnose(arg->getLoc(),
                diag::expected_uninterpolated_literal_arg_in_object_literal);
       return makeParserError();

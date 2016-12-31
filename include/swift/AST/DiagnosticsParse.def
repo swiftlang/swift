@@ -1009,7 +1009,7 @@ ERROR(dollar_numeric_too_large,none,
 ERROR(numeric_literal_numeric_member,none,
       "expected named member of numeric literal", ())
 ERROR(standalone_dollar_identifier,none,
-      "'$' is not an identifier; use backticks to escape it", ())
+     "'$' is not an identifier; use backticks to escape it", ())
 
 ERROR(anon_closure_arg_not_in_closure,none,
       "anonymous closure argument not contained in a closure", ())
@@ -1032,9 +1032,9 @@ ERROR(cannot_capture_fields,none,
 ERROR(expected_closure_result_type,none,
       "expected closure result type after '->'", ())
 ERROR(expected_closure_in,none,
-      "expected 'in' after the closure signature", ())
+   "expected 'in' after the closure signature", ())
 ERROR(unexpected_tokens_before_closure_in,none,
-      "unexpected tokens prior to 'in'", ())
+   "unexpected tokens prior to 'in'", ())
 ERROR(expected_closure_rbrace,none,
       "expected '}' at end of closure", ())
 
@@ -1095,12 +1095,15 @@ ERROR(expected_object_literal_identifier,none,
       "expected identifier after '#' in object literal expression", ())
 ERROR(expected_arg_list_in_object_literal,none,
       "expected argument list in object literal", ())
-ERROR(expected_uninterpolated_literal_arg_in_object_literal,none,
-      "argument in object literal must be an uninterpolated literal", ())
 ERROR(object_literal_legacy_name,none,
       "'%0' has been renamed to '%1", (StringRef, StringRef))
 ERROR(legacy_object_literal_syntax,none,
       "object literal syntax no longer uses '[# ... #]'", ())
+ERROR(expected_uninterpolated_literal_arg_in_object_literal,none,
+      "argument in object literal must be an uninterpolated literal", ())
+WARNING(non_literal_or_interpolated_literal_arg_in_object_literal,none,
+        "non-literal or interpolated literal arguments in object literals are "
+        "deprecated", ())
 
 // If expressions
 ERROR(expected_expr_after_if_question,none,
@@ -1179,16 +1182,16 @@ ERROR(decl_attribute_applied_to_type,none,
       "attribute can only be applied to declarations, not types", ())
 
 ERROR(attr_expected_lparen,none,
-      "expected '(' in '%0' %select{attribute|modifier}1", (StringRef, bool))
+"expected '(' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
 ERROR(attr_expected_rparen,none,
-      "expected ')' in '%0' %select{attribute|modifier}1", (StringRef, bool))
+"expected ')' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
 ERROR(attr_expected_comma,none,
-      "expected ',' in '%0' %select{attribute|modifier}1", (StringRef, bool))
+"expected ',' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
 ERROR(attr_expected_string_literal,none,
-      "expected string literal in '%0' attribute", (StringRef))
+"expected string literal in '%0' attribute", (StringRef))
 
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
@@ -1197,7 +1200,7 @@ ERROR(swift_native_objc_runtime_base_must_be_identifier,none,
       "@_swift_native_objc_runtime_base class name must be an identifier", ())
 
 ERROR(attr_interpolated_string,none,
-      "%0 cannot be an interpolated string literal", (StringRef))
+"%0 cannot be an interpolated string literal", (StringRef))
 
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
@@ -1214,7 +1217,7 @@ ERROR(attr_availability_unavailable_deprecated,none,
       "'deprecated'", (StringRef))
 
 WARNING(attr_availability_unknown_platform,none,
-        "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+"unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
 ERROR(attr_availability_invalid_renamed,none,
       "'renamed' argument of '%0' attribute must be an operator, identifier, "
       "or full function name, optionally prefixed by a type name", (StringRef))
