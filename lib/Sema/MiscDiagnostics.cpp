@@ -15,9 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "MiscDiagnostics.h"
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
@@ -1409,40 +1410,263 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
   class DiagnoseWalker : public ASTWalker {
     ASTContext &Ctx;
     SmallVector<AbstractClosureExpr *, 4> Closures;
+
+    enum IsIndirectlyReferenced_t : bool {
+      IsDirectlyReferenced = false,
+      IsIndirectlyReferenced = true
+    };
+    using ReferenceCycleRoot =
+        llvm::PointerIntPair<const VarDecl *, 1, IsIndirectlyReferenced_t>;
+    struct ExprSelfUseInfo {
+      /// Set if the expression is 'self'
+      unsigned IsSelfRef : 1;
+      /// Set if the expression is an implicit declref.  When paired with the
+      /// first field, this can be used to determine if a self reference is
+      /// implicit.
+      unsigned IsImplicitRef : 1;
+
+      /// Returns a pair where the first element is true if the expression is
+      /// 'self' and the second element is true if the expression is implicit.
+      static ExprSelfUseInfo get(const Expr *E) {
+        auto *DRE = dyn_cast<DeclRefExpr>(E);
+        return {DRE && isa<VarDecl>(DRE->getDecl()) &&
+                    cast<VarDecl>(DRE->getDecl())->isSelfParameter() &&
+                    // Metatype self captures don't extend the lifetime of an
+                    // object.
+                    !DRE->getType()->is<MetatypeType>() &&
+                    DRE->getType()->hasReferenceSemantics(),
+                DRE && DRE->isImplicit()};
+      }
+
+      bool isImplicitSelfUseLikelyToCauseCycle() const {
+        return IsSelfRef && IsImplicitRef;
+      }
+    };
+
   public:
     explicit DiagnoseWalker(ASTContext &ctx, AbstractClosureExpr *ACE)
         : Ctx(ctx), Closures() {
-          if (ACE)
-            Closures.push_back(ACE);
-        }
+      if (ACE)
+        Closures.push_back(ACE);
+    }
 
-    /// Return true if this is an implicit reference to self which is required
-    /// to be explicit in an escaping closure. Metatype references and value
-    /// type references are excluded.
-    static bool isImplicitSelfParamUseLikelyToCauseCycle(Expr *E) {
-      auto *DRE = dyn_cast<DeclRefExpr>(E);
-
-      if (!DRE || !DRE->isImplicit() || !isa<VarDecl>(DRE->getDecl()) ||
-          !cast<VarDecl>(DRE->getDecl())->isSelfParameter())
+    static bool isStronglyOwnedVariable(const VarDecl *var) {
+      if (!var->getType()->hasReferenceSemantics())
         return false;
 
-      // Defensive check for type. If the expression doesn't have type here, it
-      // should have been diagnosed somewhere else.
-      Type ty = DRE->getType();
-      assert(ty && "Implicit self parameter ref without type");
-      if (!ty)
-        return false;
+      if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+        if (OA->get() != ReferenceOwnership::Strong)
+          return false;
 
-      // Metatype self captures don't extend the lifetime of an object.
-      if (ty->is<MetatypeType>())
-        return false;
-
-      // If self does not have reference semantics, it is very unlikely that
-      // capturing it will create a reference cycle.
-      if (!ty->hasReferenceSemantics())
+      if (!var->hasStorage())
         return false;
 
       return true;
+    }
+
+    static bool variableIsCycleRoot(const VarDecl *var,
+                                    ReferenceCycleRoot &owner) {
+      if (!isStronglyOwnedVariable(var))
+        return false;
+
+      // Only consider explicitly initialized variables.  This rejects e.g.
+      // variables bound during pattern matching.
+      if (var->hasNonPatternBindingInit())
+        return false;
+      owner.setPointer(var);
+      return true;
+    }
+
+    static bool findReferenceCycleRoot(Expr *E, ReferenceCycleRoot &root) {
+      while (true) {
+        E = E->getSemanticsProvidingExpr();
+
+        if (DotSyntaxCallExpr *call = dyn_cast<DotSyntaxCallExpr>(E)) {
+          E = call->getArg();
+          continue;
+        }
+
+        if (LoadExpr *LE = dyn_cast<LoadExpr>(E)) {
+          E = LE->getSubExpr();
+          continue;
+        }
+
+        if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+          VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl());
+          if (!VD)
+            return false;
+          return variableIsCycleRoot(VD, root);
+        }
+
+        if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+          auto selfUse = ExprSelfUseInfo::get(MRE->getBase());
+          // If the member reference is implicit and not rooted at
+          // implicit 'self' then assume it's generated code and does the right
+          // thing.
+          if (MRE->isImplicit() && !selfUse.IsSelfRef)
+            return false;
+
+          VarDecl *property = dyn_cast<VarDecl>(MRE->getMember().getDecl());
+          // If this is not a strongly-owned variable or a reference to 'self'
+          // then bail.
+          if (!(isStronglyOwnedVariable(property) || selfUse.IsSelfRef))
+            return false;
+
+          root.setInt(IsIndirectlyReferenced);
+          E = MRE->getBase();
+          continue;
+        }
+
+        return false;
+      }
+    }
+
+    /// Check whether the given argument is a block which captures a
+    /// variable.
+    static Expr *findCapturingExpr(Expr *E, ReferenceCycleRoot &root) {
+      assert(root.getPointer());
+
+      E = E->getSemanticsProvidingExpr();
+      if (auto *IIOE = dyn_cast<InjectIntoOptionalExpr>(E)) {
+        E = IIOE->getSubExpr();
+      }
+
+      auto *ACE = dyn_cast<AbstractClosureExpr>(E);
+      if (!ACE) {
+        return nullptr;
+      }
+
+      // @noescape closures do not cause reference cycles.
+      if (!ACE->getType()->hasError() &&
+          ACE->getType()->castTo<AnyFunctionType>()->isNoEscape()) {
+        return nullptr;
+      }
+
+      TypeChecker::computeCaptures(ACE);
+      for (auto &cap : ACE->getCaptureInfo().getCaptures()) {
+        if (cap.getDecl() == root.getPointer())
+          return ACE;
+      }
+
+      return nullptr;
+    }
+
+    void diagnoseReferenceCyclesInLazyVarClosure(AbstractClosureExpr *CE) {
+      auto *DC = dyn_cast_or_null<PatternBindingInitializer>(CE->getParent());
+      if (!DC) {
+        return;
+      }
+
+      // FIXME: This does not handle complex patterns like
+      // lazy var (a, b) = { ... }
+      auto *lazyVar = DC->getInitializedLazyVar();
+      if (!lazyVar) {
+        return;
+      }
+
+      auto *selfVar = DC->getImplicitSelfDecl();
+      ReferenceCycleRoot root{selfVar, IsIndirectlyReferenced};
+      if (Expr *capturer = findCapturingExpr(CE, root)) {
+        if (lazyVar->getLoc().isValid()) {
+          lazyVar->diagnose(diag::warn_reference_cycle,
+                            root.getPointer()->getName());
+          Ctx.Diags.diagnose(capturer->getLoc(),
+                             diag::note_reference_cycle_owner, root.getInt(),
+                             root.getPointer()->getName());
+        } else {
+          Ctx.Diags.diagnose(capturer->getLoc(), diag::warn_reference_cycle,
+                             root.getPointer()->getName());
+          Ctx.Diags.diagnose(capturer->getLoc(),
+                             diag::note_reference_cycle_owner, root.getInt(),
+                             root.getPointer()->getName());
+        }
+
+          if (auto *CCE = dyn_cast<const ClosureExpr>(capturer)) {
+            auto diag = Ctx.Diags.diagnose(CCE->getLoc(),
+                                       diag::note_capture_variable_explicitly_silence,
+                                           root.getPointer()->getName());
+            emitFixItsForExplicitClosure(Ctx.Diags,
+                                         root.getPointer()->getLoc(), CCE,
+                                         diag,
+                                         root.getPointer()->getName().str());
+          }
+      }
+    }
+
+    void diagnoseReferenceCyclesInAssignment(AssignExpr *AE) {
+      if (auto *MRE = dyn_cast<MemberRefExpr>(AE->getDest())) {
+        ReferenceCycleRoot root;
+        if (!findReferenceCycleRoot(MRE, root))
+          return;
+
+        if (Expr *capturer = findCapturingExpr(AE->getSrc(), root)) {
+          if (MRE->getLoc().isValid()) {
+            Ctx.Diags.diagnose(MRE->getLoc(), diag::warn_reference_cycle,
+                               root.getPointer()->getName());
+            Ctx.Diags.diagnose(capturer->getLoc(),
+                               diag::note_reference_cycle_owner, root.getInt(),
+                               root.getPointer()->getName());
+          } else {
+            Ctx.Diags.diagnose(capturer->getLoc(), diag::warn_reference_cycle,
+                               root.getPointer()->getName());
+            Ctx.Diags.diagnose(capturer->getLoc(),
+                               diag::note_reference_cycle_owner, root.getInt(),
+                               root.getPointer()->getName());
+          }
+
+          if (auto *CCE = dyn_cast<const ClosureExpr>(capturer)) {
+            auto diag = Ctx.Diags.diagnose(CCE->getLoc(),
+                                       diag::note_capture_variable_explicitly_silence,
+                                           root.getPointer()->getName());
+            emitFixItsForExplicitClosure(Ctx.Diags,
+                                         root.getPointer()->getLoc(), CCE,
+                                         diag,
+                                         root.getPointer()->getName().str());
+          }
+          return;
+        }
+      }
+    }
+
+    void diagnoseReferenceCyclesInCall(ApplyExpr *AE) {
+      ReferenceCycleRoot root;
+      if (!findReferenceCycleRoot(AE->getFn(), root))
+        return;
+
+      Expr *Arg = AE->getArg();
+      auto handleArgument = [&](Expr *arg) {
+        auto *CE = dyn_cast<AbstractClosureExpr>(arg);
+        if (!CE || !isClosureRequiringSelfQualification(CE))
+          return;
+
+        if (Expr *capturer = findCapturingExpr(arg, root)) {
+          Ctx.Diags.diagnose(CE->getLoc(), diag::warn_reference_cycle,
+                             root.getPointer()->getName());
+          Ctx.Diags.diagnose(capturer->getLoc(),
+                             diag::note_reference_cycle_thru_call,
+                             root.getPointer()->getName());
+          if (auto *CCE = dyn_cast<const ClosureExpr>(capturer)) {
+            auto diag = Ctx.Diags.diagnose(CCE->getLoc(),
+                                       diag::note_capture_variable_explicitly_silence,
+                                           root.getPointer()->getName());
+            emitFixItsForExplicitClosure(Ctx.Diags,
+                                         root.getPointer()->getLoc(), CCE,
+                                         diag,
+                                         root.getPointer()->getName().str());
+          }
+        }
+      };
+
+      if (auto *parenArgs = dyn_cast<ParenExpr>(Arg)) {
+        return handleArgument(parenArgs->getSubExpr());
+      }
+
+      if (auto *argTuple = dyn_cast<TupleExpr>(Arg)) {
+        for (auto *Argument : argTuple->getElements()) {
+          handleArgument(Argument);
+        }
+        return;
+      }
     }
 
     /// Return true if this is a closure expression that will require explicit
@@ -1471,36 +1695,46 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
+        // Try to catch simple reference cycles in calls and assignments.
+        diagnoseReferenceCyclesInLazyVarClosure(CE);
+
         // If this is a potentially-escaping closure expression, start looking
         // for references to self if we aren't already.
         if (isClosureRequiringSelfQualification(CE))
           Closures.push_back(CE);
       }
 
+      if (auto *CE = dyn_cast<CallExpr>(E)) {
+        diagnoseReferenceCyclesInCall(CE);
+      } else if (auto *AE = dyn_cast<AssignExpr>(E)) {
+        diagnoseReferenceCyclesInAssignment(AE);
+      }
 
       // If we aren't in a closure, no diagnostics will be produced.
       if (Closures.size() == 0)
         return { true, E };
 
       auto &Diags = Ctx.Diags;
-      
       // Diagnostics should correct the innermost closure
-      auto *ACE = Closures[Closures.size() - 1];
+      auto *ACE = Closures.back();
       assert(ACE);
-      
+
       SourceLoc memberLoc = SourceLoc();
-      if (auto *MRE = dyn_cast<MemberRefExpr>(E))
-        if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase())) {
+      if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+        auto selfUse = ExprSelfUseInfo::get(MRE->getBase());
+        if (selfUse.isImplicitSelfUseLikelyToCauseCycle()) {
           auto baseName = MRE->getMember().getDecl()->getBaseName();
           memberLoc = MRE->getLoc();
           Diags.diagnose(memberLoc,
                          diag::property_use_in_closure_without_explicit_self,
                          baseName.getIdentifier());
         }
+      }
 
       // Handle method calls with a specific diagnostic + fixit.
-      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
-        if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase()) &&
+      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E)) {
+        auto selfUse = ExprSelfUseInfo::get(DSCE->getBase());
+        if (selfUse.isImplicitSelfUseLikelyToCauseCycle() &&
             isa<DeclRefExpr>(DSCE->getFn())) {
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
           memberLoc = DSCE->getLoc();
@@ -1508,19 +1742,21 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
                          diag::method_call_in_closure_without_explicit_self,
                          MethodExpr->getDecl()->getBaseIdentifier());
         }
+      }
 
       if (memberLoc.isValid()) {
         emitFixIts(Diags, memberLoc, ACE);
         return { false, E };
       }
-      
+
       // Catch any other implicit uses of self with a generic diagnostic.
-      if (isImplicitSelfParamUseLikelyToCauseCycle(E))
+      auto selfUse = ExprSelfUseInfo::get(E);
+      if (selfUse.isImplicitSelfUseLikelyToCauseCycle())
         Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
 
       return { true, E };
     }
-    
+
     Expr *walkToExprPost(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         if (isClosureRequiringSelfQualification(CE)) {
@@ -1528,7 +1764,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           Closures.pop_back();
         }
       }
-      
+
       return E;
     }
 
@@ -1544,10 +1780,15 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           // capture 'self' explicitly will result in an error, and using
           // 'self.' explicitly will be accessing something other than the
           // self param.
-          // FIXME: We could offer a special fixit in the [weak self] case to insert 'self?.'...
+          // FIXME: We could offer a special fixit in the [weak self] case to
+          // insert 'self?.'...
           return;
         }
-        emitFixItsForExplicitClosure(Diags, memberLoc, CE);
+        Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
+          .fixItInsert(memberLoc, "self.");
+        auto diag = Diags.diagnose(CE->getLoc(),
+                                   diag::note_capture_self_explicitly);
+        emitFixItsForExplicitClosure(Diags, memberLoc, CE, diag, "self");
       } else {
         // If this wasn't an explicit closure, just offer the fix-it to
         // reference self explicitly.
@@ -1555,7 +1796,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           .fixItInsert(memberLoc, "self.");
       }
     }
-    
+
     /// Diagnose any captures which might have been an attempt to capture
     /// \c self strongly, but do not actually enable implicit \c self. Returns
     /// whether there were any such captures to diagnose.
@@ -1572,7 +1813,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         } else {
           Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
         }
-        
+
         return true;
       }
       return false;
@@ -1583,17 +1824,15 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     /// or by using \c self. explicitly.
     void emitFixItsForExplicitClosure(DiagnosticEngine &Diags,
                                       SourceLoc memberLoc,
-                                      const ClosureExpr *closureExpr) {
-      Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
-        .fixItInsert(memberLoc, "self.");
-      auto diag = Diags.diagnose(closureExpr->getLoc(),
-                                 diag::note_capture_self_explicitly);
+                                      const ClosureExpr *closureExpr,
+                                      InFlightDiagnostic &diag,
+                                      StringRef subject) {
       // There are four different potential fix-its to offer based on the
       // closure signature:
       //   1. There is an existing capture list which already has some
       //      entries. We need to insert 'self' into the capture list along
       //      with a separating comma.
-      //   2. There is an existing capture list, but it is empty (jusr '[]').
+      //   2. There is an existing capture list, but it is empty (just '[]').
       //      We can just insert 'self'.
       //   3. Arguments or types are already specified in the signature,
       //      but there is no existing capture list. We will need to insert
@@ -1602,10 +1841,10 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       //      list as well as 'in'.
       const auto brackets = closureExpr->getBracketRange();
       if (brackets.isValid()) {
-        emitInsertSelfIntoCaptureListFixIt(brackets, diag);
+        emitInsertSelfIntoCaptureListFixIt(brackets, diag, subject);
       }
       else {
-        emitInsertNewCaptureListFixIt(closureExpr, diag);
+        emitInsertNewCaptureListFixIt(closureExpr, diag, subject);
       }
     }
 
@@ -1613,7 +1852,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     /// with a trailing comma if needed. The fix-it will be attached to the
     /// provided diagnostic \c diag.
     void emitInsertSelfIntoCaptureListFixIt(SourceRange brackets,
-                                            InFlightDiagnostic &diag) {
+                                            InFlightDiagnostic &diag,
+                                            StringRef subjectName) {
       // Look for any non-comment token. If there's anything before the
       // closing bracket, we assume that it is a valid capture list entry and
       // insert 'self,'. If it wasn't a valid entry, then we will at least not
@@ -1623,18 +1863,20 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           Lexer::getTokenAtLocation(Ctx.SourceMgr, locAfterBracket,
                                     CommentRetentionMode::None);
       if (nextAfterBracket.getLoc() != brackets.End)
-        diag.fixItInsertAfter(brackets.Start, "self, ");
+        diag.fixItInsertAfter(brackets.Start, subjectName.str() + ", ");
       else
-        diag.fixItInsertAfter(brackets.Start, "self");
+        diag.fixItInsertAfter(brackets.Start, subjectName);
     }
 
     /// Emit a fix-it for inserting a capture list into a closure that does not
     /// already have one, along with a trailing \c in if necessary. The fix-it
     /// will be attached to the provided diagnostic \c diag.
     void emitInsertNewCaptureListFixIt(const ClosureExpr *closureExpr,
-                                       InFlightDiagnostic &diag) {
+                                       InFlightDiagnostic &diag,
+                                       StringRef subjectName) {
       if (closureExpr->getInLoc().isValid()) {
-        diag.fixItInsertAfter(closureExpr->getLoc(), " [self]");
+        diag.fixItInsertAfter(closureExpr->getLoc(),
+                              " [" + subjectName.str() + "]");
         return;
       }
 
@@ -1647,7 +1889,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
                                 CommentRetentionMode::None);
       std::string trailing = next.getLoc() == nextLoc ? " " : "";
 
-      diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
+      diag.fixItInsertAfter(closureExpr->getLoc(),
+                            " [" + subjectName.str() + "] in" + trailing);
     }
   };
 

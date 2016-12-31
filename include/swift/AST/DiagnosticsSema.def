@@ -5095,5 +5095,21 @@ ERROR(atomics_ordering_must_be_constant, none,
       "ordering argument must be a static method or property of %0",
       (Identifier))
 
+//------------------------------------------------------------------------------
+// Reference cycle diagnostics
+//------------------------------------------------------------------------------
+
+WARNING(warn_reference_cycle, none,
+        "implicitly capturing %0 strongly in this closure is likely to lead "
+        "to a reference cycle", (Identifier))
+NOTE(note_reference_cycle_owner, none,
+     "closure is strongly referenced by %select{%1|an object "
+     "strongly referenced by %1}0", (unsigned, Identifier))
+NOTE(note_reference_cycle_thru_call, none,
+     "closure capturing %0 is referenced as an escaping argument "
+     "to this function call", (Identifier))
+NOTE(note_capture_variable_explicitly_silence,none,
+     "capture %0 explicitly to silence this warning", (Identifier))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
