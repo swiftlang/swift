@@ -4290,6 +4290,59 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                             diag::assignment_lhs_not_lvalue);
 }
 
+//===----------------------------------------------------------------------===//
+// Diagnose assigning variable to itself.
+//===----------------------------------------------------------------------===//
+
+static Decl *findSimpleReferencedDecl(const Expr *E) {
+  if (auto *LE = dyn_cast<LoadExpr>(E))
+    E = LE->getSubExpr();
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl();
+
+  return nullptr;
+}
+
+static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
+  E = E->getValueProvidingExpr();
+
+  if (auto *LE = dyn_cast<LoadExpr>(E))
+    return findReferencedDecl(LE->getSubExpr());
+
+  if (auto *AE = dyn_cast<AssignExpr>(E))
+    return findReferencedDecl(AE->getDest());
+
+  if (auto *D = findSimpleReferencedDecl(E))
+    return std::make_pair(nullptr, D);
+
+  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+    if (auto *BaseDecl = findSimpleReferencedDecl(MRE->getBase()))
+      return std::make_pair(BaseDecl, MRE->getMember().getDecl());
+  }
+
+  return std::make_pair(nullptr, nullptr);
+}
+
+bool TypeChecker::diagnoseSelfAssignment(const Expr *E) {
+  auto AE = dyn_cast<AssignExpr>(E);
+  if (!AE)
+    return false;
+
+  auto LHSDecl = findReferencedDecl(AE->getDest());
+  auto RHSDecl = findReferencedDecl(AE->getSrc());
+
+  if (LHSDecl.second && LHSDecl == RHSDecl) {
+    diagnose(AE->getLoc(), LHSDecl.first ? diag::self_assignment_prop
+                                         : diag::self_assignment_var)
+    .highlight(AE->getDest()->getSourceRange())
+    .highlight(AE->getSrc()->getSourceRange());
+    return true;
+  }
+
+  return false;
+}
+
 static bool isSymmetricBinaryOperator(const CalleeCandidateInfo &CCI) {
   // If we don't have at least one known candidate, don't trigger.
   if (CCI.candidates.empty()) return false;
@@ -6040,6 +6093,9 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
     diagnose(assignExpr->getLoc(), diag::cannot_assign_to_literal);
     return true;
   }
+
+  if (CS->TC.diagnoseSelfAssignment(assignExpr))
+    return true;
 
   // Type check the destination first, so we can coerce the source to it.
   auto destExpr = typeCheckChildIndependently(assignExpr->getDest(),

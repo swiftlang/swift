@@ -2016,6 +2016,9 @@ public:
   VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
                                                  UnresolvedDotExpr *ctorRef);
 
+  /// Diagnose assigning variable to itself.
+  bool diagnoseSelfAssignment(const Expr *E);
+
   /// When referencing a class initializer, check that the base expression is
   /// either a static metatype or that the initializer is 'required'.
   bool
