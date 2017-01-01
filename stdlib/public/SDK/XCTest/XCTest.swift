@@ -166,7 +166,7 @@ public func XCTAssertNotNil(_ expression: @autoclosure () throws -> Any?, _ mess
   }
 }
 
-public func XCTAssert(_ expression: @autoclosure () throws -> Bool, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
+public func XCTAssert(_ expression: @autoclosure () throws -> Bool, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
   // XCTAssert is just a cover for XCTAssertTrue.
   XCTAssertTrue(expression, message, file: file, line: line)
 }
@@ -202,7 +202,7 @@ public func XCTAssertTrue(_ expression: @autoclosure () throws -> Bool, _ messag
   }
 }
 
-public func XCTAssertFalse(_ expression: @autoclosure () throws -> Bool, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
+public func XCTAssertFalse(_ expression: @autoclosure () throws -> Bool, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
   let assertionType = _XCTAssertionType.`false`
   
   // evaluate the expression exactly once
