@@ -77,7 +77,7 @@ extension Set : _ObjectiveCBridgeable {
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s.count)
     s.enumerateObjects({
-      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
+      (anyMember: Any, _) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
         anyMember as AnyObject, Element.self))
     })
@@ -117,7 +117,7 @@ extension Set : _ObjectiveCBridgeable {
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s!.count)
     s!.enumerateObjects({
-      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
+      (anyMember: Any, _) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
         anyMember as AnyObject, Element.self))
     })

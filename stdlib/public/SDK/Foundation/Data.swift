@@ -382,7 +382,7 @@ public final class _DataStorage {
     
     @inline(__always)
     public func append(_ otherData: Data) {
-        otherData.enumerateBytes { (buffer: UnsafeBufferPointer<UInt8>, location: Data.Index, stop: inout Bool) in
+        otherData.enumerateBytes { (buffer: UnsafeBufferPointer<UInt8>, _, _) in
             append(buffer.baseAddress!, length: buffer.count)
         }
     }

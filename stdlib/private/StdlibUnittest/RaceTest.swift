@@ -432,7 +432,7 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
 
   sharedState.raceData.removeAll(keepingCapacity: true)
 
-  sharedState.raceData.append(contentsOf: (0..<raceDataCount).lazy.map { i in
+  sharedState.raceData.append(contentsOf: (0..<raceDataCount).lazy.map { _ in
     rt.makeRaceData()
   })
 
@@ -440,7 +440,7 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
   sharedState.workerStates.removeAll(keepingCapacity: true)
   
   sharedState.workerStates.append(contentsOf: (0..<racingThreadCount).lazy.map {
-    i in
+    _ in
     let workerState = _RaceTestWorkerState<RT>()
 
     // Shuffle the data so that threads process it in different order.
