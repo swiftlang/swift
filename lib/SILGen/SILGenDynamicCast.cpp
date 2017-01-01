@@ -357,20 +357,18 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
   }
   
   std::unique_ptr<TemporaryInitialization> init;
-  SGFContext ctx;
   if (requiresAddress) {
     init = SGF.emitTemporary(loc, srcAbstractTL);
-    
+
+    if (hasAbstraction)
+      src = SGF.emitSubstToOrigValue(loc, src, abstraction, sourceType);
+
     // Okay, if all we need to do is drop the value in an address,
     // this is easy.
-    if (!hasAbstraction) {
-      SGF.B.emitStoreValueOperation(loc, src.forward(SGF), init->getAddress(),
-                                    StoreOwnershipQualifier::Init);
-      init->finishInitialization(SGF);
-      return init->getManagedAddress();
-    }
-    
-    ctx = SGFContext(init.get());
+    SGF.B.emitStoreValueOperation(loc, src.forward(SGF), init->getAddress(),
+                                  StoreOwnershipQualifier::Init);
+    init->finishInitialization(SGF);
+    return init->getManagedAddress();
   }
   
   assert(hasAbstraction);
