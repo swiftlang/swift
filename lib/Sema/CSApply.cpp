@@ -272,6 +272,20 @@ void ConstraintSystem::propagateLValueAccessKind(Expr *E,
                                allowOverwrite);
 }
 
+bool ConstraintSystem::isTypeReference(Expr *E) {
+  return E->isTypeReference([&](const Expr &E) -> Type { return getType(&E); });
+}
+
+bool ConstraintSystem::isStaticallyDerivedMetatype(Expr *E) {
+  return E->isStaticallyDerivedMetatype(
+      [&](const Expr &E) -> Type { return getType(&E); });
+}
+
+Type ConstraintSystem::getInstanceType(TypeExpr *E) {
+  return E->getInstanceType([&](const Expr &E) -> bool { return hasType(&E); },
+                            [&](const Expr &E) -> Type { return getType(&E); });
+}
+
 namespace {
 
   /// \brief Rewrites an expression by applying the solution of a constraint
@@ -6478,7 +6492,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // If the metatype value isn't a type expression, the user should reference
   // '.init' explicitly, for clarity.
-  if (!fn->isTypeReference()) {
+  if (!cs.isTypeReference(fn)) {
     cs.TC.diagnose(apply->getArg()->getStartLoc(),
                    diag::missing_init_on_metatype_initialization)
       .fixItInsert(apply->getArg()->getStartLoc(), ".init");

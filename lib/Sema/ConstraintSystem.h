@@ -1774,11 +1774,27 @@ public:
   bool isAnyHashableType(Type t);
 
   /// Call Expr::propagateLValueAccessKind on the given expression,
-  /// using a custom accessor for the type on the expression which
+  /// using a custom accessor for the type on the expression that
   /// reads the type from the ConstraintSystem expression type map.
   void propagateLValueAccessKind(Expr *E,
                                  AccessKind accessKind,
                                  bool allowOverwrite = false);
+
+  /// Call Expr::isTypeReference on the given expression, using a
+  /// custom accessor for the type on the expression that reads the
+  /// type from the ConstraintSystem expression type map.
+  bool isTypeReference(Expr *E);
+
+  /// Call Expr::isIsStaticallyDerivedMetatype on the given
+  /// expression, using a custom accessor for the type on the
+  /// expression that reads the type from the ConstraintSystem
+  /// expression type map.
+  bool isStaticallyDerivedMetatype(Expr *E);
+
+  /// Call Expr::getInstanceType on the given expression, using a
+  /// custom accessor for the type on the expression that reads the
+  /// type from the ConstraintSystem expression type map.
+  Type getInstanceType(TypeExpr *E);
 
 private:
   /// Introduce the constraints associated with the given type variable

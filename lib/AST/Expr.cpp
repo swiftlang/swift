@@ -567,9 +567,10 @@ void Expr::forEachChildExpr(const std::function<Expr*(Expr*)> &callback) {
   this->walk(ChildWalker(callback));
 }
 
-bool Expr::isTypeReference() const {
+bool Expr::
+isTypeReference(llvm::function_ref<Type(const Expr &)> getType) const {
   // If the result isn't a metatype, there's nothing else to do.
-  if (!getType()->is<AnyMetatypeType>())
+  if (!getType(*this)->is<AnyMetatypeType>())
     return false;
   
   const Expr *expr = this;
@@ -600,13 +601,14 @@ bool Expr::isTypeReference() const {
 
 }
 
-bool Expr::isStaticallyDerivedMetatype() const {
+bool Expr::isStaticallyDerivedMetatype(
+    llvm::function_ref<Type(const Expr &)> getType) const {
   // The type must first be a type reference.
-  if (!isTypeReference())
+  if (!isTypeReference(getType))
     return false;
 
   // Archetypes are never statically derived.
-  return !getType()->getAs<AnyMetatypeType>()->getInstanceType()
+  return !getType(*this)->getAs<AnyMetatypeType>()->getInstanceType()
     ->is<ArchetypeType>();
 }
 
@@ -1890,14 +1892,16 @@ TypeExpr::TypeExpr(Type Ty)
 
 // The type of a TypeExpr is always a metatype type.  Return the instance
 // type or null if not set yet.
-Type TypeExpr::getInstanceType() const {
-  if (!getType())
+Type TypeExpr::getInstanceType(
+    llvm::function_ref<bool(const Expr &)> hasType,
+    llvm::function_ref<Type(const Expr &)> getType) const {
+  if (!hasType(*this))
     return Type();
 
-  if (auto metaType = getType()->getAs<MetatypeType>())
+  if (auto metaType = getType(*this)->getAs<MetatypeType>())
     return metaType->getInstanceType();
 
-  return ErrorType::get(getType()->getASTContext());
+  return ErrorType::get(getType(*this)->getASTContext());
 }
 
 
