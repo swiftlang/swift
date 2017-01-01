@@ -558,14 +558,14 @@ public:
       assert(level <= Constant.uncurryLevel
              && "uncurrying past natural uncurry level of method");
 
-      auto constant = Constant.atUncurryLevel(level);
+      constant = Constant.atUncurryLevel(level);
       // Lower the substituted type from the AST, which should have any generic
       // parameters in the original signature erased to their upper bounds.
       auto objcFormalType = SubstFormalType.withExtInfo(
          SubstFormalType->getExtInfo()
            .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod));
       auto fnType = gen.SGM.M.Types
-        .getUncachedSILFunctionTypeForConstant(constant, objcFormalType);
+        .getUncachedSILFunctionTypeForConstant(*constant, objcFormalType);
 
       auto closureType =
         replaceSelfTypeForDynamicLookup(gen.getASTContext(), fnType,
@@ -574,9 +574,9 @@ public:
 
       SILValue fn = gen.B.createDynamicMethod(Loc,
                           SelfValue,
-                          constant,
+                          *constant,
                           SILType::getPrimitiveObjectType(closureType),
-                          /*volatile*/ constant.isForeign);
+                          /*volatile*/ Constant.isForeign);
       mv = ManagedValue::forUnmanaged(fn);
       break;
     }
