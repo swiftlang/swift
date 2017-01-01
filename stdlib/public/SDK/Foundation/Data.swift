@@ -233,8 +233,8 @@ public final class _DataStorage {
             newBytes = _DataStorage.allocate(newCapacity, allocateCleared)
             if newBytes == nil {
                 /* Try again with minimum length */
-                allocateCleared = clear && _DataStorage.shouldAllocateCleared(newLength);
-                newBytes = _DataStorage.allocate(newLength, allocateCleared);
+                allocateCleared = clear && _DataStorage.shouldAllocateCleared(newLength)
+                newBytes = _DataStorage.allocate(newLength, allocateCleared)
             }
         } else {
             let tryCalloc = (origLength == 0 || (newLength / origLength) >= 4)
