@@ -3414,6 +3414,17 @@ bool TypeChecker::isRepresentableInObjC(
     if (!foundErrorParameterIndex) {
       auto *paramList = AFD->getParameterLists().back();
       errorParameterIndex = paramList->size();
+
+      // Note: the errorParameterIndex is actually a SIL function
+      // parameter index, which means tuples are exploded. Normally
+      // tuple types cannot be bridged to Objective-C, except for
+      // one special case -- a constructor with a single named parameter
+      // 'foo' of tuple type becomes a zero-argument selector named
+      // 'initFoo'.
+      if (auto *CD = dyn_cast<ConstructorDecl>(AFD))
+        if (CD->isObjCZeroParameterWithLongSelector())
+          errorParameterIndex--;
+
       while (errorParameterIndex > 0) {
         // Skip over trailing closures.
         auto type = paramList->get(errorParameterIndex - 1)->getType();
