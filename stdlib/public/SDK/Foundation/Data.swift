@@ -20,11 +20,11 @@ import Glibc
     
 import CoreFoundation
 
-internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void {
+internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int) {
     munmap(mem, length)
 }
 
-internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void {
+internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) {
     free(mem)
 }
 
@@ -33,13 +33,13 @@ internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ le
 @_exported import Foundation // Clang module
 
 @_silgen_name("__NSDataInvokeDeallocatorVM")
-internal func __NSDataInvokeDeallocatorVM(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorVM(_ mem: UnsafeMutableRawPointer, _ length: Int)
 
 @_silgen_name("__NSDataInvokeDeallocatorUnmap")
-internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int)
 
 @_silgen_name("__NSDataInvokeDeallocatorFree")
-internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int)
 
 @_silgen_name("_NSWriteDataToFile_Swift")
 internal func _NSWriteDataToFile_Swift(url: NSURL, data: NSData, options: UInt, error: NSErrorPointer) -> Bool
