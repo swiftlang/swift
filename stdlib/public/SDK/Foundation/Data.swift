@@ -304,9 +304,9 @@ public final class _DataStorage {
             let newLength = length
             if _capacity < newLength || _bytes == nil {
                 _grow(newLength, true)
-            } else if (origLength < newLength && _needToZero) {
+            } else if origLength < newLength && _needToZero {
                 memset(_bytes! + origLength, 0, newLength - origLength)
-            } else if (newLength < origLength) {
+            } else if newLength < origLength {
                 _needToZero = true
             }
             _length = newLength
@@ -580,7 +580,7 @@ public final class _DataStorage {
     public init(length: Int) {
         precondition(length < _DataStorage.maxSize)
         var capacity = (length < 1024 * 1024 * 1024) ? length + (length >> 2) : length
-        if (_DataStorage.vmOpsThreshold <= capacity) {
+        if _DataStorage.vmOpsThreshold <= capacity {
             capacity = NSRoundUpToMultipleOfPageSize(capacity)
         }
         
@@ -596,7 +596,7 @@ public final class _DataStorage {
     public init(capacity capacity_: Int) {
         var capacity = capacity_
         precondition(capacity < _DataStorage.maxSize)
-        if (_DataStorage.vmOpsThreshold <= capacity) {
+        if _DataStorage.vmOpsThreshold <= capacity {
             capacity = NSRoundUpToMultipleOfPageSize(capacity)
         }
         _length = 0
@@ -620,7 +620,7 @@ public final class _DataStorage {
             _DataStorage.move(_bytes!, bytes, length)
         } else {
             var capacity = length
-            if (_DataStorage.vmOpsThreshold <= capacity) {
+            if _DataStorage.vmOpsThreshold <= capacity {
                 capacity = NSRoundUpToMultipleOfPageSize(capacity)
             }
             _length = length
@@ -659,7 +659,7 @@ public final class _DataStorage {
             }
         } else {
             var capacity = length
-            if (_DataStorage.vmOpsThreshold <= capacity) {
+            if _DataStorage.vmOpsThreshold <= capacity {
                 capacity = NSRoundUpToMultipleOfPageSize(capacity)
             }
             _length = length

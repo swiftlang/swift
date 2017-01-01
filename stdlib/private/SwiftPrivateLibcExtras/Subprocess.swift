@@ -267,10 +267,10 @@ public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
   if waitpid(pid, &status, 0) < 0 {
     preconditionFailure("waitpid() failed")
   }
-  if (WIFEXITED(status)) {
+  if WIFEXITED(status) {
     return .exit(Int(WEXITSTATUS(status)))
   }
-  if (WIFSIGNALED(status)) {
+  if WIFSIGNALED(status) {
     return .signal(Int(WTERMSIG(status)))
   }
   preconditionFailure("did not understand what happened to child process")

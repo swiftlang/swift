@@ -74,7 +74,7 @@ public extension UIDeviceOrientation {
   }
 
   var isValidInterfaceOrientation: Bool {
-    switch (self) {
+    switch self {
     case .portrait, .portraitUpsideDown, .landscapeLeft, .landscapeRight:
       return true
     default:
