@@ -472,9 +472,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     }
   
     // Walk scopes outward from the innermost scope until we find something.
-    bool lookupInNominalIsStatic = true;
     ParamDecl *selfDecl = nullptr;
-    bool withinDefaultArgument = false;
     for (auto currentScope = lookupScope; currentScope;
          currentScope = currentScope->getParent()) {
       // Perform local lookup within this scope.
@@ -510,8 +508,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // affect lookup in an enclosing nominal type or extension thereof.
         if (auto *bindingInit = dyn_cast<PatternBindingInitializer>(dc)) {
           if (auto binding = bindingInit->getBinding()) {
-            lookupInNominalIsStatic = binding->isStatic();
-          
             // Look for 'self' for a lazy variable initializer.
             if (auto singleVar = binding->getSingleVar())
               // We only care about lazy variables.
@@ -539,38 +535,17 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         // Default arguments only have 'static' access to the members of the
         // enclosing type, if there is one.
-        if (isa<DefaultArgumentInitializer>(dc)) {
-          lookupInNominalIsStatic = true;
-          withinDefaultArgument = true;
-          continue;
-        }
+        if (isa<DefaultArgumentInitializer>(dc)) continue;
 
         // Functions/initializers/deinitializers are only interesting insofar as
         // they affect lookup in an enclosing nominal type or extension thereof.
-        if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-          // We don't update the 'static lookup' bit if we came from within a
-          // default argument.
-          if (!withinDefaultArgument)
-            lookupInNominalIsStatic = func->isStatic();
-          withinDefaultArgument = false;
-          continue;
-        }
+        if (isa<AbstractFunctionDecl>(dc)) continue;
 
         // Subscripts have no lookup of their own.
-        if (auto subscript = dyn_cast<SubscriptDecl>(dc)) {
-          // We don't update the 'static lookup' bit if we came from within a
-          // default argument.
-          if (!withinDefaultArgument)
-            lookupInNominalIsStatic = subscript->isStatic();
-          withinDefaultArgument = false;
-          continue;
-        }
+        if (isa<SubscriptDecl>(dc)) continue;
 
         // Closures have no lookup of their own.
-        if (isa<AbstractClosureExpr>(dc)) {
-          withinDefaultArgument = false;
-          continue;
-        }
+        if (isa<AbstractClosureExpr>(dc)) continue;
 
         // Top-level declarations have no lookup of their own.
         if (isa<TopLevelCodeDecl>(dc)) continue;
@@ -590,6 +565,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
         if (!nominal) continue;
 
+        // FIXME: This is overkill for name lookup.
+        if (TypeResolver)
+          TypeResolver->resolveDeclSignature(nominal);
+
         // Dig out the type we're looking into.
         // FIXME: We shouldn't need to compute a type to perform this lookup.
         Type lookupType = dc->getSelfTypeInContext();
@@ -601,15 +580,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         }
 
         if (!lookupType || lookupType->hasError()) continue;
-
-        // If we're performing a static lookup, use the metatype.
-        // FIXME: This is awful. The client should filter, not us.
-        if (lookupInNominalIsStatic)
-          lookupType = MetatypeType::get(lookupType, Ctx);
-
-        // FIXME: This is overkill for name lookup.
-        if (TypeResolver)
-          TypeResolver->resolveDeclSignature(nominal);
 
         // Perform lookup into the type.
         NLOptions options = NL_UnqualifiedDefault;
@@ -676,16 +646,13 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         ValueDecl *MetaBaseDecl = nullptr;
         GenericParamList *GenericParams = nullptr;
         Type ExtendedType;
-        bool isTypeLookup = false;
         
         // If this declcontext is an initializer for a static property, then we're
         // implicitly doing a static lookup into the parent declcontext.
         if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
           if (!DC->getParent()->isModuleScopeContext()) {
-            if (auto PBD = PBI->getBinding()) {
-              isTypeLookup = PBD->isStatic();
+            if (PBI->getBinding())
               DC = DC->getParent();
-            }
           }
         
         if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
@@ -723,10 +690,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             MetaBaseDecl = AFD->getDeclContext()
                 ->getAsNominalTypeOrNominalTypeExtensionContext();
             DC = DC->getParent();
-
-            if (auto *FD = dyn_cast<FuncDecl>(AFD))
-              if (FD->isStatic())
-                ExtendedType = MetatypeType::get(ExtendedType);
 
             // If we're not in the body of the function, the base declaration
             // is the nominal type, not 'self'.
@@ -781,11 +744,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             isCascadingUse = DC->isCascadingContextForLookup(false);
         }
 
-        // If this is implicitly a lookup into the static members, add a metatype
-        // wrapper.
-        if (isTypeLookup && ExtendedType)
-          ExtendedType = MetatypeType::get(ExtendedType, Ctx);
-        
         // Check the generic parameters for something with the given name.
         if (GenericParams) {
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
