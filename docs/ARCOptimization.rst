@@ -886,7 +886,7 @@ Consider the following pseudo-Swift example::
 
   var GLOBAL_D : D = D1()
 
-  class C { deinit { GLOBAL_D = D2 } }
+  class C { deinit { GLOBAL_D = D2() } }
 
   func main() {
     let c = C()
