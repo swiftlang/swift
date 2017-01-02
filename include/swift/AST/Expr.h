@@ -2614,8 +2614,9 @@ class OpenExistentialExpr : public Expr {
 public:
   OpenExistentialExpr(Expr *existentialValue,
                       OpaqueValueExpr *opaqueValue,
-                      Expr *subExpr)
-    : Expr(ExprKind::OpenExistential, /*Implicit=*/ true, subExpr->getType()),
+                      Expr *subExpr,
+                      Type subExprTy)
+    : Expr(ExprKind::OpenExistential, /*Implicit=*/ true, subExprTy),
       ExistentialValue(existentialValue), OpaqueValue(opaqueValue), 
       SubExpr(subExpr) { }
 
@@ -3948,8 +3949,8 @@ class DotSyntaxBaseIgnoredExpr : public Expr {
   SourceLoc DotLoc;
   Expr *RHS;
 public:
-  DotSyntaxBaseIgnoredExpr(Expr *LHS, SourceLoc DotLoc, Expr *RHS)
-    : Expr(ExprKind::DotSyntaxBaseIgnored, /*Implicit=*/false, RHS->getType()),
+  DotSyntaxBaseIgnoredExpr(Expr *LHS, SourceLoc DotLoc, Expr *RHS, Type rhsTy)
+    : Expr(ExprKind::DotSyntaxBaseIgnored, /*Implicit=*/false, rhsTy),
       LHS(LHS), DotLoc(DotLoc), RHS(RHS) {
   }
   
