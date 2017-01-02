@@ -214,6 +214,25 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
   return result;
 }
 
+SmallVector<TypeDecl *, 1>
+TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
+                                   SourceLoc loc,
+                                   NameLookupOptions options) {
+  UnqualifiedLookup lookup(
+      name, dc, this,
+      options.contains(NameLookupFlags::KnownPrivate),
+      loc,
+      /*OnlyTypes=*/true,
+      options.contains(NameLookupFlags::ProtocolMembers),
+      options.contains(NameLookupFlags::IgnoreAccessibility));
+
+  LookupResult result;
+  SmallVector<TypeDecl *, 1> decls;
+  for (auto found : lookup.Results)
+    decls.push_back(cast<TypeDecl>(found.getValueDecl()));
+  return decls;
+}
+
 LookupResult TypeChecker::lookupMember(DeclContext *dc,
                                        Type type, DeclName name,
                                        NameLookupOptions options) {
@@ -332,7 +351,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       if (type->isExistentialType() &&
           (isa<TypeAliasDecl>(typeDecl) ||
            isa<AssociatedTypeDecl>(typeDecl))) {
-        auto memberType = typeDecl->getInterfaceType()->getRValueInstanceType();
+        auto memberType = typeDecl->getDeclaredInterfaceType();
 
         if (memberType->hasTypeParameter()) {
           // If we haven't seen this type result yet, add it to the result set.
@@ -347,26 +366,17 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // record it later for conformance checking; we might find a more
       // direct typealias with the same name later.
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-        if (!type->is<ArchetypeType>()) {
+        if (!type->is<ArchetypeType>() &&
+            !type->isTypeParameter()) {
           inferredAssociatedTypes.push_back(assocType);
           continue;
         }
       }
-
-      // We are looking up an associated type of an archetype, or a
-      // protocol typealias or an archetype or concrete type.
-      //
-      // Proceed with the usual path below.
     }
 
     // Substitute the base into the member's type.
     auto memberType = substMemberTypeWithBase(dc->getParentModule(),
                                               typeDecl, type);
-
-    // FIXME: It is not clear why this substitution can fail, but the
-    // standard library won't build without this check.
-    if (!memberType)
-      continue;
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)
@@ -386,7 +396,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
       auto conformance = conformsToProtocol(type, protocol, dc,
                                             conformanceOptions);
-      if (!conformance || conformance->isAbstract()) {
+      if (!conformance) {
         // FIXME: This is an error path. Should we try to recover?
         continue;
       }

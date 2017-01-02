@@ -3048,7 +3048,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
                                     LazyResolver *resolver) {
   Type t(this);
   while (t) {
-    auto *derivedClass = t->getClassOrBoundGenericClass();
+    auto *derivedClass = dyn_cast_or_null<ClassDecl>(t->getAnyNominal());
     assert(derivedClass && "expected a class here");
 
     if (derivedClass == baseClass)

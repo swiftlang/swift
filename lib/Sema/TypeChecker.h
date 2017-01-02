@@ -811,14 +811,11 @@ public:
   /// \param isSpecialized Whether this type is immediately specialized.
   /// \param resolver The resolver for generic types.
   ///
-  /// \returns the resolved type, or emits a diagnostic and returns null if the
-  /// type cannot be resolved.
+  /// \returns the resolved type.
   Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *fromDC,
                             TypeResolutionOptions options,
                             bool isSpecialized,
-                            GenericTypeResolver *resolver = nullptr,
-                            UnsatisfiedDependency *unsatisfiedDependency
-                              = nullptr);
+                            GenericTypeResolver *resolver = nullptr);
 
   /// Apply generic arguments to the given type.
   ///
@@ -877,7 +874,7 @@ public:
   /// \param member The member whose type projection is being computed.
   /// \param baseTy The base type that will be substituted for the 'Self' of the
   /// member.
-  Type substMemberTypeWithBase(Module *module, const TypeDecl *member, Type baseTy);
+  Type substMemberTypeWithBase(Module *module, TypeDecl *member, Type baseTy);
 
   /// \brief Retrieve the superclass type of the given type, or a null type if
   /// the type has no supertype.
@@ -1704,6 +1701,18 @@ public:
   LookupResult lookupUnqualified(DeclContext *dc, DeclName name, SourceLoc loc,
                                  NameLookupOptions options
                                    = defaultUnqualifiedLookupOptions);
+
+  /// Perform unqualified type lookup at the given source location
+  /// within a particular declaration context.
+  ///
+  /// \param dc The declaration context in which to perform name lookup.
+  /// \param name The name of the entity to look for.
+  /// \param loc The source location at which name lookup occurs.
+  /// \param options Options that control name lookup.
+  SmallVector<TypeDecl *, 1>
+  lookupUnqualifiedType(DeclContext *dc, DeclName name, SourceLoc loc,
+                        NameLookupOptions options
+                          = defaultUnqualifiedLookupOptions);
 
   /// \brief Lookup a member in the given type.
   ///
