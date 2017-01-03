@@ -82,11 +82,31 @@ func testInvalidIntegerLiterals() {
   // var l2 = INVALID_INTEGER_LITERAL_2 // FIXME {{use of unresolved identifier 'INVALID_INTEGER_LITERAL_2'}}
 }
 
+func testFunctionLikeLiterals() {
+  let _ = VALID_INTEGER_LITERAL_FUNC()
+  let i = VALID_INTEGER_LITERAL_FUNC
+  let _ = i()
+  let _ = VALID_NSSTRING_LITERAL_FUNC()
+  let s = VALID_NSSTRING_LITERAL_FUNC
+  let _ = s()
+
+  // Macros that expand to call expressions of other function-like macros
+  // can't yet be imported into Swift. These tests verify that they simply don't
+  // get imported, rather than causing other wacky errors.
+  let _ = INTEGER_LITERAL_FUNC_FUNC() // expected-error {{use of unresolved identifier 'INTEGER_LITERAL_FUNC_FUNC'}}
+  let _ = NSSTRING_LITERAL_FUNC_FUNC() // expected-error {{use of unresolved identifier 'NSSTRING_LITERAL_FUNC_FUNC'}}
+}
+
 func testUsesMacroFromOtherModule() {
   let m1 = USES_MACRO_FROM_OTHER_MODULE_1
   let m2 = macros.USES_MACRO_FROM_OTHER_MODULE_1
   let m3 = USES_MACRO_FROM_OTHER_MODULE_2 // expected-error {{use of unresolved identifier 'USES_MACRO_FROM_OTHER_MODULE_2'}}
   let m4 = macros.USES_MACRO_FROM_OTHER_MODULE_2 // expected-error {{module 'macros' has no member named 'USES_MACRO_FROM_OTHER_MODULE_2'}}
+
+  let m5 = USES_MACRO_FROM_OTHER_MODULE_1_FUNC()
+  let m6 = macros.USES_MACRO_FROM_OTHER_MODULE_1_FUNC()
+  let m7 = USES_MACRO_FROM_OTHER_MODULE_2_FUNC() // expected-error {{use of unresolved identifier 'USES_MACRO_FROM_OTHER_MODULE_2_FUNC'}}
+  let m8 = macros.USES_MACRO_FROM_OTHER_MODULE_2_FUNC() // expected-error {{module 'macros' has no member named 'USES_MACRO_FROM_OTHER_MODULE_2_FUNC'}}
 }
 
 func testSuppressed() {
