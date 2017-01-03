@@ -202,9 +202,9 @@
 ///     printInt(atAddress: &numbers)
 ///     // Prints "5"
 ///
-/// However you call `printInt(atAddress:)`, Swift's type safety guarantees
-/// that you can only pass a pointer to the type required by the function---in
-/// this case, a pointer to an `Int`.
+/// No matter which way you call `printInt(atAddress:)`, Swift's type safety
+/// guarantees that you can only pass a pointer to the type required by the
+/// function---in this case, a pointer to an `Int`.
 %else:
 /// When calling a function or method with an `${Self}` parameter, you can pass
 /// an instance of that specific pointer type, pass an instance of a
@@ -257,9 +257,9 @@
 ///     var mutableNumbers = numbers
 ///     printInt(atAddress: &mutableNumbers)
 ///
-/// However you call `printInt(atAddress:)`, Swift's type safety guarantees
-/// that you can only pass a pointer to the type required by the function---in
-/// this case, a pointer to an `Int`.
+/// No matter which way you call `printInt(atAddress:)`, Swift's type safety
+/// guarantees that you can only pass a pointer to the type required by the
+/// function---in this case, a pointer to an `Int`.
 %end
 ///
 /// - Important: The pointer created through implicit bridging of an instance
@@ -549,8 +549,9 @@ public struct ${Self}<Pointee>
     }
   }
 
-  /// Initializes the memory referenced by this pointer with the values
-  /// starting at the given pointer, and then deinitializes the source memory.
+  /// Moves instances from initialized source memory into the uninitialized
+  /// memory referenced by this pointer, leaving the source memory
+  /// uninitialized and the memory referenced by this pointer initialized.
   ///
   /// The region of memory starting at this pointer and covering `count`
   /// instances of the pointer's `Pointee` type must be uninitialized or
@@ -640,7 +641,7 @@ public struct ${Self}<Pointee>
   }
 
   /// Replaces the memory referenced by this pointer with the values
-  /// starting at the given pointer, and then deinitializes the source memory.
+  /// starting at the given pointer, leaving the source memory uninitialized.
   ///
   /// The region of memory starting at this pointer and covering `count`
   /// instances of the pointer's `Pointee` type must be initialized or
