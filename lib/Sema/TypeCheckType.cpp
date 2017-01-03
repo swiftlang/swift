@@ -2249,12 +2249,13 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     ArrayRef<GenericTypeParamType *> params;
 
     params = genericSig->getGenericParams();
-    if (repr->getGenericArguments().size() != params.size()) {
+    if (repr->getGenericArguments().size()
+          != genericSig->getAllDependentTypes().size()) {
       TC.diagnose(repr->getLoc(), diag::sil_box_arg_mismatch);
       return ErrorType::get(Context);
     }
   
-    for (unsigned i : indices(repr->getGenericArguments())) {
+    for (unsigned i : indices(params)) {
       auto argTy = resolveType(repr->getGenericArguments()[i], options);
       genericArgMap.insert({params[i], argTy->getCanonicalType()});
     }
