@@ -439,6 +439,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // The callee only needs to know about opened archetypes used in
       // the substitution list.
       OpenedArchetypesTracker.registerUsedOpenedArchetypes(InnerAI.getInstruction());
+      if (PAI) {
+        OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
+      }
 
       SILInliner Inliner(*F, *CalleeFunction,
                          SILInliner::InlineKind::MandatoryInline,
