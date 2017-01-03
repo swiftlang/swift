@@ -99,10 +99,6 @@ namespace {
     /// \param foundInType The type through which we found the
     /// declaration.
     void add(ValueDecl *found, ValueDecl *base, Type foundInType) {
-      // If we only want types, AST name lookup should not yield anything else.
-      assert(!Options.contains(NameLookupFlags::OnlyTypes) ||
-             isa<TypeDecl>(found));
-
       ConformanceCheckOptions conformanceOptions;
       if (Options.contains(NameLookupFlags::KnownPrivate))
         conformanceOptions |= ConformanceCheckFlags::InExpression;
@@ -181,7 +177,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       name, dc, this,
       options.contains(NameLookupFlags::KnownPrivate),
       loc,
-      options.contains(NameLookupFlags::OnlyTypes),
+      /*OnlyTypes=*/false,
       options.contains(NameLookupFlags::ProtocolMembers),
       options.contains(NameLookupFlags::IgnoreAccessibility));
 
@@ -236,6 +232,8 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
 LookupResult TypeChecker::lookupMember(DeclContext *dc,
                                        Type type, DeclName name,
                                        NameLookupOptions options) {
+  assert(type->mayHaveMembers());
+
   LookupResult result;
   NLOptions subOptions = NL_QualifiedDefault;
   if (options.contains(NameLookupFlags::KnownPrivate))
@@ -244,19 +242,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     subOptions |= NL_DynamicLookup;
   if (options.contains(NameLookupFlags::IgnoreAccessibility))
     subOptions |= NL_IgnoreAccessibility;
-  if (options.contains(NameLookupFlags::OnlyTypes))
-    subOptions |= NL_OnlyTypes;
 
-  // Dig out the type that we'll actually be looking into, and determine
-  // whether it is a nominal type.
-  Type lookupType = type;
-  if (auto lvalueType = lookupType->getAs<LValueType>()) {
-    lookupType = lvalueType->getObjectType();
-  }
-  if (auto metaType = lookupType->getAs<MetatypeType>()) {
-    lookupType = metaType->getInstanceType();
-  }
-  NominalTypeDecl *nominalLookupType = lookupType->getAnyNominal();
+  NominalTypeDecl *nominalLookupType = type->getAnyNominal();
 
   if (options.contains(NameLookupFlags::ProtocolMembers))
     subOptions |= NL_ProtocolMembers;
@@ -264,9 +251,6 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   // We handle our own overriding/shadowing filtering.
   subOptions &= ~NL_RemoveOverridden;
   subOptions &= ~NL_RemoveNonVisible;
-
-  // We can't have tuple types here; they need to be handled elsewhere.
-  assert(!type->is<TupleType>());
 
   // Local function that performs lookup.
   auto doLookup = [&]() {
@@ -278,7 +262,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     dc->lookupQualified(type, name, subOptions, this, lookupResults);
 
     for (auto found : lookupResults) {
-      builder.add(found, nominalLookupType, lookupType);
+      builder.add(found, nominalLookupType, type);
     }
   };
 
@@ -309,10 +293,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
                                                Type type, Identifier name,
                                                NameLookupOptions options) {
   LookupTypeResult result;
-
-  // Structural types do not have member types.
-  if (!type->mayHaveMemberTypes())
-    return result;
 
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;

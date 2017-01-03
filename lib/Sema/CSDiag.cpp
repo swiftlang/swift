@@ -1606,6 +1606,9 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
 
         // Compute a new substituted type if we have a base type to apply.
         if (baseType && C.level == 1 && C.getDecl()) {
+          baseType = baseType
+              ->getLValueOrInOutObjectType()
+              ->getRValueInstanceType();
           C.entityType = baseType->getTypeOfMember(CS->DC->getParentModule(),
                                                    C.getDecl(), nullptr);
           C.substituted = true;
@@ -1793,22 +1796,18 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     //
     if (baseType) {
       auto substType = replaceTypeVariablesWithUnresolved(baseType);
+      if (substType)
+        substType = substType
+            ->getLValueOrInOutObjectType()
+            ->getRValueInstanceType();
 
       // If this is a DeclViaUnwrappingOptional, then we're actually looking
       // through an optional to get the member, and baseType is an Optional or
       // Metatype<Optional>.
       if (cand.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) {
-        bool isMeta = false;
-        if (auto MTT = substType->getAs<MetatypeType>()) {
-          isMeta = true;
-          substType = MTT->getInstanceType();
-        }
-
         // Look through optional or IUO to get the underlying type the decl was
         // found in.
         substType = substType->getAnyOptionalObjectType();
-        if (isMeta && substType)
-          substType = MetatypeType::get(substType);
       } else if (cand.getKind() != OverloadChoiceKind::Decl) {
         // Otherwise, if it is a remapping we can't handle, don't try to compute
         // a substitution.
@@ -2330,8 +2329,8 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   anchor = typeCheckArbitrarySubExprIndependently(anchor, TCC_AllowLValue);
   if (!anchor) return true;
   
-  auto baseTy = anchor->getType();
-  auto baseObjTy = baseTy->getRValueType();
+  auto baseTy = anchor->getType()->getLValueOrInOutObjectType();
+  auto baseObjTy = baseTy;
 
   // If the base type is an IUO, look through it.  Odds are, the code is not
   // trying to find a member of it.
@@ -3105,7 +3104,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // contain a member var 'boolValue', now does not convert to Bool. This block
   // tries to add a specific diagnosis/fixit to explicitly invoke 'boolValue'.
   if (toType->isBool() &&
-      fromType->mayHaveMemberTypes()) {
+      fromType->mayHaveMembers()) {
     auto LookupResult = CS->TC.lookupMember(CS->DC, fromType,
       DeclName(CS->TC.Context.getIdentifier("boolValue")));
     if (!LookupResult.empty()) {

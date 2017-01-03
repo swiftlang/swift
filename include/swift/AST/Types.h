@@ -648,9 +648,17 @@ public:
   /// with a class type.
   bool mayHaveSuperclass();
 
-  /// \brief Determine whether this type may have nested types, which holds for
-  /// nominal types, existentials and archetypes.
-  bool mayHaveMemberTypes() {
+  /// \brief Determine whether this type can be used as a base type for AST
+  /// name lookup, which is the case for nominal types, protocol compositions
+  /// and archetypes.
+  ///
+  /// Generally, the static vs instanec and mutating vs nonmutating distinction
+  /// is handled elsewhere, so metatypes, lvalue types and inout types are not
+  /// allowed here.
+  ///
+  /// Similarly, tuples formally have members, but this does not go through
+  /// name lookup.
+  bool mayHaveMembers() {
     return (is<ArchetypeType>() ||
             is<ModuleType>() ||
             isExistentialType() ||

@@ -214,10 +214,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
   result = std::move(lookup);
 
   // If we aren't performing dynamic lookup, we're done.
-  auto instanceTy = base->getRValueType();
-  if (auto metaTy = instanceTy->getAs<AnyMetatypeType>())
-    instanceTy = metaTy->getInstanceType();
-  auto protoTy = instanceTy->getAs<ProtocolType>();
+  auto protoTy = base->getAs<ProtocolType>();
   if (!*result ||
       !protoTy ||
       !protoTy->getDecl()->isSpecificProtocol(
@@ -1568,15 +1565,7 @@ Type ConstraintSystem::simplifyType(Type type) {
       if (newBase.getPointer() == depMemTy->getBase().getPointer())
         return type;
 
-      Type lookupBaseType = newBase;
-
-      // Look through an inout type.
-      if (auto inout = lookupBaseType->getAs<InOutType>())
-        lookupBaseType = inout->getObjectType();
-
-      // Look through a metatype.
-      if (auto metatype = lookupBaseType->getAs<AnyMetatypeType>())
-        lookupBaseType = metatype->getInstanceType();
+      Type lookupBaseType = newBase->getLValueOrInOutObjectType();
 
       // If the new base is still something we can't handle, just build a
       // new dependent member type.
@@ -1592,9 +1581,12 @@ Type ConstraintSystem::simplifyType(Type type) {
       auto assocType = depMemTy->getAssocType();
       assert(depMemTy->getAssocType());
 
-      auto result = lookupBaseType->getTypeOfMember(
-                      DC->getParentModule(), assocType, &TC,
-                      assocType->getDeclaredInterfaceType());
+      if (!lookupBaseType->mayHaveMembers()) return type;
+
+      auto result = assocType->getDeclaredInterfaceType()
+          .subst(DC->getParentModule(),
+                 lookupBaseType->getContextSubstitutions(
+                    assocType->getDeclContext()));
 
       // FIXME: Record failure somehow?
       if (!result) return type;

@@ -134,12 +134,11 @@ static Type getObjectiveCNominalType(TypeChecker &TC,
 
   NameLookupOptions lookupOptions
     = defaultMemberLookupOptions |
-      NameLookupFlags::KnownPrivate |
-      NameLookupFlags::OnlyTypes;
-  if (auto result = TC.lookupMember(dc, ModuleType::get(module), TypeName,
-                                    lookupOptions)) {
-    for (auto decl : result) {
-      if (auto nominal = dyn_cast<NominalTypeDecl>(decl.Decl)) {
+      NameLookupFlags::KnownPrivate;
+  if (auto result = TC.lookupMemberType(dc, ModuleType::get(module), TypeName,
+                                        lookupOptions)) {
+    for (auto pair : result) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(pair.first)) {
         cache = nominal->getDeclaredType();
         return cache;
       }
@@ -775,7 +774,6 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessibility;
-    relookupOptions |= NameLookupFlags::OnlyTypes;
     auto inaccessibleResults =
         tc.lookupUnqualifiedType(lookupDC, comp->getIdentifier(), comp->getIdLoc(),
                                  relookupOptions);
@@ -831,6 +829,12 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
   }
 
   // Qualified lookup case.
+  if (!parentType->mayHaveMembers()) {
+    tc.diagnose(comp->getIdLoc(), diag::invalid_member_type,
+                comp->getIdentifier(), parentType)
+        .highlight(parentRange);
+    return ErrorType::get(tc.Context);
+  }
 
   // Try ignoring access control.
   NameLookupOptions relookupOptions = lookupOptions;
@@ -883,12 +887,9 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     NameLookupOptions memberLookupOptions = lookupOptions;
     memberLookupOptions |= NameLookupFlags::IgnoreAccessibility;
     memberLookupOptions |= NameLookupFlags::KnownPrivate;
-    memberLookupOptions -= NameLookupFlags::OnlyTypes;
 
-    if (parentType->mayHaveMemberTypes()) {
-      memberLookup = tc.lookupMember(dc, parentType, comp->getIdentifier(),
-                                     memberLookupOptions);
-    }
+    memberLookup = tc.lookupMember(dc, parentType, comp->getIdentifier(),
+                                   memberLookupOptions);
 
     // Looks like this is not a member type, but simply a member of parent type.
     if (!memberLookup.empty()) {
@@ -1028,7 +1029,6 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     return nullptr;
 
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
-  lookupOptions |= NameLookupFlags::OnlyTypes;
   if (options.contains(TR_KnownNonCascadingDependency))
     lookupOptions |= NameLookupFlags::KnownPrivate;
   // FIXME: Eliminate this once we can handle finding protocol members
@@ -1229,8 +1229,10 @@ static Type resolveNestedIdentTypeComponent(
   if (options.contains(TR_ExtensionBinding) ||
       options.contains(TR_InheritanceClause))
     lookupOptions -= NameLookupFlags::ProtocolMembers;
-  auto memberTypes = TC.lookupMemberType(DC, parentTy, comp->getIdentifier(),
-                                         lookupOptions);
+  LookupTypeResult memberTypes;
+  if (parentTy->mayHaveMembers())
+    memberTypes = TC.lookupMemberType(DC, parentTy, comp->getIdentifier(),
+                                      lookupOptions);
 
   // Name lookup was ambiguous. Complain.
   // FIXME: Could try to apply generic arguments first, and see whether

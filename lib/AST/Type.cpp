@@ -3099,22 +3099,14 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
 }
 
 TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
+  assert(dc->isTypeContext());
+  Type baseTy(this);
 
-  // Ignore lvalues in the base type.
-  Type baseTy(getRValueType());
-
-  // Look through the metatype; it has no bearing on the result.
-  if (auto metaBase = baseTy->getAs<AnyMetatypeType>()) {
-    baseTy = metaBase->getInstanceType()->getRValueType();
-  }
+  assert(!baseTy->isLValueType() && !baseTy->is<AnyMetatypeType>());
 
   // The resulting set of substitutions. Always use this to ensure we
   // don't miss out on NRVO anywhere.
   TypeSubstitutionMap substitutions;
-
-  // Look through non-type contexts.
-  while (!dc->isTypeContext())
-    dc = dc->getParent();
 
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
@@ -3127,19 +3119,24 @@ TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
     return substitutions;
   }
 
+  // If we found a member of a concrete type from a protocol extension,
+  // get the superclass out of the archetype.
+  if (auto *archetypeTy = baseTy->getAs<ArchetypeType>())
+    baseTy = archetypeTy->getSuperclass();
+
   // Extract the lazy resolver.
   LazyResolver *resolver = dc->getASTContext().getLazyResolver();
 
   // Find the superclass type with the context matching that of the member.
   //
   // FIXME: Do this in the caller?
-  if (baseTy->getAnyNominal()) {
-    auto *ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
-    if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
-      baseTy = baseTy->getSuperclassForDecl(ownerClass, resolver);
+  assert(baseTy->getAnyNominal());
 
-    assert(ownerNominal == baseTy->getAnyNominal());
-  }
+  auto *ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
+    baseTy = baseTy->getSuperclassForDecl(ownerClass, resolver);
+
+  assert(ownerNominal == baseTy->getAnyNominal());
 
   // If the base type isn't specialized, there's nothing to substitute.
   if (!baseTy->isSpecialized())
@@ -3177,8 +3174,7 @@ TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
       continue;
     }
 
-    // We're done.
-    break;
+    llvm_unreachable("Bad base type");
   }
 
   return substitutions;

@@ -5343,7 +5343,6 @@ public:
     // one.
     auto attempt = OverrideCheckingAttempt::PerfectMatch;
     SmallVector<OverrideMatch, 2> matches;
-    auto superclassMetaTy = MetatypeType::get(superclass);
     DeclName name = decl->getFullName();
     bool hadExactMatch = false;
     LookupResult members;
@@ -5387,7 +5386,7 @@ public:
         lookupOptions -= NameLookupFlags::ProtocolMembers;
         lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
-        members = TC.lookupMember(decl->getDeclContext(), superclassMetaTy,
+        members = TC.lookupMember(decl->getDeclContext(), superclass,
                                   name, lookupOptions);
       }
 

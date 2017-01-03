@@ -521,13 +521,16 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // non-existential type and has any initializers.
       auto eTy = E->getType();
       bool isExistential = false;
-      if (auto metaTy = eTy->getAs<MetatypeType>())
-        isExistential = metaTy->getInstanceType()->isAnyExistentialType();
-      if (!isExistential &&
-          !eTy->is<TupleType>() &&
-          !TC.lookupConstructors(const_cast<DeclContext *>(DC), eTy).empty()) {
-        TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
-          .fixItInsertAfter(E->getEndLoc(), "()");
+      if (auto metaTy = E->getType()->getAs<MetatypeType>()) {
+        auto instanceTy = metaTy->getInstanceType();
+        isExistential = instanceTy->isExistentialType();
+        if (!isExistential &&
+            instanceTy->mayHaveMembers() &&
+            !TC.lookupConstructors(const_cast<DeclContext *>(DC),
+                                   instanceTy).empty()) {
+          TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
+            .fixItInsertAfter(E->getEndLoc(), "()");
+        }
       }
 
       // Add fix-it to insert ".self".
@@ -3319,7 +3322,8 @@ class ObjCSelectorWalker : public ASTWalker {
     auto nominal =
       method->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
     auto result = TC.lookupMember(const_cast<DeclContext *>(DC),
-                                  nominal->getInterfaceType(), lookupName,
+                                  nominal->getDeclaredInterfaceType(),
+                                  lookupName,
                                   (defaultMemberLookupOptions |
                                    NameLookupFlags::KnownPrivate));
 
