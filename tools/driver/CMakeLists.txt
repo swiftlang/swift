@@ -12,9 +12,7 @@ add_swift_host_tool(swift
   SWIFT_COMPONENT compiler
 )
 
-if(HAVE_UNICODE_LIBEDIT)
-  target_link_libraries(swift edit)
-endif()
+target_link_libraries(swift edit)
 
 add_custom_command(TARGET swift POST_BUILD
     COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swiftc"
