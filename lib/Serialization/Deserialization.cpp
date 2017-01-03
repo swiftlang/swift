@@ -269,6 +269,15 @@ static bool skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 #endif
 }
 
+void ModuleFile::finishPendingActions() {
+  while (!DelayedGenericEnvironments.empty()) {
+    // Force completion of the last generic environment.
+    auto genericEnvDC = DelayedGenericEnvironments.back();
+    DelayedGenericEnvironments.pop_back();
+    (void)genericEnvDC->getGenericEnvironmentOfContext();
+  }
+}
+
 /// Translate from the serialization DefaultArgumentKind enumerators, which are
 /// guaranteed to be stable, to the AST ones.
 static Optional<swift::DefaultArgumentKind>
@@ -926,11 +935,14 @@ void ModuleFile::configureGenericEnvironment(
   if (auto genericSig = sigOrEnv.dyn_cast<GenericSignature *>()) {
     if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
       type->setLazyGenericEnvironment(this, genericSig, envID);
+      DelayedGenericEnvironments.push_back(type);
     } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
       func->setLazyGenericEnvironment(this, genericSig, envID);
+      DelayedGenericEnvironments.push_back(func);
     } else {
       auto ext = genericDecl.get<ExtensionDecl *>();
       ext->setLazyGenericEnvironment(this, genericSig, envID);
+      DelayedGenericEnvironments.push_back(ext);
     }
 
     return;
@@ -2125,6 +2137,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   PrivateDiscriminatorRAII privateDiscriminatorRAII{*this, declOrOffset};
   LocalDiscriminatorRAII localDiscriminatorRAII(declOrOffset);
+  DeserializingEntityRAII deserializingEntity(*this);
 
   // Local function that handles the "inherited" list for a type.
   auto handleInherited
