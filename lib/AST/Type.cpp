@@ -2093,10 +2093,6 @@ getForeignRepresentable(Type type, ForeignLanguage language,
              nullptr };
   }
 
-  // In Objective-C, type parameters are always objects.
-  if (type->isTypeParameter() && language == ForeignLanguage::ObjectiveC)
-    return { ForeignRepresentableKind::Object, nullptr };
-
   auto nominal = type->getAnyNominal();
   if (!nominal) return failure();
 
@@ -2204,6 +2200,13 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       // Type arguments cannot be optional.
       if (typeArg->getAnyOptionalObjectType())
         return failure();
+
+      // A type parameter can appear here when we're looking at an
+      // extension of an @objc imported class.
+      //
+      // FIXME: Make this more principled.
+      if (typeArg->isTypeParameter())
+        continue;
 
       // And must be representable either an object or bridged.
       switch (typeArg->getForeignRepresentableIn(language, dc).first) {
