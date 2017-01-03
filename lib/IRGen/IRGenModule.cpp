@@ -403,7 +403,7 @@ namespace RuntimeConstants {
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
-}
+} // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
 // RuntimeFunctions.def FUNCTION macro. Instead, special case the one attribute
@@ -860,7 +860,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
 
     if (!Module.getGlobalVariable(buf.str())) {
       auto ref = new llvm::GlobalVariable(Module, symbolAddr->getType(),
-                                          /*constant=*/true,
+                                          /*isConstant=*/true,
                                           llvm::GlobalValue::WeakAnyLinkage,
                                           symbolAddr, buf.str());
       ref->setVisibility(llvm::GlobalValue::HiddenVisibility);
@@ -965,7 +965,7 @@ void IRGenModule::emitAutolinkInfo() {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
     auto symbol =
-        new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/false,
+        new llvm::GlobalVariable(Module, Int1Ty, /*isConstant=*/false,
                                  llvm::GlobalValue::CommonLinkage,
                                  llvm::Constant::getNullValue(Int1Ty),
                                  buf.str());

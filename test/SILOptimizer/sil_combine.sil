@@ -440,8 +440,8 @@ enum U {
 // CHECK-NEXT: tuple ({{%[0-9]+}} : $U, {{%[0-9]+}} : $U, [[INVALID_CASE]] : $U)
 // CHECK-NEXT: return
 //
-// release_value  of an  enum without  any payload  or with  a trivial
-// typed payload  is a  no-op. Leave  enums with  non-trivial payloads
+// release_value of an enum without any payload or with a trivial
+// typed payload is a no-op. Leave enums with non-trivial payloads
 // alone.
 //
 // rdar://15568314

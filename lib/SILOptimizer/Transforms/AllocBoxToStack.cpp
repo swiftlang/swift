@@ -194,8 +194,8 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
 
       // apply instructions do not capture the pointer when it is passed
       // indirectly
-      if (isIndirectConvention(
-            apply->getArgumentConvention(UI->getOperandNumber()-1)))
+      if (apply->getArgumentConvention(UI->getOperandNumber() - 1)
+              .isIndirectConvention())
         continue;
 
       // Optionally drill down into an apply to see if the operand is
@@ -503,7 +503,7 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
   // references.
   llvm::SmallSet<SILValue, 4> PromotedParameters;
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
                                  IsFragile_t Fragile,
@@ -521,7 +521,7 @@ static std::string getClonedName(SILFunction *F,
                                  IsFragile_t Fragile,
                                  ParamIndexList &PromotedParamIndices) {
   Mangle::Mangler M;
-  auto P = SpecializationPass::AllocBoxToStack;
+  auto P = Demangle::SpecializationPass::AllocBoxToStack;
   FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
   NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
   for (unsigned i : PromotedParamIndices) {
@@ -553,7 +553,12 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
       auto boxTy = param.getType()->castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented");
-      auto paramTy = boxTy->getFieldType(Orig->getModule(), 0);
+      SILType paramTy;
+      {
+        Lowering::GenericContextScope scope(Orig->getModule().Types,
+                                            OrigFTI->getGenericSignature());
+        paramTy = boxTy->getFieldType(Orig->getModule(), 0);
+      }
       auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
                                   ParameterConvention::Indirect_InoutAliasable);
       ClonedInterfaceArgTys.push_back(promotedParam);
@@ -613,7 +618,7 @@ PromotedParamCloner::populateCloned() {
              && "promoting multi-field boxes not implemented yet");
       auto promotedTy = boxTy->getFieldType(Cloned->getModule(), 0);
       auto *promotedArg =
-          ClonedEntryBB->createArgument(promotedTy, (*I)->getDecl());
+          ClonedEntryBB->createFunctionArgument(promotedTy, (*I)->getDecl());
       PromotedParameters.insert(*I);
       
       // Map any projections of the box to the promoted argument.
@@ -625,8 +630,8 @@ PromotedParamCloner::populateCloned() {
       
     } else {
       // Create a new argument which copies the original argument.
-      SILValue MappedValue =
-          ClonedEntryBB->createArgument((*I)->getType(), (*I)->getDecl());
+      SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
+          (*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;
@@ -776,9 +781,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
                                                    ClonedFn);
   CanSILFunctionType CanFnTy = ClonedFn->getLoweredFunctionType();
   auto const &Subs = PartialApply->getSubstitutions();
-  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M,
-                                                             M.getSwiftModule(),
-                                                             Subs);
+  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M, Subs);
   return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
                                  SILType::getPrimitiveObjectType(SubstCalleeTy),
                                     PartialApply->getSubstitutions(), Args,

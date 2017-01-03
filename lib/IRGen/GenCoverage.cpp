@@ -97,8 +97,9 @@ void IRGenModule::emitCoverageMapping() {
           MR.Counter, /*FileID=*/0, MR.StartLine, MR.StartCol, MR.EndLine,
           MR.EndCol));
     // Append each function's regions into the encoded buffer.
-    llvm::coverage::CoverageMappingWriter W({FileID}, M.getExpressions(),
-                                            Regions);
+    ArrayRef<unsigned> VirtualFileMapping(FileID);
+    llvm::coverage::CoverageMappingWriter W(VirtualFileMapping,
+                                            M.getExpressions(), Regions);
     W.write(OS);
 
     std::string NameValue = llvm::getPGOFuncName(

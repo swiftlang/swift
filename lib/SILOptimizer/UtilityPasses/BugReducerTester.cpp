@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -42,8 +42,9 @@ class BugReducerTester : public SILFunctionTransform {
         auto *Apply = dyn_cast<ApplyInst>(&II);
         if (!Apply)
           continue;
-        FullApplySite FAS(Apply);
-        if (!FAS || !FAS.getCalleeFunction()->getName().equals(FunctionTarget))
+        auto *FRI = dyn_cast<FunctionRefInst>(Apply->getCallee());
+        if (!FRI ||
+            !FRI->getReferencedFunction()->getName().equals(FunctionTarget))
           continue;
         llvm_unreachable("Found the target!");
       }

@@ -219,7 +219,7 @@ bool swift::immediate::IRGenImportedModules(
     AllLinkLibraries.push_back(linkLib);
   };
 
-  M->forAllVisibleModules({}, /*includePrivateTopLevel=*/true,
+  M->forAllVisibleModules({}, /*includePrivateTopLevelImports=*/true,
                           [&](Module::ImportedModule import) {
     import.second->collectLinkLibraries(addLinkLibrary);
   });

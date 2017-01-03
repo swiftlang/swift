@@ -18,7 +18,7 @@ class ListReducer(object):
         self.max_iters_without_progress = 3
 
         # Maximal number of allowed single-element trim iterations. We add a
-        # threshhold here as single-element reductions may otherwise take a
+        # threshold here as single-element reductions may otherwise take a
         # very long time to complete.
         self.max_trim_iterations_without_back_jump = 3
         self.shuffling_enabled = True

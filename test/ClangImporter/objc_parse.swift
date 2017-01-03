@@ -356,14 +356,14 @@ class ProtocolAdopter2 : FooProto {
     set { /* do nothing! */ }
   }
 }
-class ProtocolAdopterBad1 : FooProto { // expected-error{{type 'ProtocolAdopterBad1' does not conform to protocol 'FooProto'}}
-  @objc var bar: Int = 0 // expected-note{{candidate has non-matching type 'Int'}}
+class ProtocolAdopterBad1 : FooProto { // expected-error 2{{type 'ProtocolAdopterBad1' does not conform to protocol 'FooProto'}}
+  @objc var bar: Int = 0 // expected-note 2{{candidate has non-matching type 'Int'}}
 }
-class ProtocolAdopterBad2 : FooProto { // expected-error{{type 'ProtocolAdopterBad2' does not conform to protocol 'FooProto'}}
-  let bar: CInt = 0 // expected-note{{candidate is not settable, but protocol requires it}}
+class ProtocolAdopterBad2 : FooProto { // expected-error 2{{type 'ProtocolAdopterBad2' does not conform to protocol 'FooProto'}}
+  let bar: CInt = 0 // expected-note 2{{candidate is not settable, but protocol requires it}}
 }
-class ProtocolAdopterBad3 : FooProto { // expected-error{{type 'ProtocolAdopterBad3' does not conform to protocol 'FooProto'}}
-  var bar: CInt { // expected-note{{candidate is not settable, but protocol requires it}}
+class ProtocolAdopterBad3 : FooProto { // expected-error 2{{type 'ProtocolAdopterBad3' does not conform to protocol 'FooProto'}}
+  var bar: CInt { // expected-note 2{{candidate is not settable, but protocol requires it}}
     return 42
   }
 }
@@ -466,7 +466,8 @@ func testWeakVariable() {
 }
 
 class IncompleteProtocolAdopter : Incomplete, IncompleteOptional { // expected-error {{type 'IncompleteProtocolAdopter' cannot conform to protocol 'Incomplete' because it has requirements that cannot be satisfied}}
-  @objc func getObject() -> AnyObject { return self }
+      // expected-error@-1{{type 'IncompleteProtocolAdopter' does not conform to protocol 'Incomplete'}}
+  @objc func getObject() -> AnyObject { return self } // expected-note{{candidate has non-matching type '() -> AnyObject'}}
 }
 
 func testNullarySelectorPieces(_ obj: AnyObject) {
@@ -501,8 +502,10 @@ func testUnusedResults(_ ur: UnusedResults) {
   ur.producesResult() // expected-warning{{result of call to 'producesResult()' is unused}}
 }
 
-func testCStyle() {
-  ExtraSelectors.cStyle(0, 1, 2) // expected-error{{type 'ExtraSelectors' has no member 'cStyle'}}
+func testStrangeSelectors(obj: StrangeSelectors) {
+  StrangeSelectors.cStyle(0, 1, 2) // expected-error{{type 'StrangeSelectors' has no member 'cStyle'}}
+  _ = StrangeSelectors(a: 0, b: 0) // okay
+  obj.empty(1, 2) // okay
 }
 
 func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,

@@ -48,7 +48,7 @@ internal func _NSWriteDataToFile_Swift(url: NSURL, data: NSData, options: UInt, 
 
 public final class _DataStorage {
     public enum Backing {
-        // A mirror of the objective-c implementation that is suitable to inline in swift
+        // A mirror of the Objective-C implementation that is suitable to inline in Swift
         case swift
         
         // these two storage points for immutable and mutable data are reserved for references that are returned by "known"
@@ -59,7 +59,7 @@ public final class _DataStorage {
         case immutable(NSData) // This will most often (perhaps always) be NSConcreteData
         case mutable(NSMutableData) // This will often (perhaps always) be NSConcreteMutableData
         
-        // These are reserved for foregin sources where neither Swift nor Foundation are fully certain whom they belong
+        // These are reserved for foreign sources where neither Swift nor Foundation are fully certain whom they belong
         // to from an object inheritance standpoint, this means that all bets are off and the values of bytes, mutableBytes,
         // and length cannot be cached. This also means that all methods are expected to dynamically dispatch out to the
         // backing reference.
@@ -91,7 +91,7 @@ public final class _DataStorage {
             num -= pages
         }
         if num > 0 {
-            memmove(dest, source, num)
+            memmove(dest, source!, num)
         }
     }
     
@@ -500,7 +500,7 @@ public final class _DataStorage {
             }
             if replacementLength != 0 {
                 if replacementBytes != nil {
-                    memmove(mutableBytes! + start, replacementBytes, replacementLength)
+                    memmove(mutableBytes! + start, replacementBytes!, replacementLength)
                 } else {
                     memset(mutableBytes! + start, 0, replacementLength)
                 }
@@ -759,7 +759,7 @@ public final class _DataStorage {
             return d
         case .customMutableReference(let d):
             // Because this is returning an object that may be mutated in the future it needs to create a copy to prevent
-            // any further mutations out from under the reciever
+            // any further mutations out from under the receiver
             return d.copy() as! NSData
         }
     }
@@ -822,7 +822,10 @@ public final class _DataStorage {
             if lhs.bytes == rhs.bytes {
                 return true
             }
-            return memcmp(lhs._bytes, rhs._bytes, length1) == 0
+            if length1 > 0 {
+                return memcmp(lhs._bytes!, rhs._bytes!, length1) == 0
+            }
+            return true
         }
     }
     
@@ -865,7 +868,7 @@ internal class _NSSwiftData : NSData {
     override var bytes: UnsafeRawPointer {
         // NSData's byte pointer methods are not annotated for nullability correctly
         // (but assume non-null by the wrapping macro guards). This placeholder value
-        // is to work-around this bug. Any indirection to the underlying bytes of a NSData
+        // is to work-around this bug. Any indirection to the underlying bytes of an NSData
         // with a length of zero would have been a programmer error anyhow so the actual
         // return value here is not needed to be an allocated value. This is specifically
         // needed to live like this to be source compatible with Swift3. Beyond that point
@@ -932,7 +935,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         /// A custom deallocator.
         case custom((UnsafeMutableRawPointer, Int) -> Void)
         
-        fileprivate var _deallocator : ((UnsafeMutableRawPointer, Int) -> Void)? {
+        fileprivate var _deallocator : ((UnsafeMutableRawPointer, Int) -> Void) {
 #if DEPLOYMENT_RUNTIME_SWIFT
             switch self {
             case .unmap:
@@ -940,7 +943,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             case .free:
                 return { __NSDataInvokeDeallocatorFree($0, $1) }
             case .none:
-                return nil
+                return { _, _ in }
             case .custom(let b):
                 return { (ptr, len) in
                     b(ptr, len)
@@ -955,7 +958,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             case .free:
                 return { __NSDataInvokeDeallocatorFree($0, $1) }
             case .none:
-                return nil
+                return { _, _ in }
             case .custom(let b):
                 return { (ptr, len) in
                     b(ptr, len)
@@ -1639,7 +1642,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         if backing1.bytes == backing2.bytes {
             return true
         }
-        return memcmp(backing1.bytes, backing2.bytes, length1) == 0
+        if length1 > 0 {
+            return memcmp(backing1.bytes!, backing2.bytes!, length1) == 0
+        }
+        return true
     }
 }
 

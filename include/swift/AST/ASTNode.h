@@ -24,6 +24,7 @@ namespace swift {
   class Expr;
   class Stmt;
   class Decl;
+  class DeclContext;
   class SourceLoc;
   class SourceRange;
   class ASTWalker;
@@ -42,6 +43,10 @@ namespace swift {
 
     void walk(ASTWalker &Walker);
     void walk(ASTWalker &&walker) { walk(walker); }
+
+    /// \brief get the underlying entity as a decl context if it is one,
+    /// otherwise, return nullptr;
+    DeclContext *getAsDeclContext() const;
   };
   
 } // namespace swift

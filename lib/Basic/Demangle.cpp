@@ -58,7 +58,7 @@ struct QuotedString {
 
   explicit QuotedString(std::string Value) : Value(Value) {}
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 static DemanglerPrinter &operator<<(DemanglerPrinter &printer,
                                     const QuotedString &QS) {
@@ -2457,6 +2457,8 @@ private:
     case Node::Kind::FunctionType:
     case Node::Kind::GenericProtocolWitnessTable:
     case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
+    case Node::Kind::GenericPartialSpecialization:
+    case Node::Kind::GenericPartialSpecializationNotReAbstracted:
     case Node::Kind::GenericSpecialization:
     case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericSpecializationParam:
@@ -2720,6 +2722,9 @@ private:
 
   unsigned printFunctionSigSpecializationParam(NodePointer pointer,
                                                unsigned Idx);
+
+  void printSpecializationPrefix(NodePointer node, StringRef Description,
+                                 StringRef ParamPrefix = StringRef());
 };
 } // end anonymous namespace
 
@@ -2803,6 +2808,41 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer pointer,
       "Invalid OptionSet");
   print(pointer->getChild(Idx++));
   return Idx;
+}
+
+void NodePrinter::printSpecializationPrefix(NodePointer node,
+                                            StringRef Description,
+                                            StringRef ParamPrefix) {
+  if (!Options.DisplayGenericSpecializations) {
+    Printer << "specialized ";
+    return;
+  }
+  Printer << Description << " <";
+  const char *Separator = "";
+  for (unsigned i = 0, e = node->getNumChildren(); i < e; ++i) {
+    switch (node->getChild(i)->getKind()) {
+      case Node::Kind::SpecializationPassID:
+        // We skip the SpecializationPassID since it does not contain any
+        // information that is useful to our users.
+        break;
+
+      case Node::Kind::SpecializationIsFragile:
+        Printer << Separator;
+        Separator = ", ";
+        print(node->getChild(i));
+        break;
+
+      default:
+        // Ignore empty specializations.
+        if (node->getChild(i)->hasChildren()) {
+          Printer << Separator << ParamPrefix;
+          Separator = ", ";
+          print(node->getChild(i));
+        }
+        break;
+    }
+  }
+  Printer << "> of ";
 }
 
 static bool isClassType(NodePointer pointer) {
@@ -3124,46 +3164,20 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "override ";
     return;
   case Node::Kind::FunctionSignatureSpecialization:
+    return printSpecializationPrefix(pointer,
+              "function signature specialization");
+  case Node::Kind::GenericPartialSpecialization:
+    return printSpecializationPrefix(pointer,
+              "generic partial specialization", "Signature = ");
+  case Node::Kind::GenericPartialSpecializationNotReAbstracted:
+    return printSpecializationPrefix(pointer,
+              "generic not-reabstracted partial specialization", "Signature = ");
   case Node::Kind::GenericSpecialization:
-  case Node::Kind::GenericSpecializationNotReAbstracted: {
-    if (!Options.DisplayGenericSpecializations) {
-      Printer << "specialized ";
-      return;
-    }
-    if (pointer->getKind() == Node::Kind::FunctionSignatureSpecialization) {
-      Printer << "function signature specialization <";
-    } else if (pointer->getKind() == Node::Kind::GenericSpecialization) {
-      Printer << "generic specialization <";
-    } else {
-      Printer << "generic not re-abstracted specialization <";
-    }
-    bool hasPrevious = false;
-    for (unsigned i = 0, e = pointer->getNumChildren(); i < e; ++i) {
-      auto child = pointer->getChild(i);
-
-      switch (pointer->getChild(i)->getKind()) {
-      case Node::Kind::SpecializationPassID:
-        // We skip the SpecializationPassID since it does not contain any
-        // information that is useful to our users.
-        continue;
-
-      case Node::Kind::SpecializationIsFragile:
-        break;
-
-      default:
-        // Ignore empty specializations.
-        if (!pointer->getChild(i)->hasChildren())
-          continue;
-      }
-
-      if (hasPrevious)
-        Printer << ", ";
-      print(pointer->getChild(i));
-      hasPrevious = true;
-    }
-    Printer << "> of ";
-    return;
-  }
+    return printSpecializationPrefix(pointer,
+              "generic specialization");
+  case Node::Kind::GenericSpecializationNotReAbstracted:
+    return printSpecializationPrefix(pointer,
+              "generic not re-abstracted specialization");
   case Node::Kind::SpecializationIsFragile:
     Printer << "preserving fragile attribute";
     return;
@@ -3596,12 +3610,22 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     NodePointer child0 = pointer->getChild(0);
     NodePointer child1 = pointer->getChild(1);
     NodePointer child2 = pointer->getChild(2);
-    print(child0);
-    if (Options.DisplayProtocolConformances) {
+    if (pointer->getNumChildren() == 4) {
+      // TODO: check if this is correct
+      Printer << "property behavior storage of ";
+      print(child2);
+      Printer << " in ";
+      print(child0);
       Printer << " : ";
       print(child1);
-      Printer << " in ";
-      print(child2);
+    } else {
+      print(child0);
+      if (Options.DisplayProtocolConformances) {
+        Printer << " : ";
+        print(child1);
+        Printer << " in ";
+        print(child2);
+      }
     }
     return;
   }

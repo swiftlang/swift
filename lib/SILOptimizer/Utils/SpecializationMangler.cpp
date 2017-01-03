@@ -80,11 +80,22 @@ std::string GenericSpecializationMangler::mangle() {
 }
 
 //===----------------------------------------------------------------------===//
+//                         Partial Generic Specialization
+//===----------------------------------------------------------------------===//
+
+std::string PartialSpecializationMangler::mangle() {
+  beginMangling();
+  appendType(SpecializedFnTy);
+  appendSpecializationOperator(isReAbstracted ? "Tp" : "TP");
+  return finalize();
+}
+
+//===----------------------------------------------------------------------===//
 //                      Function Signature Optimizations
 //===----------------------------------------------------------------------===//
 
 FunctionSignatureSpecializationMangler::
-FunctionSignatureSpecializationMangler(SpecializationPass P,
+FunctionSignatureSpecializationMangler(Demangle::SpecializationPass P,
                                        IsFragile_t Fragile, SILFunction *F)
   : SpecializationMangler(P, Fragile, F) {
   for (unsigned i = 0, e = F->getLoweredFunctionType()->getNumSILArguments();
@@ -298,8 +309,12 @@ mangleReturnValue(ReturnValueModifierIntBase RetMod) {
   }
 }
 
-std::string FunctionSignatureSpecializationMangler::mangle() {
+std::string FunctionSignatureSpecializationMangler::mangle(int UniqueID) {
+  ArgOpStorage.clear();
   beginMangling();
+
+  if (UniqueID)
+    ArgOpBuffer << UniqueID;
 
   for (unsigned i : indices(Args)) {
     ArgumentModifierIntBase ArgMod;

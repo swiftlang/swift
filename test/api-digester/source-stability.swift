@@ -1,4 +1,3 @@
-// REQUIRES: rdar://29591753
 // REQUIRES: OS=macosx
 // RUN: rm -rf %S/tmp && mkdir %S/tmp && mkdir %S/tmp/module-cache && mkdir %S/tmp/dummy.sdk
 // RUN: %api-digester -dump-sdk -module Swift -o %S/tmp/current-stdlib.json -module-cache-path %S/tmp/module-cache -sdk %S/tmp/dummy.sdk -swift-version 3

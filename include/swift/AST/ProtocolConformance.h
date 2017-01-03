@@ -297,7 +297,8 @@ private:
   /// applies to the substituted type.
   ProtocolConformance *subst(ModuleDecl *module,
                              Type substType,
-                             const SubstitutionMap &subMap) const;
+                             TypeSubstitutionFn subs,
+                             LookupConformanceFn conformances) const;
 };
 
 /// Normal protocol conformance, which involves mapping each of the protocol

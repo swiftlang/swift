@@ -477,11 +477,11 @@ static void reportRelated(ASTContext &Ctx,
 
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
 
-    // If underlying type exists, report the inheritance and conformance of the
-    // underlying type.
-    auto Ty = TAD->getUnderlyingType();
-    if (Ty) {
-      if (auto NM = Ty->getCanonicalType()->getAnyNominal()) {
+    if (TAD->hasInterfaceType()) {
+      // If underlying type exists, report the inheritance and conformance of the
+      // underlying type.
+      auto Ty = TAD->getDeclaredInterfaceType();
+      if (auto NM = Ty->getAnyNominal()) {
         passInherits(NM->getInherited(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                      Consumer);
@@ -759,7 +759,7 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
         TypeRange = InOutTyR->getBase()->getSourceRange();
       if (TypeRange.isInvalid())
         continue;
-      
+
       unsigned StartOffs = SM.getLocOffsetInBuffer(TypeRange.Start, BufferID);
       unsigned EndOffs =
         SM.getLocOffsetInBuffer(Lexer::getLocForEndOfToken(SM, TypeRange.End),
@@ -927,7 +927,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
   if (makeParserAST(ParseCI, IFaceInfo.Text))
     return true;
   addParameterEntities(ParseCI, IFaceInfo);
-  
+
   Consumer.handleSourceText(IFaceInfo.Text);
   reportDocEntities(Ctx, IFaceInfo.TopEntities, Consumer);
   reportSourceAnnotations(IFaceInfo, ParseCI, Consumer);
@@ -977,7 +977,8 @@ public:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type Ty) override {
+                          TypeDecl *CtorTyRef, Type Ty,
+                          SemaReferenceKind Kind) override {
     unsigned StartOffset = getOffset(Range.getStart());
     References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
     return true;
@@ -986,7 +987,8 @@ public:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
-    return visitDeclReference(D, Range, nullptr, Type());
+    return visitDeclReference(D, Range, nullptr, Type(),
+                              SemaReferenceKind::SubscriptRef);
   }
 
   bool isLocal(Decl *D) const {

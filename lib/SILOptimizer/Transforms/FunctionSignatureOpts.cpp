@@ -364,8 +364,16 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   }
 
   OldFM.mangle();
-  std::string Old = OldFM.getMangler().finalize();
-  std::string New = NewFM.mangle();
+  SILModule &M = F->getModule();
+  std::string Old = getUniqueName(OldFM.getMangler().finalize(), M);
+
+  int UniqueID = 0;
+  std::string New;
+  do {
+    New = NewFM.mangle(UniqueID);
+    ++UniqueID;
+  } while (M.lookUpFunction(New));
+
   return NewMangling::selectMangling(Old, New);
 }
 
@@ -472,7 +480,7 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
 void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Create the optimized function !
   SILModule &M = F->getModule();
-  std::string Name = getUniqueName(createOptimizedSILFunctionName(), M);
+  std::string Name = createOptimizedSILFunctionName();
   SILLinkage linkage = F->getLinkage();
   if (isAvailableExternally(linkage))
     linkage = SILLinkage::Shared;
@@ -512,7 +520,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   F->setInlineStrategy(AlwaysInline);
   SILBasicBlock *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgumentDescList) {
-    ThunkBody->createArgument(ArgDesc.Arg->getType(), ArgDesc.Decl);
+    ThunkBody->createFunctionArgument(ArgDesc.Arg->getType(), ArgDesc.Decl);
   }
 
   SILLocation Loc = ThunkBody->getParent()->getLocation();
@@ -537,11 +545,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     // We need a try_apply to call a function with an error result.
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
-    ReturnValue = NormalBlock->createArgument(ResultType, nullptr);
+    ReturnValue = NormalBlock->createPHIArgument(ResultType);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createArgument(Error, nullptr);
+    auto *ErrorArg = ErrorBlock->createPHIArgument(Error);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
@@ -572,7 +580,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
   // Did we decide we should optimize any parameter?
   bool SignatureOptimize = false;
-  ArrayRef<SILArgument *> Args = F->begin()->getArguments();
+  auto Args = F->begin()->getFunctionArguments();
 
   // Analyze the argument information.
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
@@ -615,7 +623,7 @@ void FunctionSignatureTransform::DeadArgumentFinalizeOptimizedFunction() {
 /// Owned to Guaranteed transformation.                       ///
 /// ----------------------------------------------------------///
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
-  ArrayRef<SILArgument *> Args = F->begin()->getArguments();
+  auto Args = F->begin()->getFunctionArguments();
   // A map from consumed SILArguments to the release associated with an
   // argument.
   //
@@ -792,7 +800,7 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
 bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
   // Did we decide we should optimize any parameter?
   bool SignatureOptimize = false;
-  ArrayRef<SILArgument *> Args = F->begin()->getArguments();
+  auto Args = F->begin()->getFunctionArguments();
   ConsumedArgToEpilogueReleaseMatcher ArgToReturnReleaseMap(RCIA->get(F), F);
 
   // Analyze the argument information.
@@ -840,8 +848,8 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     AD.ProjTree.getLeafNodes(LeafNodes);
     for (auto Node : LeafNodes) {
       LeafValues.push_back(
-          BB->insertArgument(ArgOffset++, Node->getType(),
-                             BB->getArgument(OldArgIndex)->getDecl()));
+          BB->insertFunctionArgument(ArgOffset++, Node->getType(),
+                                     BB->getArgument(OldArgIndex)->getDecl()));
       AIM[TotalArgIndex - 1] = AD.Index;
       TotalArgIndex ++;
     }
@@ -915,7 +923,7 @@ public:
     // going to change, make sure the mangler is aware of all the changes done
     // to the function.
     Mangle::Mangler M;
-    auto P = SpecializationPass::FunctionSignatureOpts;
+    auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
     FunctionSignatureSpecializationMangler OldFM(P, M, F->isFragile(), F);
     NewMangling::FunctionSignatureSpecializationMangler NewFM(P, F->isFragile(),
                                                               F);
@@ -931,7 +939,7 @@ public:
     // Allocate the argument and result descriptors.
     llvm::SmallVector<ArgumentDescriptor, 4> ArgumentDescList;
     llvm::SmallVector<ResultDescriptor, 4> ResultDescList;
-    ArrayRef<SILArgument *> Args = F->begin()->getArguments();
+    auto Args = F->begin()->getFunctionArguments();
     for (unsigned i = 0, e = Args.size(); i != e; ++i) {
       ArgumentDescList.emplace_back(Args[i]);
     }

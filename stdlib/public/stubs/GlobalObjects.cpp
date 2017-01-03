@@ -34,7 +34,7 @@ extern "C" ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);
 // _direct type metadata for Swift._RawNativeSetStorage
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" ClassMetadata CLASS_METADATA_SYM(s20_RawNativeSetStorage);
-}
+} // namespace swift
 
 swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   // HeapObject header;
@@ -137,5 +137,6 @@ namespace llvm { namespace hashing { namespace detail {
   // An extern variable expected by LLVM's hashing templates. We don't link any
   // LLVM libs into the runtime, so define this here.
   size_t fixed_seed_override = 0;
-} } }
-
+} // namespace detail
+} // namespace hashing
+} // namespace llvm

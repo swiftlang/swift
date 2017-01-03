@@ -1,4 +1,3 @@
-// REQUIRES: rdar://29591622
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %s -profile-generate -profile-coverage-mapping -Xfrontend -disable-incremental-llvm-codegen -o %t/main
 // RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main

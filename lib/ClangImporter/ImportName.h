@@ -32,27 +32,15 @@ namespace swift {
 namespace importer {
 struct PlatformAvailability;
 
-/// Information about imported error parameters.
-struct ImportedErrorInfo {
-  ForeignErrorConvention::Kind Kind;
-  ForeignErrorConvention::IsOwned_t IsOwned;
-
-  /// The index of the error parameter.
-  unsigned ParamIndex;
-
-  /// Whether the parameter is being replaced with "void"
-  /// (vs. removed).
-  bool ReplaceParamWithVoid;
-};
-
 /// The kind of accessor that an entity will be imported as.
-enum class ImportedAccessorKind {
+enum class ImportedAccessorKind : unsigned {
   None = 0,
   PropertyGetter,
   PropertySetter,
   SubscriptGetter,
   SubscriptSetter,
 };
+enum { NumImportedAccessorKindBits = 3 };
 
 /// The name version
 enum class ImportNameVersion : unsigned {
@@ -69,6 +57,9 @@ enum class ImportNameVersion : unsigned {
   Swift4,
 };
 enum { NumImportNameVersions = 4 };
+
+/// Map a language version into an import name version
+ImportNameVersion nameVersionFromOptions(const LangOptions &langOpts);
 
 /// Describes a name that was imported from Clang.
 class ImportedName {
@@ -88,34 +79,44 @@ class ImportedName {
   EffectiveClangContext effectiveContext;
 
   struct Info {
+    /// For names that map Objective-C error handling conventions into
+    /// throwing Swift methods, describes how the mapping is performed.
+    ForeignErrorConvention::Info errorInfo;
+
+    /// For a declaration name that makes the declaration into an
+    /// instance member, the index of the "Self" parameter.
+    unsigned selfIndex;
+
+    /// For an initializer, the kind of initializer to import.
+    CtorInitializerKind initKind;
+
     /// The version of Swift this name corresponds to
-    ImportNameVersion version;
+    ImportNameVersion version : NumImportNameVersions;
+
+    /// What kind of accessor this name refers to, if any.
+    ImportedAccessorKind accessorKind : NumImportedAccessorKindBits;
 
     /// Whether this name was explicitly specified via a Clang
     /// swift_name attribute.
-    bool hasCustomName = false;
+    unsigned hasCustomName : 1;
 
     /// Whether this was one of a special class of Objective-C
     /// initializers for which we drop the variadic argument rather
     /// than refuse to import the initializer.
-    bool droppedVariadic = false;
+    unsigned droppedVariadic : 1;
 
     /// Whether this is a global being imported as a member
-    bool importAsMember = false;
+    unsigned importAsMember : 1;
 
-    /// What kind of accessor this name refers to, if any.
-    ImportedAccessorKind accessorKind = ImportedAccessorKind::None;
+    unsigned hasSelfIndex : 1;
 
-    /// For an initializer, the kind of initializer to import.
-    CtorInitializerKind initKind = CtorInitializerKind::Designated;
+    unsigned hasErrorInfo : 1;
 
-    /// For names that map Objective-C error handling conventions into
-    /// throwing Swift methods, describes how the mapping is performed.
-    Optional<ImportedErrorInfo> errorInfo = None;
-
-    /// For a declaration name that makes the declaration into an
-    /// instance member, the index of the "Self" parameter.
-    Optional<unsigned> selfIndex = None;
+    Info()
+        : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
+          version(), accessorKind(ImportedAccessorKind::None),
+          hasCustomName(false), droppedVariadic(false), importAsMember(false),
+          hasSelfIndex(false), hasErrorInfo(false) {}
   } info;
 
 public:
@@ -146,13 +147,19 @@ public:
 
   /// For names that map Objective-C error handling conventions into
   /// throwing Swift methods, describes how the mapping is performed.
-  Optional<ImportedErrorInfo> getErrorInfo() const {
-    return info.errorInfo;
+  Optional<ForeignErrorConvention::Info> getErrorInfo() const {
+    if (info.hasErrorInfo)
+      return info.errorInfo;
+    return None;
   }
 
   /// For a declaration name that makes the declaration into an
   /// instance member, the index of the "Self" parameter.
-  Optional<unsigned> getSelfIndex() const { return info.selfIndex; }
+  Optional<unsigned> getSelfIndex() const {
+    if (info.hasSelfIndex)
+      return info.selfIndex;
+    return None;
+  }
 
   /// Whether this name was explicitly specified via a Clang
   /// swift_name attribute.
@@ -205,20 +212,6 @@ public:
 /// in "Notification", or it there would be nothing left.
 StringRef stripNotification(StringRef name);
 
-// TODO: I'd like to remove the following
-/// Flags that control the import of names in importFullName.
-enum class ImportNameFlags {
-  /// Suppress the factory-method-as-initializer transformation.
-  SuppressFactoryMethodAsInit = 0x01,
-
-  /// Produce the Swift 2 name of the given entity.
-  Swift2Name = 0x02,
-};
-enum { NumImportNameFlags = 2 };
-
-/// Options that control the import of names in importFullName.
-typedef OptionSet<ImportNameFlags> ImportNameOptions;
-
 /// Class to determine the Swift name of foreign entities. Currently fairly
 /// stateless and borrows from the ClangImporter::Implementation, but in the
 /// future will be more self-contained and encapsulated.
@@ -234,7 +227,7 @@ class NameImporter {
 
   // TODO: remove when we drop the options (i.e. import all names)
   using CacheKeyType =
-      std::pair<const clang::NamedDecl *, unsigned>;
+      std::pair<const clang::NamedDecl *, ImportNameVersion>;
 
   /// Cache for repeated calls
   llvm::DenseMap<CacheKeyType, ImportedName> importNameCache;
@@ -296,7 +289,7 @@ private:
                          const clang::IdentifierInfo *proposedName,
                          const clang::TypedefNameDecl *cfTypedef);
 
-  Optional<ImportedErrorInfo>
+  Optional<ForeignErrorConvention::Info>
   considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
                       StringRef &baseName,
                       SmallVectorImpl<StringRef> &paramNames,
@@ -308,13 +301,34 @@ private:
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,
-                                                  ImportNameOptions options);
+                                                  ImportNameVersion version);
 
   ImportedName importNameImpl(const clang::NamedDecl *,
-                              ImportNameOptions options);
+                              ImportNameVersion version);
 };
 
 }
+}
+
+namespace llvm {
+// Provide DenseMapInfo for ImportNameVersion.
+template <> struct DenseMapInfo<swift::importer::ImportNameVersion> {
+  using ImportNameVersion = swift::importer::ImportNameVersion;
+  using DMIU = DenseMapInfo<unsigned>;
+  static inline ImportNameVersion getEmptyKey() {
+    return (ImportNameVersion)DMIU::getEmptyKey();
+  }
+  static inline ImportNameVersion getTombstoneKey() {
+    return (ImportNameVersion)DMIU::getTombstoneKey();
+  }
+  static unsigned getHashValue(const ImportNameVersion &Val) {
+    return DMIU::getHashValue((unsigned)Val);
+  }
+  static bool isEqual(const ImportNameVersion &LHS,
+                      const ImportNameVersion &RHS) {
+    return LHS == RHS;
+  }
+};
 }
 
 #endif

@@ -808,6 +808,12 @@ public:
                       CopyValueInst(getSILDebugLocation(Loc), operand));
   }
 
+  CopyUnownedValueInst *createCopyUnownedValue(SILLocation Loc,
+                                               SILValue operand) {
+    return insert(new (F.getModule()) CopyUnownedValueInst(
+        getSILDebugLocation(Loc), operand, getModule()));
+  }
+
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
     return insert(new (F.getModule())
                       DestroyValueInst(getSILDebugLocation(Loc), operand));
@@ -1642,6 +1648,11 @@ private:
       InsertedInstrs->push_back(TheInst);
 
     BB->insert(InsertPt, TheInst);
+// TODO: We really shouldn't be creating instructions unless we are going to
+// insert them into a block... This failed in SimplifyCFG.
+#ifndef NDEBUG
+    TheInst->verifyOperandOwnership();
+#endif
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {

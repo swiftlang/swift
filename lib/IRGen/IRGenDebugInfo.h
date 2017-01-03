@@ -137,7 +137,7 @@ public:
   /// Set the location for SWIFT_ENTRY_POINT_FUNCTION.
   void setEntryPointLoc(IRBuilder &Builder);
 
-  /// Return the scope for  SWIFT_ENTRY_POINT_FUNCTION.
+  /// Return the scope for SWIFT_ENTRY_POINT_FUNCTION.
   llvm::DIScope *getEntryPointFn();
   
   /// Emit debug info for an import declaration.

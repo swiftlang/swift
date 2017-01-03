@@ -66,10 +66,9 @@ protected:
 class GenericSpecializationMangler : public SpecializationMangler {
 
   ArrayRef<Substitution> Subs;
+  bool isReAbstracted;
 
 public:
-
-  bool isReAbstracted;
 
   GenericSpecializationMangler(SILFunction *F,
                                ArrayRef<Substitution> Subs,
@@ -77,6 +76,22 @@ public:
                                bool isReAbstracted)
     : SpecializationMangler(SpecializationPass::GenericSpecializer, Fragile, F),
       Subs(Subs), isReAbstracted(isReAbstracted) {}
+
+  std::string mangle();
+};
+
+class PartialSpecializationMangler : public SpecializationMangler {
+
+  CanSILFunctionType SpecializedFnTy;
+  bool isReAbstracted;
+  
+public:
+  PartialSpecializationMangler(SILFunction *F,
+                               CanSILFunctionType SpecializedFnTy,
+                               IsFragile_t Fragile,
+                               bool isReAbstracted)
+    : SpecializationMangler(SpecializationPass::GenericSpecializer, Fragile, F),
+      SpecializedFnTy(SpecializedFnTy), isReAbstracted(isReAbstracted) {}
 
   std::string mangle();
 };
@@ -135,7 +150,7 @@ public:
   void setArgumentBoxToStack(unsigned ArgNo);
   void setReturnValueOwnedToUnowned();
 
-  std::string mangle();
+  std::string mangle(int UniqueID = 0);
   
 private:
   void mangleConstantProp(LiteralInst *LI);

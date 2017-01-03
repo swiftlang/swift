@@ -371,15 +371,14 @@ public:
     auto *EdgeBB = Fn->createBasicBlock(SrcBB);
 
     // Create block arguments.
-    unsigned ArgIdx = 0;
-    for (auto Arg : BI->getArgs()) {
-      assert(Arg->getType() == DestBB->getArgument(ArgIdx)->getType() &&
+    for (unsigned ArgIdx : range(DestBB->getNumArguments())) {
+      auto *DestPHIArg = cast<SILPHIArgument>(DestBB->getArgument(ArgIdx));
+      assert(BI->getArg(ArgIdx)->getType() == DestPHIArg->getType() &&
              "Types must match");
-      auto *BlockArg = EdgeBB->createArgument(Arg->getType());
-      ValueMap[DestBB->getArgument(ArgIdx)] = SILValue(BlockArg);
-      AvailVals.push_back(
-          std::make_pair(DestBB->getArgument(ArgIdx), BlockArg));
-      ++ArgIdx;
+      auto *BlockArg = EdgeBB->createPHIArgument(
+          DestPHIArg->getType(), DestPHIArg->getOwnershipKind());
+      ValueMap[DestPHIArg] = SILValue(BlockArg);
+      AvailVals.push_back(std::make_pair(DestPHIArg, BlockArg));
     }
 
     // Redirect the branch.
@@ -407,9 +406,7 @@ class BasicBlockCloner : public BaseThreadingCloner {
         // Create a new BB that is to be used as a target
         // for cloning.
         To = From->getParent()->createBasicBlock();
-        for (auto *Arg : FromBB->getArguments()) {
-          To->createArgument(Arg->getType(), Arg->getDecl());
-        }
+        To->cloneArgumentList(From);
       }
       DestBB = To;
 

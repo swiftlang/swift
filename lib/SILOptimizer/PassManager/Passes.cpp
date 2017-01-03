@@ -146,6 +146,8 @@ StringRef swift::PassKindName(PassKind Kind) {
   case PassKind::invalidPassKind:
     llvm_unreachable("Invalid pass kind?!");
   }
+
+  llvm_unreachable("Unhandled PassKind in switch.");
 }
 
 StringRef swift::PassKindID(PassKind Kind) {
@@ -157,4 +159,6 @@ StringRef swift::PassKindID(PassKind Kind) {
   case PassKind::invalidPassKind:
     llvm_unreachable("Invalid pass kind?!");
   }
+
+  llvm_unreachable("Unhandled PassKind in switch.");
 }

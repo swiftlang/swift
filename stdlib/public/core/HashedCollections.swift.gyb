@@ -124,7 +124,7 @@ import SwiftShims
 // declared its actual type parameters. Similarly, the empty singleton would 
 // have to declare its actual type parameters. If the singleton was, for 
 // instance, a `HashableStorage<(), ()>`, then it would be a violation of 
-// Swift's strict  aliasing rules to pass it where a `HashableStorage<Int, Int>`
+// Swift's strict aliasing rules to pass it where a `HashableStorage<Int, Int>`
 // was expected.
 //
 // It's therefore necessary for several types to store a RawStorage, rather than
@@ -4482,14 +4482,13 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   }
 
   internal mutating func nativeRemoveAll() {
-    // FIXME(performance): if the buffer is non-uniquely referenced, we
-    // shouldn't be copying the elements into new buffer and then immediately
-    // deleting the elements. We should detect that the buffer is not uniquely
-    // referenced and allocate new empty buffer of appropriate capacity.
+    if !isUniquelyReferenced() {
+        asNative = NativeBuffer(minimumCapacity: asNative.capacity)
+        return
+    }
 
-    // We have already checked for the empty dictionary case, so we will always
-    // mutating the dictionary buffer.  Request unique buffer.
-    _ = ensureUniqueNativeBuffer(asNative.capacity)
+    // We have already checked for the empty dictionary case and unique
+    // reference, so we will always mutate the dictionary buffer.
     var nativeBuffer = asNative
 
     for b in 0..<nativeBuffer.capacity {

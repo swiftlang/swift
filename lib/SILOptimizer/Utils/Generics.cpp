@@ -89,9 +89,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
   }
 
   SILModule &M = OrigF->getModule();
-  Module *SM = M.getSwiftModule();
-
-  SubstitutedType = SILType::substFuncType(M, SM, InterfaceSubs.getMap(),
+  SubstitutedType = SILType::substFuncType(M, InterfaceSubs,
                                            OrigF->getLoweredFunctionType(),
                                            /*dropGenerics = */ true);
 
@@ -299,7 +297,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
       Builder.setInsertionPoint(ResultBB->begin());
       fixUsedVoidType(ResultBB->getArgument(0), Loc, Builder);
 
-      SILArgument *Arg = ResultBB->replaceArgument(
+      SILArgument *Arg = ResultBB->replacePHIArgument(
           0, StoreResultTo->getType().getObjectType());
       // Store the direct result to the original result address.
       Builder.createStore(Loc, Arg, StoreResultTo,
@@ -408,12 +406,13 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
       if (ReInfo.isResultIndex(Idx)) {
         // Store the result later.
         SILType Ty = SpecType->getSILResult().getAddressType();
-        ReturnValueAddr = EntryBB->createArgument(Ty);
+        ReturnValueAddr = EntryBB->createFunctionArgument(Ty);
       } else {
         // Instead of passing the address, pass the loaded value.
         SILArgument *SpecArg = *SpecArgIter++;
         SILType Ty = SpecArg->getType().getAddressType();
-        SILArgument *NewArg = EntryBB->createArgument(Ty, SpecArg->getDecl());
+        SILArgument *NewArg =
+            EntryBB->createFunctionArgument(Ty, SpecArg->getDecl());
         auto *ArgVal = Builder.createLoad(Loc, NewArg,
                                           LoadOwnershipQualifier::Unqualified);
         Arguments.push_back(ArgVal);
@@ -421,8 +420,8 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
     } else {
       // No change to the argument.
       SILArgument *SpecArg = *SpecArgIter++;
-      SILArgument *NewArg =
-          EntryBB->createArgument(SpecArg->getType(), SpecArg->getDecl());
+      SILArgument *NewArg = EntryBB->createFunctionArgument(SpecArg->getType(),
+                                                            SpecArg->getDecl());
       Arguments.push_back(NewArg);
     }
   }
@@ -436,10 +435,10 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
     Builder.createTryApply(Loc, FRI, SpecializedFunc->getLoweredType(),
                            {}, Arguments, NormalBB, ErrorBB);
     auto *ErrorVal =
-        ErrorBB->createArgument(SpecType->getErrorResult().getSILType());
+        ErrorBB->createPHIArgument(SpecType->getErrorResult().getSILType());
     Builder.setInsertionPoint(ErrorBB);
     Builder.createThrow(Loc, ErrorVal);
-    ReturnValue = NormalBB->createArgument(SpecType->getSILResult());
+    ReturnValue = NormalBB->createPHIArgument(SpecType->getSILResult());
     Builder.setInsertionPoint(NormalBB);
   } else {
     ReturnValue = Builder.createApply(Loc, FRI, SpecializedFunc->getLoweredType(),

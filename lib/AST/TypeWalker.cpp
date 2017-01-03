@@ -203,7 +203,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 bool Type::walk(TypeWalker &walker) const {
   return Traversal(walker).doIt(*this);

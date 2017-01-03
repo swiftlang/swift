@@ -211,7 +211,6 @@ enum class MappedTypeNameKind {
 enum class SpecialMethodKind {
   Regular,
   Constructor,
-  PropertyAccessor,
   NSDictionarySubscriptGetter
 };
 
@@ -260,6 +259,7 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   : public LazyMemberLoader
 {
   friend class ClangImporter;
+  using Version = importer::ImportNameVersion;
 
 public:
   Implementation(ASTContext &ctx, const ClangImporterOptions &opts);
@@ -271,6 +271,8 @@ public:
   const bool ImportForwardDeclarations;
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
+
+  const Version CurrentVersion;
 
   constexpr static const char * const moduleImportBufferName =
     "<swift-imported-modules>";
@@ -321,10 +323,7 @@ private:
 
 public:
   /// \brief Mapping of already-imported declarations.
-  ///
-  /// The "char" in the key is a "bool" in disguise that indicates whether this
-  /// is a Swift 2 name vs. a Swift 3 name.
-  llvm::DenseMap<std::pair<const clang::Decl *, char>, Decl *> ImportedDecls;
+  llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
 
   /// \brief The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
@@ -354,8 +353,8 @@ public:
 
   /// \brief Mapping of already-imported declarations from protocols, which
   /// can (and do) get replicated into classes.
-  llvm::DenseMap<std::tuple<const clang::Decl *, DeclContext *, char>, Decl *>
-    ImportedProtocolDecls;
+  llvm::DenseMap<std::tuple<const clang::Decl *, DeclContext *, Version>,
+                 Decl *> ImportedProtocolDecls;
 
   /// Mapping from identifiers to the set of macros that have that name along
   /// with their corresponding Swift declaration.
@@ -441,9 +440,9 @@ public:
 
   /// \brief Keep track of initializer declarations that correspond to
   /// imported methods.
-  llvm::DenseMap<std::tuple<const clang::ObjCMethodDecl *, DeclContext *, char>,
-                 ConstructorDecl *>
-    Constructors;
+  llvm::DenseMap<
+      std::tuple<const clang::ObjCMethodDecl *, DeclContext *, Version>,
+      ConstructorDecl *> Constructors;
 
   /// Retrieve the alternative declaration for the given imported
   /// Swift declaration.
@@ -629,7 +628,7 @@ public:
   ///
   /// \param D The Clang declaration whose name should be imported.
   importer::ImportedName importFullName(const clang::NamedDecl *D,
-                                        importer::ImportNameVersion version) {
+                                        Version version) {
     return getNameImporter().importName(D, version);
   }
 
@@ -687,15 +686,13 @@ public:
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
-  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, bool useSwift2Name);
+  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version);
 
-  Decl *importDeclImpl(const clang::NamedDecl *ClangDecl,
-                       bool useSwift2Name,
-                       bool &TypedefIsSuperfluous,
-                       bool &HadForwardDeclaration);
+  Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
+                       bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
 
   Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
-                               bool useSwift2Name,
+                               Version version,
                                bool SuperfluousTypedefsAreTransparent);
 
   /// \brief Same as \c importDeclReal, but for use inside importer
@@ -704,8 +701,8 @@ public:
   /// Unlike \c importDeclReal, this function for convenience transparently
   /// looks through superfluous typedefs and returns the imported underlying
   /// decl in that case.
-  Decl *importDecl(const clang::NamedDecl *ClangDecl, bool useSwift2Name) {
-    return importDeclAndCacheImpl(ClangDecl, useSwift2Name,
+  Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version) {
+    return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/true);
   }
 
@@ -715,8 +712,8 @@ public:
   ///
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
-  Decl *importDeclReal(const clang::NamedDecl *ClangDecl, bool useSwift2Name) {
-    return importDeclAndCacheImpl(ClangDecl, useSwift2Name,
+  Decl *importDeclReal(const clang::NamedDecl *ClangDecl, Version version) {
+    return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/false);
   }
 
@@ -727,7 +724,7 @@ public:
   /// \returns The imported declaration, or null if this declaration could not
   /// be represented in Swift.
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
-                           bool useSwift2Name, ProtocolDecl *proto);
+                           Version version, ProtocolDecl *proto);
 
   /// \brief Utility function for building simple generic environments.
   GenericEnvironment *buildGenericEnvironment(GenericParamList *genericParams,
@@ -981,41 +978,53 @@ public:
                        StringRef argumentLabel, bool isFirstParameter,
                        bool isLastParameter, importer::NameImporter &);
 
-  /// \brief Import the type of an Objective-C method.
+  /// Import the type of an Objective-C method.
   ///
-  /// This routine should be preferred when importing function types for
-  /// which we have actual function parameters, e.g., when dealing with a
-  /// function declaration, because it produces a function type whose input
-  /// tuple has argument names.
+  /// Note that this is not appropriate to use for property accessor methods.
+  /// Use #importAccessorMethodType instead.
   ///
-  /// \param clangDecl The underlying declaration, if any; should only be
-  ///   considered for any attributes it might carry.
-  /// \param resultType The result type of the function.
-  /// \param params The parameter types to the function.
+  /// \param dc The context the method is being imported into.
+  /// \param clangDecl The underlying declaration.
+  /// \param params The parameter types to the function. Note that this may not
+  ///   include all parameters defined on the ObjCMethodDecl.
   /// \param isVariadic Whether the function is variadic.
-  /// \param isNoReturn Whether the function is noreturn.
   /// \param isFromSystemModule Whether to apply special rules that only apply
   ///   to system APIs.
-  /// \param bodyParams The patterns visible inside the function body.
-  ///   whether the created arg/body patterns are different (selector-style).
-  /// \param importedName The name of the imported method.
-  /// \param errorConvention Information about the method's error conventions.
+  /// \param[out] bodyParams The patterns visible inside the function body.
+  /// \param importedName How to import the name of the method.
+  /// \param[out] errorConvention Whether and how the method throws NSErrors.
   /// \param kind Controls whether we're building a type for a method that
-  ///        needs special handling.
+  ///   needs special handling.
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
   Type importMethodType(const DeclContext *dc,
                         const clang::ObjCMethodDecl *clangDecl,
-                        clang::QualType resultType,
                         ArrayRef<const clang::ParmVarDecl *> params,
-                        bool isVariadic, bool isNoReturn,
+                        bool isVariadic,
                         bool isFromSystemModule,
                         ParameterList **bodyParams,
                         importer::ImportedName importedName,
-                        DeclName &name,
                         Optional<ForeignErrorConvention> &errorConvention,
                         SpecialMethodKind kind);
+
+  /// Import the type of an Objective-C method that will be imported as an
+  /// accessor for \p property.
+  ///
+  /// \param dc The context the method is being imported into.
+  /// \param property The property the method will be an accessor for.
+  /// \param clangDecl The underlying declaration.
+  /// \param isFromSystemModule Whether to apply special rules that only apply
+  ///   to system APIs.
+  /// \param[out] params The patterns visible inside the function body.
+  ///
+  /// \returns the imported function type, or null if the type cannot be
+  /// imported.
+  Type importAccessorMethodType(const DeclContext *dc,
+                                const clang::ObjCPropertyDecl *property,
+                                const clang::ObjCMethodDecl *clangDecl,
+                                bool isFromSystemModule,
+                                ParameterList **params);
 
   /// \brief Determine whether the given typedef-name is "special", meaning
   /// that it has performed some non-trivial mapping of its underlying type

@@ -16,7 +16,6 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -705,7 +704,7 @@ struct ASTNodeBase {};
       Type resultType;
       if (FuncDecl *FD = dyn_cast<FuncDecl>(func)) {
         resultType = FD->getResultInterfaceType();
-        resultType = ArchetypeBuilder::mapTypeIntoContext(FD, resultType);
+        resultType = FD->mapTypeIntoContext(resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
       } else {
@@ -1704,7 +1703,7 @@ struct ASTNodeBase {};
 
       // Variables must have materializable type, unless they are parameters,
       // in which case they must either have l-value type or be anonymous.
-      if (!var->getType()->isMaterializable()) {
+      if (!var->getInterfaceType()->isMaterializable()) {
         if (!isa<ParamDecl>(var)) {
           Out << "Non-parameter VarDecl has non-materializable type: ";
           var->getType().print(Out);
@@ -1712,7 +1711,7 @@ struct ASTNodeBase {};
           abort();
         }
 
-        if (!var->getType()->is<InOutType>() && var->hasName()) {
+        if (!var->getInterfaceType()->is<InOutType>() && var->hasName()) {
           Out << "ParamDecl may only have non-materializable tuple type "
                  "when it is anonymous: ";
           var->getType().print(Out);
@@ -1724,7 +1723,7 @@ struct ASTNodeBase {};
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
       if (var->getAttrs().hasAttribute<OwnershipAttr>() !=
-          isa<ReferenceStorageType>(var->getType().getPointer())) {
+          isa<ReferenceStorageType>(var->getInterfaceType().getPointer())) {
         if (var->getAttrs().hasAttribute<OwnershipAttr>()) {
           Out << "VarDecl has an ownership attribute, but its type"
                  " is not a ReferenceStorageType: ";
@@ -1732,15 +1731,14 @@ struct ASTNodeBase {};
           Out << "VarDecl has no ownership attribute, but its type"
                  " is a ReferenceStorageType: ";
         }
-        var->getType().print(Out);
+        var->getInterfaceType().print(Out);
         abort();
       }
 
       Type typeForAccessors =
           var->getInterfaceType()->getReferenceStorageReferent();
       typeForAccessors =
-          ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
-                                               typeForAccessors);
+          var->getDeclContext()->mapTypeIntoContext(typeForAccessors);
       if (const FuncDecl *getter = var->getGetter()) {
         if (getter->getParameterLists().back()->size() != 0) {
           Out << "property getter has parameters\n";
@@ -1748,8 +1746,7 @@ struct ASTNodeBase {};
         }
         Type getterResultType = getter->getResultInterfaceType();
         getterResultType =
-            ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
-                                                 getterResultType);
+            var->getDeclContext()->mapTypeIntoContext(getterResultType);
         if (!getterResultType->isEqual(typeForAccessors)) {
           Out << "property and getter have mismatched types: '";
           typeForAccessors.print(Out);
@@ -1775,8 +1772,7 @@ struct ASTNodeBase {};
         }
         const ParamDecl *param = setter->getParameterLists().back()->get(0);
         Type paramType = param->getInterfaceType();
-        paramType = ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
-                                                         paramType);
+        paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
         if (!paramType->isEqual(typeForAccessors)) {
           Out << "property and setter param have mismatched types: '";
           typeForAccessors.print(Out);

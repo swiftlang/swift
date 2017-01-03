@@ -412,7 +412,7 @@ namespace {
       assert(TheStruct.getStructOrBoundGenericStruct());
     }
     
-    llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) {
+    llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
       // Get the field offset vector from the struct metadata.
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
       Address fieldVector = emitAddressOfFieldOffsetVector(IGF,
@@ -782,7 +782,7 @@ private:
   }
 };
 
-}  // end anonymous namespace.
+} // end anonymous namespace
 
 /// A convenient macro for delegating an operation to all of the
 /// various struct implementations.
@@ -861,7 +861,7 @@ namespace {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
     }
   };
-}
+} // end anonymous namespace
 
 const TypeInfo *TypeConverter::convertResilientStruct() {
   llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();

@@ -114,7 +114,7 @@ struct DebugOnlyPassNumberOpt {
   }
 };
 
-}
+} // end anonymous namespace
 
 static DebugOnlyPassNumberOpt DebugOnlyPassNumberOptLoc;
 
@@ -239,6 +239,12 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
     A->initialize(this);
     M->registerDeleteNotificationHandler(A);
   }
+}
+
+SILPassManager::SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
+                               llvm::StringRef Stage)
+    : SILPassManager(M, Stage) {
+  this->IRMod = IRMod;
 }
 
 bool SILPassManager::continueTransforming() {
@@ -509,36 +515,11 @@ void SILPassManager::runOneIteration() {
   }
 }
 
-void SILPassManager::run() {
-  const SILOptions &Options = getOptions();
-  (void) Options;
-
-  if (SILPrintAll) {
-    if (SILPrintOnlyFun.empty() && SILPrintOnlyFuns.empty()) {
-      llvm::dbgs() << "*** SIL module before transformation ("
-                   << NumOptimizationIterations << ") ***\n";
-      Mod->dump(Options.EmitVerboseSIL);
-    } else {
-      for (auto &F : *Mod) {
-        if (!SILPrintOnlyFun.empty() && F.getName().str() == SILPrintOnlyFun) {
-          llvm::dbgs() << "*** SIL function before transformation ("
-                       << NumOptimizationIterations << ") ***\n";
-          F.dump(Options.EmitVerboseSIL);
-        }
-        if (!SILPrintOnlyFuns.empty() &&
-            F.getName().find(SILPrintOnlyFuns, 0) != StringRef::npos) {
-          llvm::dbgs() << "*** SIL function before transformation ("
-                       << NumOptimizationIterations << ") ***\n";
-          F.dump(Options.EmitVerboseSIL);
-        }
-      }
-    }
-  }
-  runOneIteration();
-}
-
 /// D'tor.
 SILPassManager::~SILPassManager() {
+  assert(IRGenPasses.empty() && "Must add IRGen SIL passes that were "
+                                "registered to the list of transformations");
+
   // Free all transformations.
   for (auto *T : Transformations)
     delete T;
@@ -631,6 +612,15 @@ void SILPassManager::addPass(PassKind Kind) {
     SILTransform *T = swift::create##ID();                                     \
     T->setPassKind(PassKind::ID);                                              \
     Transformations.push_back(T);                                              \
+    break;                                                                     \
+  }
+#define IRGEN_PASS(ID, NAME, DESCRIPTION)                                      \
+  case PassKind::ID: {                                                         \
+    SILTransform *T = IRGenPasses[unsigned(Kind)];                             \
+    assert(T && "Missing IRGen pass?");                                        \
+    T->setPassKind(PassKind::ID);                                              \
+    Transformations.push_back(T);                                              \
+    IRGenPasses.erase(unsigned(Kind));                                         \
     break;                                                                     \
   }
 #include "swift/SILOptimizer/PassManager/Passes.def"
@@ -739,7 +729,7 @@ namespace {
     }
   }
 
-} // end swift namespace
+} // end anonymous namespace
 
 namespace llvm {
 
@@ -835,7 +825,7 @@ namespace llvm {
       return "";
     }
   };
-} // end llvm namespace
+} // namespace llvm
 #endif
 
 void SILPassManager::viewCallGraph() {

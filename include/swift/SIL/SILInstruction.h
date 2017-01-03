@@ -21,14 +21,15 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
+#include "swift/SIL/SILArgumentConvention.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
-#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILValue.h"
-#include "llvm/ADT/ilist_node.h"
-#include "llvm/ADT/ilist.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/ilist.h"
+#include "llvm/ADT/ilist_node.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
@@ -332,6 +333,10 @@ public:
   /// additional handling. It is important to know this information when
   /// you perform such optimizations like e.g. jump-threading.
   bool isTriviallyDuplicatable() const;
+
+  /// Verify that all operands of this instruction have compatible ownership
+  /// with this instruction.
+  void verifyOperandOwnership() const;
 };
 
 /// Returns the combined behavior of \p B1 and \p B2.
@@ -1239,6 +1244,13 @@ public:
     return getSubstCalleeType()->getSILArgumentConvention(index);
   }
 
+  Optional<SILResultInfo> getSingleResult() const {
+    auto SubstCallee = getSubstCalleeType();
+    if (SubstCallee->getNumAllResults() != 1)
+      return None;
+    return SubstCallee->getSingleResult();
+  }
+
   Substitution getSelfSubstitution() const {
     assert(getNumArguments() && "Should only be called when Callee has "
            "at least a self parameter.");
@@ -1759,7 +1771,7 @@ class BeginBorrowInst
 };
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
-/// address. Must be paired with a end_borrow in its use-def list.
+/// address. Must be paired with an end_borrow in its use-def list.
 class StoreBorrowInst : public SILInstruction {
   friend class SILBuilder;
 
@@ -4236,6 +4248,16 @@ class CopyValueInst : public UnaryInstructionBase<ValueKind::CopyValueInst> {
 
   CopyValueInst(SILDebugLocation DebugLoc, SILValue operand)
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+};
+
+class CopyUnownedValueInst
+    : public UnaryInstructionBase<ValueKind::CopyUnownedValueInst> {
+  friend class SILBuilder;
+
+  CopyUnownedValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                       SILModule &M)
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().getReferentType(M)) {}
 };
 
 class DestroyValueInst

@@ -337,6 +337,9 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         assert(FD->getImplicitSelfDecl() && "should not find free functions");
         (void)FD;
 
+        if (FD->isInvalid())
+          break;
+
         // Get the type without the first uncurry level with 'self'.
         CanType T = D->getInterfaceType()
                         ->castTo<AnyFunctionType>()
@@ -359,7 +362,8 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       case DeclKind::Var: {
         auto *VD = cast<VarDecl>(D);
         auto Signature =
-            std::make_pair(VD->getName(), VD->getType()->getCanonicalType());
+            std::make_pair(VD->getName(),
+                           VD->getInterfaceType()->getCanonicalType());
         if (!PropertiesReported.insert(Signature).second)
           return;
         break;
@@ -623,7 +627,7 @@ template <> struct DenseMapInfo<FoundDeclTy> {
   }
 };
 
-} // end llvm namespace
+} // namespace llvm
 
 namespace {
 
@@ -726,7 +730,7 @@ public:
 
     auto FoundSignature = VD->getOverloadSignature();
     if (FoundSignature.InterfaceType && shouldSubst) {
-      auto subs = BaseTy->getMemberSubstitutions(VD->getDeclContext());
+      auto subs = BaseTy->getMemberSubstitutions(VD);
       if (auto CT = FoundSignature.InterfaceType.subst(M, subs, None))
         FoundSignature.InterfaceType = CT->getCanonicalType();
     }
@@ -742,7 +746,7 @@ public:
 
       auto OtherSignature = OtherVD->getOverloadSignature();
       if (OtherSignature.InterfaceType && shouldSubst) {
-        auto subs = BaseTy->getMemberSubstitutions(OtherVD->getDeclContext());
+        auto subs = BaseTy->getMemberSubstitutions(OtherVD);
         if (auto CT = OtherSignature.InterfaceType.subst(M, subs, None))
           OtherSignature.InterfaceType = CT->getCanonicalType();
       }

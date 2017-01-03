@@ -862,6 +862,10 @@ ERROR(expected_lbrace_after_if,PointsToFirstBadToken,
       "expected '{' after 'if' condition", ())
 ERROR(expected_lbrace_after_else,PointsToFirstBadToken,
       "expected '{' after 'else'", ())
+ERROR(unexpected_else_after_if,none,
+      "unexpected 'else' immediately following 'if' condition", ())
+NOTE(suggest_removing_else,none,
+     "remove 'else' to execute the braced block of statements when the condition is true", ())
 
 // Guard Statement
 ERROR(expected_condition_guard,PointsToFirstBadToken,
@@ -1334,7 +1338,8 @@ ERROR(unsupported_conditional_compilation_binary_expression,none,
 ERROR(unsupported_conditional_compilation_unary_expression,none,
       "expected unary '!' expression", ())
 ERROR(unsupported_platform_condition_expression,none,
-      "unexpected platform condition (expected 'os', 'arch', or 'swift')",
+      "unexpected platform condition "
+      "(expected 'canImport', 'os', 'arch', or 'swift')",
       ())
 ERROR(platform_condition_expected_one_argument,none,
       "expected only one argument to platform condition",

@@ -170,7 +170,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 public protocol FloatingPoint: Comparable, Arithmetic,
   SignedNumber, Strideable {
 
-  /// A type that can represent any written exponent.
+  /// A type that represents any written exponent.
   associatedtype Exponent: SignedInteger
 
   /// Creates a new value from the given sign, exponent, and significand.
@@ -1541,10 +1541,10 @@ public func >= <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
 /// - SeeAlso: `FloatingPoint`
 public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
 
-  /// A type that can represent the encoded significand of a value.
+  /// A type that represents the encoded significand of a value.
   associatedtype RawSignificand: UnsignedInteger
 
-  /// A type that can represent the encoded exponent of a value.
+  /// A type that represents the encoded exponent of a value.
   associatedtype RawExponent: UnsignedInteger
 
   /// Creates a new instance from the specified sign and bit patterns.

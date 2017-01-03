@@ -23,6 +23,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/Constant.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
@@ -468,5 +469,6 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
   // Acquire the archetype's static metadata.
   llvm::Value *metadata = emitArchetypeTypeMetadataRef(IGF, archetype);
   return IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
-                                {addr.getAddress(), metadata});
+                                {addr.getAddress(), metadata,
+                                 llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0)});
 }

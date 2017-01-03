@@ -60,7 +60,7 @@ namespace {
     }
     
   };
-}
+} // end anonymous namespace
 
 static std::string getDiagKindString(llvm::SourceMgr::DiagKind Kind) {
   switch (Kind) {

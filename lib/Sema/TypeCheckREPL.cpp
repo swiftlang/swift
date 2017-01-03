@@ -199,7 +199,7 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
 #define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
 #include "swift/AST/PatternNodes.def"
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 namespace {
   class REPLChecker : public REPLContext {
@@ -213,7 +213,7 @@ namespace {
   private:
     void generatePrintOfExpression(StringRef name, Expr *E);
   };
-}
+} // end anonymous namespace
 
 /// Emit logic to print the specified expression value with the given
 /// description of the pattern involved.

@@ -126,10 +126,10 @@ bool swift::isIntermediateRelease(SILInstruction *I,
   // OK. we have a release instruction.
   // Check whether this is a release on part of a guaranteed function argument.
   SILValue Op = stripValueProjections(I->getOperand(0));
-  SILArgument *Arg = dyn_cast<SILArgument>(Op);
-  if (!Arg || !Arg->isFunctionArg())
+  auto *Arg = dyn_cast<SILFunctionArgument>(Op);
+  if (!Arg)
     return false;
-  
+
   // This is a release on a guaranteed parameter. Its not the final release.
   if (Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed))
     return true;
@@ -583,7 +583,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     auto *CurBB = B->getInsertionPoint()->getParent();
 
     auto *ContBB = CurBB->split(B->getInsertionPoint());
-    ContBB->createArgument(DestTy, nullptr);
+    ContBB->createPHIArgument(DestTy);
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
     CaseBBs.push_back(std::make_pair(SomeDecl, SomeBB));
@@ -1446,7 +1446,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
       // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
       if (isConditional) {
         SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-        CastSuccessBB->createArgument(SILBridgedTy);
+        CastSuccessBB->createPHIArgument(SILBridgedTy);
         Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
         Builder.setInsertionPoint(CastSuccessBB);
         SrcOp = CastSuccessBB->getArgument(0);
@@ -1455,7 +1455,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
       }
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-      CastSuccessBB->createArgument(SILBridgedTy);
+      CastSuccessBB->createPHIArgument(SILBridgedTy);
       NewI = Builder.createCheckedCastBranch(Loc, false, Load, SILBridgedTy,
                                              CastSuccessBB, ConvFailBB);
       Builder.setInsertionPoint(CastSuccessBB);
@@ -2146,7 +2146,7 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, MI,
               Dest->getType().getObjectType(), SuccessBB, FailureBB);
-          SuccessBB->createArgument(Dest->getType().getObjectType(), nullptr);
+          SuccessBB->createPHIArgument(Dest->getType().getObjectType());
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result
           B.createStore(Loc, SuccessBB->getArgument(0), Dest,

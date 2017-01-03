@@ -72,7 +72,7 @@ namespace {
       return 0;
     }
   };
-}
+} // end anonymous namespace
 
 struct TypeMetadataState {
   ConcurrentMap<TypeMetadataCacheEntry> Cache;

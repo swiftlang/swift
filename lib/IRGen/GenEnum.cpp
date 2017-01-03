@@ -1192,7 +1192,7 @@ namespace {
       }
     }
     
-    ~PayloadEnumImplStrategyBase() {
+    ~PayloadEnumImplStrategyBase() override {
       if (auto schema = PayloadSchema.getSchema())
         delete schema;
     }
@@ -4229,7 +4229,7 @@ namespace {
       // Initialize the extra tag bits, if we have them.
       if (ExtraTagBitCount > 0) {
         extraTag = IGF.Builder.CreateIntCast(extraTag, ExtraTagTy,
-                                             /*signed=*/false);
+                                             /*isSigned=*/false);
         IGF.Builder.CreateStore(extraTag, projectExtraTagBits(IGF, enumAddr));
       }
     }
@@ -4956,7 +4956,7 @@ namespace {
     EnumTypeInfoBase(EnumImplStrategy &strategy, AA &&...args)
       : BaseTypeInfo(std::forward<AA>(args)...), Strategy(strategy) {}
 
-    ~EnumTypeInfoBase() {
+    ~EnumTypeInfoBase() override {
       delete &Strategy;
     }
 

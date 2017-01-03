@@ -1236,7 +1236,7 @@ struct DOTGraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
                             SuccIter, ParentRegion->Region->backedge_begin());
   }
 };
-} // end llvm namespace
+} // namespace llvm
 
 static llvm::cl::opt<std::string> TargetFunction(
     "view-loop-regions-only-for-function", llvm::cl::init(""),

@@ -329,7 +329,7 @@ public:
     EXPECT_TRUE(!ConstructedTesters->hasLiveTesters());
   }
 
-  ~BlotMapVectorTest() {
+  ~BlotMapVectorTest() override {
     ConstructedTesters->verifyTesters();
     llvm::outs() << "Destroying Fixture\n";
     ConstructedTesters->finalize();

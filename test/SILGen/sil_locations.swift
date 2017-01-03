@@ -145,7 +145,7 @@ func testSwitch() {
   // CHECK: cond_br
   //
     var z: Int = 200
-  // CHECK: [[VAR_Z:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>, var, name "z"{{.*}}line:[[@LINE-1]]:9
+  // CHECK: [[VAR_Z:%[0-9]+]] = alloc_box ${ var Int }, var, name "z"{{.*}}line:[[@LINE-1]]:9
   // CHECK: integer_literal $Builtin.Int2048, 200, loc "{{.*}}":[[@LINE-2]]:18
     x = z
   // CHECK:  destroy_value [[VAR_Z]]{{.*}}, loc "{{.*}}":[[@LINE-1]]:9, {{.*}}:cleanup
@@ -186,11 +186,11 @@ func testFor() {
   }
 
   // CHECK-LABEL: sil hidden @_TF13sil_locations7testForFT_T_
-  // CHECK: [[VAR_Y_IN_FOR:%[0-9]+]]  = alloc_box $<τ_0_0> { var τ_0_0 } <Int>, var, name "y", loc "{{.*}}":[[@LINE-10]]:9
+  // CHECK: [[VAR_Y_IN_FOR:%[0-9]+]]  = alloc_box ${ var Int }, var, name "y", loc "{{.*}}":[[@LINE-10]]:9
   // CHECK: integer_literal $Builtin.Int2048, 300, loc "{{.*}}":[[@LINE-11]]:18
-  // CHECK: destroy_value [[VAR_Y_IN_FOR]] : $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: destroy_value [[VAR_Y_IN_FOR]] : ${ var Int }
   // CHECK: br bb{{.*}}, loc "{{.*}}":[[@LINE-10]]:7
-  // CHECK: destroy_value [[VAR_Y_IN_FOR]] : $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: destroy_value [[VAR_Y_IN_FOR]] : ${ var Int }
   // CHECK: br bb{{.*}}, loc "{{.*}}":[[@LINE-9]]:5
   
   

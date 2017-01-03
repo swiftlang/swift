@@ -930,7 +930,7 @@ namespace {
                                 CastConsumptionKind::TakeAlways);
         } else {
           SILValue sourceObjectValue =
-              someBB->createArgument(loweredSourceObjectType);
+              someBB->createPHIArgument(loweredSourceObjectType);
           objectSource = Source(sourceObjectValue, sourceObjectType,
                                 source.Consumption);
         }
@@ -968,7 +968,7 @@ namespace {
       if (target.isAddress()) {
         return target.asAddressSource();
       } else {
-        SILValue result = contBB->createArgument(target.LoweredType);
+        SILValue result = contBB->createPHIArgument(target.LoweredType);
         return target.asScalarSource(result);
       }
     }
@@ -1024,7 +1024,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit an unconditional scalar cast that's known to succeed.
 SILValue
@@ -1214,7 +1214,7 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
   // Emit the success block.
   B.setInsertionPoint(scalarSuccBB); {
     auto &targetTL = B.getModule().Types.getTypeLowering(targetValueType);
-    SILValue succValue = scalarSuccBB->createArgument(targetValueType);
+    SILValue succValue = scalarSuccBB->createPHIArgument(targetValueType);
     if (!shouldTakeOnSuccess(consumption))
       targetTL.emitCopyValue(B, loc, succValue);
     targetTL.emitStoreOfCopy(B, loc, succValue, dest, IsInitialization);

@@ -57,7 +57,7 @@ public:
     OS << Text;
   }
 };
-} // anonymous namespace.
+} // end anonymous namespace
 
 void SwiftASTConsumer::failed(StringRef Error) { }
 
@@ -101,7 +101,7 @@ struct ASTKey {
   llvm::FoldingSetNodeID FSID;
 };
 
-} // anonymous namespace.
+} // end anonymous namespace
 
 struct SwiftInvocation::Implementation {
   InvocationOptions Opts;
@@ -278,7 +278,7 @@ private:
 
 typedef IntrusiveRefCntPtr<ASTProducer> ASTProducerRef;
 
-} // anonymous namespace.
+} // end anonymous namespace
 
 namespace swift {
 namespace sys {
@@ -301,7 +301,7 @@ struct CacheKeyHashInfo<ASTKey> {
 };
 
 } // namespace sys
-} // namespace swift.
+} // namespace swift
 
 struct SwiftASTManager::Implementation {
   explicit Implementation(SwiftLangSupport &LangSupport)

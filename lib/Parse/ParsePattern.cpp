@@ -901,8 +901,8 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
     return result;
 
   Pattern *P;
-  if (result.isNull())  // Recover by creating AnyPattern.
-    P = new (Context) AnyPattern(Tok.getLoc());
+  if (result.isNull())
+    return nullptr;
   else
     P = result.get();
 

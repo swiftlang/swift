@@ -16,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(_MSC_VER) || defined(__CYGWIN__)
+#if defined(_WIN32) || defined(__CYGWIN__)
 
 #include "ImageInspection.h"
 #include "swift/Runtime/Debug.h"
@@ -162,13 +162,13 @@ static int _addImageCallback(struct _swift_dl_phdr_info *info,
                              size_t size, const void *data) {
   const InspectArgs *inspectArgs = (InspectArgs *)data;
   // inspectArgs contains addImage*Block function and the section name
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   HMODULE handle;
 
   if (!info->dlpi_name || info->dlpi_name[0] == '\0')
     handle = GetModuleHandle(nullptr);
   else
-    handle = GetModuleHandle(info->dlpi_name);
+    handle = GetModuleHandleA(info->dlpi_name);
 #else
   void *handle;
   if (!info->dlpi_name || info->dlpi_name[0] == '\0')
@@ -185,7 +185,7 @@ static int _addImageCallback(struct _swift_dl_phdr_info *info,
   if (conformances)
     inspectArgs->fnAddImageBlock(conformances, conformancesSize);
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   FreeLibrary(handle);
 #else
   dlclose(handle);
@@ -235,4 +235,4 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 #endif // __CYGWIN__
 }
 
-#endif // defined(_MSC_VER) || defined(__CYGWIN__)
+#endif // defined(_WIN32) || defined(__CYGWIN__)

@@ -104,6 +104,33 @@ public:
   bool isValid() const { return Addr.isValid(); }
 };
 
+/// An address on the stack together with an optional stack pointer reset
+/// location.
+class StackAddress {
+  /// The address of an object of type T.
+  Address Addr;
+  /// The stack pointer location to reset to when this stack object is
+  /// deallocated.
+  llvm::Value *StackPtrResetLocation;
+
+public:
+  StackAddress() : StackPtrResetLocation(nullptr) {}
+  StackAddress(Address address)
+    : Addr(address), StackPtrResetLocation(nullptr) {}
+  StackAddress(Address address, llvm::Value *SP)
+      : Addr(address), StackPtrResetLocation(SP) {}
+
+  llvm::Value *getAddressPointer() const { return Addr.getAddress(); }
+  Alignment getAlignment() const { return Addr.getAlignment(); }
+  Address getAddress() const { return Addr; }
+  bool needsSPRestore() const { return StackPtrResetLocation != nullptr; }
+  llvm::Value *getSavedSP() const {
+    assert(StackPtrResetLocation && "Expect a valid stacksave");
+    return StackPtrResetLocation; }
+
+  bool isValid() const { return Addr.isValid(); }
+};
+
 } // end namespace irgen
 } // end namespace swift
 

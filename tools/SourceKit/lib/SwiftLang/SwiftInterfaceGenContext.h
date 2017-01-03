@@ -99,6 +99,6 @@ private:
   SwiftInterfaceGenContext();
 };
 
-} // namespace SourceKit.
+} // namespace SourceKit
 
 #endif

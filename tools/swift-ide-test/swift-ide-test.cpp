@@ -609,7 +609,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   // Consumer.
   std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                              *Consumer.get()));
+                                              *Consumer));
 
   Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
   if (!SecondSourceFileName.empty()) {
@@ -831,7 +831,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 static int doSyntaxColoring(const CompilerInvocation &InitInvok,
                             StringRef SourceFilename,
@@ -1145,14 +1145,16 @@ private:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type Ty) override {
+                          TypeDecl *CtorTyRef, Type Ty,
+                          SemaReferenceKind Kind) override {
     annotateSourceEntity({ Range, D, CtorTyRef, /*IsRef=*/true });
     return true;
   }
 
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override {
-    return visitDeclReference(D, Range, nullptr, Type());
+    return visitDeclReference(D, Range, nullptr, Type(),
+                              SemaReferenceKind::SubscriptRef);
   }
 
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
@@ -1681,7 +1683,7 @@ public:
     OS << "</ref>";
   }
 };
-}
+} // end anonymous namespace
 
 struct GroupNamesPrinter {
   llvm::StringSet<> Groups;
@@ -1941,8 +1943,8 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
 
       if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
         if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-          TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
-            ->getNominalOrBoundGenericNominal();
+          TypeDecl *origTypeDecl = typeAliasDecl->getDeclaredInterfaceType()
+            ->getAnyNominal();
           if (origTypeDecl) {
             origTypeDecl->print(*Printer, Options);
             typeDecl = origTypeDecl;
@@ -2064,7 +2066,7 @@ public:
     return true;
   }
 };
-} // end namespace
+} // end anonymous namespace
 
 namespace {
 class ASTCommentPrinter : public ASTWalker {
@@ -2543,7 +2545,8 @@ public:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T) override {
+                          TypeDecl *CtorTyRef, Type T,
+                          SemaReferenceKind Kind) override {
     if (SeenDecls.insert(D).second)
       tryDemangleDecl(D, Range, /*isRef=*/true);
 

@@ -16,6 +16,7 @@
 
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
@@ -288,17 +289,15 @@ SmallVector<Type, 4> GenericSignature::getAllDependentTypes() const {
 }
 
 void GenericSignature::
-getSubstitutions(ModuleDecl &mod,
-                 const TypeSubstitutionMap &subs,
+getSubstitutions(const TypeSubstitutionMap &subs,
                  GenericSignature::LookupConformanceFn lookupConformance,
                  SmallVectorImpl<Substitution> &result) const {
-  getSubstitutions(mod, QueryTypeSubstitutionMap{subs}, lookupConformance,
+  getSubstitutions(QueryTypeSubstitutionMap{subs}, lookupConformance,
                    result);
 }
 
 void GenericSignature::
-getSubstitutions(ModuleDecl &mod,
-                 TypeSubstitutionFn subs,
+getSubstitutions(TypeSubstitutionFn subs,
                  GenericSignature::LookupConformanceFn lookupConformance,
                  SmallVectorImpl<Substitution> &result) const {
   // Enumerate all of the requirements that require substitution.
@@ -306,7 +305,7 @@ getSubstitutions(ModuleDecl &mod,
     auto &ctx = getASTContext();
 
     // Compute the replacement type.
-    Type currentReplacement = depTy.subst(&mod, subs);
+    Type currentReplacement = depTy.subst(subs, lookupConformance);
     if (!currentReplacement)
       currentReplacement = ErrorType::get(depTy);
 
@@ -315,9 +314,10 @@ getSubstitutions(ModuleDecl &mod,
     for (auto req: reqs) {
       assert(req.getKind() == RequirementKind::Conformance);
       auto protoType = req.getSecondType()->castTo<ProtocolType>();
+      // TODO: Error handling for failed conformance lookup.
       currentConformances.push_back(
-        lookupConformance(depTy->getCanonicalType(), currentReplacement,
-                          protoType));
+        *lookupConformance(depTy->getCanonicalType(), currentReplacement,
+                           protoType));
     }
 
     // Add it to the final substitution list.
@@ -331,16 +331,15 @@ getSubstitutions(ModuleDecl &mod,
 }
 
 void GenericSignature::
-getSubstitutions(ModuleDecl &mod,
-                 const SubstitutionMap &subMap,
+getSubstitutions(const SubstitutionMap &subMap,
                  SmallVectorImpl<Substitution> &result) const {
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
-          -> ProtocolConformanceRef {
-    return *subMap.lookupConformance(original, protoType->getDecl());
-  };
+      -> Optional<ProtocolConformanceRef> {
+        return subMap.lookupConformance(original, protoType->getDecl());
+      };
 
-  getSubstitutions(mod, subMap.getMap(), lookupConformanceFn, result);
+  getSubstitutions(subMap.getMap(), lookupConformanceFn, result);
 }
 
 bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {

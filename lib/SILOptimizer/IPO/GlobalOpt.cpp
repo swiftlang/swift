@@ -148,7 +148,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
   }
 };
 
-} // namespace
+} // end anonymous namespace
 
 /// If this is a call to a global initializer, map it.
 void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
@@ -938,7 +938,7 @@ class SILGlobalOptPass : public SILModuleTransform
 
   StringRef getName() override { return "SIL Global Optimization"; }
 };
-} // anonymous
+} // end anonymous namespace
 
 SILTransform *swift::createGlobalOpt() {
   return new SILGlobalOptPass();

@@ -2138,6 +2138,11 @@ func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
   static func +(lhs: Self, rhs: Self) -> Self // expected-error {{@objc protocols may not have operator requirements}}
 }
 
+class AdoptsOperatorInProtocol : OperatorInProtocol {
+  static func +(lhs: AdoptsOperatorInProtocol, rhs: AdoptsOperatorInProtocol) -> Self {}
+  // expected-error@-1 {{operator methods cannot be declared @objc}}
+}
+
 //===--- @objc inference for witnesses
 
 @objc protocol InferFromProtocol {

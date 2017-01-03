@@ -80,7 +80,9 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
 
       // Look for a literal-conformance constraint on the type variable.
       SmallVector<Constraint *, 8> constraints;
-      cs.getConstraintGraph().gatherConstraints(bindingTypeVar, constraints);
+      cs.getConstraintGraph().gatherConstraints(
+                              bindingTypeVar, constraints,
+                              ConstraintGraph::GatheringKind::EquivalenceClass);
       for (auto constraint : constraints) {
         if (constraint->getKind() == ConstraintKind::LiteralConformsTo &&
             constraint->getProtocol()->isSpecificProtocol(
@@ -243,7 +245,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
     if (!getFixedType(binding.first) && !binding.second->hasTypeVariable())
-      assignFixedType(binding.first, binding.second, /*updateScore=*/false);
+      assignFixedType(binding.first, binding.second, /*updateState=*/false);
   }
 
   // Register overload choices.
@@ -685,7 +687,7 @@ namespace {
       out << ")\n";
     }
   };
-}
+} // end anonymous namespace
 
 /// \brief Return whether a relational constraint between a type variable and a
 /// trivial wrapper type (autoclosure, unary tuple) should result in the type
@@ -699,7 +701,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::Subtype:
     return true;
   case ConstraintKind::Bind:
@@ -744,7 +746,7 @@ static void findInferableTypeVars(
     explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVars)
       : typeVars(typeVars) { }
 
-    virtual Action walkToTypePre(Type ty) override {
+    Action walkToTypePre(Type ty) override {
       if (ty->is<DependentMemberType>())
         return Action::SkipChildren;
 
@@ -769,7 +771,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   // Gather the constraints associated with this type variable.
   SmallVector<Constraint *, 8> constraints;
   llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
-  cs.getConstraintGraph().gatherConstraints(typeVar, constraints);
+  cs.getConstraintGraph().gatherConstraints(
+                              typeVar, constraints,
+                              ConstraintGraph::GatheringKind::EquivalenceClass);
 
   PotentialBindings result;
   Optional<unsigned> lastSupertypeIndex;
@@ -824,7 +828,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
-    case ConstraintKind::ExplicitConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
@@ -837,6 +840,10 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // FIXME: Relational constraints for which we could perhaps do better
       // than the default.
       break;
+
+    case ConstraintKind::BridgingConversion:
+      // Nothing to infer from bridging conversions.
+      continue;
 
     case ConstraintKind::DynamicTypeOf:
       // Constraints from which we can't do anything.

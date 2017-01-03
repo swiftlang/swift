@@ -460,8 +460,8 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       OS << " type='";
-      if (TAD->hasUnderlyingType())
-        OS << TAD->getUnderlyingType().getString();
+      if (TAD->getUnderlyingTypeLoc().getType())
+        OS << TAD->getUnderlyingTypeLoc().getType().getString();
       else
         OS << "<<<unresolved>>>";
       printInherited(TAD->getInherited());
@@ -1013,7 +1013,7 @@ namespace {
       OS << ')';
     }
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void ParameterList::dump() const {
   dump(llvm::errs(), 0);
@@ -1048,7 +1048,7 @@ void Decl::dump(raw_ostream &OS, unsigned Indent) const {
 }
 
 /// Print the given declaration context (with its parents).
-static void printContext(raw_ostream &os, DeclContext *dc) {
+void swift::printContext(raw_ostream &os, DeclContext *dc) {
   if (auto parent = dc->getParent()) {
     printContext(os, parent);
     os << '.';
@@ -1458,7 +1458,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void Stmt::dump() const {
   print(llvm::errs());
@@ -1853,7 +1853,7 @@ public:
   }
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
     printCommon(E, "tuple_shuffle_expr");
-    if (E->isSourceScalar()) OS << " sourceIsScalar";
+    if (E->isSourceScalar()) OS << " source_is_scalar";
     OS << " elements=[";
     for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
       if (i) OS << ", ";
@@ -1867,6 +1867,12 @@ public:
                },
                [&] { OS << ", "; });
     OS << "]";
+
+    if (auto defaultArgsOwner = E->getDefaultArgsOwner()) {
+      OS << " default_args_owner=";
+      defaultArgsOwner.dump(OS);
+      dump(defaultArgsOwner.getSubstitutions());
+    }
 
     OS << "\n";
     printRec(E->getSubExpr());
@@ -2291,7 +2297,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 
 void Expr::dump(raw_ostream &OS) const {
@@ -2468,7 +2474,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 void PrintDecl::printRec(TypeRepr *T) {
   PrintTypeRepr(OS, Indent+2).visit(T);
@@ -2819,7 +2825,11 @@ namespace {
 
       // FIXME: This is ugly.
       OS << "\n";
-      T->getASTContext().dumpArchetypeContext(T, OS, Indent + 2);
+      if (auto genericEnv = T->getGenericEnvironment()) {
+        if (auto owningDC = genericEnv->getOwningDeclContext()) {
+          owningDC->printContext(OS, Indent + 2);
+        }
+      }
 
       if (auto superclass = T->getSuperclass())
         printRec("superclass", superclass);

@@ -104,6 +104,11 @@ class OuterGenericClass<T> {
       super.init()
     }
   }
+
+  class Middle {
+    class Inner1<T> {}
+    class Inner2<T> : Middle where T: Inner1<Int> {}
+  }
 }
 
 // <rdar://problem/12895793>

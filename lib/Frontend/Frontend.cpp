@@ -446,6 +446,7 @@ void CompilerInstance::performSema() {
 
     Diags.setSuppressWarnings(DidSuppressWarnings);
 
+    performConditionResolution(*NextInput);
     performNameBinding(*NextInput);
   }
 
@@ -506,10 +507,19 @@ void CompilerInstance::performSema() {
     Diags.setSuppressWarnings(DidSuppressWarnings);
     
     if (mainIsPrimary && !Context->hadError() &&
+        Invocation.getFrontendOptions().PCMacro) {
+      performPCMacro(MainFile, PersistentState.getTopLevelContext());
+    }
+    
+    // Playground transform knows to look out for PCMacro's changes and not
+    // to playground log them.
+    if (mainIsPrimary && !Context->hadError() &&
         Invocation.getFrontendOptions().PlaygroundTransform)
       performPlaygroundTransform(MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);
-    if (!mainIsPrimary)
+    if (!mainIsPrimary) {
+      performConditionResolution(MainFile);
       performNameBinding(MainFile);
+    }
   }
 
   // Type-check each top-level input besides the main source file.

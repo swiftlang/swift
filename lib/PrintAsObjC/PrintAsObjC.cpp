@@ -29,6 +29,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -87,7 +88,7 @@ namespace {
     IsFunctionParam = true,
     IsNotFunctionParam = false,
   };
-}
+} // end anonymous namespace
 
 static StringRef getNameForObjC(const ValueDecl *VD,
                                 CustomNamesOnly_t customNamesOnly = Normal) {
@@ -114,14 +115,15 @@ static StringRef getNameForObjC(const ValueDecl *VD,
   return VD->getName().str();
 }
 
-/// Returns true if the given selector might be mistaken for an init method
+/// Returns true if the given selector might be classified as an init method
 /// by Objective-C ARC.
-static bool isMistakableForInit(ObjCSelector selector) {
+static bool looksLikeInitMethod(ObjCSelector selector) {
   ArrayRef<Identifier> selectorPieces = selector.getSelectorPieces();
   assert(!selectorPieces.empty());
-  return selectorPieces.front().str().startswith("init");
+  auto firstPiece = selectorPieces.front().str();
+  if (!firstPiece.startswith("init")) return false;
+  return !(firstPiece.size() > 4 && clang::isLowercase(firstPiece[4]));
 }
-
 
 namespace {
 using DelayedMemberSet = llvm::SmallSetVector<const ValueDecl *, 32>;
@@ -365,7 +367,7 @@ private:
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
-      print(param->getType(), OTK_None, Identifier(), IsFunctionParam);
+      print(param->getInterfaceType(), OTK_None, Identifier(), IsFunctionParam);
     }
     os << ")";
 
@@ -541,8 +543,11 @@ private:
           !isa<ProtocolDecl>(ctor->getDeclContext())) {
         os << " OBJC_DESIGNATED_INITIALIZER";
       }
+      if (!looksLikeInitMethod(AFD->getObjCSelector())) {
+        os << " SWIFT_METHOD_FAMILY(init)";
+      }
     } else {
-      if (isMistakableForInit(AFD->getObjCSelector())) {
+      if (looksLikeInitMethod(AFD->getObjCSelector())) {
         os << " SWIFT_METHOD_FAMILY(none)";
       }
       if (!methodTy->getResult()->isVoid() &&
@@ -579,7 +584,7 @@ private:
     auto params = FD->getParameterLists().back();
     interleave(*params,
                [&](const ParamDecl *param) {
-                 print(param->getType(), OTK_None, param->getName(),
+                 print(param->getInterfaceType(), OTK_None, param->getName(),
                        IsFunctionParam);
                },
                [&]{ os << ", "; });
@@ -628,7 +633,7 @@ private:
     const TypeAliasDecl *TAD = nullptr;
     while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
       TAD = aliasTy->getDecl();
-      ty = TAD->getUnderlyingType();
+      ty = aliasTy->getSinglyDesugaredType();
     }
 
     return TAD && TAD->getName() == ID_CFTypeRef && TAD->hasClangNode();
@@ -662,7 +667,7 @@ private:
     // We treat "unowned" as "assign" (even though it's more like
     // "safe_unretained") because we want people to think twice about
     // allowing that object to disappear.
-    Type ty = VD->getType();
+    Type ty = VD->getInterfaceType();
     if (auto weakTy = ty->getAs<WeakStorageType>()) {
       auto innerTy = weakTy->getReferentType()->getAnyOptionalObjectType();
       auto innerClass = innerTy->getClassOrBoundGenericClass();
@@ -766,9 +771,9 @@ private:
       }
     } else {
       os << "\n";
-      if (isMistakableForInit(VD->getObjCGetterSelector()))
+      if (looksLikeInitMethod(VD->getObjCGetterSelector()))
         printAbstractFunctionAsMethod(VD->getGetter(), false);
-      if (isSettable && isMistakableForInit(VD->getObjCSetterSelector()))
+      if (isSettable && looksLikeInitMethod(VD->getObjCSetterSelector()))
         printAbstractFunctionAsMethod(VD->getSetter(), false);
     }
   }
@@ -1125,7 +1130,7 @@ private:
       return;
     }
 
-    visitPart(alias->getUnderlyingType(), optionalKind);
+    visitPart(alias->getUnderlyingTypeLoc().getType(), optionalKind);
   }
 
   void maybePrintTagKeyword(const NominalTypeDecl *NTD) {
@@ -1898,7 +1903,7 @@ public:
         } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
           (void)addImport(TD);
           // Just in case, make sure the underlying type is visible too.
-          finder.visit(TAD->getUnderlyingType());
+          finder.visit(TAD->getUnderlyingTypeLoc().getType());
         } else if (addImport(TD)) {
           return;
         } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
@@ -2384,7 +2389,7 @@ public:
     return false;
   }
 };
-}
+} // end anonymous namespace
 
 bool swift::printAsObjC(llvm::raw_ostream &os, Module *M,
                         StringRef bridgingHeader,

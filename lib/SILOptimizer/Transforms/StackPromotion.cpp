@@ -305,7 +305,7 @@ public:
     return !(lhs == rhs);
   }
 };
-}
+} // end anonymous namespace
 
 namespace llvm {
 
@@ -334,7 +334,7 @@ template <> struct GraphTraits<StackPromoter *>
   }
 };
 
-}
+} // namespace llvm
 
 bool StackPromoter::canPromoteAlloc(AllocRefInst *ARI,
                                     SILInstruction *&AllocInsertionPoint,

@@ -79,3 +79,24 @@ func f5<T, U>(x: T, y: U) {
     typealias U = Int
   }
 }
+
+// Issue with gatherAllSubstitutions().
+struct OuterGenericStruct<A> {
+  class MiddleNonGenericClass {
+    func nonGenericFunction() {
+      class InnerGenericClass<T> : MiddleNonGenericClass {
+      // expected-error@-1 {{type 'InnerGenericClass' cannot be nested in generic function 'nonGenericFunction'}}
+        override init() { super.init() }
+      }
+    }
+  }
+}
+
+// Issue with diagnoseUnknownType().
+func genericFunction<T>(t: T) {
+  class First : Second<T>.UnknownType { }
+  // expected-error@-1 {{type 'First' cannot be nested in generic function 'genericFunction'}}
+  class Second<T> : Second { }
+  // expected-error@-1 {{type 'Second' cannot be nested in generic function 'genericFunction'}}
+  // expected-error@-2 2 {{circular class inheritance Second}}
+}

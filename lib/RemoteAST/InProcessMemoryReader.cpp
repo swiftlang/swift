@@ -1,4 +1,4 @@
-//===--- InProcessMemoryReader.cpp - Reads local memory ---------*- C++ -*-===//
+//===--- InProcessMemoryReader.cpp - Reads local memory -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

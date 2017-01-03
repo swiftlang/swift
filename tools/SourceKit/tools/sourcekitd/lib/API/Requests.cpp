@@ -60,7 +60,7 @@ public:
     return get();
   }
 };
-} // anonymous namespace.
+} // anonymous namespace
 
 static LazySKDUID RequestProtocolVersion("source.request.protocol_version");
 
@@ -1047,7 +1047,8 @@ public:
 static bool isSwiftPrefixed(StringRef MangledName) {
   if (MangledName.size() < 2)
     return false;
-  return (MangledName[0] == '_' && MangledName[1] == 'T');
+  return MangledName[0] == '_' &&
+         (MangledName[1] == 'T' || MangledName[1] == MANGLING_PREFIX_STR[1]);
 }
 
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,

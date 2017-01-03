@@ -1,4 +1,4 @@
   add_subdirectory(InProc)
-if (APPLE)
+if (HAVE_XPC_H)
   add_subdirectory(XPC)
 endif()

@@ -14,6 +14,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/DenseMap.h"
@@ -295,17 +296,13 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
 }
 
 Type DeclContext::mapTypeIntoContext(Type type) const {
-  if (auto genericEnv = getGenericEnvironmentOfContext())
-    return genericEnv->mapTypeIntoContext(getParentModule(), type);
-
-  return type;
+  return GenericEnvironment::mapTypeIntoContext(
+      getParentModule(), getGenericEnvironmentOfContext(), type);
 }
 
 Type DeclContext::mapTypeOutOfContext(Type type) const {
-  if (auto genericEnv = getGenericEnvironmentOfContext())
-    return genericEnv->mapTypeOutOfContext(getParentModule(), type);
-
-  return type;
+  return GenericEnvironment::mapTypeOutOfContext(
+      getGenericEnvironmentOfContext(), type);
 }
 
 DeclContext *DeclContext::getLocalContext() {
@@ -670,7 +667,7 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
 }
 
 void DeclContext::dumpContext() const {
-  printContext(llvm::outs());
+  printContext(llvm::errs());
 }
 
 template <typename DCType>
@@ -731,7 +728,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   case DeclContextKind::AbstractFunctionDecl:
     Kind = "AbstractFunctionDecl";
     break;
-    case DeclContextKind::SubscriptDecl:  Kind = "SubscriptDecl"; break;
+  case DeclContextKind::SubscriptDecl:    Kind = "SubscriptDecl"; break;
   }
   OS.indent(Depth*2 + indent) << "0x" << (void*)this << " " << Kind;
 
@@ -920,7 +917,7 @@ void IterableDeclContext::loadAllMembers() const {
   // Don't try to load all members re-entrant-ly.
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
-                                                            /*loader=*/nullptr);
+    /*lazyLoader=*/nullptr);
   FirstDeclAndLazyMembers.setInt(false);
 
   const Decl *container = nullptr;

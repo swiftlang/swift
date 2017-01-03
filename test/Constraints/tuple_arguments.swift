@@ -1,7 +1,9 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
+
+// See test/Compatibility/tuple_arguments.swift for the Swift 3 behavior.
 
 func concrete(_ x: Int) {}
-func concreteTwo(_ x: Int, _ y: Int) {} // expected-note 3 {{'concreteTwo' declared here}}
+func concreteTwo(_ x: Int, _ y: Int) {} // expected-note 5 {{'concreteTwo' declared here}}
 func concreteTuple(_ x: (Int, Int)) {}
 
 do {
@@ -26,10 +28,10 @@ do {
   concrete(c)
 
   concreteTwo(a, b)
-  concreteTwo((a, b)) // FIXME
-  concreteTwo(d) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+  concreteTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  concreteTwo(d) // expected-error {{missing argument for parameter #2 in call}}
 
-  concreteTuple(a, b) // FIXME
+  concreteTuple(a, b) // expected-error {{extra argument in call}}
   concreteTuple((a, b))
   concreteTuple(d)
 }
@@ -59,7 +61,7 @@ func genericTuple<T, U>(_ x: (T, U)) {}
 
 do {
   generic(3)
-  generic(3, 4) // FIXME
+  generic(3, 4) // expected-error {{extra argument in call}}
   generic((3))
   generic((3, 4))
 
@@ -77,7 +79,7 @@ do {
   let d = (a, b)
 
   generic(a)
-  generic(a, b) // FIXME
+  generic(a, b) // expected-error {{extra argument in call}}
   generic((a))
   generic(c)
   generic((a, b))
@@ -115,7 +117,7 @@ do {
 }
 
 var function: (Int) -> ()
-var functionTwo: (Int, Int) -> () // expected-note 3 {{'functionTwo' declared here}}
+var functionTwo: (Int, Int) -> () // expected-note 5 {{'functionTwo' declared here}}
 var functionTuple: ((Int, Int)) -> ()
 
 do {
@@ -140,10 +142,10 @@ do {
   function(c)
 
   functionTwo(a, b)
-  functionTwo((a, b)) // FIXME
-  functionTwo(d) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+  functionTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  functionTwo(d) // expected-error {{missing argument for parameter #2 in call}}
 
-  functionTuple(a, b) // FIXME
+  functionTuple(a, b) // expected-error {{extra argument in call}}
   functionTuple((a, b))
   functionTuple(d)
 }
@@ -171,7 +173,7 @@ struct Concrete {}
 
 extension Concrete {
   func concrete(_ x: Int) {}
-  func concreteTwo(_ x: Int, _ y: Int) {} // expected-note 3 {{'concreteTwo' declared here}}
+  func concreteTwo(_ x: Int, _ y: Int) {} // expected-note 5 {{'concreteTwo' declared here}}
   func concreteTuple(_ x: (Int, Int)) {}
 }
 
@@ -201,10 +203,10 @@ do {
   s.concrete(c)
 
   s.concreteTwo(a, b)
-  s.concreteTwo((a, b)) // FIXME
-  s.concreteTwo(d) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+  s.concreteTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  s.concreteTwo(d) // expected-error {{missing argument for parameter #2 in call}}
 
-  s.concreteTuple(a, b) // FIXME
+  s.concreteTuple(a, b) // expected-error {{extra argument in call}}
   s.concreteTuple((a, b))
   s.concreteTuple(d)
 }
@@ -240,7 +242,7 @@ do {
   let s = Concrete()
 
   s.generic(3)
-  s.generic(3, 4) // FIXME
+  s.generic(3, 4) // expected-error {{extra argument in call}}
   s.generic((3))
   s.generic((3, 4))
 
@@ -260,7 +262,7 @@ do {
   let d = (a, b)
 
   s.generic(a)
-  s.generic(a, b) // FIXME
+  s.generic(a, b) // expected-error {{extra argument in call}}
   s.generic((a))
   s.generic((a, b))
   s.generic(d)
@@ -299,7 +301,7 @@ do {
 
 extension Concrete {
   mutating func mutatingConcrete(_ x: Int) {}
-  mutating func mutatingConcreteTwo(_ x: Int, _ y: Int) {} // expected-note 3 {{'mutatingConcreteTwo' declared here}}
+  mutating func mutatingConcreteTwo(_ x: Int, _ y: Int) {} // expected-note 5 {{'mutatingConcreteTwo' declared here}}
   mutating func mutatingConcreteTuple(_ x: (Int, Int)) {}
 }
 
@@ -329,10 +331,10 @@ do {
   s.mutatingConcrete(c)
 
   s.mutatingConcreteTwo(a, b)
-  s.mutatingConcreteTwo((a, b)) // FIXME
-  s.mutatingConcreteTwo(d) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+  s.mutatingConcreteTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  s.mutatingConcreteTwo(d) // expected-error {{missing argument for parameter #2 in call}}
 
-  s.mutatingConcreteTuple(a, b) // FIXME
+  s.mutatingConcreteTuple(a, b) // expected-error {{extra argument in call}}
   s.mutatingConcreteTuple((a, b))
   s.mutatingConcreteTuple(d)
 }
@@ -368,7 +370,7 @@ do {
   var s = Concrete()
 
   s.mutatingGeneric(3)
-  s.mutatingGeneric(3, 4) // FIXME
+  s.mutatingGeneric(3, 4) // expected-error {{extra argument in call}}
   s.mutatingGeneric((3))
   s.mutatingGeneric((3, 4))
 
@@ -388,7 +390,7 @@ do {
   let d = (a, b)
 
   s.mutatingGeneric(a)
-  s.mutatingGeneric(a, b) // FIXME
+  s.mutatingGeneric(a, b) // expected-error {{extra argument in call}}
   s.mutatingGeneric((a))
   s.mutatingGeneric((a, b))
   s.mutatingGeneric(d)
@@ -437,7 +439,7 @@ do {
   s.function(3)
   s.function((3))
 
-  s.functionTwo(3, 4) // FIXME
+  s.functionTwo(3, 4)
   s.functionTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
 
   s.functionTuple(3, 4) // expected-error {{extra argument in call}}
@@ -457,10 +459,11 @@ do {
   s.function(c)
 
   s.functionTwo(a, b)
-  s.functionTwo((a, b)) // FIXME
-  s.functionTwo(d) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+  s.functionTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  s.functionTwo(d) // expected-error {{missing argument for parameter #2 in call}}
 
-  s.functionTuple(a, b) // FIXME
+
+  s.functionTuple(a, b) // expected-error {{extra argument in call}}
   s.functionTuple((a, b))
   s.functionTuple(d)
 }
@@ -487,7 +490,7 @@ do {
 }
 
 struct InitTwo {
-  init(_ x: Int, _ y: Int) {} // expected-note 3 {{'init' declared here}}
+  init(_ x: Int, _ y: Int) {} // expected-note 5 {{'init' declared here}}
 }
 
 struct InitTuple {
@@ -508,10 +511,10 @@ do {
   let c = (a, b)
 
   _ = InitTwo(a, b)
-  _ = InitTwo((a, b)) // FIXME
-  _ = InitTwo(c) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+  _ = InitTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  _ = InitTwo(c) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = InitTuple(a, b) // FIXME
+  _ = InitTuple(a, b) // expected-error {{extra argument in call}}
   _ = InitTuple((a, b))
   _ = InitTuple(c)
 }
@@ -531,7 +534,7 @@ do {
 }
 
 struct SubscriptTwo {
-  subscript(_ x: Int, _ y: Int) -> Int { get { return 0 } set { } } // expected-note 2 {{'subscript' declared here}}
+  subscript(_ x: Int, _ y: Int) -> Int { get { return 0 } set { } } // expected-note 5 {{'subscript' declared here}}
 }
 
 struct SubscriptTuple {
@@ -555,11 +558,11 @@ do {
 
   let s1 = SubscriptTwo()
   _ = s1[a, b]
-  _ = s1[(a, b)] // FIXME
-  _ = s1[d] // FIXME
+  _ = s1[(a, b)] // expected-error {{missing argument for parameter #2 in call}}
+  _ = s1[d] // expected-error {{missing argument for parameter #2 in call}}
 
   let s2 = SubscriptTuple()
-  _ = s2[a, b] // FIXME
+  _ = s2[a, b] // expected-error {{extra argument in call}}
   _ = s2[(a, b)]
   _ = s2[d]
 }
@@ -572,9 +575,7 @@ do {
   var s1 = SubscriptTwo()
   _ = s1[a, b]
   _ = s1[(a, b)] // expected-error {{missing argument for parameter #2 in call}}
-
-  // FIXME: Crashes in CSDiag
-  // _ = s1[d]
+  _ = s1[d] // expected-error {{missing argument for parameter #2 in call}}
 
   var s2 = SubscriptTuple()
   _ = s2[a, b] // expected-error {{extra argument in call}}}
@@ -583,7 +584,7 @@ do {
 }
 
 enum Enum {
-  case two(Int, Int) // expected-note 3 {{'two' declared here}}
+  case two(Int, Int) // expected-note 5 {{'two' declared here}}
   case tuple((Int, Int))
 }
 
@@ -601,10 +602,10 @@ do {
   let c = (a, b)
 
   _ = Enum.two(a, b)
-  _ = Enum.two((a, b)) // FIXME
-  _ = Enum.two(c) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+  _ = Enum.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  _ = Enum.two(c) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = Enum.tuple(a, b) // FIXME
+  _ = Enum.tuple(a, b) // expected-error {{extra argument in call}}
   _ = Enum.tuple((a, b))
   _ = Enum.tuple(c)
 }
@@ -627,7 +628,7 @@ struct Generic<T> {}
 
 extension Generic {
   func generic(_ x: T) {}
-  func genericTwo(_ x: T, _ y: T) {} // expected-note 2 {{'genericTwo' declared here}}
+  func genericTwo(_ x: T, _ y: T) {} // expected-note 3 {{'genericTwo' declared here}}
   func genericTuple(_ x: (T, T)) {}
 }
 
@@ -662,14 +663,14 @@ do {
   s.generic(c)
 
   s.genericTwo(a, b)
-  s.genericTwo((a, b)) // FIXME
+  s.genericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
 
-  s.genericTuple(a, b) // FIXME
+  s.genericTuple(a, b) // expected-error {{extra argument in call}}
   s.genericTuple((a, b))
 
   let sTwo = Generic<(Double, Double)>()
 
-  sTwo.generic(a, b) // FIXME
+  sTwo.generic(a, b) // expected-error {{extra argument in call}}
   sTwo.generic((a, b))
   sTwo.generic(d)
 }
@@ -701,7 +702,7 @@ do {
 
 extension Generic {
   mutating func mutatingGeneric(_ x: T) {}
-  mutating func mutatingGenericTwo(_ x: T, _ y: T) {} // expected-note 2 {{'mutatingGenericTwo' declared here}}
+  mutating func mutatingGenericTwo(_ x: T, _ y: T) {} // expected-note 3 {{'mutatingGenericTwo' declared here}}
   mutating func mutatingGenericTuple(_ x: (T, T)) {}
 }
 
@@ -736,14 +737,14 @@ do {
   s.mutatingGeneric(c)
 
   s.mutatingGenericTwo(a, b)
-  s.mutatingGenericTwo((a, b)) // FIXME
+  s.mutatingGenericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
 
-  s.mutatingGenericTuple(a, b) // FIXME
+  s.mutatingGenericTuple(a, b) // expected-error {{extra argument in call}}
   s.mutatingGenericTuple((a, b))
 
   var sTwo = Generic<(Double, Double)>()
 
-  sTwo.mutatingGeneric(a, b) // FIXME
+  sTwo.mutatingGeneric(a, b) // expected-error {{extra argument in call}}
   sTwo.mutatingGeneric((a, b))
   sTwo.mutatingGeneric(d)
 }
@@ -810,14 +811,14 @@ do {
   s.genericFunction(c)
 
   s.genericFunctionTwo(a, b)
-  s.genericFunctionTwo((a, b)) // FIXME
+  s.genericFunctionTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
 
-  s.genericFunctionTuple(a, b) // FIXME
+  s.genericFunctionTuple(a, b) // expected-error {{extra argument in call}}
   s.genericFunctionTuple((a, b))
 
   let sTwo = Generic<(Double, Double)>()
 
-  sTwo.genericFunction(a, b) // FIXME
+  sTwo.genericFunction(a, b) // expected-error {{extra argument in call}}
   sTwo.genericFunction((a, b))
   sTwo.genericFunction(d)
 }
@@ -847,12 +848,12 @@ do {
   sTwo.genericFunction(d)
 }
 
-struct GenericInit<T> { // expected-note 2 {{'T' declared as parameter to type 'GenericInit'}}
+struct GenericInit<T> {
   init(_ x: T) {}
 }
 
 struct GenericInitTwo<T> {
-  init(_ x: T, _ y: T) {} // expected-note 8 {{'init' declared here}}
+  init(_ x: T, _ y: T) {} // expected-note 10 {{'init' declared here}}
 }
 
 struct GenericInitTuple<T> {
@@ -860,7 +861,7 @@ struct GenericInitTuple<T> {
 }
 
 do {
-  _ = GenericInit(3, 4) // FIXME
+  _ = GenericInit(3, 4) // expected-error {{extra argument in call}}
   _ = GenericInit((3, 4))
 
   _ = GenericInitTwo(3, 4)
@@ -871,8 +872,8 @@ do {
 }
 
 do {
-  _ = GenericInit<(Int, Int)>(3, 4) // FIXME
-  _ = GenericInit<(Int, Int)>((3, 4)) // FIXME // expected-error {{expression type 'GenericInit<(Int, Int)>' is ambiguous without more context}}
+  _ = GenericInit<(Int, Int)>(3, 4) // expected-error {{extra argument in call}}
+  _ = GenericInit<(Int, Int)>((3, 4))
 
   _ = GenericInitTwo<Int>(3, 4)
   _ = GenericInitTwo<Int>((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
@@ -886,7 +887,7 @@ do {
   let b = 4
   let c = (a, b)
 
-  _ = GenericInit(a, b) // FIXME
+  _ = GenericInit(a, b) // expected-error {{extra argument in call}}
   _ = GenericInit((a, b))
   _ = GenericInit(c)
 
@@ -904,15 +905,15 @@ do {
   let b = 4
   let c = (a, b)
 
-  _ = GenericInit<(Int, Int)>(a, b) // FIXME
+  _ = GenericInit<(Int, Int)>(a, b) // expected-error {{extra argument in call}}
   _ = GenericInit<(Int, Int)>((a, b))
   _ = GenericInit<(Int, Int)>(c)
 
   _ = GenericInitTwo<Int>(a, b)
-  _ = GenericInitTwo<Int>((a, b)) // FIXME
-  _ = GenericInitTwo<Int>(c) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+  _ = GenericInitTwo<Int>((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericInitTwo<Int>(c) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = GenericInitTuple<Int>(a, b) // FIXME
+  _ = GenericInitTuple<Int>(a, b) // expected-error {{extra argument in call}}
   _ = GenericInitTuple<Int>((a, b))
   _ = GenericInitTuple<Int>(c)
 }
@@ -923,8 +924,8 @@ do {
   var c = (a, b)
 
   _ = GenericInit(a, b) // expected-error {{extra argument in call}}
-  _ = GenericInit((a, b)) // FIXME // expected-error {{generic parameter 'T' could not be inferred}} // expected-note {{explicitly specify the generic arguments to fix this issue}}
-  _ = GenericInit(c) // FIXME // expected-error {{generic parameter 'T' could not be inferred}} // expected-note {{explicitly specify the generic arguments to fix this issue}}
+  _ = GenericInit((a, b))
+  _ = GenericInit(c)
 
   _ = GenericInitTwo(a, b)
   _ = GenericInitTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
@@ -940,10 +941,9 @@ do {
   var b = 4
   var c = (a, b)
 
-  // FIXME: Crashes CSDiag
-  // _ = GenericInit<(Int, Int)>(a, b)
-  _ = GenericInit<(Int, Int)>((a, b)) // FIXME // expected-error {{expression type 'GenericInit<(Int, Int)>' is ambiguous without more context}}
-   _ = GenericInit<(Int, Int)>(c) // FIXME // expected-error {{expression type 'GenericInit<(Int, Int)>' is ambiguous without more context}}
+  _ = GenericInit<(Int, Int)>(a, b) // expected-error {{extra argument in call}}
+  _ = GenericInit<(Int, Int)>((a, b))
+   _ = GenericInit<(Int, Int)>(c)
 
   _ = GenericInitTwo<Int>(a, b)
   _ = GenericInitTwo<Int>((a, b)) // expected-error {{missing argument for parameter #2 in call}}
@@ -968,8 +968,8 @@ struct GenericSubscriptTuple<T> {
 
 do {
   let s1 = GenericSubscript<(Double, Double)>()
-  _ = s1[3.0, 4.0] // FIXME
-  _ = s1[(3.0, 4.0)] // FIXME // expected-error {{expression type 'Int' is ambiguous without more context}}
+  _ = s1[3.0, 4.0] // expected-error {{extra argument in call}}
+  _ = s1[(3.0, 4.0)]
 
   let s2 = GenericSubscriptTwo<Double>()
   _ = s2[3.0, 4.0]
@@ -986,17 +986,17 @@ do {
   let d = (a, b)
 
   let s1 = GenericSubscript<(Double, Double)>()
-  _ = s1[a, b] // FIXME
+  _ = s1[a, b] // expected-error {{extra argument in call}}
   _ = s1[(a, b)]
   _ = s1[d]
 
   let s2 = GenericSubscriptTwo<Double>()
   _ = s2[a, b]
-  _ = s2[(a, b)] // FIXME
-  _ = s2[d] // FIXME
+  _ = s2[(a, b)] // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type '(_, _)'}}
+  _ = s2[d] // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type '(_, _)'}}
 
   let s3 = GenericSubscriptTuple<Double>()
-  _ = s3[a, b] // FIXME
+  _ = s3[a, b] // expected-error {{extra argument in call}}
   _ = s3[(a, b)]
   _ = s3[d]
 }
@@ -1007,10 +1007,9 @@ do {
   var d = (a, b)
 
   var s1 = GenericSubscript<(Double, Double)>()
-  // FIXME: Crashes CSDiag
-  //_ = s1[a, b]
-  _ = s1[(a, b)] // FIXME // expected-error {{expression type '@lvalue Int' is ambiguous without more context}}
-  _ = s1[d] // FIXME // expected-error {{expression type '@lvalue Int' is ambiguous without more context}}
+  _ = s1[a, b] // expected-error {{extra argument in call}}
+  _ = s1[(a, b)]
+  _ = s1[d]
 
   var s2 = GenericSubscriptTwo<Double>()
   _ = s2[a, b]
@@ -1025,12 +1024,12 @@ do {
 
 enum GenericEnum<T> {
   case one(T)
-  case two(T, T) // expected-note 8 {{'two' declared here}}
+  case two(T, T) // expected-note 10 {{'two' declared here}}
   case tuple((T, T))
 }
 
 do {
-  _ = GenericEnum.one(3, 4) // FIXME
+  _ = GenericEnum.one(3, 4) // expected-error {{extra argument in call}}
   _ = GenericEnum.one((3, 4))
 
   _ = GenericEnum.two(3, 4)
@@ -1056,7 +1055,7 @@ do {
   let b = 4
   let c = (a, b)
 
-  _ = GenericEnum.one(a, b) // FIXME
+  _ = GenericEnum.one(a, b) // expected-error {{extra argument in call}}
   _ = GenericEnum.one((a, b))
   _ = GenericEnum.one(c)
 
@@ -1074,15 +1073,15 @@ do {
   let b = 4
   let c = (a, b)
 
-  _ = GenericEnum<(Int, Int)>.one(a, b) // FIXME
+  _ = GenericEnum<(Int, Int)>.one(a, b) // expected-error {{extra argument in call}}
   _ = GenericEnum<(Int, Int)>.one((a, b))
   _ = GenericEnum<(Int, Int)>.one(c)
 
   _ = GenericEnum<Int>.two(a, b)
-  _ = GenericEnum<Int>.two((a, b)) // FIXME
-  _ = GenericEnum<Int>.two(c) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+  _ = GenericEnum<Int>.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericEnum<Int>.two(c) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = GenericEnum<Int>.tuple(a, b) // FIXME
+  _ = GenericEnum<Int>.tuple(a, b) // expected-error {{extra argument in call}}
   _ = GenericEnum<Int>.tuple((a, b))
   _ = GenericEnum<Int>.tuple(c)
 }
@@ -1129,7 +1128,7 @@ protocol Protocol {
 
 extension Protocol {
   func requirement(_ x: Element) {}
-  func requirementTwo(_ x: Element, _ y: Element) {} // expected-note 2 {{'requirementTwo' declared here}}
+  func requirementTwo(_ x: Element, _ y: Element) {} // expected-note 3 {{'requirementTwo' declared here}}
   func requirementTuple(_ x: (Element, Element)) {}
 }
 
@@ -1168,14 +1167,14 @@ do {
   s.requirement(c)
 
   s.requirementTwo(a, b)
-  s.requirementTwo((a, b)) // FIXME
+  s.requirementTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
 
-  s.requirementTuple(a, b) // FIXME
+  s.requirementTuple(a, b) // expected-error {{extra argument in call}}
   s.requirementTuple((a, b))
 
   let sTwo = GenericConforms<(Double, Double)>()
 
-  sTwo.requirement(a, b) // FIXME
+  sTwo.requirement(a, b) // expected-error {{extra argument in call}}
   sTwo.requirement((a, b))
   sTwo.requirement(d)
 }
@@ -1217,9 +1216,9 @@ do {
   s.takesClosure({ x in })
   s.takesClosure({ (x: Double) in })
 
-  s.takesClosureTwo({ _ = $0 }) // FIXME
-  s.takesClosureTwo({ x in }) // FIXME
-  s.takesClosureTwo({ (x: (Double, Double)) in }) // FIXME
+  s.takesClosureTwo({ _ = $0 }) // expected-error {{contextual closure type '(Double, Double) -> ()' expects 2 arguments, but 1 was used in closure body}}
+  s.takesClosureTwo({ x in }) // expected-error {{contextual closure type '(Double, Double) -> ()' expects 2 arguments, but 1 was used in closure body}}
+  s.takesClosureTwo({ (x: (Double, Double)) in }) // expected-error {{contextual closure type '(Double, Double) -> ()' expects 2 arguments, but 1 was used in closure body}}
   s.takesClosureTwo({ _ = $0; _ = $1 })
   s.takesClosureTwo({ (x, y) in })
   s.takesClosureTwo({ (x: Double, y:Double) in })
@@ -1227,15 +1226,45 @@ do {
   s.takesClosureTuple({ _ = $0 })
   s.takesClosureTuple({ x in })
   s.takesClosureTuple({ (x: (Double, Double)) in })
-  s.takesClosureTuple({ _ = $0; _ = $1 }) // FIXME
-  s.takesClosureTuple({ (x, y) in }) // FIXME
-  s.takesClosureTuple({ (x: Double, y:Double) in }) // FIXME
+  s.takesClosureTuple({ _ = $0; _ = $1 }) // expected-error {{cannot convert value of type '(_, _) -> ()' to expected argument type '((Double, Double)) -> ()'}}
+  s.takesClosureTuple({ (x, y) in }) // expected-error {{cannot convert value of type '(_, _) -> ()' to expected argument type '((Double, Double)) -> ()'}}
+  s.takesClosureTuple({ (x: Double, y:Double) in }) // expected-error {{cannot convert value of type '(Double, Double) -> ()' to expected argument type '((Double, Double)) -> ()'}}
 
   let sTwo = GenericConforms<(Double, Double)>()
   sTwo.takesClosure({ _ = $0 })
   sTwo.takesClosure({ x in })
   sTwo.takesClosure({ (x: (Double, Double)) in })
-  sTwo.takesClosure({ _ = $0; _ = $1 }) // FIXME
-  sTwo.takesClosure({ (x, y) in }) // FIXME
-  sTwo.takesClosure({ (x: Double, y: Double) in }) // FIXME
+  sTwo.takesClosure({ _ = $0; _ = $1 }) // expected-error {{cannot convert value of type '(_, _) -> ()' to expected argument type '((Double, Double)) -> ()'}}
+  sTwo.takesClosure({ (x, y) in }) // expected-error {{cannot convert value of type '(_, _) -> ()' to expected argument type '((Double, Double)) -> ()'}}
+  sTwo.takesClosure({ (x: Double, y: Double) in }) // expected-error {{cannot convert value of type '(Double, Double) -> ()' to expected argument type '((Double, Double)) -> ()'}}
+}
+
+do {
+  let _: ((Int, Int)) -> () = { _ = $0 }
+  let _: ((Int, Int)) -> () = { _ = ($0.0, $0.1) }
+  let _: ((Int, Int)) -> () = { t in _ = (t.0, t.1) }
+
+  let _: ((Int, Int)) -> () = { _ = ($0, $1) } // expected-error {{cannot convert value of type '(_, _) -> ()' to specified type '((Int, Int)) -> ()'}}
+  let _: ((Int, Int)) -> () = { t, u in _ = (t, u) } // expected-error {{cannot convert value of type '(_, _) -> ()' to specified type '((Int, Int)) -> ()'}}
+
+  let _: (Int, Int) -> () = { _ = $0 } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
+  let _: (Int, Int) -> () = { _ = ($0.0, $0.1) } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
+  let _: (Int, Int) -> () = { t in _ = (t.0, t.1) } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
+
+  let _: (Int, Int) -> () = { _ = ($0, $1) }
+  let _: (Int, Int) -> () = { t, u in _ = (t, u) }
+}
+
+// rdar://problem/28952837 - argument labels ignored when calling function
+// with single 'Any' parameter
+func takesAny(_: Any) {}
+
+do {
+  let fn: (Any) -> () = { _ in }
+
+  fn(123)
+  fn(data: 123) // expected-error {{extraneous argument label 'data:' in call}}
+
+  takesAny(123)
+  takesAny(data: 123) // expected-error {{extraneous argument label 'data:' in call}}
 }

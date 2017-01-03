@@ -90,7 +90,7 @@ struct Printer {
     return OS;
   }
 };
-}
+} // end anonymous namespace
 
 void SILCoverageMap::printCounter(llvm::raw_ostream &OS,
                                   llvm::coverage::Counter C) const {

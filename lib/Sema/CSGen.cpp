@@ -566,7 +566,8 @@ namespace {
     // be the disjunction constraint for the overload group.
     auto &CG = CS.getConstraintGraph();
     SmallVector<Constraint *, 4> constraints;
-    CG.gatherConstraints(tyvarType, constraints);
+    CG.gatherConstraints(tyvarType, constraints,
+                         ConstraintGraph::GatheringKind::EquivalenceClass);
     if (constraints.empty())
       return;
     
@@ -609,9 +610,8 @@ namespace {
         auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
         auto overloadType = overloadChoice.getDecl()->getInterfaceType();
         auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
-        resultType = ArchetypeBuilder::mapTypeIntoContext(
-            overloadChoice.getDecl()->getInnermostDeclContext(),
-            resultType);
+        resultType = overloadChoice.getDecl()->getInnermostDeclContext()
+            ->mapTypeIntoContext(resultType);
         CS.setFavoredType(expr, resultType.getPointer());
       }
 
@@ -754,10 +754,10 @@ namespace {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
       
-      Type paramTy = ArchetypeBuilder::mapTypeIntoContext(
-          value->getInnermostDeclContext(), fnTy->getInput());
-      auto resultTy = ArchetypeBuilder::mapTypeIntoContext(
-          value->getInnermostDeclContext(), fnTy->getResult());
+      Type paramTy = value->getInnermostDeclContext()
+          ->mapTypeIntoContext(fnTy->getInput());
+      auto resultTy = value->getInnermostDeclContext()
+          ->mapTypeIntoContext(fnTy->getResult());
       auto contextualTy = CS.getContextualType(expr);
 
       return isFavoredParamAndArg(
@@ -831,8 +831,8 @@ namespace {
           }
         }
         Type paramTy = fnTy->getInput();
-        paramTy = ArchetypeBuilder::mapTypeIntoContext(
-            value->getInnermostDeclContext(), paramTy);
+        paramTy = value->getInnermostDeclContext()
+            ->mapTypeIntoContext(paramTy);
         
         return favoredTy->isEqual(paramTy);
       };
@@ -918,8 +918,8 @@ namespace {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
       
-      Type paramTy = ArchetypeBuilder::mapTypeIntoContext(
-          value->getInnermostDeclContext(), fnTy->getInput());
+      Type paramTy = value->getInnermostDeclContext()
+          ->mapTypeIntoContext(fnTy->getInput());
       auto paramTupleTy = paramTy->getAs<TupleType>();
       if (!paramTupleTy || paramTupleTy->getNumElements() != 2)
         return false;
@@ -927,8 +927,8 @@ namespace {
       auto firstParamTy = paramTupleTy->getElement(0).getType();
       auto secondParamTy = paramTupleTy->getElement(1).getType();
       
-      auto resultTy = ArchetypeBuilder::mapTypeIntoContext(
-          value->getInnermostDeclContext(), fnTy->getResult());
+      auto resultTy = value->getInnermostDeclContext()
+          ->mapTypeIntoContext(fnTy->getResult());
       auto contextualTy = CS.getContextualType(expr);
       
       return
@@ -991,7 +991,7 @@ namespace {
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
-}
+} // end anonymous namespace
 
 namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
@@ -1021,7 +1021,7 @@ namespace {
       if (!decl)
         return nullptr;
       
-      CS.getTypeChecker().validateDecl(decl, true);
+      CS.getTypeChecker().validateDecl(decl);
       if (decl->isInvalid())
         return nullptr;
 
@@ -1300,7 +1300,8 @@ namespace {
       // for the decl that isn't bound to anything.  This will ensure that it
       // is considered ambiguous.
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
-        if (VD->hasType() && VD->getType()->is<UnresolvedType>()) {
+        if (VD->hasInterfaceType() &&
+            VD->getInterfaceType()->is<UnresolvedType>()) {
           return CS.createTypeVariable(CS.getConstraintLocator(E),
                                        TVO_CanBindToLValue);
         }
@@ -1311,7 +1312,7 @@ namespace {
       // FIXME: If the decl is in error, we get no information from this.
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
-      CS.getTypeChecker().validateDecl(E->getDecl(), true);
+      CS.getTypeChecker().validateDecl(E->getDecl());
       if (E->getDecl()->isInvalid())
         return nullptr;
 
@@ -1326,8 +1327,14 @@ namespace {
                                         E->getFunctionRefKind()));
       
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
-        if (VD->getType() && !VD->getType()->is<TypeVariableType>()) {
-          CS.setFavoredType(E, VD->getType().getPointer());
+        if (VD->getInterfaceType() &&
+            !VD->getInterfaceType()->is<TypeVariableType>()) {
+          // FIXME: ParamDecls in closures shouldn't get an interface type
+          // until the constraint system has been solved.
+          auto type = VD->getInterfaceType();
+          if (type->hasTypeParameter())
+            type = VD->getDeclContext()->mapTypeIntoContext(type);
+          CS.setFavoredType(E, type.getPointer());
         }
       }
 
@@ -1383,7 +1390,7 @@ namespace {
         // If the result is invalid, skip it.
         // FIXME: Note this as invalid, in case we don't find a solution,
         // so we don't let errors cascade further.
-        CS.getTypeChecker().validateDecl(decls[i], true);
+        CS.getTypeChecker().validateDecl(decls[i]);
         if (decls[i]->isInvalid())
           continue;
 
@@ -1671,12 +1678,13 @@ namespace {
       Type contextualArrayElementType = nullptr;
       
       // If a contextual type exists for this expression, apply it directly.
-      if (contextualType && CS.isArrayType(contextualType)) {
+      Optional<Type> arrayElementType;
+      if (contextualType &&
+          (arrayElementType = ConstraintSystem::isArrayType(contextualType))) {
         // Is the array type a contextual type
         contextualArrayType = contextualType;
-        contextualArrayElementType =
-            CS.getBaseTypeForArrayType(contextualType.getPointer());
-        
+        contextualArrayElementType = *arrayElementType;
+
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredType(),
                          locator);
@@ -2323,7 +2331,7 @@ namespace {
             if (FD->getHaveFoundCommonOverloadReturnType()) {
               outputTy = FD->getInterfaceType()->getAs<AnyFunctionType>()
                   ->getResult();
-              outputTy = ArchetypeBuilder::mapTypeIntoContext(FD, outputTy);
+              outputTy = FD->mapTypeIntoContext(outputTy);
             }
             
           } else {
@@ -2343,8 +2351,7 @@ namespace {
                 }
                 
                 resultType = OFT->getResult();
-                resultType = ArchetypeBuilder::mapTypeIntoContext(
-                    OFD, resultType);
+                resultType = OFD->mapTypeIntoContext(resultType);
                 
                 if (commonType.isNull()) {
                   commonType = resultType;
@@ -2515,25 +2522,8 @@ namespace {
       auto fromType = CS.getType(expr->getSubExpr());
       auto locator = CS.getConstraintLocator(expr);
 
-      if (CS.shouldAttemptFixes()) {
-        Constraint *coerceConstraint =
-          Constraint::create(CS, ConstraintKind::ExplicitConversion,
-                             fromType, toType, DeclName(),
-                             FunctionRefKind::Compound,
-                             locator);
-        Constraint *downcastConstraint =
-          Constraint::createFixed(CS, ConstraintKind::CheckedCast,
-                                  FixKind::CoerceToCheckedCast, fromType,
-                                  toType, locator);
-        coerceConstraint->setFavored();
-        auto constraints = { coerceConstraint, downcastConstraint };
-        CS.addDisjunctionConstraint(constraints, locator, RememberChoice);
-      } else {
-        // The source type can be explicitly converted to the destination type.
-        CS.addConstraint(ConstraintKind::ExplicitConversion, fromType, toType,
-                         locator);
-      }
-
+      CS.addExplicitConversionConstraint(fromType, toType, /*allowFixes=*/true,
+                                         locator);
       return toType;
     }
 
@@ -3013,7 +3003,7 @@ class InferUnresolvedMemberConstraintGenerator : public ConstraintGenerator {
 public:
   InferUnresolvedMemberConstraintGenerator(Expr *Target, ConstraintSystem &CS) :
     ConstraintGenerator(CS), Target(Target), VT(nullptr) {};
-  virtual ~InferUnresolvedMemberConstraintGenerator() = default;
+  ~InferUnresolvedMemberConstraintGenerator() override = default;
 
   Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *Expr) override {
     if (Target != Expr) {
@@ -3129,7 +3119,7 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   SmallVector<Type, 3> TypeScratch;
 
   // Prepare type substitution map.
-  TypeSubstitutionMap Substitutions = BaseTy->getMemberSubstitutions(ED);
+  TypeSubstitutionMap Substitutions = BaseTy->getContextSubstitutions(ED);
   auto resolveType = [&](Type Ty) {
     return Ty.subst(DC.getParentModule(), Substitutions);
   };

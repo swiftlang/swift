@@ -55,6 +55,6 @@ inline IsTake_t shouldTakeOnSuccess(CastConsumptionKind kind) {
   return IsTake_t(kind != CastConsumptionKind::CopyOnSuccess);
 }
 
-}  // end namespace swift
+} // end namespace swift
 
 #endif

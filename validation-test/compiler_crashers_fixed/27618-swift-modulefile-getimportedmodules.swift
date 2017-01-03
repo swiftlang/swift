@@ -7,6 +7,3 @@
 
 // RUN: not %target-swift-frontend %s -typecheck
 struct d<T where g:t{protocol a{func b<d where g.E=C{}}class C{class A{class B<T>:B<T>
-
-// REQUIRES: disabled
-

@@ -75,6 +75,41 @@ class ModuleFile : public LazyMemberLoader {
   /// A callback to be invoked every time a type was deserialized.
   std::function<void(Type)> DeserializedTypeCallback;
 
+  /// The number of entities that are currently being deserialized.
+  unsigned NumCurrentDeserializingEntities = 0;
+
+  /// Declaration contexts with delayed generic environments, which will be
+  /// completed as a pending action.
+  ///
+  /// FIXME: This is needed because completing a generic environment can
+  /// require the type checker, which might be gone if we delay generic
+  /// environments too far. It is a hack.
+  std::vector<DeclContext *> DelayedGenericEnvironments;
+
+  /// RAII class to be used when deserializing an entity.
+  class DeserializingEntityRAII {
+    ModuleFile &MF;
+
+  public:
+    DeserializingEntityRAII(ModuleFile &MF) : MF(MF) {
+      ++MF.NumCurrentDeserializingEntities;
+    }
+    ~DeserializingEntityRAII() {
+      assert(MF.NumCurrentDeserializingEntities > 0 &&
+             "Imbalanced currently-deserializing count?");
+      if (MF.NumCurrentDeserializingEntities == 1) {
+        MF.finishPendingActions();
+      }
+
+      --MF.NumCurrentDeserializingEntities;
+    }
+  };
+  friend class DeserializingEntityRAII;
+
+  /// Finish any pending actions that were waiting for the topmost entity to
+  /// be deserialized.
+  void finishPendingActions();
+
 public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {
@@ -250,6 +285,9 @@ private:
   /// Types referenced by this module.
   std::vector<Serialized<Type>> Types;
 
+  /// Generic environments referenced by this module.
+  std::vector<Serialized<GenericEnvironment *>> GenericEnvironments;
+
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
   /// If \c Offset is non-zero, the identifier has not been loaded yet.
@@ -306,9 +344,6 @@ private:
 
   std::unique_ptr<GroupNameTable> GroupNamesMap;
   std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
-
-  /// Saved type substitution maps for lazily-created generic environments.
-  std::vector<std::unique_ptr<TypeSubstitutionMap>> GenericEnvironmentMaps;
 
   struct ModuleBits {
     /// The decl ID of the main class in this module file, if it has one.
@@ -443,35 +478,12 @@ private:
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
                                llvm::BitstreamCursor &Cursor);
 
-  /// Allocate a lazy generic environment map for use with lazily deserialized
-  /// generic environments.
-  uint64_t allocateLazyGenericEnvironmentMap(TypeSubstitutionMap &&map);
-
-  /// Set up a lazy generic environment for the given type or extension.
-  void readLazyGenericEnvironment(
-              llvm::PointerUnion<GenericTypeDecl *, ExtensionDecl *> typeOrExt);
-
-  /// Read the generic signature and type substitution map for a
-  /// generic environment from \c Cursor.
-  std::pair<GenericSignature *, TypeSubstitutionMap>
-  readGenericEnvironmentPieces(llvm::BitstreamCursor &Cursor,
-                               Optional<ArrayRef<Requirement>> optRequirements
-                                 = None);
-
-  /// Reads a GenericEnvironment from \c Cursor.
-  ///
-  /// The optional requirements are used to construct the signature without
-  /// attempting to deserialize any requirements, such as when reading SIL.
-  GenericEnvironment *readGenericEnvironment(
-      llvm::BitstreamCursor &Cursor,
-      Optional<ArrayRef<Requirement>> optRequirements = None);
-
-  /// Reads a GenericEnvironment followed by requirements from \c DeclTypeCursor.
-  ///
-  /// Returns the GenericEnvironment.
-  ///
-  /// Returns nullptr if there's no generic signature here.
-  GenericEnvironment *maybeReadGenericEnvironment();
+  /// Set up a (potentially lazy) generic environment for the given type,
+  /// function or extension.
+  void configureGenericEnvironment(
+                   llvm::PointerUnion3<GenericTypeDecl *, ExtensionDecl *,
+                                       AbstractFunctionDecl *> genericDecl,
+                   serialization::GenericEnvironmentID envID);
 
   /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
   ///
@@ -722,6 +734,35 @@ public:
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
   Module *getModule(ArrayRef<Identifier> name);
+
+  /// Return the generic signature or environment at the current position in
+  /// the given cursor.
+  ///
+  /// \param cursor The cursor to read from.
+  /// \param wantEnvironment Whether we always want to receive a generic
+  /// environment vs. being able to handle the generic signature.
+  /// \param optRequirements If not \c None, use these generic requirements
+  /// rather than deserializing requirements.
+  llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+  readGenericSignatureOrEnvironment(
+                        llvm::BitstreamCursor &cursor,
+                        bool wantEnvironment,
+                        Optional<ArrayRef<Requirement>> optRequirements);
+
+  /// Returns the generic signature or environment for the given ID,
+  /// deserializing it if needed.
+  ///
+  /// \param wantEnvironment If true, always return the full generic
+  /// environment. Otherwise, only return the generic environment if it's
+  /// already been constructed, and the signature in other cases.
+  llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+  getGenericSignatureOrEnvironment(serialization::GenericEnvironmentID ID,
+                                   bool wantEnvironment = false);
+
+  /// Returns the generic environment for the given ID, deserializing it if
+  /// needed.
+  GenericEnvironment *getGenericEnvironment(
+                                        serialization::GenericEnvironmentID ID);
 
   /// Reads a substitution record from \c DeclTypeCursor.
   ///

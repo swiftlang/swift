@@ -159,7 +159,7 @@ namespace {
                                           abstraction, origTargetTL, ctx);
         } else {
           SILValue argument =
-              trueBB->createArgument(origTargetTL.getLoweredType());
+              trueBB->createPHIArgument(origTargetTL.getLoweredType());
           result = finishFromResultScalar(hasAbstraction, argument, consumption,
                                           abstraction, origTargetTL, ctx);
         }
@@ -256,7 +256,7 @@ namespace {
       return CastStrategy::Address;
     }
   };
-}
+} // end anonymous namespace
 
 void SILGenFunction::emitCheckedCastBranch(SILLocation loc, Expr *source,
                                            Type targetType,
@@ -499,7 +499,7 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
   if (resultObjectTemp) {
     result = SGF.manageBufferForExprResult(resultBuffer, resultTL, C);
   } else {
-    auto argument = contBB->createArgument(resultTL.getLoweredType());
+    auto argument = contBB->createPHIArgument(resultTL.getLoweredType());
     result = SGF.emitManagedRValueWithCleanup(argument, resultTL);
   }
 
@@ -548,7 +548,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
     });
 
   auto contBB = scope.exit();
-  auto isa = contBB->createArgument(i1Ty);
+  auto isa = contBB->createPHIArgument(i1Ty);
   return isa;
 }
 

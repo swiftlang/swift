@@ -806,7 +806,7 @@ private:
     return true;
   }
 };
-} // anonymous namespace.
+} // anonymous namespace
 
 sourcekitd_object_t
 sourcekitd_request_create_from_yaml(const char *yaml, char **error) {

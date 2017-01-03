@@ -355,7 +355,7 @@ tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc, const Expr *expr,
     const ParamDecl *param = paramList->getArray().back();
 
     // Sanity-check that the trailing closure corresponds to this parameter.
-    if (!param->getType()->is<AnyFunctionType>())
+    if (!param->getInterfaceType()->is<AnyFunctionType>())
       return false;
 
     Identifier trailingClosureLabel = param->getArgumentName();
@@ -849,9 +849,8 @@ namespace {
         entityType = decl->getInterfaceType();
         auto *DC = decl->getInnermostDeclContext();
         if (auto *GFT = entityType->getAs<GenericFunctionType>()) {
-          auto *M = DC->getParentModule();
           auto subs = DC->getGenericEnvironmentOfContext()
-              ->getForwardingSubstitutions(M);
+              ->getForwardingSubstitutions();
           entityType = GFT->substGenericArgs(subs);
         } else {
           if (auto objType =
@@ -1074,7 +1073,7 @@ namespace {
   private:
     void collectCalleeCandidates(Expr *fnExpr, bool implicitDotSyntax);
   };
-}
+} // end anonymous namespace
 
 void CalleeCandidateInfo::dump() const {
   llvm::errs() << "CalleeCandidateInfo for '" << declName << "': closeness="
@@ -2113,7 +2112,7 @@ private:
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
   bool visitClosureExpr(ClosureExpr *CE);
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 
 
@@ -2546,7 +2545,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
 
   // Check if the expression is the matching operator ~=, most often used in
   // case statements. If so, try to provide a single dot fix-it
-  const Expr *contextualTypeNode;
+  const Expr *contextualTypeNode = nullptr;
   for (auto iterateCS = CS; iterateCS; iterateCS = iterateCS->baseCS) {
     contextualTypeNode = iterateCS->getContextualTypeNode();
   }
@@ -3235,7 +3234,8 @@ namespace {
       
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getInterfaceType()->hasError());
+          if (D->hasInterfaceType())
+            D->setInvalid(D->getInterfaceType()->hasError());
       
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
@@ -3279,10 +3279,11 @@ namespace {
 
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getInterfaceType()->hasError());
+          if (D->hasInterfaceType())
+            D->setInvalid(D->getInterfaceType()->hasError());
     }
   };
-}
+} // end anonymous namespace
 
 /// Erase an expression tree's open existentials after a re-typecheck operation.
 ///
@@ -3845,20 +3846,25 @@ static bool tryIntegerCastFixIts(InFlightDiagnostic &diag,
 static bool
 addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem *CS,
                    Type fromType, Type toType, Expr *expr) {
+  // Look through optional types; casts can add them, but can't remove extra
+  // ones.
+  toType = toType->lookThroughAllAnyOptionalTypes();
+
   CheckedCastKind Kind =
-    CS->getTypeChecker().typeCheckCheckedCast(fromType, toType, CS->DC,
-                                              SourceLoc(), SourceRange(),
-                                              SourceRange(),
-                                              [](Type T) { return false; },
-                                              /*suppressDiagnostics*/ true);
+    CS->getTypeChecker().typeCheckCheckedCast(fromType, toType,
+                                              CheckedCastContextKind::None,
+                                              CS->DC,
+                                              SourceLoc(), nullptr,
+                                              SourceRange());
   if (Kind != CheckedCastKind::Unresolved) {
     SmallString<32> buffer;
     llvm::raw_svector_ostream OS(buffer);
     toType->print(OS);
+    bool canUseAs = Kind == CheckedCastKind::Coercion ||
+      Kind == CheckedCastKind::BridgingCast;
     diag.fixItInsert(Lexer::getLocForEndOfToken(CS->DC->getASTContext().SourceMgr,
                                                 expr->getEndLoc()),
-                     (llvm::Twine(Kind == CheckedCastKind::Coercion ? " as " :
-                                                                      " as! ") +
+                     (llvm::Twine(canUseAs ? " as " : " as! ") +
                       OS.str()).str());
     return true;
   }
@@ -4302,7 +4308,8 @@ static bool isSymmetricBinaryOperator(const CalleeCandidateInfo &CCI) {
     if (params->size() != 2) return false;
 
     // Require the types to be the same.
-    if (!params->get(0)->getType()->isEqual(params->get(1)->getType()))
+    if (!params->get(0)->getInterfaceType()->isEqual(
+          params->get(1)->getInterfaceType()))
       return false;
   }
 
@@ -4502,7 +4509,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 
     /// Use a match call argument listener that allows relabeling.
     struct RelabelMatchCallArgumentListener : MatchCallArgumentListener {
-      virtual bool relabelArguments(ArrayRef<Identifier> newNames) override {
+      bool relabelArguments(ArrayRef<Identifier> newNames) override {
         return false;
       }
     } listener;
@@ -4650,7 +4657,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     return false;
 
   auto context = CS->DC;
-  using CandididateMap =
+  using CandidateMap =
       llvm::SmallDenseMap<ValueDecl *, llvm::SmallVector<OverloadChoice, 2>>;
 
   auto getBaseKind = [](ValueDecl *base) -> DescriptiveDeclKind {
@@ -4733,7 +4740,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     if (!result || result.empty())
       continue;
 
-    CandididateMap candidates;
+    CandidateMap candidates;
     for (const auto &candidate : result) {
       auto base = candidate.Base;
       if ((base && base->isInvalid()) || candidate->isInvalid())
@@ -5051,7 +5058,13 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
               TC.Context.SourceMgr, FnExpr->getEndLoc());
         }
       } else {
-        llvm_unreachable("unexpected argument expression type");
+        // FIXME: Due to a quirk of CSApply, we can end up without a
+        // ParenExpr if the argument has an '@lvalue TupleType'.
+        assert((isa<TupleType>(ArgExpr->getType().getPointer()) ||
+                isa<ParenType>(ArgExpr->getType().getPointer())) &&
+                "unexpected argument expression type");
+        insertLoc = ArgExpr->getLoc();
+
         // Can't be TupleShuffleExpr because this argExpr is not yet resolved.
       }
 
@@ -5394,7 +5407,7 @@ namespace {
     explicit CalleeListener(Type contextualType)
       : contextualType(contextualType) { }
 
-    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // If we have no contextual type, there is nothing to do.
       if (!contextualType) return false;
 
@@ -5428,7 +5441,7 @@ namespace {
       return false;
     }
   };
-}
+} // end anonymous namespace
 
 /// Return true if this function name is a comparison operator.  This is a
 /// simple heuristic used to guide comparison related diagnostics.
@@ -7035,7 +7048,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           auto *generic =
               dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
-          if (hasArchetype(generic, Archetype)) {
+          if (generic && hasArchetype(generic, Archetype)) {
             FoundDecl = generic;
             FoundGenericTypeBase = ident;
             return false;
@@ -7065,7 +7078,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
     if (auto *nominal = dyn_cast<NominalTypeDecl>(FoundDecl))
       type = nominal->getDeclaredType();
     else if (auto *typeAlias = dyn_cast<TypeAliasDecl>(FoundDecl))
-      type = typeAlias->getAliasType();
+      type = typeAlias->getUnboundGenericType();
     else
       type = FoundDecl->getDeclaredInterfaceType();
     tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype, type);
@@ -7248,7 +7261,9 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
     unsigned numConstraints = 0;
     {
       llvm::SmallVector<Constraint *, 2> constraints;
-      CS->getConstraintGraph().gatherConstraints(tv, constraints);
+      CS->getConstraintGraph().gatherConstraints(
+                             tv, constraints,
+                             ConstraintGraph::GatheringKind::EquivalenceClass);
 
       for (auto constraint : constraints) {
         // We are not interested in ConformsTo constraints because

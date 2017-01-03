@@ -150,19 +150,16 @@ namespace {
         }
 
         // Dig out the witness.
-        ValueDecl *witness;
+        ValueDecl *witness = nullptr;
         auto concrete = conformance->getConcrete();
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
+          // If we're validating the protocol recursively, bail out.
+          if (!assocType->hasValidSignature())
+            return;
+
           witness = concrete->getTypeWitnessSubstAndDecl(assocType, &TC)
             .second;
-        } else if (isa<TypeAliasDecl>(found)) {
-          // No witness for typealiases. This means typealiases in
-          // protocols cannot be found if PerformConformanceCheck
-          // is on.
-          //
-          // FIXME: Fix this.
-          return;
-        } else {
+        } else if (TC.isRequirement(found)) {
           witness = concrete->getWitness(found, &TC).getDecl();
         }
 
@@ -175,7 +172,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
@@ -294,17 +291,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
                                                NameLookupOptions options) {
   LookupTypeResult result;
 
-  // Look through an inout type.
-  if (auto inout = type->getAs<InOutType>())
-    type = inout->getObjectType();
+  // Structural types do not have member types.
+  if (!type->is<ArchetypeType>() &&
+      !type->isExistentialType() &&
+      !type->getAnyNominal() &&
+      !type->is<ModuleType>())
+    return result;
 
-  // Look through the metatype.
-  if (auto metaT = type->getAs<AnyMetatypeType>())
-    type = metaT->getInstanceType();
-  
-  // Callers must cope with dependent types directly.  
-  assert(!type->isTypeParameter());
-         
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
   NLOptions subOptions = NL_QualifiedDefault | NL_OnlyTypes;
@@ -336,7 +329,9 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // existential type, because we have no way to represent such types.
       //
       // This is diagnosed further on down in resolveNestedIdentTypeComponent().
-      if (type->isExistentialType()) {
+      if (type->isExistentialType() &&
+          (isa<TypeAliasDecl>(typeDecl) ||
+           isa<AssociatedTypeDecl>(typeDecl))) {
         auto memberType = typeDecl->getInterfaceType()->getRValueInstanceType();
 
         if (memberType->hasTypeParameter()) {
@@ -492,7 +487,7 @@ namespace {
       DelegatingLazyResolver::resolveDeclSignature(VD);
     }
   };
-}
+} // end anonymous namespace
 
 void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         Type baseTypeOrNull,

@@ -93,7 +93,8 @@ bool SemaLocResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
 bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
-  return visitDeclReference(D, Range, nullptr, Type());
+  return visitDeclReference(D, Range, nullptr, Type(),
+                            SemaReferenceKind::SubscriptRef);
 }
 
 SemaToken SemaLocResolver::resolve(SourceLoc Loc) {
@@ -146,7 +147,8 @@ bool SemaLocResolver::walkToStmtPost(Stmt *S) {
 }
 
 bool SemaLocResolver::visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                                         TypeDecl *CtorTyRef, Type T) {
+                                         TypeDecl *CtorTyRef, Type T,
+                                         SemaReferenceKind Kind) {
   if (isDone())
     return false;
   return !tryResolve(D, CtorTyRef, Range.getStart(), /*IsRef=*/true, T);
@@ -204,10 +206,31 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     Ty->print(OS);
     OS << "</Type>\n";
   }
+
+  OS << "<Context>";
+  printContext(OS, RangeContext);
+  OS << "</Context>\n";
+
+  for (auto *VD : DeclaredDecls) {
+    OS << "<Declared>" << VD->getNameStr() << "</Declared>\n";
+  }
+  for (auto &RD : ReferencedDecls) {
+    OS << "<Referenced>" << RD.VD->getNameStr() << "</Referenced>";
+    OS << "<Type>";
+    RD.Ty->print(OS);
+    OS << "</Type>\n";
+  }
+  OS << "<end>\n";
+}
+
+bool ReferencedDecl::operator==(const ReferencedDecl& Other) {
+  return VD == Other.VD && Ty.getPointer() == Other.Ty.getPointer();
 }
 
 struct RangeResolver::Implementation {
   SourceFile &File;
+  ASTContext &Ctx;
+  SourceManager &SM;
 private:
   enum class RangeMatchKind : int8_t {
     NoneMatch,
@@ -233,17 +256,51 @@ private:
     return ContextStack.back();
   }
 
+  std::vector<ValueDecl*> DeclaredDecls;
+  std::vector<ReferencedDecl> ReferencedDecls;
+
+  /// Collect the type that an ASTNode should be evaluated to.
+  Type resolveNodeType(ASTNode N) {
+    if (N.is<Stmt*>()) {
+      if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
+        return resolveNodeType(RS->getResult());
+      }
+      // For other statements, the type should be void.
+      return Ctx.getVoidDecl()->getDeclaredInterfaceType();
+    } else if (N.is<Expr*>()) {
+      return N.get<Expr*>()->getType();
+    }
+    return Type();
+  }
+
   ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {
     assert(!Node.isNull());
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
-                               Node.get<Expr*>()->getType(), Content);
+                               resolveNodeType(Node), Content,
+                               getImmediateContext(),
+                               llvm::makeArrayRef(DeclaredDecls),
+                               llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
-      return ResolvedRangeInfo(RangeKind::SingleStatement, Type(), Content);
+      return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
+                               Content, getImmediateContext(),
+                               llvm::makeArrayRef(DeclaredDecls),
+                               llvm::makeArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
-      return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content);
+      return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content,
+                               getImmediateContext(),
+                               llvm::makeArrayRef(DeclaredDecls),
+                               llvm::makeArrayRef(ReferencedDecls));
     }
+  }
+
+  bool isContainedInSelection(CharSourceRange Range) {
+    if (SM.isBeforeInBuffer(Range.getStart(), Start))
+      return false;
+    if (SM.isBeforeInBuffer(End, Range.getEnd()))
+      return false;
+    return true;
   }
 
   static SourceLoc getNonwhitespaceLocBefore(SourceManager &SM,
@@ -283,8 +340,17 @@ private:
     return SourceLoc();
   }
 
+  DeclContext *getImmediateContext() {
+    for (auto It = ContextStack.rbegin(); It != ContextStack.rend(); It ++) {
+      if (auto *DC = It->Parent.getAsDeclContext())
+        return DC;
+    }
+    return static_cast<DeclContext*>(&File);
+  }
+
   Implementation(SourceFile &File, SourceLoc Start, SourceLoc End) :
-    File(File), Start(Start), End(End), Content(getContent()) {}
+    File(File), Ctx(File.getASTContext()), SM(Ctx.SourceMgr), Start(Start),
+    End(End), Content(getContent()) {}
 
 public:
   bool hasResult() { return Result.hasValue(); }
@@ -310,6 +376,8 @@ public:
 
   static Implementation *createInstance(SourceFile &File, SourceLoc Start,
                                         SourceLoc End) {
+    if (Start.isInvalid() || End.isInvalid())
+      return nullptr;
     SourceManager &SM = File.getASTContext().SourceMgr;
     unsigned BufferId = File.getBufferID().getValue();
     unsigned StartOff = SM.getLocOffsetInBuffer(Start, BufferId);
@@ -318,9 +386,21 @@ public:
   }
 
   void analyze(ASTNode Node) {
+    Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
+
+    // Collect declared decls in the range.
+    if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
+      if (isContainedInSelection(CharSourceRange(SM, VD->getStartLoc(),
+                                                 VD->getEndLoc())))
+        DeclaredDecls.push_back(VD);
+    }
+
     auto &DCInfo = getCurrentDC();
     switch (getRangeMatchKind(Node.getSourceRange())) {
     case RangeMatchKind::NoneMatch:
+      // PatternBindingDecl is not visited; we need to explicitly analyze here.
+      if (auto *VA = dyn_cast_or_null<VarDecl>(D))
+        analyze(VA->getParentPatternBinding());
       return;
     case RangeMatchKind::RangeMatch:
       Result = getSingleNodeKind(Node);
@@ -332,14 +412,19 @@ public:
       DCInfo.EndMatches.emplace_back(Node);
       break;
     }
+
     if (!DCInfo.StartMatches.empty() && !DCInfo.EndMatches.empty()) {
-      Result = {RangeKind::MultiStatement, Type(), Content};
+      Result = {RangeKind::MultiStatement,
+                /* Last node has the type */
+                resolveNodeType(DCInfo.EndMatches.back()), Content,
+                getImmediateContext(),
+                llvm::makeArrayRef(DeclaredDecls),
+                llvm::makeArrayRef(ReferencedDecls)};
       return;
     }
   }
 
   bool shouldEnter(ASTNode Node) {
-    SourceManager &SM = File.getASTContext().SourceMgr;
     if (hasResult())
       return false;
     if (SM.isBeforeInBuffer(End, Node.getSourceRange().Start))
@@ -352,7 +437,27 @@ public:
   ResolvedRangeInfo getResult() {
     if (Result.hasValue())
       return Result.getValue();
-    return ResolvedRangeInfo(RangeKind::Invalid, Type(), getContent());
+    return ResolvedRangeInfo();
+  }
+
+  void analyzeDeclRef(ValueDecl *VD, CharSourceRange Range, Type Ty,
+                      SemaReferenceKind Kind) {
+    // Only collect decl ref.
+    if (Kind != SemaReferenceKind::DeclRef)
+      return;
+
+    if (!isContainedInSelection(Range))
+      return;
+
+    // If the VD is declared outside of current file, exclude such decl.
+    if (VD->getDeclContext()->getParentSourceFile() != &File)
+      return;
+
+    // Collect referenced decls in the range.
+    ReferencedDecl RD(VD, Ty);
+    if (std::find(ReferencedDecls.begin(), ReferencedDecls.end(), RD) ==
+          ReferencedDecls.end())
+      ReferencedDecls.push_back(RD);
   }
 
 private:
@@ -420,6 +525,14 @@ bool RangeResolver::walkToStmtPost(Stmt *S) {
 bool RangeResolver::walkToDeclPost(Decl *D) {
   Impl->leave(D);
   return !Impl->hasResult();
+}
+
+
+bool RangeResolver::
+visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
+                   Type T, SemaReferenceKind Kind) {
+  Impl->analyzeDeclRef(D, Range, T, Kind);
+  return true;
 }
 
 ResolvedRangeInfo RangeResolver::resolve() {

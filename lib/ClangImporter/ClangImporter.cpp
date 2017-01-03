@@ -83,11 +83,11 @@ namespace {
       if (!imported)
         return;
       Module *nativeImported = Impl.finishLoadingClangModule(Importer, imported,
-                                                             /*adapter=*/true);
+        /*preferAdapter=*/true);
       Impl.ImportedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
     }
 
-    virtual void InclusionDirective(clang::SourceLocation HashLoc,
+    void InclusionDirective(clang::SourceLocation HashLoc,
                                     const clang::Token &IncludeTok,
                                     StringRef FileName,
                                     bool IsAngled,
@@ -101,7 +101,7 @@ namespace {
         Importer.addDependency(File->getName());
     }
 
-    virtual void moduleImport(clang::SourceLocation ImportLoc,
+    void moduleImport(clang::SourceLocation ImportLoc,
                               clang::ModuleIdPath Path,
                               const clang::Module *Imported) override {
       handleImport(Imported);
@@ -326,10 +326,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
           // Enable modules
           "-fmodules",
-          "-fmodules-validate-system-headers",
           "-Werror=non-modular-include-in-framework-module",
-          // Enable implicit module maps (implied by "-fmodules")
-          "-fimplicit-module-maps",
           "-Xclang", "-fmodule-feature", "-Xclang", "swift",
 
           // Don't emit LLVM IR.
@@ -482,6 +479,10 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     invocationArgStrs.push_back("-fapinotes-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
+  }
+
+  if (!importerOpts.DisableModulesValidateSystemHeaders) {
+    invocationArgStrs.push_back("-fmodules-validate-system-headers");
   }
 
   if (importerOpts.DetailedPreprocessingRecord) {
@@ -725,7 +726,7 @@ ClangImporter::create(ASTContext &ctx,
   // Manually run the action, so that the TU stays open for additional parsing.
   instance.createSema(action->getTranslationUnitKind(), nullptr);
   importer->Impl.Parser.reset(new clang::Parser(clangPP, instance.getSema(),
-                                                /*skipFunctionBodies=*/false));
+                                                /*SkipFunctionBodies=*/false));
 
   clangPP.EnterMainSourceFile();
   importer->Impl.Parser->Initialize();
@@ -808,7 +809,7 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
   Impl.Instance->getHeaderSearchOpts().AddPath(newSearchPath,
                                                clang::frontend::Angled,
                                                isFramework,
-                                               /*ignoreSysroot=*/true);
+                                               /*IgnoreSysRoot=*/true);
   return false;
 }
 
@@ -843,7 +844,7 @@ bool ClangImporter::Implementation::importHeader(
       static_cast<HeaderParsingASTConsumer &>(Instance->getASTConsumer());
   consumer.reset();
 
-  pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
+  pp.EnterSourceFile(bufferID, /*Dir=*/nullptr, /*Loc=*/{});
   // Force the import to occur.
   pp.LookAhead(0);
 
@@ -906,7 +907,7 @@ bool ClangImporter::importHeader(StringRef header, Module *adapter,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*open=*/true);
+                                                           /*OpenFile=*/true);
   if (headerFile && headerFile->getSize() == expectedSize &&
       headerFile->getModificationTime() == expectedModTime) {
     return importBridgingHeader(header, adapter, diagLoc);
@@ -926,7 +927,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, Module *adapter,
                                          bool trackParsedSymbols) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*open=*/true);
+                                                           /*OpenFile=*/true);
   if (!headerFile) {
     Impl.SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_missing,
                                      header);
@@ -1087,7 +1088,8 @@ Module *ClangImporter::loadModule(
   if (!clangModule)
     return nullptr;
 
-  return Impl.finishLoadingClangModule(*this, clangModule, /*adapter=*/false);
+  return Impl.finishLoadingClangModule(*this, clangModule,
+                                       /*preferAdapter=*/false);
 }
 
 Module *ClangImporter::Implementation::finishLoadingClangModule(
@@ -1218,6 +1220,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       ImportForwardDeclarations(opts.ImportForwardDeclarations),
       InferImportAsMember(opts.InferImportAsMember),
       DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
+      CurrentVersion(nameVersionFromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(nullptr), platformAvailability(ctx.LangOpts),
       nameImporter() {}
 
@@ -1317,7 +1320,7 @@ namespace llvm {
     }
     enum { NumLowBitsAvailable = 0 };
   };
-}
+} // namespace llvm
 
 Identifier
 ClangImporter::Implementation::importIdentifier(
@@ -1433,7 +1436,7 @@ bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
       // Suppress the import of this method when the corresponding
       // property is not suppressed.
       return !shouldSuppressDeclImport(
-               objcMethod->findPropertyDecl(/*checkOverrides=*/false));
+               objcMethod->findPropertyDecl(/*CheckOverrides=*/false));
     }
 
     // If the method was declared within a protocol, check that it
@@ -1722,7 +1725,7 @@ void ClangImporter::lookupBridgingHeaderDecls(
   for (auto *ClangD : Impl.BridgeHeaderTopLevelDecls) {
     if (filter(ClangD)) {
       if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
-        if (Decl *imported = Impl.importDeclReal(ND, /*useSwift2Name=*/false))
+        if (Decl *imported = Impl.importDeclReal(ND, Impl.CurrentVersion))
           receiver(imported);
       }
     }
@@ -1787,7 +1790,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
         continue;
       if (filter(ClangD)) {
         if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
-          if (Decl *imported = Impl.importDeclReal(ND, /*useSwift2Name=*/false))
+          if (Decl *imported = Impl.importDeclReal(ND, Impl.CurrentVersion))
             receiver(imported);
         }
       }
@@ -1865,7 +1868,7 @@ public:
   explicit VectorDeclPtrConsumer(SmallVectorImpl<Decl *> &Decls)
     : Results(Decls) {}
 
-  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     Results.push_back(VD);
   }
 };
@@ -1892,7 +1895,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     // Add the extensions produced by importing categories.
     for (auto category : lookupTable->categories()) {
       if (auto extension = cast_or_null<ExtensionDecl>(
-                            owner.Impl.importDecl(category, false)))
+              owner.Impl.importDecl(category, owner.Impl.CurrentVersion)))
         results.push_back(extension);
     }
 
@@ -1903,7 +1906,8 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
       auto decl = entry.get<clang::NamedDecl *>();
-      auto importedDecl = owner.Impl.importDecl(decl, false);
+      auto importedDecl =
+          owner.Impl.importDecl(decl, owner.Impl.CurrentVersion);
       if (!importedDecl) continue;
 
       auto ext = dyn_cast<ExtensionDecl>(importedDecl->getDeclContext());
@@ -2035,7 +2039,7 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
     for (auto I = objcClass->visible_categories_begin(),
            E = objcClass->visible_categories_end();
          I != E; ++I) {
-      Impl.importDeclReal(*I, /*useSwift2Name=*/false);
+      Impl.importDeclReal(*I, Impl.CurrentVersion);
     }
   }
 
@@ -2096,7 +2100,7 @@ void ClangImporter::loadObjCMethods(
       continue;
 
     if (auto method = dyn_cast_or_null<AbstractFunctionDecl>(
-                        Impl.importDecl(objcMethod, false))) {
+                        Impl.importDecl(objcMethod, Impl.CurrentVersion))) {
       foundMethods.push_back(method);
     }
   }
@@ -2163,11 +2167,11 @@ void ClangModuleUnit::lookupObjCMethods(
   auto &clangSema = owner.Impl.getClangSema();
   clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
-                                               /*instance=*/true,
+                                               /*InstanceFirst=*/true,
                                                /*CheckTheOther=*/false);
   clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
-                                               /*instance=*/false,
+                                               /*InstanceFirst=*/false,
                                                /*CheckTheOther=*/false);
 
   // Import the methods.
@@ -2183,13 +2187,15 @@ void ClangModuleUnit::lookupObjCMethods(
     // If we found a property accessor, import the property.
     if (objcMethod->isPropertyAccessor())
       (void)owner.Impl.importDecl(objcMethod->findPropertyDecl(true),
-                                  false);
+                                  owner.Impl.CurrentVersion);
 
     // Import it.
     // FIXME: Retrying a failed import works around recursion bugs in the Clang
     // importer.
-    auto imported = owner.Impl.importDecl(objcMethod, false);
-    if (!imported) imported = owner.Impl.importDecl(objcMethod, false);
+    auto imported =
+        owner.Impl.importDecl(objcMethod, owner.Impl.CurrentVersion);
+    if (!imported)
+      imported = owner.Impl.importDecl(objcMethod, owner.Impl.CurrentVersion);
     if (!imported) continue;
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(imported))
@@ -2259,7 +2265,7 @@ std::string ClangImporter::getClangModuleHash() const {
 }
 
 Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
-  return Impl.importDeclCached(ClangDecl, /*useSwift2Name=*/false);
+  return Impl.importDeclCached(ClangDecl, Impl.CurrentVersion);
 }
 
 void ClangImporter::printStatistics() const {
@@ -2275,7 +2281,7 @@ void ClangImporter::verifyAllModules() {
   // more decls to be imported and modify the map while we are iterating it.
   SmallVector<Decl *, 8> Decls;
   for (auto &I : Impl.ImportedDecls)
-    if (!I.first.second)
+    if (I.first.second == Impl.CurrentVersion)
       if (Decl *D = I.second)
         Decls.push_back(D);
 
@@ -2559,7 +2565,7 @@ void ClangImporter::Implementation::lookupValue(
     // If it's a Clang declaration, try to import it.
     if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
       decl = cast_or_null<ValueDecl>(
-               importDeclReal(clangDecl->getMostRecentDecl(), false));
+          importDeclReal(clangDecl->getMostRecentDecl(), CurrentVersion));
       if (!decl) continue;
     } else {
       // Try to import a macro.
@@ -2597,9 +2603,8 @@ void ClangImporter::Implementation::lookupValue(
     // name.
     if (!anyMatching) {
       if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
-        if (auto swift2Decl = cast_or_null<ValueDecl>(
-                                importDeclReal(clangDecl->getMostRecentDecl(),
-                                               true))) {
+        if (auto swift2Decl = cast_or_null<ValueDecl>(importDeclReal(
+                clangDecl->getMostRecentDecl(), ImportNameVersion::Swift2))) {
           if (swift2Decl->getFullName().matchesRef(name) &&
               swift2Decl->getDeclContext()->isModuleScopeContext()) {
             consumer.foundDecl(swift2Decl,
@@ -2636,7 +2641,8 @@ void ClangImporter::Implementation::lookupObjCMembers(
     if (!isVisibleClangEntry(clangCtx, clangDecl)) continue;
 
     // Import the declaration.
-    auto decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl, false));
+    auto decl =
+        cast_or_null<ValueDecl>(importDeclReal(clangDecl, CurrentVersion));
     if (!decl)
       continue;
 
@@ -2659,7 +2665,7 @@ void ClangImporter::Implementation::lookupObjCMembers(
     // If we didn't find anything, try under the Swift 2 name.
     if (!matchedAny) {
       if (auto swift2Decl = cast_or_null<ValueDecl>(
-                              importDeclReal(clangDecl, true))) {
+                              importDeclReal(clangDecl, Version::Swift2))) {
         if (swift2Decl->getFullName().matchesRef(name)) {
           consumer.foundDecl(swift2Decl, DeclVisibilityKind::DynamicLookup);
         }

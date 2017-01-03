@@ -213,20 +213,20 @@ DeclRefExpr *Expr::getMemberOperatorRef() {
 
 /// Propagate l-value use information to children.
 void Expr::propagateLValueAccessKind(AccessKind accessKind,
-                                     std::function<Type(Expr *)> getType,
+                                     llvm::function_ref<Type(Expr *)> getType,
                                      bool allowOverwrite) {
   /// A visitor class which walks an entire l-value expression.
   class PropagateAccessKind
        : public ExprVisitor<PropagateAccessKind, void, AccessKind> {
+    llvm::function_ref<Type(Expr *)> GetType;
 #ifndef NDEBUG
-    std::function<Type(Expr *)> GetType;
     bool AllowOverwrite;
 #endif
   public:
-    PropagateAccessKind(std::function<Type(Expr *)> getType,
-                        bool allowOverwrite)
+    PropagateAccessKind(llvm::function_ref<Type(Expr *)> getType,
+                        bool allowOverwrite) : GetType(getType)
 #ifndef NDEBUG
-      : GetType(getType), AllowOverwrite(allowOverwrite)
+                                               , AllowOverwrite(allowOverwrite)
 #endif
     {}
 
@@ -782,7 +782,7 @@ llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
     explicit RecordingTraversal(llvm::DenseMap<Expr *, Expr *> &parentMap)
       : ParentMap(parentMap) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto parent = Parent.getAsExpr())
         ParentMap[E] = parent;
 
@@ -805,13 +805,13 @@ llvm::DenseMap<Expr *, unsigned> Expr::getDepthMap() {
     explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &depthMap)
       : DepthMap(depthMap) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       DepthMap[E] = Depth;
       Depth++;
       return { true, E };
     }
 
-    virtual Expr *walkToExprPost(Expr *E) {
+    Expr *walkToExprPost(Expr *E) override {
       Depth--;
       return E;
     }
@@ -832,7 +832,7 @@ llvm::DenseMap<Expr *, unsigned> Expr::getPreorderIndexMap() {
     explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &indexMap)
       : IndexMap(indexMap) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       IndexMap[E] = Index;
       Index++;
       return { true, E };
@@ -1133,8 +1133,8 @@ static Expr *packSingleArgument(
     }
       
     auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                                 rParenLoc, /*hasTrailingClosure=*/false,
-                                 /*implicit=*/false);
+                                 rParenLoc, /*HasTrailingClosure=*/false,
+                                 /*Implicit=*/false);
     computeSingleArgumentType(ctx, arg, implicit);
     return arg;
   }
@@ -1178,8 +1178,8 @@ static Expr *packSingleArgument(
 
   auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels,
                                argLabelLocs, rParenLoc,
-                               /*hasTrailingClosure=*/true,
-                               /*implicit=*/false);
+                               /*HasTrailingClosure=*/true,
+                               /*Implicit=*/false);
   computeSingleArgumentType(ctx, arg, implicit);
 
   return arg;

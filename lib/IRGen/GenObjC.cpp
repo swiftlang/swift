@@ -21,6 +21,7 @@
 #include "llvm/IR/InlineAsm.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/CharInfo.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 
 #include "swift/AST/Decl.h"
@@ -219,7 +220,7 @@ namespace {
       return ReferenceCounting::ObjC;
     }
   };
-}
+} // end anonymous namespace
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinUnknownObject() {
   return new ObjCTypeInfo(IGM.ObjCPtrTy, IGM.getPointerSize(),
@@ -272,7 +273,7 @@ namespace {
       IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.SizeTy, 0), dest);
     }
   };
-}
+} // end anonymous namespace
 
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinBridgeObject() {
@@ -569,12 +570,12 @@ namespace {
       if (!text.startswith(prefix)) return false;
       if (text.size() == prefix.size()) return true;
       assert(text.size() > prefix.size());
-      return !islower(text[prefix.size()]);
+      return !clang::isLowercase(text[prefix.size()]);
     }
 
 #undef FOREACH_FAMILY
   };
-}
+} // end anonymous namespace
 
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
                               llvm::Value *selfValue,

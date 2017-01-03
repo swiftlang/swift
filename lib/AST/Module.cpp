@@ -80,11 +80,9 @@ void BuiltinUnit::LookupCache::lookupValue(
   if (!Entry) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
       auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
-                                          TypeLoc::withoutLoc(Ty),
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
-      TAD->computeType();
-      TAD->setInterfaceType(MetatypeType::get(TAD->getAliasType(), Ctx));
+      TAD->setUnderlyingType(Ty);
       TAD->setAccessibility(Accessibility::Public);
       Entry = TAD;
     }
@@ -612,43 +610,46 @@ TypeBase::gatherAllSubstitutions(Module *module,
     llvm_unreachable("Not a nominal or bound generic type");
   }
 
+  auto *genericEnv = gpContext->getGenericEnvironmentOfContext();
+
   // Add forwarding substitutions from the outer context if we have
   // a type nested inside a generic function.
   auto *parentDC = gpContext;
   while (parentDC->isTypeContext())
     parentDC = parentDC->getParent();
-  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext()) {
-    for (auto gp : outerEnv->getGenericParams()) {
+  if (auto *outerSig = parentDC->getGenericSignatureOfContext()) {
+    for (auto gp : outerSig->getGenericParams()) {
       auto result = substitutions.insert(
                       {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
-                       outerEnv->mapTypeIntoContext(gp)});
+                       genericEnv->mapTypeIntoContext(gp)});
       assert(result.second);
     }
   }
 
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
-          -> ProtocolConformanceRef {
-
-    auto *proto = protoType->getDecl();
-
-    // If the type is a type variable or is dependent, just fill in empty
-    // conformances.
-    if (replacement->isTypeVariableOrMember() ||
-        replacement->isTypeParameter())
-      return ProtocolConformanceRef(proto);
-
-    // Otherwise, find the conformance.
-    auto conforms = module->lookupConformance(replacement, proto, resolver);
-    if (conforms)
-      return *conforms;
-
-    // FIXME: Should we ever end up here?
-    return ProtocolConformanceRef(proto);
-  };
+      -> Optional<ProtocolConformanceRef> {
+        auto *proto = protoType->getDecl();
+        
+        // If the type is a type variable or is dependent, just fill in empty
+        // conformances.
+        if (replacement->isTypeVariableOrMember() ||
+            replacement->isTypeParameter())
+          return ProtocolConformanceRef(proto);
+        
+        // Otherwise, try to find the conformance.
+        auto conforms = module->lookupConformance(replacement, proto, resolver);
+        if (conforms)
+          return *conforms;
+        
+        // FIXME: Should we ever end up here?
+        // We should return None and let getSubstitutions handle the error
+        // if we do.
+        return ProtocolConformanceRef(proto);
+      };
 
   SmallVector<Substitution, 4> result;
-  genericSig->getSubstitutions(*module, substitutions,
+  genericSig->getSubstitutions(substitutions,
                                lookupConformanceFn,
                                result);
 
@@ -1539,8 +1540,8 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   // FIXME: And there are more compact ways to encode a 16-byte value.
   buffer.reserve(buffer.size() + 2*llvm::array_lengthof(result));
   for (uint8_t byte : result) {
-    buffer.push_back(llvm::hexdigit(byte >> 4, /*lowercase=*/false));
-    buffer.push_back(llvm::hexdigit(byte & 0xF, /*lowercase=*/false));
+    buffer.push_back(llvm::hexdigit(byte >> 4, /*LowerCase=*/false));
+    buffer.push_back(llvm::hexdigit(byte & 0xF, /*LowerCase=*/false));
   }
 
   PrivateDiscriminator = getASTContext().getIdentifier(buffer);

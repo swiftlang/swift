@@ -262,7 +262,7 @@ static void maybeMarkTransparent(FuncDecl *accessor,
                                  AbstractStorageDecl *storage,
                                  TypeChecker &TC) {
   auto *DC = storage->getDeclContext();
-  if (isa<ProtocolDecl>(DC))
+  if (isa<ProtocolDecl>(DC) || isa<ClassDecl>(DC))
     return;
 
   auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -392,8 +392,8 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
       return nullptr;
     
     Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
-    if (param->getType()->is<InOutType>())
-      ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*implicit=*/true);
+    if (param->getInterfaceType()->is<InOutType>())
+      ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*isImplicit=*/true);
     args.push_back(ref);
     
     labels.push_back(param->getArgumentName());
@@ -409,9 +409,6 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
   return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
                            SourceLoc(), false, IsImplicit);
 }
-
-
-
 
 
 /// Build a reference to the subscript index variables for this subscript
@@ -484,7 +481,7 @@ namespace {
     FuncDecl *Accessor;
   public:
     AccessorStorageReferenceContext(FuncDecl *accessor) : Accessor(accessor) {}
-    virtual ~AccessorStorageReferenceContext() = default;
+    ~AccessorStorageReferenceContext() override = default;
 
     VarDecl *getSelfDecl() const override {
       return Accessor->getImplicitSelfDecl();
@@ -494,7 +491,7 @@ namespace {
       return buildSubscriptIndexReference(ctx, Accessor);
     }
   };
-}
+} // end anonymous namespace
 
 /// Build an l-value for the storage of a declaration.
 static Expr *buildStorageReference(
@@ -568,7 +565,7 @@ static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
   DC->lookupQualified(ModuleType::get(foundation),
                       ctx.getSwiftId(KnownFoundationEntity::NSCopying),
                       NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                      /*resolver=*/nullptr,
+                      /*typeResolver=*/nullptr,
                       results);
 
   if (results.size() != 1)
@@ -1006,7 +1003,7 @@ namespace {
     bool walkToDeclPre(Decl *) override { return false; }
     std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override { return {false,S}; }
   };
-}
+} // end anonymous namespace
 
 /// Synthesize the getter for a lazy property with the specified storage
 /// vardecl.
@@ -1363,7 +1360,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     makeFinal(Context, Parameter);
   Parameter->setImplicit();
   Parameter->setAccessibility(Accessibility::Private);
-  Parameter->setIsBeingTypeChecked();
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the parameter function.
@@ -1390,7 +1386,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                 SourceLoc(), /*implicit*/ true);
   Parameter->setBody(Body);
   
-  Parameter->setIsBeingTypeChecked(false);
   typeCheckDecl(Parameter, true);
   typeCheckDecl(Parameter, false);
   addMemberToContextIfNeeded(Parameter, DC);
@@ -1624,9 +1619,7 @@ void TypeChecker::introduceLazyVarAccessors(VarDecl *var) {
 }
 
 void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
-  // If we've already synthesized accessors or are currently in the process
-  // of doing so, don't proceed.
-  if (var->getGetter() || var->isBeingTypeChecked())
+  if (var->getGetter())
     return;
 
   auto *dc = var->getDeclContext();
@@ -1642,8 +1635,6 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       assert(!var->hasStorage() && "behavior var was not made computed");
     };
     
-    var->setIsBeingTypeChecked();
-
     auto behavior = var->getMutableBehavior();
     NormalProtocolConformance *conformance = nullptr;
     VarDecl *valueProp = nullptr;
@@ -1688,7 +1679,6 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       // Save the conformance and 'value' decl for later type checking.
       behavior->Conformance = conformance;
       behavior->ValueDecl = valueProp;
-      var->setIsBeingTypeChecked(false);
 
       addMemberToContextIfNeeded(getter, dc);
       if (setter)
@@ -1778,8 +1768,6 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
   // Lazy properties require special handling.
   if (var->getAttrs().hasAttribute<LazyAttr>()) {
-    var->setIsBeingTypeChecked();
-
     auto *getter = createGetterPrototype(var, TC);
     // lazy getters are mutating on an enclosing value type.
     if (!dc->getAsClassOrClassExtensionContext())
@@ -1794,7 +1782,6 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       materializeForSet = createMaterializeForSetPrototype(var, setter, TC);
 
     var->makeComputed(SourceLoc(), getter, setter, materializeForSet, SourceLoc());
-    var->setIsBeingTypeChecked(false);
 
     addMemberToContextIfNeeded(getter, dc);
     addMemberToContextIfNeeded(setter, dc);
@@ -1827,18 +1814,14 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       else
         TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
 
-      var->setIsBeingTypeChecked();
       convertStoredVarInProtocolToComputed(var, TC);
-      var->setIsBeingTypeChecked(false);
     }
     return;
 
   // NSManaged properties on classes require special handling.
   } else if (dc->getAsClassOrClassExtensionContext()) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
-      var->setIsBeingTypeChecked();
       convertNSManagedStoredVarToComputed(var, TC);
-      var->setIsBeingTypeChecked(false);
       return;
     }
 
@@ -1854,9 +1837,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       return;
 
   // Everything else gets accessors.
-  var->setIsBeingTypeChecked();
   addTrivialAccessorsToStorage(var, TC);
-  var->setIsBeingTypeChecked(false);
 }
 
 /// \brief Create an implicit struct or class constructor.
@@ -1943,7 +1924,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   // 'override' attribute.
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->getSuperclass())
-      ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*implicit=*/true));
+      ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*IsImplicit=*/true));
   }
 
   // Type-check the constructor declaration.
@@ -1986,7 +1967,7 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(call),
                                   SourceLoc(),
-                                  /*Implicit=*/true));
+                                  /*implicit=*/true));
 
   // Note that this is a stub implementation.
   ctor->setStubImplementation(true);
@@ -2011,8 +1992,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // immediate superclass.
   Type superclassTyInCtor = superclassCtor->getDeclContext()->getDeclaredTypeOfContext();
   Type superclassTy = classDecl->getSuperclass();
-  Type superclassTyInContext = ArchetypeBuilder::mapTypeIntoContext(
-      classDecl, superclassTy);
+  Type superclassTyInContext = classDecl->mapTypeIntoContext(superclassTy);
   NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
   if (superclassTyInCtor->getAnyNominal() != superclassDecl) {
     return nullptr;
@@ -2034,29 +2014,28 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   //
   // We might have to apply substitutions, if for example we have a declaration
   // like 'class A : B<Int>'.
-  if (superclassDecl->isGenericContext()) {
-    if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
-      auto *moduleDecl = classDecl->getParentModule();
-      auto subs = superclassTyInContext->gatherAllSubstitutions(
-          moduleDecl, nullptr, nullptr);
-      auto subsMap = superclassSig->getSubstitutionMap(subs);
+  if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
+    auto *moduleDecl = classDecl->getParentModule();
+    auto subs = superclassTyInContext->gatherAllSubstitutions(
+        moduleDecl, nullptr, nullptr);
+    auto subsMap = superclassSig->getSubstitutionMap(subs);
 
-      for (auto *decl : *bodyParams) {
-        // Map the parameter type to an interface type written in terms of
-        // the superclass generic signature.
-        auto paramTy = ArchetypeBuilder::mapTypeOutOfContext(
-            superclassDecl, decl->getType());
+    for (auto *decl : *bodyParams) {
+      auto paramTy = decl->getInterfaceType();
 
-        // Apply the superclass substitutions to produce a contextual
-        // type in terms of the derived class archetypes.
-        auto paramSubstTy = paramTy.subst(subsMap, SubstOptions());
-        decl->setType(paramSubstTy);
+      // Apply the superclass substitutions to produce a contextual
+      // type in terms of the derived class archetypes.
+      auto paramSubstTy = paramTy.subst(subsMap, SubstOptions());
+      decl->setType(paramSubstTy);
 
-        // Map it to an interface type in terms of the derived class
-        // generic signature.
-        decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
-            classDecl, paramSubstTy));
-      }
+      // Map it to an interface type in terms of the derived class
+      // generic signature.
+      decl->setInterfaceType(classDecl->mapTypeOutOfContext(paramSubstTy));
+    }
+  } else {
+    for (auto *decl : *bodyParams) {
+      if (!decl->hasType())
+        decl->setType(classDecl->mapTypeIntoContext(decl->getInterfaceType()));
     }
   }
 
@@ -2103,10 +2082,10 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
   }
   if (superclassCtor->isRequired())
-    ctor->getAttrs().add(new (tc.Context) RequiredAttr(/*implicit=*/true));
+    ctor->getAttrs().add(new (tc.Context) RequiredAttr(/*IsImplicit=*/true));
 
   // Wire up the overrides.
-  ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*Implicit=*/true));
+  ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*IsImplicit=*/true));
   ctor->setOverriddenDecl(superclassCtor);
 
   if (kind == DesignatedInitKind::Stub) {
@@ -2146,12 +2125,12 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                      /*hasTrailingClosure=*/false, /*implicit=*/true);
   if (superclassCtor->hasThrows()) {
     superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
-                                  /*Implicit=*/true);
+                                  /*implicit=*/true);
   }
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(superCall),
                                   SourceLoc(),
-                                  /*Implicit=*/true));
+                                  /*implicit=*/true));
 
   return ctor;
 }

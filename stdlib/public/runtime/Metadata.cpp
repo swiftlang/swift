@@ -28,7 +28,7 @@
 #include <condition_variable>
 #include <new>
 #include <cctype>
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
 #define NOMINMAX
@@ -101,7 +101,7 @@ namespace {
       return reinterpret_cast<GenericCacheEntry*>(bytes);
     }
   };
-}
+} // end anonymous namespace
 
 using GenericMetadataCache = MetadataCache<GenericCacheEntry>;
 using LazyGenericMetadataCache = Lazy<GenericMetadataCache>;
@@ -531,7 +531,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 /// The uniquing structure for tuple type metadata.
 static SimpleGlobalCache<TupleCacheEntry> TupleTypes;
@@ -1126,7 +1126,7 @@ namespace {
       return (void (*)(OutArgs *...))function;
     }
   };
-}
+} // end anonymous namespace
 
 /// Cast a function that takes all pointer arguments and returns to a
 /// function type that takes different pointer arguments and returns.
@@ -1428,7 +1428,7 @@ namespace {
     const uint8_t *WeakIvarLayout;
     const void *PropertyList;
   };
-}
+} // end anonymous namespace
 
 #if SWIFT_OBJC_INTEROP
 static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
@@ -1811,7 +1811,7 @@ namespace {
       return 0;
     }
   };
-}
+} // end anonymous namespace
 
 /// The uniquing structure for metatype type metadata.
 static SimpleGlobalCache<MetatypeCacheEntry> MetatypeTypes;
@@ -1879,7 +1879,7 @@ public:
   }
 };
 
-} // end anonymous namespace 
+} // end anonymous namespace
 
 /// The uniquing structure for existential metatype value witness tables.
 static SimpleGlobalCache<ExistentialMetatypeValueWitnessTableCacheEntry>
@@ -2199,6 +2199,8 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
   case ProtocolClassConstraint::Any:
     return getOpaqueExistentialValueWitnesses(numWitnessTables);
   }
+
+  swift_unreachable("Unhandled ProtocolClassConstraint in switch.");
 }
 
 template<> ExistentialTypeRepresentation
@@ -2240,6 +2242,8 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
     return errorBox->isPureNSError();
   }
   }
+
+  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 template<> void
@@ -2289,6 +2293,8 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
     return errorBox->getValue();
   }
   }
+
+  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 template<> const Metadata *
@@ -2311,6 +2317,8 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
     return errorBox->getType();
   }
   }
+
+  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 template<> const WitnessTable *
@@ -2440,7 +2448,7 @@ namespace {
     StringRef Data;
     /*implicit*/ GlobalString(StringRef data) : Data(data) {}
   };
-}
+} // end anonymous namespace
 
 template <>
 struct llvm::DenseMapInfo<GlobalString> {
@@ -2468,7 +2476,7 @@ struct ForeignTypeState {
   ConditionVariable InitializationWaiters;
   llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> Types;
 };
-}
+} // end anonymous namespace
 
 static Lazy<ForeignTypeState> ForeignTypes;
 
@@ -2600,6 +2608,8 @@ Metadata::getClassObject() const {
   case MetadataKind::ErrorObject:
     return nullptr;
   }
+
+  swift_unreachable("Unhandled MetdataKind in switch.");
 }
 
 #ifndef NDEBUG
@@ -2660,7 +2670,7 @@ namespace {
           genericTable->WitnessTablePrivateSizeInWords);
     }
   };
-}
+} // end anonymous namespace
 
 using GenericWitnessTableCache = MetadataCache<WitnessTableCacheEntry>;
 using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;

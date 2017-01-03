@@ -109,7 +109,7 @@ public:
   std::string mangleGlobalInit(const VarDecl *decl, int counter,
                                bool isInitFunc);
 
-  std::string mangleReabstructionThunkHelper(CanSILFunctionType ThunkType,
+  std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
 
@@ -149,7 +149,7 @@ protected:
     appendType(BlandTy);
   }
 
-  void appendBoundGenericArgs(Type type);
+  void appendBoundGenericArgs(Type type, bool &isFirstArgList);
 
   void appendImplFunctionType(SILFunctionType *fn);
 

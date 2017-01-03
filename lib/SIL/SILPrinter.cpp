@@ -124,7 +124,7 @@ public:
   }
 #undef DEF_COL
 };
-}
+} // end anonymous namespace
 
 static raw_ostream &operator<<(raw_ostream &OS, ID i) {
   SILColor C(OS, i.Kind);
@@ -1280,6 +1280,10 @@ public:
   }
 
   void visitCopyValueInst(CopyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitCopyUnownedValueInst(CopyUnownedValueInst *I) {
     *this << getIDAndType(I->getOperand());
   }
 

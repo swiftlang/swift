@@ -170,7 +170,7 @@ namespace {
       P.markWasHandled(D);
     }
   };
-}
+} // end anonymous namespace
 
 /// \brief Main entrypoint for the parser.
 ///
@@ -242,9 +242,10 @@ bool Parser::parseTopLevel() {
   // newly parsed stuff).
   bool FoundTopLevelCodeToExecute = false;
   if (allowTopLevelCode()) {
-    for (auto V : Items)
+    for (auto V : Items) {
       if (isa<TopLevelCodeDecl>(V.get<Decl*>()))
         FoundTopLevelCodeToExecute = true;
+    }
   }
 
   // Add newly parsed decls to the module.
@@ -773,7 +774,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                        AvailableAttr(AtLoc, AttrRange,
                                      Platform,
                                      /*Message=*/StringRef(),
-                                     /*Renamed=*/StringRef(),
+                                     /*Rename=*/StringRef(),
                                      /*Introduced=*/Version,
                                      /*Deprecated=*/clang::VersionTuple(),
                                      /*Obsoleted=*/clang::VersionTuple(),
@@ -1847,9 +1848,8 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   if (!CurLocalContext || !D->getDeclContext()->isLocalContext())
     return;
 
-  if (auto TD = dyn_cast<TypeDecl>(D))
-    if (!getScopeInfo().isInactiveConfigBlock())
-      SF.LocalTypeDecls.push_back(TD);
+  if (getScopeInfo().isStaticallyInactiveConfigBlock())
+    return;
 
   Identifier name = D->getName();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
@@ -1899,8 +1899,10 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       // The IfConfigDecl is ahead of its members in source order.
       Handler(ICD);
       // Copy the active members into the entries list.
-      for (auto activeMember : ICD->getActiveMembers()) {
-        Handler(activeMember);
+      if (ICD->isResolved()) {
+        for (auto activeMember : ICD->getActiveMembers()) {
+          Handler(activeMember);
+        }
       }
     }
     return IfConfigResult;
@@ -2215,15 +2217,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     break;
   }
 
-  if (auto SF = CurDeclContext->getParentSourceFile()) {
-    if (!getScopeInfo().isInactiveConfigBlock()) {
-      for (auto Attr : Attributes) {
-        if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
-          SF->AttrsRequiringFoundation.insert({Attr->getKind(), Attr});
-      }
-    }
-  }
-
   if (FoundCCTokenInAttr) {
     if (CodeCompletion) {
       CodeCompletion->completeDeclAttrKeyword(DeclResult.getPtrOrNull(),
@@ -2295,7 +2288,11 @@ void Parser::parseDeclDelayed() {
   Scope S(this, DelayedState->takeScope());
   ContextChange CC(*this, DelayedState->ParentContext);
 
-  parseDecl(ParseDeclOptions(DelayedState->Flags), [](Decl *D) {});
+  parseDecl(ParseDeclOptions(DelayedState->Flags), [&](Decl *D) {
+    SmallVector<Decl *, 2> scratch;
+    performDelayedConditionResolution(D, SF, scratch);
+    assert(scratch.empty());
+  });
 }
 
 /// \brief Parse an 'import' declaration, doing no token skipping on error.
@@ -2520,8 +2517,15 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
 
   default:
     P.checkForInputIncomplete();
-    if (!D.is(diag::invalid_diagnostic))
-      P.diagnose(P.Tok, D);
+    if (!D.is(diag::invalid_diagnostic)) {
+      if (P.Tok.isKeyword()) {
+        P.diagnose(P.Tok, diag::keyword_cant_be_identifier, P.Tok.getText());
+        P.diagnose(P.Tok, diag::backticks_to_escape)
+          .fixItReplace(P.Tok.getLoc(), "`" + P.Tok.getText().str() + "`");
+      } else {
+        P.diagnose(P.Tok, D);
+      }
+    }
     if (P.Tok.isKeyword() &&
         (P.peekToken().is(ResyncT1) || P.peekToken().is(ResyncT2) ||
          P.peekToken().is(ResyncT3) || P.peekToken().is(ResyncT4) ||
@@ -2806,24 +2810,22 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::IfConfig);
 
-  bool foundActive = false;
   SmallVector<IfConfigDeclClause, 4> Clauses;
 
-  ConditionalCompilationExprState ConfigState;
+  bool canStaticallyFindActive = true;
+  bool foundActiveClause = false;
   while (1) {
     bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
     
-    if (isElse) {
-      ConfigState.setConditionActive(!foundActive);
-    } else {
+    if (!isElse) {
       if (Tok.isAtStartOfLine()) {
         diagnose(ClauseLoc, diag::expected_conditional_compilation_expression,
                  !Clauses.empty());
       }
       
-      // Evaluate the condition.
+      // Parse the condition.
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                     /*isBasic*/true,
                                                     /*isForDirective*/true);
@@ -2831,12 +2833,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
         return makeParserError();
       
       Condition = Result.get();
-
-      // Evaluate the condition, to validate it.
-      ConfigState = evaluateConditionalCompilationExpr(Condition);
     }
-
-    foundActive |= ConfigState.isConditionActive();
 
     if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
       diagnose(Tok.getLoc(),
@@ -2844,31 +2841,45 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     }
 
     Optional<Scope> scope;
-    if (!ConfigState.isConditionActive())
-      scope.emplace(this, getScopeInfo().getCurrentScope()->getKind(),
-                    /*inactiveConfigBlock=*/true);
+    scope.emplace(this, getScopeInfo().getCurrentScope()->getKind());
     
     SmallVector<Decl*, 8> Decls;
-    if (ConfigState.shouldParse()) {
-      ParserStatus Status;
-      while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
-             Tok.isNot(tok::pound_elseif)) {
-          Status = parseDecl(Flags, [&](Decl *D) {Decls.push_back(D);});
-          if (Status.isError()) {
-            diagnose(Tok, diag::expected_close_to_if_directive);
-            skipUntilConditionalBlockClose();
-            break;
-          }
-        }
-      } else {
+    auto condValue = classifyConditionalCompilationExpr(Condition, Context,
+                                                        Diags);
+
+    // If we see a block conditionalizing compilation on language or
+    // compiler version we must take care not to emit diagnostics.
+    if (!condValue.getValueOr(true)
+        || (isElse && canStaticallyFindActive && foundActiveClause)) {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();
       DT.abort();
+    } else {
+      if (!(isElse || condValue.hasValue())) {
+        canStaticallyFindActive = false;
+      } else if (condValue.getValueOr(false)) {
+        foundActiveClause = true;
+      }
+      ParserStatus Status;
+      while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
+             Tok.isNot(tok::pound_elseif)) {
+        Status = parseDecl(Flags, [&](Decl *D) { Decls.push_back(D); });
+        if (Status.isError()) {
+          diagnose(Tok, diag::expected_close_to_if_directive);
+          skipUntilConditionalBlockClose();
+          break;
+        }
+      }
+    }
+
+    // If we can statically determine the condition of a '#else' clause, do so.
+    if (canStaticallyFindActive && isElse) {
+      condValue.emplace(!foundActiveClause);
     }
 
     Clauses.push_back(IfConfigDeclClause(ClauseLoc, Condition,
                                          Context.AllocateCopy(Decls),
-                                         ConfigState.isConditionActive()));
+                                         condValue.getValueOr(false)));
 
     if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
       break;
@@ -2883,6 +2894,11 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
                                                  Context.AllocateCopy(Clauses),
                                                  EndLoc, HadMissingEnd);
+  // If we were able to resolve this condition statically, mark it as such.
+  if (canStaticallyFindActive) {
+    ICD->setResolved();
+  }
+
   return makeParserResult(ICD);
 }
 
@@ -2969,8 +2985,8 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
-                                          UnderlyingTy.getPtrOrNull(),
                                           genericParams, CurDeclContext);
+  TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
   TAD->getAttrs() = Attributes;
 
   // Exit the scope introduced for the generic parameters.
@@ -4797,6 +4813,9 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     consumeIf(tok::period_prefix, DotLoc);
 
     const bool NameIsNotIdentifier = Tok.isNot(tok::identifier);
+    const bool NameIsKeyword = Tok.isKeyword();
+    StringRef TokText = Tok.getText();
+    SourceLoc TokLoc = Tok.getLoc();
     if (parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren,
                                 tok::kw_case, tok::colon, tok::r_brace,
                                 diag::invalid_diagnostic).isError()) {
@@ -4826,7 +4845,13 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         Status.setIsParseError();
         return Status;
       }
-      diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
+      if (NameIsKeyword) {
+        diagnose(TokLoc, diag::keyword_cant_be_identifier, TokText);
+        diagnose(TokLoc, diag::backticks_to_escape)
+          .fixItReplace(TokLoc, "`" + TokText.str() + "`");
+      } else {
+        diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
+      }
     } else if (DotLoc.isValid()) {
       diagnose(DotLoc, diag::enum_case_dot_prefix)
         .fixItRemove(DotLoc);

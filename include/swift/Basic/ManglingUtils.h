@@ -205,7 +205,7 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
       if (Idx < End - 2) {
         M.Buffer << (char)(Repl.WordIdx + 'a');
       } else {
-        // The last word substitution is a captial letter.
+        // The last word substitution is a capital letter.
         M.Buffer << (char)(Repl.WordIdx + 'A');
         if (Pos == ident.size())
           M.Buffer << '0';

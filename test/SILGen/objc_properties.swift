@@ -100,7 +100,7 @@ class B : A {
 
 // Test the @NSCopying attribute.
 class TestNSCopying {
-  // CHECK-LABEL: sil hidden [transparent] @_TFC15objc_properties13TestNSCopyings8propertyCSo8NSString : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
+  // CHECK-LABEL: sil hidden @_TFC15objc_properties13TestNSCopyings8propertyCSo8NSString : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
   // CHECK: bb0(%0 : $NSString, %1 : $TestNSCopying):
   // CHECK:  class_method [volatile] %0 : $NSString, #NSString.copy!1.foreign
   @NSCopying var property : NSString
@@ -131,18 +131,18 @@ class TestComputedOutlet : NSObject {
 }
 
 class Singleton : NSObject {
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(method) (@thick Singleton.Type) -> @owned Singleton
-  // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
+  // CHECK-DAG: sil hidden @_TZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(method) (@thick Singleton.Type) -> @owned Singleton
+  // CHECK-DAG: sil hidden [thunk] @_TToZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
   static let sharedInstance = Singleton()
 
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1iSi : $@convention(method) (@thick Singleton.Type) -> Int
-  // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong1iSi : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Int
+  // CHECK-DAG: sil hidden @_TZFC15objc_properties9Singletong1iSi : $@convention(method) (@thick Singleton.Type) -> Int
+  // CHECK-DAG: sil hidden [thunk] @_TToZFC15objc_properties9Singletong1iSi : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Int
   static let i = 2
 
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1jSS : $@convention(method) (@thick Singleton.Type) -> @owned String
-  // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong1jSS : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased NSString
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletons1jSS : $@convention(method) (@owned String, @thick Singleton.Type) -> ()
-  // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletons1jSS : $@convention(objc_method) (NSString, @objc_metatype Singleton.Type) -> ()
+  // CHECK-DAG: sil hidden @_TZFC15objc_properties9Singletong1jSS : $@convention(method) (@thick Singleton.Type) -> @owned String
+  // CHECK-DAG: sil hidden [thunk] @_TToZFC15objc_properties9Singletong1jSS : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased NSString
+  // CHECK-DAG: sil hidden @_TZFC15objc_properties9Singletons1jSS : $@convention(method) (@owned String, @thick Singleton.Type) -> ()
+  // CHECK-DAG: sil hidden [thunk] @_TToZFC15objc_properties9Singletons1jSS : $@convention(objc_method) (NSString, @objc_metatype Singleton.Type) -> ()
   static var j = "Hello"
 
   // CHECK-DAG: sil hidden [thunk] @_TToZFC15objc_properties9Singletong1kSd : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Double
@@ -153,7 +153,7 @@ class Singleton : NSObject {
 }
 
 class HasUnmanaged : NSObject {
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15objc_properties12HasUnmanagedg3refGSqGVs9UnmanagedPs9AnyObject___
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC15objc_properties12HasUnmanagedg3refGSqGVs9UnmanagedPs9AnyObject___
   // CHECK: bb0([[CLS:%.*]] : $HasUnmanaged):
   // CHECK:     [[CLS_COPY:%.*]] = copy_value [[CLS]]
   // CHECK:     [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanagedg3refGSqGVs9UnmanagedPs9AnyObject___
@@ -164,7 +164,7 @@ class HasUnmanaged : NSObject {
   // CHECK:     return [[RESULT]] : $Optional<Unmanaged<AnyObject>>
   // CHECK: } // end sil function '_TToFC15objc_properties12HasUnmanagedg3refGSqGVs9UnmanagedPs9AnyObject___'
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15objc_properties12HasUnmanageds3refGSqGVs9UnmanagedPs9AnyObject___
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC15objc_properties12HasUnmanageds3refGSqGVs9UnmanagedPs9AnyObject___
   // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<Unmanaged<AnyObject>>, [[SELF:%.*]] : $HasUnmanaged):
   // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $HasUnmanaged
   // CHECK-NEXT: // function_ref

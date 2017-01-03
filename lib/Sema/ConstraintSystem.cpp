@@ -160,7 +160,8 @@ void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Gather the constraints affected by a change to this type variable.
   SmallVector<Constraint *, 8> constraints;
-  CG.gatherConstraints(typeVar, constraints);
+  CG.gatherConstraints(typeVar, constraints,
+                       ConstraintGraph::GatheringKind::AllMentions);
 
   // Add any constraints that aren't already active to the worklist.
   for (auto constraint : constraints) {
@@ -446,7 +447,7 @@ namespace {
       return type;
     }
   };
-}
+} // end anonymous namespace
 
 Type ConstraintSystem::openType(
        Type startingType,
@@ -520,37 +521,33 @@ Type ConstraintSystem::openFunctionType(
   return removeArgumentLabels(type, numArgumentLabelsToRemove);
 }
 
-bool ConstraintSystem::isArrayType(Type t) {
-  t = t->getDesugaredType();
-  
-  // ArraySliceType<T> desugars to Array<T>.
-  if (isa<ArraySliceType>(t.getPointer()))
-    return true;
-  if (auto boundStruct = dyn_cast<BoundGenericStructType>(t.getPointer())) {
-    return boundStruct->getDecl() == TC.Context.getArrayDecl();
-  }
-  
-  return false;
-}
-
-Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
+Optional<Type> ConstraintSystem::isArrayType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
-    if (boundStruct->getDecl() != TC.Context.getDictionaryDecl())
-      return None;
-
-    auto genericArgs = boundStruct->getGenericArgs();
-    return std::make_pair(genericArgs[0], genericArgs[1]);
+    if (boundStruct->getDecl() == type->getASTContext().getArrayDecl())
+      return boundStruct->getGenericArgs()[0];
   }
 
   return None;
 }
 
-bool ConstraintSystem::isSetType(Type type) {
+Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
-    return boundStruct->getDecl() == TC.Context.getSetDecl();
+    if (boundStruct->getDecl() == type->getASTContext().getDictionaryDecl()) {
+      auto genericArgs = boundStruct->getGenericArgs();
+      return std::make_pair(genericArgs[0], genericArgs[1]);
+    }
   }
 
-  return false;
+  return None;
+}
+
+Optional<Type> ConstraintSystem::isSetType(Type type) {
+  if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
+    if (boundStruct->getDecl() == type->getASTContext().getSetDecl())
+      return boundStruct->getGenericArgs()[0];
+  }
+
+  return None;
 }
 
 bool ConstraintSystem::isAnyHashableType(Type type) {
@@ -720,7 +717,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     auto openedType = openFunctionType(
             func->getInterfaceType()->castTo<AnyFunctionType>(),
-            /*numRemovedArgumentLabels=*/0,
+            /*numArgumentLabelsToRemove=*/0,
             locator, replacements,
             func->getInnermostDeclContext(),
             func->getDeclContext(),
@@ -1033,7 +1030,7 @@ ConstraintSystem::getTypeOfMemberReference(
   // protocols.
   if (auto *alias = dyn_cast<TypeAliasDecl>(value)) {
     if (baseObjTy->isExistentialType()) {
-      auto memberTy = alias->getUnderlyingType();
+      auto memberTy = alias->getDeclaredInterfaceType();
       auto openedType = FunctionType::get(baseObjTy, memberTy);
       return { openedType, memberTy };
     }
@@ -1084,8 +1081,7 @@ ConstraintSystem::getTypeOfMemberReference(
     Type memberTy = isTypeReference
         ? assocType->getDeclaredInterfaceType()
         : assocType->getInterfaceType();
-    memberTy = ArchetypeBuilder::mapTypeIntoContext(
-        assocType->getProtocol(), memberTy);
+    memberTy = assocType->getProtocol()->mapTypeIntoContext(memberTy);
     auto openedType = FunctionType::get(baseObjTy, memberTy);
     return { openedType, memberTy };
   }

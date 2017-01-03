@@ -102,7 +102,7 @@ struct Tester {
   }
 };
 
-}
+} // end anonymous namespace
 
 TEST(EncodedSequenceTest, PushIterate) {
   Tester tester;

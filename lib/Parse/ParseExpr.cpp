@@ -661,7 +661,7 @@ ParserResult<Expr> Parser::parseExprSelector() {
     if (Tok.is(tok::r_paren))
       rParenLoc = consumeToken();
     else
-      rParenLoc = Tok.getLoc();
+      rParenLoc = PreviousLoc;
   } else {
     parseMatchingToken(tok::r_paren, rParenLoc,
                        diag::expr_selector_expected_rparen, lParenLoc);
@@ -1132,7 +1132,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
     SourceLoc Loc = consumeToken();
     Result = makeParserResult(
-       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
+       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*implicit=*/false));
     break;
   }
       
@@ -1505,7 +1505,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       }
 
       DeclNameLoc NameLoc;
-      DeclName Name = parseUnqualifiedDeclName(/*allowDot=*/true,
+      DeclName Name = parseUnqualifiedDeclName(/*afterDot=*/true,
                                                NameLoc,
                                                diag::expected_member_name);
       if (!Name) return nullptr;
@@ -2494,7 +2494,7 @@ ParserResult<Expr> Parser::parseExprList(tok leftTok, tok rightTok) {
   return makeParserResult(
       status,
       TupleExpr::create(Context, leftLoc, subExprs, subExprNames,
-                        subExprNameLocs, rightLoc, /*hasTrailingClosure=*/false,
+                        subExprNameLocs, rightLoc, /*HasTrailingClosure=*/false,
                         /*Implicit=*/false));
 }
 

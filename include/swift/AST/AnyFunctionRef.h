@@ -14,7 +14,6 @@
 #define SWIFT_AST_ANY_FUNCTION_REF_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
@@ -83,8 +82,7 @@ public:
   Type getBodyResultType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
-        return ArchetypeBuilder::mapTypeIntoContext(
-            FD, FD->getResultInterfaceType());
+        return FD->mapTypeIntoContext(FD->getResultInterfaceType());
       return TupleType::getEmpty(AFD->getASTContext());
     }
     return TheFunction.get<AbstractClosureExpr *>()->getResultType();
@@ -159,6 +157,16 @@ public:
     }
     if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
       return ce->dump();
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
+  
+  GenericEnvironment *getGenericEnvironment() const {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->getGenericEnvironment();
+    }
+    if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      return ce->getGenericEnvironmentOfContext();
     }
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }

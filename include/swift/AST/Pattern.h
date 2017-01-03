@@ -131,7 +131,7 @@ public:
   /// Set the type of this pattern as an interface type whose resolution to
   /// a context type will be performed lazily.
   ///
-  /// \param dc The context in whch the type will be resolved.
+  /// \param dc The context in which the type will be resolved.
   void setDelayedInterfaceType(Type interfaceTy, DeclContext *dc);
 
   /// Overwrite the type of this pattern.
