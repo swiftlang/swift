@@ -131,18 +131,6 @@ func privateInOtherFile() {} // expected-note {{previously declared here}}
 
 
 #if !ACCESS_DISABLED
-// rdar://problem/21408035
-private class PrivateBox<T> { // expected-note 2 {{type declared here}}
-  typealias ValueType = T
-  typealias AlwaysFloat = Float
-}
-
-let boxUnboxInt: PrivateBox<Int>.ValueType = 0 // expected-error {{constant must be declared private or fileprivate because its type uses a private type}}
-let boxFloat: PrivateBox<Int>.AlwaysFloat = 0 // expected-error {{constant must be declared private or fileprivate because its type uses a private type}}
-#endif
-
-
-#if !ACCESS_DISABLED
 struct ConformerByTypeAlias : TypeProto {
   private typealias TheType = Int // expected-error {{type alias 'TheType' must be declared internal because it matches a requirement in internal protocol 'TypeProto'}} {{3-10=internal}}
 }

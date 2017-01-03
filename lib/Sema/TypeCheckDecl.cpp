@@ -1136,19 +1136,18 @@ static void recordSelfContextType(AbstractFunctionDecl *func) {
 namespace {
 
 class AccessScopeChecker {
-  ASTContext &Context;
   const SourceFile *File;
   TypeChecker::TypeAccessScopeCacheMap &Cache;
 
 protected:
-  Optional<AccessScope> Scope;
+  ASTContext &Context;
+  Optional<AccessScope> Scope = AccessScope::getPublic();
 
   AccessScopeChecker(const DeclContext *useDC,
                      decltype(TypeChecker::TypeAccessScopeCache) &caches)
-      : Context(useDC->getASTContext()),
-        File(useDC->getParentSourceFile()),
+      : File(useDC->getParentSourceFile()),
         Cache(caches[File]),
-        Scope(AccessScope::getPublic()) {}
+        Context(File->getASTContext()) {}
 
   bool visitDecl(ValueDecl *VD, bool isInParameter = false) {
     if (!VD || isa<GenericTypeParamDecl>(VD))
@@ -1211,6 +1210,17 @@ class TypeReprAccessScopeChecker : private ASTWalker, AccessScopeChecker {
 
   bool walkToTypeReprPre(TypeRepr *TR) override {
     if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR)) {
+      // In Swift 3, components other than the last one were not properly
+      // checked for availability.
+      // FIXME: We should try to downgrade these errors to warnings, not just
+      // skip diagnosing them.
+      if (Context.LangOpts.isSwiftVersion3()) {
+        const TypeRepr *parent = Parent.getAsTypeRepr();
+        if (auto *compound = dyn_cast_or_null<CompoundIdentTypeRepr>(parent))
+          if (compound->Components.back() != CITR)
+            return true;
+      }
+
       return visitDecl(CITR->getBoundDecl(),
                        isParamParent(Parent.getAsTypeRepr()));
     }
