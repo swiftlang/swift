@@ -81,6 +81,41 @@ class ModuleFile : public LazyMemberLoader {
   /// A callback to be invoked every time a type was deserialized.
   std::function<void(Type)> DeserializedTypeCallback;
 
+  /// The number of entities that are currently being deserialized.
+  unsigned NumCurrentDeserializingEntities = 0;
+
+  /// Declaration contexts with delayed generic environments, which will be
+  /// completed as a pending action.
+  ///
+  /// FIXME: This is needed because completing a generic environment can
+  /// require the type checker, which might be gone if we delay generic
+  /// environments too far. It is a hack.
+  std::vector<DeclContext *> DelayedGenericEnvironments;
+
+  /// RAII class to be used when deserializing an entity.
+  class DeserializingEntityRAII {
+    ModuleFile &MF;
+
+  public:
+    DeserializingEntityRAII(ModuleFile &MF) : MF(MF) {
+      ++MF.NumCurrentDeserializingEntities;
+    }
+    ~DeserializingEntityRAII() {
+      assert(MF.NumCurrentDeserializingEntities > 0 &&
+             "Imbalanced currently-deserializing count?");
+      if (MF.NumCurrentDeserializingEntities == 1) {
+        MF.finishPendingActions();
+      }
+
+      --MF.NumCurrentDeserializingEntities;
+    }
+  };
+  friend class DeserializingEntityRAII;
+
+  /// Finish any pending actions that were waiting for the topmost entity to
+  /// be deserialized.
+  void finishPendingActions();
+
 public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {
