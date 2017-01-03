@@ -458,11 +458,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
       // Use GenericEnvironment to produce user-friendly
       // names instead of something like t_0_0.
       auto *GenericEnv = FnDecl->getGenericEnvironment();
-      auto *SM = FnDecl->getModuleContext();
       assert(GenericEnv);
       GetInterfaceType = [=](Type Ty) -> Type {
-        return GenericEnv->mapTypeOutOfContext(
-            GenericEnv->mapTypeIntoContext(SM, Ty));
+        return GenericEnv->getSugaredType(Ty);
       };
     }
     interleave(attr->getRequirements(),

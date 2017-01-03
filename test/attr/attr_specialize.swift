@@ -170,7 +170,8 @@ public func simpleGeneric<T>(t: T) -> T {
 
 
 @_specialize(exported: true, where S: _Trivial64)
-@_specialize(exported: true, where S: _Trivial32)
+// Check that any bitsize size is OK, not only powers of 8.
+// @_specialize(where S: _Trivial60)
 @_specialize(exported: true, where S: _RefCountedObject)
 @inline(never)
 public func copyValue<S>(_ t: S, s: inout S) -> Int64 where S: P{
@@ -196,5 +197,12 @@ struct OuterStruct<S> {
     public func bar<U>(u : U) {
     }
   }
+}
+
+// Check _TrivialAtMostN constraints.
+@_specialize(exported: true, where S: _TrivialAtMost64)
+@inline(never)
+public func copy2<S>(_ t: S, s: inout S) -> S where S: P{
+  return s
 }
 

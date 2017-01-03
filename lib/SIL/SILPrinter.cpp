@@ -2346,15 +2346,12 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
     assert(F);
     auto GenericEnv = F->getGenericEnvironment();
     assert(GenericEnv);
-    auto *SM = F->getModule().getSwiftModule();
     interleave(getRequirements(),
                [&](Requirement req) {
                  // Use GenericEnvironment to produce user-friendly
                  // names instead of something like t_0_0.
-                 auto FirstTy = GenericEnv->mapTypeOutOfContext(
-                     GenericEnv->mapTypeIntoContext(SM, req.getFirstType()));
-                 auto SecondTy = GenericEnv->mapTypeOutOfContext(
-                     GenericEnv->mapTypeIntoContext(SM, req.getSecondType()));
+                 auto FirstTy = GenericEnv->getSugaredType(req.getFirstType());
+                 auto SecondTy = GenericEnv->getSugaredType(req.getSecondType());
                  Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
                  ReqWithDecls.print(OS, SubPrinter);
                },

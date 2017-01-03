@@ -18,23 +18,44 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "cctype"
 
 namespace swift {
 
 LayoutConstraintInfo getLayoutConstraintInfo(StringRef ID) {
-  auto LayoutKind =
-      llvm::StringSwitch<LayoutConstraintKind>(ID)
-          .Case("_Trivial", LayoutConstraintKind::Trivial)
-          .Case("_Trivial8", LayoutConstraintKind::Trivial8)
-          .Case("_Trivial16", LayoutConstraintKind::Trivial16)
-          .Case("_Trivial32", LayoutConstraintKind::Trivial32)
-          .Case("_Trivial64", LayoutConstraintKind::Trivial64)
-          .Case("_Trivial128", LayoutConstraintKind::Trivial128)
-          .Case("_Trivial256", LayoutConstraintKind::Trivial256)
-          .Case("_Trivial512", LayoutConstraintKind::Trivial512)
-          .Case("_RefCountedObject", LayoutConstraintKind::RefCountedObject)
-          .Default(LayoutConstraintKind::UnknownLayout);
-  return LayoutConstraintInfo(LayoutKind);
+  if (ID.consume_front("_Trivial")) {
+    if (ID.empty())
+      return LayoutConstraintInfo(LayoutConstraintKind::Trivial);
+    auto kind = LayoutConstraintKind::TrivialOfExactSize;
+    if (ID.consume_front("AtMost"))
+      kind = LayoutConstraintKind::TrivialOfAtMostSize;
+    auto Suffix = ID;
+    // Try to parse the size.
+    unsigned size = 0;
+    ID = ID.drop_while([&](char c) -> bool {
+      if (!isdigit(c))
+        return false;
+      auto newSize = size;
+      newSize *= 10;
+      newSize += (c - '0');
+      if (newSize > (1 << 16))
+        return false;
+      size = newSize;
+      return true;
+    });
+    if (!ID.empty() || !isdigit(Suffix[0])) {
+      return LayoutConstraintInfo(LayoutConstraintKind::UnknownLayout);
+    }
+    return LayoutConstraintInfo(kind, size);
+  }
+
+  if (ID == "_RefCountedObject")
+    return LayoutConstraintInfo(LayoutConstraintKind::RefCountedObject);
+
+  if (ID == "_NativeRefCountedObject")
+    return LayoutConstraintInfo(LayoutConstraintKind::NativeRefCountedObject);
+
+  return LayoutConstraintInfo(LayoutConstraintKind::UnknownLayout);
 }
 
 /// Checks if a given TypeRepr is a layout constraint type.

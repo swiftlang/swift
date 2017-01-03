@@ -800,6 +800,11 @@ void ReabstractionInfo::SpecializeConcreteAndGenericSubstitutions(
             ->getAs<SILFunctionType>());
   }
 
+  if (SpecializedGenericSig && SpecializedGenericSig->areAllParamsConcrete()) {
+    SpecializedGenericSig = nullptr;
+    SpecializedGenericEnv = nullptr;
+  }
+
   SubstitutedType = SILFunctionType::get(
       SpecializedGenericSig, SpecializedSubstFnTy->getExtInfo(),
       SpecializedSubstFnTy->getCalleeConvention(),
@@ -1122,6 +1127,11 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
         SpecializedGenericSig
             ->getCanonicalTypeInContext(FnTy, *M.getSwiftModule())
             ->getAs<SILFunctionType>());
+
+  if (SpecializedGenericSig && SpecializedGenericSig->areAllParamsConcrete()) {
+    SpecializedGenericSig = nullptr;
+    SpecializedGenericEnv = nullptr;
+  }
 
   // Use the new specialized generic signature.
   auto NewFnTy = SILFunctionType::get(

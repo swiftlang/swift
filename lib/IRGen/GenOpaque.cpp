@@ -672,15 +672,6 @@ void irgen::emitDestroyCall(IRGenFunction &IGF,
   // TODO: If T is a trivial/POD type, nothing needs to be done.
   if (T.getObjectType().isTrivial(IGF.getSILModule()))
     return;
-#if 0
-  if (auto ArchetypeTy = dyn_cast<ArchetypeType>(T.getSwiftRValueType())) {
-    // Nothing to be done of it is an object of a trivial type.
-    auto LayoutInfo = ArchetypeTy->getCanonicalType().getLayoutConstraintInfo();
-    if (LayoutInfo > LayoutConstraintInfo::UnknownLayout &&
-        LayoutInfo <= LayoutConstraintInfo::Trivial)
-      return;
-  }
-#endif
   auto metadata = IGF.emitTypeMetadataRefForLayout(T);
   llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
                                    ValueWitness::Destroy);
@@ -698,17 +689,6 @@ void irgen::emitDestroyArrayCall(IRGenFunction &IGF,
   // TODO: If T is a trivial/POD type, nothing needs to be done.
   if (T.getObjectType().isTrivial(IGF.getSILModule()))
     return;
-#if 0
-  // TODO: If T is a trivial/POD type, nothing needs to be done.
-  if (auto ArchetypeTy = dyn_cast<ArchetypeType>(T.getSwiftRValueType())) {
-    // Nothing to be done of it is an object of a trivial type.
-    auto LayoutInfo = ArchetypeTy->getCanonicalType().getLayoutConstraintInfo();
-    if (LayoutInfo > LayoutConstraintInfo::UnknownLayout &&
-        LayoutInfo <= LayoutConstraintInfo::Trivial)
-      return;
-  }
-#endif
-
   auto metadata = IGF.emitTypeMetadataRefForLayout(T);
   llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
                                    ValueWitness::DestroyArray);

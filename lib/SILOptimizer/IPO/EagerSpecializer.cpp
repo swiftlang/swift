@@ -477,8 +477,9 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
                                          WordTy, Sub, { GenericMT });
   auto LayoutSize =
       Builder.createIntegerLiteral(Loc, WordTy, Layout.getTrivialSizeInBytes());
+  const char *CmpOpName = Layout.isFixedSizeTrivial() ? "cmp_eq" : "cmp_le";
   auto Cmp =
-    Builder.createBuiltinBinaryFunction(Loc, "cmp_eq", WordTy,
+    Builder.createBuiltinBinaryFunction(Loc, CmpOpName, WordTy,
                                         BoolTy,
                                         {ParamSize, LayoutSize});
 
@@ -606,7 +607,6 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
     SubstitutedType = CalleeSubstFnTy;
   }
 
-  //auto OrigArgs = GenericFunc->getArguments();
   assert(OrigArgs.size() == ReInfo.getNumArguments() && "signature mismatch");
   
   CallArgs.reserve(OrigArgs.size());

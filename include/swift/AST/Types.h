@@ -3283,8 +3283,11 @@ public:
   ParameterSILTypeArrayRef getParameterSILTypes() const {
     return ParameterSILTypeArrayRef(getParameters());
   }
-  
-  bool isPolymorphic() const { return GenericSig != nullptr; }
+
+  bool isPolymorphic() const {
+    return GenericSig != nullptr && !GenericSig->areAllParamsConcrete();
+  }
+
   CanGenericSignature getGenericSignature() const { return GenericSig; }
 
   CanType getSelfInstanceType() const;

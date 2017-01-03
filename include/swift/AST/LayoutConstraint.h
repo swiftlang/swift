@@ -25,28 +25,37 @@ class Type;
 class TypeRepr;
 
 /// Describes a layout constraint information.
-enum class LayoutConstraintKind {
+enum class LayoutConstraintKind : unsigned char {
   // It is not a known layout constraint.
   UnknownLayout,
-  Trivial8 = 1,
-  Trivial16 = 2,
-  Trivial24 = 3,
-  Trivial32 = 4,
-  Trivial64 = 8,
-  Trivial128 = 16,
-  Trivial256 = 32,
-  Trivial512 = 64,
   // It is a layout constraint representing a trivial type of an unknown size.
-  Trivial = 1024,
+  TrivialOfExactSize,
+  // It is a layout constraint representing a trivial type of an unknown size.
+  TrivialOfAtMostSize,
+  // It is a layout constraint representing a trivial type of an unknown size.
+  Trivial,
   // It is a layout constraint representing a reference counted object.
   RefCountedObject,
+  // It is a layout constraint representing a native reference counted object.
+  NativeRefCountedObject,
 };
 
 class LayoutConstraintInfo {
+  // Size of the layout in bits.
+  unsigned SizeInBits: 24;
+  // Kind of the layout.
   LayoutConstraintKind Kind;
 
 public:
-  LayoutConstraintInfo(LayoutConstraintKind Kind) : Kind(Kind) {}
+  LayoutConstraintInfo(LayoutConstraintKind Kind) : Kind(Kind) {
+    assert(!isKnownSizeTrivial() && "Size in bits should be specified");
+  }
+
+  LayoutConstraintInfo(LayoutConstraintKind Kind, unsigned Size) : Kind(Kind) {
+    assert(
+        isKnownSizeTrivial() &&
+        "Size in bits should be specified only for trivial layout constraints");
+  }
 
   LayoutConstraintKind getKind() const {
     return Kind;
@@ -57,6 +66,10 @@ public:
   }
 
   bool isFixedSizeTrivial() const {
+    return Kind == LayoutConstraintKind::TrivialOfExactSize;
+  }
+
+  bool isKnownSizeTrivial() const {
     return Kind > LayoutConstraintKind::UnknownLayout &&
            Kind < LayoutConstraintKind::Trivial;
   }
@@ -74,14 +87,28 @@ public:
     return Kind == LayoutConstraintKind::RefCountedObject;
   }
 
+  bool isNativeRefCountedObject() const {
+    return Kind == LayoutConstraintKind::NativeRefCountedObject;
+  }
+
   unsigned getTrivialSizeInBytes() {
-    assert(isFixedSizeTrivial());
-    return (unsigned)Kind;
+    assert(isKnownSizeTrivial());
+    return (SizeInBits + 7) / 8;
+  }
+
+  unsigned getMaxTrivialSizeInBytes() {
+    assert(isKnownSizeTrivial());
+    return (SizeInBits + 7) / 8;
   }
 
   unsigned getTrivialSizeInBits() {
-    assert(isFixedSizeTrivial());
-    return ((unsigned)Kind * 8);
+    assert(isKnownSizeTrivial());
+    return SizeInBits;
+  }
+
+  unsigned getMaxTrivialSizeInBits() {
+    assert(isKnownSizeTrivial());
+    return SizeInBits;
   }
 };
 

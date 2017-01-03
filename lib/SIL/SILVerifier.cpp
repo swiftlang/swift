@@ -751,8 +751,7 @@ public:
 
     // If there are substitutions, verify them and apply them to the callee.
     if (subs.empty()) {
-      require(!fnTy->isPolymorphic() ||
-                  fnTy->getGenericSignature()->areAllParamsConcrete(),
+      require(!fnTy->isPolymorphic(),
               "callee of apply without substitutions must not be polymorphic");
       return fnTy;
     }
