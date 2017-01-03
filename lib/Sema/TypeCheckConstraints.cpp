@@ -2926,9 +2926,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         llvm_unreachable("suppressing diagnostics");
 
       case CheckedCastContextKind::ForcedCast: {
+        std::string extraFromOptionalsStr(extraFromOptionals, '!');
         auto diag = diagnose(diagLoc, diag::downcast_same_type,
                              origFromType, origToType,
-                             std::string(extraFromOptionals, '!'),
+                             extraFromOptionalsStr,
                              isBridged);
         diag.highlight(diagFromRange);
         diag.highlight(diagToRange);
