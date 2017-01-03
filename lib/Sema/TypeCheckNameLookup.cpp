@@ -214,18 +214,38 @@ SmallVector<TypeDecl *, 1>
 TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
                                    SourceLoc loc,
                                    NameLookupOptions options) {
+  SmallVector<TypeDecl *, 1> decls;
+
+  // Try lookup without ProtocolMembers first.
   UnqualifiedLookup lookup(
       name, dc, this,
       options.contains(NameLookupFlags::KnownPrivate),
       loc,
       /*OnlyTypes=*/true,
-      options.contains(NameLookupFlags::ProtocolMembers),
+      /*ProtocolMembers=*/false,
       options.contains(NameLookupFlags::IgnoreAccessibility));
-
-  LookupResult result;
-  SmallVector<TypeDecl *, 1> decls;
   for (auto found : lookup.Results)
     decls.push_back(cast<TypeDecl>(found.getValueDecl()));
+
+  if (decls.empty() &&
+      options.contains(NameLookupFlags::ProtocolMembers)) {
+    // Try again, this time with protocol members.
+    //
+    // FIXME: Fix the problem where if NominalTypeDecl::getAllProtocols()
+    // is called too early, we start resolving extensions -- even those
+    // which do provide conformances.
+    UnqualifiedLookup lookup(
+        name, dc, this,
+        options.contains(NameLookupFlags::KnownPrivate),
+        loc,
+        /*OnlyTypes=*/true,
+        /*ProtocolMembers=*/true,
+        options.contains(NameLookupFlags::IgnoreAccessibility));
+
+    for (auto found : lookup.Results)
+      decls.push_back(cast<TypeDecl>(found.getValueDecl()));
+  }
+
   return decls;
 }
 
