@@ -92,21 +92,21 @@ func foo6() -> Int {
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
 // CHECK1-NEXT: <Context>swift_ide_test.(file)</Context>
-// CHECK1-NEXT: <Declared>foo1</Declared>
+// CHECK1-NEXT: <Declared>foo1</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK1-NEXT: <end>
 
 // CHECK2: <Kind>SingleDecl</Kind>
 // CHECK2-NEXT: <Content>class C { func foo() {} }</Content>
 // CHECK2-NEXT: <Context>swift_ide_test.(file)</Context>
-// CHECK2-NEXT: <Declared>C</Declared>
-// CHECK2-NEXT: <Declared>foo</Declared>
+// CHECK2-NEXT: <Declared>C</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK2-NEXT: <Declared>foo</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK2-NEXT: <end>
 
 // CHECK3: <Kind>SingleDecl</Kind>
 // CHECK3-NEXT: <Content>struct S { func foo() {} }</Content>
 // CHECK3-NEXT: <Context>swift_ide_test.(file)</Context>
-// CHECK3-NEXT: <Declared>S</Declared>
-// CHECK3-NEXT: <Declared>foo</Declared>
+// CHECK3-NEXT: <Declared>S</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK3-NEXT: <Declared>foo</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK3-NEXT: <end>
 
 // CHECK4: <Kind>MultiStatement</Kind>
@@ -141,8 +141,8 @@ func foo6() -> Int {
 // CHECK7-NEXT:   print(b + c)</Content>
 // CHECK7-NEXT: <Type>()</Type>
 // CHECK7-NEXT: <Context>swift_ide_test.(file).func decl</Context>
-// CHECK7-NEXT: <Declared>b</Declared>
-// CHECK7-NEXT: <Declared>c</Declared>
+// CHECK7-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK7-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK7-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK7-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK7-NEXT: <Referenced>c</Referenced><Type>Int</Type>
@@ -154,7 +154,7 @@ func foo6() -> Int {
 // CHECK8-NEXT:   return c + b</Content>
 // CHECK8-NEXT: <Type>Int</Type>
 // CHECK8-NEXT: <Context>swift_ide_test.(file).func decl</Context>
-// CHECK8-NEXT: <Declared>c</Declared>
+// CHECK8-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK8-NEXT: <Referenced>s</Referenced><Type>@lvalue S1</Type>
 // CHECK8-NEXT: <Referenced>b</Referenced><Type>Int</Type>
 // CHECK8-NEXT: <Referenced>c</Referenced><Type>Int</Type>
@@ -166,8 +166,8 @@ func foo6() -> Int {
 // CHECK9-NEXT:   return c + b</Content>
 // CHECK9-NEXT: <Type>Int</Type>
 // CHECK9-NEXT: <Context>swift_ide_test.(file).func decl</Context>
-// CHECK9-NEXT: <Declared>b</Declared>
-// CHECK9-NEXT: <Declared>c</Declared>
+// CHECK9-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK9-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK9-NEXT: <Referenced>s</Referenced><Type>S1</Type>
 // CHECK9-NEXT: <Referenced>b</Referenced><Type>Int</Type>
 // CHECK9-NEXT: <Referenced>c</Referenced><Type>Int</Type>
@@ -177,8 +177,8 @@ func foo6() -> Int {
 // CHECK10-NEXT: <Content>let a = c.c.getC().c.getC().getC().getC()
 // CHECK10-NEXT:   let b = a.c.c.c.c.getC().getC()</Content>
 // CHECK10-NEXT: <Context>swift_ide_test.(file).func decl</Context>
-// CHECK10-NEXT: <Declared>a</Declared>
-// CHECK10-NEXT: <Declared>b</Declared>
+// CHECK10-NEXT: <Declared>a</Declared><OutscopeReference>true</OutscopeReference>
+// CHECK10-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK10-NEXT: <Referenced>c</Referenced><Type>C1</Type>
 // CHECK10-NEXT: <Referenced>a</Referenced><Type>C1</Type>
 // CHECK10-NEXT: <end>
@@ -188,9 +188,9 @@ func foo6() -> Int {
 // CHECK11-NEXT:   let b = a.c.c.c.c.getC().getC()
 // CHECK11-NEXT:   let d = a.c.getC().getC().c.c</Content>
 // CHECK11-NEXT: <Context>swift_ide_test.(file).func decl</Context>
-// CHECK11-NEXT: <Declared>a</Declared>
-// CHECK11-NEXT: <Declared>b</Declared>
-// CHECK11-NEXT: <Declared>d</Declared>
+// CHECK11-NEXT: <Declared>a</Declared><OutscopeReference>true</OutscopeReference>
+// CHECK11-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
+// CHECK11-NEXT: <Declared>d</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK11-NEXT: <Referenced>c</Referenced><Type>C1</Type>
 // CHECK11-NEXT: <Referenced>a</Referenced><Type>C1</Type>
 // CHECK11-NEXT: <end>
@@ -202,9 +202,9 @@ func foo6() -> Int {
 // CHECK12-NEXT:   return a.take(another: b).take(another: d)</Content>
 // CHECK12-NEXT: <Type>C1</Type>
 // CHECK12-NEXT: <Context>swift_ide_test.(file).func decl</Context>
-// CHECK12-NEXT: <Declared>a</Declared>
-// CHECK12-NEXT: <Declared>b</Declared>
-// CHECK12-NEXT: <Declared>d</Declared>
+// CHECK12-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK12-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK12-NEXT: <Declared>d</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK12-NEXT: <Referenced>c</Referenced><Type>C1</Type>
 // CHECK12-NEXT: <Referenced>a</Referenced><Type>C1</Type>
 // CHECK12-NEXT: <Referenced>b</Referenced><Type>C1</Type>
@@ -219,9 +219,9 @@ func foo6() -> Int {
 // CHECK13-NEXT:     print(b + c)</Content>
 // CHECK13-NEXT: <Type>()</Type>
 // CHECK13-NEXT: <Context>swift_ide_test.(file).func decl.explicit closure discriminator=0</Context>
-// CHECK13-NEXT: <Declared>a</Declared>
-// CHECK13-NEXT: <Declared>b</Declared>
-// CHECK13-NEXT: <Declared>c</Declared>
+// CHECK13-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK13-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK13-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK13-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK13-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK13-NEXT: <Referenced>c</Referenced><Type>Int</Type>
@@ -243,12 +243,12 @@ func foo6() -> Int {
 // CHECK14-NEXT:     }()</Content>
 // CHECK14-NEXT: <Type>Int</Type>
 // CHECK14-NEXT: <Context>swift_ide_test.(file).func decl.explicit closure discriminator=0</Context>
-// CHECK14-NEXT: <Declared>a</Declared>
-// CHECK14-NEXT: <Declared>b</Declared>
-// CHECK14-NEXT: <Declared>c</Declared>
-// CHECK14-NEXT: <Declared>a</Declared>
-// CHECK14-NEXT: <Declared>b</Declared>
-// CHECK14-NEXT: <Declared>c</Declared>
+// CHECK14-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK14-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK14-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK14-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK14-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK14-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK14-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK14-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK14-NEXT: <Referenced>c</Referenced><Type>Int</Type>
@@ -264,9 +264,9 @@ func foo6() -> Int {
 // CHECK15-NEXT:       b = b.bigEndian.bigEndian.byteSwapped</Content>
 // CHECK15-NEXT: <Type>()</Type>
 // CHECK15-NEXT: <Context>swift_ide_test.(file).func decl.explicit closure discriminator=0.explicit closure discriminator=0</Context>
-// CHECK15-NEXT: <Declared>a</Declared>
-// CHECK15-NEXT: <Declared>b</Declared>
-// CHECK15-NEXT: <Declared>c</Declared>
+// CHECK15-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK15-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
+// CHECK15-NEXT: <Declared>c</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK15-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK15-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK15-NEXT: <end>
@@ -280,9 +280,9 @@ func foo6() -> Int {
 // CHECK16-NEXT:       return 1</Content>
 // CHECK16-NEXT: <Type>Int</Type>
 // CHECK16-NEXT: <Context>swift_ide_test.(file).func decl.explicit closure discriminator=0.explicit closure discriminator=0</Context>
-// CHECK16-NEXT: <Declared>a</Declared>
-// CHECK16-NEXT: <Declared>b</Declared>
-// CHECK16-NEXT: <Declared>c</Declared>
+// CHECK16-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK16-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK16-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK16-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK16-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK16-NEXT: <Referenced>c</Referenced><Type>Int</Type>

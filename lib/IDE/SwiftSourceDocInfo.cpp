@@ -212,7 +212,13 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   OS << "</Context>\n";
 
   for (auto &VD : DeclaredDecls) {
-    OS << "<Declared>" << VD.VD->getNameStr() << "</Declared>\n";
+    OS << "<Declared>" << VD.VD->getNameStr() << "</Declared>";
+    OS << "<OutscopeReference>";
+    if (VD.ReferedAfterRange)
+      OS << "true";
+    else
+      OS << "false";
+    OS << "</OutscopeReference>\n";
   }
   for (auto &RD : ReferencedDecls) {
     OS << "<Referenced>" << RD.VD->getNameStr() << "</Referenced>";
@@ -416,6 +422,39 @@ public:
     CompleteWalker(Implementation *Impl) : Impl(Impl) {}
   };
 
+  /// This walker walk the current decl context and analyze whether declared
+  /// decls in the range is referenced after it.
+  class FurtherReferenceWalker : public SourceEntityWalker {
+    Implementation *Impl;
+    bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                            TypeDecl *CtorTyRef, Type T,
+                            SemaReferenceKind Kind) override {
+      // If the reference is after the given range, continue logic.
+      if (!Impl->SM.isBeforeInBuffer(Impl->End, Range.getStart()))
+        return true;
+
+      // If the referenced decl is declared in the range, than the declared decl
+      // is referenced out of scope/range.
+      auto It = std::find(Impl->DeclaredDecls.begin(),
+                          Impl->DeclaredDecls.end(), D);
+      if (It != Impl->DeclaredDecls.end()) {
+        It->ReferedAfterRange = true;
+      }
+      return true;
+    }
+  public:
+    FurtherReferenceWalker(Implementation *Impl) : Impl(Impl) {}
+  };
+
+  void postAnalysis(ASTNode EndNode) {
+    // Visit the content of this node thoroughly, because the walker may
+    // abort early.
+    EndNode.walk(CompleteWalker(this));
+
+    // Analyze whether declared decls in the range is referenced outside of it.
+    FurtherReferenceWalker(this).walk(getImmediateContext());
+  }
+
   void analyze(ASTNode Node) {
     Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
     analyzeDecl(D);
@@ -427,9 +466,7 @@ public:
         analyze(VA->getParentPatternBinding());
       return;
     case RangeMatchKind::RangeMatch: {
-      // Visit the content of this node thoroughly, because the walker may
-      // abort early.
-      Node.walk(CompleteWalker(this));
+      postAnalysis(Node);
       Result = getSingleNodeKind(Node);
       return;
     }
@@ -442,8 +479,7 @@ public:
     }
 
     if (!DCInfo.StartMatches.empty() && !DCInfo.EndMatches.empty()) {
-      // Visit the last node since it may have interesting information.
-      DCInfo.EndMatches.back().walk(CompleteWalker(this));
+      postAnalysis(DCInfo.EndMatches.back());
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */
                 resolveNodeType(DCInfo.EndMatches.back()), Content,
