@@ -76,8 +76,7 @@ extension Set : _ObjectiveCBridgeable {
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s.count)
-    s.enumerateObjects({
-      (anyMember: Any, _) in
+    s.enumerateObjects({ (anyMember: Any, _) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
         anyMember as AnyObject, Element.self))
     })
@@ -116,8 +115,7 @@ extension Set : _ObjectiveCBridgeable {
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s!.count)
-    s!.enumerateObjects({
-      (anyMember: Any, _) in
+    s!.enumerateObjects({ (anyMember: Any, _) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
         anyMember as AnyObject, Element.self))
     })
