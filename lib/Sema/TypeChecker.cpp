@@ -773,15 +773,18 @@ static Optional<Type> getTypeOfCompletionContextExpr(
     return None;
   }
 
-  CanType originalType = parsedExpr->getType().getCanonicalTypeOrNull();
+  Type originalType = parsedExpr->getType();
   if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
                  referencedDecl, FreeTypeVariableBinding::GenericParameters))
     return T;
 
   // Try to recover if we've made any progress.
-  if (parsedExpr && !isa<ErrorExpr>(parsedExpr) && parsedExpr->getType() &&
+  if (parsedExpr &&
+      !isa<ErrorExpr>(parsedExpr) &&
+      parsedExpr->getType() &&
       !parsedExpr->getType()->hasError() &&
-      parsedExpr->getType().getCanonicalTypeOrNull() != originalType) {
+      (originalType.isNull() ||
+       !parsedExpr->getType()->isEqual(originalType))) {
     return parsedExpr->getType();
   }
 

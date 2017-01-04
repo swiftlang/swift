@@ -1119,7 +1119,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     if (NP->isImplicit()) {
       // If the whole pattern is implicit, the user didn't write it.
       // Assume the compiler knows what it's doing.
-    } else if (diagTy->getCanonicalType() == Context.TheEmptyTupleType) {
+    } else if (diagTy->isEqual(Context.TheEmptyTupleType)) {
       shouldRequireType = true;
     } else if (auto MTT = diagTy->getAs<AnyMetatypeType>()) {
       if (auto protoTy = MTT->getInstanceType()->getAs<ProtocolType>()) {
@@ -1224,8 +1224,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
   case PatternKind::Expr: {
     assert(cast<ExprPattern>(P)->isResolved()
            && "coercing unresolved expr pattern!");
-    if (type.getCanonicalTypeOrNull().getAnyNominal() ==
-        Context.getBoolDecl()) {
+    if (type->getAnyNominal() == Context.getBoolDecl()) {
       // The type is Bool.
       // Check if the pattern is a Bool literal
       auto EP = cast<ExprPattern>(P);

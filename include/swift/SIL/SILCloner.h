@@ -229,8 +229,8 @@ public:
   }
 
   // Register a re-mapping for opened existentials.
-  void registerOpenedExistentialRemapping(ArchetypeType *From, CanType To) {
-    OpenedExistentialSubs.addSubstitution(CanType(From), To);
+  void registerOpenedExistentialRemapping(ArchetypeType *From, ArchetypeType *To) {
+    OpenedExistentialSubs.addSubstitution(CanType(From), CanType(To));
   }
 
 protected:

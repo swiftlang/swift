@@ -105,6 +105,7 @@ public:
                  FunctionRefKind functionRefKind)
     : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
       TheFunctionRefKind(functionRefKind) {
+    assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
            "Badly aligned decl");
     
@@ -115,6 +116,7 @@ public:
                  FunctionRefKind functionRefKind)
     : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
       TheFunctionRefKind(functionRefKind) {
+    assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0
            && "Badly aligned decl");
     DeclOrKind = reinterpret_cast<uintptr_t>(type) | 0x01;
@@ -125,6 +127,7 @@ public:
         DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x03),
         TheFunctionRefKind(FunctionRefKind::Unapplied) {
     assert(base && "Must have a base type for overload choice");
+    assert(!base->hasTypeParameter());
     assert(kind != OverloadChoiceKind::Decl &&
            kind != OverloadChoiceKind::DeclViaDynamic &&
            kind != OverloadChoiceKind::TypeDecl &&

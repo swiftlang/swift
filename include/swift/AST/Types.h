@@ -4542,10 +4542,6 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
   return {isVariadic, autoclosure, escaping};
 }
 
-inline CanType Type::getCanonicalTypeOrNull() const {
-  return isNull() ? CanType() : getPointer()->getCanonicalType();
-}
-
 #define TYPE(id, parent)
 #define SUGARED_TYPE(id, parent) \
 template <> \

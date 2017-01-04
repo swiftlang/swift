@@ -2214,7 +2214,8 @@ struct ASTNodeBase {};
 
       // If the function has a generic interface type, it should also have a
       // generic signature.
-      if (AFD->isGenericContext() != AFD->isValidGenericContext()) {
+      if (AFD->isGenericContext() !=
+          (AFD->getGenericEnvironment() != nullptr)) {
         Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
         abort();
@@ -2338,7 +2339,7 @@ struct ASTNodeBase {};
         case AccessorKind::IsDidSet:
         case AccessorKind::IsMaterializeForSet:
           if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
-            Out << "non-addressor accessor has an addressor kind";
+            Out << "non-addressor accessor has an addressor kind\n";
             abort();
           }
           break;
@@ -2346,7 +2347,7 @@ struct ASTNodeBase {};
         case AccessorKind::IsAddressor:
         case AccessorKind::IsMutableAddressor:
           if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
-            Out << "addressor does not have an addressor kind";
+            Out << "addressor does not have an addressor kind\n";
             abort();
           }
           break;
@@ -2362,7 +2363,7 @@ struct ASTNodeBase {};
       unsigned MinParamPatterns = FD->getImplicitSelfDecl() ? 2 : 1;
       if (FD->getParameterLists().size() < MinParamPatterns) {
         Out << "should have at least " << MinParamPatterns
-            << " parameter patterns";
+            << " parameter patterns\n";
         abort();
       }
 
@@ -2371,7 +2372,7 @@ struct ASTNodeBase {};
         if (FD->getImplicitSelfDecl())
           NumExpectedParamPatterns++;
         if (FD->getParameterLists().size() != NumExpectedParamPatterns) {
-          Out << "accessors should not be curried";
+          Out << "accessors should not be curried\n";
           abort();
         }
       }
@@ -2379,7 +2380,7 @@ struct ASTNodeBase {};
       if (auto *VD = FD->getAccessorStorageDecl()) {
         if (isa<VarDecl>(VD)
             && cast<VarDecl>(VD)->isStatic() != FD->isStatic()) {
-          Out << "getter or setter static-ness must match static-ness of var";
+          Out << "getter or setter static-ness must match static-ness of var\n";
           abort();
         }
       }
@@ -2399,13 +2400,13 @@ struct ASTNodeBase {};
         }
         if (NumDestructors != 1) {
           Out << "every class should have exactly one destructor, "
-                 "explicitly provided or created by the type checker";
+                 "explicitly provided or created by the type checker\n";
           abort();
         }
       }
       
       if (!CD->hasDestructor()) {
-        Out << "every class's 'has destructor' bit must be set";
+        Out << "every class's 'has destructor' bit must be set\n";
         abort();
       }
 
@@ -2418,7 +2419,7 @@ struct ASTNodeBase {};
       auto *DC = ATD->getDeclContext();
       if (!isa<NominalTypeDecl>(DC) ||
           !isa<ProtocolDecl>(cast<NominalTypeDecl>(DC))) {
-        Out << "AssociatedTypeDecl should only occur inside a protocol";
+        Out << "AssociatedTypeDecl should only occur inside a protocol\n";
         abort();
       }
       verifyParsedBase(ATD);

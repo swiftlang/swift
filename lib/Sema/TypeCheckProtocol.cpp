@@ -2105,33 +2105,26 @@ diagnoseMatch(Module *module, NormalProtocolConformance *conformance,
 /// type.
 static Substitution getArchetypeSubstitution(TypeChecker &tc,
                                              DeclContext *dc,
-                                             ArchetypeType *archetype,
+                                             ArrayRef<ProtocolDecl *> protocols,
                                              Type replacement) {
-  Type resultReplacement = replacement;
-  assert(!resultReplacement->isTypeParameter() && "Can't be dependent");
+  assert(!replacement->isTypeParameter() && "Can't be dependent");
   SmallVector<ProtocolConformanceRef, 4> conformances;
 
-  bool isError =
-    replacement->hasError() || replacement->getCanonicalType()->hasError();
-  assert((archetype != nullptr || isError) &&
-         "Should have built archetypes already");
+  bool isError = replacement->hasError();
 
-  // FIXME: Turn the nullptr check into an assertion
-  if (archetype != nullptr) {
-    for (auto proto : archetype->getConformsTo()) {
-      auto conformance = tc.conformsToProtocol(replacement, proto, dc, None);
-      assert((conformance || isError) &&
-             "Conformance should already have been verified");
-      (void)isError;
-      if (conformance)
-        conformances.push_back(*conformance);
-      else
-        conformances.push_back(ProtocolConformanceRef(proto));
-    }
+  for (auto proto : protocols) {
+    auto conformance = tc.conformsToProtocol(replacement, proto, dc, None);
+    assert((conformance || isError) &&
+           "Conformance should already have been verified");
+    (void)isError;
+    if (conformance)
+      conformances.push_back(*conformance);
+    else
+      conformances.push_back(ProtocolConformanceRef(proto));
   }
 
   return Substitution{
-    resultReplacement,
+    replacement,
     tc.Context.AllocateCopy(conformances),
   };
 }
@@ -2298,14 +2291,11 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 
   // Record the type witness.
-  auto *archetype = Conformance->getProtocol()->mapTypeIntoContext(
-      assocType->getDeclaredInterfaceType())
-          ->getAs<ArchetypeType>();
-  if (archetype)
-    Conformance->setTypeWitness(
-        assocType,
-        getArchetypeSubstitution(TC, DC, archetype, type),
-        typeDecl);
+  auto protocols = assocType->getConformingProtocols();
+  Conformance->setTypeWitness(
+      assocType,
+      getArchetypeSubstitution(TC, DC, protocols, type),
+      typeDecl);
 }
 
 /// Generates a note for a protocol requirement for which no witness was found

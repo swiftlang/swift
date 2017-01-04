@@ -232,7 +232,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   }
 
   // Generate a getter from the global init function without side-effects.
-  auto refType = varDecl->getType().getCanonicalTypeOrNull();
+  auto refType = varDecl->getInterfaceType()->getCanonicalType();
   // Function takes no arguments and returns refType
   SILResultInfo Results[] = { SILResultInfo(refType, ResultConvention::Owned) };
   SILFunctionType::ExtInfo EInfo;
@@ -485,7 +485,7 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   if (auto *F = InitF->getModule().lookUpFunction(getterName))
     return F;
 
-  auto refType = varDecl->getType().getCanonicalTypeOrNull();
+  auto refType = varDecl->getInterfaceType()->getCanonicalType();
   // Function takes no arguments and returns refType
   SILResultInfo Results[] = { SILResultInfo(refType, ResultConvention::Owned) };
   SILFunctionType::ExtInfo EInfo;
