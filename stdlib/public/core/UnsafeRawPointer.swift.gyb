@@ -675,6 +675,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///     memory region referenced by `source` must not overlap the
   ///     destination region.
   /// - Returns: A typed pointer to the memory referenced by this raw pointer.
+  // This is fundamentally unsafe since collections can underreport their count.
+  @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableRawBufferPointer.initialize(from:)' instead")
   @discardableResult
   public func initializeMemory<C : Collection>(
     as type: C.Iterator.Element.Type, from source: C
