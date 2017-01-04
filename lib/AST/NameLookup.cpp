@@ -1316,17 +1316,6 @@ bool DeclContext::lookupQualified(Type type,
     }
   };
 
-  // Look through lvalue and inout types.
-  type = type->getLValueOrInOutObjectType();
-
-  // Look through metatypes.
-  if (auto metaTy = type->getAs<AnyMetatypeType>())
-    type = metaTy->getInstanceType();
-
-  // Look through DynamicSelf.
-  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
-    type = dynamicSelf->getSelfType();
-
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {
     Module *module = moduleTy->getModule();
@@ -1438,6 +1427,8 @@ bool DeclContext::lookupQualified(Type type,
         }
       }
     }
+  } else {
+    llvm_unreachable("Bad type for qualified lookup");
   }
 
   // Allow filtering of the visible declarations based on various

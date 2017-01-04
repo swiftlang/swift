@@ -5852,7 +5852,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   auto toObjType = toType->getLValueOrInOutObjectType();
 
   // Conversion to/from UnresolvedType (looking through @lvalue or inout).
-  if (fromObjType->is<UnresolvedType>() || toObjType->is<UnresolvedType>())
+  if (fromObjType->hasUnresolvedType() || toObjType->hasUnresolvedType())
     return cs.cacheType(new (tc.Context)
                             UnresolvedTypeConversionExpr(expr, toType));
 

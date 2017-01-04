@@ -2048,17 +2048,17 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // types of existentials.
       //
       // We will diagnose it later.
-      if (!sequenceType->isExistentialType()) {
+      if (!sequenceType->isExistentialType() &&
+          (sequenceType->mayHaveMembers() ||
+           sequenceType->isTypeVariableOrMember())) {
         ASTContext &ctx = tc.Context;
         auto iteratorAssocType =
           cast<AssociatedTypeDecl>(
             sequenceProto->lookupDirect(ctx.Id_Iterator).front());
 
-        iteratorType = sequenceType->getTypeOfMember(
-                         cs.DC->getParentModule(),
-                         iteratorAssocType,
-                         &tc,
-                         iteratorAssocType->getDeclaredInterfaceType());
+        iteratorType = iteratorAssocType->getDeclaredInterfaceType()
+            .subst(cs.DC->getParentModule(),
+                   sequenceType->getContextSubstitutions(sequenceProto));
 
         if (iteratorType) {
           auto iteratorProto =

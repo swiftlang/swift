@@ -224,7 +224,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     // the extension to the interface types of the base type's
     // declaration.
     TypeSubstitutionMap subMap;
-    if (!BaseType->isAnyExistentialType())
+    if (!BaseType->isExistentialType())
       subMap = BaseType->getContextSubstitutions(Ext);
     auto *M = DC->getParentModule();
 
@@ -453,7 +453,9 @@ void PrintOptions::clearSynthesizedExtension() {
 }
 
 TypeTransformContext::TypeTransformContext(Type T)
-    : BaseType(T.getPointer()) {}
+    : BaseType(T.getPointer()) {
+  assert(T->mayHaveMembers());
+}
 
 TypeTransformContext::TypeTransformContext(NominalTypeDecl *NTD)
     : BaseType(NTD->getDeclaredTypeInContext().getPointer()), Nominal(NTD) {}
@@ -984,8 +986,9 @@ public:
     Type OldType = CurrentType;
     if (CurrentType && (Old != nullptr || Options.PrintAsMember)) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        CurrentType = CurrentType->getTypeOfMember(
-            Options.CurrentModule, NTD, nullptr);
+        CurrentType = NTD->getDeclaredInterfaceType().subst(
+            Options.CurrentModule,
+            CurrentType->getContextSubstitutions(NTD->getDeclContext()));
       }
     }
 
@@ -1259,7 +1262,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
   ModuleDecl *M = nullptr;
 
   if (CurrentType) {
-    if (!CurrentType->isAnyExistentialType()) {
+    if (!CurrentType->isExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
       subMap = CurrentType->getContextSubstitutions(DC);
       M = DC->getParentModule();

@@ -152,3 +152,9 @@ struct S4<Q>: P4 {
 }
 
 extension S4 where T : P5 {}
+
+struct S5<Q> {
+  init(_: Q) { }
+}
+
+extension S5 : P4 {}

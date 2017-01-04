@@ -154,9 +154,9 @@ struct T5 : P5 {
   var v2: P5.T2 // expected-error {{typealias 'T2' can only be used with a concrete type or generic parameter base}}
   var v3: P5.X // expected-error {{typealias 'X' can only be used with a concrete type or generic parameter base}}
 
-  // FIXME: Unqualified reference to typealias from a protocol conformance
-  var v4: T1 // expected-error {{use of undeclared type 'T1'}}
-  var v5: T2 // expected-error {{use of undeclared type 'T2'}}
+  // Unqualified reference to typealias from a protocol conformance
+  var v4: T1 // OK
+  var v5: T2 // OK
 
   // Qualified reference
   var v6: T5.T1 // OK
@@ -178,8 +178,7 @@ extension P7 {
 struct S7 : P7 {
   typealias A = Int
 
-  // FIXME
-  func inTypeContext(y: Y) // expected-error {{use of undeclared type 'Y'}}
+  func inTypeContext(y: Y) { }
 
   func inExpressionContext() {
     _ = Y.self

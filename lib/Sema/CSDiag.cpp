@@ -1219,6 +1219,9 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     }
   };
 
+  if (paramType->hasError())
+    return false;
+
   GenericVisitor visitor(dc, archetypesMap);
   return visitor.match(paramType, actualArgType);
 }
@@ -1474,6 +1477,38 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   return { closeness, {}};
 }
 
+/// Rewrite any type parameters in the specified type with UnresolvedType.
+static Type replaceTypeParametersWithUnresolved(Type ty) {
+  if (!ty) return ty;
+
+  if (!ty->hasTypeParameter() && !ty->hasArchetype()) return ty;
+
+  auto &ctx = ty->getASTContext();
+
+  return ty.transform([&](Type type) -> Type {
+    if (type->is<ArchetypeType>() ||
+        type->isTypeParameter())
+      return ctx.TheUnresolvedType;
+    return type;
+  });
+}
+
+/// Rewrite any type variables & archetypes in the specified type with
+/// UnresolvedType.
+static Type replaceTypeVariablesWithUnresolved(Type ty) {
+  if (!ty) return ty;
+
+  if (!ty->hasTypeVariable()) return ty;
+
+ auto &ctx = ty->getASTContext();
+
+  return ty.transform([&](Type type) -> Type {
+    if (type->isTypeVariableOrMember())
+      return ctx.TheUnresolvedType;
+    return type;
+  });
+}
+
 void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn, 
                                                   bool implicitDotSyntax) {
   fn = fn->getValueProvidingExpr();
@@ -1552,23 +1587,28 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     collectCalleeCandidates(AE->getFn(),
                             /*implicitDotSyntax=*/AE->getMemberOperatorRef());
 
-    // If this is a DotSyntaxCallExpr, then the callee is a method, and the
-    // argument list of this apply is the base being applied to the method.
-    // If we have a type for that, capture it so that we can calculate a
-    // substituted type, which resolves many generic arguments.
-    Type baseType;
-    if (isa<SelfApplyExpr>(AE) &&
-        !isUnresolvedOrTypeVarType(AE->getArg()->getType()))
-      baseType = AE->getArg()->getType()->getLValueOrInOutObjectType();
-
     // If we found a candidate list with a recursive walk, try adjust the curry
     // level for the applied subexpression in this call.
     if (!candidates.empty()) {
+      // If this is a DotSyntaxCallExpr, then the callee is a method, and the
+      // argument list of this apply is the base being applied to the method.
+      // If we have a type for that, capture it so that we can calculate a
+      // substituted type, which resolves many generic arguments.
+      Type baseType;
+      if (isa<SelfApplyExpr>(AE) &&
+          !isUnresolvedOrTypeVarType(AE->getArg()->getType()))
+        baseType = AE->getArg()->getType()->getLValueOrInOutObjectType();
+
       for (auto &C : candidates) {
         C.level += 1;
 
+        baseType = replaceTypeVariablesWithUnresolved(baseType);
+
         // Compute a new substituted type if we have a base type to apply.
         if (baseType && C.level == 1 && C.getDecl()) {
+          baseType = baseType
+              ->getLValueOrInOutObjectType()
+              ->getRValueInstanceType();
           C.entityType = baseType->getTypeOfMember(CS->DC->getParentModule(),
                                                    C.getDecl(), nullptr);
           C.substituted = true;
@@ -1755,22 +1795,19 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     // it to get a simpler and more concrete type.
     //
     if (baseType) {
-      auto substType = baseType;
+      auto substType = replaceTypeVariablesWithUnresolved(baseType);
+      if (substType)
+        substType = substType
+            ->getLValueOrInOutObjectType()
+            ->getRValueInstanceType();
+
       // If this is a DeclViaUnwrappingOptional, then we're actually looking
       // through an optional to get the member, and baseType is an Optional or
       // Metatype<Optional>.
       if (cand.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) {
-        bool isMeta = false;
-        if (auto MTT = substType->getAs<MetatypeType>()) {
-          isMeta = true;
-          substType = MTT->getInstanceType();
-        }
-
         // Look through optional or IUO to get the underlying type the decl was
         // found in.
         substType = substType->getAnyOptionalObjectType();
-        if (isMeta && substType)
-          substType = MetatypeType::get(substType);
       } else if (cand.getKind() != OverloadChoiceKind::Decl) {
         // Otherwise, if it is a remapping we can't handle, don't try to compute
         // a substitution.
@@ -2292,8 +2329,8 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   anchor = typeCheckArbitrarySubExprIndependently(anchor, TCC_AllowLValue);
   if (!anchor) return true;
   
-  auto baseTy = anchor->getType();
-  auto baseObjTy = baseTy->getRValueType();
+  auto baseTy = anchor->getType()->getLValueOrInOutObjectType();
+  auto baseObjTy = baseTy;
 
   // If the base type is an IUO, look through it.  Odds are, the code is not
   // trying to find a member of it.
@@ -3067,7 +3104,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // contain a member var 'boolValue', now does not convert to Bool. This block
   // tries to add a specific diagnosis/fixit to explicitly invoke 'boolValue'.
   if (toType->isBool() &&
-      fromType->mayHaveMemberTypes()) {
+      fromType->mayHaveMembers()) {
     auto LookupResult = CS->TC.lookupMember(CS->DC, fromType,
       DeclName(CS->TC.Context.getIdentifier("boolValue")));
     if (!LookupResult.empty()) {
@@ -3366,22 +3403,6 @@ static void eraseOpenedExistentials(Expr *&expr) {
   expr = expr->walk(ExistentialEraser());
 }
 
-/// Rewrite any type variables & archetypes in the specified type with
-/// UnresolvedType.
-static Type replaceArchetypesAndTypeVarsWithUnresolved(Type ty) {
-  if (!ty) return ty;
-
- auto &ctx = ty->getASTContext();
-
-  return ty.transform([&](Type type) -> Type {
-    if (type->isTypeVariableOrMember() ||
-        type->is<ArchetypeType>() ||
-        type->isTypeParameter())
-      return ctx.TheUnresolvedType;
-    return type;
-  });
-}
-
 /// Unless we've already done this, retypecheck the specified subexpression on
 /// its own, without including any contextual constraints or parent expr
 /// nodes.  This is more likely to succeed than type checking the original
@@ -3414,9 +3435,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
         convertType = FT->getResult();
 
     // Replace archetypes and type parameters with UnresolvedType.
-    if (convertType->hasTypeVariable() || convertType->hasArchetype() ||
-        convertType->hasTypeParameter())
-      convertType = replaceArchetypesAndTypeVarsWithUnresolved(convertType);
+    convertType = replaceTypeParametersWithUnresolved(convertType);
+    convertType = replaceTypeVariablesWithUnresolved(convertType);
     
     // If the conversion type contains no info, drop it.
     if (convertType->is<UnresolvedType>() ||

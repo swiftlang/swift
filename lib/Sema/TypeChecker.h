@@ -246,11 +246,9 @@ enum class NameLookupFlags {
   /// Whether to perform 'dynamic' name lookup that finds @objc
   /// members of any class or protocol.
   DynamicLookup = 0x08,
-  /// Whether we're only looking for types.
-  OnlyTypes = 0x10,
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
-  IgnoreAccessibility = 0x20,
+  IgnoreAccessibility = 0x10,
 };
 
 /// A set of options that control name lookup.

@@ -2644,9 +2644,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     return result;
   }
 
-  if (instanceTy->isTypeParameter())
-    return MemberLookupResult();
-
   // Okay, start building up the result list.
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
@@ -2676,7 +2673,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     result.ViableCandidates.push_back(OverloadChoice(baseTy, fieldIdx));
     return result;
   }
-  
+
+  if (auto *selfTy = instanceTy->getAs<DynamicSelfType>())
+    instanceTy = selfTy->getSelfType();
+
+  if (!instanceTy->mayHaveMembers())
+    return result;
 
   // If we have a simple name, determine whether there are argument
   // labels we can use to restrict the set of lookup results.
@@ -2741,7 +2743,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // extensions cannot yet define designated initializers.
     lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
-    LookupResult ctors = TC.lookupConstructors(DC, baseObjTy, lookupOptions);
+    LookupResult ctors = TC.lookupConstructors(DC, instanceTy, lookupOptions);
     if (!ctors)
       return result;    // No result.
     
@@ -2831,7 +2833,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   }
 
   // Look for members within the base.
-  LookupResult &lookup = lookupMember(baseObjTy, memberName);
+  LookupResult &lookup = lookupMember(instanceTy, memberName);
 
   // The set of directly accessible types, which is only used when
   // we're performing dynamic lookup into an existential type.
@@ -3017,10 +3019,11 @@ retry_after_fail:
   if (result.ViableCandidates.empty() && isMetatype &&
       constraintKind == ConstraintKind::UnresolvedValueMember) {
     if (auto objectType = instanceTy->getAnyOptionalObjectType()) {
-      LookupResult &optionalLookup = lookupMember(MetatypeType::get(objectType),
-                                                  memberName);
-      for (auto result : optionalLookup)
-        addChoice(result, /*bridged*/false, /*isUnwrappedOptional=*/true);
+      if (objectType->mayHaveMembers()) {
+        LookupResult &optionalLookup = lookupMember(objectType, memberName);
+        for (auto result : optionalLookup)
+          addChoice(result, /*bridged*/false, /*isUnwrappedOptional=*/true);
+      }
     }
   }
 
@@ -3045,7 +3048,7 @@ retry_after_fail:
     // This is only used for diagnostics, so always use KnownPrivate.
     lookupOptions |= NameLookupFlags::KnownPrivate;
     
-    auto lookup = TC.lookupMember(DC, baseObjTy->getCanonicalType(),
+    auto lookup = TC.lookupMember(DC, instanceTy,
                                   memberName, lookupOptions);
     for (auto cand : lookup) {
       // If the result is invalid, skip it.
