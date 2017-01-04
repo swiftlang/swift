@@ -89,7 +89,7 @@ let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F
 
 // TODO QoI: Cannot infer T1/T2.
-let _ : F = { a in a }  // expected-error {{cannot convert value of type '(_) -> _' to specified type 'F'}}
+let _ : F = { a in a }  // expected-error {{type of expression is ambiguous without more context}}
 
 _ = MyType(a: "foo", b: 42)
 _ = A(a: "foo", b: 42)

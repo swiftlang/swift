@@ -1984,10 +1984,12 @@ public:
   /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
   /// resolved) and returns null when the subexpression fails to typecheck.
   ///
-  Expr *typeCheckChildIndependently(Expr *subExpr, Type convertType = Type(),
-                          ContextualTypePurpose convertTypePurpose = CTP_Unused,
-                                    TCCOptions options = TCCOptions(),
-                                    ExprTypeCheckListener *listener = nullptr);
+  Expr *typeCheckChildIndependently(
+      Expr *subExpr, Type convertType = Type(),
+      ContextualTypePurpose convertTypePurpose = CTP_Unused,
+      TCCOptions options = TCCOptions(),
+      ExprTypeCheckListener *listener = nullptr,
+      bool allowFreeTypeVariables = true);
   Expr *typeCheckChildIndependently(Expr *subExpr, TCCOptions options) {
     return typeCheckChildIndependently(subExpr, Type(), CTP_Unused, options);
   }
@@ -3382,12 +3384,11 @@ static Type replaceArchetypesAndTypeVarsWithUnresolved(Type ty) {
 ///
 /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
 /// resolved) and returns null when the subexpression fails to typecheck.
-Expr *FailureDiagnosis::
-typeCheckChildIndependently(Expr *subExpr, Type convertType,
-                            ContextualTypePurpose convertTypePurpose,
-                            TCCOptions options,
-                            ExprTypeCheckListener *listener) {
-  
+Expr *FailureDiagnosis::typeCheckChildIndependently(
+    Expr *subExpr, Type convertType, ContextualTypePurpose convertTypePurpose,
+    TCCOptions options, ExprTypeCheckListener *listener,
+    bool allowFreeTypeVariables) {
+
   // If this sub-expression is currently being diagnosed, refuse to recheck the
   // expression (which may lead to infinite recursion).  If the client is
   // telling us that it knows what it is doing, then believe it.
@@ -3458,7 +3459,8 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // If there is no contextual type available, tell typeCheckExpression that it
   // is ok to produce an ambiguous result, it can just fill in holes with
   // UnresolvedType and we'll deal with it.
-  if (!convertType || options.contains(TCC_AllowUnresolvedTypeVariables))
+  if ((!convertType || options.contains(TCC_AllowUnresolvedTypeVariables)) &&
+      allowFreeTypeVariables)
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
   
   // If we're not passing down contextual type information this time, but the
@@ -6337,9 +6339,15 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     llvm::SaveAndRestore<DeclContext*> SavedDC(CS->DC, CE);
     
     auto CTP = expectedResultType ? CTP_ClosureResult : CTP_Unused;
-    
+
+    // Explicitly disallow to produce solutions with unresolved type variables,
+    // because there is no auxiliary logic which would handle that and it's
+    // better to allow failure diagnosis to run directly on the closure body.
+    // Note that presence of contextual type implicitly forbids such solutions,
+    // but it's not always reset.
     if (!typeCheckChildIndependently(CE->getSingleExpressionBody(),
-                                     expectedResultType, CTP))
+                                     expectedResultType, CTP, TCCOptions(),
+                                     nullptr, false))
       return true;
   }
   
