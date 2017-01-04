@@ -369,33 +369,37 @@ getSubstitutionMap(ModuleDecl *mod,
     if (reqt.getKind() != RequirementKind::SameType)
       continue;
 
-    auto first = reqt.getFirstType()->getAs<DependentMemberType>();
-    auto second = reqt.getSecondType()->getAs<DependentMemberType>();
-
-    if (!first || !second)
-      continue;
+    auto first = reqt.getFirstType();
+    auto second = reqt.getSecondType();
 
     auto archetype = mapTypeIntoContext(mod, first)->getAs<ArchetypeType>();
     if (!archetype)
       continue;
 
-    auto firstBase = first->getBase();
-    auto secondBase = second->getBase();
+#ifndef NDEBUG
+    auto secondArchetype = mapTypeIntoContext(mod, second)->getAs<ArchetypeType>();
+    assert(secondArchetype == archetype);
+#endif
 
-    auto firstBaseArchetype = mapTypeIntoContext(mod, firstBase)->getAs<ArchetypeType>();
-    auto secondBaseArchetype = mapTypeIntoContext(mod, secondBase)->getAs<ArchetypeType>();
+    if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
+      auto parent = mapTypeIntoContext(mod, firstMemTy->getBase())
+          ->getAs<ArchetypeType>();
+      if (parent && archetype->getParent() != parent) {
+        result.addParent(CanType(archetype),
+                         CanType(parent),
+                         firstMemTy->getAssocType());
+      }
+    }
 
-    if (!firstBaseArchetype || !secondBaseArchetype)
-      continue;
-
-    if (archetype->getParent() != firstBaseArchetype)
-      result.addParent(CanType(archetype),
-                       CanType(firstBaseArchetype),
-                       first->getAssocType());
-    if (archetype->getParent() != secondBaseArchetype)
-      result.addParent(CanType(archetype),
-                       CanType(secondBaseArchetype),
-                       second->getAssocType());
+    if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
+      auto parent = mapTypeIntoContext(mod, secondMemTy->getBase())
+          ->getAs<ArchetypeType>();
+      if (parent && archetype->getParent() != parent) {
+        result.addParent(CanType(archetype),
+                         CanType(parent),
+                         secondMemTy->getAssocType());
+      }
+    }
   }
 
   assert(subs.empty() && "did not use all substitutions?!");

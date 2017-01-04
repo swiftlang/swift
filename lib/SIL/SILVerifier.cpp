@@ -1935,18 +1935,21 @@ public:
     require(methodType->isPolymorphic(),
             "result of witness_method must be polymorphic");
 
-    auto selfGenericParam
-      = methodType->getGenericSignature()->getGenericParams()[0];
+    auto genericSig = methodType->getGenericSignature();
+
+    auto selfGenericParam = genericSig->getGenericParams()[0];
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
-    auto selfRequirement
-      = methodType->getGenericSignature()->getRequirements()[0];
-    require(selfRequirement.getKind() == RequirementKind::Conformance
-            && selfRequirement.getFirstType()->isEqual(selfGenericParam)
-            && selfRequirement.getSecondType()->getAs<ProtocolType>()
-              ->getDecl() == protocol,
-            "method's Self parameter should be constrained by protocol");
+    auto selfRequirement = genericSig->getRequirements()[0];
+    require(selfRequirement.getKind() == RequirementKind::Conformance,
+            "first requirement should be conformance requirement");
+    auto conformsTo = genericSig->getConformsTo(selfGenericParam,
+                                                *F.getModule().getSwiftModule());
+    require(conformsTo.size() == 1,
+            "requirement Self parameter must conform to exactly one protocol");
+    require(conformsTo[0] == protocol,
+            "requirement Self parameter should be constrained by protocol");
 
     auto lookupType = AMI->getLookupType();
     if (getOpenedArchetypeOf(lookupType)) {
