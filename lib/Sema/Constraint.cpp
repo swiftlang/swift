@@ -347,8 +347,6 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[tuple-to-tuple]";
   case ConversionRestrictionKind::ScalarToTuple:
     return "[scalar-to-tuple]";
-  case ConversionRestrictionKind::TupleToScalar:
-    return "[tuple-to-scalar]";
   case ConversionRestrictionKind::DeepEquality:
     return "[deep equality]";
   case ConversionRestrictionKind::Superclass:

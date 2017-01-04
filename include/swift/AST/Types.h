@@ -64,6 +64,7 @@ namespace swift {
   class TypeVariableType;
   class ValueDecl;
   class ModuleDecl;
+  class ModuleType;
   class ProtocolConformance;
   struct SILArgumentConvention;
   enum OptionalTypeKind : unsigned;
@@ -646,6 +647,15 @@ public:
   /// classes, bound generic classes, and archetypes that are only instantiable
   /// with a class type.
   bool mayHaveSuperclass();
+
+  /// \brief Determine whether this type may have nested types, which holds for
+  /// nominal types, existentials and archetypes.
+  bool mayHaveMemberTypes() {
+    return (is<ArchetypeType>() ||
+            is<ModuleType>() ||
+            isExistentialType() ||
+            getAnyNominal());
+  }
 
   /// \brief Retrieve the superclass of this type.
   ///

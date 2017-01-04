@@ -907,20 +907,6 @@ ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
                     locator.withPathElement(ConstraintLocator::ScalarToTuple));
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::matchTupleToScalarTypes(TupleType *tuple1, Type type2,
-                                          ConstraintKind kind, TypeMatchOptions flags,
-                                          ConstraintLocatorBuilder locator) {
-  assert(tuple1->getNumElements() == 1 && "Wrong number of elements");
-  assert(!tuple1->getElement(0).isVararg() && "Should not be variadic");
-
-  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
-  return matchTypes(tuple1->getElementType(0),
-                    type2, kind, subflags,
-                    locator.withPathElement(
-                      LocatorPathElt::getTupleElement(0)));
-}
-
 // Returns 'false' (i.e. no error) if it is legal to match functions with the
 // corresponding function type representations and the given match kind.
 static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
@@ -1686,15 +1672,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
         // FIXME: Prohibits some user-defined conversions for tuples.
         goto commit_to_conversions;
-      }
-    }
-
-    if (tuple1 && !tuplesWithMismatchedNames) {
-      // A single-element tuple can be a trivial subtype of a scalar.
-      if (tuple1->getNumElements() == 1 &&
-          !tuple1->getElement(0).isVararg()) {
-        conversionsOrFixes.push_back(
-          ConversionRestrictionKind::TupleToScalar);
       }
     }
 
@@ -3721,12 +3698,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //   T <c U ===> T <c (U)
   case ConversionRestrictionKind::ScalarToTuple:
     return matchScalarToTupleTypes(type1, type2->castTo<TupleType>(),
-                                   matchKind, subflags, locator);
-
-  // for $< in { <, <c, <oc }:
-  //   T $< U ===> (T) $< U
-  case ConversionRestrictionKind::TupleToScalar:
-    return matchTupleToScalarTypes(type1->castTo<TupleType>(), type2,
                                    matchKind, subflags, locator);
 
   case ConversionRestrictionKind::DeepEquality:

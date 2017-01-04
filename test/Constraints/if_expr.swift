@@ -56,3 +56,5 @@ var y = 22 ? 1 : 0 // expected-error{{'Int' is not convertible to 'Bool'}}
 _ = x ? x : x // expected-error {{'Int' is not convertible to 'Bool'}}
 _ = true ? x : 1.2 // expected-error {{result values in '? :' expression have mismatching types 'Int' and 'Double'}}
 
+_ = (x: true) ? true : false // expected-error {{'(x: Bool)' is not convertible to 'Bool'}}
+_ = (x: 1) ? true : false // expected-error {{'(x: Int)' is not convertible to 'Bool'}}

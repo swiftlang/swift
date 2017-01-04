@@ -5409,36 +5409,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  toTuple->getElementForScalarInit(), locator);
     }
 
-    case ConversionRestrictionKind::TupleToScalar: {
-      // If this was a single-element tuple expression, reach into that
-      // subexpression.
-      // FIXME: This is a hack to deal with @lvalue-ness issues. It loses
-      // source information.
-      if (auto fromTupleExpr = dyn_cast<TupleExpr>(expr)) {
-        if (fromTupleExpr->getNumElements() == 1) {
-          return coerceToType(fromTupleExpr->getElement(0), toType,
-                              locator.withPathElement(
-                                LocatorPathElt::getTupleElement(0)));
-        }
-      }
-
-      // Extract the element.
-      auto fromTuple = fromType->castTo<TupleType>();
-      expr =
-        cs.cacheType(
-            new (cs.getASTContext()) TupleElementExpr(expr,
-                                                      expr->getLoc(),
-                                                      0,
-                                                      expr->getLoc(),
-                                                 fromTuple->getElementType(0)));
-      expr->setImplicit(true);
-
-      // Coerce the element to the expected type.
-      return coerceToType(expr, toType,
-                          locator.withPathElement(
-                            LocatorPathElt::getTupleElement(0)));
-    }
-
     case ConversionRestrictionKind::DeepEquality:
       llvm_unreachable("Equality handled above");
 
