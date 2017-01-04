@@ -792,6 +792,9 @@ Globals
   global ::= type 'WV'                   // value witness table
   global ::= entity 'Wv' DIRECTNESS      // field offset
 
+  global ::= type 'Wy' // Outlined Copy Function Type
+  global ::= type 'We' // Outlined Consume Function Type
+
   DIRECTNESS ::= 'd'                         // direct
   DIRECTNESS ::= 'i'                         // indirect
 

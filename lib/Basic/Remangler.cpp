@@ -1626,6 +1626,16 @@ void Remangler::mangleVariadicMarker(Node *node) {
   Buffer << 'd';
 }
 
+void Remangler::mangleOutlinedCopy(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wy";
+}
+
+void Remangler::mangleOutlinedConsume(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "We";
+}
+
 void Remangler::mangleSILBoxTypeWithLayout(Node *node) {
   assert(node->getNumChildren() == 1 || node->getNumChildren() == 3);
   assert(node->getChild(0)->getKind() == Node::Kind::SILBoxLayout);
