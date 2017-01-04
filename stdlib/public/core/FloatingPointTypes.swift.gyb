@@ -26,7 +26,7 @@ allIntBits = [8, 16, 32, 64, 'Int']
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 # Number of bits in integer literals.
-builtinIntLiteralBits = 2048
+builtinIntLiteralBits = 64
 
 def allInts():
     for bits in allIntBits:

@@ -488,12 +488,21 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
     //     sext_IntFrom(Result) == Val ? Result : overflow_error
     //   For signed destination:
     //     zext_IntFrom(Result) == Val ? Result : overflow_error
-    Result = SrcVal.trunc(DstBitWidth);
-    // Get the signedness of the destination.
-    bool Signed = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc);
-    APInt Ext = Signed ? Result.sext(SrcBitWidth) : Result.zext(SrcBitWidth);
-    OverflowError = (SrcVal != Ext);
-
+    if (SrcBitWidth == DstBitWidth) {
+      // Trunc for the same size integers is equivalent to
+      // conversion for the same size integers.
+      Result = SrcVal;
+      // Report an error if the sign bit is set.
+      OverflowError =
+          DstTy.getCanonicalTypeOrNull() != SrcTy.getCanonicalTypeOrNull() &&
+          SrcVal.isNegative();
+    } else {
+      Result = SrcVal.trunc(DstBitWidth);
+      // Get the signedness of the destination.
+      bool Signed = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc);
+      APInt Ext = Signed ? Result.sext(SrcBitWidth) : Result.zext(SrcBitWidth);
+      OverflowError = (SrcVal != Ext);
+    }
   // Process the rest of truncations.
   } else {
     assert(Builtin.Types.size() == 2);
@@ -504,9 +513,20 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
     //   Result = trunc_IntTo(Val)
     //   Trunc  = trunc_'IntTo-1bit'(Val)
     //   zext_IntFrom(Trunc) == Val ? Result : overflow_error
-    Result = SrcVal.trunc(DstBitWidth);
-    APInt TruncVal = SrcVal.trunc(DstBitWidth - 1);
-    OverflowError = (SrcVal != TruncVal.zext(SrcBitWidth));
+ 
+    if (SrcBitWidth == DstBitWidth) {
+      // Trunc for the same size integers is equivalent to
+      // conversion for the same size integers.
+      Result = SrcVal;
+      // Report an error if the sign bit is set.
+      OverflowError =
+          DstTy.getCanonicalTypeOrNull() != SrcTy.getCanonicalTypeOrNull() &&
+          SrcVal.isNegative();
+    } else {
+      Result = SrcVal.trunc(DstBitWidth);
+      APInt TruncVal = SrcVal.trunc(DstBitWidth - 1);
+      OverflowError = (SrcVal != TruncVal.zext(SrcBitWidth));
+    }
   }
 
   // Check for overflow.
@@ -535,8 +555,8 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
         UserDstTy = CE->getType();
       }
     }
-    
- 
+
+
     // Assume that we are converting from a literal if the Source size is
     // 2048. Is there a better way to identify conversions from literals?
     bool Literal = (SrcBitWidth == 2048);
