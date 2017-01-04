@@ -365,7 +365,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Diagnose 'self.init' or 'super.init' nested in another expression.
       if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
-        if (!Parent.isNull() || !IsExprStmt) {
+        bool inDefer = false;
+        auto *innerDecl = DC->getInnermostDeclarationDeclContext();
+        if (auto *FD = dyn_cast_or_null<FuncDecl>(innerDecl)) {
+          inDefer = FD->isDeferBody();
+        }
+
+        if (!Parent.isNull() || !IsExprStmt || inDefer) {
           bool isChainToSuper;
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           TC.diagnose(E->getLoc(), diag::init_delegation_nested,
@@ -547,12 +553,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
+      auto eTy = E->getType();
       bool isExistential = false;
-      if (auto metaTy = E->getType()->getAs<MetatypeType>())
+      if (auto metaTy = eTy->getAs<MetatypeType>())
         isExistential = metaTy->getInstanceType()->isAnyExistentialType();
       if (!isExistential &&
-          !TC.lookupConstructors(const_cast<DeclContext *>(DC),
-                                 E->getType()).empty()) {
+          !eTy->is<TupleType>() &&
+          !TC.lookupConstructors(const_cast<DeclContext *>(DC), eTy).empty()) {
         TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
           .fixItInsertAfter(E->getEndLoc(), "()");
       }

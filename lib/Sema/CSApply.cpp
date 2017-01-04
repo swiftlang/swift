@@ -4595,15 +4595,16 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 
   // Handle existential coercions that implicitly look through ImplicitlyUnwrappedOptional<T>.
   if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
-    expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
+    auto unwrappedExpr
+      = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
     
-    fromType = cs.getType(expr);
-    assert(!fromType->is<AnyMetatypeType>());
+    auto unwrappedFromType = cs.getType(unwrappedExpr);
+    assert(!unwrappedFromType->is<AnyMetatypeType>());
 
     // FIXME: Hack. We shouldn't try to coerce existential when there is no
     // existential upcast to perform.
-    if (fromType->isEqual(toType))
-      return expr;
+    if (unwrappedFromType->isEqual(toType))
+      return unwrappedExpr;
   }
 
   Type fromInstanceType = fromType;
