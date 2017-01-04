@@ -25,6 +25,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/Parse/Lexer.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
@@ -33,6 +34,7 @@
 #include "clang/Basic/Module.h"
 #include "clang/Lex/Lexer.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Path.h"
@@ -283,6 +285,42 @@ private:
     auto DC = getSingleDocComment(MC, D);
     if (DC.hasValue())
       ide::getDocumentationCommentAsDoxygen(DC.getValue(), os);
+  }
+
+  /// Prints an encoded string, escaped properly for C.
+  void printEncodedString(StringRef str, bool includeQuotes = true) {
+    // NB: We don't use raw_ostream::write_escaped() because it does hex escapes
+    // for non-ASCII chars.
+
+    llvm::SmallString<128> Buf;
+    StringRef decodedStr = Lexer::getEncodedStringSegment(str, Buf);
+
+    if (includeQuotes) os << '"';
+    for (unsigned char c : decodedStr) {
+      switch (c) {
+      case '\\':
+        os << '\\' << '\\';
+        break;
+      case '\t':
+        os << '\\' << 't';
+        break;
+      case '\n':
+        os << '\\' << 'n';
+        break;
+      case '"':
+        os << '\\' << '"';
+        break;
+      default:
+        if (c < 0x20 || c == 0x7F) {
+          os << '\\' << 'x';
+          os << llvm::hexdigit((c >> 4) & 0xF);
+          os << llvm::hexdigit((c >> 0) & 0xF);
+        } else {
+          os << c;
+        }
+      }
+    }
+    if (includeQuotes) os << '"';
   }
 
   // Ignore other declarations.
@@ -569,6 +607,7 @@ private:
       ++paramIndex;
     }
 
+    bool skipAvailability = false;
     // Swift designated initializers are Objective-C designated initializers.
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
       if (ctor->hasStubImplementation()
@@ -576,6 +615,7 @@ private:
         // This will only be reached if the overridden initializer has the
         // required access
         os << " SWIFT_UNAVAILABLE";
+        skipAvailability = true;
       } else if (ctor->isDesignatedInit() &&
           !isa<ProtocolDecl>(ctor->getDeclContext())) {
         os << " OBJC_DESIGNATED_INITIALIZER";
@@ -592,6 +632,10 @@ private:
           !AFD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
         os << " SWIFT_WARN_UNUSED_RESULT";
       }
+    }
+
+    if (!skipAvailability) {
+      appendAvailabilityAttribute(AFD);
     }
 
     os << ";\n";
@@ -631,8 +675,130 @@ private:
     
     // Finish the result type.
     multiPart.finish();
+
+    appendAvailabilityAttribute(FD);
     
     os << ';';
+  }
+
+  void appendAvailabilityAttribute(const ValueDecl *VD) {
+    for (auto Attr : VD->getAttrs()) {
+      if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+        if (AvAttr->isInvalid()) continue;
+        if (AvAttr->Platform == PlatformKind::none) {
+          if (AvAttr->PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
+            // Availability for *
+            if (!AvAttr->Rename.empty()) {
+                // NB: Don't bother getting obj-c names, we can't get one for the rename
+                os << " SWIFT_UNAVAILABLE_MSG(\"'" << VD->getName() << "' has been renamed to '";
+                printEncodedString(AvAttr->Rename, false);
+                os << '\'';
+                if (!AvAttr->Message.empty()) {
+                  os << ": ";
+                  printEncodedString(AvAttr->Message, false);
+                }
+                os << "\")";
+            } else if (!AvAttr->Message.empty()) {
+              os << " SWIFT_UNAVAILABLE_MSG(";
+              printEncodedString(AvAttr->Message);
+              os << ")";
+            } else {
+                os << " SWIFT_UNAVAILABLE";
+            }
+            break;
+          }
+          if (AvAttr->isUnconditionallyDeprecated()) {
+            if (!AvAttr->Rename.empty() || !AvAttr->Message.empty()) {
+              os << " SWIFT_DEPRECATED_MSG(";
+              printEncodedString(AvAttr->Message);
+              if (!AvAttr->Rename.empty()) {
+                os << ", ";
+                printEncodedString(AvAttr->Rename);
+              }
+              os << ")";
+            } else {
+              os << " SWIFT_DEPRECATED";
+            }
+          }
+          continue;
+        }
+        // Availability for a specific platform
+        if (!AvAttr->Introduced.hasValue()
+            && !AvAttr->Deprecated.hasValue()
+            && !AvAttr->Obsoleted.hasValue()
+            && !AvAttr->isUnconditionallyDeprecated()
+            && !AvAttr->isUnconditionallyUnavailable()) {
+          continue;
+        }
+        const char *plat = NULL;
+        switch (AvAttr->Platform) {
+        case PlatformKind::OSX:
+          plat = "macos";
+          break;
+        case PlatformKind::iOS:
+          plat = "ios";
+          break;
+        case PlatformKind::tvOS:
+          plat = "tvos";
+          break;
+        case PlatformKind::watchOS:
+          plat = "watchos";
+          break;
+        case PlatformKind::OSXApplicationExtension:
+          plat = "macos_app_extension";
+          break;
+        case PlatformKind::iOSApplicationExtension:
+          plat = "ios_app_extension";
+          break;
+        case PlatformKind::tvOSApplicationExtension:
+          plat = "tvos_app_extension";
+          break;
+        case PlatformKind::watchOSApplicationExtension:
+          plat = "watchos_app_extension";
+          break;
+        default:
+          break;
+        }
+        if (plat == NULL) continue;
+        os << " SWIFT_AVAILABILITY(" << plat;
+        if (AvAttr->isUnconditionallyUnavailable()) {
+          os << ",unavailable";
+        } else {
+          if (AvAttr->Introduced.hasValue()) {
+            os << ",introduced=" << AvAttr->Introduced.getValue().getAsString();
+          }
+          if (AvAttr->Deprecated.hasValue()) {
+            os << ",deprecated=" << AvAttr->Deprecated.getValue().getAsString();
+          } else if (AvAttr->isUnconditionallyDeprecated()) {
+            // We need to specify some version, we can't just say deprecated.
+            // We also can't deprecate it before it's introduced.
+            if (AvAttr->Introduced.hasValue()) {
+              os << ",deprecated=" << AvAttr->Introduced.getValue().getAsString();
+            } else {
+              os << ",deprecated=0.0.1";
+            }
+          }
+          if (AvAttr->Obsoleted.hasValue()) {
+            os << ",obsoleted=" << AvAttr->Obsoleted.getValue().getAsString();
+          }
+          if (!AvAttr->Rename.empty()) {
+            // NB: Don't bother getting obj-c names, we can't get one for the rename
+            os << ",message=\"'" << VD->getName() << "' has been renamed to '";
+            printEncodedString(AvAttr->Rename, false);
+            os << '\'';
+            if (!AvAttr->Message.empty()) {
+              os << ": ";
+              printEncodedString(AvAttr->Message, false);
+            }
+            os << "\"";
+          } else if (!AvAttr->Message.empty()) {
+            os << ",message=";
+            printEncodedString(AvAttr->Message);
+          }
+        }
+        os << ")";
+      }
+    }
   }
     
   void visitFuncDecl(FuncDecl *FD) {
@@ -2235,6 +2401,18 @@ public:
            "#endif\n"
            "#if !defined(SWIFT_UNAVAILABLE)\n"
            "# define SWIFT_UNAVAILABLE __attribute__((unavailable))\n"
+           "#endif\n"
+           "#if !defined(SWIFT_UNAVAILABLE_MSG)\n"
+           "# define SWIFT_UNAVAILABLE_MSG(msg) __attribute__((unavailable(msg)))\n"
+           "#endif\n"
+           "#if !defined(SWIFT_AVAILABILITY)\n"
+           "# define SWIFT_AVAILABILITY(plat, ...) __attribute__((availability(plat, __VA_ARGS__)))\n"
+           "#endif\n"
+           "#if !defined(SWIFT_DEPRECATED)\n"
+           "# define SWIFT_DEPRECATED __attribute__((deprecated))\n"
+           "#endif\n"
+           "#if !defined(SWIFT_DEPRECATED_MSG)\n"
+           "# define SWIFT_DEPRECATED_MSG(...) __attribute__((deprecated(__VA_ARGS__)))\n"
            "#endif\n"
            ;
     static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
