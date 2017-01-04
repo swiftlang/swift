@@ -78,6 +78,80 @@ ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v,
   return emitManagedRValueWithCleanup(v, lowering);
 }
 
+ManagedValue SILGenFunction::emitManagedLoadBorrow(SILLocation loc,
+                                                   SILValue v) {
+  auto &lowering = getTypeLowering(v->getType().getSwiftRValueType());
+  return emitManagedLoadBorrow(loc, v, lowering);
+}
+
+ManagedValue
+SILGenFunction::emitManagedLoadBorrow(SILLocation loc, SILValue v,
+                                      const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getAddressType() == v->getType());
+  if (lowering.isTrivial()) {
+    v = lowering.emitLoadOfCopy(B, loc, v, IsNotTake);
+    return ManagedValue::forUnmanaged(v);
+  }
+
+  assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
+  auto *lbi = B.createLoadBorrow(loc, v);
+  return emitManagedBorrowedRValueWithCleanup(v, lbi, lowering);
+}
+
+ManagedValue SILGenFunction::emitManagedStoreBorrow(SILLocation loc, SILValue v,
+                                                    SILValue addr) {
+  auto &lowering = getTypeLowering(v->getType().getSwiftRValueType());
+  return emitManagedStoreBorrow(loc, v, addr, lowering);
+}
+
+ManagedValue SILGenFunction::emitManagedStoreBorrow(
+    SILLocation loc, SILValue v, SILValue addr, const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getObjectType() == v->getType());
+  if (lowering.isTrivial()) {
+    lowering.emitStore(B, loc, v, addr, StoreOwnershipQualifier::Trivial);
+    return ManagedValue::forUnmanaged(v);
+  }
+  assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
+  auto *sbi = B.createStoreBorrow(loc, v, addr);
+  return emitManagedBorrowedRValueWithCleanup(sbi->getSrc(), sbi, lowering);
+}
+
+ManagedValue SILGenFunction::emitManagedBeginBorrow(SILLocation loc,
+                                                    SILValue v) {
+  auto &lowering = getTypeLowering(v->getType().getSwiftRValueType());
+  return emitManagedBeginBorrow(loc, v, lowering);
+}
+
+ManagedValue
+SILGenFunction::emitManagedBeginBorrow(SILLocation loc, SILValue v,
+                                       const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getObjectType() ==
+         v->getType().getObjectType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(v);
+  auto *bbi = B.createBeginBorrow(loc, v);
+  return emitManagedBorrowedRValueWithCleanup(v, bbi, lowering);
+}
+
+ManagedValue
+SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue borrowee,
+                                                     SILValue borrowed) {
+  assert(borrowee->getType().getObjectType() ==
+         borrowed->getType().getObjectType());
+  auto &lowering = getTypeLowering(borrowee->getType());
+  return emitManagedBorrowedRValueWithCleanup(borrowee, borrowed, lowering);
+}
+
+ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
+    SILValue borrowee, SILValue borrowed, const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getObjectType() ==
+         borrowee->getType().getObjectType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(borrowed);
+
+  return ManagedValue(borrowed, enterEndBorrowCleanup(borrowee, borrowed));
+}
+
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
   auto &lowering = getTypeLowering(v->getType());
   return emitManagedRValueWithCleanup(v, lowering);
