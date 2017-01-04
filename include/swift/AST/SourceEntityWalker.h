@@ -53,6 +53,12 @@ public:
   /// Walks the provided DeclContext.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(DeclContext *DC);
+  /// Walks the provided Stmt.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(Stmt *S);
+  /// Walks the provided Expr.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(Expr *E);
 
   /// This method is called when first visiting a decl, before walking into its
   /// children.  If it returns false, the subtree is skipped.
