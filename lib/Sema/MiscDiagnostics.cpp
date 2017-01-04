@@ -519,7 +519,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
-      auto eTy = E->getType();
       bool isExistential = false;
       if (auto metaTy = E->getType()->getAs<MetatypeType>()) {
         auto instanceTy = metaTy->getInstanceType();
