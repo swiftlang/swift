@@ -79,6 +79,11 @@ WARNING(unresolvable_clang_decl,none,
         "imported declaration '%0' could not be mapped to '%1'",
         (StringRef, StringRef))
 
+WARNING(implicit_bridging_header_imported_from_module,none,
+        "implicit import of bridging header '%0' via module %1 "
+        "is deprecated and will be removed in a later version of Swift",
+        (StringRef, Identifier))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

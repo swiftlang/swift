@@ -201,13 +201,16 @@ public:
   /// \param diagLoc A location to attach any diagnostics to if import fails.
   /// \param trackParsedSymbols If true, tracks decls and macros that were
   ///        parsed from the bridging header.
+  /// \param implicitImport If true, indicates that this import was implicit
+  ///        from a reference in a module file (deprecated behaviour).
   ///
   /// \returns true if there was an error importing the header.
   ///
   /// \sa getImportedHeaderModule
   bool importBridgingHeader(StringRef header, ModuleDecl *adapter,
                             SourceLoc diagLoc = {},
-                            bool trackParsedSymbols = false);
+                            bool trackParsedSymbols = false,
+                            bool implicitImport = false);
 
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.
