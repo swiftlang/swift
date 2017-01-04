@@ -2009,18 +2009,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
   // literals.
-  {
-    if (concrete && kind >= ConstraintKind::Subtype &&
-        (type1->isUninhabited() || type2->isVoid())) {
-      SmallVector<LocatorPathElt, 2> parts;
-      locator.getLocatorParts(parts);
-      
-      while (!parts.empty()) {
-        if (parts.back().getKind() == ConstraintLocator::ClosureResult) {
-          increaseScore(SK_FunctionConversion);
-          return SolutionKind::Solved;
-        }
-        parts.pop_back();
+  if (auto elt = locator.last()) {
+    if (elt->getKind() == ConstraintLocator::ClosureResult) {
+      if (concrete && kind >= ConstraintKind::Subtype &&
+          (type1->isUninhabited() || type2->isVoid())) {
+        increaseScore(SK_FunctionConversion);
+        return SolutionKind::Solved;
       }
     }
   }

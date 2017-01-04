@@ -2208,3 +2208,7 @@ extension SubclassInfersFromProtocol2 {
   // CHECK: {{^}} @objc dynamic func method1(value: Int)
   func method1(value: Int) { }
 }
+
+@objc class NeverReturningMethod {
+  @objc func doesNotReturn() -> Never {}
+}

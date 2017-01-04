@@ -427,7 +427,11 @@ private:
         break;
       }
     }
-    return methodTy->getResult();
+
+    auto result = methodTy->getResult();
+    if (result->isUninhabited())
+      return M.getASTContext().TheEmptyTupleType;
+    return result;
   }
                                           
   void printAbstractFunctionAsMethod(AbstractFunctionDecl *AFD,
@@ -551,6 +555,7 @@ private:
         os << " SWIFT_METHOD_FAMILY(none)";
       }
       if (!methodTy->getResult()->isVoid() &&
+          !methodTy->getResult()->isUninhabited() &&
           !AFD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
         os << " SWIFT_WARN_UNUSED_RESULT";
       }
