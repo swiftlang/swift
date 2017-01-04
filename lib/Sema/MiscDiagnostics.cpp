@@ -38,52 +38,6 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
   return nullptr;
 }
 
-//===----------------------------------------------------------------------===//
-// Diagnose assigning variable to itself.
-//===----------------------------------------------------------------------===//
-
-static Decl *findSimpleReferencedDecl(const Expr *E) {
-  if (auto *LE = dyn_cast<LoadExpr>(E))
-    E = LE->getSubExpr();
-
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-    return DRE->getDecl();
-
-  return nullptr;
-}
-
-static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
-  if (auto *LE = dyn_cast<LoadExpr>(E))
-    E = LE->getSubExpr();
-
-  if (auto *D = findSimpleReferencedDecl(E))
-    return std::make_pair(nullptr, D);
-
-  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    if (auto *BaseDecl = findSimpleReferencedDecl(MRE->getBase()))
-      return std::make_pair(BaseDecl, MRE->getMember().getDecl());
-  }
-
-  return std::make_pair(nullptr, nullptr);
-}
-
-/// Diagnose assigning variable to itself.
-static void diagSelfAssignment(TypeChecker &TC, const Expr *E) {
-  auto *AE = dyn_cast<AssignExpr>(E);
-  if (!AE)
-    return;
-
-  auto LHSDecl = findReferencedDecl(AE->getDest());
-  auto RHSDecl = findReferencedDecl(AE->getSrc());
-  if (LHSDecl.second && LHSDecl == RHSDecl) {
-    TC.diagnose(AE->getLoc(), LHSDecl.first ? diag::self_assignment_prop
-                                            : diag::self_assignment_var)
-        .highlight(AE->getDest()->getSourceRange())
-        .highlight(AE->getSrc()->getSourceRange());
-  }
-}
-
-
 /// Diagnose syntactic restrictions of expressions.
 ///
 ///   - Module values may only occur as part of qualification.
@@ -3832,7 +3786,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
                                             const DeclContext *DC,
                                             bool isExprStmt) {
-  diagSelfAssignment(TC, E);
+  TC.diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
