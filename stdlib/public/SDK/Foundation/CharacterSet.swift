@@ -509,7 +509,7 @@ extension _SwiftNSCharacterSet {
     
     @objc(hasMemberInPlane:)
     func hasMember(inPlane plane: UInt8) -> Bool {
-        return _mapUnmanaged {$0.hasMemberInPlane(plane) }
+        return _mapUnmanaged { $0.hasMemberInPlane(plane) }
     }
     
     @objc(characterIsMember:)
