@@ -1270,6 +1270,24 @@ void Driver::buildActions(const ToolChain &TC,
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::UpdateCode: {
+
+    // If the user is importing a textual (.h) bridging header and we're in
+    // standard-compile (non-WMO) mode, we take the opportunity to precompile
+    // the header into a temporary PCH, and replace the import argument with the
+    // PCH in the subsequent frontend jobs.
+    JobAction *PCH = nullptr;
+    if (!Args.hasArg(options::OPT_disable_bridging_pch)) {
+      if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
+        StringRef Value = A->getValue();
+        auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
+        if (Ty == types::TY_ObjCHeader) {
+          std::unique_ptr<Action> HeaderInput(new InputAction(*A, Ty));
+          PCH = new GeneratePCHJobAction(HeaderInput.release());
+          Actions.push_back(PCH);
+        }
+      }
+    }
+
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
       const Arg *InputArg = Input.second;
@@ -1300,6 +1318,21 @@ void Driver::buildActions(const ToolChain &TC,
                                              OI.CompilerOutputType,
                                              previousBuildState));
           AllModuleInputs.push_back(Current.get());
+        }
+        if (PCH) {
+          // FIXME: When we have a PCH job, it's officially owned by the Actions
+          // array; but it's also a secondary input to each of the current
+          // JobActions, which means that we need to flip the "owns inputs" bit
+          // on the JobActions so they don't try to free it. That in turn means
+          // we need to transfer ownership of all the JobActions' existing
+          // inputs to the Actions array, since the JobActions either own or
+          // don't own _all_ of their inputs. Ownership can't vary
+          // input-by-input.
+          auto *job = cast<JobAction>(Current.get());
+          auto inputs = job->getInputs();
+          Actions.append(inputs.begin(), inputs.end());
+          job->setOwnsInputs(false);
+          job->addInput(PCH);
         }
         AllLinkerInputs.push_back(Current.release());
         break;
@@ -1554,6 +1587,12 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
     unsigned NumOutputs = 0;
     for (const Action *A : Actions) {
       types::ID Type = A->getType();
+
+      // Skip any GeneratePCHJobActions or InputActions incidentally stored in
+      // Actions (for ownership), as a result of PCH-generation.
+      if (isa<GeneratePCHJobAction>(A) || isa<InputAction>(A))
+        continue;
+
       // Only increment NumOutputs if this is an output which must have its
       // path specified using -o.
       // (Module outputs can be specified using -module-output-path, or will
@@ -1580,8 +1619,10 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 
   for (const Action *A : Actions) {
-    (void)buildJobsForAction(C, cast<JobAction>(A), OI, OFM, TC,
-                             /*TopLevel*/true, JobCache);
+    if (auto *JA = dyn_cast<JobAction>(A)) {
+      (void)buildJobsForAction(C, JA, OI, OFM, TC,
+                               /*TopLevel*/true, JobCache);
+    }
   }
 }
 
@@ -1640,6 +1681,13 @@ static StringRef getOutputFilename(Compilation &C,
     return Buffer.str();
   }
 
+  // FIXME: Treat GeneratePCHJobAction as non-top-level (to get tempfile and not
+  // use the -o arg) even though, based on ownership considerations within the
+  // driver, it is stored as a "top level" JobAction.
+  if (isa<GeneratePCHJobAction>(JA)) {
+    AtTopLevel = false;
+  }
+
   // We don't have an output from an Action-specific command line option,
   // so figure one out using the defaults.
   if (AtTopLevel) {
@@ -1660,8 +1708,8 @@ static StringRef getOutputFilename(Compilation &C,
 
   // We don't yet have a name, assign one.
   if (!AtTopLevel) {
-    // We should output to a temporary file, since we're not at
-    // the top level.
+    // We should output to a temporary file, since we're not at the top level
+    // (or are generating a bridging PCH, which is currently always a temp).
     StringRef Stem = llvm::sys::path::stem(BaseName);
     StringRef Suffix = types::getTypeTempSuffix(JA->getType());
     std::error_code EC =

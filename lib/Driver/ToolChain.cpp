@@ -83,6 +83,7 @@ ToolChain::constructJob(const JobAction &JA,
     CASE(ModuleWrapJob)
     CASE(LinkJob)
     CASE(GenerateDSYMJob)
+    CASE(GeneratePCHJob)
     CASE(AutolinkExtractJob)
     CASE(REPLJob)
 #undef CASE

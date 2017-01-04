@@ -237,6 +237,10 @@ def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable using the swift bridge attribute">;
 
+def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
+  Flags<[HelpHidden]>,
+  HelpText<"Disable automatic generation of bridging PCH files">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
