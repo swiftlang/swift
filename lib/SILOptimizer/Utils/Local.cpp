@@ -1769,11 +1769,25 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     // If it is addr cast then store the result.
     auto ConvTy = NewAI->getType();
     auto DestTy = Dest->getType().getObjectType();
-    assert((ConvTy == DestTy || DestTy.isExactSuperclassOf(ConvTy)) &&
-           "Destination should have the same type or be a superclass "
-           "of the source operand");
-    auto CastedValue = SILValue(
-        (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy));
+    SILValue CastedValue;
+    if ((ConvTy == DestTy || DestTy.isExactSuperclassOf(ConvTy))) {
+      CastedValue = SILValue(
+          (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy));
+    } else if (ConvTy.getSwiftRValueType() ==
+                   getNSBridgedClassOfCFClass(M.getSwiftModule(),
+                                              DestTy.getSwiftRValueType()) ||
+               DestTy.getSwiftRValueType() ==
+                   getNSBridgedClassOfCFClass(M.getSwiftModule(),
+                                              ConvTy.getSwiftRValueType())) {
+      // Handle NS <-> CF toll-free bridging here.
+      CastedValue =
+          SILValue(Builder.createUncheckedRefCast(Loc, NewAI, DestTy));
+    } else {
+      llvm_unreachable(
+          "Destination should have the same type, be bridgeable CF "
+          "type or be a superclass "
+          "of the source operand");
+    }
     NewI = Builder.createStore(Loc, CastedValue, Dest,
                                StoreOwnershipQualifier::Unqualified);
   }

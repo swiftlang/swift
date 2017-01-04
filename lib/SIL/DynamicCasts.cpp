@@ -262,7 +262,7 @@ classifyClassHierarchyCast(CanType source, CanType target) {
   return DynamicCastFeasibility::WillFail;
 }
 
-static CanType getNSBridgedClassOfCFClass(Module *M, CanType type) {
+CanType swift::getNSBridgedClassOfCFClass(Module *M, CanType type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
     if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       if (auto bridgedAttr =
