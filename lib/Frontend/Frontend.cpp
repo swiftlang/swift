@@ -446,7 +446,6 @@ void CompilerInstance::performSema() {
 
     Diags.setSuppressWarnings(DidSuppressWarnings);
 
-    performConditionResolution(*NextInput);
     performNameBinding(*NextInput);
   }
 
@@ -517,7 +516,6 @@ void CompilerInstance::performSema() {
         Invocation.getFrontendOptions().PlaygroundTransform)
       performPlaygroundTransform(MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);
     if (!mainIsPrimary) {
-      performConditionResolution(MainFile);
       performNameBinding(MainFile);
     }
   }
