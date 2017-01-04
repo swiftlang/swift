@@ -99,8 +99,11 @@ let _: () -> Int = {
 
 func id<T>(_ t: T) -> T { return t }
 
-protocol P {
+protocol Initable {
   init()
+}
+
+protocol P : Initable {
   func bar(_ x: Int)
   mutating func mut(_ x: Int)
   static func tum()
