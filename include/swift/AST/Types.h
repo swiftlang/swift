@@ -791,6 +791,9 @@ public:
   /// \param uncurryLevel The number of uncurry levels to apply before
   /// replacing the type. With uncurry level == 0, this simply
   /// replaces the current type with the new result type.
+  ///
+  /// \param preserveOptionality The flag which indicates if optionality of
+  /// the original result type should be represerved after replacement.
   Type replaceCovariantResultType(Type newResultType,
                                   unsigned uncurryLevel,
                                   bool preserveOptionality = true);

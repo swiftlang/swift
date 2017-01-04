@@ -1173,7 +1173,8 @@ ConstraintSystem::getTypeOfMemberReference(
          func->hasArchetypeSelf())) {
       openedType = openedType->replaceCovariantResultType(
                      baseObjTy,
-                     func->getNumParameterLists());
+                     func->getNumParameterLists(),
+                     !baseObjTy->getAnyOptionalObjectType());
     }
   }
   // If this is an initializer, replace the result type with the base
