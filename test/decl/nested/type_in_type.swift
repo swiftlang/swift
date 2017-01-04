@@ -303,3 +303,37 @@ typealias OuterGenericMidGeneric<T> = OuterGeneric<T>.MidGeneric
 extension OuterGenericMidGeneric {
 
 }
+
+class BaseClass {
+  struct T {}
+
+  func m1() -> T {}
+  func m2() -> BaseClass.T {}
+  func m3() -> DerivedClass.T {}
+}
+
+func f1() -> DerivedClass.T {
+  return BaseClass.T()
+}
+
+func f2() -> BaseClass.T {
+  return DerivedClass.T()
+}
+
+func f3() -> DerivedClass.T {
+  return DerivedClass.T()
+}
+
+class DerivedClass : BaseClass {
+  override func m1() -> DerivedClass.T {
+    return f2()
+  }
+
+  override func m2() -> BaseClass.T {
+    return f3()
+  }
+
+  override func m3() -> T {
+    return f2()
+  }
+}

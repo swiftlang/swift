@@ -398,14 +398,17 @@ namespace {
       // Open up unbound generic types, turning them into bound generic
       // types with type variables for each parameter.
       if (auto unbound = type->getAs<UnboundGenericType>()) {
-        auto parentTy = unbound->getParent();
-        if (parentTy)
-          parentTy = parentTy.transform(*this);
-
         auto unboundDecl = unbound->getDecl();
         if (unboundDecl->isInvalid())
           return ErrorType::get(cs.getASTContext());
         
+        auto parentTy = unbound->getParent();
+        if (parentTy) {
+          parentTy = parentTy.transform(*this);
+          unbound = UnboundGenericType::get(unboundDecl, parentTy,
+                                            cs.getASTContext());
+        }
+
         // If the unbound decl hasn't been validated yet, we have a circular
         // dependency that isn't being diagnosed properly.
         if (!unboundDecl->getGenericSignature()) {
@@ -747,8 +750,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto type = getTypeChecker().resolveTypeInContext(typeDecl, DC,
                                                       TR_InExpression,
                                                       isSpecialized);
-    if (!type)
-      return { nullptr, nullptr };
 
     // Open the type.
     type = openType(type, locator, replacements);

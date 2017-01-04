@@ -230,20 +230,17 @@ let _ = GenericClass<Int>.TA(a: 1, b: 4.0)
 let _ = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Int' is not convertible to 'Float'}}
 let _ = GenericClass<Int>.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{'Int' is not convertible to 'Float'}}
 
-// FIXME: Crashes
-#if false
 let _: GenericClass.TA = GenericClass.TA(a: 4.0, b: 1)
 let _: GenericClass.TA = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass.TA = GenericClass.TA<Float>(a: 4.0, b: 1)
+let _: GenericClass.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
 let _: GenericClass.TA = GenericClass.TA<Float>(a: 1, b: 4.0)
 
-let _: GenericClass.TA = GenericClass<Int>.TA(a: 4.0, b: 1)
+let _: GenericClass.TA = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot invoke value of type 'MyType<Int, _>.Type' with argument list '(a: Double, b: Int)'}}
 let _: GenericClass.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
 
-let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1)
-let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
-#endif
+let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Int' is not convertible to 'Float'}}
+let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{'Int' is not convertible to 'Float'}}
 
 let _: GenericClass<Int>.TA = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot invoke value of type 'MyType<_, _>.Type' with argument list '(a: Double, b: Int)'}}
 let _: GenericClass<Int>.TA = GenericClass.TA(a: 1, b: 4.0)
@@ -309,12 +306,22 @@ struct ErrorC {
 
 typealias Y = ErrorA<ErrorB>
 
+typealias Id<T> = T
+
+extension Id {} // expected-error {{non-nominal type 'Id' cannot be extended}}
+
+class OuterGeneric<T> {
+  typealias Alias<T> = AnotherGeneric<T>
+  // expected-note@-1 {{generic type 'Alias' declared here}}
+  class InnerNonGeneric : Alias {}
+  // expected-error@-1 {{reference to generic type 'OuterGeneric<T>.Alias' requires arguments in <...>}}
+}
+
+class AnotherGeneric<T> {}
 
 //
 // Generic typealiases in protocols
 //
-
-/* FIXME
 
 protocol P {
   associatedtype A
@@ -333,4 +340,4 @@ func takesMyType(y: MyType<Int, Float>) {}
 func f(x: S.G1<Int>, y: S.G2<Int>) {
   takesMyType(x: x)
   takesMyType(y: y)
-} */
+}
