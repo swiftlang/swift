@@ -13,6 +13,7 @@
 #include "swift/Immediate/Immediate.h"
 #include "ImmediateImpl.h"
 
+#include "swift/Config.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -34,11 +35,9 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
-// FIXME: Support REPL on non-Apple platforms. Ubuntu 14.10's editline does not
-// include the wide character entry points needed by the REPL yet.
+#if HAVE_UNICODE_LIBEDIT
 #include <histedit.h>
-#endif // __APPLE__
+#endif
 
 using namespace swift;
 using namespace swift::immediate;
@@ -131,7 +130,7 @@ public:
 
 using Convert = ConvertForWcharSize<sizeof(wchar_t)>;
   
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if HAVE_UNICODE_LIBEDIT
 static void convertFromUTF8(llvm::StringRef utf8,
                             llvm::SmallVectorImpl<wchar_t> &out) {
   size_t reserve = out.size() + utf8.size();
@@ -163,7 +162,7 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 } // end anonymous namespace
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if HAVE_UNICODE_LIBEDIT
 
 static bool appendToREPLFile(SourceFile &SF,
                              PersistentParserState &PersistentState,
@@ -1182,7 +1181,7 @@ void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   } while (env.handleREPLInput(inputKind, Line));
 }
 
-#else // __APPLE__
+#else
 
 void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                     bool ParseStdlib) {
