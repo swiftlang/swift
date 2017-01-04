@@ -191,6 +191,7 @@ void GenericParamList::dump() {
 static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
   if (!Params)
     return;
+  OS << ' ';
   Params->print(OS);
 }
 
