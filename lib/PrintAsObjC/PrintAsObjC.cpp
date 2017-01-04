@@ -31,6 +31,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
+#include "clang/Lex/Lexer.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/STLExtras.h"
@@ -124,6 +125,38 @@ static bool looksLikeInitMethod(ObjCSelector selector) {
   if (!firstPiece.startswith("init")) return false;
   return !(firstPiece.size() > 4 && clang::isLowercase(firstPiece[4]));
 }
+
+/// Returns the name of an <os/object.h> type minus the leading "OS_",
+/// or an empty string if \p decl is not an <os/object.h> type.
+static StringRef maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
+  StringRef name = decl->getName();
+  if (!name.consume_front("OS_"))
+    return StringRef();
+
+  clang::SourceLocation loc = decl->getLocation();
+  if (!loc.isMacroID())
+    return StringRef();
+
+  // Hack: check to see if the name came from a macro in <os/object.h>.
+  clang::SourceManager &sourceMgr = decl->getASTContext().getSourceManager();
+  clang::SourceLocation expansionLoc =
+      sourceMgr.getImmediateExpansionRange(loc).first;
+  clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(expansionLoc);
+
+  if (!sourceMgr.getFilename(spellingLoc).endswith("/os/object.h"))
+    return StringRef();
+
+  return name;
+}
+
+/// Returns true if \p decl represents an <os/object.h> type.
+static bool isOSObjectType(const clang::Decl *decl) {
+  auto *named = dyn_cast_or_null<clang::NamedDecl>(decl);
+  if (!named)
+    return false;
+  return !maybeGetOSObjectBaseName(named).empty();
+}
+
 
 namespace {
 using DelayedMemberSet = llvm::SmallSetVector<const ValueDecl *, 32>;
@@ -1325,18 +1358,21 @@ private:
     assert(CD->isObjC());
     auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(CD->getClangDecl());
     if (clangDecl) {
-      if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
+      // Hack for <os/object.h> types, which use classes in Swift but
+      // protocols in Objective-C, and a typedef to hide the difference.
+      StringRef osObjectName = maybeGetOSObjectBaseName(clangDecl);
+      if (!osObjectName.empty()) {
+        os << osObjectName << "_t";
+      } else if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
         os << clangDecl->getName() << " *";
-        printNullability(optionalKind);
       } else {
         maybePrintTagKeyword(CD);
         os << clangDecl->getName();
-        printNullability(optionalKind);
       }
     } else {
       os << getNameForObjC(CD) << " *";
-      printNullability(optionalKind);
     }
+    printNullability(optionalKind);
   }
 
   void visitProtocolType(ProtocolType *PT, 
@@ -1804,7 +1840,8 @@ public:
 
   bool forwardDeclare(const ClassDecl *CD) {
     if (!CD->isObjC() ||
-        CD->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+        CD->getForeignClassKind() == ClassDecl::ForeignKind::CFType ||
+        isOSObjectType(CD->getClangDecl())) {
       return false;
     }
     forwardDeclare(CD, [&]{ os << "@class " << getNameForObjC(CD) << ";\n"; });
