@@ -3185,13 +3185,18 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
     SILLayoutID layoutRef = addSILLayoutRef(boxTy->getLayout());
-    
-    SmallVector<TypeID, 4> genericArgs;
-    for (auto &arg : boxTy->getGenericArgs())
-      genericArgs.push_back(addTypeRef(arg.getReplacement()));
-    
-    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 layoutRef, genericArgs);
+
+#ifndef NDEBUG
+    if (auto sig = boxTy->getLayout()->getGenericSignature()) {
+      assert(sig->getAllDependentTypes().size()
+               == boxTy->getGenericArgs().size());
+    }
+#endif
+
+    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef);
+
+    // Write the set of substitutions.
+    writeSubstitutions(boxTy->getGenericArgs(), DeclTypeAbbrCodes);
     break;
   }
       

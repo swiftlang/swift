@@ -3977,9 +3977,8 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::SIL_BOX_TYPE: {
     SILLayoutID layoutID;
-    ArrayRef<uint64_t> args;
 
-    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID, args);
+    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID);
     
     // Get the layout.
     auto getLayout = [&]() -> SILLayout * {
@@ -4008,49 +4007,20 @@ Type ModuleFile::getType(TypeID TID) {
     
     SmallVector<Substitution, 4> genericArgs;
     if (auto sig = layout->getGenericSignature()) {
-      if (args.size() != sig->getAllDependentTypes().size()) {
-        error();
-        return nullptr;
-      }
-      TypeSubstitutionMap mappings;
-      
-      for (unsigned i : indices(sig->getGenericParams())) {
-        mappings[sig->getGenericParams()[i]] =
-          getType(args[i])->getCanonicalType();
-      }
-      
-      bool ok = true;
-      sig->getSubstitutions(mappings,
-        [&](CanType depTy, Type replacementTy, ProtocolType *proto)
-        -> ProtocolConformanceRef {
-          if (replacementTy->is<SubstitutableType>()
-              || replacementTy->is<DependentMemberType>())
-            return ProtocolConformanceRef(proto->getDecl());
-          
-          auto conformance = getAssociatedModule()
-            ->lookupConformance(replacementTy, proto->getDecl(), nullptr);
-          if (!conformance) {
-            error();
-            ok = false;
-            return ProtocolConformanceRef(proto->getDecl());
-          }
-          return *conformance;
-        },
-        genericArgs);
-      if (!ok)
-        return nullptr;
-      
-      for (auto &arg : genericArgs) {
-        arg = Substitution(arg.getReplacement()->getCanonicalType(),
-                           arg.getConformances());
-      }
-    } else {
-      if (args.size() != 0) {
-        error();
-        return nullptr;
+      for (unsigned i : range(sig->getAllDependentTypes().size())) {
+        (void)i;
+        auto sub = maybeReadSubstitution(DeclTypeCursor);
+        if (!sub) {
+          error();
+          return nullptr;
+        }
+
+        genericArgs.push_back(
+          Substitution(sub->getReplacement()->getCanonicalType(),
+                       sub->getConformances()));
       }
     }
-    
+
     typeOrOffset = SILBoxType::get(getContext(), layout, genericArgs);
     break;
   }
