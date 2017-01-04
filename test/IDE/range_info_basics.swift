@@ -93,6 +93,7 @@ func foo6() -> Int {
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
 // CHECK1-NEXT: <Context>swift_ide_test.(file)</Context>
 // CHECK1-NEXT: <Declared>foo1</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK1-NEXT: <ASTNodes>1</ASTNodes>
 // CHECK1-NEXT: <end>
 
 // CHECK2: <Kind>SingleDecl</Kind>
@@ -100,6 +101,7 @@ func foo6() -> Int {
 // CHECK2-NEXT: <Context>swift_ide_test.(file)</Context>
 // CHECK2-NEXT: <Declared>C</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK2-NEXT: <Declared>foo</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK2-NEXT: <ASTNodes>1</ASTNodes>
 // CHECK2-NEXT: <end>
 
 // CHECK3: <Kind>SingleDecl</Kind>
@@ -107,6 +109,7 @@ func foo6() -> Int {
 // CHECK3-NEXT: <Context>swift_ide_test.(file)</Context>
 // CHECK3-NEXT: <Declared>S</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK3-NEXT: <Declared>foo</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK3-NEXT: <ASTNodes>1</ASTNodes>
 // CHECK3-NEXT: <end>
 
 // CHECK4: <Kind>MultiStatement</Kind>
@@ -115,6 +118,7 @@ func foo6() -> Int {
 // CHECK4-NEXT: <Type>Void</Type>
 // CHECK4-NEXT: <Context>swift_ide_test.(file).func decl</Context>
 // CHECK4-NEXT: <Referenced>aaa</Referenced><Type>@lvalue Int</Type>
+// CHECK4-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK4-NEXT: <end>
 
 // CHECK5: <Kind>MultiStatement</Kind>
@@ -124,6 +128,7 @@ func foo6() -> Int {
 // CHECK5-NEXT: <Type>Int</Type>
 // CHECK5-NEXT: <Context>swift_ide_test.(file).func decl</Context>
 // CHECK5-NEXT: <Referenced>aaa</Referenced><Type>@lvalue Int</Type>
+// CHECK5-NEXT: <ASTNodes>3</ASTNodes>
 // CHECK5-NEXT: <end>
 
 // CHECK6: <Kind>MultiStatement</Kind>
@@ -132,6 +137,7 @@ func foo6() -> Int {
 // CHECK6-NEXT: <Type>Int</Type>
 // CHECK6-NEXT: <Context>swift_ide_test.(file).func decl</Context>
 // CHECK6-NEXT: <Referenced>aaa</Referenced><Type>@lvalue Int</Type>
+// CHECK6-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK6-NEXT: <end>
 
 // CHECK7: <Kind>MultiStatement</Kind>
@@ -146,6 +152,7 @@ func foo6() -> Int {
 // CHECK7-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK7-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK7-NEXT: <Referenced>c</Referenced><Type>Int</Type>
+// CHECK7-NEXT: <ASTNodes>4</ASTNodes>
 // CHECK7-NEXT: <end>
 
 // CHECK8: <Kind>MultiStatement</Kind>
@@ -158,6 +165,7 @@ func foo6() -> Int {
 // CHECK8-NEXT: <Referenced>s</Referenced><Type>@lvalue S1</Type>
 // CHECK8-NEXT: <Referenced>b</Referenced><Type>Int</Type>
 // CHECK8-NEXT: <Referenced>c</Referenced><Type>Int</Type>
+// CHECK8-NEXT: <ASTNodes>3</ASTNodes>
 // CHECK8-NEXT: <end>
 
 // CHECK9: <Kind>MultiStatement</Kind>
@@ -171,6 +179,7 @@ func foo6() -> Int {
 // CHECK9-NEXT: <Referenced>s</Referenced><Type>S1</Type>
 // CHECK9-NEXT: <Referenced>b</Referenced><Type>Int</Type>
 // CHECK9-NEXT: <Referenced>c</Referenced><Type>Int</Type>
+// CHECK9-NEXT: <ASTNodes>3</ASTNodes>
 // CHECK9-NEXT: <end>
 
 // CHECK10: <Kind>MultiStatement</Kind>
@@ -181,6 +190,7 @@ func foo6() -> Int {
 // CHECK10-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK10-NEXT: <Referenced>c</Referenced><Type>C1</Type>
 // CHECK10-NEXT: <Referenced>a</Referenced><Type>C1</Type>
+// CHECK10-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK10-NEXT: <end>
 
 // CHECK11: <Kind>MultiStatement</Kind>
@@ -193,6 +203,7 @@ func foo6() -> Int {
 // CHECK11-NEXT: <Declared>d</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK11-NEXT: <Referenced>c</Referenced><Type>C1</Type>
 // CHECK11-NEXT: <Referenced>a</Referenced><Type>C1</Type>
+// CHECK11-NEXT: <ASTNodes>3</ASTNodes>
 // CHECK11-NEXT: <end>
 
 // CHECK12: <Kind>MultiStatement</Kind>
@@ -209,6 +220,7 @@ func foo6() -> Int {
 // CHECK12-NEXT: <Referenced>a</Referenced><Type>C1</Type>
 // CHECK12-NEXT: <Referenced>b</Referenced><Type>C1</Type>
 // CHECK12-NEXT: <Referenced>d</Referenced><Type>C1</Type>
+// CHECK12-NEXT: <ASTNodes>4</ASTNodes>
 // CHECK12-NEXT: <end>
 
 // CHECK13: <Kind>MultiStatement</Kind>
@@ -225,6 +237,7 @@ func foo6() -> Int {
 // CHECK13-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK13-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK13-NEXT: <Referenced>c</Referenced><Type>Int</Type>
+// CHECK13-NEXT: <ASTNodes>5</ASTNodes>
 // CHECK13-NEXT: <end>
 
 // CHECK14: <Kind>MultiStatement</Kind>
@@ -255,6 +268,7 @@ func foo6() -> Int {
 // CHECK14-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK14-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK14-NEXT: <Referenced>c</Referenced><Type>Int</Type>
+// CHECK14-NEXT: <ASTNodes>6</ASTNodes>
 // CHECK14-NEXT: <end>
 
 // CHECK15: <Kind>MultiStatement</Kind>
@@ -269,6 +283,7 @@ func foo6() -> Int {
 // CHECK15-NEXT: <Declared>c</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK15-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK15-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
+// CHECK15-NEXT: <ASTNodes>4</ASTNodes>
 // CHECK15-NEXT: <end>
 
 // CHECK16: <Kind>MultiStatement</Kind>
@@ -286,6 +301,7 @@ func foo6() -> Int {
 // CHECK16-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK16-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK16-NEXT: <Referenced>c</Referenced><Type>Int</Type>
+// CHECK16-NEXT: <ASTNodes>6</ASTNodes>
 // CHECK16-NEXT: <end>
 
 // CHECK17: <Kind>SingleExpression</Kind>
@@ -294,4 +310,5 @@ func foo6() -> Int {
 // CHECK17-NEXT: <Context>swift_ide_test.(file).func decl.explicit closure discriminator=0.explicit closure discriminator=0</Context>
 // CHECK17-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK17-NEXT: <Referenced>c</Referenced><Type>Int</Type>
+// CHECK17-NEXT: <ASTNodes>1</ASTNodes>
 // CHECK17-NEXT: <end>

@@ -226,6 +226,8 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     RD.Ty->print(OS);
     OS << "</Type>\n";
   }
+
+  OS << "<ASTNodes>" << ContainedNodes.size() << "</ASTNodes>\n";
   OS << "<end>\n";
 }
 
@@ -251,9 +253,14 @@ private:
 
   struct ContextInfo {
     ASTNode Parent;
+
+    // Whether the context is entirely contained in the given range under
+    // scrutiny.
+    bool ContainedInRange;
     std::vector<ASTNode> StartMatches;
     std::vector<ASTNode> EndMatches;
-    ContextInfo(ASTNode Parent) : Parent(Parent) {}
+    ContextInfo(ASTNode Parent, bool ContainedInRange) : Parent(Parent),
+      ContainedInRange(ContainedInRange) {}
   };
 
   SourceLoc Start;
@@ -268,6 +275,9 @@ private:
 
   std::vector<DeclaredDecl> DeclaredDecls;
   std::vector<ReferencedDecl> ReferencedDecls;
+
+  // Keep track of the AST nodes contained in the range under question.
+  std::vector<ASTNode> ContainedASTNodes;
 
   /// Collect the type that an ASTNode should be evaluated to.
   Type resolveNodeType(ASTNode N) {
@@ -285,21 +295,25 @@ private:
 
   ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {
     assert(!Node.isNull());
+    assert(ContainedASTNodes.size() == 1);
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
                                resolveNodeType(Node), Content,
                                getImmediateContext(),
+                               llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
       return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
                                Content, getImmediateContext(),
+                               llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
       return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content,
                                getImmediateContext(),
+                               llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     }
@@ -364,7 +378,24 @@ private:
 
 public:
   bool hasResult() { return Result.hasValue(); }
-  void enter(ASTNode Node) { ContextStack.emplace_back(Node); }
+
+  void enter(ASTNode Node) {
+    bool ContainedInRange;
+    if (!Node.getOpaqueValue()) {
+      // If the node is the root, it's not contained for sure.
+      ContainedInRange = false;
+    } else if (ContextStack.back().ContainedInRange) {
+      // If the node's parent is contained in the range, so is the node.
+      ContainedInRange = true;
+    } else {
+      // If the node's parent is not contained in the range, check if this node is.
+      ContainedInRange = isContainedInSelection(CharSourceRange(SM,
+                                                            Node.getStartLoc(),
+                                                            Node.getEndLoc()));
+    }
+    ContextStack.emplace_back(Node, ContainedInRange);
+  }
+
   void leave(ASTNode Node) {
     assert(ContextStack.back().Parent.getOpaqueValue() == Node.getOpaqueValue());
     ContextStack.pop_back();
@@ -464,9 +495,12 @@ public:
       // PatternBindingDecl is not visited; we need to explicitly analyze here.
       if (auto *VA = dyn_cast_or_null<VarDecl>(D))
         analyze(VA->getParentPatternBinding());
-      return;
+      break;
     case RangeMatchKind::RangeMatch: {
       postAnalysis(Node);
+
+      // The node is contained in the given range.
+      ContainedASTNodes.push_back(Node);
       Result = getSingleNodeKind(Node);
       return;
     }
@@ -478,12 +512,25 @@ public:
       break;
     }
 
+    // If the node's parent is not contained in the range under question but the
+    // node itself is, we keep track of the node as top-level contained node.
+    if (!getCurrentDC().ContainedInRange &&
+        isContainedInSelection(CharSourceRange(SM, Node.getStartLoc(),
+                                               Node.getEndLoc()))) {
+      if (std::find_if(ContainedASTNodes.begin(), ContainedASTNodes.end(),
+          [&](ASTNode N) { return SM.rangeContains(N.getSourceRange(),
+            Node.getSourceRange()); }) == ContainedASTNodes.end()) {
+        ContainedASTNodes.push_back(Node);
+      }
+    }
+
     if (!DCInfo.StartMatches.empty() && !DCInfo.EndMatches.empty()) {
       postAnalysis(DCInfo.EndMatches.back());
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */
                 resolveNodeType(DCInfo.EndMatches.back()), Content,
                 getImmediateContext(),
+                llvm::makeArrayRef(ContainedASTNodes),
                 llvm::makeArrayRef(DeclaredDecls),
                 llvm::makeArrayRef(ReferencedDecls)};
       return;

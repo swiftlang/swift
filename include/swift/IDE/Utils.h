@@ -14,6 +14,7 @@
 #define SWIFT_IDE_UTILS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/SourceEntityWalker.h"
@@ -226,18 +227,23 @@ struct ResolvedRangeInfo {
   RangeKind Kind;
   Type Ty;
   StringRef Content;
+
+  // The topmost ast nodes contained in the given range.
+  ArrayRef<ASTNode> ContainedNodes;
   ArrayRef<DeclaredDecl> DeclaredDecls;
   ArrayRef<ReferencedDecl> ReferencedDecls;
   DeclContext* RangeContext;
   ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content,
                     DeclContext* RangeContext,
+                    ArrayRef<ASTNode> ContainedNodes,
                     ArrayRef<DeclaredDecl> DeclaredDecls,
                     ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
-                      Ty(Ty), Content(Content), DeclaredDecls(DeclaredDecls),
+                      Ty(Ty), Content(Content), ContainedNodes(ContainedNodes),
+                      DeclaredDecls(DeclaredDecls),
                       ReferencedDecls(ReferencedDecls),
                       RangeContext(RangeContext) {}
   ResolvedRangeInfo() :
-    ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef(), nullptr, {}, {}) {}
+  ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef(), nullptr, {}, {}, {}) {}
   void print(llvm::raw_ostream &OS);
 };
 
