@@ -234,6 +234,7 @@ precommitTests = [
   "SevenBoom": run_SevenBoom,
   "Sim2DArray": run_Sim2DArray,
   "SortLettersInPlace": run_SortLettersInPlace,
+  "SortSortedStrings": run_SortSortedStrings,
   "SortStrings": run_SortStrings,
   "SortStringsUnicode": run_SortStringsUnicode,
   "StackPromo": run_StackPromo,
