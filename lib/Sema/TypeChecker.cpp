@@ -2330,3 +2330,15 @@ void TypeChecker::checkForForbiddenPrefix(StringRef Name) {
     llvm::report_fatal_error(Msg);
   }
 }
+
+DeclTypeCheckingSemantics
+TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
+  // Check for a @_semantics attribute.
+  if (auto semantics = decl->getAttrs().getAttribute<SemanticsAttr>()) {
+    if (semantics->Value.equals("typechecker.type(of:)"))
+      return DeclTypeCheckingSemantics::TypeOf;
+    if (semantics->Value.equals("typechecker.withoutActuallyEscaping(_:do:)"))
+      return DeclTypeCheckingSemantics::WithoutActuallyEscaping;
+  }
+  return DeclTypeCheckingSemantics::Normal;
+}

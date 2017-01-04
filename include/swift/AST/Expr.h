@@ -2522,6 +2522,69 @@ public:
   }
 };
 
+/// \brief An expression that grants temporary escapability to a nonescaping
+/// closure value.
+///
+/// This expression is formed by the type checker when a call to the
+/// `withoutActuallyEscaping` declaration is made.
+class MakeTemporarilyEscapableExpr : public Expr {
+  Expr *NonescapingClosureValue;
+  OpaqueValueExpr *EscapingClosureValue;
+  Expr *SubExpr;
+  SourceLoc NameLoc, LParenLoc, RParenLoc;
+
+public:
+  MakeTemporarilyEscapableExpr(SourceLoc NameLoc,
+                               SourceLoc LParenLoc,
+                               Expr *NonescapingClosureValue,
+                               Expr *SubExpr,
+                               SourceLoc RParenLoc,
+                               OpaqueValueExpr *OpaqueValueForEscapingClosure,
+                               bool implicit = false)
+    : Expr(ExprKind::MakeTemporarilyEscapable, implicit, Type()),
+      NonescapingClosureValue(NonescapingClosureValue),
+      EscapingClosureValue(OpaqueValueForEscapingClosure),
+      SubExpr(SubExpr),
+      NameLoc(NameLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc)
+  {}
+  
+  SourceLoc getStartLoc() const {
+    return NameLoc;
+  }
+  SourceLoc getEndLoc() const {
+    return RParenLoc;
+  }
+  
+  SourceLoc getLoc() const {
+    return NameLoc;
+  }
+  
+  /// Retrieve the opaque value representing the escapable copy of the
+  /// closure.
+  OpaqueValueExpr *getOpaqueValue() const { return EscapingClosureValue; }
+  
+  /// Retrieve the nonescaping closure expression.
+  Expr *getNonescapingClosureValue() const {
+    return NonescapingClosureValue;
+  }
+  void setNonescapingClosureValue(Expr *e) {
+    NonescapingClosureValue = e;
+  }
+  
+  /// Retrieve the subexpression that has access to the escapable copy of the
+  /// closure.
+  Expr *getSubExpr() const {
+    return SubExpr;
+  }
+  void setSubExpr(Expr *e) {
+    SubExpr = e;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MakeTemporarilyEscapable;
+  }
+};
+
 /// \brief An expression that opens up a value of protocol or protocol
 /// composition type and gives a name to its dynamic type.
 ///

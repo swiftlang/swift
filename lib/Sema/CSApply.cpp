@@ -387,7 +387,7 @@ namespace {
                        AccessSemantics semantics) {
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
-
+      
       // If this is a member of a nominal type, build a reference to the
       // member with an implied base type.
       if (decl->getDeclContext()->isTypeContext() && isa<FuncDecl>(decl)) {
@@ -3512,6 +3512,10 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
     
+    Expr *visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *expr){
+      llvm_unreachable("Already type-checked");
+    }
+    
     Expr *visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
       // Should already be type-checked.
       return simplifyExprType(expr);
@@ -5231,6 +5235,16 @@ ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) 
   return closureExpr;
 }
 
+// Look through sugar and DotSyntaxBaseIgnoredExprs.
+static Expr *
+getSemanticExprForDeclOrMemberRef(Expr *expr) {
+  auto semanticExpr = expr->getSemanticsProvidingExpr();
+  while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(semanticExpr)){
+    semanticExpr = ignoredBase->getRHS()->getSemanticsProvidingExpr();
+  }
+  return semanticExpr;
+}
+
 static void
 maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
                                            AnyFunctionType *toType) {
@@ -5253,11 +5267,7 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
     // Can convert a decl ref to a global or local function that doesn't
     // capture context. Look through ignored bases too.
     // TODO: Look through static method applications to the type.
-    auto semanticExpr = expr->getSemanticsProvidingExpr();
-    while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(semanticExpr)){
-      semanticExpr = ignoredBase->getRHS()->getSemanticsProvidingExpr();
-    }
-    
+    auto semanticExpr = getSemanticExprForDeclOrMemberRef(expr);
     auto maybeDiagnoseFunctionRef = [&](FuncDecl *fn) {
       // TODO: We could allow static (or class final) functions too by
       // "capturing" the metatype in a thunk.
@@ -6331,12 +6341,85 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   TypeChecker &tc = cs.getTypeChecker();
   
   auto fn = apply->getFn();
-  
+
+  auto finishApplyOfDeclWithSpecialTypeCheckingSemantics
+    = [&](ApplyExpr *apply,
+          ValueDecl *decl,
+          Type openedType) -> Expr* {
+      switch (cs.TC.getDeclTypeCheckingSemantics(decl)) {
+      case DeclTypeCheckingSemantics::TypeOf: {
+        // Resolve into a DynamicTypeExpr.
+        auto arg = apply->getArg();
+        if (auto tuple = dyn_cast<TupleExpr>(arg))
+          arg = tuple->getElements()[0];
+        auto replacement = new (tc.Context)
+          DynamicTypeExpr(apply->getFn()->getLoc(),
+                          apply->getArg()->getStartLoc(),
+                          arg,
+                          apply->getArg()->getEndLoc(),
+                          Type());
+        cs.setType(replacement, simplifyType(openedType));
+        return replacement;
+      }
+      
+      case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
+        // Resolve into a MakeTemporarilyEscapingExpr.
+        auto arg = cast<TupleExpr>(apply->getArg());
+        assert(arg->getNumElements() == 2 && "should have two arguments");
+        auto nonescaping = arg->getElements()[0];
+        auto body = arg->getElements()[1];
+        auto bodyFnTy = body->getType()->castTo<FunctionType>();
+        auto escapableType = bodyFnTy->getInput();
+        auto resultType = bodyFnTy->getResult();
+        
+        // The body is immediately called, so is obviously noescape.
+        bodyFnTy = cast<FunctionType>(
+          bodyFnTy->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
+        body = coerceToType(body, bodyFnTy, locator);
+        assert(body && "can't make nonescaping?!");
+        
+        auto escapable = new (tc.Context)
+          OpaqueValueExpr(apply->getFn()->getLoc(), Type());
+        cs.setType(escapable, escapableType);
+        
+        auto callSubExpr = CallExpr::create(tc.Context, body, escapable,
+                                            {}, {},
+                                            /*trailing closure*/ false,
+                                            /*implicit*/ true);
+        cs.setType(callSubExpr, resultType);
+        
+        auto replacement = new (tc.Context)
+          MakeTemporarilyEscapableExpr(apply->getFn()->getLoc(),
+                                       apply->getArg()->getStartLoc(),
+                                       nonescaping,
+                                       callSubExpr,
+                                       apply->getArg()->getEndLoc(),
+                                       escapable);
+        cs.setType(replacement, resultType);
+        return replacement;
+      }
+      
+      case DeclTypeCheckingSemantics::Normal:
+        return nullptr;
+      }
+    };
+
   // The function is always an rvalue.
   fn = cs.coerceToRValue(fn);
   assert(fn && "Rvalue conversion failed?");
   if (!fn)
     return nullptr;
+  
+  // Resolve applications of decls with special semantics.
+  if (auto declRef =
+      dyn_cast<DeclRefExpr>(getSemanticExprForDeclOrMemberRef(fn))) {
+    if (auto special =
+        finishApplyOfDeclWithSpecialTypeCheckingSemantics(apply,
+                                                          declRef->getDecl(),
+                                                          openedType)) {
+      return special;
+    }
+  }
   
   // Handle applications that look through ImplicitlyUnwrappedOptional<T>.
   if (auto fnTy = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(fn)))

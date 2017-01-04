@@ -717,6 +717,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::OptionalObject:
     return false;
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
@@ -846,6 +847,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       continue;
 
     case ConstraintKind::DynamicTypeOf:
+    case ConstraintKind::EscapableFunctionOf:
       // Constraints from which we can't do anything.
       // FIXME: Record this somehow?
       continue;

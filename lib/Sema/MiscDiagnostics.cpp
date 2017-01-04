@@ -258,6 +258,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
+        
+        // Verify that special decls are eliminated.
+        checkForDeclWithSpecialTypeCheckingSemantics(DRE);
       }
       if (auto *MRE = dyn_cast<MemberRefExpr>(Base)) {
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
@@ -273,6 +276,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             AcceptableInOutExprs.insert(IOE);
       }
 
+      // Check decl refs in withoutActuallyEscaping blocks.
+      if (auto MakeEsc = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
+        if (auto DRE =
+              dyn_cast<DeclRefExpr>(MakeEsc->getNonescapingClosureValue()))
+          checkNoEscapeParameterUse(DRE, MakeEsc);
+      }
 
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
@@ -484,8 +493,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // The only valid use of the noescape parameter is an immediate call,
       // either as the callee or as an argument (in which case, the typechecker
-      // validates that the noescape bit didn't get stripped off).
-      if (ParentExpr && isa<ApplyExpr>(ParentExpr)) // param()
+      // validates that the noescape bit didn't get stripped off), or as
+      // a special case, in the binding of a withoutActuallyEscaping block.
+      if (ParentExpr
+          && (isa<ApplyExpr>(ParentExpr) // param()
+              || isa<MakeTemporarilyEscapableExpr>(ParentExpr)))
         return;
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
@@ -643,6 +655,17 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         TC.diagnose(DRE->getLoc(), topLevelDiag,
                     namePlusDot, k, pair.first->getName())
           .fixItInsert(DRE->getStartLoc(), namePlusDot);
+      }
+    }
+    
+    void checkForDeclWithSpecialTypeCheckingSemantics(const DeclRefExpr *DRE) {
+      // Referencing type(of:) and other decls with special type-checking
+      // behavior as functions is not implemented. Maybe we could wrap up the
+      // special-case behavior in a closure someday...
+      if (TC.getDeclTypeCheckingSemantics(DRE->getDecl())
+            != DeclTypeCheckingSemantics::Normal) {
+        TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
+                    DRE->getDecl()->getName());
       }
     }
     

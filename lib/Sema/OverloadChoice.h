@@ -89,7 +89,7 @@ class OverloadChoice {
   llvm::PointerIntPair<Type, 3, unsigned> BaseAndBits;
 
   /// \brief Either the declaration pointer (if the low bit is clear) or the
-  /// overload choice kind shifted by 1 with the low bit set.
+  /// overload choice kind shifted two bits with the low bit set.
   uintptr_t DeclOrKind;
 
   /// The kind of function reference.

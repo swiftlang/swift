@@ -338,6 +338,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(DynamicType)
     NON_LVALUE_EXPR(RebindSelfInConstructor)
     NON_LVALUE_EXPR(Apply)
+    NON_LVALUE_EXPR(MakeTemporarilyEscapable)
     NON_LVALUE_EXPR(ImplicitConversion)
     NON_LVALUE_EXPR(ExplicitCast)
     NON_LVALUE_EXPR(OptionalEvaluation)
@@ -450,6 +451,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(PostfixUnary);
   NO_REFERENCE(Binary);
   NO_REFERENCE(DotSyntaxCall);
+  NO_REFERENCE(MakeTemporarilyEscapable);
 
   PASS_THROUGH_REFERENCE(ConstructorRefCall, getFn);
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
@@ -718,6 +720,7 @@ bool Expr::canAppendCallParentheses() const {
     return true;
 
   case ExprKind::OpenExistential:
+  case ExprKind::MakeTemporarilyEscapable:
     return false;
 
   case ExprKind::Call:

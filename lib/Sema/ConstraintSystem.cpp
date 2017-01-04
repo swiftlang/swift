@@ -1325,18 +1325,98 @@ void ConstraintSystem::addOverloadSet(Type boundType,
   addDisjunctionConstraint(overloads, locator, ForgetChoice, favoredChoice);
 }
 
+/// If we're resolving an overload set with a decl that has special type
+/// checking semantics, set up the special-case type system and return true;
+/// otherwise return false.
+static bool
+resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
+                                                     ConstraintLocator *locator,
+                                                     Type boundType,
+                                                     OverloadChoice choice,
+                                                     Type &refType,
+                                                     Type &openedFullType) {
+  assert(choice.getKind() == OverloadChoiceKind::Decl);
+  
+  switch (CS.TC.getDeclTypeCheckingSemantics(choice.getDecl())) {
+  case DeclTypeCheckingSemantics::Normal:
+    return false;
+    
+  case DeclTypeCheckingSemantics::TypeOf: {
+    // Proceed with a "DynamicType" operation. This produces an existential
+    // metatype from existentials, or a concrete metatype from non-
+    // existentials (as seen from the current abstraction level), which can't
+    // be expressed in the type system currently.
+    auto input = CS.createTypeVariable(
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+    auto output = CS.createTypeVariable(
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult), 0);
+    
+    auto inputArg = TupleTypeElt(input, CS.getASTContext().getIdentifier("of"));
+    auto inputTuple = TupleType::get(inputArg, CS.getASTContext());
+    
+    CS.addConstraint(ConstraintKind::DynamicTypeOf, output, input,
+        CS.getConstraintLocator(locator, ConstraintLocator::RvalueAdjustment));
+    refType = FunctionType::get(inputTuple, output);
+    openedFullType = refType;
+    return true;
+  }
+  case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
+    // Proceed with a "WithoutActuallyEscaping" operation. The body closure
+    // receives a copy of the argument closure that is temporarily made
+    // @escaping.
+    auto noescapeClosure = CS.createTypeVariable(
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+    auto escapeClosure = CS.createTypeVariable(
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+    CS.addConstraint(ConstraintKind::EscapableFunctionOf,
+         escapeClosure, noescapeClosure,
+         CS.getConstraintLocator(locator, ConstraintLocator::RvalueAdjustment));
+    auto result = CS.createTypeVariable(
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult), 0);
+    auto bodyClosure = FunctionType::get(
+      ParenType::get(CS.getASTContext(), escapeClosure), result,
+      FunctionType::ExtInfo(FunctionType::Representation::Swift,
+                            /*autoclosure*/ false,
+                            /*noescape*/ true,
+                            /*throws*/ true));
+    TupleTypeElt argTupleElts[] = {
+      TupleTypeElt(noescapeClosure),
+      TupleTypeElt(bodyClosure, CS.getASTContext().getIdentifier("do")),
+    };
+    
+    auto argTuple = TupleType::get(argTupleElts, CS.getASTContext());
+    refType = FunctionType::get(argTuple, result,
+      FunctionType::ExtInfo(FunctionType::Representation::Swift,
+                            /*autoclosure*/ false,
+                            /*noescape*/ false,
+                            /*throws*/ true));
+    openedFullType = refType;
+    return true;
+  }
+  }
+}
+
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
                                        OverloadChoice choice) {
   // Determine the type to which we'll bind the overload set's type.
   Type refType;
   Type openedFullType;
-  switch (choice.getKind()) {
-  case OverloadChoiceKind::DeclViaBridge:
+  switch (auto kind = choice.getKind()) {
   case OverloadChoiceKind::Decl:
+    // If we refer to a top-level decl with special type-checking semantics,
+    // handle it now.
+    if (resolveOverloadForDeclWithSpecialTypeCheckingSemantics(
+          *this, locator, boundType, choice, refType, openedFullType))
+      break;
+    
+    SWIFT_FALLTHROUGH;
+
+  case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::TypeDecl: {
+  
     bool isTypeReference = choice.getKind() == OverloadChoiceKind::TypeDecl;
     bool isDynamicResult
       = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
@@ -1420,7 +1500,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
     break;
   }
-  
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
   
   // If we're binding to an init member, the 'throws' need to line up between
