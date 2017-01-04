@@ -322,7 +322,8 @@ clang::NamedDecl *SwiftLookupTable::resolveContext(StringRef unresolvedName) {
 }
 
 void SwiftLookupTable::addCategory(clang::ObjCCategoryDecl *category) {
-  assert(!Reader && "Cannot modify a lookup table stored on disk");
+  // Force deserialization to occur before appending.
+  (void) categories();
 
   // Add the category.
   Categories.push_back(category);
@@ -467,8 +468,6 @@ bool SwiftLookupTable::addLocalEntry(SingleEntry newEntry,
 void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
                                 EffectiveClangContext effectiveContext,
                                 const clang::Preprocessor *PP) {
-  assert(!Reader && "Cannot modify a lookup table stored on disk");
-
   // Translate the context.
   auto contextOpt = translateContext(effectiveContext);
   if (!contextOpt) {
@@ -483,6 +482,9 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
 
     return;
   }
+
+  // Populate cache from reader if necessary.
+  findOrCreate(name.getBaseName().str());
 
   auto context = *contextOpt;
 
