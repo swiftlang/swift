@@ -538,13 +538,20 @@ public:
   ///
   /// This distinguishes static references to types, like Int, from metatype
   /// values, "someTy: Any.Type".
-  bool isTypeReference() const;
+  bool isTypeReference(llvm::function_ref<Type(const Expr &)> getType
+                       = [](const Expr &E) -> Type {
+                         return E.getType();
+                       }) const;
 
   /// Determine whether this expression refers to a statically-derived metatype.
   ///
   /// This implies `isTypeReference`, but also requires that the referenced type
   /// is not an archetype or dependent type.
-  bool isStaticallyDerivedMetatype() const;
+  bool isStaticallyDerivedMetatype(
+      llvm::function_ref<Type(const Expr &)> getType
+      = [](const Expr &E) -> Type {
+        return E.getType();
+      }) const;
 
   /// isImplicit - Determines whether this expression was implicitly-generated,
   /// rather than explicitly written in the AST.
@@ -1324,7 +1331,14 @@ public:
 
   // The type of a TypeExpr is always a metatype type.  Return the instance
   // type, ErrorType if an error, or null if not set yet.
-  Type getInstanceType() const;
+  Type getInstanceType(llvm::function_ref<bool(const Expr &)> hasType
+                       = [](const Expr &E) -> bool {
+                         return !!E.getType();
+                       },
+                       llvm::function_ref<Type(const Expr &)> getType
+                       = [](const Expr &E) -> Type {
+                         return E.getType();
+                       }) const;
   
   // Create an implicit TypeExpr, which has no location information.
   static TypeExpr *createImplicit(Type Ty, ASTContext &C) {
