@@ -554,6 +554,11 @@ Optional<Type> ConstraintSystem::isSetType(Type type) {
 }
 
 bool ConstraintSystem::isAnyHashableType(Type type) {
+  if (auto tv = type->getAs<TypeVariableType>()) {
+    auto fixedType = getFixedType(tv);
+    return fixedType && isAnyHashableType(fixedType);
+  }
+
   if (auto st = type->getAs<StructType>()) {
     return st->getDecl() == TC.Context.getAnyHashableDecl();
   }
