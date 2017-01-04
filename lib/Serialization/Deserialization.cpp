@@ -2478,7 +2478,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     declOrOffset = assocType;
 
     assocType->computeType();
-    assocType->setAccessibility(cast<ProtocolDecl>(DC)->getFormalAccess());
+    Accessibility parentAccess = cast<ProtocolDecl>(DC)->getFormalAccess();
+    assocType->setAccessibility(std::max(parentAccess,Accessibility::Internal));
     if (isImplicit)
       assocType->setImplicit();
 

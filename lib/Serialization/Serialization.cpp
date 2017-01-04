@@ -2217,11 +2217,9 @@ void Serializer::writeDecl(const Decl *D) {
                                         addIdentifierRef(discriminator));
       }
     }
-  }
 
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->getDeclContext()->isLocalContext()) {
-      auto discriminator = VD->getLocalDiscriminator();
+    if (value->getDeclContext()->isLocalContext()) {
+      auto discriminator = value->getLocalDiscriminator();
       auto abbrCode = DeclTypeAbbrCodes[LocalDiscriminatorLayout::Code];
       LocalDiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            discriminator);
