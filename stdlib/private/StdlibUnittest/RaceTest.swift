@@ -678,7 +678,7 @@ public func consumeCPU(units amountOfWork: Int) {
 }
 
 internal struct ClosureBasedRaceTest : RaceTestWithPerTrialData {
-  static var thread: () -> () = {}
+  static var thread: () -> Void = {}
 
   class RaceData {}
   typealias ThreadLocalData = Void
@@ -703,7 +703,7 @@ public func runRaceTest(
   trials: Int,
   timeoutInSeconds: Int? = nil,
   threads: Int? = nil,
-  invoking body: @escaping () -> ()
+  invoking body: @escaping () -> Void
 ) {
   ClosureBasedRaceTest.thread = body
   runRaceTest(ClosureBasedRaceTest.self, trials: trials,
@@ -714,7 +714,7 @@ public func runRaceTest(
   operations: Int,
   timeoutInSeconds: Int? = nil,
   threads: Int? = nil,
-  invoking body: @escaping () -> ()
+  invoking body: @escaping () -> Void
 ) {
   ClosureBasedRaceTest.thread = body
   runRaceTest(ClosureBasedRaceTest.self, operations: operations,
