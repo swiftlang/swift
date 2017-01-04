@@ -5,6 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-{{}typealias{guard{return.h.A>String({
+// RUN: not %target-swift-frontend %s -emit-ir
+f
+let c
+{{guard{return.h.E == Int

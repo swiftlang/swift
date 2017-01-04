@@ -7200,25 +7200,56 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
     llvm::SaveAndRestore<DeclContext*> SavedDC(CS->DC, closure);
     
     // Otherwise, we're ok to type check the subexpr.
-    Expr *returnedExpr = nullptr;
-    if (RS->hasResult())
-      returnedExpr =
-        typeCheckChildIndependently(RS->getResult(),
-                                    TCC_AllowUnresolvedTypeVariables);
+    Type resultType;
+    if (RS->hasResult()) {
+      auto resultExpr = RS->getResult();
+      ConcreteDeclRef decl = nullptr;
+
+      // If return expression uses closure parameters, which have/are
+      // type variables, such means that we won't be be able to
+      // type-check result correctly and, unfornutately,
+      // we are going to leak type variables from the parent
+      // constraint system through declaration types.
+      bool hasUnresolvedParams = false;
+      resultExpr->forEachChildExpr([&](Expr *childExpr) -> Expr *{
+        if (auto DRE = dyn_cast<DeclRefExpr>(resultExpr)) {
+          if (auto param = dyn_cast<ParamDecl>(DRE->getDecl())) {
+            auto paramType = param->getType();
+            if (!paramType || paramType->hasTypeVariable()) {
+              hasUnresolvedParams = true;
+              return nullptr;
+            }
+          }
+        }
+        return childExpr;
+      });
+
+      if (hasUnresolvedParams)
+        continue;
+
+      // Obtain type of the result expression without applying solutions,
+      // because otherwise this might result in leaking of type variables,
+      // since we are not reseting result statement and if expression is
+      // sucessfully type-checked its type cleanup is going to be disabled
+      // (we are allowing unresolved types), and as a side-effect it might
+      // also be transformed e.g. OverloadedDeclRefExpr -> DeclRefExpr.
+      auto type = CS->TC.getTypeOfExpressionWithoutApplying(resultExpr,
+                         CS->DC, decl, FreeTypeVariableBinding::UnresolvedType);
+      if (type)
+        resultType = type.getValue();
+    }
     
     // If we found a type, presuppose it was the intended result and insert a
     // fixit hint.
-    if (returnedExpr && returnedExpr->getType() &&
-        !isUnresolvedOrTypeVarType(returnedExpr->getType())) {
-      
-      std::string resultType = returnedExpr->getType()->getString();
+    if (resultType && !isUnresolvedOrTypeVarType(resultType)) {
+      std::string resultTypeStr = resultType->getString();
       
       // If there is a location for an 'in' token, then the argument list was
       // specified somehow but no return type was.  Insert a "-> ReturnType "
       // before the in token.
       if (closure->getInLoc().isValid()) {
         diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type)
-          .fixItInsert(closure->getInLoc(), "-> " + resultType + " ");
+          .fixItInsert(closure->getInLoc(), "-> " + resultTypeStr + " ");
         return true;
       }
       
@@ -7228,7 +7259,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       //
       // As such, we insert " () -> ReturnType in " right after the '{' that
       // starts the closure body.
-      auto insertString = " () -> " + resultType + " " + "in ";
+      auto insertString = " () -> " + resultTypeStr + " " + "in ";
       diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type)
         .fixItInsertAfter(closure->getBody()->getLBraceLoc(), insertString);
       return true;

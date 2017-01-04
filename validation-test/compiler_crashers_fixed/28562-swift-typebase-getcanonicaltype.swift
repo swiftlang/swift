@@ -5,5 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-{guard{if{return 0+1
+// RUN: not %target-swift-frontend %s -emit-ir
+{class A{let f={return 0 &+ 1 a}}s

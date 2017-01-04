@@ -5,13 +5,8 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// RUN: not --crash %target-swift-frontend %s -typecheck
-// REQUIRES: SR-3149
-t c
-let : {{
-return $0
-== Int
-struct B
-}
-g:
+// RUN: not %target-swift-frontend %s -typecheck
+// REQUIRES: asserts
+let c{{
+return.E == .i
+c

@@ -5,9 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-// REQUIRES: SR-3149
-guard{{return $0
-== Int
-p
+// RUN: not %target-swift-frontend %s -emit-ir
+// REQUIRES: asserts
+{c:{a{}guard{return $0+1
