@@ -736,11 +736,16 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
-    if (func->hasDynamicSelf()) {
-      Type selfTy = openedFnType->getInput()->getRValueInstanceType();
-      openedType = openedType->replaceCovariantResultType(
-                     selfTy,
-                     func->getNumParameterLists());
+    if (!func->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      if (func->hasDynamicSelf()) {
+        Type selfTy = openedFnType->getInput()->getRValueInstanceType();
+        openedType = openedType->replaceCovariantResultType(
+                       selfTy,
+                       func->getNumParameterLists());
+        openedFnType = openedType->castTo<FunctionType>();
+      }
+    } else {
+      openedType = openedType->eraseDynamicSelfType();
       openedFnType = openedType->castTo<FunctionType>();
     }
 
@@ -1046,50 +1051,13 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // Handle associated type lookup as a special case, horribly.
   // FIXME: This is an awful hack.
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(value)) {
-    // Error recovery path.
-    if (baseObjTy->isOpenedExistential()) {
-      Type memberTy = ErrorType::get(TC.Context);
-      auto openedType = FunctionType::get(baseObjTy, memberTy);
-      return { openedType, memberTy };
-    }
-
+  if (isa<AssociatedTypeDecl>(value)) {
     // Refer to a member of the archetype directly.
-    if (auto archetype = baseObjTy->getAs<ArchetypeType>()) {
-      Type memberTy = archetype->getNestedType(value->getName());
-      if (!isTypeReference)
-        memberTy = MetatypeType::get(memberTy);
+    auto archetype = baseObjTy->castTo<ArchetypeType>();
+    Type memberTy = archetype->getNestedType(value->getName());
+    if (!isTypeReference)
+      memberTy = MetatypeType::get(memberTy);
 
-      auto openedType = FunctionType::get(baseObjTy, memberTy);
-      return { openedType, memberTy };
-    }
-
-    // If we have a nominal type that conforms to the protocol in which the
-    // associated type resides, use the witness.
-    if (!baseObjTy->isExistentialType() &&
-        baseObjTy->getAnyNominal()) {
-      auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
-      if (auto conformance =
-            TC.conformsToProtocol(baseObjTy, proto, DC,
-                                  ConformanceCheckFlags::InExpression)) {
-        if (conformance->isConcrete()) {
-          auto memberTy = conformance->getConcrete()->getTypeWitness(assocType,
-                                                                     &TC)
-            .getReplacement();
-          if (!isTypeReference)
-            memberTy = MetatypeType::get(memberTy);
-
-          auto openedType = FunctionType::get(baseObjTy, memberTy);
-          return { openedType, memberTy };
-        }
-      }
-    }
-
-    // FIXME: Totally bogus fallthrough.
-    Type memberTy = isTypeReference
-        ? assocType->getDeclaredInterfaceType()
-        : assocType->getInterfaceType();
-    memberTy = assocType->getProtocol()->mapTypeIntoContext(memberTy);
     auto openedType = FunctionType::get(baseObjTy, memberTy);
     return { openedType, memberTy };
   }
@@ -1173,28 +1141,22 @@ ConstraintSystem::getTypeOfMemberReference(
     }
   }
 
-  // If this is a method whose result type has a dynamic Self return, replace
-  // DynamicSelf with the actual object type.
-  if (auto func = dyn_cast<FuncDecl>(value)) {
-    if (func->hasDynamicSelf() ||
-        (baseObjTy->isExistentialType() &&
-         func->hasArchetypeSelf())) {
-      openedType = openedType->replaceCovariantResultType(
-                     baseObjTy,
-                     func->getNumParameterLists());
+  if (!outerDC->getAsProtocolOrProtocolExtensionContext()) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+      if ((isa<FuncDecl>(func) &&
+           cast<FuncDecl>(func)->hasDynamicSelf()) ||
+          (isa<ConstructorDecl>(func) &&
+           !baseObjTy->getAnyOptionalObjectType())) {
+        openedType = openedType->replaceCovariantResultType(
+                       baseObjTy,
+                       func->getNumParameterLists());
+      }
     }
-  }
-  // If this is an initializer, replace the result type with the base
-  // object type.
-  else if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
-    auto resultTy = baseObjTy;
-    if (ctor->getFailability() != OTK_None)
-      resultTy = OptionalType::get(ctor->getFailability(), resultTy);
-
-    openedType = openedType->replaceCovariantResultType(
-                     resultTy,
-                     /*uncurryLevel=*/ 2,
-                     /*preserveOptionality=*/ false);
+  } else {
+    // Protocol requirements returning Self have a dynamic Self return
+    // type. Erase the dynamic Self since it only comes into play during
+    // protocol conformance checking.
+    openedType = openedType->eraseDynamicSelfType();
   }
 
   // If we are looking at a member of an existential, open the existential.
@@ -1238,29 +1200,6 @@ ConstraintSystem::getTypeOfMemberReference(
     }
 
     type = FunctionType::get(fnType->getInput(), elementTy);
-  } else if (isa<ProtocolDecl>(outerDC) &&
-             isa<AssociatedTypeDecl>(value)) {
-    // When we have an associated type, the base type conforms to the
-    // given protocol, so use the type witness directly.
-    // FIXME: Diagnose existentials properly.
-    auto proto = cast<ProtocolDecl>(outerDC);
-    auto assocType = cast<AssociatedTypeDecl>(value);
-
-    type = openedFnType->getResult();
-    if (baseOpenedTy->is<ArchetypeType>()) {
-      // For an archetype, we substitute the base object for the base.
-      // FIXME: Feels like a total hack.
-    } else if (!baseOpenedTy->isExistentialType() &&
-               !baseOpenedTy->is<ArchetypeType>()) {
-      if (auto conformance =
-            TC.conformsToProtocol(baseOpenedTy, proto, DC,
-                                  ConformanceCheckFlags::InExpression)) {
-        if (conformance->isConcrete()) {
-          type = conformance->getConcrete()->getTypeWitness(assocType, &TC)
-                   .getReplacement();
-        }
-      }
-    }
   } else if (!value->isInstanceMember() || isInstance) {
     // For a constructor, enum element, static method, static property,
     // or an instance method referenced through an instance, we've consumed the
@@ -1280,6 +1219,27 @@ ConstraintSystem::getTypeOfMemberReference(
     // For an unbound instance method reference, replace the 'Self'
     // parameter with the base type.
     type = openedFnType->replaceSelfParameterType(baseObjTy);
+  }
+
+  // When accessing members of an existential, replace the 'Self' type
+  // parameter with the existential type, since formally the access will
+  // operate on existentials and not type parameters.
+  if (!isDynamicResult && baseObjTy->isExistentialType()) {
+    auto selfTy = replacements[outerDC->getSelfInterfaceType()
+          ->getCanonicalType()];
+    auto existentialTy = outerDC->getDeclaredTypeOfContext();
+
+    type = type.transform([&](Type t) -> Type {
+      if (auto *selfTy = t->getAs<DynamicSelfType>())
+        t = selfTy->getSelfType();
+      if (t->is<TypeVariableType>())
+        if (t->isEqual(selfTy))
+        return existentialTy;
+      if (auto *metatypeTy = t->getAs<MetatypeType>())
+        if (metatypeTy->getInstanceType()->isEqual(selfTy))
+          return ExistentialMetatypeType::get(existentialTy);
+      return t;
+    });
   }
 
   // If we opened up any type variables, record the replacements.

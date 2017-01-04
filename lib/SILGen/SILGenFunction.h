@@ -1535,7 +1535,9 @@ public:
   CanSILFunctionType buildThunkType(ManagedValue fn,
                                     CanSILFunctionType expectedType,
                                     CanSILFunctionType &substFnType,
-                                    SmallVectorImpl<Substitution> &subs);
+                                    GenericEnvironment *&genericEnv,
+                                    SubstitutionMap &contextSubMap,
+                                    SubstitutionMap &interfaceSubMap);
 
   //===--------------------------------------------------------------------===//
   // Declarations

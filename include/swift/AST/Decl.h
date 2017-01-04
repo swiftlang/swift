@@ -5070,13 +5070,6 @@ public:
     FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
   }
 
-  /// Determine whether this method has an archetype \c Self return
-  /// type. This is when a method defined in a protocol extension
-  /// returns Self. In this case, the type is not quite as constrained
-  /// as a dynamic Self, because it is bound to the conforming type,
-  /// not the dynamic type of the value.
-  bool hasArchetypeSelf() const;
-
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);
   }

@@ -489,7 +489,11 @@ public:
 
   /// Erase the given opened existential type by replacing it with its
   /// existential type throughout the given type.
-  Type eraseOpenedExistential(ModuleDecl *module, ArchetypeType *opened);
+  Type eraseOpenedExistential(ArchetypeType *opened);
+
+  /// Erase DynamicSelfType from the given type by replacing it with its
+  /// underlying type.
+  Type eraseDynamicSelfType();
 
   /// \brief Compute and return the set of type variables that occur within this
   /// type.
@@ -799,8 +803,7 @@ public:
   /// replacing the type. With uncurry level == 0, this simply
   /// replaces the current type with the new result type.
   Type replaceCovariantResultType(Type newResultType,
-                                  unsigned uncurryLevel,
-                                  bool preserveOptionality = true);
+                                  unsigned uncurryLevel);
 
   /// Returns a new function type exactly like this one but with the self
   /// parameter replaced. Only makes sense for function members of types.
