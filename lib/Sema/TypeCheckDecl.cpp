@@ -2901,7 +2901,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   auto behaviorSelf = conformance->getType();
   auto behaviorInterfaceSelf = conformance->getInterfaceType();
   auto behaviorProto = conformance->getProtocol();
-  auto behaviorProtoTy = ProtocolType::get(behaviorProto, TC.Context);
+  auto behaviorProtoTy = behaviorProto->getDeclaredType();
   
   // Treat any inherited protocols as constraints on `Self`, and gather
   // conformances from the containing type.
@@ -3557,7 +3557,7 @@ public:
       }
     }
 
-    if (IsSecondPass && !IsFirstPass) {
+    if (!IsFirstPass) {
       TC.checkUnsupportedProtocolType(decl);
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         TC.checkDeclCircularity(nominal);

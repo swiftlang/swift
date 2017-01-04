@@ -1081,7 +1081,8 @@ RequirementEnvironment::RequirementEnvironment(
     switch (reqReq.getKind()) {
     case RequirementKind::Conformance: {
       // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
+      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
+                                               SubstFlags::UseErrorType);
       if (!first->isTypeParameter()) break;
 
       builder.addRequirement(Requirement(RequirementKind::Conformance,
@@ -1092,8 +1093,10 @@ RequirementEnvironment::RequirementEnvironment(
 
     case RequirementKind::Superclass: {
       // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
-      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap);
+      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
+                                               SubstFlags::UseErrorType);
+      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap,
+                                                 SubstFlags::UseErrorType);
 
       if (!first->isTypeParameter()) break;
 
@@ -1105,8 +1108,10 @@ RequirementEnvironment::RequirementEnvironment(
 
     case RequirementKind::SameType: {
       // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
-      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap);
+      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
+                                               SubstFlags::UseErrorType);
+      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap,
+                                                 SubstFlags::UseErrorType);
 
       // FIXME: We really want to check hasTypeParameter here, but the
       // ArchetypeBuilder isn't ready for that.
@@ -2828,6 +2833,18 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
   for (auto reqProto : assocType->getConformingProtocols()) {
     if (!tc.conformsToProtocol(type, reqProto, dc, None))
       return reqProto;
+
+    // FIXME: Why is conformsToProtocol() not enough? The stdlib doesn't
+    // build unless we fail here while inferring an associated type
+    // somewhere.
+    if (type->isSpecialized()) {
+      auto substitutions = type->gatherAllSubstitutions(
+          dc->getParentModule(), &tc);
+      for (auto sub : substitutions) {
+        if (sub.getReplacement()->hasError())
+          return reqProto;
+      }
+    }
   }
 
   // Success!
@@ -3405,6 +3422,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // Local function that folds dependent member types with non-dependent
   // bases into actual member references.
   std::function<Type(Type)> foldDependentMemberTypes;
+  llvm::DenseSet<AssociatedTypeDecl *> recursionCheck;
   foldDependentMemberTypes = [&](Type type) -> Type {
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
       auto baseTy = depMemTy->getBase().transform(foldDependentMemberTypes);
@@ -3414,6 +3432,11 @@ void ConformanceChecker::resolveTypeWitnesses() {
       auto assocType = depMemTy->getAssocType();
       if (!assocType)
         return nullptr;
+
+      if (!recursionCheck.insert(assocType).second)
+        return nullptr;
+
+      SWIFT_DEFER { recursionCheck.erase(assocType); };
 
       // Try to substitute into the base type.
       if (Type result = depMemTy->substBaseType(DC->getParentModule(), baseTy)){

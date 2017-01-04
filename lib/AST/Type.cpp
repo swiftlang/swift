@@ -1139,7 +1139,8 @@ CanType TypeBase::getCanonicalType() {
 
   case TypeKind::Enum:
   case TypeKind::Struct:
-  case TypeKind::Class: {
+  case TypeKind::Class:
+  case TypeKind::Protocol: {
     auto nominalTy = cast<NominalType>(this);
     auto parentTy = nominalTy->getParent()->getCanonicalType();
     Result = NominalType::get(nominalTy->getDecl(), parentTy,
@@ -1317,6 +1318,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::Class:
+  case TypeKind::Protocol:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
   case TypeKind::UnownedStorage:
@@ -1465,6 +1467,7 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::Class:
+  case TypeKind::Protocol:
   case TypeKind::NameAlias:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
@@ -3162,6 +3165,13 @@ TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
     }
 
     // Continue looking into the parent.
+    if (auto protocolTy = baseTy->getAs<ProtocolType>()) {
+      baseTy = protocolTy->getParent();
+      curGenericParams = curGenericParams->getOuterParameters();
+      continue;
+    }
+
+    // Continue looking into the parent.
     if (auto nominalTy = baseTy->getAs<NominalType>()) {
       baseTy = nominalTy->getParent();
       continue;
@@ -3179,12 +3189,9 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
 
   TypeSubstitutionMap substitutions;
 
-  // If the member is not part of a type, there's nothing to substitute.
-  if (!memberDC->isTypeContext())
-    return substitutions;
-
   // Compute the set of member substitutions to apply.
-  substitutions = getContextSubstitutions(memberDC);
+  if (memberDC->isTypeContext())
+    substitutions = getContextSubstitutions(memberDC);
 
   // If the member itself is generic, preserve its generic parameters.
   // We need this since code completion and diagnostics want to be able
@@ -3213,12 +3220,7 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
 
   assert(memberType);
 
-  // Compute the set of member substitutions to apply.
   auto substitutions = getMemberSubstitutions(member);
-  if (substitutions.empty())
-    return memberType;
-
-  // Perform the substitutions.
   return memberType.subst(module, substitutions, SubstFlags::UseErrorType);
 }
 
@@ -3303,7 +3305,8 @@ case TypeKind::Id:
 
   case TypeKind::Enum:
   case TypeKind::Struct:
-  case TypeKind::Class: {
+  case TypeKind::Class:
+  case TypeKind::Protocol: {
     auto nominalTy = cast<NominalType>(base);
     if (auto parentTy = nominalTy->getParent()) {
       parentTy = parentTy.transform(fn);

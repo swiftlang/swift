@@ -602,6 +602,12 @@ TypeBase::gatherAllSubstitutions(Module *module,
       continue;
     }
 
+    if (auto protocol = parent->getAs<ProtocolType>()) {
+      parent = protocol->getParent();
+      lastGenericIndex--;
+      continue;
+    }
+
     if (auto nominal = parent->getAs<NominalType>()) {
       parent = nominal->getParent();
       continue;
@@ -761,11 +767,8 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
   // intended type might have.
-  if (type->is<UnresolvedType>()) {
-    return ProtocolConformanceRef(
-             ctx.getConformance(type, protocol, protocol->getLoc(), this,
-                                ProtocolConformanceState::Complete));
-  }
+  if (type->is<UnresolvedType>())
+    return ProtocolConformanceRef(protocol);
 
   auto nominal = type->getAnyNominal();
 
@@ -820,11 +823,6 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
       // the specialized conformance.
       auto substitutions = type->gatherAllSubstitutions(this, resolver,
                                                         explicitConformanceDC);
-      
-      for (auto sub : substitutions) {
-        if (sub.getReplacement()->hasError())
-          return None;
-      }
 
       // Create the specialized conformance entry.
       auto result = ctx.getSpecializedConformance(type, conformance,

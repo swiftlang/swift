@@ -1395,6 +1395,8 @@ ASTContext::getConformance(Type conformingType,
                            SourceLoc loc,
                            DeclContext *dc,
                            ProtocolConformanceState state) {
+  assert(dc->isTypeContext());
+
   llvm::FoldingSetNodeID id;
   NormalProtocolConformance::Profile(id, protocol, dc);
 
@@ -2645,7 +2647,7 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext 
   case DeclKind::Class:
     return ClassType::get(cast<ClassDecl>(D), Parent, C);
   case DeclKind::Protocol: {
-    return ProtocolType::get(cast<ProtocolDecl>(D), C);
+    return ProtocolType::get(cast<ProtocolDecl>(D), Parent, C);
   }
 
   default:
@@ -3288,12 +3290,8 @@ ImplicitlyUnwrappedOptionalType *ImplicitlyUnwrappedOptionalType::get(Type base)
   return entry = new (C, arena) ImplicitlyUnwrappedOptionalType(C, base, properties);
 }
 
-ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {
-  // Protocol types can never be nested inside other types, but we should
-  // model this anyway to fix some compiler crashes when computing
-  // substitutions on invalid code.
-  Type Parent;
-
+ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
+                                const ASTContext &C) {
   llvm::FoldingSetNodeID id;
   ProtocolType::Profile(id, D, Parent);
 
@@ -3306,15 +3304,16 @@ ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {
         = C.Impl.getArena(arena).ProtocolTypes.FindNodeOrInsertPos(id, insertPos))
     return protoTy;
 
-  auto protoTy = new (C, arena) ProtocolType(D, C);
+  auto protoTy = new (C, arena) ProtocolType(D, Parent, C, properties);
   C.Impl.getArena(arena).ProtocolTypes.InsertNode(protoTy, insertPos);
 
   return protoTy;
 }
 
-ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)
-  : NominalType(TypeKind::Protocol, &Ctx, TheDecl, /*Parent=*/Type(),
-                RecursiveTypeProperties()) { }
+ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
+                           const ASTContext &Ctx,
+                           RecursiveTypeProperties properties)
+  : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
 
 void ProtocolType::Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D,
                            Type Parent) {

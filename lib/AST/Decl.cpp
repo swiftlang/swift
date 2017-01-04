@@ -2043,11 +2043,8 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       return interfaceType;
 
     auto *genericEnv = decl->getGenericEnvironmentOfContext();
-    if (genericEnv == nullptr)
-      return ErrorType::get(ctx);
-
-    return genericEnv->mapTypeIntoContext(decl->getModuleContext(),
-                                          interfaceType)->getCanonicalType();
+    return GenericEnvironment::mapTypeIntoContext(
+        decl->getModuleContext(), genericEnv, interfaceType);
   }
 
   // Get the parent type.
@@ -2064,13 +2061,14 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       Ty = dc->getDeclaredInterfaceType();
       break;
     }
-    if (!Ty || Ty->hasError())
-      return Ty;
+    if (!Ty)
+      return Type();
+    if (Ty->is<ErrorType>())
+      Ty = Type();
   }
 
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    return ProtocolType::get(proto, ctx);
-  } else if (decl->getGenericParams()) {
+  if (decl->getGenericParams() &&
+      !isa<ProtocolDecl>(decl)) {
     switch (kind) {
     case DeclTypeKind::DeclaredType:
       return UnboundGenericType::get(decl, Ty, ctx);
@@ -2982,7 +2980,7 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
   auto selfId = ctx.Id_Self;
   auto selfDecl = new (ctx) GenericTypeParamDecl(dc, selfId,
                                                  SourceLoc(), depth, 0);
-  auto protoType = ProtocolType::get(this, ctx);
+  auto protoType = getDeclaredType();
   TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
   selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
   selfDecl->setImplicit();
@@ -3569,7 +3567,8 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   if (auto *VP = dyn_cast<VarPattern>(Pat))
     Pat = VP->getSubPattern();
   if (auto *TP = dyn_cast<TypedPattern>(Pat))
-    return TP->getTypeLoc().getTypeRepr()->getSourceRange();
+    if (auto typeRepr = TP->getTypeLoc().getTypeRepr())
+      return typeRepr->getSourceRange();
 
   return SourceRange();
 }
@@ -3626,10 +3625,11 @@ Pattern *VarDecl::getParentPattern() const {
 }
 
 bool VarDecl::isSelfParameter() const {
-  // Note: we need to check the isImplicit() bit here to make sure that we
-  // don't classify explicit parameters declared with `self` as the self param.
-  return isa<ParamDecl>(this) && getName() == getASTContext().Id_self &&
-         isImplicit();
+  if (isa<ParamDecl>(this))
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(getDeclContext()))
+      return AFD->getImplicitSelfDecl() == this;
+
+  return false;
 }
 
 /// Return true if this stored property needs to be accessed with getters and
@@ -4189,14 +4189,19 @@ void AbstractFunctionDecl::setGenericParams(GenericParamList *GP) {
 /// Note that some functions don't have an implicit 'self' decl, for example,
 /// free functions.  In this case nullptr is returned.
 ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
-  auto paramLists = getParameterLists();
-  if (paramLists.empty())
+  if (!getDeclContext()->isTypeContext())
     return nullptr;
 
   // "self" is always the first parameter list.
-  if (paramLists[0]->size() == 1 && paramLists[0]->get(0)->isSelfParameter())
-    return paramLists[0]->get(0);
-  return nullptr;
+  auto paramLists = getParameterLists();
+  assert(paramLists.size() >= 1);
+  assert(paramLists[0]->size() == 1);
+
+  auto selfParam = paramLists[0]->get(0);
+  assert(selfParam->getName() == getASTContext().Id_self);
+  assert(selfParam->isImplicit());
+
+  return selfParam;
 }
 
 std::pair<DefaultArgumentKind, Type>

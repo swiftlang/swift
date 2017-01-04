@@ -127,12 +127,12 @@ enum class DeclTypeKind : unsigned {
 };
 
 static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
-  if (ED->isInvalid())
-    return ErrorType::get(ED->getASTContext());
-
   auto type = ED->getExtendedType();
-  if (!type)
+  if (!type) {
+    if (ED->isInvalid())
+      return ErrorType::get(ED->getASTContext());
     return Type();
+  }
 
   if (type->is<UnboundGenericType>()) {
     ED->getASTContext().getLazyResolver()->resolveExtension(
@@ -147,8 +147,6 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
   case DeclTypeKind::DeclaredType:
     return type->getAnyNominal()->getDeclaredType();
   case DeclTypeKind::DeclaredTypeInContext:
-    if (type->is<UnboundGenericType>())
-      return Type();
     return type;
   case DeclTypeKind::DeclaredInterfaceType:
     // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
