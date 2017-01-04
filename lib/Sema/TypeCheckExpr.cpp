@@ -654,6 +654,9 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
     return Type();
   TC.validateDecl(TD);
 
+  if (TD->isInvalid())
+    return Type();
+
   if (auto *NTD = dyn_cast<NominalTypeDecl>(TD))
     return NTD->getDeclaredType();
   return cast<TypeAliasDecl>(TD)->getDeclaredInterfaceType();
