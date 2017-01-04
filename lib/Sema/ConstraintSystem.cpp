@@ -147,6 +147,8 @@ void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
          "argument to setMustBeMaterializableRecursive may not be inherently "
          "non-materializable");
   type = getFixedTypeRecursive(type, /*wantRValue=*/false);
+  type = type->lookThroughAllAnyOptionalTypes();
+
   if (auto typeVar = type->getAs<TypeVariableType>()) {
     typeVar->getImpl().setMustBeMaterializable(getSavedBindings());
   } else if (auto *tupleTy = type->getAs<TupleType>()) {
