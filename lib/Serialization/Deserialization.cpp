@@ -4007,13 +4007,13 @@ Type ModuleFile::getType(TypeID TID) {
     
     SmallVector<Substitution, 4> genericArgs;
     if (auto sig = layout->getGenericSignature()) {
-      if (args.size() != sig->getGenericParams().size()) {
+      if (args.size() != sig->getAllDependentTypes().size()) {
         error();
         return nullptr;
       }
       TypeSubstitutionMap mappings;
       
-      for (unsigned i : indices(args)) {
+      for (unsigned i : indices(sig->getGenericParams())) {
         mappings[sig->getGenericParams()[i]] =
           getType(args[i])->getCanonicalType();
       }
