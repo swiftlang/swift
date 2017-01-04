@@ -435,9 +435,9 @@ public struct Locale : Hashable, Equatable, ReferenceConvertible {
 
 extension Locale : CustomDebugStringConvertible, CustomStringConvertible, CustomReflectable {
     private var _kindDescription : String {
-        if (self == Locale.autoupdatingCurrent) {
+        if self == Locale.autoupdatingCurrent {
             return "autoupdatingCurrent"
-        } else if (self == Locale.current) {
+        } else if self == Locale.current {
             return "current"
         } else {
             return "fixed"

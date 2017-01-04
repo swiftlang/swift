@@ -114,12 +114,12 @@ public struct _StringCore {
         src: srcStart,
         size: UInt(count << (srcElementWidth - 1)))
     }
-    else if (srcElementWidth < dstElementWidth) {
+    else if srcElementWidth < dstElementWidth {
       // Widening ASCII to UTF-16; we need to copy the bytes manually
       var dest = dstStart.assumingMemoryBound(to: UTF16.CodeUnit.self)
       var src = srcStart.assumingMemoryBound(to: UTF8.CodeUnit.self)
       let srcEnd = src + count
-      while (src != srcEnd) {
+      while src != srcEnd {
         dest.pointee = UTF16.CodeUnit(src.pointee)
         dest += 1
         src += 1
@@ -130,7 +130,7 @@ public struct _StringCore {
       var dest = dstStart.assumingMemoryBound(to: UTF8.CodeUnit.self)
       var src = srcStart.assumingMemoryBound(to: UTF16.CodeUnit.self)
       let srcEnd = src + count
-      while (src != srcEnd) {
+      while src != srcEnd {
         dest.pointee = UTF8.CodeUnit(src.pointee)
         dest += 1
         src += 1
@@ -365,7 +365,7 @@ public struct _StringCore {
         _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
       }
     }
-    else if (hasCocoaBuffer) {
+    else if hasCocoaBuffer {
 #if _runtime(_ObjC)
       _StringCore(
         _cocoaStringToContiguous(
