@@ -5,14 +5,13 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-sil
-
-// Submitted by https://github.com/deville (Andrii Chernenko)
-
-func f(value: Any) {
+// RUN: not %target-swift-frontend %s -emit-ir
+// REQUIRES: asserts
+struct A{
+func a()->String{
 }
-
-struct A {
 }
-
-Mirror(reflecting: A()).children.forEach(f)
+func b(){
+guard let c = A.a as?String else{
+}
+}

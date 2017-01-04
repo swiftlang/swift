@@ -33,14 +33,13 @@ struct S {
   }
 
   class SC {
-    // CHECK-LABEL: sil hidden  @_TFCV5types1S2SC3bar{{.*}}
+    // CHECK-LABEL: sil hidden @_TFCV5types1S2SC3bar{{.*}}
     func bar() {}
   }
 }
 
 func f() {
   class FC {
-    // CHECK-LABEL: sil shared @_TFCF5types1fFT_T_L_2FC3zim{{.*}}
     func zim() {}
   }
 }
@@ -48,12 +47,10 @@ func f() {
 func g(b b : Bool) {
   if (b) {
     class FC {
-      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L_2FC3zim{{.*}}
       func zim() {}
     }
   } else {
     class FC {
-      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L0_2FC3zim{{.*}}
       func zim() {}
     }
   }
@@ -94,3 +91,7 @@ func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
     return (nil, g)
   }
 }
+
+// CHECK-LABEL: sil shared @_TFCF5types1fFT_T_L_2FC3zim{{.*}}
+// CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L_2FC3zim{{.*}}
+// CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L0_2FC3zim{{.*}}
