@@ -865,7 +865,8 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
 bool ClangImporter::Implementation::importHeader(
     ModuleDecl *adapter, StringRef headerName, SourceLoc diagLoc,
     bool trackParsedSymbols,
-    std::unique_ptr<llvm::MemoryBuffer> sourceBuffer) {
+    std::unique_ptr<llvm::MemoryBuffer> sourceBuffer,
+    bool implicitImport) {
   // Don't even try to load the bridging header if the Clang AST is in a bad
   // state. It could cause a crash.
   auto &clangDiags = getClangASTContext().getDiagnostics();
@@ -917,6 +918,27 @@ bool ClangImporter::Implementation::importHeader(
     consumer.reset();
   }
 
+  // We're trying to discourage (and eventually deprecate) the use of implicit
+  // bridging-header imports triggered by IMPORTED_HEADER blocks in
+  // modules. There are two sub-cases to consider:
+  //
+  //   #1 The implicit import actually occurred.
+  //
+  //   #2 The user explicitly -import-objc-header'ed some header or PCH that
+  //      makes the implicit import redundant.
+  //
+  // It's not obvious how to exactly differentiate these cases given the
+  // interface clang gives us, but we only want to warn on case #1, and the
+  // non-emptiness of allParsedDecls is a _definite_ sign that we're in case
+  // #1. So we treat that as an approximation of the condition we're after, and
+  // accept that we might fail to warn in the odd case where "the import
+  // occurred" but didn't introduce any new decls.
+  if (implicitImport && !allParsedDecls.empty()) {
+    SwiftContext.Diags.diagnose(
+      diagLoc, diag::implicit_bridging_header_imported_from_module,
+      llvm::sys::path::filename(headerName), adapter->getName());
+  }
+
   // We can't do this as we're parsing because we may want to resolve naming
   // conflicts between the things we've parsed.
   for (auto group : allParsedDecls)
@@ -959,7 +981,7 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
                                                            /*OpenFile=*/true);
   if (headerFile && headerFile->getSize() == expectedSize &&
       headerFile->getModificationTime() == expectedModTime) {
-    return importBridgingHeader(header, adapter, diagLoc);
+    return importBridgingHeader(header, adapter, diagLoc, false, true);
   }
 
   if (!cachedContents.empty() && cachedContents.back() == '\0')
@@ -968,12 +990,13 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
     llvm::MemoryBuffer::getMemBuffer(cachedContents, header)
   };
   return Impl.importHeader(adapter, header, diagLoc, /*trackParsedSymbols=*/false,
-                           std::move(sourceBuffer));
+                           std::move(sourceBuffer), true);
 }
 
 bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          SourceLoc diagLoc,
-                                         bool trackParsedSymbols) {
+                                         bool trackParsedSymbols,
+                                         bool implicitImport) {
   if (llvm::sys::path::extension(header).endswith(PCH_EXTENSION)) {
     // We already imported this with -include-pch above, so we should have
     // collected a bunch of PCH-encoded module imports that we need to
@@ -1006,7 +1029,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
   };
 
   return Impl.importHeader(adapter, header, diagLoc, trackParsedSymbols,
-                           std::move(sourceBuffer));
+                           std::move(sourceBuffer), implicitImport);
 }
 
 std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
