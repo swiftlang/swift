@@ -48,9 +48,10 @@ public:
     REPLJob,
     LinkJob,
     GenerateDSYMJob,
+    GeneratePCHJob,
 
     JobFirst=CompileJob,
-    JobLast=GenerateDSYMJob
+    JobLast=GeneratePCHJob
   };
 
   static const char *getClassName(ActionClass AC);
@@ -265,6 +266,17 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::GenerateDSYMJob;
+  }
+};
+
+class GeneratePCHJobAction : public JobAction {
+  virtual void anchor();
+public:
+  explicit GeneratePCHJobAction(Action *Input)
+    : JobAction(Action::GeneratePCHJob, Input, types::TY_PCH) {}
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::GeneratePCHJob;
   }
 };
 

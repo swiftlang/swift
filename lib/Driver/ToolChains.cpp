@@ -133,7 +133,6 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
-  inputArgs.AddLastArg(arguments, options::OPT_import_objc_header);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
@@ -258,9 +257,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   
   Arguments.push_back(FrontendModeOption);
 
-  assert(context.Inputs.empty() &&
-         "The Swift frontend does not expect to be fed any input Jobs!");
-
   // Add input arguments.
   switch (context.OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
@@ -317,6 +313,23 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         Arguments);
+
+  // Pass along an -import-objc-header arg, replacing the argument with the name
+  // of any input PCH to the current action if one is present.
+  if (context.Args.hasArgNoClaim(options::OPT_import_objc_header)) {
+    bool ForwardAsIs = true;
+    for (auto *IJ : context.Inputs) {
+      if (!IJ->getOutput().getAnyOutputForType(types::TY_PCH).empty()) {
+        Arguments.push_back("-import-objc-header");
+        addInputsOfType(Arguments, context.Inputs, types::TY_PCH);
+        ForwardAsIs = false;
+        break;
+      }
+    }
+    if (ForwardAsIs) {
+      context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+    }
+  }
 
   // Pass the optimization level down to the frontend.
   context.Args.AddLastArg(Arguments, options::OPT_O_Group);
@@ -426,6 +439,7 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
 
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         Arguments);
+  context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
   // Pass the optimization level down to the frontend.
   context.Args.AddLastArg(Arguments, options::OPT_O_Group);
@@ -618,6 +632,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         Arguments);
+  context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
@@ -687,6 +702,7 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   ArgStringList FrontendArgs;
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         FrontendArgs);
+  context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
   context.Args.AddAllArgs(FrontendArgs, options::OPT_l, options::OPT_framework,
                           options::OPT_L);
 
@@ -729,6 +745,30 @@ ToolChain::constructInvocation(const GenerateDSYMJobAction &job,
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
   return {"dsymutil", Arguments};
+}
+
+ToolChain::InvocationInfo
+ToolChain::constructInvocation(const GeneratePCHJobAction &job,
+                               const JobContext &context) const {
+  assert(context.Inputs.empty());
+  assert(context.InputActions.size() == 1);
+  assert(context.Output.getPrimaryOutputType() == types::TY_PCH);
+
+  ArgStringList Arguments;
+
+  Arguments.push_back("-frontend");
+
+  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
+                        Arguments);
+
+  addInputsOfType(Arguments, context.InputActions, types::TY_ObjCHeader);
+
+  Arguments.push_back("-emit-pch");
+  Arguments.push_back("-o");
+  Arguments.push_back(
+    context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  return {SWIFT_EXECUTABLE_NAME, Arguments};
 }
 
 ToolChain::InvocationInfo
