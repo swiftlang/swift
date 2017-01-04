@@ -1102,7 +1102,7 @@ public struct Set<Element : Hashable> :
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   public var hashValue: Int {
-    // FIXME: <rdar://problem/18915294> Cache Set<T> hashValue
+    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
     var result: Int = _mixInt(0)
     for member in self {
        result ^= _mixInt(member.hashValue)

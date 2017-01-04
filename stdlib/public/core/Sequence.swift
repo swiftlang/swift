@@ -1382,6 +1382,7 @@ extension Sequence {
   }
 }
 
+// FIXME(ABI)#182
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,
 // pass an IteratorProtocol through IteratorSequence to give it "Sequence-ness"
 /// A sequence built around an iterator of type `Base`.
