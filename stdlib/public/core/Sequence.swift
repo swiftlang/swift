@@ -1349,8 +1349,7 @@ extension Sequence {
   /// Returns a subsequence containing all but the last element of the
   /// sequence.
   ///
-  /// The sequence must be finite. If the sequence has no elements, the result
-  /// is an empty subsequence.
+  /// The sequence must be finite. 
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
   ///     print(numbers.dropLast())
