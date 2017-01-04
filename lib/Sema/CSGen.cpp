@@ -2588,7 +2588,7 @@ namespace {
       // Compute the type to which the source must be converted to allow
       // assignment to the destination.
       auto destTy = CS.computeAssignDestType(expr->getDest(), expr->getLoc());
-      if (!destTy)
+      if (!destTy || destTy->getRValueType()->is<UnresolvedType>())
         return Type();
       
       // The source must be convertible to the destination.
