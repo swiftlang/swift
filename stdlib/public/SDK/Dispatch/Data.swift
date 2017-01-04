@@ -121,7 +121,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 
 	private func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: CountableRange<Index>) {
 		var copiedCount = 0
-		__dispatch_data_apply(__wrapped) { (data: __DispatchData, offset: Int, ptr: UnsafeRawPointer, size: Int) in
+		__dispatch_data_apply(__wrapped) { (_, _, ptr: UnsafeRawPointer, size: Int) in
 			let limit = Swift.min((range.endIndex - range.startIndex) - copiedCount, size)
 			memcpy(pointer + copiedCount, ptr, limit)
 			copiedCount += limit
