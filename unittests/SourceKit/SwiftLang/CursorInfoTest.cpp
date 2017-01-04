@@ -129,7 +129,7 @@ public:
     Semaphore sema(0);
 
     TestCursorInfo TestInfo;
-    getLang().getCursorInfo(DocName, Offset, Args,
+    getLang().getCursorInfo(DocName, Offset, 0, false, Args,
       [&](const CursorInfo &Info) {
         TestInfo.Name = Info.Name;
         TestInfo.Typename = Info.TypeName;

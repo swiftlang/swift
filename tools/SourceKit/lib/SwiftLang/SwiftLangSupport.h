@@ -377,6 +377,7 @@ public:
                                EditorConsumer &Consumer) override;
 
   void getCursorInfo(StringRef Filename, unsigned Offset,
+                     unsigned Length, bool Actionables,
                      ArrayRef<const char *> Args,
                      std::function<void(const CursorInfo &)> Receiver) override;
 
