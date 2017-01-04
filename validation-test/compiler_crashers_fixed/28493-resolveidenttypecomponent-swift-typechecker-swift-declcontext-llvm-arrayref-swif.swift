@@ -5,10 +5,20 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// rdar://problem/29145783 - The compiler is periodically hanging on this test.
-// REQUIRES: rdar29145783
-
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-protocol P{func c(array:A.c
-class A:P
+// RUN: not %target-swift-frontend %s -emit-ir
+class c:A
+let a
+{
+protocol a{
+func d:A.d:A
+class A:a}} _b(array:b{
+struct g:a{
+let a(){{typealias fb
+protocol a<T>:A{
+let e
+typealias f)typealias etypealias e:d class a:a
+protocol AA.h{protocol {a(){struct g:A{
+typealias fb
+class a)class A:A{func<T where S
+class a:a{class A:f:
+for in.E Int S}typea

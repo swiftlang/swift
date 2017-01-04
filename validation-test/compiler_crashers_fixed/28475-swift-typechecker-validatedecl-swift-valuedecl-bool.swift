@@ -5,10 +5,8 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// FIXME: Disabled. This test does not always crash, which confuses CI.
-// REQUIRES: deterministic-behavior
+// rdar://problem/29145783 - The compiler is periodically hanging on this test.
 
-// REQUIRES: OS=linux-gnu
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-_&[i
--{$0
+// RUN: not %target-swift-frontend %s -emit-ir
+protocol P{func c(array:A.c
+class A:P
