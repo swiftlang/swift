@@ -97,7 +97,8 @@ class OptBugReducerTestCase(unittest.TestCase):
             '--module-cache=%s' % self.module_cache,
             '--module-name=%s' % name,
             '--work-dir=%s' % self.tmp_dir,
-            '--extra-arg=-bug-reducer-tester-target-func=test_target'
+            '--extra-arg=-bug-reducer-tester-target-func=test_target',
+            '--extra-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")
@@ -125,7 +126,8 @@ class OptBugReducerTestCase(unittest.TestCase):
             '--module-cache=%s' % self.module_cache,
             '--module-name=%s' % name,
             '--work-dir=%s' % self.tmp_dir,
-            '--extra-arg=-bug-reducer-tester-target-func=closure_test_target'
+            '--extra-arg=-bug-reducer-tester-target-func=closure_test_target',
+            '--extra-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")
@@ -154,6 +156,7 @@ class OptBugReducerTestCase(unittest.TestCase):
             '--module-name=%s' % name,
             '--work-dir=%s' % self.tmp_dir,
             '--extra-arg=-bug-reducer-tester-target-func=__TF_test_target',
+            '--extra-arg=-bug-reducer-tester-failure-kind=opt-crasher',
             '--reduce-sil'
         ]
         args.extend(self.passes)
