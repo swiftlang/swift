@@ -1946,7 +1946,6 @@ class IfConfigDecl : public Decl {
   /// The array is ASTContext allocated.
   ArrayRef<IfConfigDeclClause> Clauses;
   SourceLoc EndLoc;
-
 public:
   
   IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigDeclClause> Clauses,
@@ -1954,7 +1953,6 @@ public:
     : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc)
   {
     IfConfigDeclBits.HadMissingEnd = HadMissingEnd;
-    IfConfigDeclBits.HasBeenResolved = false;
   }
 
   ArrayRef<IfConfigDeclClause> getClauses() const { return Clauses; }
@@ -1971,9 +1969,6 @@ public:
       return Clause->Members;
     return {};
   }
-
-  bool isResolved() const { return IfConfigDeclBits.HasBeenResolved; }
-  void setResolved() { IfConfigDeclBits.HasBeenResolved = true; }
   
   SourceLoc getEndLoc() const { return EndLoc; }
   SourceLoc getLoc() const { return Clauses[0].Loc; }

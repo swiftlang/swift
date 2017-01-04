@@ -1231,13 +1231,13 @@ public:
   ParserResult<CaseStmt> parseStmtCase();
 
   /// Classify the condition of an #if directive according to whether it can
-  /// be evaluated statically.  If evaluation is not possible, the result is
-  /// 'None'.
-  static Optional<bool>
+  /// be evaluated statically.  The first member of the pair indicates whether
+  /// parsing of the condition body should occur, the second contains the result
+  /// of evaluating the conditional expression.
+  static ConditionalCompilationExprState
   classifyConditionalCompilationExpr(Expr *condition,
                                      ASTContext &context,
-                                     DiagnosticEngine &diags,
-                                     bool fullCheck = false);
+                                     DiagnosticEngine &diags);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing
