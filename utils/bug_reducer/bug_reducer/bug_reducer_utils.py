@@ -97,8 +97,7 @@ class SILToolInvoker(object):
         self.config = config
         self.extra_args = extra_args
 
-    @property
-    def base_args(self):
+    def base_args(self, emit_sib):
         x = [self.tool]
         if self.config.sdk is not None:
             x.append("-sdk=%s" % self.config.sdk)
@@ -110,6 +109,8 @@ class SILToolInvoker(object):
             x.append("-module-cache-path=%s" % self.config.module_cache)
         if self.config.module_name is not None:
             x.append("-module-name=%s" % self.config.module_name)
+        if emit_sib:
+            x.append("-emit-sib")
         return x
 
     @property
@@ -137,14 +138,8 @@ class SILConstantInputToolInvoker(SILToolInvoker):
         self.input_file = initial_input_file
         sanity_check_file_exists(initial_input_file)
 
-    def _invoke(self, input_file, passes, output_filename):
+    def _invoke(self, *args, **kwargs):
         raise RuntimeError('Abstract method')
-
-    @property
-    def base_args(self):
-        base_args = SILToolInvoker.base_args.fget(self)
-        base_args.append('-emit-sib')
-        return base_args
 
     def get_suffixed_filename(self, suffix):
         basename = self.base_input_file_stem + '_' + suffix
@@ -158,29 +153,31 @@ class SILOptInvoker(SILConstantInputToolInvoker):
         SILConstantInputToolInvoker.__init__(self, config, tools, input_file,
                                              extra_args)
         self.input_file = self.get_suffixed_filename('initial')
-        self._invoke(input_file, [], self.input_file)
+        self._invoke(input_file, [], True, self.input_file)
 
     @property
     def tool(self):
         return self.tools.sil_opt
 
-    def _cmdline(self, input_file, passes, output_file='-'):
-        base_args = self.base_args
+    def _cmdline(self, input_file, passes, emit_sib, output_file='-'):
+        assert(isinstance(emit_sib, bool))
+        assert(isinstance(output_file, str))
+        base_args = self.base_args(emit_sib)
         sanity_check_file_exists(input_file)
         base_args.extend([input_file, '-o', output_file])
         base_args.extend(self.extra_args)
         base_args.extend(passes)
         return base_args
 
-    def _invoke(self, input_file, passes, output_filename):
-        cmdline = self._cmdline(input_file, passes, output_filename)
+    def _invoke(self, input_file, passes, emit_sib, output_filename):
+        cmdline = self._cmdline(input_file, passes, emit_sib, output_filename)
         return br_call(cmdline)
 
     def invoke_with_passlist(self, passes, output_filename):
-        return self._invoke(self.input_file, passes, output_filename)
+        return self._invoke(self.input_file, passes, True, output_filename)
 
     def cmdline_with_passlist(self, passes):
-        return self._cmdline(self.input_file, passes)
+        return self._cmdline(self.input_file, passes, False)
 
 
 class SILFuncExtractorInvoker(SILConstantInputToolInvoker):
@@ -193,12 +190,15 @@ class SILFuncExtractorInvoker(SILConstantInputToolInvoker):
     def tool(self):
         return self.tools.sil_func_extractor
 
-    def _cmdline(self, input_file, funclist_path, output_file='-',
+    def _cmdline(self, input_file, funclist_path, emit_sib, output_file='-',
                  invert=False):
+        assert(isinstance(emit_sib, bool))
+        assert(isinstance(output_file, str))
+
         sanity_check_file_exists(input_file)
         sanity_check_file_exists(funclist_path)
         assert(isinstance(funclist_path, str))
-        base_args = self.base_args
+        base_args = self.base_args(emit_sib)
         base_args.extend([input_file, '-o', output_file,
                           '-func-file=%s' % funclist_path])
         if invert:
@@ -208,7 +208,7 @@ class SILFuncExtractorInvoker(SILConstantInputToolInvoker):
     def _invoke(self, input_file, funclist_path, output_filename,
                 invert=False):
         assert(isinstance(funclist_path, str))
-        cmdline = self._cmdline(input_file, funclist_path, output_filename,
+        cmdline = self._cmdline(input_file, funclist_path, True, output_filename,
                                 invert)
         return br_call(cmdline)
 
@@ -231,7 +231,7 @@ class SILNMInvoker(SILToolInvoker):
 
     def get_symbols(self, input_file):
         sanity_check_file_exists(input_file)
-        cmdline = self.base_args
+        cmdline = self.base_args(emit_sib=False)
         cmdline.append(input_file)
         output = subprocess.check_output(cmdline)
         for l in output.split("\n")[:-1]:
