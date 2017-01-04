@@ -3332,7 +3332,7 @@ bool TypeChecker::isRepresentableInObjC(
   }
 
   if (auto FD = dyn_cast<FuncDecl>(AFD)) {
-    Type ResultType = FD->getResultInterfaceType();
+    Type ResultType = FD->mapTypeIntoContext(FD->getResultInterfaceType());
     if (!ResultType->hasError() &&
         !ResultType->isVoid() &&
         !ResultType->isRepresentableIn(ForeignLanguage::ObjectiveC,
