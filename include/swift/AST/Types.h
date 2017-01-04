@@ -778,6 +778,13 @@ public:
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
 
+  /// Retrieve the type without any labels around it. For example, given
+  /// \code
+  /// (p : int)
+  /// \endcode
+  /// the result would be the (unparenthesized) type 'int'.
+  Type getWithoutImmediateLabel();
+
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
 
@@ -4431,12 +4438,7 @@ inline Type TypeBase::getRValueObjectType() {
     type = lv->getObjectType();
 
   // Look through argument list tuples.
-  if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
-      type = tupleTy->getElementType(0);
-  }
-  
-  return type;
+  return type->getWithoutImmediateLabel();
 }
 
 /// getLValueOrInOutObjectType - For an @lvalue or inout type, retrieves the

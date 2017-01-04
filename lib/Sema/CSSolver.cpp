@@ -1055,11 +1055,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
           type = funcTy->getResult();
       }
 
-      if (auto tupleTy = type->getAs<TupleType>()) {
-        if (tupleTy->getNumElements() == 1 &&
-            !tupleTy->getElement(0).isVararg())
-          type = tupleTy->getElementType(0);
-      }
+      type = type->getWithoutImmediateLabel();
     }
 
     // Don't deduce IUO types.

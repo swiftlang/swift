@@ -4004,12 +4004,7 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
   auto indexTy = getIndicesInterfaceType();
 
   // Look through a named 1-tuple.
-  if (auto tupleTy = indexTy->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 &&
-        !tupleTy->getElement(0).isVararg()) {
-      indexTy = tupleTy->getElementType(0);
-    }
-  }
+  indexTy = indexTy->getWithoutImmediateLabel();
 
   // If the index type is an integral type, we have an indexed
   // subscript.

@@ -2916,7 +2916,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       anchor = locator->getAnchor();    
   }
 
-  Type fromType = CS->simplifyType(constraint->getFirstType());
+  Type fromType = CS->simplifyType(constraint->getFirstType())
+                    ->getWithoutImmediateLabel();
   
   if (fromType->hasTypeVariable() && resolvedAnchorToExpr) {
     TCCOptions options;
@@ -2933,7 +2934,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   }
 
   fromType = fromType->getRValueType();
-  auto toType = CS->simplifyType(constraint->getSecondType());
+  auto toType = CS->simplifyType(constraint->getSecondType())
+                  ->getWithoutImmediateLabel();
   
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"

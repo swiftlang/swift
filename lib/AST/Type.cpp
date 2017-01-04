@@ -720,6 +720,15 @@ Type TypeBase::getWithoutParens() {
   return Ty;
 }
 
+Type TypeBase::getWithoutImmediateLabel() {
+  Type Ty = this;
+  if (auto tupleTy = dyn_cast<TupleType>(Ty.getPointer())) {
+    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
+      Ty = tupleTy->getElementType(0);
+  }
+  return Ty;
+}
+
 Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel,
                                           bool preserveOptionality) {
