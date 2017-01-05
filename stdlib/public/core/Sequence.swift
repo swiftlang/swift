@@ -1349,8 +1349,7 @@ extension Sequence {
   /// Returns a subsequence containing all but the last element of the
   /// sequence.
   ///
-  /// The sequence must be finite. If the sequence has no elements, the result
-  /// is an empty subsequence.
+  /// The sequence must be finite. 
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
   ///     print(numbers.dropLast())
@@ -1382,6 +1381,7 @@ extension Sequence {
   }
 }
 
+// FIXME(ABI)#182
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,
 // pass an IteratorProtocol through IteratorSequence to give it "Sequence-ness"
 /// A sequence built around an iterator of type `Base`.

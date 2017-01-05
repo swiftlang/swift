@@ -338,6 +338,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(DynamicType)
     NON_LVALUE_EXPR(RebindSelfInConstructor)
     NON_LVALUE_EXPR(Apply)
+    NON_LVALUE_EXPR(MakeTemporarilyEscapable)
     NON_LVALUE_EXPR(ImplicitConversion)
     NON_LVALUE_EXPR(ExplicitCast)
     NON_LVALUE_EXPR(OptionalEvaluation)
@@ -450,6 +451,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(PostfixUnary);
   NO_REFERENCE(Binary);
   NO_REFERENCE(DotSyntaxCall);
+  NO_REFERENCE(MakeTemporarilyEscapable);
 
   PASS_THROUGH_REFERENCE(ConstructorRefCall, getFn);
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
@@ -565,9 +567,10 @@ void Expr::forEachChildExpr(const std::function<Expr*(Expr*)> &callback) {
   this->walk(ChildWalker(callback));
 }
 
-bool Expr::isTypeReference() const {
+bool Expr::
+isTypeReference(llvm::function_ref<Type(const Expr &)> getType) const {
   // If the result isn't a metatype, there's nothing else to do.
-  if (!getType()->is<AnyMetatypeType>())
+  if (!getType(*this)->is<AnyMetatypeType>())
     return false;
   
   const Expr *expr = this;
@@ -598,13 +601,14 @@ bool Expr::isTypeReference() const {
 
 }
 
-bool Expr::isStaticallyDerivedMetatype() const {
+bool Expr::isStaticallyDerivedMetatype(
+    llvm::function_ref<Type(const Expr &)> getType) const {
   // The type must first be a type reference.
-  if (!isTypeReference())
+  if (!isTypeReference(getType))
     return false;
 
   // Archetypes are never statically derived.
-  return !getType()->getAs<AnyMetatypeType>()->getInstanceType()
+  return !getType(*this)->getAs<AnyMetatypeType>()->getInstanceType()
     ->is<ArchetypeType>();
 }
 
@@ -718,6 +722,7 @@ bool Expr::canAppendCallParentheses() const {
     return true;
 
   case ExprKind::OpenExistential:
+  case ExprKind::MakeTemporarilyEscapable:
     return false;
 
   case ExprKind::Call:
@@ -1887,14 +1892,16 @@ TypeExpr::TypeExpr(Type Ty)
 
 // The type of a TypeExpr is always a metatype type.  Return the instance
 // type or null if not set yet.
-Type TypeExpr::getInstanceType() const {
-  if (!getType())
+Type TypeExpr::getInstanceType(
+    llvm::function_ref<bool(const Expr &)> hasType,
+    llvm::function_ref<Type(const Expr &)> getType) const {
+  if (!hasType(*this))
     return Type();
 
-  if (auto metaType = getType()->getAs<MetatypeType>())
+  if (auto metaType = getType(*this)->getAs<MetatypeType>())
     return metaType->getInstanceType();
 
-  return ErrorType::get(getType()->getASTContext());
+  return ErrorType::get(getType(*this)->getASTContext());
 }
 
 

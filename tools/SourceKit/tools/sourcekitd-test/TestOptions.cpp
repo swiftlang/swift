@@ -258,6 +258,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       isAsyncRequest = true;
       break;
 
+    case OPT_cursor_action:
+      CollectActionables = true;
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n';

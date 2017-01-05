@@ -218,7 +218,7 @@ public protocol _MutableIndexable : _Indexable {
 ///     a[i] = x
 ///     let y = x
 public protocol MutableCollection : _MutableIndexable, Collection {
-  // FIXME: should be constrained to MutableCollection
+  // FIXME(ABI)#181: should be constrained to MutableCollection
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
   /// A collection that represents a contiguous subrange of the collection's

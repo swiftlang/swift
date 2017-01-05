@@ -1522,7 +1522,7 @@ static Type applyNoEscape(Type type) {
 
 Type ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc,
-    const clang::FunctionDecl *clangDecl, clang::QualType resultType,
+    const clang::FunctionDecl *clangDecl,
     bool allowNSUIntegerAsInt) {
  // CF function results can be managed if they are audited or
   // the ownership convention is explicitly declared.
@@ -1541,7 +1541,7 @@ Type ClangImporter::Implementation::importFunctionReturnType(
   }
 
   // Import the result type.
-  auto type = importType(resultType,
+  auto type = importType(clangDecl->getReturnType(),
                          (isAuditedResult ? ImportTypeKind::AuditedResult
                                           : ImportTypeKind::Result),
                          allowNSUIntegerAsInt,
@@ -1555,17 +1555,15 @@ Type ClangImporter::Implementation::importFunctionReturnType(
 Type ClangImporter::Implementation::
 importFunctionType(DeclContext *dc,
                    const clang::FunctionDecl *clangDecl,
-                   clang::QualType resultType,
                    ArrayRef<const clang::ParmVarDecl *> params,
-                   bool isVariadic, bool isNoReturn,
-                   bool isFromSystemModule, bool hasCustomName,
-                   ParameterList *&parameterList, DeclName &name) {
+                   bool isVariadic, bool isFromSystemModule,
+                   DeclName name, ParameterList *&parameterList) {
 
   bool allowNSUIntegerAsInt =
       shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
 
   auto swiftResultTy =
-      importFunctionReturnType(dc, clangDecl, resultType, allowNSUIntegerAsInt);
+      importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
   if (!swiftResultTy)
     return Type();
 
@@ -1575,7 +1573,7 @@ importFunctionType(DeclContext *dc,
   if (!parameterList)
     return Type();
 
-  if (isNoReturn)
+  if (clangDecl->isNoReturn())
     swiftResultTy = SwiftContext.getNeverType();
 
   // Form the function type.

@@ -728,8 +728,12 @@ handleSemanticRequest(RequestDict Req,
 
     int64_t Offset;
     if (!Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
+      int64_t Length = 0;
+      Req.getInt64(KeyLength, Length, /*isOptional=*/true);
+      int64_t Actionables = false;
+      Req.getInt64(KeyActionable, Actionables, /*isOptional=*/true);
       return Lang.getCursorInfo(
-          *SourceFile, Offset, Args,
+          *SourceFile, Offset, Length, Actionables, Args,
           [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
     }
     if (auto USR = Req.getString(KeyUSR)) {
@@ -1350,6 +1354,13 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
     for (auto Name : Info.ModuleGroupArray) {
       auto Entry = Groups.appendDictionary();
       Entry.set(KeyGroupName, Name);
+    }
+  }
+  if (!Info.AvailableActions.empty()) {
+    auto Actions = Elem.setArray(KeyActionable);
+    for (auto Name : Info.AvailableActions) {
+      auto Entry = Actions.appendDictionary();
+      Entry.set(KeyActionName, Name);
     }
   }
   if (!Info.AnnotatedRelatedDeclarations.empty()) {

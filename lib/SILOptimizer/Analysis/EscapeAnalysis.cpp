@@ -1162,8 +1162,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   // destructors for its components.
   while (Ty.getSwiftRValueType()->getAnyOptionalObjectType())
     Ty = M.Types.getLoweredType(Ty.getSwiftRValueType()
-                                    ->getAnyOptionalObjectType()
-                                    .getCanonicalTypeOrNull());
+                                  .getAnyOptionalObjectType());
   auto Class = Ty.getSwiftRValueType().getClassOrBoundGenericClass();
   if (!Class || !Class->hasDestructor())
     return false;

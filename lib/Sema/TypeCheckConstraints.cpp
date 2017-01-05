@@ -2048,17 +2048,17 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // types of existentials.
       //
       // We will diagnose it later.
-      if (!sequenceType->isExistentialType()) {
+      if (!sequenceType->isExistentialType() &&
+          (sequenceType->mayHaveMembers() ||
+           sequenceType->isTypeVariableOrMember())) {
         ASTContext &ctx = tc.Context;
         auto iteratorAssocType =
           cast<AssociatedTypeDecl>(
             sequenceProto->lookupDirect(ctx.Id_Iterator).front());
 
-        iteratorType = sequenceType->getTypeOfMember(
-                         cs.DC->getParentModule(),
-                         iteratorAssocType,
-                         &tc,
-                         iteratorAssocType->getDeclaredInterfaceType());
+        iteratorType = iteratorAssocType->getDeclaredInterfaceType()
+            .subst(cs.DC->getParentModule(),
+                   sequenceType->getContextSubstitutions(sequenceProto));
 
         if (iteratorType) {
           auto iteratorProto =
@@ -2147,7 +2147,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   }
 
   Type destTy = simplifyType(getType(dest));
-  if (destTy->hasError() || destTy->getRValueType()->is<UnresolvedType>())
+  if (destTy->hasError())
     return Type();
 
   // If we have already resolved a concrete lvalue destination type, return it.
@@ -2159,8 +2159,10 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   // @lvalue T, where T is a fresh type variable that will be the object type of
   // this particular expression type.
   if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
+    // Newly allocated type should be explicitly materializable,
+    // it's invalid to use non-materializable types as assignment destination.
     auto objectTv = createTypeVariable(getConstraintLocator(dest),
-                                       /*options=*/0);
+                                       TVO_MustBeMaterializable);
     auto refTv = LValueType::get(objectTv);
     addConstraint(ConstraintKind::Bind, typeVar, refTv,
                   getConstraintLocator(dest));
@@ -2926,9 +2928,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         llvm_unreachable("suppressing diagnostics");
 
       case CheckedCastContextKind::ForcedCast: {
+        std::string extraFromOptionalsStr(extraFromOptionals, '!');
         auto diag = diagnose(diagLoc, diag::downcast_same_type,
                              origFromType, origToType,
-                             std::string(extraFromOptionals, '!'),
+                             extraFromOptionalsStr,
                              isBridged);
         diag.highlight(diagFromRange);
         diag.highlight(diagToRange);

@@ -269,6 +269,15 @@ static bool skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 #endif
 }
 
+void ModuleFile::finishPendingActions() {
+  while (!DelayedGenericEnvironments.empty()) {
+    // Force completion of the last generic environment.
+    auto genericEnvDC = DelayedGenericEnvironments.back();
+    DelayedGenericEnvironments.pop_back();
+    (void)genericEnvDC->getGenericEnvironmentOfContext();
+  }
+}
+
 /// Translate from the serialization DefaultArgumentKind enumerators, which are
 /// guaranteed to be stable, to the AST ones.
 static Optional<swift::DefaultArgumentKind>
@@ -926,11 +935,14 @@ void ModuleFile::configureGenericEnvironment(
   if (auto genericSig = sigOrEnv.dyn_cast<GenericSignature *>()) {
     if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
       type->setLazyGenericEnvironment(this, genericSig, envID);
+      DelayedGenericEnvironments.push_back(type);
     } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
       func->setLazyGenericEnvironment(this, genericSig, envID);
+      DelayedGenericEnvironments.push_back(func);
     } else {
       auto ext = genericDecl.get<ExtensionDecl *>();
       ext->setLazyGenericEnvironment(this, genericSig, envID);
+      DelayedGenericEnvironments.push_back(ext);
     }
 
     return;
@@ -2125,6 +2137,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   PrivateDiscriminatorRAII privateDiscriminatorRAII{*this, declOrOffset};
   LocalDiscriminatorRAII localDiscriminatorRAII(declOrOffset);
+  DeserializingEntityRAII deserializingEntity(*this);
 
   // Local function that handles the "inherited" list for a type.
   auto handleInherited
@@ -2465,7 +2478,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     declOrOffset = assocType;
 
     assocType->computeType();
-    assocType->setAccessibility(cast<ProtocolDecl>(DC)->getFormalAccess());
+    Accessibility parentAccess = cast<ProtocolDecl>(DC)->getFormalAccess();
+    assocType->setAccessibility(std::max(parentAccess,Accessibility::Internal));
     if (isImplicit)
       assocType->setImplicit();
 
@@ -3963,9 +3977,8 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::SIL_BOX_TYPE: {
     SILLayoutID layoutID;
-    ArrayRef<uint64_t> args;
 
-    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID, args);
+    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID);
     
     // Get the layout.
     auto getLayout = [&]() -> SILLayout * {
@@ -3994,49 +4007,20 @@ Type ModuleFile::getType(TypeID TID) {
     
     SmallVector<Substitution, 4> genericArgs;
     if (auto sig = layout->getGenericSignature()) {
-      if (args.size() != sig->getGenericParams().size()) {
-        error();
-        return nullptr;
-      }
-      TypeSubstitutionMap mappings;
-      
-      for (unsigned i : indices(args)) {
-        mappings[sig->getGenericParams()[i]] =
-          getType(args[i])->getCanonicalType();
-      }
-      
-      bool ok = true;
-      sig->getSubstitutions(mappings,
-        [&](CanType depTy, Type replacementTy, ProtocolType *proto)
-        -> ProtocolConformanceRef {
-          if (replacementTy->is<SubstitutableType>()
-              || replacementTy->is<DependentMemberType>())
-            return ProtocolConformanceRef(proto->getDecl());
-          
-          auto conformance = getAssociatedModule()
-            ->lookupConformance(replacementTy, proto->getDecl(), nullptr);
-          if (!conformance) {
-            error();
-            ok = false;
-            return ProtocolConformanceRef(proto->getDecl());
-          }
-          return *conformance;
-        },
-        genericArgs);
-      if (!ok)
-        return nullptr;
-      
-      for (auto &arg : genericArgs) {
-        arg = Substitution(arg.getReplacement()->getCanonicalType(),
-                           arg.getConformances());
-      }
-    } else {
-      if (args.size() != 0) {
-        error();
-        return nullptr;
+      for (unsigned i : range(sig->getAllDependentTypes().size())) {
+        (void)i;
+        auto sub = maybeReadSubstitution(DeclTypeCursor);
+        if (!sub) {
+          error();
+          return nullptr;
+        }
+
+        genericArgs.push_back(
+          Substitution(sub->getReplacement()->getCanonicalType(),
+                       sub->getConformances()));
       }
     }
-    
+
     typeOrOffset = SILBoxType::get(getContext(), layout, genericArgs);
     break;
   }

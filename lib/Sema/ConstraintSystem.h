@@ -906,7 +906,7 @@ private:
   /// nodes themselves. This allows us to typecheck an expression and
   /// run through various diagnostics passes without actually mutating
   /// the types on the expression nodes.
-  llvm::DenseMap<Expr *, TypeBase *> ExprTypes;
+  llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
 
   /// There can only be a single contextual type on the root of the expression
   /// being checked.  If specified, this holds its type along with the base
@@ -1388,16 +1388,16 @@ public:
   }
 
   /// Check to see if we have a type for an expression.
-  bool hasType(Expr *E) {
+  bool hasType(const Expr *E) const {
     return ExprTypes.find(E) != ExprTypes.end();
   }
 
   /// Get the type for an expression.
-  Type getType(Expr *E) {
+  Type getType(const Expr *E) const {
     assert(hasType(E) && "Expected type to have been set!");
-    assert(ExprTypes[E]->isEqual(E->getType()) &&
+    assert(ExprTypes.find(E)->second->isEqual(E->getType()) &&
            "Expected type in map to be the same type in expression!");
-    return ExprTypes[E];
+    return ExprTypes.find(E)->second;
   }
 
   /// Cache the type of the expression argument and return that same
@@ -1774,11 +1774,27 @@ public:
   bool isAnyHashableType(Type t);
 
   /// Call Expr::propagateLValueAccessKind on the given expression,
-  /// using a custom accessor for the type on the expression which
+  /// using a custom accessor for the type on the expression that
   /// reads the type from the ConstraintSystem expression type map.
   void propagateLValueAccessKind(Expr *E,
                                  AccessKind accessKind,
                                  bool allowOverwrite = false);
+
+  /// Call Expr::isTypeReference on the given expression, using a
+  /// custom accessor for the type on the expression that reads the
+  /// type from the ConstraintSystem expression type map.
+  bool isTypeReference(Expr *E);
+
+  /// Call Expr::isIsStaticallyDerivedMetatype on the given
+  /// expression, using a custom accessor for the type on the
+  /// expression that reads the type from the ConstraintSystem
+  /// expression type map.
+  bool isStaticallyDerivedMetatype(Expr *E);
+
+  /// Call Expr::getInstanceType on the given expression, using a
+  /// custom accessor for the type on the expression that reads the
+  /// type from the ConstraintSystem expression type map.
+  Type getInstanceType(TypeExpr *E);
 
 private:
   /// Introduce the constraints associated with the given type variable
@@ -2007,15 +2023,6 @@ public:
                                        TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
 
-  /// \brief Subroutine of \c matchTypes(), which extracts a scalar value from
-  /// a single-element tuple type.
-  ///
-  /// \returns the result of performing the tuple-to-scalar conversion.
-  SolutionKind matchTupleToScalarTypes(TupleType *tuple1, Type type2,
-                                       ConstraintKind kind,
-                                       TypeMatchOptions flags,
-                                       ConstraintLocatorBuilder locator);
-
   /// \brief Subroutine of \c matchTypes(), which matches up two function
   /// types.
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
@@ -2190,6 +2197,12 @@ private:
 
   /// \brief Attempt to simplify the given DynamicTypeOf constraint.
   SolutionKind simplifyDynamicTypeOfConstraint(
+                                         Type type1, Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
+  /// \brief Attempt to simplify the given EscapableFunctionOf constraint.
+  SolutionKind simplifyEscapableFunctionOfConstraint(
                                          Type type1, Type type2,
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);

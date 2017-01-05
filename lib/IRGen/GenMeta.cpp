@@ -1542,7 +1542,31 @@ namespace {
     llvm::Value *visitType(CanType t) {
       return IGF.emitTypeMetadataRef(t);
     }
-      
+
+    llvm::Value *visitBoundGenericEnumType(CanBoundGenericEnumType type) {
+      // Optionals have a lowered payload type, so we recurse here.
+      if (auto objectTy = CanType(type).getAnyOptionalObjectType()) {
+        auto payloadMetadata = visit(objectTy);
+        llvm::Value *args[] = { payloadMetadata };
+        llvm::Type *types[] = { IGF.IGM.TypeMetadataPtrTy };
+
+        // Call the generic metadata accessor function.
+        llvm::Function *accessor =
+            IGF.IGM.getAddrOfGenericTypeMetadataAccessFunction(
+                type->getDecl(), types, NotForDefinition);
+
+        auto result = IGF.Builder.CreateCall(accessor, args);
+        result->setDoesNotThrow();
+        result->addAttribute(llvm::AttributeSet::FunctionIndex,
+                             llvm::Attribute::ReadNone);
+
+        return result;
+      }
+
+      // Otherwise, generic arguments are not lowered.
+      return visitType(type);
+    }
+
     llvm::Value *visitTupleType(CanTupleType type) {
       if (auto cached = tryGetLocal(type))
         return cached;
@@ -4704,7 +4728,9 @@ namespace {
     CanType getParentType() const {
       Type type = Target->getDeclaredTypeInContext();
       Type parentType = type->getNominalParent();
-      return parentType.getCanonicalTypeOrNull();
+      if (parentType)
+        return parentType->getCanonicalType();
+      return CanType();
     }
 
   public:

@@ -191,7 +191,7 @@ public:
                               SILBuilder &B) const;
 
   /// getElementType - Return the swift type of the specified element.
-  CanType getElementType(unsigned EltNo) const;
+  SILType getElementType(unsigned EltNo) const;
 
   /// Push the symbolic path name to the specified element number onto the
   /// specified std::string.  If the actual decl (or a subelement thereof) can

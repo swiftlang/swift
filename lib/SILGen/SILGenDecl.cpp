@@ -202,6 +202,21 @@ void TemporaryInitialization::finishInitialization(SILGenFunction &gen) {
 }
 
 namespace {
+class EndBorrowCleanup : public Cleanup {
+  SILValue borrowee;
+  SILValue borrowed;
+
+public:
+  EndBorrowCleanup(SILValue borrowee, SILValue borrowed)
+      : borrowee(borrowee), borrowed(borrowed) {}
+
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.createEndBorrow(l, borrowee, borrowed);
+  }
+};
+} // end anonymous namespace
+
+namespace {
 class ReleaseValueCleanup : public Cleanup {
   SILValue v;
 public:
@@ -1141,6 +1156,12 @@ CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILValue temp) {
 
 CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
   Cleanups.pushCleanup<ReleaseValueCleanup>(valueOrAddr);
+  return Cleanups.getTopCleanup();
+}
+
+CleanupHandle SILGenFunction::enterEndBorrowCleanup(SILValue borrowee,
+                                                    SILValue borrowed) {
+  Cleanups.pushCleanup<EndBorrowCleanup>(borrowee, borrowed);
   return Cleanups.getTopCleanup();
 }
 

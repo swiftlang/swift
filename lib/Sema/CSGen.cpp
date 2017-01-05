@@ -71,6 +71,19 @@ static bool mergeRepresentativeEquivalenceClasses(ConstraintSystem &CS,
     auto rep2 = CS.getRepresentative(tyvar2);
 
     if (rep1 != rep2) {
+      auto fixedType2 = CS.getFixedType(rep2);
+
+      // If the there exists fixed type associated with the second
+      // type variable, and we simply merge two types together it would
+      // mean that portion of the constraint graph previously associated
+      // with that (second) variable is going to be disconnected from its
+      // new equivalence class, which is going to lead to incorrect solutions,
+      // so we need to make sure to re-bind fixed to the new representative.
+      if (fixedType2) {
+        CS.addConstraint(ConstraintKind::Bind, fixedType2, rep1,
+                         rep1->getImpl().getLocator());
+      }
+
       CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
       return true;
     }
@@ -137,7 +150,12 @@ namespace {
 
           // We'd like to look at the elements of arrays and dictionaries.
           isa<ArrayExpr>(expr) ||
-          isa<DictionaryExpr>(expr)) {
+          isa<DictionaryExpr>(expr) ||
+
+          // assignment expression can involve anonymous closure parameters
+          // as source and destination, so it's beneficial for diagnostics if
+          // we look at the assignment.
+          isa<AssignExpr>(expr)) {
         LinkedExprs.push_back(expr);
         return {false, expr};
       }
@@ -225,6 +243,11 @@ namespace {
           CS.optimizeConstraints(expr);
           return { false, expr };
         }
+      }
+
+      if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
+        LTI.collectedTypes.insert(CS.getType(FVE).getPointer());
+        return { false, expr };
       }
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
@@ -2588,7 +2611,7 @@ namespace {
       // Compute the type to which the source must be converted to allow
       // assignment to the destination.
       auto destTy = CS.computeAssignDestType(expr->getDest(), expr->getLoc());
-      if (!destTy)
+      if (!destTy || destTy->getRValueType()->is<UnresolvedType>())
         return Type();
       
       // The source must be convertible to the destination.
@@ -2667,6 +2690,9 @@ namespace {
     }
 
     Type visitOpenExistentialExpr(OpenExistentialExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    Type visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
     

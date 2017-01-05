@@ -2,7 +2,7 @@
 
 func doSomething<T>(_ t: T) {}
 
-// CHECK: func_decl "outerGeneric(t:x:)"<T> interface type='<T> (t: T, x: AnyObject) -> ()'
+// CHECK: func_decl "outerGeneric(t:x:)" <T> interface type='<T> (t: T, x: AnyObject) -> ()'
 
 func outerGeneric<T>(t: T, x: AnyObject) {
   // Simple case -- closure captures outer generic parameter
@@ -20,7 +20,7 @@ func outerGeneric<T>(t: T, x: AnyObject) {
 
   // Nested generic functions always capture outer generic parameters, even if
   // they're not mentioned in the function body
-  // CHECK: func_decl "innerGeneric(u:)"<U> interface type='<T, U> (u: U) -> ()' {{.*}} captures=(<generic> )
+  // CHECK: func_decl "innerGeneric(u:)" <U> interface type='<T, U> (u: U) -> ()' {{.*}} captures=(<generic> )
   func innerGeneric<U>(u: U) {}
 
   // Make sure we look through typealiases

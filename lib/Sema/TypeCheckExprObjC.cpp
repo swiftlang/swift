@@ -330,8 +330,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       Type newType;
       if (lookupType && !lookupType->isAnyObject()) {
-        newType = lookupType->getTypeOfMember(dc->getParentModule(), type,
-                                              this);
+        newType = lookupType->getTypeOfMember(dc->getParentModule(), type, this,
+                                              type->getDeclaredInterfaceType());
       } else {
         newType = type->getDeclaredInterfaceType();
       }

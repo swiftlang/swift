@@ -261,7 +261,7 @@ private:
                                                CanType ConcreteType,
                                                SILValue ConcreteTypeDef,
                                                ProtocolConformanceRef Conformance,
-                                               CanType OpenedArchetype);
+                                               ArchetypeType *OpenedArchetype);
   SILInstruction *
   propagateConcreteTypeOfInitExistential(FullApplySite AI,
       ProtocolDecl *Protocol,

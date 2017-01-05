@@ -417,10 +417,6 @@ void SILGenModule::visitNominalTypeDecl(NominalTypeDecl *ntd) {
   SILGenType(*this, ntd).emitType();
 }
 
-void SILGenFunction::visitNominalTypeDecl(NominalTypeDecl *ntd) {
-  SILGenType(SGM, ntd).emitType();
-}
-
 /// SILGenExtension - an ASTVisitor for generating SIL from method declarations
 /// and protocol conformances inside type extensions.
 class SILGenExtension : public TypeMemberVisitor<SILGenExtension> {

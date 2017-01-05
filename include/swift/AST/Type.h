@@ -280,9 +280,6 @@ public:
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
 
-  /// Get the canonical type, or return null if the type is null.
-  CanType getCanonicalTypeOrNull() const; // in Types.h
-
   /// Computes the join between two types.
   ///
   /// The join of two types is the most specific type that is a supertype of

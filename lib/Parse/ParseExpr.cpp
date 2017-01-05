@@ -576,7 +576,7 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     if (Tok.is(tok::r_paren))
       rParenLoc = consumeToken();
     else
-      rParenLoc = Tok.getLoc();
+      rParenLoc = PreviousLoc;
   } else {
     parseMatchingToken(tok::r_paren, rParenLoc,
                        diag::expr_keypath_expected_rparen, lParenLoc);
@@ -654,7 +654,7 @@ ParserResult<Expr> Parser::parseExprSelector() {
   if (subExpr.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
 
-  // Parse the closing ')'
+  // Parse the closing ')'.
   SourceLoc rParenLoc;
   if (subExpr.isParseError()) {
     skipUntilDeclStmtRBrace(tok::r_paren);
@@ -968,6 +968,11 @@ getMagicIdentifierLiteralKind(tok Kind) {
 
 /// See if type(of: <expr>) can be parsed backtracking on failure.
 static bool canParseTypeOf(Parser &P) {
+  // We parsed `type(of:)` as a special syntactic form in Swift 3. In Swift 4
+  // it is handled by overload resolution.
+  if (!P.Context.LangOpts.isSwiftVersion3())
+    return false;
+
   if (!(P.Tok.getText() == "type" && P.peekToken().is(tok::l_paren))) {
     return false;
   }

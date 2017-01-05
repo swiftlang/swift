@@ -82,8 +82,9 @@ class SwiftTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertEqual(swift.cmake_options, [
-                         '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE'])
+        self.assertEqual(set(swift.cmake_options), set([
+                         '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
+                         '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE']))
 
     def test_swift_runtime_tsan(self):
         self.args.enable_tsan_runtime = True
@@ -92,9 +93,10 @@ class SwiftTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertEqual(swift.cmake_options,
-                         ['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
-                          '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE'])
+        self.assertEqual(set(swift.cmake_options),
+                         set(['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
+                          '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
+                          '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE']))
 
     def test_swift_compiler_vendor_flags(self):
         self.args.compiler_vendor = "none"

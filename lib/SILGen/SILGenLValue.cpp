@@ -831,10 +831,11 @@ namespace {
         return true;
       }
 
-      // If the declaration is dynamically dispatched through a protocol,
-      // we have to use materializeForSet.
-      if (isa<ProtocolDecl>(decl->getDeclContext()))
-        return true;
+      // If the declaration is dynamically dispatched through a
+      // non-ObjC protocol, we have to use materializeForSet.
+      if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl->getDeclContext()))
+        if (!protoDecl->isObjC())
+          return true;
 
       return false;
     }

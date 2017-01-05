@@ -1408,6 +1408,9 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
   for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem))
     visit(D);
 
+  for (Decl *D : sf->LocalTypeDecls)
+    visit(D);
+
   // Mark any conformances as "used".
   for (auto conformance : sf->getUsedConformances())
     useConformance(ProtocolConformanceRef(conformance));

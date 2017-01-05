@@ -1081,7 +1081,8 @@ RequirementEnvironment::RequirementEnvironment(
     switch (reqReq.getKind()) {
     case RequirementKind::Conformance: {
       // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
+      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
+                                               SubstFlags::UseErrorType);
       if (!first->isTypeParameter()) break;
 
       builder.addRequirement(Requirement(RequirementKind::Conformance,
@@ -1092,8 +1093,10 @@ RequirementEnvironment::RequirementEnvironment(
 
     case RequirementKind::Superclass: {
       // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
-      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap);
+      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
+                                               SubstFlags::UseErrorType);
+      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap,
+                                                 SubstFlags::UseErrorType);
 
       if (!first->isTypeParameter()) break;
 
@@ -1105,8 +1108,10 @@ RequirementEnvironment::RequirementEnvironment(
 
     case RequirementKind::SameType: {
       // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
-      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap);
+      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
+                                               SubstFlags::UseErrorType);
+      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap,
+                                                 SubstFlags::UseErrorType);
 
       // FIXME: We really want to check hasTypeParameter here, but the
       // ArchetypeBuilder isn't ready for that.
@@ -1222,7 +1227,7 @@ matchWitness(TypeChecker &tc,
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfReference(witness,
                                  /*isTypeReference=*/false,
-                                 /*isDynamicResult=*/false,
+                                 /*isSpecialized=*/false,
                                  FunctionRefKind::DoubleApply,
                                  witnessLocator,
                                  /*base=*/nullptr);
@@ -2100,33 +2105,26 @@ diagnoseMatch(Module *module, NormalProtocolConformance *conformance,
 /// type.
 static Substitution getArchetypeSubstitution(TypeChecker &tc,
                                              DeclContext *dc,
-                                             ArchetypeType *archetype,
+                                             ArrayRef<ProtocolDecl *> protocols,
                                              Type replacement) {
-  Type resultReplacement = replacement;
-  assert(!resultReplacement->isTypeParameter() && "Can't be dependent");
+  assert(!replacement->isTypeParameter() && "Can't be dependent");
   SmallVector<ProtocolConformanceRef, 4> conformances;
 
-  bool isError =
-    replacement->hasError() || replacement->getCanonicalType()->hasError();
-  assert((archetype != nullptr || isError) &&
-         "Should have built archetypes already");
+  bool isError = replacement->hasError();
 
-  // FIXME: Turn the nullptr check into an assertion
-  if (archetype != nullptr) {
-    for (auto proto : archetype->getConformsTo()) {
-      auto conformance = tc.conformsToProtocol(replacement, proto, dc, None);
-      assert((conformance || isError) &&
-             "Conformance should already have been verified");
-      (void)isError;
-      if (conformance)
-        conformances.push_back(*conformance);
-      else
-        conformances.push_back(ProtocolConformanceRef(proto));
-    }
+  for (auto proto : protocols) {
+    auto conformance = tc.conformsToProtocol(replacement, proto, dc, None);
+    assert((conformance || isError) &&
+           "Conformance should already have been verified");
+    (void)isError;
+    if (conformance)
+      conformances.push_back(*conformance);
+    else
+      conformances.push_back(ProtocolConformanceRef(proto));
   }
 
   return Substitution{
-    resultReplacement,
+    replacement,
     tc.Context.AllocateCopy(conformances),
   };
 }
@@ -2293,14 +2291,11 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 
   // Record the type witness.
-  auto *archetype = Conformance->getProtocol()->mapTypeIntoContext(
-      assocType->getDeclaredInterfaceType())
-          ->getAs<ArchetypeType>();
-  if (archetype)
-    Conformance->setTypeWitness(
-        assocType,
-        getArchetypeSubstitution(TC, DC, archetype, type),
-        typeDecl);
+  auto protocols = assocType->getConformingProtocols();
+  Conformance->setTypeWitness(
+      assocType,
+      getArchetypeSubstitution(TC, DC, protocols, type),
+      typeDecl);
 }
 
 /// Generates a note for a protocol requirement for which no witness was found
@@ -2828,6 +2823,18 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
   for (auto reqProto : assocType->getConformingProtocols()) {
     if (!tc.conformsToProtocol(type, reqProto, dc, None))
       return reqProto;
+
+    // FIXME: Why is conformsToProtocol() not enough? The stdlib doesn't
+    // build unless we fail here while inferring an associated type
+    // somewhere.
+    if (type->isSpecialized()) {
+      auto substitutions = type->gatherAllSubstitutions(
+          dc->getParentModule(), &tc);
+      for (auto sub : substitutions) {
+        if (sub.getReplacement()->hasError())
+          return reqProto;
+      }
+    }
   }
 
   // Success!
@@ -2839,7 +2846,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
   // Look for a member type with the same name as the associated type.
   auto candidates = TC.lookupMemberType(DC, Adoptee, assocType->getName(),
-                                        /*lookupOptions=*/None);
+                                        /*lookup=*/None);
 
   // If there aren't any candidates, we're done.
   if (!candidates) {
@@ -3405,6 +3412,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // Local function that folds dependent member types with non-dependent
   // bases into actual member references.
   std::function<Type(Type)> foldDependentMemberTypes;
+  llvm::DenseSet<AssociatedTypeDecl *> recursionCheck;
   foldDependentMemberTypes = [&](Type type) -> Type {
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
       auto baseTy = depMemTy->getBase().transform(foldDependentMemberTypes);
@@ -3414,6 +3422,11 @@ void ConformanceChecker::resolveTypeWitnesses() {
       auto assocType = depMemTy->getAssocType();
       if (!assocType)
         return nullptr;
+
+      if (!recursionCheck.insert(assocType).second)
+        return nullptr;
+
+      SWIFT_DEFER { recursionCheck.erase(assocType); };
 
       // Try to substitute into the base type.
       if (Type result = depMemTy->substBaseType(DC->getParentModule(), baseTy)){

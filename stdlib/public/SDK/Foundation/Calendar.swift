@@ -1077,9 +1077,9 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
 
 extension Calendar : CustomDebugStringConvertible, CustomStringConvertible, CustomReflectable {
     private var _kindDescription : String {
-        if (self == Calendar.autoupdatingCurrent) {
+        if self == Calendar.autoupdatingCurrent {
             return "autoupdatingCurrent"
-        } else if (self == Calendar.current) {
+        } else if self == Calendar.current {
             return "current"
         } else {
             return "fixed"

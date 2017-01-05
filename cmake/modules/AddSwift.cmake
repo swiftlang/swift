@@ -341,8 +341,6 @@ function(_add_variant_link_flags)
     list(APPEND library_search_directories
         "${SWIFT_ANDROID_PREBUILT_PATH}/lib/gcc/arm-linux-androideabi/${SWIFT_ANDROID_NDK_GCC_VERSION}.x")
   else()
-    list(APPEND result "-lobjc")
-
     # If lto is enabled, we need to add the object path flag so that the LTO code
     # generator leaves the intermediate object file in a place where it will not
     # be touched. The reason why this must be done is that on OS X, debug info is
@@ -1588,7 +1586,7 @@ function(add_swift_library name)
         else()
           if("${sdk}" STREQUAL "WINDOWS")
             set(UNIVERSAL_LIBRARY_NAME
-              "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/lib${name}.lib")
+              "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${name}.lib")
           else()
             set(UNIVERSAL_LIBRARY_NAME
               "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")

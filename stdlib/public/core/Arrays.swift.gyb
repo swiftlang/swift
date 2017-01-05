@@ -578,10 +578,11 @@ public struct ${Self}<Element>
   /// value, so it succeeds.
   ///
   ///     let numbers = [10, 20, 30, 40, 50]
-  ///     let i = numbers.index(numbers.startIndex,
-  ///                           offsetBy: 4,
-  ///                           limitedBy: numbers.endIndex)
-  ///     print(numbers[i])
+  ///     if let i = numbers.index(numbers.startIndex,
+  ///                              offsetBy: 4,
+  ///                              limitedBy: numbers.endIndex) {
+  ///         print(numbers[i])
+  ///     }
   ///     // Prints "50"
   ///
   /// The next example attempts to retrieve an index ten positions from

@@ -439,9 +439,108 @@ func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) ->
 // CHECK:         apply {{.*}}<T>
 // CHECK:         return
 
-
 func convAnyHashable<T : Hashable>(t: T) {
   let fn: (T, T) -> Bool = {
     (x: AnyHashable, y: AnyHashable) in x == y
   }
 }
+
+// ==== Convert exploded tuples to Any or Optional<Any>
+
+// CHECK-LABEL: sil hidden @_TF19function_conversion12convTupleAnyFTFT_T_FT_TSiSi_FP_T_FGSqP__T__T_
+// CHECK:         function_ref @_TTRXFo___XFo__iP__
+// CHECK:         partial_apply
+// CHECK:         function_ref @_TTRXFo___XFo__iGSqP___
+// CHECK:         partial_apply
+// CHECK:         function_ref @_TTRXFo__dSidSi_XFo__iP__
+// CHECK:         partial_apply
+// CHECK:         function_ref @_TTRXFo__dSidSi_XFo__iGSqP___
+// CHECK:         partial_apply
+// CHECK:         function_ref @_TTRXFo_iP___XFo_dSidSi__
+// CHECK:         partial_apply
+// CHECK:         function_ref @_TTRXFo_iGSqP____XFo_dSidSi__
+// CHECK:         partial_apply
+
+func convTupleAny(_ f1: @escaping () -> (),
+                  _ f2: @escaping () -> (Int, Int),
+                  _ f3: @escaping (Any) -> (),
+                  _ f4: @escaping (Any?) -> ()) {
+  let _: () -> Any = f1
+  let _: () -> Any? = f1
+
+  let _: () -> Any = f2
+  let _: () -> Any? = f2
+
+  let _: ((Int, Int)) -> () = f3
+
+  let _: ((Int, Int)) -> () = f4
+}
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo___XFo__iP__ : $@convention(thin) (@owned @callee_owned () -> ()) -> @out Any
+// CHECK:         init_existential_addr %0 : $*Any, $()
+// CHECK-NEXT:    apply %1()
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo___XFo__iGSqP___ : $@convention(thin) (@owned @callee_owned () -> ()) -> @out Optional<Any>
+// CHECK:         [[ENUM_PAYLOAD:%.*]] = init_enum_data_addr %0 : $*Optional<Any>, #Optional.some!enumelt.1
+// CHECK-NEXT:    init_existential_addr [[ENUM_PAYLOAD]] : $*Any, $()
+// CHECK-NEXT:    apply %1()
+// CHECK-NEXT:    inject_enum_addr %0 : $*Optional<Any>, #Optional.some!enumelt.1
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSidSi_XFo__iP__ : $@convention(thin) (@owned @callee_owned () -> (Int, Int)) -> @out Any
+// CHECK:         [[ANY_PAYLOAD:%.*]] = init_existential_addr %0
+// CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK-NEXT:    [[RESULT:%.*]] = apply %1()
+// CHECK-NEXT:    [[LEFT:%.*]] = tuple_extract [[RESULT]]
+// CHECK-NEXT:    [[RIGHT:%.*]] = tuple_extract [[RESULT]]
+// CHECK-NEXT:    store [[LEFT:%.*]] to [trivial] [[LEFT_ADDR]]
+// CHECK-NEXT:    store [[RIGHT:%.*]] to [trivial] [[RIGHT_ADDR]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSidSi_XFo__iGSqP___ : $@convention(thin) (@owned @callee_owned () -> (Int, Int)) -> @out Optional<Any> {
+// CHECK:         [[OPTIONAL_PAYLOAD:%.*]] = init_enum_data_addr %0
+// CHECK-NEXT:    [[ANY_PAYLOAD:%.*]] = init_existential_addr [[OPTIONAL_PAYLOAD]]
+// CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK-NEXT:    [[RESULT:%.*]] = apply %1()
+// CHECK-NEXT:    [[LEFT:%.*]] = tuple_extract [[RESULT]]
+// CHECK-NEXT:    [[RIGHT:%.*]] = tuple_extract [[RESULT]]
+// CHECK-NEXT:    store [[LEFT:%.*]] to [trivial] [[LEFT_ADDR]]
+// CHECK-NEXT:    store [[RIGHT:%.*]] to [trivial] [[RIGHT_ADDR]]
+// CHECK-NEXT:    inject_enum_addr %0
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP___XFo_dSidSi__ : $@convention(thin) (Int, Int, @owned @callee_owned (@in Any) -> ()) -> ()
+// CHECK:         [[ANY_VALUE:%.*]] = alloc_stack $Any
+// CHECK-NEXT:    [[ANY_PAYLOAD:%.*]] = init_existential_addr [[ANY_VALUE]]
+// CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK-NEXT:    store %0 to [trivial] [[LEFT_ADDR]]
+// CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK-NEXT:    store %1 to [trivial] [[RIGHT_ADDR]]
+// CHECK-NEXT:    apply %2([[ANY_VALUE]])
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    dealloc_stack [[ANY_VALUE]]
+// CHECK-NEXT:    return
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iGSqP____XFo_dSidSi__ : $@convention(thin) (Int, Int, @owned @callee_owned (@in Optional<Any>) -> ()) -> ()
+// CHECK:         [[ANY_VALUE:%.*]] = alloc_stack $Any
+// CHECK-NEXT:    [[ANY_PAYLOAD:%.*]] = init_existential_addr [[ANY_VALUE]]
+// CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK-NEXT:    store %0 to [trivial] [[LEFT_ADDR]]
+// CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK-NEXT:    store %1 to [trivial] [[RIGHT_ADDR]]
+// CHECK-NEXT:    [[OPTIONAL_VALUE:%.*]] = alloc_stack $Optional<Any>
+// CHECK-NEXT:    [[OPTIONAL_PAYLOAD:%.*]] = init_enum_data_addr [[OPTIONAL_VALUE]]
+// CHECK-NEXT:    copy_addr [take] [[ANY_VALUE]] to [initialization] [[OPTIONAL_PAYLOAD]]
+// CHECK-NEXT:    inject_enum_addr [[OPTIONAL_VALUE]]
+// CHECK-NEXT:    apply %2([[OPTIONAL_VALUE]])
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    dealloc_stack [[OPTIONAL_VALUE]]
+// CHECK-NEXT:    dealloc_stack [[ANY_VALUE]]
+// CHECK-NEXT:    return

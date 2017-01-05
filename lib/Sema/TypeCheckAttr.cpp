@@ -1152,14 +1152,13 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   ProtocolDecl *ApplicationDelegateProto = nullptr;
   if (KitModule) {
     auto lookupOptions = defaultUnqualifiedLookupOptions;
-    lookupOptions |= NameLookupFlags::OnlyTypes;
     lookupOptions |= NameLookupFlags::KnownPrivate;
 
-    auto lookup = TC.lookupUnqualified(KitModule, Id_ApplicationDelegate,
-                                       SourceLoc(),
-                                       lookupOptions);
-    ApplicationDelegateProto = dyn_cast_or_null<ProtocolDecl>(
-                                   lookup.getSingleTypeResult());
+    auto lookup = TC.lookupUnqualifiedType(KitModule, Id_ApplicationDelegate,
+                                           SourceLoc(),
+                                           lookupOptions);
+    if (lookup.size() == 1)
+      ApplicationDelegateProto = dyn_cast<ProtocolDecl>(lookup[0]);
   }
 
   if (!ApplicationDelegateProto ||

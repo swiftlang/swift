@@ -18,6 +18,7 @@ Var Dictionary.endIndex has declared type change from DictionaryIndex<Key, Value
 Var Dictionary.startIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
 Var Set.endIndex has declared type change from SetIndex<Element> to Set<Element>.Index
 Var Set.startIndex has declared type change from SetIndex<Element> to Set<Element>.Index
+Constructor AnyIterator.init(_:) has 1st parameter type change from () -> Element? to () -> AnyIterator.Element?
 Constructor BidirectionalSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<BidirectionalSlice.Index>
 Constructor MutableBidirectionalSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<MutableBidirectionalSlice.Index>
 Constructor MutableRandomAccessSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<MutableRandomAccessSlice.Index>
@@ -40,7 +41,9 @@ Func CountableClosedRange.index(_:offsetBy:) has return type change from ClosedR
 Func CountableClosedRange.index(after:) has return type change from ClosedRangeIndex<Bound> to CountableClosedRange.Index
 Func CountableClosedRange.index(before:) has return type change from ClosedRangeIndex<Bound> to CountableClosedRange.Index
 Func CountableRange.distance(from:to:) has return type change from Bound.Stride to CountableRange.IndexDistance
-Func CountableRange.index(_:offsetBy:) has 2nd parameter type change from Bound.Stride to CountableRange.IndexDistance
+Func CountableRange.index(_:offsetBy:) has return type change from Bound to CountableRange.Index
+Func CountableRange.index(after:) has return type change from Bound to CountableRange.Index
+Func CountableRange.index(before:) has return type change from Bound to CountableRange.Index
 Func DefaultBidirectionalIndices.index(after:) has return type change from Elements.Index to DefaultBidirectionalIndices.Index
 Func DefaultBidirectionalIndices.index(before:) has return type change from Elements.Index to DefaultBidirectionalIndices.Index
 Func DefaultIndices.index(after:) has return type change from Elements.Index to DefaultIndices.Index
@@ -174,6 +177,7 @@ Func ReversedRandomAccessCollection.index(after:) has return type change from Re
 Func ReversedRandomAccessCollection.index(before:) has return type change from ReversedRandomAccessIndex<Base> to ReversedRandomAccessCollection.Index
 Func Set.index(after:) has return type change from SetIndex<Element> to Set<Element>.Index
 Func Set.index(of:) has return type change from SetIndex<Element>? to Set<Element>.Index?
+Func Set.popFirst() has return type change from Element? to Set.Element?
 Func Set.remove(at:) has 1st parameter type change from SetIndex<Element> to Set<Element>.Index
 Func Slice.distance(from:to:) has return type change from Base.IndexDistance to Slice.IndexDistance
 Func Slice.index(_:offsetBy:) has return type change from Base.Index to Slice.Index

@@ -223,9 +223,9 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
 
 extension TimeZone : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     private var _kindDescription : String {
-        if (self == TimeZone.autoupdatingCurrent) {
+        if self == TimeZone.autoupdatingCurrent {
             return "autoupdatingCurrent"
-        } else if (self == TimeZone.current) {
+        } else if self == TimeZone.current {
             return "current"
         } else {
             return "fixed"
