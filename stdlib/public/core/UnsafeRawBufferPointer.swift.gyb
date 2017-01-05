@@ -427,7 +427,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// `source` and binds the initialized memory to type `T`.
   ///
   /// Returns an iterator to any elements of `source` that didn't fit in the 
-  /// buffer, and an index into the buffer one past the last byte written.
+  /// buffer, and a typed buffer of the written elements.
   ///
   /// - Precondition: The memory in `startIndex..<(source.count *
   ///   MemoryLayout<T>.stride)` is uninitialized or initialized to a
@@ -436,16 +436,18 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// - Precondition: The buffer must contain sufficient memory to
   ///   accommodate at least `source.underestimateCount` elements.
   ///
-  /// - Postcondition: The memory at `self[startIndex..<returned index]                 
+  /// - Postcondition: The memory at `self[startIndex..<source.count *
+  ///   MemoryLayout<T>.stride]                 
   ///   is bound to type `T`.
   ///
-  /// - Postcondition: The `T` values at `self[startIndex..<returned index]`
+  /// - Postcondition: The `T` values at `self[startIndex..<source.count *
+  ///   MemoryLayout<T>.stride]`
   ///   are initialized.
   ///
   // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
   public func initializeMemory<S: Sequence>(
     as: S.Iterator.Element.Type, from source: S
-  ) -> (unwritten: S.Iterator, initializedUpTo: Index) {
+  ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Iterator.Element>) {
 
     var it = source.makeIterator()
     var idx = startIndex
@@ -456,8 +458,9 @@ public struct Unsafe${Mutable}RawBufferPointer
       "insufficient space to accommodate source.underestimatedCount elements")
     guard let base = baseAddress else {
       // this can be a precondition since only an invalid argument should be costly
-      _precondition(source.underestimatedCount == 0, "no memory available to initialize from source")
-      return (it, startIndex)
+      _precondition(source.underestimatedCount == 0, 
+        "no memory available to initialize from source")
+      return (it, UnsafeMutableBufferPointer(start: nil, count: 0))
     }  
 
     for p in stride(from: base, 
@@ -472,7 +475,9 @@ public struct Unsafe${Mutable}RawBufferPointer
       formIndex(&idx, offsetBy: elementStride)
     }
 
-    return (it, idx)
+    return (it, UnsafeMutableBufferPointer(
+                  start: base.assumingMemoryBound(to: S.Iterator.Element.self), 
+                  count: idx / elementStride))
   }
   %  end # mutable
 
