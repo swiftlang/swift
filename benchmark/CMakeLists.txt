@@ -15,10 +15,6 @@ list(APPEND CMAKE_MODULE_PATH
 include(AddSwiftBenchmarkSuite)
 
 set(SWIFT_BENCH_MODULES
-    single-source/unit-tests/ObjectiveCBridging
-    single-source/unit-tests/ObjectiveCBridgingStubs
-    single-source/unit-tests/ObjectiveCNoBridgingStubs
-    single-source/unit-tests/StackPromo
     single-source/Ackermann
     single-source/AngryPhonebook
     single-source/AnyHashableWithAClass
@@ -64,10 +60,13 @@ set(SWIFT_BENCH_MODULES
     single-source/NSStringConversion
     single-source/NopDeinit
     single-source/ObjectAllocation
+    single-source/ObjectiveCBridging
+    single-source/ObjectiveCBridgingStubs
+    single-source/ObjectiveCNoBridgingStubs
     single-source/ObserverClosure
     single-source/ObserverForwarderStruct
-    single-source/ObserverPartiallyAppliedMethod 
-    single-source/ObserverUnappliedMethod 
+    single-source/ObserverPartiallyAppliedMethod
+    single-source/ObserverUnappliedMethod
     single-source/OpenClose
     single-source/Phonebook
     single-source/PolymorphicCalls
@@ -77,15 +76,16 @@ set(SWIFT_BENCH_MODULES
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
     single-source/RC4
-    single-source/ReversedCollections
     single-source/RGBHistogram
     single-source/RangeAssignment
     single-source/RecursiveOwnedParameter
+    single-source/ReversedCollections
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
     single-source/SortLettersInPlace
     single-source/SortStrings
+    single-source/StackPromo
     single-source/StaticArray
     single-source/StrComplexWalk
     single-source/StrToInt
