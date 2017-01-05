@@ -1236,6 +1236,9 @@ encoded string itself. For example, the identifier ``vergüenza`` is mangled
 to ``0012vergenza_JFa``. (The encoding in standard Punycode would be
 ``vergenza-95a``)
 
+If the encoded string starts with a digit or an ``_``, an additional ``_`` is
+inserted between the run length and the encoded string.
+
 ::
 
   identifier ::= identifier 'o' OPERATOR-FIXITY
