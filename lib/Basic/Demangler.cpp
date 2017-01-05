@@ -383,6 +383,8 @@ NodePointer Demangler::demangleIdentifier() {
     int numChars = demangleNatural();
     if (numChars <= 0)
       return nullptr;
+    if (isPunycoded)
+      nextIf('_');
     if (Pos + numChars >= Text.size())
       return nullptr;
     StringRef Slice = StringRef(Text.data() + Pos, numChars);
