@@ -59,8 +59,7 @@ namespace {
 
     ConditionClauseResolver(SmallVectorImpl<Decl *> &ExtraTLCDs,
                             SourceFile &SF)
-    : NDF(SF), ExtraTLCDs(ExtraTLCDs), SF(SF),
-    Context(SF.getASTContext()) {}
+      : NDF(SF), ExtraTLCDs(ExtraTLCDs), SF(SF), Context(SF.getASTContext()) {}
 
     void resolveClausesAndInsertMembers(IterableDeclContext *Nom,
                                         IfConfigDecl *Cond) {
@@ -69,9 +68,9 @@ namespace {
         // Evaluate conditions until we find the active clause.
         DiagnosticTransaction DT(Context.Diags);
         auto classification =
-        Parser::classifyConditionalCompilationExpr(clause.Cond, Context,
-                                                   Context.Diags,
-                                                   /*fullCheck*/ true);
+          Parser::classifyConditionalCompilationExpr(clause.Cond, Context,
+                                                     Context.Diags,
+                                                     /*fullCheck*/ true);
         DT.abort();
         if (clause.Cond && !classification.getValueOr(false)) {
           continue;
