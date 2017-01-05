@@ -1344,7 +1344,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   /// Adds the elements of a sequence to the end of the array.
   ///
-  /// Use this method to append the elements of a sequence to the end of an
+  /// Use this method to append the elements of a sequence to the end of this
   /// array. This example appends the elements of a `Range<Int>` instance
   /// to an array of integers.
   ///
@@ -1358,53 +1358,40 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
   public mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Element {
-    let oldCount = self.count
-    let capacity = self.capacity
-    let newCount = oldCount + newElements.underestimatedCount
 
-    if newCount > capacity {
-      self.reserveCapacity(
-        Swift.max(newCount, _growArrayCapacity(capacity)))
-      }
-    _buffer._arrayAppendSequence(newElements)
-  }
-
-  // An overload of `append(contentsOf:)` that uses the += that is optimized for
-  // collections.
-  // FIXME(ABI)#13 (Performance): remove this entrypoint.  The overload for `Sequence` should be
-  // made optimal for this case, too.
-  /// Adds the elements of a collection to the end of the array.
-  ///
-  /// Use this method to append the elements of a collection to the end of this
-  /// array. This example appends the elements of a `Range<Int>` instance
-  /// to an array of integers.
-  ///
-  ///     var numbers = [1, 2, 3, 4, 5]
-  ///     numbers.append(contentsOf: 10...15)
-  ///     print(numbers)
-  ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
-  ///
-  /// - Parameter newElements: The elements to append to the array.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the resulting array.
-  public mutating func append<C : Collection>(contentsOf newElements: C)
-    where C.Iterator.Element == Element {
-
-    let newElementsCount = numericCast(newElements.count) as Int
+    let newElementsCount = newElements.underestimatedCount
 
     let oldCount = self.count
-    let capacity = self.capacity
+    let oldCapacity = self.capacity
     let newCount = oldCount + newElementsCount
 
     // Ensure uniqueness, mutability, and sufficient storage.  Note that
     // for consistency, we need unique self even if newElements is empty.
     self.reserveCapacity(
-      newCount > capacity ?
-      Swift.max(newCount, _growArrayCapacity(capacity))
+      newCount > oldCapacity ?
+      Swift.max(newCount, _growArrayCapacity(oldCapacity))
       : newCount)
 
-    (self._buffer.firstElementAddress + oldCount).initialize(from: newElements)
-    self._buffer.count = newCount
+    let startNewElements = _buffer.firstElementAddress + oldCount
+    let buf = UnsafeMutableBufferPointer(
+                start: startNewElements, 
+                count: self.capacity - oldCount)
+
+    let (remainder,writtenUpTo) = buf.initialize(from: newElements)
+    
+    // trap on underflow from the sequence's underestimate:
+    let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
+    _precondition(newElementsCount <= writtenCount, 
+      "newElements.underestimatedCount was an overestimate")
+    // can't check for overflow as sequences can underestimate
+
+    _buffer.count += writtenCount
+
+    if writtenUpTo == buf.endIndex {
+      // there may be elements that didn't fit in the existing buffer,
+      // append them in slow sequence-only mode
+      _buffer._arrayAppendSequence(IteratorSequence(remainder))
+    }
   }
 
 %if Self == 'ArraySlice':
@@ -1697,23 +1684,34 @@ extension ${Self} {
     return try body(&inoutBufferPointer)
   }
 
-  @discardableResult
   public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Element>
-  ) -> UnsafeMutablePointer<Element> {
-    if let s = self._baseAddressIfContiguous {
-      let count = self.count
-      ptr.initialize(from: s, count: count)
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+
+    guard !self.isEmpty else { return (makeIterator(),buffer.startIndex) }
+
+    // It is not OK for there to be no pointer/not enough space, as this is
+    // a precondition and Array never lies about its count.
+    guard var p = buffer.baseAddress
+      else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
+    _precondition(self.count <= buffer.count, 
+      "Insufficient space allocated to copy array contents")
+
+    if let s = _baseAddressIfContiguous {
+      p.initialize(from: s, count: self.count)
+      // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
+      // and all uses of the pointer it returns:
       _fixLifetime(self._owner)
-      return ptr + count
     } else {
-      var p = ptr
       for x in self {
         p.initialize(to: x)
         p += 1
       }
-      return p
     }
+
+    var it = IndexingIterator(_elements: self)
+    it._position = endIndex
+    return (it,buffer.index(buffer.startIndex, offsetBy: self.count))
   }
 }
 %end
@@ -1861,30 +1859,6 @@ extension ${Self} {
 public func += <
   S : Sequence
 >(lhs: inout ${Self}<S.Iterator.Element>, rhs: S) {
-  lhs.append(contentsOf: rhs)
-}
-
-// FIXME(ABI)#17 : remove this entrypoint.  The functionality should be provided by
-// a `+=` operator on `RangeReplaceableCollection`.
-/// Appends the elements of a collection to ${a_Self}.
-///
-/// Use this operator to append the elements of a collection to the end of
-/// ${a_Self} with same `Element` type. This example appends
-/// the elements of a `Range<Int>` instance to an array of integers.
-///
-///     var numbers = [1, 2, 3, 4, 5]
-///     numbers += 10...15
-///     print(numbers)
-///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
-///
-/// - Parameters:
-///   - lhs: The array to append to.
-///   - rhs: A collection.
-///
-/// - Complexity: O(*n*), where *n* is the length of the resulting array.
-public func += <
-  C : Collection
->(lhs: inout ${Self}<C.Iterator.Element>, rhs: C) {
   lhs.append(contentsOf: rhs)
 }
 % end

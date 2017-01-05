@@ -12,6 +12,9 @@ Protocol IndexableBase has been removed (deprecated)
 Protocol MutableIndexable has been removed (deprecated)
 Protocol RandomAccessIndexable has been removed (deprecated)
 Protocol RangeReplaceableIndexable has been removed (deprecated)
+Func Array.append(contentsOf:) has been removed
+Func ArraySlice.append(contentsOf:) has been removed
+Func ContiguousArray.append(contentsOf:) has been removed
 
 /* FIXME: Bogus */
 Var Dictionary.endIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index

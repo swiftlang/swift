@@ -215,7 +215,7 @@ public struct ${Self}<
 
   public typealias Iterator = LoggingIterator<Base.Iterator>
 
-  public func makeIterator() -> LoggingIterator<Base.Iterator> {
+  public func makeIterator() -> Iterator {
     Log.makeIterator[selfType] += 1
     return LoggingIterator(wrapping: base.makeIterator())
   }
@@ -321,10 +321,11 @@ public struct ${Self}<
 
   /// Copy a Sequence into an array.
   public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
-  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
     Log._copyContents[selfType] += 1
-    return base._copyContents(initializing: ptr)
+    let (it,idx) = base._copyContents(initializing: buffer)
+    return (Iterator(wrapping: it),idx)
   }
 
 %     if Kind in ['Collection', 'MutableCollection', 'RangeReplaceableCollection']:
