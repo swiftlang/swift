@@ -395,3 +395,7 @@ let mismatchInClosureResultType : (String) -> ((Int) -> Void) = {
     return { }
     // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}
 }
+
+// SR-3520: Generic function taking closure with inout parameter can result in a variety of compiler errors or EXC_BAD_ACCESS
+func sr3520_1<T>(_ g: (inout T) -> Int) {}
+sr3520_1 { $0 = 1 } // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
