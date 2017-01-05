@@ -698,7 +698,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     auto outputEltAddr = temp.getManagedAddress();
 
     // That might involve storing directly.
-    if (outputElt) {
+    if (!outputElt.isInContext()) {
       outputElt.forwardInto(SGF, Loc, outputEltAddr.getValue());
       temp.finishInitialization(SGF);
     }
