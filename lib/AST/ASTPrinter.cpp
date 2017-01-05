@@ -857,7 +857,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
       // Get the innermost nominal type context.
       DeclContext *DC;
-      if (isa<NominalTypeDecl>(Current))
+      if (isa<NominalTypeDecl>(Current) || isa<ExtensionDecl>(Current))
         DC = Current->getInnermostDeclContext();
       else
         DC = Current->getDeclContext();
