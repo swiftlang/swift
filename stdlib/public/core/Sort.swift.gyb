@@ -72,7 +72,11 @@ func _insertionSort<C>(
   }
 }
 
-/// Sorts the elements at indices `a`, `b`, and `c`. Stable.
+/// Sorts the elements at `elements[a]`, `elements[b]`, and `elements[c]`.
+/// Stable.
+///
+/// The indices passed as `a`, `b`, and `c` do not need to be consecutive, but
+/// must be in strict increasing order.
 ///
 /// - Precondition: `a < b && b < c`
 /// - Postcondition: `elements[a] <= elements[b] && elements[b] <= elements[c]`
@@ -86,8 +90,25 @@ func _sort3<C>(
   C : MutableCollection & RandomAccessCollection
   ${"" if p else ", C.Iterator.Element : Comparable"}
 {
-  // Possible starting states for elements at a, b, and c:
-  // 123, 132, 213, 231, 312, 321, 112, 121, 211, 122, 212, 221, 111
+  // There are thirteen possible permutations for the original ordering of
+  // the elements at indices `a`, `b`, and `c`. The comments in the code below
+  // show the relative ordering of the three elements using a three-digit
+  // number as shorthand for the position and comparative relationship of
+  // each element. For example, "312" indicates that the element at `a` is the
+  // largest of the three, the element at `b` is the smallest, and the element
+  // at `c` is the median. This hypothetical input array has a 312 ordering for
+  // `a`, `b`, and `c`:
+  //
+  //      [ 7, 4, 3, 9, 2, 0, 3, 7, 6, 5 ]
+  //        ^              ^           ^
+  //        a              b           c
+  //
+  // - If each of the three elements is distinct, they could be ordered as any
+  //   of the permutations of 1, 2, and 3: 123, 132, 213, 231, 312, or 321.
+  // - If two elements are equivalent and one is distinct, they could be
+  //   ordered as any permutation of 1, 1, and 2 or 1, 2, and 2: 112, 121, 211,
+  //   122, 212, or 221.
+  // - If all three elements are equivalent, they are already in order: 111.
 
   switch (${cmp("elements[b]", "elements[a]", p)},
     ${cmp("elements[c]", "elements[b]", p)}) {
@@ -96,24 +117,29 @@ func _sort3<C>(
     break
 
   case (true, true):
-    // 1 swap: 321->123
+    // 1 swap: 321
+    // swap(a, c): 312->123
     swap(&elements[a], &elements[c])
 
   case (true, false):
     // 1 swap: 213, 212 --- 2 swaps: 312, 211
-    // 213->123, 212->122 --- 312->132, 211->121
+    // swap(a, b): 213->123, 212->122, 312->132, 211->121
     swap(&elements[a], &elements[b])
+
     if ${cmp("elements[c]", "elements[b]", p)} {
-      // 132->123, 121->112
+      // 132 (started as 312), 121 (started as 211)
+      // swap(b, c): 132->123, 121->112
       swap(&elements[b], &elements[c])
     }
 
   case (false, true):
     // 1 swap: 132, 121 --- 2 swaps: 231, 221
-    // 132->123, 121->112 --- 231->213, 221->212
+    // swap(b, c): 132->123, 121->112, 231->213, 221->212
     swap(&elements[b], &elements[c])
+
     if ${cmp("elements[b]", "elements[a]", p)} {
-      // 213->123, 212->122
+      // 213 (started as 231), 212 (started as 221)
+      // swap(a, b): 213->123, 212->122
       swap(&elements[a], &elements[b])
     }
   }
