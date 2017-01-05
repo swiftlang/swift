@@ -470,9 +470,8 @@ namespace {
 
         // Build a reference to the protocol requirement.
         Expr *base =
-          cs.cacheType(TypeExpr::createImplicitHack(loc.getBaseNameLoc(),
-                                                    baseTy,
-                                                    ctx));
+          TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy, ctx);
+        cs.cacheExprTypes(base);
 
         return buildMemberRef(base, openedType, SourceLoc(), decl,
                               loc, openedFnType->getResult(),
@@ -778,6 +777,7 @@ namespace {
         // If the member is a constructor, verify that it can be legally
         // referenced from this base.
         if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+          cs.setExprTypes(base);
           if (!tc.diagnoseInvalidDynamicConstructorReferences(base, memberLoc,
                                            baseMeta, ctor, SuppressDiagnostics))
             return nullptr;
@@ -1436,13 +1436,14 @@ namespace {
       ConcreteDeclRef fnDeclRef(fn);
       auto fnRef = new (tc.Context) DeclRefExpr(fnDeclRef, DeclNameLoc(loc),
                                                 /*Implicit=*/true);
-      cs.setType(fnRef, fn->getInterfaceType());
+      fnRef->setType(fn->getInterfaceType());
       fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+      cs.setExprTypes(value);
       Expr *call = CallExpr::createImplicit(tc.Context, fnRef, { value }, { });
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
 
-      cs.cacheType(call);
+      cs.cacheExprTypes(call);
 
       // The return type of _bridgeErrorToNSError is formally
       // 'AnyObject' to avoid stdlib-to-Foundation dependencies, but it's
@@ -1477,11 +1478,18 @@ namespace {
             tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
                                   (ConformanceCheckFlags::InExpression|
                                    ConformanceCheckFlags::Used))) {
+        cs.setExprTypes(value);
+
         // Form the call.
-        return cs.cacheType(
+        auto result =
             tc.callWitness(value, cs.DC, bridgedProto, *conformance,
                            tc.Context.Id_bridgeToObjectiveC,
-                           { }, diag::broken_bridged_to_objc_protocol));
+                           { }, diag::broken_bridged_to_objc_protocol);
+
+        if (result)
+          cs.cacheExprTypes(result);
+
+        return result;
       }
       
       // If there is an Error conformance, try bridging as an error.
@@ -1626,6 +1634,9 @@ namespace {
       // Form the call and type-check it.
       Expr *call = CallExpr::createImplicit(tc.Context, fnRef, args,
                                             { Identifier(), Identifier() });
+      cs.cacheSubExprTypes(call);
+      cs.setSubExprTypes(call);
+
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
 
@@ -2078,6 +2089,8 @@ namespace {
                                        member,
                                        DeclNameLoc(expr->getStartLoc()),
                                        /*Implicit=*/true);
+      cs.cacheSubExprTypes(memberRef);
+      cs.setSubExprTypes(memberRef);
       bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
       cs.cacheExprTypes(memberRef);
       assert(!failed && "Could not reference string interpolation witness");
@@ -2189,12 +2202,21 @@ namespace {
       if (!isa<TupleExpr>(expr->getArg()))
         return nullptr;
       auto tupleArg = cast<TupleExpr>(expr->getArg());
-      for (auto elt : tupleArg->getElements())
+      for (auto elt : tupleArg->getElements()) {
+        cs.setExprTypes(elt);
         args.push_back(elt);
+      }
       DeclName constrName(tc.getObjectLiteralConstructorName(expr));
+
+      cs.cacheExprTypes(base);
+      cs.setExprTypes(base);
+
       Expr *semanticExpr = tc.callWitness(base, dc, proto, *conformance,
                                           constrName, args,
                                           diag::object_literal_broken_proto);
+      if (semanticExpr)
+        cs.cacheExprTypes(semanticExpr);
+
       expr->setSemanticExpr(semanticExpr);
       return expr;
     }
@@ -2661,22 +2683,27 @@ namespace {
       }
 
       Type argType = TupleType::get(typeElements, tc.Context);
-      Expr *arg = cs.cacheType(
+      Expr *arg =
           TupleExpr::create(tc.Context, SourceLoc(),
                             expr->getElements(),
                             names,
                             { },
                             SourceLoc(), /*HasTrailingClosure=*/false,
                             /*Implicit=*/true,
-                            argType));
+                            argType);
+
+      cs.cacheExprTypes(typeRef);
+      cs.setExprTypes(typeRef);
+
       Expr *result = tc.callWitness(typeRef, dc, arrayProto, *conformance,
                                     name, arg, diag::array_protocol_broken);
       if (!result)
         return nullptr;
 
+      cs.cacheExprTypes(result);
+
       expr->setSemanticExpr(result);
       cs.setType(expr, arrayTy);
-      cs.cacheSubExprTypes(expr);
 
       // If the array element type was defaulted, note that in the expression.
       if (solution.DefaultedConstraints.count(cs.getConstraintLocator(expr)))
@@ -2734,7 +2761,6 @@ namespace {
 
       Type argType = TupleType::get(typeElements, tc.Context);
       Expr *arg =
-        cs.cacheType(
             TupleExpr::create(tc.Context, expr->getLBracketLoc(),
                               expr->getElements(),
                               names,
@@ -2742,7 +2768,10 @@ namespace {
                               expr->getRBracketLoc(),
                               /*HasTrailingClosure=*/false,
                               /*Implicit=*/false,
-                              argType));
+                              argType);
+
+      cs.cacheExprTypes(typeRef);
+      cs.setExprTypes(typeRef);
 
       Expr *result = tc.callWitness(typeRef, dc, dictionaryProto,
                                     *conformance, name, arg,
@@ -2750,9 +2779,10 @@ namespace {
       if (!result)
         return nullptr;
 
+      cs.cacheExprTypes(result);
+
       expr->setSemanticExpr(result);
       cs.setType(expr, dictionaryTy);
-      cs.cacheSubExprTypes(expr);
 
       // If the dictionary key or value type was defaulted, note that in the
       // expression.
@@ -3244,8 +3274,11 @@ namespace {
       if (*choice == 0) {
         // Convert the subexpression.
         Expr *sub = expr->getSubExpr();
+
+        cs.setExprTypes(sub);
         if (tc.convertToType(sub, toType, cs.DC))
           return nullptr;
+        cs.cacheExprTypes(sub);
 
         expr->setSubExpr(sub);
         cs.setType(expr, toType);
@@ -3528,10 +3561,10 @@ namespace {
       bool invalid = tc.typeCheckExpression(callExpr, cs.DC,
                                             TypeLoc::withoutLoc(valueType),
                                             CTP_CannotFail);
+      cs.cacheExprTypes(callExpr);
+
       (void) invalid;
       assert(!invalid && "conversion cannot fail");
-
-      cs.cacheExprTypes(callExpr);
 
       E->setSemanticExpr(callExpr);
       return E;
@@ -4211,10 +4244,10 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   bool invalid = tc.typeCheckExpression(init, dc, 
                                         TypeLoc::withoutLoc(defArgType),
                                         CTP_CannotFail);
+  cs.cacheExprTypes(init);
+
   assert(!invalid && "conversion cannot fail");
   (void)invalid;
-
-  cs.cacheExprTypes(init);
 
   return {init, defArg.first};
 }
@@ -4812,7 +4845,7 @@ Expr *ExprRewriter::coerceCallArguments(
     // Total hack: In Swift 3 mode, argument labels are ignored when calling
     // function type with a single Any parameter.
     if (paramType->isAny()) {
-      if (auto tupleArgType = dyn_cast<TupleType>(arg->getType().getPointer())) {
+      if (auto tupleArgType = dyn_cast<TupleType>(cs.getType(arg).getPointer())) {
         if (tupleArgType->getNumElements() == 1) {
           matchCanFail = true;
         }
@@ -6022,15 +6055,20 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     // Call the builtin conversion operation.
     // FIXME: Bogus location info.
     Expr *base =
-      cs.cacheType(TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                                tc.Context));
+      TypeExpr::createImplicitHack(literal->getLoc(), type, tc.Context);
+
+    cs.cacheExprTypes(base);
+    cs.setExprTypes(base);
+    cs.setExprTypes(literal);
+
     Expr *result = tc.callWitness(base, dc,
                                   builtinProtocol, *builtinConformance,
                                   builtinLiteralFuncName,
                                   literal,
                                   brokenBuiltinProtocolDiag);
     if (result)
-      cs.setType(result, type);
+      cs.cacheExprTypes(result);
+
     return result;
   }
 
@@ -6081,14 +6119,18 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
   // Convert the resulting expression to the final literal type.
   // FIXME: Bogus location info.
-  Expr *base =
-    cs.cacheType(TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                              tc.Context));
+  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
+                                            tc.Context);
+  cs.cacheExprTypes(base);
+  cs.setExprTypes(base);
+  cs.setExprTypes(literal);
+
   literal = tc.callWitness(base, dc,
                            protocol, *conformance, literalFuncName,
                            literal, brokenProtocolDiag);
   if (literal)
-    cs.setType(literal, type);
+    cs.cacheExprTypes(literal);
+
   return literal;
 }
 
@@ -6321,7 +6363,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         assert(arg->getNumElements() == 2 && "should have two arguments");
         auto nonescaping = arg->getElements()[0];
         auto body = arg->getElements()[1];
-        auto bodyFnTy = body->getType()->castTo<FunctionType>();
+        auto bodyFnTy = cs.getType(body)->castTo<FunctionType>();
         auto escapableType = bodyFnTy->getInput();
         auto resultType = bodyFnTy->getResult();
         
@@ -6418,7 +6460,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     cs.setType(apply, fnType->getResult());
     apply->setIsSuper(isSuper);
 
+    cs.setExprTypes(apply);
     Expr *result = tc.substituteInputSugarTypeForResult(apply);
+    cs.cacheExprTypes(result);
 
     // Try closing the existential, if there is one.
     closeExistential(result, locator);
@@ -7131,13 +7175,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Construct an empty constraint system and solution.
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
 
-  cs.cacheExprTypes(base);
-  for (auto *e : arguments) {
-    cs.cacheExprTypes(e);
-  }
-
   // Find the witness we need to use.
-  auto type = cs.getType(base);
+  auto type = base->getType();
   assert(!type->hasTypeVariable() &&
          "Building call to witness with unresolved base type!");
 
@@ -7164,7 +7203,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Form a reference to the witness itself.
   Type openedFullType, openedType;
   std::tie(openedFullType, openedType)
-    = cs.getTypeOfMemberReference(cs.getType(base), witness,
+    = cs.getTypeOfMemberReference(base->getType(), witness,
                                   /*isTypeReference=*/false,
                                   /*isDynamicResult=*/false,
                                   FunctionRefKind::DoubleApply,
@@ -7177,7 +7216,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   auto argLabels = witness->getFullName().getArgumentNames();
   if (arguments.size() == 1 &&
       (isVariadicWitness(witness) ||
-       argumentNamesMatch(cs.getType(arguments[0]), argLabels))) {
+       argumentNamesMatch(arguments[0]->getType(), argLabels))) {
     call = CallExpr::create(Context, unresolvedDot, arguments[0], { },
                             { }, /*hasTrailingClosure=*/false,
                             /*implicit=*/true);
@@ -7203,11 +7242,9 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                             /*implicit=*/true);
   }
 
-  cs.cacheExprTypes(call);
-
   // Add the conversion from the argument to the function parameter type.
   cs.addConstraint(ConstraintKind::ArgumentTupleConversion,
-                   cs.getType(call->getArg()),
+                   call->getArg()->getType(),
                    openedType->castTo<FunctionType>()->getInput(),
                    cs.getConstraintLocator(call,
                                            ConstraintLocator::ApplyArgument));
@@ -7215,6 +7252,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Solve the system.
   SmallVector<Solution, 1> solutions;
   
+  cs.cacheExprTypes(call);
+
   // If the system failed to produce a solution, post any available diagnostics.
   if (cs.solve(solutions) || solutions.size() != 1) {
     cs.salvage(solutions, base);
@@ -7289,15 +7328,19 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) 
                                             builtinMethod,
                                             DeclNameLoc(expr->getLoc()),
                                             /*Implicit=*/true);
+  cs.cacheSubExprTypes(memberRef);
+  cs.setSubExprTypes(memberRef);
   bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-  cs.cacheType(memberRef);
+  cs.cacheExprTypes(memberRef);
   assert(!failed && "Could not reference witness?");
   (void)failed;
 
   // Call the builtin method.
   expr = CallExpr::createImplicit(ctx, memberRef, { }, { });
+  cs.cacheSubExprTypes(expr);
+  cs.setSubExprTypes(expr);
   failed = tc.typeCheckExpressionShallow(expr, cs.DC);
-  cs.cacheType(expr);
+  cs.cacheExprTypes(expr);
   assert(!failed && "Could not call witness?");
   (void)failed;
 

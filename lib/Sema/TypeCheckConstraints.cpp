@@ -1841,7 +1841,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         return true;
 
       // Add a conversion constraint between the types.
-      cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        InitType, Locator, /*isFavored*/true);
 
       // The expression has been pre-checked; save it in case we fail later.
@@ -1851,7 +1851,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Figure out what type the constraints decided on.
-      auto &tc = solution.getConstraintSystem().getTypeChecker();
+      auto &cs = solution.getConstraintSystem();
+      auto &tc = cs.getTypeChecker();
       InitType = solution.simplifyType(tc, InitType);
 
       // Convert the initializer to the type of the pattern.
@@ -2009,7 +2010,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       SequenceType =
         cs.createTypeVariable(Locator, /*options=*/TVO_MustBeMaterializable);
-      cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
                        sequenceProto->getDeclaredType(), Locator);
@@ -2036,7 +2037,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       if (isa<AbstractFunctionDecl>(cs.DC))
         lookupOptions |= NameLookupFlags::KnownPrivate;
 
-      auto sequenceType = expr->getType()->getRValueType();
+      auto sequenceType = cs.getType(expr)->getRValueType();
 
       // Look through one level of optional; this improves recovery but doesn't
       // change the result.
@@ -2105,6 +2106,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return nullptr;
       }
 
+      cs.cacheExprTypes(expr);
+
       // Apply the solution to the iteration pattern as well.
       Pattern *pattern = Stmt->getPattern();
       TypeResolutionOptions options;
@@ -2117,6 +2120,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       Stmt->setPattern(pattern);
       Stmt->setSequence(expr);
+
+      cs.setExprTypes(expr);
       return expr;
     }
   };
@@ -2206,7 +2211,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
         return true;
       
       // Condition must convert to Bool.
-      cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        boolDecl->getDeclaredType(),
                        cs.getConstraintLocator(expr));
       return false;
@@ -2216,8 +2221,12 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     Expr *appliedSolution(constraints::Solution &solution,
                                   Expr *expr) override {
       auto &cs = solution.getConstraintSystem();
-      return solution.convertBooleanTypeToBuiltinI1(expr,
-                                            cs.getConstraintLocator(OrigExpr));
+
+      auto converted =
+        solution.convertBooleanTypeToBuiltinI1(expr,
+                                             cs.getConstraintLocator(OrigExpr));
+      cs.setExprTypes(converted);
+      return converted;
     }
     
   };
@@ -2498,11 +2507,9 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
 
-  cs.cacheExprTypes(expr);
-
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr), type,
+  cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,
                    cs.getConstraintLocator(expr));
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -2527,6 +2534,8 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
     solution.dump(log);
   }
 
+  cs.cacheExprTypes(expr);
+
   // Perform the conversion.
   Expr *result = solution.coerceToType(expr, type,
                                        cs.getConstraintLocator(expr),
@@ -2536,6 +2545,8 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   if (!result) {
     return true;
   }
+
+  cs.setExprTypes(expr);
 
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();

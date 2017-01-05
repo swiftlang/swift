@@ -2327,7 +2327,7 @@ namespace {
           outputTy = fnType->getResult();
         }
       } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
-        outputTy = TE->getInstanceType();
+        outputTy = CS.getInstanceType(TE);
         NominalTypeDecl *NTD = nullptr;
         
         if (auto nominalType = outputTy->getAs<NominalType>()) {
@@ -2976,7 +2976,7 @@ Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
   // Sanitize the expression.
   expr = SanitizeExpr(getTypeChecker()).walkToExprPost(expr);
 
-  cacheExprTypes(expr);
+  cacheSubExprTypes(expr);
 
   // Visit the top-level expression generating constraints.
   ConstraintGenerator cg(*this);
