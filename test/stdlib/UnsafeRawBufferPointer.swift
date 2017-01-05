@@ -23,7 +23,7 @@ UnsafeRawBufferPointerTestSuite.test("initFromValue") {
     // Mutable view of value2's bytes.
     withUnsafeMutableBytes(of: &value2) { bytes2 in
       expectEqual(bytes1.count, bytes2.count)
-      bytes2[0..<bytes2.count].copyBytes(from: bytes1)
+      bytes2.copyBytes(from: bytes1)
     }
   }
   expectEqual(value2, value1)
@@ -45,8 +45,20 @@ UnsafeRawBufferPointerTestSuite.test("nonmutating_subscript_setter") {
   defer { buffer.deallocate() }
   buffer.copyBytes(from: [0, 1, 2, 3] as [UInt8])
   let leftBytes = buffer[0..<2]
-  let rightBytes = buffer[0..<2]
-  leftBytes[0..<2] = rightBytes
+
+  // Assign into a `var` mutable slice.
+  var rightBytes = buffer[0..<2]
+  rightBytes = leftBytes
+  expectEqualSequence(leftBytes, rightBytes)
+  
+  // Subscript assign into a `var` mutable slice.
+  buffer.copyBytes(from: [0, 1, 2, 3] as [UInt8])
+  rightBytes[3..<4] = leftBytes
+  expectEqualSequence(leftBytes, rightBytes)
+
+  // Subscript assign into a `let` mutable buffer.
+  buffer.copyBytes(from: [0, 1, 2, 3] as [UInt8])
+  buffer[3..<4] = leftBytes
   expectEqualSequence(leftBytes, rightBytes)
 }
 
