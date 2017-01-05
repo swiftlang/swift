@@ -1228,17 +1228,15 @@ ConstraintSystem::getTypeOfMemberReference(
   if (!isDynamicResult && baseObjTy->isExistentialType()) {
     auto selfTy = replacements[outerDC->getSelfInterfaceType()
           ->getCanonicalType()];
-    auto existentialTy = outerDC->getDeclaredTypeOfContext();
-
     type = type.transform([&](Type t) -> Type {
       if (auto *selfTy = t->getAs<DynamicSelfType>())
         t = selfTy->getSelfType();
       if (t->is<TypeVariableType>())
         if (t->isEqual(selfTy))
-        return existentialTy;
+        return baseObjTy;
       if (auto *metatypeTy = t->getAs<MetatypeType>())
         if (metatypeTy->getInstanceType()->isEqual(selfTy))
-          return ExistentialMetatypeType::get(existentialTy);
+          return ExistentialMetatypeType::get(baseObjTy);
       return t;
     });
   }
