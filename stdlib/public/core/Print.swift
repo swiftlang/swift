@@ -304,8 +304,6 @@ public func print<T>(_: T, appendNewline: Bool = true) {}
 @available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false': 'debugPrint((...), terminator: \"\")'")
 public func debugPrint<T>(_: T, appendNewline: Bool = true) {}
 
-
-//===--- FIXME: Not working due to <rdar://22101775> ----------------------===//
 @available(*, unavailable, message: "Please use the 'to' label for the target stream: 'print((...), to: &...)'")
 public func print<T>(_: T, _: inout TextOutputStream) {}
 @available(*, unavailable, message: "Please use the 'to' label for the target stream: 'debugPrint((...), to: &...))'")
