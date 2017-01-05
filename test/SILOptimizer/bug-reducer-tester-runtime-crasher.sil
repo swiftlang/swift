@@ -25,18 +25,15 @@
 // RUN: %target-swiftc_driver -o %t/good %t/good.o %t/main.o -module-name main
 // RUN: %t/good | %FileCheck %s
 
-// Now try to miscompile
-// RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-failure-kind=miscompile -bug-reducer-tester-target-func='target_func' -emit-sib -o %t/miscompile.sib -module-name main
-// RUN: %target-swift-frontend -c %t/miscompile.sib -o %t/miscompile.o -module-name main
-// RUN: %target-swiftc_driver -o %t/miscompile %t/miscompile.o %t/main.o -module-name main
-// RUN: %t/miscompile | %FileCheck -check-prefix=MISCOMPILE %s
+// Now try to insert a runtime crash and make sure that we hit the crash.
+// RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-failure-kind=runtime-crasher -bug-reducer-tester-target-func='target_func' -emit-sib -o %t/runtime_crasher.sib -module-name main
+// RUN: %target-swift-frontend -c %t/runtime_crasher.sib -o %t/runtime_crasher.o -module-name main
+// RUN: %target-swiftc_driver -o %t/runtime_crasher %t/runtime_crasher.o %t/main.o -module-name main
+// RUN: not --crash  %t/runtime_crasher
 
 // CHECK: swift
 // CHECK: swift
 // CHECK: swift
-// MISCOMPILE: swift
-// MISCOMPILE: swift
-// MISCOMPILE-NOT: swift
 
 sil_stage canonical
 
