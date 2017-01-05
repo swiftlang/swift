@@ -2578,6 +2578,18 @@ enum PointerTypeKind : unsigned {
   PTK_AutoreleasingUnsafeMutablePointer,
 };
 
+static inline bool isRawPointerKind(PointerTypeKind PTK) {
+  switch (PTK) {
+  case PTK_UnsafeMutableRawPointer:
+  case PTK_UnsafeRawPointer:
+    return true;
+  case PTK_UnsafeMutablePointer:
+  case PTK_UnsafePointer:
+  case PTK_AutoreleasingUnsafeMutablePointer:
+    return false;
+  }
+}
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.
 class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   SourceRange Braces;
