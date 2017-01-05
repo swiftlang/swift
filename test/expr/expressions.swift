@@ -645,13 +645,18 @@ func lvalue_processing() {
 
 struct Foo {
   func method() {}
+  mutating func mutatingMethod() {}
 }
 
 func test() {
   var x = Foo()
+  let y = Foo()
+
+  // FIXME: Bad diagnostics
 
   // rdar://15708430
-  (&x).method()  // expected-error {{'inout Foo' is not convertible to 'Foo'}}
+  (&x).method()  // expected-error {{type of expression is ambiguous without more context}}
+  (&x).mutatingMethod() // expected-error {{cannot use mutating member on immutable value of type 'inout Foo'}}
 }
 
 

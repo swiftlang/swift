@@ -38,52 +38,6 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
   return nullptr;
 }
 
-//===----------------------------------------------------------------------===//
-// Diagnose assigning variable to itself.
-//===----------------------------------------------------------------------===//
-
-static Decl *findSimpleReferencedDecl(const Expr *E) {
-  if (auto *LE = dyn_cast<LoadExpr>(E))
-    E = LE->getSubExpr();
-
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-    return DRE->getDecl();
-
-  return nullptr;
-}
-
-static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
-  if (auto *LE = dyn_cast<LoadExpr>(E))
-    E = LE->getSubExpr();
-
-  if (auto *D = findSimpleReferencedDecl(E))
-    return std::make_pair(nullptr, D);
-
-  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    if (auto *BaseDecl = findSimpleReferencedDecl(MRE->getBase()))
-      return std::make_pair(BaseDecl, MRE->getMember().getDecl());
-  }
-
-  return std::make_pair(nullptr, nullptr);
-}
-
-/// Diagnose assigning variable to itself.
-static void diagSelfAssignment(TypeChecker &TC, const Expr *E) {
-  auto *AE = dyn_cast<AssignExpr>(E);
-  if (!AE)
-    return;
-
-  auto LHSDecl = findReferencedDecl(AE->getDest());
-  auto RHSDecl = findReferencedDecl(AE->getSrc());
-  if (LHSDecl.second && LHSDecl == RHSDecl) {
-    TC.diagnose(AE->getLoc(), LHSDecl.first ? diag::self_assignment_prop
-                                            : diag::self_assignment_var)
-        .highlight(AE->getDest()->getSourceRange())
-        .highlight(AE->getSrc()->getSourceRange());
-  }
-}
-
-
 /// Diagnose syntactic restrictions of expressions.
 ///
 ///   - Module values may only occur as part of qualification.
@@ -145,7 +99,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     // the call (or not).
     llvm::SmallDenseMap<Expr*, PartialApplication,2> InvalidPartialApplications;
 
-    ~DiagnoseWalker() {
+    ~DiagnoseWalker() override {
       for (auto &unapplied : InvalidPartialApplications) {
         unsigned kind = unapplied.second.kind;
         TC.diagnose(unapplied.first->getLoc(),
@@ -258,6 +212,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
+        
+        // Verify that special decls are eliminated.
+        checkForDeclWithSpecialTypeCheckingSemantics(DRE);
       }
       if (auto *MRE = dyn_cast<MemberRefExpr>(Base)) {
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
@@ -273,6 +230,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             AcceptableInOutExprs.insert(IOE);
       }
 
+      // Check decl refs in withoutActuallyEscaping blocks.
+      if (auto MakeEsc = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
+        if (auto DRE =
+              dyn_cast<DeclRefExpr>(MakeEsc->getNonescapingClosureValue()))
+          checkNoEscapeParameterUse(DRE, MakeEsc);
+      }
 
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
@@ -365,7 +328,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Diagnose 'self.init' or 'super.init' nested in another expression.
       if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
-        if (!Parent.isNull() || !IsExprStmt) {
+        bool inDefer = false;
+        auto *innerDecl = DC->getInnermostDeclarationDeclContext();
+        if (auto *FD = dyn_cast_or_null<FuncDecl>(innerDecl)) {
+          inDefer = FD->isDeferBody();
+        }
+
+        if (!Parent.isNull() || !IsExprStmt || inDefer) {
           bool isChainToSuper;
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           TC.diagnose(E->getLoc(), diag::init_delegation_nested,
@@ -478,8 +447,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // The only valid use of the noescape parameter is an immediate call,
       // either as the callee or as an argument (in which case, the typechecker
-      // validates that the noescape bit didn't get stripped off).
-      if (ParentExpr && isa<ApplyExpr>(ParentExpr)) // param()
+      // validates that the noescape bit didn't get stripped off), or as
+      // a special case, in the binding of a withoutActuallyEscaping block.
+      if (ParentExpr
+          && (isa<ApplyExpr>(ParentExpr) // param()
+              || isa<MakeTemporarilyEscapableExpr>(ParentExpr)))
         return;
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
@@ -548,13 +520,16 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
       bool isExistential = false;
-      if (auto metaTy = E->getType()->getAs<MetatypeType>())
-        isExistential = metaTy->getInstanceType()->isAnyExistentialType();
-      if (!isExistential &&
-          !TC.lookupConstructors(const_cast<DeclContext *>(DC),
-                                 E->getType()).empty()) {
-        TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
-          .fixItInsertAfter(E->getEndLoc(), "()");
+      if (auto metaTy = E->getType()->getAs<MetatypeType>()) {
+        auto instanceTy = metaTy->getInstanceType();
+        isExistential = instanceTy->isExistentialType();
+        if (!isExistential &&
+            instanceTy->mayHaveMembers() &&
+            !TC.lookupConstructors(const_cast<DeclContext *>(DC),
+                                   instanceTy).empty()) {
+          TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
+            .fixItInsertAfter(E->getEndLoc(), "()");
+        }
       }
 
       // Add fix-it to insert ".self".
@@ -636,6 +611,17 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         TC.diagnose(DRE->getLoc(), topLevelDiag,
                     namePlusDot, k, pair.first->getName())
           .fixItInsert(DRE->getStartLoc(), namePlusDot);
+      }
+    }
+    
+    void checkForDeclWithSpecialTypeCheckingSemantics(const DeclRefExpr *DRE) {
+      // Referencing type(of:) and other decls with special type-checking
+      // behavior as functions is not implemented. Maybe we could wrap up the
+      // special-case behavior in a closure someday...
+      if (TC.getDeclTypeCheckingSemantics(DRE->getDecl())
+            != DeclTypeCheckingSemantics::Normal) {
+        TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
+                    DRE->getDecl()->getName());
       }
     }
     
@@ -1061,7 +1047,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
       return false;
     }
 
-    // This is a scalar-to-tuple conversion. Add the  name.  We "know"
+    // This is a scalar-to-tuple conversion. Add the name. We "know"
     // that we're inside a ParenExpr, because ParenExprs are required
     // by the syntax and locator resolution looks through on level of
     // them.
@@ -1297,7 +1283,8 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     SourceRange typeRange = var->getTypeSourceRangeForDiagnostics();
     auto *baseVar = cast<VarDecl>(base);
-    return checkType(var->getType(), baseVar->getType(), typeRange);
+    return checkType(var->getInterfaceType(), baseVar->getInterfaceType(),
+                     typeRange);
   }
 
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -1312,12 +1299,12 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
-      auto resultType = ArchetypeBuilder::mapTypeIntoContext(
-          method, method->getResultInterfaceType());
+      auto resultType = method->mapTypeIntoContext(
+          method->getResultInterfaceType());
 
       auto *baseMethod = cast<FuncDecl>(base);
-      auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
-          baseMethod, baseMethod->getResultInterfaceType());
+      auto baseResultType = baseMethod->mapTypeIntoContext(
+          baseMethod->getResultInterfaceType());
 
       fixedAny |= checkType(resultType, baseResultType,
                             method->getBodyResultTypeLoc().getSourceRange());
@@ -1334,11 +1321,9 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
     });
 
-    auto resultType = ArchetypeBuilder::mapTypeIntoContext(
-        subscript->getDeclContext(),
+    auto resultType = subscript->getDeclContext()->mapTypeIntoContext(
         subscript->getElementInterfaceType());
-    auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
-        baseSubscript->getDeclContext(),
+    auto baseResultType = baseSubscript->getDeclContext()->mapTypeIntoContext(
         baseSubscript->getElementInterfaceType());
     fixedAny |= checkType(resultType, baseResultType,
                           subscript->getElementTypeLoc().getSourceRange());
@@ -1670,7 +1655,7 @@ namespace {
     InstanceMethod,
     Property,
   };
-}
+} // end anonymous namespace
 
 static Optional<ReplacementDeclKind>
 describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
@@ -1970,7 +1955,7 @@ public:
   AvailabilityWalker(
       TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {}
 
-  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     ExprStack.push_back(E);
 
     auto visitChildren = [&]() { return std::make_pair(true, E); };
@@ -2012,7 +1997,7 @@ public:
     return visitChildren();
   }
 
-  virtual Expr *walkToExprPost(Expr *E) override {
+  Expr *walkToExprPost(Expr *E) override {
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
 
@@ -2158,7 +2143,7 @@ private:
     }
   }
 };
-}
+} // end anonymous namespace
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
@@ -2398,7 +2383,7 @@ public:
     
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
-  ~VarDeclUsageChecker();
+  ~VarDeclUsageChecker() override;
 
   /// Check to see if the specified VarDecl is part of a larger
   /// PatternBindingDecl, where some other bound variable was mutated.  In this
@@ -2529,7 +2514,7 @@ public:
   }
 
 };
-}
+} // end anonymous namespace
 
 
 // After we have scanned the entire region, diagnose variables that could be
@@ -3091,7 +3076,7 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
       .fixItRemoveChars(FS->getFirstSemicolonLoc(), endOfIncrementLoc);
   }
 }
-}// Anonymous namespace end.
+} // end anonymous namespace
 
 // Perform MiscDiagnostics on Switch Statements.
 static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
@@ -3236,7 +3221,7 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
   public:
     DiagnoseWalker(TypeChecker &tc) : TC(tc) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // Dig into implicit expression.
       if (E->isImplicit()) return { true, E };
       // Diagnose call expression.
@@ -3336,7 +3321,8 @@ class ObjCSelectorWalker : public ASTWalker {
     auto nominal =
       method->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
     auto result = TC.lookupMember(const_cast<DeclContext *>(DC),
-                                  nominal->getInterfaceType(), lookupName,
+                                  nominal->getDeclaredInterfaceType(),
+                                  lookupName,
                                   (defaultMemberLookupOptions |
                                    NameLookupFlags::KnownPrivate));
 
@@ -3367,7 +3353,7 @@ public:
   ObjCSelectorWalker(TypeChecker &tc, const DeclContext *dc, Type selectorTy)
     : TC(tc), DC(dc), SelectorTy(selectorTy) { }
 
-  virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     StringLiteralExpr *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
     bool fromStringLiteral = false;
     bool hadParens = false;
@@ -3667,7 +3653,7 @@ public:
   }
 
 };
-}
+} // end anonymous namespace
 
 static void diagDeprecatedObjCSelectors(TypeChecker &tc, const DeclContext *dc,
                                         const Expr *expr) {
@@ -3725,7 +3711,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     TypeChecker &TC;
     SmallPtrSet<Expr *, 4> ErasureCoercedToAny;
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return { false, E };
 
@@ -3803,7 +3789,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
                                             const DeclContext *DC,
                                             bool isExprStmt) {
-  diagSelfAssignment(TC, E);
+  TC.diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
@@ -3931,7 +3917,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   do {
     // Look through typealiases.
     if (auto aliasTy = dyn_cast<NameAliasType>(type.getPointer())) {
-      type = aliasTy->getDecl()->getUnderlyingType();
+      type = aliasTy->getSinglyDesugaredType();
       continue;
     }
 
@@ -4050,7 +4036,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultInterfaceType();
-    resultType = ArchetypeBuilder::mapTypeIntoContext(func, resultType);
+    resultType = func->mapTypeIntoContext(resultType);
     returnsSelf = func->hasDynamicSelf();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;

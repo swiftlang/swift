@@ -198,23 +198,10 @@ bb0(%0 : $SinglePayloadNontrivial):
 }
 
 // CHECK-LABEL: define{{( protected)?}} void @single_payload_nontrivial_copy_destroy(i64)
-// CHECK:      switch i64 %0, label [[PRESENT:%.*]] [
-// CHECK-NEXT:   i64 0, label [[NOT_PRESENT:%.*]]
-// CHECK-NEXT:   i64 2, label [[NOT_PRESENT]]
-// CHECK-NEXT:   i64 4, label [[NOT_PRESENT]]
-// CHECK-NEXT: ]
-// CHECK:      [[T0:%.*]] = inttoptr i64 [[V:%.*]] to %swift.refcounted*
-// CHECK-NEXT: call void @swift_rt_swift_retain(%swift.refcounted* [[T0]])
-// CHECK-NEXT: br label [[NOT_PRESENT]]
-// CHECK:      switch i64 %0, label [[PRESENT:%.*]] [
-// CHECK-NEXT:   i64 0, label [[NOT_PRESENT:%.*]]
-// CHECK-NEXT:   i64 2, label [[NOT_PRESENT]]
-// CHECK-NEXT:   i64 4, label [[NOT_PRESENT]]
-// CHECK-NEXT: ]
-// CHECK:      [[T0:%.*]] = inttoptr i64 [[V:%.*]] to %swift.refcounted*
-// CHECK-NEXT: call void @swift_rt_swift_release(%swift.refcounted* [[T0]])
-// CHECK-NEXT: br label [[NOT_PRESENT]]
-// CHECK:      ret void
+// CHECK:      call void @_T020enum_value_semantics23SinglePayloadNontrivialOWy
+// CHECK-NEXT: call void @single_payload_nontrivial_user
+// CHECK-NEXT: call void @_T020enum_value_semantics23SinglePayloadNontrivialOWe
+// CHECK-NEXT: ret void
 
 //
 // No payload enums
@@ -482,19 +469,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %O20enum_value_semantics22MultiPayloadNontrivial, %O20enum_value_semantics22MultiPayloadNontrivial* %0, i32 0, i32 1
 // CHECK-NEXT: [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i8*
 // CHECK-NEXT: [[TAG:%.*]] = load i8, i8* [[TAG_ADDR]], align 8
-// CHECK-NEXT: switch i8 [[TAG]], label %[[END:[0-9]+]] [
-// CHECK:        i8 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
-// CHECK:        i8 2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
-// CHECK:      ]
-// CHECK:      ; <label>:[[PAYLOAD1_DESTROY]]
-// CHECK-NEXT: [[PAYLOAD1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_0]] to %swift.refcounted*
-// CHECK-NEXT: call void @swift_rt_swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
-// CHECK-NEXT: br label %[[END]]
-// CHECK:      ; <label>:[[PAYLOAD3_DESTROY]]
-// CHECK-NEXT: [[PAYLOAD3_1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_1]] to %objc_object*
-// CHECK-NEXT: call void @objc_release(%objc_object* [[PAYLOAD3_1_VAL]])
-// CHECK-NEXT: br label %[[END]]
-// CHECK:      ; <label>:[[END]]
+// CHECK-NEXT: @_T020enum_value_semantics22MultiPayloadNontrivialOWy
 // CHECK-NEXT: ret void
 
 
@@ -537,20 +512,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[PAYLOAD_0:%.*]] = load i64, i64* [[PAYLOAD_0_ADDR]], align 8
 // CHECK-NEXT: [[PAYLOAD_1_ADDR:%.*]] = getelementptr
 // CHECK-NEXT: [[PAYLOAD_1:%.*]] = load i64, i64* [[PAYLOAD_1_ADDR]], align 8
-// CHECK:      switch i8 [[SPARE_BITS:%.*]], label %[[END:[0-9]+]] [
-// CHECK:        i8 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
-// CHECK:        i8 2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
-// CHECK:      ]
-// CHECK:      ; <label>:[[PAYLOAD1_DESTROY]]
-// CHECK-NEXT: [[PAYLOAD1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_0]] to %swift.refcounted*
-// CHECK-NEXT: call void @swift_rt_swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
-// CHECK-NEXT: br label %[[END]]
-// CHECK:      ; <label>:[[PAYLOAD3_DESTROY]]
-// CHECK-NEXT: [[MASKED:%.*]] = and i64 [[PAYLOAD_1]]
-// CHECK-NEXT: [[PAYLOAD3_1_VAL:%.*]] = inttoptr i64 [[MASKED]] to %objc_object*
-// CHECK-NEXT: call void @objc_release(%objc_object* [[PAYLOAD3_1_VAL]])
-// CHECK-NEXT: br label %[[END]]
-// CHECK:      ; <label>:[[END]]
+// CHECK:      call void @_T020enum_value_semantics31MultiPayloadNontrivialSpareBitsOWy
 // CHECK-NEXT: ret void
 
 

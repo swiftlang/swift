@@ -17,7 +17,6 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -51,7 +50,6 @@
 #include <queue>
 
 using namespace swift;
-namespace swift {
 
 struct SynthesizedExtensionAnalyzer::Implementation {
   static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
@@ -226,8 +224,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     // the extension to the interface types of the base type's
     // declaration.
     TypeSubstitutionMap subMap;
-    if (!BaseType->isAnyExistentialType())
-      subMap = BaseType->getMemberSubstitutions(Ext);
+    if (!BaseType->isExistentialType())
+      subMap = BaseType->getContextSubstitutions(Ext);
     auto *M = DC->getParentModule();
 
     assert(Ext->getGenericSignature() && "No generic signature.");
@@ -430,7 +428,6 @@ hasMergeGroup(MergeGroupKind Kind) {
   }
   return false;
 }
-} // end anonymous namespace
 
 PrintOptions PrintOptions::printTypeInterface(Type T) {
   PrintOptions result = printInterface();
@@ -456,7 +453,9 @@ void PrintOptions::clearSynthesizedExtension() {
 }
 
 TypeTransformContext::TypeTransformContext(Type T)
-    : BaseType(T.getPointer()) {}
+    : BaseType(T.getPointer()) {
+  assert(T->mayHaveMembers());
+}
 
 TypeTransformContext::TypeTransformContext(NominalTypeDecl *NTD)
     : BaseType(NTD->getDeclaredTypeInContext().getPointer()), Nominal(NTD) {}
@@ -855,19 +854,18 @@ class PrintAST : public ASTVisitor<PrintAST> {
       if (T->hasArchetype()) {
         // Get the interface type, since TypeLocs still have
         // contextual types in them.
-        T = ArchetypeBuilder::mapTypeOutOfContext(
-            Current->getInnermostDeclContext(), T);
+        T = Current->getInnermostDeclContext()->mapTypeOutOfContext(T);
       }
 
       // Get the innermost nominal type context.
       DeclContext *DC;
-      if (isa<NominalTypeDecl>(Current))
+      if (isa<NominalTypeDecl>(Current) || isa<ExtensionDecl>(Current))
         DC = Current->getInnermostDeclContext();
       else
         DC = Current->getDeclContext();
 
       // Get the substitutions from our base type.
-      auto subMap = CurrentType->getMemberSubstitutions(DC);
+      auto subMap = CurrentType->getContextSubstitutions(DC);
       auto *M = DC->getParentModule();
       T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
     }
@@ -988,8 +986,9 @@ public:
     Type OldType = CurrentType;
     if (CurrentType && (Old != nullptr || Options.PrintAsMember)) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        CurrentType = CurrentType->getTypeOfMember(
-            Options.CurrentModule, NTD, nullptr);
+        CurrentType = NTD->getDeclaredInterfaceType().subst(
+            Options.CurrentModule,
+            CurrentType->getContextSubstitutions(NTD->getDeclContext()));
       }
     }
 
@@ -1263,9 +1262,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
   ModuleDecl *M = nullptr;
 
   if (CurrentType) {
-    if (!CurrentType->isAnyExistentialType()) {
+    if (!CurrentType->isExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
-      subMap = CurrentType->getMemberSubstitutions(DC);
+      subMap = CurrentType->getContextSubstitutions(DC);
       M = DC->getParentModule();
     }
   }
@@ -2141,9 +2140,8 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
           printGenericSignature(genericSig, PrintParams | InnermostOnly);
     });
   bool ShouldPrint = true;
-  Type Ty;
-  if (decl->hasUnderlyingType())
-    Ty = decl->getUnderlyingType();
+  Type Ty = decl->getUnderlyingTypeLoc().getType();
+
   // If the underlying type is private, don't print it.
   if (Options.SkipPrivateStdlibDecls && Ty && Ty.isPrivateStdlibType())
     ShouldPrint = false;
@@ -2338,11 +2336,11 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (decl->hasType()) {
+  if (decl->hasInterfaceType()) {
     Printer << ": ";
     auto tyLoc = decl->getTypeLoc();
     if (!tyLoc.getTypeRepr())
-      tyLoc = TypeLoc::withoutLoc(decl->getType());
+      tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
     printTypeLoc(tyLoc);
   }
 
@@ -2395,12 +2393,8 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
   printArgName();
 
-  if (!TheTypeLoc.getTypeRepr() && param->hasType()) {
-    // FIXME: ParamDecls should have interface types instead
-    auto *DC = Current->getInnermostDeclContext();
-    auto type = ArchetypeBuilder::mapTypeOutOfContext(DC, param->getType());
-    TheTypeLoc = TypeLoc::withoutLoc(type);
-  }
+  if (!TheTypeLoc.getTypeRepr() && param->hasInterfaceType())
+    TheTypeLoc = TypeLoc::withoutLoc(param->getInterfaceType());
 
   // If the parameter is variadic, we will print the "..." after it, but we have
   // to strip off the added array type.
@@ -2518,7 +2512,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                              ? parameterListTypes[CurrPattern]
                              : nullptr;
     printParameterList(BodyParams[CurrPattern], paramListType,
-                       /*Curried=*/CurrPattern > 0,
+                       /*isCurried=*/CurrPattern > 0,
                        [&]()->bool {
       return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault();
     });
@@ -2769,7 +2763,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer << "subscript";
   }, [&] { // Parameters
     printParameterList(decl->getIndices(), decl->getIndicesInterfaceType(),
-                       /*Curried=*/false,
+                       /*isCurried=*/false,
                        /*isAPINameByDefault*/[]()->bool{return false;});
   });
   Printer << " -> ";
@@ -4117,8 +4111,8 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "dictionary_downcast";
   case CheckedCastKind::SetDowncast:
     return "set_downcast";
-  case CheckedCastKind::BridgeFromObjectiveC:
-    return "bridge_from_objc";
+  case CheckedCastKind::BridgingCast:
+    return "bridging_cast";
   }
   llvm_unreachable("bad checked cast name");
 }

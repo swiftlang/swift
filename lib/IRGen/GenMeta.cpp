@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
@@ -224,7 +223,7 @@ namespace {
       assert(Types.size() == Values.size());
     }
   };
-}
+} // end anonymous namespace
 
 /// Given an array of polymorphic arguments as might be set up by
 /// GenericArguments, bind the polymorphic parameters.
@@ -236,7 +235,7 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   array = IGF.Builder.CreateElementBitCast(array, IGF.IGM.TypeMetadataPtrTy);
 
   auto getInContext = [&](CanType type) -> CanType {
-    return ArchetypeBuilder::mapTypeIntoContext(typeDecl, type)
+    return typeDecl->mapTypeIntoContext(type)
              ->getCanonicalType();
   };
 
@@ -1028,7 +1027,7 @@ namespace {
       return metatype;
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit a type metadata reference without using an accessor function.
 static llvm::Value *emitDirectTypeMetadataRef(IRGenFunction &IGF,
@@ -1543,7 +1542,31 @@ namespace {
     llvm::Value *visitType(CanType t) {
       return IGF.emitTypeMetadataRef(t);
     }
-      
+
+    llvm::Value *visitBoundGenericEnumType(CanBoundGenericEnumType type) {
+      // Optionals have a lowered payload type, so we recurse here.
+      if (auto objectTy = CanType(type).getAnyOptionalObjectType()) {
+        auto payloadMetadata = visit(objectTy);
+        llvm::Value *args[] = { payloadMetadata };
+        llvm::Type *types[] = { IGF.IGM.TypeMetadataPtrTy };
+
+        // Call the generic metadata accessor function.
+        llvm::Function *accessor =
+            IGF.IGM.getAddrOfGenericTypeMetadataAccessFunction(
+                type->getDecl(), types, NotForDefinition);
+
+        auto result = IGF.Builder.CreateCall(accessor, args);
+        result->setDoesNotThrow();
+        result->addAttribute(llvm::AttributeSet::FunctionIndex,
+                             llvm::Attribute::ReadNone);
+
+        return result;
+      }
+
+      // Otherwise, generic arguments are not lowered.
+      return visitType(type);
+    }
+
     llvm::Value *visitTupleType(CanTupleType type) {
       if (auto cached = tryGetLocal(type))
         return cached;
@@ -1719,7 +1742,7 @@ namespace {
       return metatype;
     }
   };
-}
+} // end anonymous namespace
 
 llvm::Value *IRGenFunction::emitTypeMetadataRefForLayout(SILType type) {
   return EmitTypeMetadataRefForLayout(*this).visit(type.getSwiftRValueType());
@@ -2702,7 +2725,7 @@ namespace {
     }
   };
 
-}
+} // end anonymous namespace
 
 void
 IRGenModule::addLazyFieldTypeAccessor(NominalTypeDecl *type,
@@ -2781,7 +2804,7 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
     auto declCtxt = type;
     if (auto generics = declCtxt->getGenericSignatureOfContext()) {
       auto getInContext = [&](CanType type) -> CanType {
-        return ArchetypeBuilder::mapTypeIntoContext(declCtxt, type)
+        return declCtxt->mapTypeIntoContext(type)
             ->getCanonicalType();
       };
       bindArchetypeAccessPaths(IGF, generics, getInContext);
@@ -3140,7 +3163,7 @@ namespace {
       return makeArray(IGM.Int8PtrTy, privateData);
     }
   };
-}
+} // end anonymous namespace
 
 // Classes
 
@@ -3658,9 +3681,7 @@ namespace {
         return;
       }
 
-      Type superclassTy
-        = ArchetypeBuilder::mapTypeIntoContext(Target,
-                                               Target->getSuperclass());
+      Type superclassTy = Target->mapTypeIntoContext(Target->getSuperclass());
 
       if (!addReferenceToHeapMetadata(superclassTy->getCanonicalType(),
                                       /*allowUninit*/ false)) {
@@ -3799,7 +3820,7 @@ namespace {
       llvm::Value *superMetadata;
       if (Target->hasSuperclass()) {
         Type superclass = Target->getSuperclass();
-        superclass = ArchetypeBuilder::mapTypeIntoContext(Target, superclass);
+        superclass = Target->mapTypeIntoContext(superclass);
         superMetadata =
           emitClassHeapMetadataRef(IGF, superclass->getCanonicalType(),
                                    MetadataValueType::ObjCClass);
@@ -3994,7 +4015,7 @@ namespace {
       (void) emitFinishInitializationOfClassMetadata(IGF, metadata);
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit the ObjC-compatible class symbol for a class.
 /// Since LLVM and many system linkers do not have a notion of relative symbol
@@ -4182,7 +4203,7 @@ namespace {
       super::addParentMetadataRef(forClass, classType);
     }
   END_METADATA_SEARCHER()
-}
+} // end anonymous namespace
 
 /// Return the index of the parent metadata pointer for the given class.
 static int getClassParentIndex(IRGenModule &IGM, ClassDecl *classDecl) {
@@ -4237,7 +4258,7 @@ namespace {
         this->setTargetOffset();
     }
   END_GENERIC_METADATA_SEARCHER(GenericRequirements)
-}
+} // end anonymous namespace
 
 static int getIndexOfGenericRequirement(IRGenModule &IGM,
                                         NominalTypeDecl *decl,
@@ -4622,7 +4643,7 @@ namespace {
       super::addMethod(fn);
     }
   END_METADATA_SEARCHER()
-}
+} // end anonymous namespace
 
 /// Load the correct virtual function for the given class method.
 llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
@@ -4707,7 +4728,9 @@ namespace {
     CanType getParentType() const {
       Type type = Target->getDeclaredTypeInContext();
       Type parentType = type->getNominalParent();
-      return parentType.getCanonicalTypeOrNull();
+      if (parentType)
+        return parentType->getCanonicalType();
+      return CanType();
     }
 
   public:
@@ -4728,7 +4751,7 @@ namespace {
       addWord(parentMetadata);
     }
   };
-}
+} // end anonymous namespace
 
 static llvm::Value *
 emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
@@ -4963,7 +4986,7 @@ namespace {
                             IGF.IGM.getLoweredType(structTy));
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit the type metadata or metadata template for a struct.
 void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
@@ -5153,7 +5176,7 @@ public:
   }
 };
   
-}
+} // end anonymous namespace
 
 void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   // Set up a dummy global to stand in for the metadata object while we produce
@@ -5455,7 +5478,7 @@ namespace {
       assert(HasUnfilledParent);
     }
   };
-}
+} // end anonymous namespace
 
 llvm::Constant *
 IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {

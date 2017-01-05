@@ -303,22 +303,6 @@ public:
   /// For any type that cannot refer to an archetype, this routine returns null.
   PotentialArchetype *resolveArchetype(Type type);
 
-  /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(const DeclContext *dc, Type type);
-
-  /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(ModuleDecl *M,
-                                 GenericEnvironment *genericEnv,
-                                 Type type);
-
-  /// Map a contextual type to an interface type.
-  static Type mapTypeOutOfContext(const DeclContext *dc, Type type);
-
-  /// Map a contextual type to an interface type.
-  static Type mapTypeOutOfContext(ModuleDecl *M,
-                                  GenericEnvironment *genericEnv,
-                                  Type type);
-
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),

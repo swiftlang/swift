@@ -41,7 +41,7 @@ namespace {
   struct alignas(32) int256_like {
     char data[32];
   };
-}
+} // end anonymous namespace
 
 // We use explicit sizes and alignments here just in case the C ABI
 // under-aligns any or all of them.
@@ -125,7 +125,7 @@ namespace {
       return FunctionPointerBox::getExtraInhabitantIndex((void * const *) src);
     }
   };
-}
+} // end anonymous namespace
 
 /// The basic value-witness table for function types.
 const ExtraInhabitantsValueWitnessTable

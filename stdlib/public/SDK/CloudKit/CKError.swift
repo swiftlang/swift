@@ -18,7 +18,7 @@ extension CKError {
   /// Retrieve partial error results associated by item ID.
   public var partialErrorsByItemID: [AnyHashable: Error]? {
     return userInfo[CKPartialErrorsByItemIDKey] as? [AnyHashable: NSError]
-             as? [AnyHashable: Error]
+             as [AnyHashable: Error]?
   }
 
   /// The original CKRecord object that you used as the basis for

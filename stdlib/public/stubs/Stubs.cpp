@@ -212,7 +212,7 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
   }
 #else
   // Pass a null locale to use the C locale.
-  int i = swift_snprintf_l(Buffer, BufferLength, /*locale=*/nullptr, Format,
+  int i = swift_snprintf_l(Buffer, BufferLength, /*Locale=*/nullptr, Format,
                            Precision, Value);
 
   if (i < 0)

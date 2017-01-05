@@ -120,7 +120,7 @@ public:
     return true;
   }
 };
-}
+} // end anonymous namespace
 
 SILTransform *swift::createMergeCondFails() {
   return new MergeCondFailInsts();

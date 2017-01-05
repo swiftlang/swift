@@ -216,7 +216,7 @@ class StoredPropertyCount {
 }
 
 extension StoredPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
 
 class ComputedPropertyCount {
   @objc var count: Int { return 0 }
@@ -247,7 +247,7 @@ extension InformallyFunging: NSFunging { }
 // CHECK-LABEL: sil hidden @_TF14objc_protocols28testInitializableExistentialFTPMPS_13Initializable_1iSi_PS0__ : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
 func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializable {
   // CHECK: bb0([[META:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
-  // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Initializable>
+  // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var Initializable }
   // CHECK:   [[PB:%.*]] = project_box [[I2_BOX]]
   // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
   // CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick (@opened([[N]]) Initializable).Type to $@objc_metatype (@opened([[N]]) Initializable).Type
@@ -258,7 +258,7 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
   // CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]]) Initializable : $@opened([[N]]) Initializable, $Initializable
   // CHECK:   store [[I2_EXIST_CONTAINER]] to [init] [[PB]] : $*Initializable
   // CHECK:   [[I2:%[0-9]+]] = load [copy] [[PB]] : $*Initializable
-  // CHECK:   destroy_value [[I2_BOX]] : $<τ_0_0> { var τ_0_0 } <Initializable>
+  // CHECK:   destroy_value [[I2_BOX]] : ${ var Initializable }
   // CHECK:   return [[I2]] : $Initializable
   var i2 = im.init(int: i)
   return i2
@@ -280,3 +280,12 @@ extension InitializableConformerByExtension: Initializable {
   }
 }
 // CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols33InitializableConformerByExtensionc
+
+// Make sure we're crashing from trying to use materializeForSet here.
+@objc protocol SelectionItem {
+  var time: Double { get set }
+}
+
+func incrementTime(contents: SelectionItem) {
+  contents.time += 1.0
+}

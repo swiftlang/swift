@@ -110,7 +110,7 @@ struct Observer : public FrontendObserver {
   }
 };
 
-}
+} // end anonymous namespace
 
 int main(int argc, const char *argv[]) {
   unsigned numForwardedArgs = argc

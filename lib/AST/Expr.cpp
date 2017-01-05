@@ -213,17 +213,17 @@ DeclRefExpr *Expr::getMemberOperatorRef() {
 
 /// Propagate l-value use information to children.
 void Expr::propagateLValueAccessKind(AccessKind accessKind,
-                                     std::function<Type(Expr *)> getType,
+                                     llvm::function_ref<Type(Expr *)> getType,
                                      bool allowOverwrite) {
   /// A visitor class which walks an entire l-value expression.
   class PropagateAccessKind
        : public ExprVisitor<PropagateAccessKind, void, AccessKind> {
-    std::function<Type(Expr *)> GetType;
+    llvm::function_ref<Type(Expr *)> GetType;
 #ifndef NDEBUG
     bool AllowOverwrite;
 #endif
   public:
-    PropagateAccessKind(std::function<Type(Expr *)> getType,
+    PropagateAccessKind(llvm::function_ref<Type(Expr *)> getType,
                         bool allowOverwrite) : GetType(getType)
 #ifndef NDEBUG
                                                , AllowOverwrite(allowOverwrite)
@@ -338,6 +338,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(DynamicType)
     NON_LVALUE_EXPR(RebindSelfInConstructor)
     NON_LVALUE_EXPR(Apply)
+    NON_LVALUE_EXPR(MakeTemporarilyEscapable)
     NON_LVALUE_EXPR(ImplicitConversion)
     NON_LVALUE_EXPR(ExplicitCast)
     NON_LVALUE_EXPR(OptionalEvaluation)
@@ -450,6 +451,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(PostfixUnary);
   NO_REFERENCE(Binary);
   NO_REFERENCE(DotSyntaxCall);
+  NO_REFERENCE(MakeTemporarilyEscapable);
 
   PASS_THROUGH_REFERENCE(ConstructorRefCall, getFn);
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
@@ -565,9 +567,10 @@ void Expr::forEachChildExpr(const std::function<Expr*(Expr*)> &callback) {
   this->walk(ChildWalker(callback));
 }
 
-bool Expr::isTypeReference() const {
+bool Expr::
+isTypeReference(llvm::function_ref<Type(const Expr &)> getType) const {
   // If the result isn't a metatype, there's nothing else to do.
-  if (!getType()->is<AnyMetatypeType>())
+  if (!getType(*this)->is<AnyMetatypeType>())
     return false;
   
   const Expr *expr = this;
@@ -598,13 +601,14 @@ bool Expr::isTypeReference() const {
 
 }
 
-bool Expr::isStaticallyDerivedMetatype() const {
+bool Expr::isStaticallyDerivedMetatype(
+    llvm::function_ref<Type(const Expr &)> getType) const {
   // The type must first be a type reference.
-  if (!isTypeReference())
+  if (!isTypeReference(getType))
     return false;
 
   // Archetypes are never statically derived.
-  return !getType()->getAs<AnyMetatypeType>()->getInstanceType()
+  return !getType(*this)->getAs<AnyMetatypeType>()->getInstanceType()
     ->is<ArchetypeType>();
 }
 
@@ -718,6 +722,7 @@ bool Expr::canAppendCallParentheses() const {
     return true;
 
   case ExprKind::OpenExistential:
+  case ExprKind::MakeTemporarilyEscapable:
     return false;
 
   case ExprKind::Call:
@@ -782,7 +787,7 @@ llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
     explicit RecordingTraversal(llvm::DenseMap<Expr *, Expr *> &parentMap)
       : ParentMap(parentMap) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto parent = Parent.getAsExpr())
         ParentMap[E] = parent;
 
@@ -805,13 +810,13 @@ llvm::DenseMap<Expr *, unsigned> Expr::getDepthMap() {
     explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &depthMap)
       : DepthMap(depthMap) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       DepthMap[E] = Depth;
       Depth++;
       return { true, E };
     }
 
-    virtual Expr *walkToExprPost(Expr *E) {
+    Expr *walkToExprPost(Expr *E) override {
       Depth--;
       return E;
     }
@@ -832,7 +837,7 @@ llvm::DenseMap<Expr *, unsigned> Expr::getPreorderIndexMap() {
     explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &indexMap)
       : IndexMap(indexMap) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       IndexMap[E] = Index;
       Index++;
       return { true, E };
@@ -1133,8 +1138,8 @@ static Expr *packSingleArgument(
     }
       
     auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                                 rParenLoc, /*hasTrailingClosure=*/false,
-                                 /*implicit=*/false);
+                                 rParenLoc, /*HasTrailingClosure=*/false,
+                                 /*Implicit=*/false);
     computeSingleArgumentType(ctx, arg, implicit);
     return arg;
   }
@@ -1178,8 +1183,8 @@ static Expr *packSingleArgument(
 
   auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels,
                                argLabelLocs, rParenLoc,
-                               /*hasTrailingClosure=*/true,
-                               /*implicit=*/false);
+                               /*HasTrailingClosure=*/true,
+                               /*Implicit=*/false);
   computeSingleArgumentType(ctx, arg, implicit);
 
   return arg;
@@ -1887,14 +1892,16 @@ TypeExpr::TypeExpr(Type Ty)
 
 // The type of a TypeExpr is always a metatype type.  Return the instance
 // type or null if not set yet.
-Type TypeExpr::getInstanceType() const {
-  if (!getType())
+Type TypeExpr::getInstanceType(
+    llvm::function_ref<bool(const Expr &)> hasType,
+    llvm::function_ref<Type(const Expr &)> getType) const {
+  if (!hasType(*this))
     return Type();
 
-  if (auto metaType = getType()->getAs<MetatypeType>())
+  if (auto metaType = getType(*this)->getAs<MetatypeType>())
     return metaType->getInstanceType();
 
-  return ErrorType::get(getType()->getASTContext());
+  return ErrorType::get(getType(*this)->getASTContext());
 }
 
 

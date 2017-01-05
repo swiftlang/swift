@@ -645,8 +645,7 @@ func test23086402(a: A23086402) {
 // <rdar://problem/23719432> [practicalswift] Compiler crashes on &(Int:_)
 func test23719432() {
   var x = 42
-  &(Int:x)  // expected-error {{'&' can only appear immediately in a call argument list}}
-  // expected-warning @-1 {{expression of type 'inout (Int: Int)' is unused}}
+  &(Int:x)  // expected-error {{expression type 'inout _' is ambiguous without more context}}
 }
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator

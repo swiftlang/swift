@@ -1396,7 +1396,14 @@ private:
                    classification.getResult() == ThrowingKind::Throws);
     }
 
-    return ShouldRecurse;
+    // If current apply expression did not type-check, don't attempt
+    // walking inside of it. This accounts for the fact that we don't
+    // erase types without type variables to enable better code complication,
+    // so DeclRefExpr(s) or ApplyExpr with DeclRefExpr as function contained
+    // inside would have their types preserved, which makes classification
+    // incorrect.
+    auto type = E->getType();
+    return !type || type->hasError() ? ShouldNotRecurse : ShouldRecurse;
   }
 
   ShouldRecurse_t checkIfConfig(IfConfigStmt *S) {
@@ -1528,7 +1535,7 @@ private:
   }
 };
 
-} // end anonymous namespace 
+} // end anonymous namespace
 
 void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
   CheckErrorCoverage checker(*this, Context::forTopLevelCode(code));

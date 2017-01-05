@@ -57,3 +57,4 @@ func f23798944() {
   }
 }
 
+.sr_3506 = 0 // expected-error {{reference to member 'sr_3506' cannot be resolved without a contextual type}}

@@ -60,10 +60,10 @@ private:
     std::vector<ValueDecl *> m_decls;
 
   public:
-    virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
       m_decls.push_back(VD);
     }
-    virtual ~VisibleDeclsConsumer() = default;
+    ~VisibleDeclsConsumer() override = default;
     explicit operator bool() { return m_decls.size() > 0; }
 
     decltype(m_decls)::const_iterator begin() { return m_decls.begin(); }
@@ -581,7 +581,7 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
         // declarations in sub-stmts, etc.
         UnqualifiedLookup lookup(ast->getIdentifier(name), FD,
                                  ast->getLazyResolver(),
-                                 /*isKnownPrivate=*/false, FD->getEndLoc());
+                                 /*IsKnownPrivate=*/false, FD->getEndLoc());
         if (!lookup.isSuccess()) {
           result._error = "no decl found in function";
         } else {
@@ -1195,15 +1195,15 @@ static bool CompareFunctionTypes(const AnyFunctionType *f,
   if (nullptr == g)
     return false;
 
-  auto f_input = f->getInput().getCanonicalTypeOrNull();
-  auto g_input = g->getInput().getCanonicalTypeOrNull();
+  auto f_input = f->getInput();
+  auto g_input = g->getInput();
 
-  auto f_output = f->getResult().getCanonicalTypeOrNull();
-  auto g_output = g->getResult().getCanonicalTypeOrNull();
+  auto f_output = f->getResult();
+  auto g_output = g->getResult();
 
-  if (f_input == g_input) {
+  if (f_input->isEqual(g_input)) {
     in_matches = true;
-    if (f_output == g_output)
+    if (f_output->isEqual(g_output))
       out_matches = true;
   }
 
@@ -1843,8 +1843,8 @@ static void VisitNodeQualifiedArchetype(
         if (sig) {
           auto params = sig->getInnermostGenericParams();
           if (index < params.size()) {
-            auto argTy = ArchetypeBuilder::mapTypeIntoContext(
-                dc, params[index])->getAs<ArchetypeType>();
+            auto argTy = dc->mapTypeIntoContext(params[index])
+                ->getAs<ArchetypeType>();
             if (argTy)
               result._types.push_back(argTy);
           }

@@ -493,9 +493,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly) {
     auto signature = fn->getLoweredFunctionType()->getGenericSignature();
-    genericEnv = MF->readGenericEnvironment(
-        SILCursor,
-        signature ? signature->getRequirements() : ArrayRef<Requirement>());
+    genericEnv = MF->readGenericSignatureOrEnvironment(
+                    SILCursor,
+                    /*wantEnvironment=*/true,
+                    signature ? signature->getRequirements()
+                              : ArrayRef<Requirement>())
+                  .get<GenericEnvironment *>();
   }
 
   // If the next entry is the end of the block, then this function has
@@ -619,6 +622,7 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
   // Args should be a list of pairs, the first number is a TypeID, the
   // second number is a ValueID.
   SILBasicBlock *CurrentBB = getBBForDefinition(Fn, Prev, BasicBlockID++);
+  bool IsEntry = CurrentBB->isEntry();
   for (unsigned I = 0, E = Args.size(); I < E; I += 3) {
     TypeID TyID = Args[I];
     if (!TyID) return nullptr;
@@ -626,8 +630,13 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     if (!ValId) return nullptr;
 
     auto ArgTy = MF->getType(TyID);
-    auto Arg = CurrentBB->createArgument(
-        getSILType(ArgTy, (SILValueCategory)Args[I + 1]));
+    SILArgument *Arg;
+    SILType SILArgTy = getSILType(ArgTy, (SILValueCategory)Args[I + 1]);
+    if (IsEntry) {
+      Arg = CurrentBB->createFunctionArgument(SILArgTy);
+    } else {
+      Arg = CurrentBB->createPHIArgument(SILArgTy);
+    }
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);
   }
@@ -771,7 +780,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
   SILInstruction *ResultVal;
   switch ((ValueKind)OpCode) {
-  case ValueKind::SILArgument:
+  case ValueKind::SILPHIArgument:
+  case ValueKind::SILFunctionArgument:
   case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
@@ -1078,8 +1088,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     
     auto SubstFnTy = SILType::getPrimitiveObjectType(
       FnTy.castTo<SILFunctionType>()
-        ->substGenericArgs(Builder.getModule(),
-                         Builder.getModule().getSwiftModule(), Substitutions));
+        ->substGenericArgs(Builder.getModule(), Substitutions));
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
     auto ArgTys = FTI->getParameterSILTypes();
 
@@ -1300,6 +1309,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(CondFail)
   REFCOUNTING_INSTRUCTION(RetainValue)
   UNARY_INSTRUCTION(CopyValue)
+  UNARY_INSTRUCTION(CopyUnownedValue)
   UNARY_INSTRUCTION(DestroyValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
   REFCOUNTING_INSTRUCTION(AutoreleaseValue)
@@ -2171,6 +2181,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   std::vector<SILVTable::Pair> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
   while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
+         kind != SIL_DEFAULT_WITNESS_TABLE &&
          kind != SIL_FUNCTION) {
     assert(kind == SIL_VTABLE_ENTRY &&
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");

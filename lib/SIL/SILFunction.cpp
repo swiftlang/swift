@@ -16,7 +16,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/CFG.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/CommandLine.h"
@@ -172,9 +171,10 @@ bool SILFunction::shouldOptimize() const {
 }
 
 Type SILFunction::mapTypeIntoContext(Type type) const {
-  return ArchetypeBuilder::mapTypeIntoContext(getModule().getSwiftModule(),
-                                              getGenericEnvironment(),
-                                              type);
+  return GenericEnvironment::mapTypeIntoContext(
+      getModule().getSwiftModule(),
+      getGenericEnvironment(),
+      type);
 }
 
 namespace {
@@ -277,9 +277,9 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
 }
 
 Type SILFunction::mapTypeOutOfContext(Type type) const {
-  return ArchetypeBuilder::mapTypeOutOfContext(getModule().getSwiftModule(),
-                                               getGenericEnvironment(),
-                                               type);
+  return GenericEnvironment::mapTypeOutOfContext(
+      getGenericEnvironment(),
+      type);
 }
 
 bool SILFunction::isNoReturnFunction() const {
@@ -467,7 +467,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
     return "";
   }
 };
-} // end llvm namespace
+} // namespace llvm
 #endif
 
 #ifndef NDEBUG
@@ -554,8 +554,6 @@ ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
   if (!env)
     return {};
 
-  auto *M = getModule().getSwiftModule();
-  ForwardingSubs = env->getForwardingSubstitutions(M);
-
+  ForwardingSubs = env->getForwardingSubstitutions();
   return *ForwardingSubs;
 }

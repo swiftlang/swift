@@ -1493,6 +1493,14 @@ class infer_instanceVar2<
   @objc func func_GP_Unconstrained_(a: GP_Unconstrained) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
+
+  @objc func func_GP_Unconstrained_() -> GP_Unconstrained {}
+  // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
+
+  @objc func func_GP_Class_ObjC__() -> GP_Class_ObjC {}
+  // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 }
 
 class infer_instanceVar3 : Class_ObjC1 {
@@ -2138,6 +2146,11 @@ func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
   static func +(lhs: Self, rhs: Self) -> Self // expected-error {{@objc protocols may not have operator requirements}}
 }
 
+class AdoptsOperatorInProtocol : OperatorInProtocol {
+  static func +(lhs: AdoptsOperatorInProtocol, rhs: AdoptsOperatorInProtocol) -> Self {}
+  // expected-error@-1 {{operator methods cannot be declared @objc}}
+}
+
 //===--- @objc inference for witnesses
 
 @objc protocol InferFromProtocol {
@@ -2194,4 +2207,8 @@ class SubclassInfersFromProtocol2 : SuperclassImplementsProtocol {
 extension SubclassInfersFromProtocol2 {
   // CHECK: {{^}} @objc dynamic func method1(value: Int)
   func method1(value: Int) { }
+}
+
+@objc class NeverReturningMethod {
+  @objc func doesNotReturn() -> Never {}
 }

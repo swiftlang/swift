@@ -16,7 +16,6 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -568,6 +567,7 @@ struct ASTNodeBase {};
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
 
+      assert(!OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues[expr->getOpaqueValue()] = 0;
       assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==0);
       OpenedExistentialArchetypes.insert(expr->getOpenedArchetype());
@@ -575,9 +575,24 @@ struct ASTNodeBase {};
     }
 
     void cleanup(OpenExistentialExpr *expr) {
+      assert(OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues.erase(expr->getOpaqueValue());
       assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==1);
       OpenedExistentialArchetypes.erase(expr->getOpenedArchetype());
+    }
+
+    bool shouldVerify(MakeTemporarilyEscapableExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+      
+      assert(!OpaqueValues.count(expr->getOpaqueValue()));
+      OpaqueValues[expr->getOpaqueValue()] = 0;
+      return true;
+    }
+    
+    void cleanup(MakeTemporarilyEscapableExpr *expr) {
+      assert(OpaqueValues.count(expr->getOpaqueValue()));
+      OpaqueValues.erase(expr->getOpaqueValue());
     }
 
     // Keep a stack of the currently-live optional evaluations.
@@ -666,7 +681,8 @@ struct ASTNodeBase {};
         }
       }
       
-      if (D->getAttrs().hasAttribute<OverrideAttr>()) {
+      if (D->didEarlyAttrValidation() &&
+          D->getAttrs().hasAttribute<OverrideAttr>()) {
         if (!D->isInvalid() && D->hasInterfaceType() &&
             !isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
@@ -705,7 +721,7 @@ struct ASTNodeBase {};
       Type resultType;
       if (FuncDecl *FD = dyn_cast<FuncDecl>(func)) {
         resultType = FD->getResultInterfaceType();
-        resultType = ArchetypeBuilder::mapTypeIntoContext(FD, resultType);
+        resultType = FD->mapTypeIntoContext(resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
       } else {
@@ -1633,6 +1649,48 @@ struct ASTNodeBase {};
       }
       verifyCheckedBase(E);
     }
+    
+    void verifyChecked(MakeTemporarilyEscapableExpr *E) {
+      PrettyStackTraceExpr debugStack(
+        Ctx, "verifying MakeTemporarilyEscapableExpr", E);
+      
+      // Expression type should match subexpression.
+      if (!E->getType()->isEqual(E->getSubExpr()->getType())) {
+        Out << "MakeTemporarilyEscapableExpr type does not match subexpression";
+        abort();
+      }
+      
+      // Closure and opaque value should both be functions, with the closure
+      // noescape and the opaque value escapable but otherwise matching.
+      auto closureFnTy = E->getNonescapingClosureValue()->getType()
+        ->getAs<FunctionType>();
+      if (!closureFnTy) {
+        Out << "MakeTemporarilyEscapableExpr closure type is not a closure";
+        abort();
+      }
+      auto opaqueValueFnTy = E->getOpaqueValue()->getType()
+        ->getAs<FunctionType>();
+      if (!opaqueValueFnTy) {
+        Out<<"MakeTemporarilyEscapableExpr opaque value type is not a closure";
+        abort();
+      }
+      if (!closureFnTy->isNoEscape()) {
+        Out << "MakeTemporarilyEscapableExpr closure type should be noescape";
+        abort();
+      }
+      if (opaqueValueFnTy->isNoEscape()) {
+        Out << "MakeTemporarilyEscapableExpr opaque value type should be "
+               "escaping";
+        abort();
+      }
+      if (!closureFnTy->isEqual(
+            opaqueValueFnTy->withExtInfo(opaqueValueFnTy->getExtInfo()
+                                                        .withNoEscape()))) {
+        Out << "MakeTemporarilyEscapableExpr closure and opaque value type "
+               "don't match";
+        abort();
+      }
+    }
 
     static bool hasEnclosingFunctionContext(DeclContext *dc) {
       switch (dc->getContextKind()) {
@@ -1704,7 +1762,7 @@ struct ASTNodeBase {};
 
       // Variables must have materializable type, unless they are parameters,
       // in which case they must either have l-value type or be anonymous.
-      if (!var->getType()->isMaterializable()) {
+      if (!var->getInterfaceType()->isMaterializable()) {
         if (!isa<ParamDecl>(var)) {
           Out << "Non-parameter VarDecl has non-materializable type: ";
           var->getType().print(Out);
@@ -1712,7 +1770,7 @@ struct ASTNodeBase {};
           abort();
         }
 
-        if (!var->getType()->is<InOutType>() && var->hasName()) {
+        if (!var->getInterfaceType()->is<InOutType>() && var->hasName()) {
           Out << "ParamDecl may only have non-materializable tuple type "
                  "when it is anonymous: ";
           var->getType().print(Out);
@@ -1724,7 +1782,7 @@ struct ASTNodeBase {};
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
       if (var->getAttrs().hasAttribute<OwnershipAttr>() !=
-          isa<ReferenceStorageType>(var->getType().getPointer())) {
+          isa<ReferenceStorageType>(var->getInterfaceType().getPointer())) {
         if (var->getAttrs().hasAttribute<OwnershipAttr>()) {
           Out << "VarDecl has an ownership attribute, but its type"
                  " is not a ReferenceStorageType: ";
@@ -1732,15 +1790,14 @@ struct ASTNodeBase {};
           Out << "VarDecl has no ownership attribute, but its type"
                  " is a ReferenceStorageType: ";
         }
-        var->getType().print(Out);
+        var->getInterfaceType().print(Out);
         abort();
       }
 
       Type typeForAccessors =
           var->getInterfaceType()->getReferenceStorageReferent();
       typeForAccessors =
-          ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
-                                               typeForAccessors);
+          var->getDeclContext()->mapTypeIntoContext(typeForAccessors);
       if (const FuncDecl *getter = var->getGetter()) {
         if (getter->getParameterLists().back()->size() != 0) {
           Out << "property getter has parameters\n";
@@ -1748,8 +1805,7 @@ struct ASTNodeBase {};
         }
         Type getterResultType = getter->getResultInterfaceType();
         getterResultType =
-            ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
-                                                 getterResultType);
+            var->getDeclContext()->mapTypeIntoContext(getterResultType);
         if (!getterResultType->isEqual(typeForAccessors)) {
           Out << "property and getter have mismatched types: '";
           typeForAccessors.print(Out);
@@ -1775,8 +1831,7 @@ struct ASTNodeBase {};
         }
         const ParamDecl *param = setter->getParameterLists().back()->get(0);
         Type paramType = param->getInterfaceType();
-        paramType = ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
-                                                         paramType);
+        paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
         if (!paramType->isEqual(typeForAccessors)) {
           Out << "property and setter param have mismatched types: '";
           typeForAccessors.print(Out);
@@ -2159,7 +2214,8 @@ struct ASTNodeBase {};
 
       // If the function has a generic interface type, it should also have a
       // generic signature.
-      if (AFD->isGenericContext() != AFD->isValidGenericContext()) {
+      if (AFD->isGenericContext() !=
+          (AFD->getGenericEnvironment() != nullptr)) {
         Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
         abort();
@@ -2283,7 +2339,7 @@ struct ASTNodeBase {};
         case AccessorKind::IsDidSet:
         case AccessorKind::IsMaterializeForSet:
           if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
-            Out << "non-addressor accessor has an addressor kind";
+            Out << "non-addressor accessor has an addressor kind\n";
             abort();
           }
           break;
@@ -2291,7 +2347,7 @@ struct ASTNodeBase {};
         case AccessorKind::IsAddressor:
         case AccessorKind::IsMutableAddressor:
           if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
-            Out << "addressor does not have an addressor kind";
+            Out << "addressor does not have an addressor kind\n";
             abort();
           }
           break;
@@ -2307,7 +2363,7 @@ struct ASTNodeBase {};
       unsigned MinParamPatterns = FD->getImplicitSelfDecl() ? 2 : 1;
       if (FD->getParameterLists().size() < MinParamPatterns) {
         Out << "should have at least " << MinParamPatterns
-            << " parameter patterns";
+            << " parameter patterns\n";
         abort();
       }
 
@@ -2316,7 +2372,7 @@ struct ASTNodeBase {};
         if (FD->getImplicitSelfDecl())
           NumExpectedParamPatterns++;
         if (FD->getParameterLists().size() != NumExpectedParamPatterns) {
-          Out << "accessors should not be curried";
+          Out << "accessors should not be curried\n";
           abort();
         }
       }
@@ -2324,7 +2380,7 @@ struct ASTNodeBase {};
       if (auto *VD = FD->getAccessorStorageDecl()) {
         if (isa<VarDecl>(VD)
             && cast<VarDecl>(VD)->isStatic() != FD->isStatic()) {
-          Out << "getter or setter static-ness must match static-ness of var";
+          Out << "getter or setter static-ness must match static-ness of var\n";
           abort();
         }
       }
@@ -2344,13 +2400,13 @@ struct ASTNodeBase {};
         }
         if (NumDestructors != 1) {
           Out << "every class should have exactly one destructor, "
-                 "explicitly provided or created by the type checker";
+                 "explicitly provided or created by the type checker\n";
           abort();
         }
       }
       
       if (!CD->hasDestructor()) {
-        Out << "every class's 'has destructor' bit must be set";
+        Out << "every class's 'has destructor' bit must be set\n";
         abort();
       }
 
@@ -2363,7 +2419,7 @@ struct ASTNodeBase {};
       auto *DC = ATD->getDeclContext();
       if (!isa<NominalTypeDecl>(DC) ||
           !isa<ProtocolDecl>(cast<NominalTypeDecl>(DC))) {
-        Out << "AssociatedTypeDecl should only occur inside a protocol";
+        Out << "AssociatedTypeDecl should only occur inside a protocol\n";
         abort();
       }
       verifyParsedBase(ATD);

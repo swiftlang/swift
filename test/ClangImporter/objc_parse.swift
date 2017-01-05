@@ -502,8 +502,10 @@ func testUnusedResults(_ ur: UnusedResults) {
   ur.producesResult() // expected-warning{{result of call to 'producesResult()' is unused}}
 }
 
-func testCStyle() {
-  ExtraSelectors.cStyle(0, 1, 2) // expected-error{{type 'ExtraSelectors' has no member 'cStyle'}}
+func testStrangeSelectors(obj: StrangeSelectors) {
+  StrangeSelectors.cStyle(0, 1, 2) // expected-error{{type 'StrangeSelectors' has no member 'cStyle'}}
+  _ = StrangeSelectors(a: 0, b: 0) // okay
+  obj.empty(1, 2) // okay
 }
 
 func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,

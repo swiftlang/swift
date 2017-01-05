@@ -614,7 +614,7 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
 /// Find the init_existential, which could be used to determine a concrete
 /// type of the \p Self.
 static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
-                                           CanType &OpenedArchetype,
+                                           ArchetypeType *&OpenedArchetype,
                                            SILValue &OpenedArchetypeDef) {
   if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
     // In case the Self operand is an alloc_stack where a copy_addr copies the
@@ -637,14 +637,16 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
     if (!IE)
       return nullptr;
 
-    OpenedArchetype = Open->getType().getSwiftRValueType();
+    OpenedArchetype = Open->getType().getSwiftRValueType()
+        ->castTo<ArchetypeType>();
     OpenedArchetypeDef = Open;
     return IE;
   }
 
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(Self)) {
     if (auto *IE = dyn_cast<InitExistentialRefInst>(Open->getOperand())) {
-      OpenedArchetype = Open->getType().getSwiftRValueType();
+      OpenedArchetype = Open->getType().getSwiftRValueType()
+          ->castTo<ArchetypeType>();
       OpenedArchetypeDef = Open;
       return IE;
     }
@@ -654,9 +656,10 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
   if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(Self)) {
     if (auto *IE =
           dyn_cast<InitExistentialMetatypeInst>(Open->getOperand())) {
-      OpenedArchetype = Open->getType().getSwiftRValueType();
-      while (auto Metatype = dyn_cast<MetatypeType>(OpenedArchetype))
-        OpenedArchetype = Metatype.getInstanceType();
+      auto Ty = Open->getType().getSwiftRValueType();
+      while (auto Metatype = dyn_cast<MetatypeType>(Ty))
+        Ty = Metatype.getInstanceType();
+      OpenedArchetype = Ty->castTo<ArchetypeType>();
       OpenedArchetypeDef = Open;
       return IE;
     }
@@ -674,7 +677,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
                                          CanType ConcreteType,
                                          SILValue ConcreteTypeDef,
                                          ProtocolConformanceRef Conformance,
-                                         CanType OpenedArchetype) {
+                                         ArchetypeType *OpenedArchetype) {
   // Create a set of arguments.
   SmallVector<SILValue, 8> Args;
   for (auto Arg : AI.getArgumentsWithoutSelf()) {
@@ -686,8 +689,8 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   // replaced by a concrete type.
   SmallVector<Substitution, 8> Substitutions;
   for (auto Subst : AI.getSubstitutions()) {
-    if (Subst.getReplacement().getCanonicalTypeOrNull() ==
-        OpenedArchetype) {
+    auto *A = Subst.getReplacement()->getAs<ArchetypeType>();
+    if (A && A == OpenedArchetype) {
       auto Conformances = AI.getModule().getASTContext()
                             .AllocateUninitialized<ProtocolConformanceRef>(1);
       Conformances[0] = Conformance;
@@ -707,15 +710,13 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
     // their parameter types.
     CanSILFunctionType SFT = FnTy->substGenericArgs(
                                         AI.getModule(),
-                                        AI.getModule().getSwiftModule(),
                                         Substitutions);
     NewSubstCalleeType = SILType::getPrimitiveObjectType(SFT);
   } else {
-    TypeSubstitutionMap TypeSubstitutions;
-    TypeSubstitutions[OpenedArchetype->castTo<ArchetypeType>()] = ConcreteType;
-    NewSubstCalleeType = SubstCalleeType.subst(AI.getModule(),
-                                               AI.getModule().getSwiftModule(),
-                                               TypeSubstitutions);
+    SubstitutionMap Subs;
+    Subs.addSubstitution(CanType(OpenedArchetype), ConcreteType);
+    Subs.addConformances(CanType(OpenedArchetype), Conformance);
+    NewSubstCalleeType = SubstCalleeType.subst(AI.getModule(), Subs);
   }
 
   FullApplySite NewAI;
@@ -822,7 +823,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
 
   // Try to find the init_existential, which could be used to
   // determine a concrete type of the self.
-  CanType OpenedArchetype;
+  ArchetypeType *OpenedArchetype = nullptr;
   SILValue OpenedArchetypeDef;
   SILInstruction *InitExistential =
     findInitExistential(AI, Self, OpenedArchetype, OpenedArchetypeDef);
@@ -851,7 +852,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   if (ConcreteType->isOpenedExistential()) {
     // Prepare a mini-mapping for opened archetypes.
     // SILOpenedArchetypesTracker OpenedArchetypesTracker(*AI.getFunction());
-    OpenedArchetypesTracker.addOpenedArchetypeDef(ConcreteType, ConcreteTypeDef);
+    OpenedArchetypesTracker.addOpenedArchetypeDef(
+        ConcreteType->castTo<ArchetypeType>(), ConcreteTypeDef);
     Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 

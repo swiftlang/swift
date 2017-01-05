@@ -61,6 +61,7 @@ seo = SwiftEnumObjC.corge
 seo = SwiftEnumObjC.grault
 
 var seoRaw: CUnsignedChar = seo.rawValue
+_ = ExtendsTwoProtosImpl.self
 
 // Make sure we're actually parsing stuff.
 useBaseClass() // expected-error{{missing argument for parameter #1}}

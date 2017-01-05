@@ -185,7 +185,7 @@ REPLCompletions::REPLCompletions()
   // Consumer.
   CompletionCallbacksFactory.reset(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                              *Consumer.get()));
+                                              *Consumer));
 }
 
 static void

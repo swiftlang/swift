@@ -140,6 +140,8 @@ public:
     case ImplodeKind::Copy:
       return v.copyUnmanaged(gen, l).forward(gen);
     }
+
+    llvm_unreachable("Unhandled ImplodeKind in switch.");
   }
 
   ImplodeLoadableTupleValue(ArrayRef<ManagedValue> values,
@@ -254,8 +256,15 @@ public:
     : gen(gen), parent(parent), loc(l), functionArgs(functionArgs) {}
 
   RValue visitType(CanType t) {
-    SILValue arg = parent->createArgument(gen.getLoweredType(t),
-                                          loc.getAsASTNode<ValueDecl>());
+    SILValue arg;
+    if (functionArgs) {
+      arg = parent->createFunctionArgument(gen.getLoweredType(t),
+                                           loc.getAsASTNode<ValueDecl>());
+    } else {
+      arg = parent->createPHIArgument(gen.getLoweredType(t),
+                                      ValueOwnershipKind::Any,
+                                      loc.getAsASTNode<ValueDecl>());
+    }
     ManagedValue mv = isa<InOutType>(t)
       ? ManagedValue::forLValue(arg)
       : gen.emitManagedRValueWithCleanup(arg);

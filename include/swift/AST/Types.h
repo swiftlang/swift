@@ -64,10 +64,12 @@ namespace swift {
   class TypeVariableType;
   class ValueDecl;
   class ModuleDecl;
+  class ModuleType;
   class ProtocolConformance;
-  enum class SILArgumentConvention : uint8_t;
+  struct SILArgumentConvention;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
+  enum class ValueOwnershipKind : uint8_t;
 
   enum class TypeKind {
 #define TYPE(id, parent) id,
@@ -488,7 +490,11 @@ public:
 
   /// Erase the given opened existential type by replacing it with its
   /// existential type throughout the given type.
-  Type eraseOpenedExistential(ModuleDecl *module, ArchetypeType *opened);
+  Type eraseOpenedExistential(ArchetypeType *opened);
+
+  /// Erase DynamicSelfType from the given type by replacing it with its
+  /// underlying type.
+  Type eraseDynamicSelfType();
 
   /// \brief Compute and return the set of type variables that occur within this
   /// type.
@@ -642,6 +648,23 @@ public:
   /// with a class type.
   bool mayHaveSuperclass();
 
+  /// \brief Determine whether this type can be used as a base type for AST
+  /// name lookup, which is the case for nominal types, protocol compositions
+  /// and archetypes.
+  ///
+  /// Generally, the static vs instanec and mutating vs nonmutating distinction
+  /// is handled elsewhere, so metatypes, lvalue types and inout types are not
+  /// allowed here.
+  ///
+  /// Similarly, tuples formally have members, but this does not go through
+  /// name lookup.
+  bool mayHaveMembers() {
+    return (is<ArchetypeType>() ||
+            is<ModuleType>() ||
+            isExistentialType() ||
+            getAnyNominal());
+  }
+
   /// \brief Retrieve the superclass of this type.
   ///
   /// \param resolver The resolver for lazy type checking, or null if the
@@ -777,6 +800,13 @@ public:
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
 
+  /// Retrieve the type without any labels around it. For example, given
+  /// \code
+  /// (p : int)
+  /// \endcode
+  /// the result would be the (unparenthesized) type 'int'.
+  Type getWithoutImmediateLabel();
+
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
 
@@ -791,8 +821,7 @@ public:
   /// replacing the type. With uncurry level == 0, this simply
   /// replaces the current type with the new result type.
   Type replaceCovariantResultType(Type newResultType,
-                                  unsigned uncurryLevel,
-                                  bool preserveOptionality = true);
+                                  unsigned uncurryLevel);
 
   /// Returns a new function type exactly like this one but with the self
   /// parameter replaced. Only makes sense for function members of types.
@@ -839,7 +868,14 @@ public:
   /// the context of the extension above will produce substitutions T
   /// -> Int and U -> String suitable for mapping the type of
   /// \c SomeArray.
-  TypeSubstitutionMap getMemberSubstitutions(const DeclContext *dc);
+  TypeSubstitutionMap getContextSubstitutions(const DeclContext *dc);
+
+  /// Get the substitutions to apply to the type of the given member as seen
+  /// from this base type.
+  ///
+  /// If the member has its own generic parameters, they will remain unchanged
+  /// by the substitution.
+  TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member);
 
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
@@ -873,17 +909,11 @@ public:
   Type getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
                        LazyResolver *resolver, Type memberType = Type());
 
-  /// Given the type of a member from a particular declaration context,
-  /// substitute in the types from the given base type (this) to produce
-  /// the resulting member type.
-  Type getTypeOfMember(ModuleDecl *module, Type memberType,
-                       const DeclContext *memberDC);
-
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the
   /// 'self' argument type as appropriate.
-  Type adjustSuperclassMemberDeclType(const ValueDecl *decl,
-                                      const ValueDecl *parentDecl,
+  Type adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
+                                      const ValueDecl *derivedDecl,
                                       Type memberType,
                                       LazyResolver *resolver);
 
@@ -2580,6 +2610,12 @@ public:
   ///
   /// The order of Substitutions must match the order of generic parameters.
   FunctionType *substGenericArgs(ArrayRef<Substitution> subs);
+  
+  /// Substitute the given generic arguments into this generic
+  /// function type using the given substitution and conformance lookup
+  /// callbacks.
+  FunctionType *substGenericArgs(TypeSubstitutionFn subs,
+                                 LookupConformanceFn conformances);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getInput(), getResult(),
@@ -2916,6 +2952,8 @@ public:
     type.print(out);
     return out;
   }
+
+  ValueOwnershipKind getOwnershipKind(SILModule &) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;
@@ -3294,8 +3332,10 @@ public:
   }
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
-                                      ModuleDecl *astModule,
                                       ArrayRef<Substitution> subs);
+  CanSILFunctionType substGenericArgs(SILModule &silModule,
+                                      TypeSubstitutionFn subs,
+                                      LookupConformanceFn conformances);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getExtInfo(), getCalleeConvention(),
@@ -3536,7 +3576,7 @@ class ProtocolType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// \brief Retrieve the type when we're referencing the given protocol.
   /// declaration.
-  static ProtocolType *get(ProtocolDecl *D, const ASTContext &C);
+  static ProtocolType *get(ProtocolDecl *D, Type Parent, const ASTContext &C);
 
   ProtocolDecl *getDecl() const {
     return reinterpret_cast<ProtocolDecl *>(NominalType::getDecl());
@@ -3581,7 +3621,8 @@ public:
 
 private:
   friend class NominalTypeDecl;
-  ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx);
+  ProtocolType(ProtocolDecl *TheDecl, Type Parent, const ASTContext &Ctx,
+               RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
   void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos) {
@@ -4419,12 +4460,7 @@ inline Type TypeBase::getRValueObjectType() {
     type = lv->getObjectType();
 
   // Look through argument list tuples.
-  if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
-      type = tupleTy->getElementType(0);
-  }
-  
-  return type;
+  return type->getWithoutImmediateLabel();
 }
 
 /// getLValueOrInOutObjectType - For an @lvalue or inout type, retrieves the
@@ -4512,10 +4548,6 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
   bool escaping = paramTy->is<AnyFunctionType>() &&
                   !paramTy->castTo<AnyFunctionType>()->isNoEscape();
   return {isVariadic, autoclosure, escaping};
-}
-
-inline CanType Type::getCanonicalTypeOrNull() const {
-  return isNull() ? CanType() : getPointer()->getCanonicalType();
 }
 
 #define TYPE(id, parent)

@@ -326,7 +326,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   TupleExpr *Arg = TupleExpr::create(TC.Context,
                                      SourceLoc(), 
                                      ArgElts2, { }, { }, SourceLoc(),
-                                     /*hasTrailingClosure=*/false,
+                                     /*HasTrailingClosure=*/false,
                                      /*Implicit=*/true);
 
   
@@ -352,7 +352,7 @@ namespace {
                == Associativity::Left;
     }
   };
-}
+} // end anonymous namespace
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.
@@ -654,9 +654,12 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
     return Type();
   TC.validateDecl(TD);
 
+  if (TD->isInvalid())
+    return Type();
+
   if (auto *NTD = dyn_cast<NominalTypeDecl>(TD))
     return NTD->getDeclaredType();
-  return cast<TypeAliasDecl>(TD)->getAliasType();
+  return cast<TypeAliasDecl>(TD)->getDeclaredInterfaceType();
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
@@ -759,7 +762,7 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     // the name of the typealias itself anywhere.
     if (type && *type) {
       if (auto typeAlias = dyn_cast<NameAliasType>(type->getPointer()))
-        *type = typeAlias->getDecl()->getUnderlyingType();
+        *type = typeAlias->getSinglyDesugaredType();
     }
   }
 

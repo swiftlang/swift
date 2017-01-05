@@ -618,6 +618,9 @@ public:
   SILBasicBlock &front() { return *begin(); }
   const SILBasicBlock &front() const { return *begin(); }
 
+  SILBasicBlock *getEntryBlock() { return &front(); }
+  const SILBasicBlock *getEntryBlock() const { return &front(); }
+
   SILBasicBlock *createBasicBlock();
   SILBasicBlock *createBasicBlock(SILBasicBlock *After);
 

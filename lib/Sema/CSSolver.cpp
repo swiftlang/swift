@@ -245,7 +245,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
     if (!getFixedType(binding.first) && !binding.second->hasTypeVariable())
-      assignFixedType(binding.first, binding.second, /*updateScore=*/false);
+      assignFixedType(binding.first, binding.second, /*updateState=*/false);
   }
 
   // Register overload choices.
@@ -687,7 +687,7 @@ namespace {
       out << ")\n";
     }
   };
-}
+} // end anonymous namespace
 
 /// \brief Return whether a relational constraint between a type variable and a
 /// trivial wrapper type (autoclosure, unary tuple) should result in the type
@@ -701,7 +701,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::Subtype:
     return true;
   case ConstraintKind::Bind:
@@ -717,6 +717,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::OptionalObject:
     return false;
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
@@ -746,7 +747,7 @@ static void findInferableTypeVars(
     explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVars)
       : typeVars(typeVars) { }
 
-    virtual Action walkToTypePre(Type ty) override {
+    Action walkToTypePre(Type ty) override {
       if (ty->is<DependentMemberType>())
         return Action::SkipChildren;
 
@@ -828,7 +829,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
-    case ConstraintKind::ExplicitConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
@@ -842,7 +842,12 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // than the default.
       break;
 
+    case ConstraintKind::BridgingConversion:
+      // Nothing to infer from bridging conversions.
+      continue;
+
     case ConstraintKind::DynamicTypeOf:
+    case ConstraintKind::EscapableFunctionOf:
       // Constraints from which we can't do anything.
       // FIXME: Record this somehow?
       continue;
@@ -1050,11 +1055,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
           type = funcTy->getResult();
       }
 
-      if (auto tupleTy = type->getAs<TupleType>()) {
-        if (tupleTy->getNumElements() == 1 &&
-            !tupleTy->getElement(0).isVararg())
-          type = tupleTy->getElementType(0);
-      }
+      type = type->getWithoutImmediateLabel();
     }
 
     // Don't deduce IUO types.

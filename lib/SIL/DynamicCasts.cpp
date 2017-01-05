@@ -262,7 +262,7 @@ classifyClassHierarchyCast(CanType source, CanType target) {
   return DynamicCastFeasibility::WillFail;
 }
 
-static CanType getNSBridgedClassOfCFClass(Module *M, CanType type) {
+CanType swift::getNSBridgedClassOfCFClass(Module *M, CanType type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
     if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       if (auto bridgedAttr =
@@ -637,7 +637,7 @@ swift::classifyDynamicCast(Module *M,
       // If the bridged ObjC type is known, check if
       // source type can be cast into it.
       return classifyDynamicCast(M, source,
-          ObjCTy.getCanonicalTypeOrNull(),
+          ObjCTy->getCanonicalType(),
           /* isSourceTypeExact */ false, isWholeModuleOpts);
     }
     return DynamicCastFeasibility::MaySucceed;
@@ -650,7 +650,7 @@ swift::classifyDynamicCast(Module *M,
       // If the bridged ObjC type is known, check if
       // this type can be cast into target type.
       return classifyDynamicCast(M,
-          ObjCTy.getCanonicalTypeOrNull(),
+          ObjCTy->getCanonicalType(),
           target,
           /* isSourceTypeExact */ false, isWholeModuleOpts);
     }
@@ -930,7 +930,7 @@ namespace {
                                 CastConsumptionKind::TakeAlways);
         } else {
           SILValue sourceObjectValue =
-              someBB->createArgument(loweredSourceObjectType);
+              someBB->createPHIArgument(loweredSourceObjectType);
           objectSource = Source(sourceObjectValue, sourceObjectType,
                                 source.Consumption);
         }
@@ -968,7 +968,7 @@ namespace {
       if (target.isAddress()) {
         return target.asAddressSource();
       } else {
-        SILValue result = contBB->createArgument(target.LoweredType);
+        SILValue result = contBB->createPHIArgument(target.LoweredType);
         return target.asScalarSource(result);
       }
     }
@@ -1024,7 +1024,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit an unconditional scalar cast that's known to succeed.
 SILValue
@@ -1214,7 +1214,7 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
   // Emit the success block.
   B.setInsertionPoint(scalarSuccBB); {
     auto &targetTL = B.getModule().Types.getTypeLowering(targetValueType);
-    SILValue succValue = scalarSuccBB->createArgument(targetValueType);
+    SILValue succValue = scalarSuccBB->createPHIArgument(targetValueType);
     if (!shouldTakeOnSuccess(consumption))
       targetTL.emitCopyValue(B, loc, succValue);
     targetTL.emitStoreOfCopy(B, loc, succValue, dest, IsInitialization);

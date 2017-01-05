@@ -832,7 +832,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     auto ResultTD = std::make_shared<sma::TypealiasDecl>();
     ResultTD->Name = convertToIdentifier(TAD->getName());
-    ResultTD->Type = convertToTypeName(TAD->getUnderlyingType());
+    ResultTD->Type = convertToTypeName(TAD->getUnderlyingTypeLoc().getType());
     // FIXME
     // ResultTD->Attributes = ?;
     Result.Typealiases.emplace_back(std::move(ResultTD));
@@ -920,7 +920,7 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
 
   CompilerInstance CI;
   CI.addDiagnosticConsumer(&PDC);
-  if (CI.setup(*Invocation.get()))
+  if (CI.setup(*Invocation))
     return 1;
   CI.performSema();
 

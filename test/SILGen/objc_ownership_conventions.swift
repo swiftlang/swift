@@ -34,7 +34,7 @@ func test5(_ g: Gizmo) {
   var g = g
   Gizmo.inspect(g)
   // CHECK: bb0([[ARG:%.*]] : $Gizmo):
-  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Gizmo>
+  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
@@ -56,7 +56,7 @@ func test6(_ g: Gizmo) {
   var g = g
   Gizmo.consume(g)
   // CHECK: bb0([[ARG:%.*]] : $Gizmo):
-  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Gizmo>
+  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
@@ -80,7 +80,7 @@ func test7(_ g: Gizmo) {
   var g = g
   g.fork()
   // CHECK: bb0([[ARG:%.*]] : $Gizmo):
-  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Gizmo>
+  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]

@@ -242,8 +242,8 @@ static void maybeAddSameTypeRequirementForNestedType(
   if (!concreteType) return;
 
   // Add the same-type constraint.
-  concreteType = ArchetypeBuilder::mapTypeOutOfContext(
-                   superConformance->getDeclContext(), concreteType);
+  concreteType = superConformance->getDeclContext()
+      ->mapTypeOutOfContext(concreteType);
   if (auto otherPA = builder.resolveArchetype(concreteType))
     builder.addSameTypeRequirementBetweenArchetypes(
         nestedPA, otherPA, fromSource);
@@ -413,19 +413,13 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         // Resolve this nested type to this type alias.
         pa = new PotentialArchetype(this, alias);
         
-        if (!alias->hasUnderlyingType())
+        if (!alias->hasInterfaceType())
           builder.getLazyResolver()->resolveDeclSignature(alias);
-        if (!alias->hasUnderlyingType())
+        if (!alias->hasInterfaceType())
           continue;
 
-        auto type = alias->getUnderlyingType();
+        auto type = alias->getDeclaredInterfaceType();
         SmallVector<Identifier, 4> identifiers;
-
-        // Map the type out of its context.
-        if (auto genericEnv = alias->getGenericEnvironmentOfContext()) {
-          type = genericEnv->mapTypeOutOfContext(alias->getModuleContext(),
-                                                 type);
-        }
 
         if (auto existingPA = builder.resolveArchetype(type)) {
           builder.addSameTypeRequirementBetweenArchetypes(pa, existingPA,
@@ -688,8 +682,7 @@ void ArchetypeType::resolveNestedType(
   auto &builder = *genericEnv->getArchetypeBuilder();
 
   Type interfaceType =
-    genericEnv->mapTypeOutOfContext(&builder.getModule(),
-                                    const_cast<ArchetypeType *>(this));
+    genericEnv->mapTypeOutOfContext(const_cast<ArchetypeType *>(this));
   auto parentPA = builder.resolveArchetype(interfaceType);
   auto memberPA = parentPA->getNestedType(nested.first, builder);
   auto result = memberPA->getTypeInContext(builder, genericEnv);
@@ -1350,11 +1343,13 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
 
   // If this is an associated type that already has an archetype assigned,
   // use that information.
-  if (isa<AssociatedTypeDecl>(decl) &&
-      decl->getDeclContext()->isValidGenericContext()) {
-    auto *archetype = mapTypeIntoContext(decl->getDeclContext(),
-                                         decl->getDeclaredInterfaceType())
-        ->getAs<ArchetypeType>();
+  auto *genericEnv = decl->getDeclContext()
+      ->getGenericEnvironmentOfContext();
+  if (isa<AssociatedTypeDecl>(decl) && genericEnv != nullptr) {
+    auto *archetype = genericEnv->mapTypeIntoContext(
+        &Mod,
+        decl->getDeclaredInterfaceType())
+            ->getAs<ArchetypeType>();
 
     if (archetype) {
       SourceLoc loc = decl->getLoc();
@@ -1542,7 +1537,7 @@ public:
                           unsigned Depth)
     : Builder(builder), Loc(loc), Depth(Depth) { }
 
-  virtual Action walkToTypePost(Type ty) override { 
+  Action walkToTypePost(Type ty) override {
     auto boundGeneric = ty->getAs<BoundGenericType>();
     if (!boundGeneric)
       return Action::Continue; 
@@ -1677,7 +1672,7 @@ static Identifier typoCorrectNestedType(
         continue;
 
       unsigned dist = name.edit_distance(assocType->getName().str(),
-                                         /*allowReplacements=*/true,
+                                         /*AllowReplacements=*/true,
                                          maxScore);
       assert(dist > 0 && "nested type should have matched associated type");
       if (bestEditDistance == 0 || dist == bestEditDistance) {
@@ -1954,46 +1949,6 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "\n";
 }
 
-Type ArchetypeBuilder::mapTypeIntoContext(const DeclContext *dc, Type type) {
-  return mapTypeIntoContext(dc->getParentModule(),
-                            dc->getGenericEnvironmentOfContext(),
-                            type);
-}
-
-Type ArchetypeBuilder::mapTypeIntoContext(ModuleDecl *M,
-                                          GenericEnvironment *env,
-                                          Type type) {
-  auto canType = type->getCanonicalType();
-  assert(!canType->hasArchetype() && "already have a contextual type");
-  if (!canType->hasTypeParameter())
-    return type;
-
-  assert(env && "dependent type in non-generic context");
-
-  return env->mapTypeIntoContext(M, type);
-}
-
-Type
-ArchetypeBuilder::mapTypeOutOfContext(const DeclContext *dc, Type type) {
-  return mapTypeOutOfContext(dc->getParentModule(),
-                             dc->getGenericEnvironmentOfContext(),
-                             type);
-}
-
-Type
-ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
-                                      GenericEnvironment *env,
-                                      Type type) {
-  auto canType = type->getCanonicalType();
-  assert(!canType->hasTypeParameter() && "already have an interface type");
-  if (!canType->hasArchetype())
-    return type;
-
-  assert(env && "dependent type in non-generic context");
-
-  return env->mapTypeOutOfContext(M, type);
-}
-
 void ArchetypeBuilder::addGenericSignature(GenericSignature *sig) {
   if (!sig) return;
   
@@ -2040,6 +1995,17 @@ static void collectRequirements(ArchetypeBuilder &builder,
     if (auto concreteTy = type.dyn_cast<Type>()) {
       // Maybe we were equated to a concrete type...
       repTy = concreteTy;
+
+      // Drop requirements involving concrete types containing
+      // unresolved associated types.
+      if (repTy.findIf([](Type t) -> bool {
+            if (auto *depTy = dyn_cast<DependentMemberType>(t.getPointer()))
+              if (depTy->getAssocType() == nullptr)
+                return true;
+            return false;
+          })) {
+        return;
+      }
     } else {
       // ...or to a dependent type.
       repTy = type.get<ArchetypeBuilder::PotentialArchetype *>()

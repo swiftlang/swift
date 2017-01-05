@@ -270,8 +270,7 @@ private:
                                           CanSILFunctionType origFnType) const {
     if (!HasSubstitutions) return origFnType;
     
-    return origFnType->substGenericArgs(SGM.M, SGM.SwiftModule,
-                                        Substitutions);
+    return origFnType->substGenericArgs(SGM.M, Substitutions);
   }
 
   /// Add the 'self' clause back to the substituted formal type of
@@ -428,6 +427,8 @@ public:
     case Kind::DynamicMethod:
       return Constant.uncurryLevel;
     }
+
+    llvm_unreachable("Unhandled Kind in switch.");
   }
 
   EnumElementDecl *getEnumElementDecl() {
@@ -557,14 +558,14 @@ public:
       assert(level <= Constant.uncurryLevel
              && "uncurrying past natural uncurry level of method");
 
-      auto constant = Constant.atUncurryLevel(level);
+      constant = Constant.atUncurryLevel(level);
       // Lower the substituted type from the AST, which should have any generic
       // parameters in the original signature erased to their upper bounds.
       auto objcFormalType = SubstFormalType.withExtInfo(
          SubstFormalType->getExtInfo()
            .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod));
       auto fnType = gen.SGM.M.Types
-        .getUncachedSILFunctionTypeForConstant(constant, objcFormalType);
+        .getUncachedSILFunctionTypeForConstant(*constant, objcFormalType);
 
       auto closureType =
         replaceSelfTypeForDynamicLookup(gen.getASTContext(), fnType,
@@ -573,9 +574,9 @@ public:
 
       SILValue fn = gen.B.createDynamicMethod(Loc,
                           SelfValue,
-                          constant,
+                          *constant,
                           SILType::getPrimitiveObjectType(closureType),
-                          /*volatile*/ constant.isForeign);
+                          /*volatile*/ Constant.isForeign);
       mv = ManagedValue::forUnmanaged(fn);
       break;
     }
@@ -1103,11 +1104,9 @@ public:
       }
     }
 
-    // If this is a direct reference to a vardecl, it must be a let constant
-    // (which doesn't need to be loaded).  Just emit its value directly.
-    if (auto *vd = dyn_cast<VarDecl>(e->getDecl())) {
-      (void)vd;
-      assert(vd->isLet() && "Direct reference to vardecl that isn't a let?");
+    // If this is a direct reference to a vardecl, just emit its value directly.
+    // Recursive references to callable declarations are allowed.
+    if (isa<VarDecl>(e->getDecl())) {
       visitExpr(e);
       return;
     }
@@ -1488,7 +1487,7 @@ public:
 
   Callee getCallee() {
     assert(ApplyCallee && "did not find callee?!");
-    return *std::move(ApplyCallee);
+    return std::move(*ApplyCallee);
   }
 
   /// Ignore parentheses and implicit conversions.
@@ -1679,7 +1678,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
   {
     B.emitBlock(errorBB);
     SILValue error =
-        errorBB->createArgument(silFnType->getErrorResult().getSILType());
+        errorBB->createPHIArgument(silFnType->getErrorResult().getSILType());
 
     B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
                     SGM.Types.getEmptyTupleType(), {}, {error});
@@ -1690,7 +1689,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
 
   // Enter the normal path.
   B.emitBlock(normalBB);
-  return normalBB->createArgument(resultType);
+  return normalBB->createPHIArgument(resultType);
 }
 
 static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
@@ -1834,7 +1833,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
   // Otherwise, we need to create a try_apply.
   } else {
     SILBasicBlock *normalBB = gen.createBasicBlock();
-    result = normalBB->createArgument(resultType);
+    result = normalBB->createPHIArgument(resultType);
 
     SILBasicBlock *errorBB =
       gen.getTryApplyErrorDest(loc, substFnType->getErrorResult(),
@@ -2165,7 +2164,7 @@ namespace {
       return RValue();
     }
   };
-}
+} // end anonymous namespace
 
 /// Build a result plan for the results of an apply.
 ///
@@ -3452,7 +3451,7 @@ namespace {
       return {SGFContext(), finalContext, requiresReabstraction};
     }
   };
-}
+} // end anonymous namespace
 
 /// Decompose a type, whether it is a tuple or a single type, into an
 /// array of tuple type elements.
@@ -3634,7 +3633,10 @@ void ArgEmitter::emitShuffle(Expr *inner,
     // fill out varargsAddrs if necessary.
     for (auto &extent : innerExtents) {
       assert(extent.Used && "didn't use all the inner tuple elements!");
-      innerParams.append(extent.Params.begin(), extent.Params.end());
+
+      for (auto param : extent.Params) {
+        innerParams.push_back(param);
+      }
 
       // Fill in the special destinations array.
       if (innerSpecialDests) {
@@ -4692,15 +4694,16 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   {
     // Determine the self metatype type.
     CanSILFunctionType substFnType =
-      SGF.getLoweredType(substFormalType, /*uncurryLevel=*/1)
-      .castTo<SILFunctionType>();
+      initConstant.SILFnType->substGenericArgs(SGF.SGM.M, subs);
     SILType selfParamMetaTy = substFnType->getSelfParameter().getSILType();
 
     if (overriddenSelfType) {
       // If the 'self' type has been overridden, form a metatype to the
       // overriding 'Self' type.
       Type overriddenSelfMetaType =
-        MetatypeType::get(overriddenSelfType, SGF.getASTContext());
+        MetatypeType::get(overriddenSelfType,
+                          selfParamMetaTy.castTo<MetatypeType>()
+                              ->getRepresentation());
       selfMetaTy =
         SGF.getLoweredType(overriddenSelfMetaType->getCanonicalType());
     } else {
@@ -4906,7 +4909,7 @@ namespace {
       gen.emitUninitializedArrayDeallocation(l, Array);
     }
   };
-}
+} // end anonymous namespace
 
 CleanupHandle
 SILGenFunction::enterDeallocateUninitializedArrayCleanup(SILValue array) {
@@ -5536,7 +5539,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     auto dynamicMethodTy = getDynamicMethodLoweredType(*this, operand, member,
                                                        memberFnTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
-    SILValue memberArg = hasMemberBB->createArgument(loweredMethodTy);
+    SILValue memberArg = hasMemberBB->createPHIArgument(loweredMethodTy);
 
     // Create the result value.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, operand,
@@ -5631,7 +5634,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto dynamicMethodTy = getDynamicMethodLoweredType(*this, base, member,
                                                        functionTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
-    SILValue memberArg = hasMemberBB->createArgument(loweredMethodTy);
+    SILValue memberArg = hasMemberBB->createPHIArgument(loweredMethodTy);
     // Emit the application of 'self'.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, base,
                                               cast<FunctionType>(methodTy));

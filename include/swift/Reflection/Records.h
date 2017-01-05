@@ -32,7 +32,7 @@ class FieldRecordFlags {
     // Is this an indirect enum case?
     IsIndirectCase = 0x1
   };
-  int_type Data;
+  int_type Data = 0;
 
 public:
   bool isIndirectCase() const {

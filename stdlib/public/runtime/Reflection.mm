@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
@@ -91,16 +92,6 @@ struct String {
     : String(ptr, strlen(ptr))
   {}
 
-  /// Create a Swift String from two concatenated nul-terminated strings.
-  explicit String(const char *ptr1, const char *ptr2) {
-    size_t len1 = strlen(ptr1);
-    size_t len2 = strlen(ptr2);
-    char *concatenated = static_cast<char *>(malloc(len1 + len2));
-    memcpy(concatenated, ptr1, len1);
-    memcpy(concatenated + len1, ptr2, len2);
-    swift_stringFromUTF8InRawMemory(this, concatenated, len1 + len2);
-    free(concatenated);
-  }
 #if SWIFT_OBJC_INTEROP
   explicit String(NSString *s)
     // FIXME: Use the usual NSString bridging entry point.
@@ -190,7 +181,8 @@ extern "C"
 const Metadata *swift_MagicMirrorData_valueType(HeapObject *owner,
                                                 const OpaqueValue *value,
                                                 const Metadata *type) {
-  return swift_getDynamicType(const_cast<OpaqueValue*>(value), type);
+  return swift_getDynamicType(const_cast<OpaqueValue*>(value), type,
+                              /*existential metatype*/ true);
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -942,9 +934,9 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
 // -- MagicMirror implementation.
 
 #define MIRROR_CONFORMANCE_SYM(Mirror, Subst) \
-  SELECT_MANGLING(_TWPV##Mirror##s7_Mirrors , _S##Mirror##Vs01_##Subst##0sWP)
+  SELECT_MANGLING(WPV##Mirror##s7_Mirrors , Mirror##Vs01_##Subst##0sWP)
 #define OBJC_MIRROR_CONFORMANCE_SYM() \
-  SELECT_MANGLING(_TWPVs11_ObjCMirrors7_Mirrors, _Ss11_ObjCMirrorVs7_MirrorsWP)
+  SELECT_MANGLING(WPVs11_ObjCMirrors7_Mirrors, s11_ObjCMirrorVs7_MirrorsWP)
 
 // Addresses of the type metadata and Mirror witness tables for the primitive
 // mirrors.
@@ -1125,6 +1117,8 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::ErrorObject:
     swift::crash("Swift mirror lookup failure");
   }
+
+  swift_unreachable("Unhandled MetdataKind in switch.");
 }
 
 /// MagicMirror ownership-taking whole-value constructor.

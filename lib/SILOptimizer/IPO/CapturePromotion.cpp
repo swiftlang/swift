@@ -186,7 +186,7 @@ private:
   void compute();
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 
 namespace {
@@ -235,7 +235,7 @@ private:
   llvm::DenseMap<SILArgument*, SILValue> BoxArgumentMap;
   llvm::DenseMap<ProjectBoxInst*, SILValue> ProjectBoxArgumentMap;
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 /// \brief Compute ReachabilityInfo so that it can answer queries about
 /// whether a given basic block in a function is reachable from another basic
@@ -387,7 +387,7 @@ static std::string getSpecializedName(SILFunction *F,
                                       IsFragile_t Fragile,
                                       IndicesSet &PromotableIndices) {
   Mangle::Mangler M;
-  auto P = SpecializationPass::CapturePromotion;
+  auto P = Demangle::SpecializationPass::CapturePromotion;
   FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
   NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
   CanSILFunctionType FTy = F->getLoweredFunctionType();
@@ -432,7 +432,6 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
   computeNewArgInterfaceTypes(Orig, PromotableIndices, ClonedInterfaceArgTys);
 
-  Module *SM = M.getSwiftModule();
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
 
   // Create the thin function type for the cloned closure.
@@ -445,7 +444,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
                          OrigFTI->getOptionalErrorResult(),
                          M.getASTContext());
 
-  auto SubstTy = SILType::substFuncType(M, SM, InterfaceSubs.getMap(), ClonedTy,
+  auto SubstTy = SILType::substFuncType(M, InterfaceSubs, ClonedTy,
                                         /* dropGenerics = */ false);
   
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
@@ -487,7 +486,7 @@ ClosureCloner::populateCloned() {
              && "promoting compound box not implemented");
       auto BoxedTy = BoxTy->getFieldType(Cloned->getModule(),0).getObjectType();
       SILValue MappedValue =
-          ClonedEntryBB->createArgument(BoxedTy, (*I)->getDecl());
+          ClonedEntryBB->createFunctionArgument(BoxedTy, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
       
       // Track the projections of the box.
@@ -498,8 +497,8 @@ ClosureCloner::populateCloned() {
       }
     } else {
       // Otherwise, create a new argument which copies the original argument
-      SILValue MappedValue =
-          ClonedEntryBB->createArgument((*I)->getType(), (*I)->getDecl());
+      SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
+          (*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;
@@ -718,7 +717,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
     auto argIndex = O->getOperandNumber()-1;
     auto convention =
       AI->getSubstCalleeType()->getSILArgumentConvention(argIndex);
-    if (isIndirectConvention(convention)) {
+    if (convention.isIndirectConvention()) {
       Mutations.push_back(AI);
       return true;
     }

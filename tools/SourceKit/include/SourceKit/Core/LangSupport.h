@@ -279,6 +279,8 @@ struct CursorInfo {
   ArrayRef<StringRef> AnnotatedRelatedDeclarations;
   /// All groups of the module name under cursor.
   ArrayRef<StringRef> ModuleGroupArray;
+  /// All available actions on the code under cursor.
+  ArrayRef<StringRef> AvailableActions;
   bool IsSystem = false;
 };
 
@@ -455,6 +457,7 @@ public:
                                        EditorConsumer &Consumer) = 0;
 
   virtual void getCursorInfo(StringRef Filename, unsigned Offset,
+                             unsigned Length, bool Actionables,
                              ArrayRef<const char *> Args,
                           std::function<void(const CursorInfo &)> Receiver) = 0;
 

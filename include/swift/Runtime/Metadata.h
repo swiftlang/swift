@@ -33,6 +33,7 @@
 #include "swift/Basic/FlaggedPointer.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Basic/ManglingMacros.h"
+#include "swift/Basic/Unreachable.h"
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
 
 namespace swift {
@@ -1158,7 +1159,8 @@ public:
     case MetadataKind::ErrorObject:
       return false;
     }
-    assert(false && "not a metadata kind");
+    
+    swift_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Is this metadata for an existential type?
@@ -1183,7 +1185,8 @@ public:
     case MetadataKind::ErrorObject:
       return false;
     }
-    assert(false && "not a metadata kind");
+
+    swift_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Is this either type metadata or a class object for any kind of class?
@@ -1263,6 +1266,8 @@ public:
     case MetadataKind::ErrorObject:
       return RelativeDirectPointerNullPtrRef;
     }
+
+    swift_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Get the generic metadata pattern from which this generic type instance was
@@ -1832,7 +1837,7 @@ using ObjCClassWrapperMetadata
 // is formally UB by C++11 language rules, we should be OK because neither
 // the processor model nor the optimizer can realistically reorder our uses
 // of 'consume'.
-#if __arm64__
+#if __arm64__ || __arm__
 #  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_relaxed)
 #else
 #  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_consume)
@@ -3329,10 +3334,22 @@ swift_dynamicCastForeignClassMetatypeUnconditional(
 /// \brief Return the dynamic type of an opaque value.
 ///
 /// \param value An opaque value.
-/// \param self  The static type metadata for the opaque value.
+/// \param self  The static type metadata for the opaque value and the result
+///              type value.
+/// \param existentialMetatype Whether the result type value is an existential
+///                            metatype. If `self` is an existential type,
+///                            then a `false` value indicates that the result
+///                            is of concrete metatype type `self.Protocol`,
+///                            and existential containers will not be projected
+///                            through. A `true` value indicates that the result
+///                            is of existential metatype type `self.Type`,
+///                            so existential containers can be projected
+///                            through as long as a subtype relationship holds
+///                            from `self` to the contained dynamic type.
 SWIFT_RUNTIME_EXPORT
 extern "C" const Metadata *
-swift_getDynamicType(OpaqueValue *value, const Metadata *self);
+swift_getDynamicType(OpaqueValue *value, const Metadata *self,
+                     bool existentialMetatype);
 
 /// \brief Fetch the type metadata associated with the formal dynamic
 /// type of the given (possibly Objective-C) object.  The formal

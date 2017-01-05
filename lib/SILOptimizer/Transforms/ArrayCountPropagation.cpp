@@ -69,7 +69,7 @@ public:
     return ArrayAllocation(Inst, DeadCalls).propagate();
   }
 };
-}
+} // end anonymous namespace
 
 /// Propagate the count of an array created to count method calls on the same
 /// array.
@@ -209,7 +209,7 @@ public:
   }
 };
 
-} // anonymous namespace.
+} // end anonymous namespace
 
 SILTransform *swift::createArrayCountPropagation() {
   return new ArrayCountPropagation();

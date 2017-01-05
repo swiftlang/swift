@@ -6,7 +6,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // FIXME: Disabled. This test does not always crash, which confuses CI.
-// REQUIRES: y-u-not-crash-always
+// REQUIRES: deterministic-behavior
 
 // REQUIRES: OS=linux-gnu
 // RUN: not --crash %target-swift-frontend %s -emit-ir

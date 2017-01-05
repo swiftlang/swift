@@ -131,7 +131,7 @@ public:
   /// Set the type of this pattern as an interface type whose resolution to
   /// a context type will be performed lazily.
   ///
-  /// \param dc The context in whch the type will be resolved.
+  /// \param dc The context in which the type will be resolved.
   void setDelayedInterfaceType(Type interfaceTy, DeclContext *dc);
 
   /// Overwrite the type of this pattern.
@@ -535,7 +535,10 @@ public:
                                     : NameLoc;
   }
   SourceLoc getEndLoc() const {
-    return SubPattern ? SubPattern->getSourceRange().End : NameLoc;
+    if (SubPattern && SubPattern->getSourceRange().isValid()) {
+      return SubPattern->getSourceRange().End;
+    }
+    return NameLoc;
   }
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
   

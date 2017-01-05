@@ -62,7 +62,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
     _sanityCheck(_isClassOrObjCExistential(U.self))
     
     // FIXME: can't check that U is derived from Element pending
-    // <rdar://problem/19915280> generic metatype casting doesn't work
+    // <rdar://problem/20028320> generic metatype casting doesn't work
     // _sanityCheck(U.self is Element.Type)
 
     return _ArrayBuffer<U>(

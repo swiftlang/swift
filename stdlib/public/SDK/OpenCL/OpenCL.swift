@@ -20,5 +20,5 @@ public func clSetKernelArgsListAPPLE(
   //      cl_uint arg_indx,
   //      size_t arg_size,
   //      const void *arg_value,
-  return withVaList(args) {  clSetKernelArgsVaListAPPLE(kernel, uint, $0) }
+  return withVaList(args) { clSetKernelArgsVaListAPPLE(kernel, uint, $0) }
 }

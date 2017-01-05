@@ -36,7 +36,7 @@ public:
 
 protected:
   bool cacheResult(CanType Type, bool Result);
-  bool isSafeType(Type Ty);
+  bool isSafeType(CanType Ty);
   bool implementsDestructorSafeContainerProtocol(NominalTypeDecl *NomDecl);
   bool areTypeParametersSafe(CanType Ty);
   ASTContext &getASTContext();

@@ -80,11 +80,9 @@ void BuiltinUnit::LookupCache::lookupValue(
   if (!Entry) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
       auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
-                                          TypeLoc::withoutLoc(Ty),
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
-      TAD->computeType();
-      TAD->setInterfaceType(MetatypeType::get(TAD->getAliasType(), Ctx));
+      TAD->setUnderlyingType(Ty);
       TAD->setAccessibility(Accessibility::Public);
       Entry = TAD;
     }
@@ -604,6 +602,12 @@ TypeBase::gatherAllSubstitutions(Module *module,
       continue;
     }
 
+    if (auto protocol = parent->getAs<ProtocolType>()) {
+      parent = protocol->getParent();
+      lastGenericIndex--;
+      continue;
+    }
+
     if (auto nominal = parent->getAs<NominalType>()) {
       parent = nominal->getParent();
       continue;
@@ -612,43 +616,46 @@ TypeBase::gatherAllSubstitutions(Module *module,
     llvm_unreachable("Not a nominal or bound generic type");
   }
 
+  auto *genericEnv = gpContext->getGenericEnvironmentOfContext();
+
   // Add forwarding substitutions from the outer context if we have
   // a type nested inside a generic function.
   auto *parentDC = gpContext;
   while (parentDC->isTypeContext())
     parentDC = parentDC->getParent();
-  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext()) {
-    for (auto gp : outerEnv->getGenericParams()) {
+  if (auto *outerSig = parentDC->getGenericSignatureOfContext()) {
+    for (auto gp : outerSig->getGenericParams()) {
       auto result = substitutions.insert(
                       {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
-                       outerEnv->mapTypeIntoContext(gp)});
+                       genericEnv->mapTypeIntoContext(gp)});
       assert(result.second);
     }
   }
 
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
-          -> ProtocolConformanceRef {
-
-    auto *proto = protoType->getDecl();
-
-    // If the type is a type variable or is dependent, just fill in empty
-    // conformances.
-    if (replacement->isTypeVariableOrMember() ||
-        replacement->isTypeParameter())
-      return ProtocolConformanceRef(proto);
-
-    // Otherwise, find the conformance.
-    auto conforms = module->lookupConformance(replacement, proto, resolver);
-    if (conforms)
-      return *conforms;
-
-    // FIXME: Should we ever end up here?
-    return ProtocolConformanceRef(proto);
-  };
+      -> Optional<ProtocolConformanceRef> {
+        auto *proto = protoType->getDecl();
+        
+        // If the type is a type variable or is dependent, just fill in empty
+        // conformances.
+        if (replacement->isTypeVariableOrMember() ||
+            replacement->isTypeParameter())
+          return ProtocolConformanceRef(proto);
+        
+        // Otherwise, try to find the conformance.
+        auto conforms = module->lookupConformance(replacement, proto, resolver);
+        if (conforms)
+          return *conforms;
+        
+        // FIXME: Should we ever end up here?
+        // We should return None and let getSubstitutions handle the error
+        // if we do.
+        return ProtocolConformanceRef(proto);
+      };
 
   SmallVector<Substitution, 4> result;
-  genericSig->getSubstitutions(*module, substitutions,
+  genericSig->getSubstitutions(substitutions,
                                lookupConformanceFn,
                                result);
 
@@ -670,6 +677,11 @@ Optional<ProtocolConformanceRef>
 Module::lookupConformance(Type type, ProtocolDecl *protocol,
                           LazyResolver *resolver) {
   ASTContext &ctx = getASTContext();
+
+  // A dynamic Self type conforms to whatever its underlying type
+  // conforms to.
+  if (auto selfType = type->getAs<DynamicSelfType>())
+    type = selfType->getSelfType();
 
   // An archetype conforms to a protocol if the protocol is listed in the
   // archetype's list of conformances, or if the archetype has a superclass
@@ -755,11 +767,8 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
   // intended type might have.
-  if (type->is<UnresolvedType>()) {
-    return ProtocolConformanceRef(
-             ctx.getConformance(type, protocol, protocol->getLoc(), this,
-                                ProtocolConformanceState::Complete));
-  }
+  if (type->is<UnresolvedType>())
+    return ProtocolConformanceRef(protocol);
 
   auto nominal = type->getAnyNominal();
 
@@ -814,11 +823,6 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
       // the specialized conformance.
       auto substitutions = type->gatherAllSubstitutions(this, resolver,
                                                         explicitConformanceDC);
-      
-      for (auto sub : substitutions) {
-        if (sub.getReplacement()->hasError())
-          return None;
-      }
 
       // Create the specialized conformance entry.
       auto result = ctx.getSpecializedConformance(type, conformance,
@@ -1539,8 +1543,8 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   // FIXME: And there are more compact ways to encode a 16-byte value.
   buffer.reserve(buffer.size() + 2*llvm::array_lengthof(result));
   for (uint8_t byte : result) {
-    buffer.push_back(llvm::hexdigit(byte >> 4, /*lowercase=*/false));
-    buffer.push_back(llvm::hexdigit(byte & 0xF, /*lowercase=*/false));
+    buffer.push_back(llvm::hexdigit(byte >> 4, /*LowerCase=*/false));
+    buffer.push_back(llvm::hexdigit(byte & 0xF, /*LowerCase=*/false));
   }
 
   PrivateDiscriminator = getASTContext().getIdentifier(buffer);

@@ -55,7 +55,7 @@ enum class MacroConflictAction {
   Replace,
   AddAsAlternative
 };
-}
+} // end anonymous namespace
 
 /// Based on the Clang module structure, decides what to do when a new
 /// definition of an existing macro is seen: discard it, have it replace the
@@ -170,7 +170,7 @@ public:
          clang::serialization::ModuleFile &moduleFile,
          std::function<void()> onRemove, const llvm::BitstreamCursor &stream);
 
-  ~SwiftLookupTableReader();
+  ~SwiftLookupTableReader() override;
 
   /// Retrieve the AST reader associated with this lookup table reader.
   clang::ASTReader &getASTReader() const { return Reader; }
@@ -203,7 +203,7 @@ public:
   bool lookupGlobalsAsMembers(SwiftLookupTable::StoredContext context,
                               SmallVectorImpl<uintptr_t> &entries);
 };
-}
+} // namespace swift
 
 bool SwiftLookupTable::contextRequiresName(ContextKind kind) {
   switch (kind) {
@@ -1069,7 +1069,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 void SwiftLookupTableWriter::writeExtensionContents(
        clang::Sema &sema,
@@ -1281,7 +1281,7 @@ namespace {
       return result;
     }
   };
-}
+} // end anonymous namespace
 
 namespace swift {
   using SerializedBaseNameToEntitiesTable =
@@ -1289,7 +1289,7 @@ namespace swift {
 
   using SerializedGlobalsAsMembersTable =
     llvm::OnDiskIterableChainedHashTable<GlobalsAsMembersTableReaderInfo>;
-}
+} // namespace swift
 
 clang::NamedDecl *SwiftLookupTable::mapStoredDecl(uintptr_t &entry) {
   assert(isDeclEntry(entry) && "Not a declaration entry");

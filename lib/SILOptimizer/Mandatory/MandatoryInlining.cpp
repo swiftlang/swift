@@ -51,16 +51,16 @@ public:
     Module.registerDeleteNotificationHandler(this);
   }
 
-  ~DeleteInstructionsHandler() {
+  ~DeleteInstructionsHandler() override {
      // Unregister the handler.
     Module.removeDeleteNotificationHandler(this);
   }
 
   // Handling of instruction removal notifications.
-  bool needsNotifications() { return true; }
+  bool needsNotifications() override { return true; }
 
   // Handle notifications about removals of instructions.
-  void handleDeleteNotification(swift::ValueBase *Value) {
+  void handleDeleteNotification(swift::ValueBase *Value) override {
     if (auto DeletedI = dyn_cast<SILInstruction>(Value)) {
       if (CurrentI == SILBasicBlock::iterator(DeletedI)) {
         if (CurrentI != CurrentI->getParent()->begin()) {
@@ -439,6 +439,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // The callee only needs to know about opened archetypes used in
       // the substitution list.
       OpenedArchetypesTracker.registerUsedOpenedArchetypes(InnerAI.getInstruction());
+      if (PAI) {
+        OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
+      }
 
       SILInliner Inliner(*F, *CalleeFunction,
                          SILInliner::InlineKind::MandatoryInline,

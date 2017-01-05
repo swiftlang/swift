@@ -238,7 +238,7 @@ std::string ASTMangler::mangleGlobalInit(const VarDecl *decl, int counter,
   return finalize();
 }
 
-std::string ASTMangler::mangleReabstructionThunkHelper(
+std::string ASTMangler::mangleReabstractionThunkHelper(
                                             CanSILFunctionType ThunkType,
                                             Type FromType,
                                             Type ToType,
@@ -389,6 +389,11 @@ static const char *getMetatypeRepresentationOp(MetatypeRepresentation Rep) {
   }
 }
 
+static bool isStdlibType(const NominalTypeDecl *decl) {
+  DeclContext *dc = decl->getDeclContext();
+  return dc->isModuleScopeContext() && dc->getParentModule()->isStdlibModule();
+}
+
 /// Mangle a type into the buffer.
 ///
 void ASTMangler::appendType(Type type) {
@@ -449,7 +454,7 @@ void ASTMangler::appendType(Type type) {
       TypeAliasDecl *decl = NameAliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
         // It's not possible to mangle the context of the builtin module.
-        return appendType(decl->getUnderlyingType());
+        return appendType(NameAliasTy->getSinglyDesugaredType());
       }
 
       // For the DWARF output we want to mangle the type alias + context,
@@ -538,8 +543,17 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::BoundGenericEnum:
     case TypeKind::BoundGenericStruct:
       if (type->isSpecialized()) {
-        appendBoundGenericArgs(type);
-        appendNominalType(type->getAnyNominal());
+        NominalTypeDecl *NDecl = type->getAnyNominal();
+        if (isStdlibType(NDecl) && NDecl->getName().str() == "Optional") {
+          auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
+          assert(GenArgs.size() == 1);
+          appendType(GenArgs[0]);
+          return appendOperator("Sg");
+        }
+
+        appendNominalType(NDecl);
+        bool isFirstArgList = true;
+        appendBoundGenericArgs(type, isFirstArgList);
         return appendOperator("G");
       }
       appendNominalType(tybase->getAnyNominal());
@@ -572,8 +586,8 @@ void ASTMangler::appendType(Type type) {
 
       // Find the archetype information.
       const DeclContext *DC = DeclCtx;
-      auto GTPT = ArchetypeBuilder::mapTypeOutOfContext(DC, archetype)
-                    ->castTo<GenericTypeParamType>();
+      auto GTPT = DC->mapTypeOutOfContext(archetype)
+          ->castTo<GenericTypeParamType>();
 
       if (DWARFMangling) {
         Buffer << 'q' << Index(GTPT->getIndex());
@@ -765,25 +779,29 @@ void ASTMangler::bindGenericParameters(const DeclContext *DC) {
     bindGenericParameters(sig->getCanonicalSignature());
 }
 
-void ASTMangler::appendBoundGenericArgs(Type type) {
+void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
+  BoundGenericType *boundType = nullptr;
   if (auto *unboundType = type->getAs<UnboundGenericType>()) {
-    if (auto parent = unboundType->getParent())
-      appendBoundGenericArgs(parent);
-    return appendOperator("y");
+    if (Type parent = unboundType->getParent())
+      appendBoundGenericArgs(parent, isFirstArgList);
+  } else if (auto *nominalType = type->getAs<NominalType>()) {
+    if (Type parent = nominalType->getParent())
+      appendBoundGenericArgs(parent, isFirstArgList);
+  } else {
+    boundType = type->castTo<BoundGenericType>();
+    if (Type parent = boundType->getParent())
+      appendBoundGenericArgs(parent, isFirstArgList);
   }
-  if (auto *nominalType = type->getAs<NominalType>()) {
-    if (auto parent = nominalType->getParent())
-      appendBoundGenericArgs(parent);
-    return appendOperator("y");
+  if (isFirstArgList) {
+    appendOperator("y");
+    isFirstArgList = false;
+  } else {
+    appendOperator("_");
   }
-  auto *boundType = type->castTo<BoundGenericType>();
-  if (auto parent = boundType->getParent())
-    appendBoundGenericArgs(parent);
-
-  bool firstArg = true;
-  for (Type arg : boundType->getGenericArgs()) {
-    appendType(arg);
-    appendListSeparator(firstArg);
+  if (boundType) {
+    for (Type arg : boundType->getGenericArgs()) {
+      appendType(arg);
+    }
   }
 }
 
@@ -1372,7 +1390,7 @@ void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
   if (!Ty)
     Ty = ErrorType::get(localContext->getASTContext());
 
-  Ty = ArchetypeBuilder::mapTypeOutOfContext(parentContext, Ty);
+  Ty = parentContext->mapTypeOutOfContext(Ty);
   appendType(Ty->getCanonicalType());
   appendOperator(isImplicit ? "fu" : "fU", Index(discriminator));
 }
@@ -1504,8 +1522,7 @@ void ASTMangler::appendDeclType(const ValueDecl *decl) {
 
 bool ASTMangler::tryAppendStandardSubstitution(const NominalTypeDecl *decl) {
   // Bail out if our parent isn't the swift standard library.
-  DeclContext *dc = decl->getDeclContext();
-  if (!dc->isModuleScopeContext() || !dc->getParentModule()->isStdlibModule())
+  if (!isStdlibType(decl))
     return false;
 
   StringRef name = decl->getName().str();
@@ -1659,7 +1676,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   appendDeclName(decl);
 
   ArrayRef<GenericTypeParamType *> genericParams;
-  unsigned initialParamDepth;
+  unsigned initialParamDepth = 0;
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();

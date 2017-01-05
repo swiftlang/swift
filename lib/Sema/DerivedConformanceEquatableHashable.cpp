@@ -17,7 +17,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
@@ -133,7 +132,7 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  CanType boolTy = C.getBoolDecl()->getDeclaredType().getCanonicalTypeOrNull();
+  auto boolTy = C.getBoolDecl()->getDeclaredType();
 
   auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
 

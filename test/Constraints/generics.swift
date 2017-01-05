@@ -416,3 +416,13 @@ extension Array where Element: Hashable {
 func rdar29633747(characters: String.CharacterView) {
   let _ = Array(characters).trimmed(["("])
 }
+
+// Null pointer dereference in noteArchetypeSource()
+class GenericClass<A> {}
+// expected-note@-1 {{'A' declared as parameter to type 'GenericClass'}}
+
+func genericFunc<T>(t: T) {
+  _ = [T: GenericClass] // expected-error {{generic parameter 'A' could not be inferred}}
+  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+  // expected-error@-2 2 {{type 'T' does not conform to protocol 'Hashable'}}
+}

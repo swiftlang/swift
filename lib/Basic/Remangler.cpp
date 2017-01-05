@@ -280,7 +280,7 @@ class Remangler {
 
   void mangleAnyNominalType(Node *node);
   void mangleNominalType(Node *node, char TypeOp);
-  void mangleGenericArgs(Node *node);
+  void mangleGenericArgs(Node *node, char &Separator);
 
 #define NODE(ID)                                                        \
   void mangle##ID(Node *node);
@@ -419,8 +419,9 @@ void Remangler::mangleAnyNominalType(Node *node) {
   if (isSpecialized(node)) {
     NodePointer unboundType = getUnspecialized(node);
     TemporaryNodes.push_back(unboundType);
-    mangleGenericArgs(node);
     mangleAnyNominalType(unboundType.get());
+    char Separator = 'y';
+    mangleGenericArgs(node, Separator);
     Buffer << 'G';
     return;
   }
@@ -433,16 +434,15 @@ void Remangler::mangleAnyNominalType(Node *node) {
   }
 }
 
-void Remangler::mangleGenericArgs(Node *node) {
+void Remangler::mangleGenericArgs(Node *node, char &Separator) {
   switch (node->getKind()) {
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class: {
       NodePointer parentOrModule = node->getChild(0);
-      mangleGenericArgs(parentOrModule.get());
-
-      // No generic arguments at this level
-      Buffer << 'y';
+      mangleGenericArgs(parentOrModule.get(), Separator);
+      Buffer << Separator;
+      Separator = '_';
       break;
     }
 
@@ -453,9 +453,10 @@ void Remangler::mangleGenericArgs(Node *node) {
       assert(unboundType->getKind() == Node::Kind::Type);
       NodePointer nominalType = unboundType->getChild(0);
       NodePointer parentOrModule = nominalType->getChild(0);
-      mangleGenericArgs(parentOrModule.get());
-
-      mangleTypeList(node->getChild(1).get());
+      mangleGenericArgs(parentOrModule.get(), Separator);
+      Buffer << Separator;
+      Separator = '_';
+      mangleChildNodes(node->getChild(1).get());
       break;
     }
       
@@ -528,6 +529,16 @@ void Remangler::mangleBoundGenericClass(Node *node) {
 }
 
 void Remangler::mangleBoundGenericEnum(Node *node) {
+  Node *Enum = node->getChild(0).get()->getChild(0).get();
+  assert(Enum->getKind() == Node::Kind::Enum);
+  Node *Mod = Enum->getChild(0).get();
+  Node *Id = Enum->getChild(1).get();
+  if (Mod->getKind() == Node::Kind::Module && Mod->getText() == STDLIB_NAME &&
+      Id->getKind() == Node::Kind::Identifier && Id->getText() == "Optional") {
+    mangleSingleChildNode(node->getChild(1).get());
+    Buffer << "Sg";
+    return;
+  }
   mangleAnyNominalType(node);
 }
 
@@ -849,6 +860,11 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
       }
     }
     mangle(Child.get());
+
+    if (Child->getKind() == Node::Kind::SpecializationPassID &&
+        node->hasIndex()) {
+      Buffer << node->getIndex();
+    }
   }
   if (!returnValMangled)
     Buffer << "_n";
@@ -1338,6 +1354,8 @@ void Remangler::mangleProtocolConformance(Node *node) {
     Ty = Ty->getChild(1).get();
   }
   mangle(Ty);
+  if (node->getNumChildren() == 4)
+    mangleChildNode(node, 3);
   manglePureProtocol(node->getChild(1).get());
   mangleChildNode(node, 2);
   if (GenSig)
@@ -1606,6 +1624,16 @@ void Remangler::mangleFirstElementMarker(Node *node) {
 
 void Remangler::mangleVariadicMarker(Node *node) {
   Buffer << 'd';
+}
+
+void Remangler::mangleOutlinedCopy(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wy";
+}
+
+void Remangler::mangleOutlinedConsume(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "We";
 }
 
 void Remangler::mangleSILBoxTypeWithLayout(Node *node) {

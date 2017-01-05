@@ -42,6 +42,20 @@ SourceLoc ASTNode::getEndLoc() const {
   return getSourceRange().End;
 }
 
+DeclContext *ASTNode::getAsDeclContext() const {
+  if (Expr *E = this->dyn_cast<Expr*>()) {
+    if (isa<AbstractClosureExpr>(E))
+      return static_cast<AbstractClosureExpr*>(E);
+  } else if (is<Stmt*>()) {
+    return nullptr;
+  } else if (Decl *D = this->dyn_cast<Decl*>()) {
+    if (isa<DeclContext>(D))
+      return cast<DeclContext>(D);
+  } else if (getOpaqueValue())
+    llvm_unreachable("unsupported AST node");
+  return nullptr;
+}
+
 void ASTNode::walk(ASTWalker &Walker) {
   if (Expr *E = this->dyn_cast<Expr*>())
     E->walk(Walker);
@@ -49,6 +63,16 @@ void ASTNode::walk(ASTWalker &Walker) {
     S->walk(Walker);
   else if (Decl *D = this->dyn_cast<Decl*>())
     D->walk(Walker);
+  else
+    llvm_unreachable("unsupported AST node");
+}
+void ASTNode::walk(SourceEntityWalker &Walker) {
+  if (Expr *E = this->dyn_cast<Expr*>())
+    Walker.walk(E);
+  else if (Stmt *S = this->dyn_cast<Stmt*>())
+    Walker.walk(S);
+  else if (Decl *D = this->dyn_cast<Decl*>())
+    Walker.walk(D);
   else
     llvm_unreachable("unsupported AST node");
 }

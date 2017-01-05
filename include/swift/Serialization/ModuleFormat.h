@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 298; // Last change: Added {store,begin}_borrow
+const uint16_t VERSION_MINOR = 302; // Last change: SIL box type substitutions
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -77,6 +77,11 @@ using DeclContextIDField = DeclIDField;
 // in the same way.
 using NormalConformanceID = DeclID;
 using NormalConformanceIDField = DeclIDField;
+
+// GenericEnvironmentID must be the same as DeclID because it is stored in the
+// same way.
+using GenericEnvironmentID = DeclID;
+using GenericEnvironmentIDField = DeclIDField;
 
 // ModuleID must be the same as IdentifierID because it is stored the same way.
 using ModuleID = IdentifierID;
@@ -711,8 +716,8 @@ namespace decls_block {
 
   using SILBoxTypeLayout = BCRecordLayout<
     SIL_BOX_TYPE,
-    SILLayoutIDField,    // layout
-    BCArray<TypeIDField> // generic arguments
+    SILLayoutIDField     // layout
+                         // trailing substitutions
   >;
 
   template <unsigned Code>
@@ -751,6 +756,7 @@ namespace decls_block {
     TypeIDField, // underlying type
     TypeIDField, // interface type
     BCFixed<1>,  // implicit flag
+    GenericEnvironmentIDField, // generic environment
     AccessibilityKindField // accessibility
     // Trailed by generic parameters (if any).
   >;
@@ -778,6 +784,7 @@ namespace decls_block {
     IdentifierIDField,      // name
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
+    GenericEnvironmentIDField, // generic environment
     AccessibilityKindField, // accessibility
     BCVBR<4>,               // number of conformances
     BCArray<TypeIDField>    // inherited types
@@ -790,6 +797,7 @@ namespace decls_block {
     IdentifierIDField,      // name
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
+    GenericEnvironmentIDField, // generic environment
     TypeIDField,            // raw type
     AccessibilityKindField, // accessibility
     BCVBR<4>,               // number of conformances
@@ -805,6 +813,7 @@ namespace decls_block {
     BCFixed<1>,        // implicit?
     BCFixed<1>,        // explicitly objc?
     BCFixed<1>,        // requires stored property initial values
+    GenericEnvironmentIDField, // generic environment
     TypeIDField,       // superclass
     AccessibilityKindField, // accessibility
     BCVBR<4>,               // number of conformances
@@ -820,6 +829,7 @@ namespace decls_block {
     BCFixed<1>,             // implicit flag
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
+    GenericEnvironmentIDField, // generic environment
     AccessibilityKindField, // accessibility
     BCVBR<4>,               // number of protocols
     BCArray<DeclIDField>    // protocols and inherited types
@@ -843,6 +853,7 @@ namespace decls_block {
     BCFixed<1>,  // stub implementation?
     BCFixed<1>,  // throws?
     CtorInitializerKindField,  // initializer kind
+    GenericEnvironmentIDField, // generic environment
     TypeIDField, // type (interface)
     DeclIDField, // overridden decl
     AccessibilityKindField, // accessibility
@@ -894,6 +905,7 @@ namespace decls_block {
     BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // throws?
     BCVBR<5>,     // number of parameter patterns
+    GenericEnvironmentIDField, // generic environment
     TypeIDField,  // interface type
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
@@ -984,6 +996,7 @@ namespace decls_block {
     TypeIDField, // base type
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit flag
+    GenericEnvironmentIDField,  // generic environment
     BCVBR<4>,    // # of protocol conformances
     BCArray<TypeIDField> // inherited types
     // Trailed by the generic parameter lists, members record, and then
@@ -995,6 +1008,7 @@ namespace decls_block {
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
+    GenericEnvironmentIDField, // generic environment
     TypeIDField  // interface type
     // Trailed by a pattern for self.
   >;
@@ -1071,15 +1085,13 @@ namespace decls_block {
 
   using GenericEnvironmentLayout = BCRecordLayout<
     GENERIC_ENVIRONMENT,
-    TypeIDField,                 // sugared interface type
-    TypeIDField                  // contextual type
+    BCArray<TypeIDField>         // (sugared interface type, contextual type)
   >;
 
   using SILGenericEnvironmentLayout = BCRecordLayout<
     SIL_GENERIC_ENVIRONMENT,
-    IdentifierIDField,           // generic parameter name
-    TypeIDField,                 // canonical interface type
-    TypeIDField                  // contextual type
+    BCArray<TypeIDField>         // (generic parameter name, sugared interface
+                                 //  type, contextual type) triples
   >;
 
   using GenericRequirementLayout = BCRecordLayout<
@@ -1424,6 +1436,7 @@ namespace index_block {
     LOCAL_DECL_CONTEXT_OFFSETS,
     DECL_CONTEXT_OFFSETS,
     LOCAL_TYPE_DECLS,
+    GENERIC_ENVIRONMENT_OFFSETS,
     NORMAL_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 

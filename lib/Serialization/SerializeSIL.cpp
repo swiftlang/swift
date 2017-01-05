@@ -521,7 +521,8 @@ void SILSerializer::writeConversionLikeInstruction(const SILInstruction *I) {
 
 void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   switch (SI.getKind()) {
-  case ValueKind::SILArgument:
+  case ValueKind::SILPHIArgument:
+  case ValueKind::SILFunctionArgument:
   case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
@@ -1004,6 +1005,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::CondFailInst:
   case ValueKind::RetainValueInst:
   case ValueKind::CopyValueInst:
+  case ValueKind::CopyUnownedValueInst:
   case ValueKind::DestroyValueInst:
   case ValueKind::ReleaseValueInst:
   case ValueKind::AutoreleaseValueInst:

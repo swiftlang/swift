@@ -117,14 +117,14 @@ class ObjCInit {
 // CHECK: sil hidden @_TF12dynamic_self12testObjCInit{{.*}} : $@convention(thin) (@thick ObjCInit.Type) -> ()
 func testObjCInit(meta: ObjCInit.Type) {
 // CHECK: bb0([[THICK_META:%[0-9]+]] : $@thick ObjCInit.Type):
-// CHECK:   [[O:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <ObjCInit>
+// CHECK:   [[O:%[0-9]+]] = alloc_box ${ var ObjCInit }
 // CHECK:   [[PB:%.*]] = project_box [[O]]
 // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[THICK_META]] : $@thick ObjCInit.Type to $@objc_metatype ObjCInit.Type
 // CHECK:   [[OBJ:%[0-9]+]] = alloc_ref_dynamic [objc] [[OBJC_META]] : $@objc_metatype ObjCInit.Type, $ObjCInit
 // CHECK:   [[INIT:%[0-9]+]] = class_method [volatile] [[OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : (ObjCInit.Type) -> () -> ObjCInit , $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   [[RESULT_OBJ:%[0-9]+]] = apply [[INIT]]([[OBJ]]) : $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   store [[RESULT_OBJ]] to [init] [[PB]] : $*ObjCInit
-// CHECK:   destroy_value [[O]] : $<τ_0_0> { var τ_0_0 } <ObjCInit>
+// CHECK:   destroy_value [[O]] : ${ var ObjCInit }
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
   var o = meta.init()
@@ -190,12 +190,12 @@ class Z {
     // Capturing 'self' weak, so we have to pass in a metatype explicitly
     // so that IRGen can recover metadata.
 
-    // CHECK:      [[WEAK_SELF:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <@sil_weak Optional<Z>>
-    // CHECK:      [[FN:%.*]] = function_ref @_TFFC12dynamic_self1Z23testDynamicSelfCapturesFT1xSi_DS0_U1_FT_T_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <@sil_weak Optional<Z>>, @thick Z.Type) -> ()
-    // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF]] : $<τ_0_0> { var τ_0_0 } <@sil_weak Optional<Z>>
+    // CHECK:      [[WEAK_SELF:%.*]] = alloc_box ${ var @sil_weak Optional<Z> }
+    // CHECK:      [[FN:%.*]] = function_ref @_TFFC12dynamic_self1Z23testDynamicSelfCapturesFT1xSi_DS0_U1_FT_T_ : $@convention(thin) (@owned { var @sil_weak Optional<Z> }, @thick Z.Type) -> ()
+    // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF]] : ${ var @sil_weak Optional<Z> }
     // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick @dynamic_self Z.Type
     // CHECK-NEXT: [[STATIC_SELF:%.*]] = upcast [[DYNAMIC_SELF]] : $@thick @dynamic_self Z.Type to $@thick Z.Type
-    // CHECK:      partial_apply [[FN]]([[WEAK_SELF_COPY]], [[STATIC_SELF]]) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <@sil_weak Optional<Z>>, @thick Z.Type) -> ()
+    // CHECK:      partial_apply [[FN]]([[WEAK_SELF_COPY]], [[STATIC_SELF]]) : $@convention(thin) (@owned { var @sil_weak Optional<Z> }, @thick Z.Type) -> ()
     let fn3 = {
       [weak self] in
       _ = self
@@ -205,6 +205,20 @@ class Z {
     return self
   }
 
+}
+
+// Make sure we erase dynamic Self in a metatype instance type when
+// performing SIL type substitution.
+
+func makeInstance<T: FactoryBase>(_ cls: T.Type) -> T {
+    return cls.init()
+}
+
+class FactoryBase {
+    required init() { }
+    func before() -> Self {
+        return makeInstance(type(of: self))
+    }
 }
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {

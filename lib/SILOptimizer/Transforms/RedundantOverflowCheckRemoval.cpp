@@ -651,7 +651,7 @@ public:
     return "Removes overflow checks that are proven to be redundant";
   }
 };
-}
+} // end anonymous namespace
 
 SILTransform *swift::createRedundantOverflowCheckRemoval() {
   return new RedundantOverflowCheckRemovalPass();

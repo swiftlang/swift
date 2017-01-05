@@ -20,7 +20,7 @@ using namespace swift;
 namespace {
 
 class ExternalDefsToDecls : public SILModuleTransform {
-  virtual ~ExternalDefsToDecls() {}
+  ~ExternalDefsToDecls() override {}
 
   void run() override {
     for (auto &F : *getModule()) {

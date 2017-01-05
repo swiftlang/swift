@@ -13,6 +13,7 @@ set_property(GLOBAL PROPERTY JOB_POOL_LINK local_jobs)
 
 # First include general CMake utilities.
 include(SwiftUtils)
+include(CheckSymbolExists)
 
 #
 # User-configurable options that control the inclusion and default build
@@ -327,6 +328,7 @@ set(CMAKE_CXX_ARCHIVE_FINISH "")
 
 include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
+include(CMakePushCheckState)
 include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
@@ -488,6 +490,11 @@ set(SWIFT_HOST_VARIANT_ARCH "${SWIFT_HOST_VARIANT_ARCH_default}" CACHE STRING
 # Enable additional warnings.
 #
 swift_common_cxx_warnings()
+
+# Check if we're build with MSVC or Clang-cl, as these compilers have similar command line arguments.
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
+  set(SWIFT_COMPILER_IS_MSVC_LIKE TRUE)
+endif()
 
 #
 # Configure SDKs.
@@ -799,6 +806,19 @@ find_package(LibXml2)
 if(LIBXML2_FOUND)
   set(SWIFT_HAVE_LIBXML 1)
 endif()
+
+# You need libedit linked in order to check if you have el_wgets.
+cmake_push_check_state()
+list(APPEND CMAKE_REQUIRED_LIBRARIES "edit")
+check_symbol_exists(el_wgets "histedit.h" HAVE_EL_WGETS)
+check_symbol_exists(wcslcat wchar.h HAVE_WCSLCAT)
+# FIXME: UNICODE_LIBEDIT shouldn't need BSD's wcslcat function,
+#        rewrite the usages in terms of wcsncat to get the REPL
+#        building on linux.
+if(HAVE_EL_WGETS AND HAVE_WCSLCAT)
+  set(HAVE_UNICODE_LIBEDIT 1)
+endif()
+cmake_pop_check_state()
 
 if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")

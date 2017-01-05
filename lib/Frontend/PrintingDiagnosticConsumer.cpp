@@ -29,7 +29,7 @@ namespace {
     raw_ostream &Underlying;
   public:
     explicit ColoredStream(raw_ostream &underlying) : Underlying(underlying) {}
-    ~ColoredStream() { flush(); }
+    ~ColoredStream() override { flush(); }
 
     raw_ostream &changeColor(Colors color, bool bold = false,
                              bool bg = false) override {

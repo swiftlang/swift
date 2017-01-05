@@ -22,7 +22,6 @@
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/LazyResolver.h"
@@ -37,7 +36,6 @@
 namespace swift {
   enum class AccessSemantics : unsigned char;
   class ApplyExpr;
-  class ArchetypeBuilder;
   class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
@@ -72,6 +70,7 @@ namespace swift {
   class TypeAliasDecl;
   class Stmt;
   class SubscriptDecl;
+  class UnboundGenericType;
   class ValueDecl;
   class VarDecl;
 
@@ -216,7 +215,7 @@ bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
 class alignas(1 << DeclAlignInBits) Decl {
   class DeclBitfields {
     friend class Decl;
-    unsigned Kind : 8;
+    unsigned Kind : 6;
 
     /// \brief Whether this declaration is invalid.
     unsigned Invalid : 1;
@@ -234,10 +233,10 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// FIXME: This is ugly.
     unsigned EarlyAttrValidation : 1;
     
-    /// \brief Whether or not this declaration is currently being type-checked.
-    unsigned BeingTypeChecked : 1;
+    /// \brief Whether this declaration is currently being validated.
+    unsigned BeingValidated : 1;
   };
-  enum { NumDeclBits = 13 };
+  enum { NumDeclBits = 11 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
   
   class PatternBindingDeclBitfields {
@@ -413,9 +412,10 @@ class alignas(1 << DeclAlignInBits) Decl {
     friend class TypeAliasDecl;
     unsigned : NumGenericTypeDeclBits;
 
-    /// Whether the underlying type is an interface type that will be lazily
-    /// resolved to a context type.
-    unsigned HasInterfaceUnderlyingType : 1;
+    /// Whether we have completed validation of the typealias.
+    /// This is necessary because unlike other declarations, a
+    /// typealias will not get an interface type right away.
+    unsigned HasCompletedValidation : 1;
   };
   enum { NumTypeAliasDeclBits = NumGenericTypeDeclBits + 1 };
   static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
@@ -632,7 +632,7 @@ protected:
     DeclBits.Implicit = false;
     DeclBits.FromClang = false;
     DeclBits.EarlyAttrValidation = false;
-    DeclBits.BeingTypeChecked = false;
+    DeclBits.BeingValidated = false;
   }
 
   ClangNode getClangNodeImpl() const {
@@ -778,12 +778,16 @@ public:
     DeclBits.EarlyAttrValidation = validated;
   }
   
-  /// Whether the declaration is currently being validated.
-  bool isBeingTypeChecked();
-  
+  /// Whether the declaration has a valid interface type and
+  /// generic signature.
+  bool isBeingValidated() const {
+    return DeclBits.BeingValidated;
+  }
+
   /// Toggle whether or not the declaration is being validated.
-  void setIsBeingTypeChecked(bool ibt = true) {
-    DeclBits.BeingTypeChecked = ibt;
+  void setIsBeingValidated(bool ibv = true) {
+    assert(DeclBits.BeingValidated != ibv);
+    DeclBits.BeingValidated = ibv;
   }
 
   /// \returns the unparsed comment attached to this declaration.
@@ -1493,28 +1497,10 @@ public:
   }
 
   /// Retrieve the generic signature for this type.
-  GenericSignature *getGenericSignature() const {
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv->getGenericSignature();
-
-    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return genericSig;
-
-    return nullptr;
-  }
+  GenericSignature *getGenericSignature() const;
 
   /// Retrieve the generic context for this type.
-  GenericEnvironment *getGenericEnvironment() const {
-    // Fast case: we already have a generic environment.
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv;
-
-    // If we only have a generic signature, build the generic environment.
-    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return getLazyGenericEnvironmentSlow();
-
-    return nullptr;
-  }
+  GenericEnvironment *getGenericEnvironment() const;
 
   /// Set a lazy generic environment.
   void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
@@ -1522,15 +1508,7 @@ public:
                                  uint64_t genericEnvData);
 
   /// Set the generic context of this extension.
-  void setGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert((GenericSigOrEnv.isNull() ||
-            getGenericSignature()->getCanonicalSignature() ==
-              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-           "set a generic environment with a different generic signature");
-    this->GenericSigOrEnv = genericEnv;
-    if (genericEnv)
-      genericEnv->setOwningDeclContext(this);
-  }
+  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   /// Retrieve the type being extended.
   Type getExtendedType() const { return ExtendedType.getType(); }
@@ -1548,7 +1526,7 @@ public:
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
-  /// Whether we already validated this extension.
+  /// Whether we started validating this extension.
   bool validated() const {
     return ExtensionDeclBits.Validated;
   }
@@ -1556,6 +1534,11 @@ public:
   /// Set whether we have validated this extension.
   void setValidated(bool validated = true) {
     ExtensionDeclBits.Validated = validated;
+  }
+
+  /// Whether we have fully checked the extension.
+  bool hasValidSignature() const {
+    return validated() && !isBeingValidated();
   }
 
   /// Whether we already type-checked the inheritance clause.
@@ -1929,8 +1912,7 @@ struct IfConfigDeclClause {
 
   ArrayRef<Decl*> Members;
 
-  /// True if this is the active clause of the #if block.  Since this is
-  /// evaluated at parse time, this is always known.
+  /// True if this is the active clause of the #if block.
   bool isActive;
 
   IfConfigDeclClause(SourceLoc Loc, Expr *Cond, ArrayRef<Decl*> Members,
@@ -1950,13 +1932,13 @@ class IfConfigDecl : public Decl {
   ArrayRef<IfConfigDeclClause> Clauses;
   SourceLoc EndLoc;
   bool HadMissingEnd;
+  bool HasBeenResolved = false;
 public:
   
   IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigDeclClause> Clauses,
                SourceLoc EndLoc, bool HadMissingEnd)
-    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc),
-      HadMissingEnd(HadMissingEnd) {
-  }
+    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses),
+      EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
 
   ArrayRef<IfConfigDeclClause> getClauses() const { return Clauses; }
 
@@ -1966,11 +1948,15 @@ public:
       if (Clause.isActive) return &Clause;
     return nullptr;
   }
+
   const ArrayRef<Decl*> getActiveMembers() const {
     if (auto *Clause = getActiveClause())
       return Clause->Members;
     return {};
   }
+
+  bool isResolved() const { return HasBeenResolved; }
+  void setResolved() { HasBeenResolved = true; }
   
   SourceLoc getEndLoc() const { return EndLoc; }
   SourceLoc getLoc() const { return Clauses[0].Loc; }
@@ -2134,7 +2120,11 @@ public:
 
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
-  
+
+  bool hasValidSignature() const {
+    return hasInterfaceType() && !isBeingValidated();
+  }
+
   /// isSettable - Determine whether references to this decl may appear
   /// on the left-hand side of an assignment or as the operand of a
   /// `&` or 'inout' operator.
@@ -2280,11 +2270,6 @@ class GenericTypeDecl : public TypeDecl, public DeclContext {
   mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
     GenericSigOrEnv;
 
-  /// \brief Whether or not the generic signature of the type declaration is
-  /// currently being validated.
-  // TODO: Merge into GenericSig bits.
-  unsigned ValidatingGenericSignature = false;
-
   /// Lazily populate the generic environment.
   GenericEnvironment *getLazyGenericEnvironmentSlow() const;
 
@@ -2317,36 +2302,10 @@ public:
   }
 
   /// Retrieve the generic signature for this type.
-  GenericSignature *getGenericSignature() const {
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv->getGenericSignature();
-
-    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return genericSig;
-
-    return nullptr;
-  }
+  GenericSignature *getGenericSignature() const;
 
   /// Retrieve the generic context for this type.
-  GenericEnvironment *getGenericEnvironment() const {
-    // Fast case: we already have a generic environment.
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv;
-
-    // If we only have a generic signature, build the generic environment.
-    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return getLazyGenericEnvironmentSlow();
-
-    return nullptr;
-  }
-
-  void setIsValidatingGenericSignature(bool validating=true) {
-    ValidatingGenericSignature = validating;
-  }
-  
-  bool isValidatingGenericSignature() const {
-    return ValidatingGenericSignature;
-  }
+  GenericEnvironment *getGenericEnvironment() const;
 
   /// Set a lazy generic environment.
   void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
@@ -2354,16 +2313,7 @@ public:
                                  uint64_t genericEnvData);
 
   /// Set the generic context of this function.
-  void setGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert((GenericSigOrEnv.isNull() ||
-            getGenericSignature()->getCanonicalSignature() ==
-              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-           "set a generic environment with a different generic signature");
-    this->GenericSigOrEnv = genericEnv;
-
-    if (genericEnv)
-      genericEnv->setOwningDeclContext(this);
-  }
+  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   // Resolve ambiguity due to multiple base classes.
   using TypeDecl::getASTContext;
@@ -2388,60 +2338,38 @@ public:
 /// TypeAliasDecl's always have 'MetatypeType' type.
 ///
 class TypeAliasDecl : public GenericTypeDecl {
-  /// The type that represents this (sugared) name alias.
-  mutable NameAliasType *AliasTy;
-
   SourceLoc TypeAliasLoc;           // The location of the 'typealias' keyword
-  mutable TypeLoc UnderlyingTy;
-
-  Type computeUnderlyingContextType() const;
+  TypeLoc UnderlyingTy;
 
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                SourceLoc NameLoc, TypeLoc UnderlyingTy,
-                GenericParamList *GenericParams, DeclContext *DC);
+                SourceLoc NameLoc, GenericParamList *GenericParams,
+                DeclContext *DC);
 
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
   SourceRange getSourceRange() const;
 
-  /// getUnderlyingType - Returns the underlying type, which is
-  /// assumed to have been set.
-  Type getUnderlyingType() const {
-    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
-      return computeUnderlyingContextType();
-
-    assert(!UnderlyingTy.getType().isNull() &&
-           "getting invalid underlying type");
-    return UnderlyingTy.getType();
-  }
-
-  /// computeType - Compute the type (and declared type) of this type alias;
-  /// can only be called after the alias type has been resolved.
-  void computeType();
-
-  /// \brief Determine whether this type alias has an underlying type.
-  bool hasUnderlyingType() const {
-    return !UnderlyingTy.getType().isNull();
-  }
-
   TypeLoc &getUnderlyingTypeLoc() {
-    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
-      (void)computeUnderlyingContextType();
-
     return UnderlyingTy;
   }
   const TypeLoc &getUnderlyingTypeLoc() const {
-    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
-      (void)computeUnderlyingContextType();
-
     return UnderlyingTy;
   }
 
-  /// Set the underlying type after deserialization.
-  void setDeserializedUnderlyingType(Type type);
+  /// Set the underlying type, for deserialization and synthesized
+  /// aliases.
+  void setUnderlyingType(Type type);
 
-  /// getAliasType - Return the sugared version of this decl as a Type.
-  NameAliasType *getAliasType() const { return AliasTy; }
+  bool hasCompletedValidation() const {
+    return TypeAliasDeclBits.HasCompletedValidation;
+  }
+
+  void setHasCompletedValidation() {
+    TypeAliasDeclBits.HasCompletedValidation = 1;
+  }
+
+  /// For generic typealiases, return the unbound generic type.
+  UnboundGenericType *getUnboundGenericType() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TypeAlias;
@@ -4068,7 +3996,7 @@ public:
     return OverriddenDecl;
   }
   void setOverriddenDecl(AbstractStorageDecl *over) {
-    // FIXME: Hack due to broken class circulatity checking.
+    // FIXME: Hack due to broken class circularity checking.
     if (over == this) return;
     OverriddenDecl = over;
     over->setIsOverridden();
@@ -4161,10 +4089,7 @@ protected:
   /// This is the type specified, including location information.
   TypeLoc typeLoc;
 
-  mutable Type typeInContext;
-
-  /// Compute the type in context from the interface type.
-  Type computeTypeInContextSlow() const;
+  Type typeInContext;
 
 public:
   VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
@@ -4187,15 +4112,13 @@ public:
   bool hasType() const {
     // We have a type if either the type has been computed already or if
     // this is a deserialized declaration with an interface type.
-    return typeInContext ||
-      (hasInterfaceType() && !getDeclContext()->getParentSourceFile());
+    return !typeInContext.isNull();
   }
 
   /// Get the type of the variable within its context. If the context is generic,
   /// this will use archetypes.
   Type getType() const {
-    if (!typeInContext)
-      return computeTypeInContextSlow();
+    assert(!typeInContext.isNull() && "no contextual type set yet");
     return typeInContext;
   }
 
@@ -4411,7 +4334,7 @@ public:
   /// type wrapping it.
   Type getVarargBaseTy() const {
     assert(isVariadic());
-    return getVarargBaseTy(getType());
+    return getVarargBaseTy(getInterfaceType());
   }
   
   SourceRange getSourceRange() const;
@@ -4664,28 +4587,10 @@ public:
   bool isTransparent() const;
 
   /// Retrieve the generic signature for this function.
-  GenericSignature *getGenericSignature() const {
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv->getGenericSignature();
-
-    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return genericSig;
-
-    return nullptr;
-  }
+  GenericSignature *getGenericSignature() const;
 
   /// Retrieve the generic context for this function.
-  GenericEnvironment *getGenericEnvironment() const {
-    // Fast case: we already have a generic environment.
-    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-      return genericEnv;
-
-    // If we only have a generic signature, build the generic environment.
-    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-      return getLazyGenericEnvironmentSlow();
-
-    return nullptr;
-  }
+  GenericEnvironment *getGenericEnvironment() const;
 
   /// Set a lazy generic environment.
   void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
@@ -4693,16 +4598,7 @@ public:
                                  uint64_t genericEnvData);
 
   /// Set the generic context of this function.
-  void setGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert((GenericSigOrEnv.isNull() ||
-            getGenericSignature()->getCanonicalSignature() ==
-              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-           "set a generic environment with a different generic signature");
-    this->GenericSigOrEnv = genericEnv;
-
-    if (genericEnv)
-      genericEnv->setOwningDeclContext(this);
-  }
+  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   // Expose our import as member status
   bool isImportAsMember() const { return IAMStatus.isImportAsMember(); }
@@ -5174,13 +5070,6 @@ public:
     FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
   }
 
-  /// Determine whether this method has an archetype \c Self return
-  /// type. This is when a method defined in a protocol extension
-  /// returns Self. In this case, the type is not quite as constrained
-  /// as a dynamic Self, because it is bound to the conforming type,
-  /// not the dynamic type of the value.
-  bool hasArchetypeSelf() const;
-
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);
   }
@@ -5190,7 +5079,7 @@ public:
     return OverriddenOrBehaviorParamDecl.dyn_cast<FuncDecl *>();
   }
   void setOverriddenDecl(FuncDecl *over) {
-    // FIXME: Hack due to broken class circulatity checking.
+    // FIXME: Hack due to broken class circularity checking.
     if (over == this) return;
 
     // A function cannot be an override if it is also a derived global decl
@@ -5620,7 +5509,7 @@ public:
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(ConstructorDecl *over) {
-    // FIXME: Hack due to broken class circulatity checking.
+    // FIXME: Hack due to broken class circularity checking.
     if (over == this) return;
 
     OverriddenDecl = over;

@@ -21,8 +21,7 @@ struct Z : Fooable {
     var a : AssocType // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} {{9-10=_}}
   }
 
-  // FIXME: We should be able to find this.
-  func blarg() -> AssocType {} // expected-error{{use of undeclared type 'AssocType'}}
+  func blarg() -> AssocType {}
 
   func wonka() -> Z.AssocType {}
 }

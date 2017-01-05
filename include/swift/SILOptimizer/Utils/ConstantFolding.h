@@ -47,6 +47,6 @@ APInt constantFoldDiv(APInt lhs, APInt rhs, bool &Overflow, BuiltinValueKind ID)
   /// The \p ID must be the ID of a trunc/sext/zext builtin.
 APInt constantFoldCast(APInt val, const BuiltinInfo &BI);
 
-} // End namespace swift.
+} // end namespace swift
 
 #endif

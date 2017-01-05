@@ -109,6 +109,7 @@ namespace swift {
       WordIterator(StringRef string, unsigned position)
         : String(string), Position(position) 
       {
+        assert(!string.empty());
         NextPositionValid = false;
         PrevPositionValid = false;
       }

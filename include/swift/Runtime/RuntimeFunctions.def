@@ -866,7 +866,7 @@ FUNCTION(GetObjectType, swift_getObjectType, DefaultCC,
 // Metadata *swift_getDynamicType(opaque_t *obj, Metadata *self);
 FUNCTION(GetDynamicType, swift_getDynamicType, DefaultCC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(OpaquePtrTy, TypeMetadataPtrTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int1Ty),
          ATTRS(NoUnwind, ReadOnly))
 
 // void *swift_dynamicCastClass(void*, void*);

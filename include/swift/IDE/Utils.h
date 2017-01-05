@@ -14,6 +14,7 @@
 #define SWIFT_IDE_UTILS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/SourceEntityWalker.h"
@@ -59,7 +60,7 @@ struct SourceCompleteResult {
   // prefix will contain the leading space characters of the line that
   // contained the '{', '(' or '[' character that was unbalanced.
   std::string IndentPrefix;
-  // Returns the indent level as an indentation count (number of indentations 
+  // Returns the indent level as an indentation count (number of indentations
   // to apply). Clients can translate this into the standard indentation that
   // is being used by the IDE (3 spaces? 1 tab?) and should use the indent
   // prefix string followed by the correct indentation.
@@ -181,7 +182,8 @@ private:
   bool walkToStmtPre(Stmt *S) override;
   bool walkToStmtPost(Stmt *S) override;
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T) override;
+                          TypeDecl *CtorTyRef, Type T,
+                          SemaReferenceKind Kind) override;
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
                         ValueDecl *D) override;
   bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override;
@@ -205,13 +207,43 @@ enum class RangeKind : int8_t{
   MultiStatement,
 };
 
+struct DeclaredDecl {
+  ValueDecl *VD;
+  bool ReferedAfterRange;
+  DeclaredDecl(ValueDecl* VD) : VD(VD), ReferedAfterRange(false) {}
+  DeclaredDecl(): DeclaredDecl(nullptr) {}
+  bool operator==(const DeclaredDecl& other);
+};
+
+struct ReferencedDecl {
+  ValueDecl *VD;
+  Type Ty;
+  ReferencedDecl(ValueDecl* VD, Type Ty) : VD(VD), Ty(Ty) {}
+  ReferencedDecl() : ReferencedDecl(nullptr, Type()) {}
+  bool operator==(const ReferencedDecl& other);
+};
+
 struct ResolvedRangeInfo {
   RangeKind Kind;
   Type Ty;
   StringRef Content;
-  ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content): Kind(Kind),
-    Ty(Ty), Content(Content) {}
-  ResolvedRangeInfo(): ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef()) {}
+
+  // The topmost ast nodes contained in the given range.
+  ArrayRef<ASTNode> ContainedNodes;
+  ArrayRef<DeclaredDecl> DeclaredDecls;
+  ArrayRef<ReferencedDecl> ReferencedDecls;
+  DeclContext* RangeContext;
+  ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content,
+                    DeclContext* RangeContext,
+                    ArrayRef<ASTNode> ContainedNodes,
+                    ArrayRef<DeclaredDecl> DeclaredDecls,
+                    ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
+                      Ty(Ty), Content(Content), ContainedNodes(ContainedNodes),
+                      DeclaredDecls(DeclaredDecls),
+                      ReferencedDecls(ReferencedDecls),
+                      RangeContext(RangeContext) {}
+  ResolvedRangeInfo() :
+  ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef(), nullptr, {}, {}, {}) {}
   void print(llvm::raw_ostream &OS);
 };
 
@@ -224,6 +256,9 @@ class RangeResolver : public SourceEntityWalker {
   bool walkToStmtPost(Stmt *S) override;
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
   bool walkToDeclPost(Decl *D) override;
+  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                          TypeDecl *CtorTyRef, Type T,
+                          SemaReferenceKind Kind) override;
 public:
   RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);
   RangeResolver(SourceFile &File, unsigned Offset, unsigned Length);

@@ -794,7 +794,7 @@ namespace {
     
     StringRef getName() override { return "NoReturnFolding"; }
   };
-}
+} // end anonymous namespace
 
 SILTransform *swift::createNoReturnFolding() {
   return new NoReturnFolding();
@@ -810,7 +810,7 @@ namespace {
 
     StringRef getName() override { return "Diagnose Unreachable"; }
   };
-}
+} // end anonymous namespace
 
 SILTransform *swift::createDiagnoseUnreachable() {
   return new DiagnoseUnreachable();

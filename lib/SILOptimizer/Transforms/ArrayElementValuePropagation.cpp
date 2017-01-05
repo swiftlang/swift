@@ -84,7 +84,7 @@ public:
     return ArrayAllocation(Inst, Replacements).findValueReplacements();
   }
 };
-}
+} // end anonymous namespace
 
 
 /// Map the indices of array element initialization stores to their values.
@@ -286,7 +286,7 @@ public:
     }
   }
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 SILTransform *swift::createArrayElementPropagation() {
   return new ArrayElementPropagation();

@@ -55,7 +55,7 @@ swift::initializeTypeMetadataRecordLookup() {
 
 // This is called from Errors.cpp when dumping a stack trace entry.
 // It could be implemented by parsing the ELF information in the
-// executable. For now it returns 0 for error (cant lookup address).
+// executable. For now it returns 0 for error (can't lookup address).
 int
 swift::lookupSymbol(const void *address, SymbolInfo *info) {
   return 0;

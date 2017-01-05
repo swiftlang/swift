@@ -417,7 +417,7 @@ bool isClass(Demangle::NodePointer Node) {
       return false;
   }
 }
-}
+} // end anonymous namespace
 
 bool NominalTypeTrait::isStruct() const {
   auto Demangled = Demangle::demangleTypeAsNode(MangledName);

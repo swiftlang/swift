@@ -76,10 +76,10 @@ public:
     return (isFixedSize(expansion) && StorageSize.isZero());
   }
 
-  ContainedAddress allocateStack(IRGenFunction &IGF, SILType T,
-                                 const llvm::Twine &name) const override;
-  void deallocateStack(IRGenFunction &IGF, Address addr, SILType T) const override;
-  void destroyStack(IRGenFunction &IGF, Address addr, SILType T) const override;
+  StackAddress allocateStack(IRGenFunction &IGF, SILType T, bool isEntryBlock,
+                             const llvm::Twine &name) const override;
+  void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
+  void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
 
   // We can give these reasonable default implementations.
 

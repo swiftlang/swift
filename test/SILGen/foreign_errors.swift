@@ -172,7 +172,7 @@ class VeryErrorProne : ErrorProne {
 
 // CHECK-LABEL:    sil hidden @_TFC14foreign_errors14VeryErrorPronec{{.*}}
 // CHECK:    bb0([[ARG1:%.*]] : $Optional<AnyObject>, [[ARG2:%.*]] : $VeryErrorProne):
-// CHECK:      [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <VeryErrorProne>
+// CHECK:      [[BOX:%.*]] = alloc_box ${ var VeryErrorProne }
 // CHECK:      [[PB:%.*]] = project_box [[BOX]]
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
 // CHECK:      store [[ARG2]] to [init] [[MARKED_BOX]]

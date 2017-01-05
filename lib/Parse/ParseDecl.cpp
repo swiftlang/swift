@@ -170,7 +170,7 @@ namespace {
       P.markWasHandled(D);
     }
   };
-}
+} // end anonymous namespace
 
 /// \brief Main entrypoint for the parser.
 ///
@@ -242,9 +242,10 @@ bool Parser::parseTopLevel() {
   // newly parsed stuff).
   bool FoundTopLevelCodeToExecute = false;
   if (allowTopLevelCode()) {
-    for (auto V : Items)
+    for (auto V : Items) {
       if (isa<TopLevelCodeDecl>(V.get<Decl*>()))
         FoundTopLevelCodeToExecute = true;
+    }
   }
 
   // Add newly parsed decls to the module.
@@ -606,8 +607,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     
     StringRef alignmentText = Tok.getText();
     unsigned alignmentValue;
-    if (alignmentText.getAsInteger(0, alignmentValue))
-      llvm_unreachable("not valid integer literal token?!");
+    if (alignmentText.getAsInteger(0, alignmentValue)) {
+      diagnose(Loc, diag::alignment_must_be_positive_integer);
+      return false;
+    }
     
     consumeToken(tok::integer_literal);
     
@@ -773,7 +776,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                        AvailableAttr(AtLoc, AttrRange,
                                      Platform,
                                      /*Message=*/StringRef(),
-                                     /*Renamed=*/StringRef(),
+                                     /*Rename=*/StringRef(),
                                      /*Introduced=*/Version,
                                      /*Deprecated=*/clang::VersionTuple(),
                                      /*Obsoleted=*/clang::VersionTuple(),
@@ -1847,9 +1850,8 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   if (!CurLocalContext || !D->getDeclContext()->isLocalContext())
     return;
 
-  if (auto TD = dyn_cast<TypeDecl>(D))
-    if (!getScopeInfo().isInactiveConfigBlock())
-      SF.LocalTypeDecls.push_back(TD);
+  if (getScopeInfo().isStaticallyInactiveConfigBlock())
+    return;
 
   Identifier name = D->getName();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
@@ -1899,8 +1901,10 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       // The IfConfigDecl is ahead of its members in source order.
       Handler(ICD);
       // Copy the active members into the entries list.
-      for (auto activeMember : ICD->getActiveMembers()) {
-        Handler(activeMember);
+      if (ICD->isResolved()) {
+        for (auto activeMember : ICD->getActiveMembers()) {
+          Handler(activeMember);
+        }
       }
     }
     return IfConfigResult;
@@ -2215,15 +2219,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     break;
   }
 
-  if (auto SF = CurDeclContext->getParentSourceFile()) {
-    if (!getScopeInfo().isInactiveConfigBlock()) {
-      for (auto Attr : Attributes) {
-        if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
-          SF->AttrsRequiringFoundation.insert({Attr->getKind(), Attr});
-      }
-    }
-  }
-
   if (FoundCCTokenInAttr) {
     if (CodeCompletion) {
       CodeCompletion->completeDeclAttrKeyword(DeclResult.getPtrOrNull(),
@@ -2295,7 +2290,11 @@ void Parser::parseDeclDelayed() {
   Scope S(this, DelayedState->takeScope());
   ContextChange CC(*this, DelayedState->ParentContext);
 
-  parseDecl(ParseDeclOptions(DelayedState->Flags), [](Decl *D) {});
+  parseDecl(ParseDeclOptions(DelayedState->Flags), [&](Decl *D) {
+    SmallVector<Decl *, 2> scratch;
+    performDelayedConditionResolution(D, SF, scratch);
+    assert(scratch.empty());
+  });
 }
 
 /// \brief Parse an 'import' declaration, doing no token skipping on error.
@@ -2813,24 +2812,22 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::IfConfig);
 
-  bool foundActive = false;
   SmallVector<IfConfigDeclClause, 4> Clauses;
 
-  ConditionalCompilationExprState ConfigState;
+  bool canStaticallyFindActive = true;
+  bool foundActiveClause = false;
   while (1) {
     bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
     
-    if (isElse) {
-      ConfigState.setConditionActive(!foundActive);
-    } else {
+    if (!isElse) {
       if (Tok.isAtStartOfLine()) {
         diagnose(ClauseLoc, diag::expected_conditional_compilation_expression,
                  !Clauses.empty());
       }
       
-      // Evaluate the condition.
+      // Parse the condition.
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                     /*isBasic*/true,
                                                     /*isForDirective*/true);
@@ -2838,12 +2835,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
         return makeParserError();
       
       Condition = Result.get();
-
-      // Evaluate the condition, to validate it.
-      ConfigState = evaluateConditionalCompilationExpr(Condition);
     }
-
-    foundActive |= ConfigState.isConditionActive();
 
     if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
       diagnose(Tok.getLoc(),
@@ -2851,31 +2843,45 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     }
 
     Optional<Scope> scope;
-    if (!ConfigState.isConditionActive())
-      scope.emplace(this, getScopeInfo().getCurrentScope()->getKind(),
-                    /*inactiveConfigBlock=*/true);
+    scope.emplace(this, getScopeInfo().getCurrentScope()->getKind());
     
     SmallVector<Decl*, 8> Decls;
-    if (ConfigState.shouldParse()) {
-      ParserStatus Status;
-      while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
-             Tok.isNot(tok::pound_elseif)) {
-          Status = parseDecl(Flags, [&](Decl *D) {Decls.push_back(D);});
-          if (Status.isError()) {
-            diagnose(Tok, diag::expected_close_to_if_directive);
-            skipUntilConditionalBlockClose();
-            break;
-          }
-        }
-      } else {
+    auto condValue = classifyConditionalCompilationExpr(Condition, Context,
+                                                        Diags);
+
+    // If we see a block conditionalizing compilation on language or
+    // compiler version we must take care not to emit diagnostics.
+    if (!condValue.getValueOr(true)
+        || (isElse && canStaticallyFindActive && foundActiveClause)) {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();
       DT.abort();
+    } else {
+      if (!(isElse || condValue.hasValue())) {
+        canStaticallyFindActive = false;
+      } else if (condValue.getValueOr(false)) {
+        foundActiveClause = true;
+      }
+      ParserStatus Status;
+      while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
+             Tok.isNot(tok::pound_elseif)) {
+        Status = parseDecl(Flags, [&](Decl *D) { Decls.push_back(D); });
+        if (Status.isError()) {
+          diagnose(Tok, diag::expected_close_to_if_directive);
+          skipUntilConditionalBlockClose();
+          break;
+        }
+      }
+    }
+
+    // If we can statically determine the condition of a '#else' clause, do so.
+    if (canStaticallyFindActive && isElse) {
+      condValue.emplace(!foundActiveClause);
     }
 
     Clauses.push_back(IfConfigDeclClause(ClauseLoc, Condition,
                                          Context.AllocateCopy(Decls),
-                                         ConfigState.isConditionActive()));
+                                         condValue.getValueOr(false)));
 
     if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
       break;
@@ -2890,6 +2896,11 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
                                                  Context.AllocateCopy(Clauses),
                                                  EndLoc, HadMissingEnd);
+  // If we were able to resolve this condition statically, mark it as such.
+  if (canStaticallyFindActive) {
+    ICD->setResolved();
+  }
+
   return makeParserResult(ICD);
 }
 
@@ -2976,8 +2987,8 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
-                                          UnderlyingTy.getPtrOrNull(),
                                           genericParams, CurDeclContext);
+  TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
   TAD->getAttrs() = Attributes;
 
   // Exit the scope introduced for the generic parameters.
@@ -3131,61 +3142,66 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   // owner or pinned owner.
   } else if (Kind == AccessorKind::IsAddressor ||
              Kind == AccessorKind::IsMutableAddressor) {
-    // Construct "Unsafe{,Mutable}Pointer<T>".
-    
-    TypeRepr *args[] = { ElementTy.clone(P->Context).getTypeRepr() };
 
-    // FIXME: the fact that this could resolve in the local scope is dumb.
-    bool isMutable = (Kind == AccessorKind::IsMutableAddressor);
-    Identifier name = P->Context.getIdentifier(
-                    isMutable ? "UnsafeMutablePointer" : "UnsafePointer");
+    // If we don't have a declared type, we will diagnose later,
+    // so skip this to avoid crashing.
+    if (ElementTy.getTypeRepr()) {
+      // Construct "Unsafe{,Mutable}Pointer<T>".
+      
+      TypeRepr *args[] = { ElementTy.clone(P->Context).getTypeRepr() };
 
-    TypeRepr *resultType =
-      new (P->Context) GenericIdentTypeRepr(SourceLoc(), name,
-                                            P->Context.AllocateCopy(args),
-                                            SourceRange());
+      // FIXME: the fact that this could resolve in the local scope is dumb.
+      bool isMutable = (Kind == AccessorKind::IsMutableAddressor);
+      Identifier name = P->Context.getIdentifier(
+                      isMutable ? "UnsafeMutablePointer" : "UnsafePointer");
 
-    auto makeKnownType = [&](Type type) -> TypeRepr* {
-      return new (P->Context) FixedTypeRepr(type, SourceLoc());
-    };
-    auto makePairType = [&](TypeRepr *fst, TypeRepr *snd) -> TypeRepr* {
-      return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange());
-    };
+      TypeRepr *resultType =
+        new (P->Context) GenericIdentTypeRepr(SourceLoc(), name,
+                                              P->Context.AllocateCopy(args),
+                                              SourceRange());
 
-    switch (addressorKind) {
-    case AddressorKind::NotAddressor:
-      llvm_unreachable("not an addressor!");
+      auto makeKnownType = [&](Type type) -> TypeRepr* {
+        return new (P->Context) FixedTypeRepr(type, SourceLoc());
+      };
+      auto makePairType = [&](TypeRepr *fst, TypeRepr *snd) -> TypeRepr* {
+        return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange());
+      };
 
-    // For unsafe addressors, that's all we've got.
-    case AddressorKind::Unsafe:
-      break;
+      switch (addressorKind) {
+      case AddressorKind::NotAddressor:
+        llvm_unreachable("not an addressor!");
 
-    // For non-native owning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, Builtin.UnknownObject)
-    case AddressorKind::Owning:
-      resultType = makePairType(resultType,
-                                makeKnownType(P->Context.TheUnknownObjectType));
-      break;
+      // For unsafe addressors, that's all we've got.
+      case AddressorKind::Unsafe:
+        break;
 
-    // For native owning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
-    case AddressorKind::NativeOwning:
-      resultType = makePairType(resultType,
-                                makeKnownType(P->Context.TheNativeObjectType));
-      break;
+      // For non-native owning addressors, the return type is actually
+      //   (Unsafe{,Mutable}Pointer<T>, Builtin.UnknownObject)
+      case AddressorKind::Owning:
+        resultType = makePairType(resultType,
+                                  makeKnownType(P->Context.TheUnknownObjectType));
+        break;
 
-    // For native pinning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
-    case AddressorKind::NativePinning: {
-      auto optNativePtr = new (P->Context) OptionalTypeRepr(
-          makeKnownType(P->Context.TheNativeObjectType),
-          SourceLoc());
-      resultType = makePairType(resultType, optNativePtr);
-      break;
+      // For native owning addressors, the return type is actually
+      //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
+      case AddressorKind::NativeOwning:
+        resultType = makePairType(resultType,
+                                  makeKnownType(P->Context.TheNativeObjectType));
+        break;
+
+      // For native pinning addressors, the return type is actually
+      //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
+      case AddressorKind::NativePinning: {
+        auto optNativePtr = new (P->Context) OptionalTypeRepr(
+            makeKnownType(P->Context.TheNativeObjectType),
+            SourceLoc());
+        resultType = makePairType(resultType, optNativePtr);
+        break;
+      }
+      }
+
+      ReturnType = resultType;
     }
-    }
-
-    ReturnType = resultType;
 
   // Everything else returns ().
   } else {

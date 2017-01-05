@@ -159,7 +159,7 @@ namespace {
                                           abstraction, origTargetTL, ctx);
         } else {
           SILValue argument =
-              trueBB->createArgument(origTargetTL.getLoweredType());
+              trueBB->createPHIArgument(origTargetTL.getLoweredType());
           result = finishFromResultScalar(hasAbstraction, argument, consumption,
                                           abstraction, origTargetTL, ctx);
         }
@@ -256,7 +256,7 @@ namespace {
       return CastStrategy::Address;
     }
   };
-}
+} // end anonymous namespace
 
 void SILGenFunction::emitCheckedCastBranch(SILLocation loc, Expr *source,
                                            Type targetType,
@@ -357,20 +357,18 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
   }
   
   std::unique_ptr<TemporaryInitialization> init;
-  SGFContext ctx;
   if (requiresAddress) {
     init = SGF.emitTemporary(loc, srcAbstractTL);
-    
+
+    if (hasAbstraction)
+      src = SGF.emitSubstToOrigValue(loc, src, abstraction, sourceType);
+
     // Okay, if all we need to do is drop the value in an address,
     // this is easy.
-    if (!hasAbstraction) {
-      SGF.B.emitStoreValueOperation(loc, src.forward(SGF), init->getAddress(),
-                                    StoreOwnershipQualifier::Init);
-      init->finishInitialization(SGF);
-      return init->getManagedAddress();
-    }
-    
-    ctx = SGFContext(init.get());
+    SGF.B.emitStoreValueOperation(loc, src.forward(SGF), init->getAddress(),
+                                  StoreOwnershipQualifier::Init);
+    init->finishInitialization(SGF);
+    return init->getManagedAddress();
   }
   
   assert(hasAbstraction);
@@ -499,7 +497,7 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
   if (resultObjectTemp) {
     result = SGF.manageBufferForExprResult(resultBuffer, resultTL, C);
   } else {
-    auto argument = contBB->createArgument(resultTL.getLoweredType());
+    auto argument = contBB->createPHIArgument(resultTL.getLoweredType());
     result = SGF.emitManagedRValueWithCleanup(argument, resultTL);
   }
 
@@ -548,7 +546,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
     });
 
   auto contBB = scope.exit();
-  auto isa = contBB->createArgument(i1Ty);
+  auto isa = contBB->createPHIArgument(i1Ty);
   return isa;
 }
 

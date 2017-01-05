@@ -319,7 +319,7 @@ public:
 
   ArrayRef<IndexTrieNode*> getChildren() const { return Children; }
 };
-}
+} // end anonymous namespace
 
 namespace {
 /// Determine if an object is dead. Compute its original lifetime. Find the
@@ -378,7 +378,7 @@ private:
   template<typename Visitor>
   void visitStoreLocations(Visitor visitor, IndexTrieNode *AddressNode);
 };
-}
+} // end anonymous namespace
 
 // Record a store into this object.
 void DeadObjectAnalysis::
