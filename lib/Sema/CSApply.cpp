@@ -722,7 +722,7 @@ namespace {
         // FIXME: Implement missing tuple-to-tuple conversion
         if (result == nullptr) {
           result = new (tc.Context) ErrorExpr(range);
-          result->setType(erasedTy);
+          cs.setType(result, erasedTy);
         }
       }
 
@@ -739,7 +739,7 @@ namespace {
       result = new (tc.Context) OpenExistentialExpr(
                                   record.ExistentialValue,
                                   record.OpaqueValue,
-                                  result);
+                                  result, cs.getType(result));
       cs.cacheType(result);
 
       OpenedExistentials.pop_back();
@@ -821,7 +821,8 @@ namespace {
         cs.setType(ref, refTy);
         ref->setFunctionRefKind(functionRefKind);
         return cs.cacheType(new (context)
-                                DotSyntaxBaseIgnoredExpr(base, dotLoc, ref));
+                                DotSyntaxBaseIgnoredExpr(base, dotLoc, ref,
+                                                         cs.getType(ref)));
       }
 
       // Produce a reference to the type of the container the member
@@ -969,7 +970,8 @@ namespace {
       } else if (!baseIsInstance && member->isInstanceMember()) {
         // Reference to an unbound instance method.
         Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
-                                                              ref);
+                                                              ref,
+                                                              cs.getType(ref));
         cs.cacheType(result);
         closeExistential(result, locator, /*force=*/openedExistential);
         return result;
@@ -4618,7 +4620,8 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
     auto *result =
       cs.cacheType(new (ctx) ErasureExpr(archetypeVal, toType, conformances));
     return cs.cacheType(
-        new (ctx) OpenExistentialExpr(expr, archetypeVal, result));
+        new (ctx) OpenExistentialExpr(expr, archetypeVal, result,
+                                      cs.getType(result)));
   }
 
   // If the type we are trying to coerce is a tuple, let's look through
