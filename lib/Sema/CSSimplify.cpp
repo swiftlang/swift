@@ -1016,38 +1016,40 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   // Input types can be contravariant (or equal).
   auto input1 = func1->getInput();
-  Type underlying1;
-  if (auto *tupleTy = dyn_cast<TupleType>(input1.getPointer())) {
-    if (tupleTy->getNumElements() == 1)
-      underlying1 = tupleTy->getElementType(0);
-    else {
-      SmallVector<TupleTypeElt, 8> typeElts;
-      for (auto elt : tupleTy->getElements())
-        typeElts.push_back(TupleTypeElt(elt.getType()));
-      input1 = TupleType::get(typeElts, getTypeChecker().Context);
-    }
-  }
-  else if (auto *parenTy = dyn_cast<ParenType>(input1.getPointer()))
-    underlying1 = parenTy->getUnderlyingType();
-
   auto input2 = func2->getInput();
-  Type underlying2;
-  if (auto *tupleTy = dyn_cast<TupleType>(input2.getPointer())) {
-    if (tupleTy->getNumElements() == 1)
-      underlying2 = tupleTy->getElementType(0);
-    else {
-      SmallVector<TupleTypeElt, 8> typeElts;
-      for (auto elt : tupleTy->getElements())
-        typeElts.push_back(TupleTypeElt(elt.getType()));
-      input2 = TupleType::get(typeElts, getTypeChecker().Context);
+  if (kind >= ConstraintKind::Subtype) {
+    Type underlying1;
+    if (auto *tupleTy = dyn_cast<TupleType>(input1.getPointer())) {
+      if (tupleTy->getNumElements() == 1)
+        underlying1 = tupleTy->getElementType(0);
+      else {
+        SmallVector<TupleTypeElt, 8> typeElts;
+        for (auto elt : tupleTy->getElements())
+          typeElts.push_back(TupleTypeElt(elt.getType()));
+        input1 = TupleType::get(typeElts, getTypeChecker().Context);
+      }
     }
-  }
-  else if (auto *parenTy = dyn_cast<ParenType>(input2.getPointer()))
-    underlying2 = parenTy->getUnderlyingType();
+    else if (auto *parenTy = dyn_cast<ParenType>(input1.getPointer()))
+      underlying1 = parenTy->getUnderlyingType();
 
-  if (underlying1 && underlying2) {
-    input1 = underlying1;
-    input2 = underlying2;
+    Type underlying2;
+    if (auto *tupleTy = dyn_cast<TupleType>(input2.getPointer())) {
+      if (tupleTy->getNumElements() == 1)
+        underlying2 = tupleTy->getElementType(0);
+      else {
+        SmallVector<TupleTypeElt, 8> typeElts;
+        for (auto elt : tupleTy->getElements())
+          typeElts.push_back(TupleTypeElt(elt.getType()));
+        input2 = TupleType::get(typeElts, getTypeChecker().Context);
+      }
+    }
+    else if (auto *parenTy = dyn_cast<ParenType>(input2.getPointer()))
+      underlying2 = parenTy->getUnderlyingType();
+
+    if (underlying1 && underlying2) {
+      input1 = underlying1;
+      input2 = underlying2;
+    }
   }
 
   SolutionKind result = matchTypes(input2, input1,
