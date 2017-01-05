@@ -1,10 +1,10 @@
-// RUN: not --crash %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-target-func='target_func'
-// RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-target-func='target_func_2' | %FileCheck %s
-// RUN: %target-sil-opt -bug-reducer-tester %s | %FileCheck %s
+// RUN: not --crash %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-failure-kind=opt-crasher -bug-reducer-tester-target-func='target_func'
+// RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-failure-kind=opt-crasher -bug-reducer-tester-target-func='target_func_2' | %FileCheck %s
+// RUN: %target-sil-opt -bug-reducer-tester -bug-reducer-tester-failure-kind=opt-crasher %s | %FileCheck %s
 
 // Make sure that we do not crash on partial applies. This is important to
 // enable testing if a suffix needing a prefix case.
-// RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-target-func='partial_apply_callee'
+// RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-failure-kind=opt-crasher -bug-reducer-tester-target-func='partial_apply_callee'
 
 // REQUIRES: asserts
 

@@ -89,7 +89,8 @@ class FuncBugReducerTestCase(unittest.TestCase):
             '--module-name=%s' % name,
             '--work-dir=%s' % self.tmp_dir,
             ('--extra-silopt-arg='
-             '-bug-reducer-tester-target-func=__TF_test_target')
+             '-bug-reducer-tester-target-func=__TF_test_target'),
+            '--extra-silopt-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")
