@@ -1095,7 +1095,6 @@ public func abs<T : SignedArithmetic>(_ x: T) -> T
   return x.magnitude
 }
 
-/*
 /// Returns the absolute value of the given number.
 ///
 /// The absolute value of `x` must be representable in the same type. In
@@ -1109,10 +1108,9 @@ public func abs<T : SignedArithmetic>(_ x: T) -> T
 ///
 /// - Parameter x: A signed number.
 /// - Returns: The absolute value of `x`.
-public func abs<T : SignedArithmetic>(_ x: T) -> T {
+public func abs<T : SignedArithmetic & Comparable>(_ x: T) -> T {
   return x < 0 ? -x : x
 }
-*/
 
 //===----------------------------------------------------------------------===//
 //===--- Arithmetic operators ---------------------------------------------===//
