@@ -1172,9 +1172,67 @@ private:
 
       return expr;
     }
+
+    /// \brief Ignore statements.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
+
+    /// \brief Ignore declarations.
+    bool walkToDeclPre(Decl *decl) override { return false; }
+  };
+
+  class SetExprTypes : public ASTWalker {
+    Expr *RootExpr;
+    ConstraintSystem &CS;
+    bool ExcludeRoot;
+
+  public:
+    SetExprTypes(Expr *expr, ConstraintSystem &cs, bool excludeRoot)
+        : RootExpr(expr), CS(cs), ExcludeRoot(excludeRoot) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (auto *closure = dyn_cast<ClosureExpr>(expr))
+        if (!closure->hasSingleExpressionBody())
+          return { false, closure };
+
+      return { true, expr };
+    }
+
+    Expr *walkToExprPost(Expr *expr) override {
+      if (ExcludeRoot && expr == RootExpr)
+        return expr;
+
+      assert((!expr->getType() || CS.getType(expr)->isEqual(expr->getType()))
+             && "Mismatched types!");
+      assert(!CS.getType(expr)->hasTypeVariable() &&
+             "Should not write type variable into expression!");
+      expr->setType(CS.getType(expr));
+
+      return expr;
+    }
+
+    /// \brief Ignore statements.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
+
+    /// \brief Ignore declarations.
+    bool walkToDeclPre(Decl *decl) override { return false; }
   };
 
 public:
+
+  void setExprTypes(Expr *expr) {
+    SetExprTypes SET(expr, *this, /* excludeRoot = */ false);
+    expr->walk(SET);
+  }
+
+  void setSubExprTypes(Expr *expr) {
+    SetExprTypes SET(expr, *this, /* excludeRoot = */ true);
+    expr->walk(SET);
+  }
+
   /// Cache the types of the given expression and all subexpressions.
   void cacheExprTypes(Expr *expr) {
     bool excludeRoot = false;
@@ -1395,8 +1453,9 @@ public:
   /// Get the type for an expression.
   Type getType(const Expr *E) const {
     assert(hasType(E) && "Expected type to have been set!");
-    assert(ExprTypes.find(E)->second->isEqual(E->getType()) &&
-           "Expected type in map to be the same type in expression!");
+    assert((!E->getType() ||
+            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
+           "Mismatched types!");
     return ExprTypes.find(E)->second;
   }
 
