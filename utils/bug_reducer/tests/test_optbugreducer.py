@@ -174,7 +174,6 @@ class OptBugReducerTestCase(unittest.TestCase):
         # Make sure our final output command does not have -emit-sib in the
         # output. We want users to get sil output when they type in the relevant
         # command.
-        print output
         self.assertEquals([], [o for o in output if '-emit-sib' in o])
 
 
