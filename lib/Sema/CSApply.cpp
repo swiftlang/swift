@@ -7247,48 +7247,41 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   return result;
 }
 
-/// \brief Convert an expression via a builtin protocol.
-///
-/// \param solution The solution to the expression's constraint system,
-/// which must have included a constraint that the expression's type
-/// conforms to the give \c protocol.
-/// \param expr The expression to convert.
-/// \param locator The locator describing where the conversion occurs.
-/// \param builtinName The name of the builtin method to use for the
-/// last step of the conversion.
-/// \param brokenBuiltinDiag Diagnostic to emit if the builtin definition
-/// is broken.
-///
-/// \returns the converted expression.
-static Expr *convertViaMember(const Solution &solution, Expr *expr,
-                              ConstraintLocator *locator,
-                              Identifier builtinName,
-                              Diag<> brokenBuiltinDiag) {
-  auto &cs = solution.getConstraintSystem();
-
+Expr *
+Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) const {
   // FIXME: Cache name.
+  auto &cs = getConstraintSystem();
   auto &tc = cs.getTypeChecker();
   auto &ctx = tc.Context;
-  auto type = cs.getType(expr);
+  auto type = cs.getType(expr)->getRValueType();
+
+  // Member accesses are permitted to implicitly look through
+  // ImplicitlyUnwrappedOptional<T>.
+  if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(type)) {
+    expr = new (ctx) ForceValueExpr(expr, expr->getEndLoc());
+    cs.setType(expr, objTy);
+    expr->setImplicit();
+    type = objTy;
+  }
 
   // Look for the builtin name. If we don't have it, we need to call the
   // general name via the witness table.
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isa<AbstractFunctionDecl>(cs.DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto members = tc.lookupMember(cs.DC, type->getRValueType(), builtinName,
-                                   lookupOptions);
-  
+  auto members = tc.lookupMember(cs.DC, type,
+                                 tc.Context.Id_getBuiltinLogicValue,
+                                 lookupOptions);
+
   // Find the builtin method.
   if (members.size() != 1) {
-    tc.diagnose(expr->getLoc(), brokenBuiltinDiag);
+    tc.diagnose(expr->getLoc(), diag::broken_bool);
     return nullptr;
   }
   FuncDecl *builtinMethod = dyn_cast<FuncDecl>(members[0].Decl);
   if (!builtinMethod) {
-    tc.diagnose(expr->getLoc(), brokenBuiltinDiag);
+    tc.diagnose(expr->getLoc(), diag::broken_bool);
     return nullptr;
-
   }
 
   // Form a reference to the builtin method.
@@ -7308,23 +7301,12 @@ static Expr *convertViaMember(const Solution &solution, Expr *expr,
   assert(!failed && "Could not call witness?");
   (void)failed;
 
-  return expr;
-}
-
-Expr *
-Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) const {
-  auto &cs = getConstraintSystem();
-  auto &tc = cs.getTypeChecker();
-
-  auto result = convertViaMember(*this, expr, locator,
-                                 tc.Context.Id_getBuiltinLogicValue,
-                                 diag::broken_bool);
-  if (result && !cs.getType(result)->isBuiltinIntegerType(1)) {
+  if (expr && !cs.getType(expr)->isBuiltinIntegerType(1)) {
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return nullptr;
   }
 
-  return result;
+  return expr;
 }
 
 Expr *Solution::convertOptionalToBool(Expr *expr,
