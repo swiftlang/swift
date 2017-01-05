@@ -32,7 +32,7 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
             self.invoker.get_suffixed_filename(suffix_hash))
 
         # Found a miscompile! Keep the suffix
-        if result != 0:
+        if result['exit_code'] != 0:
             print("Suffix maintains the predicate. Returning suffix")
             return (TESTRESULT_KEEPSUFFIX, prefix, suffix)
 
@@ -56,7 +56,7 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
         result = self.invoker.invoke_with_passlist(
             prefix,
             prefix_path)
-        if result != 0:
+        if result['exit_code'] != 0:
             print("Prefix maintains the predicate by itself. Returning keep "
                   "prefix")
             return (TESTRESULT_KEEPPREFIX, prefix, suffix)
@@ -79,7 +79,7 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
 
         # If we failed at this point, then the prefix is our new
         # baseline. Return keep suffix.
-        if result != 0:
+        if result['exit_code'] != 0:
             print("Suffix failed. Keeping prefix as new baseline")
             return (TESTRESULT_KEEPSUFFIX, prefix, suffix)
 
@@ -94,7 +94,7 @@ def pass_bug_reducer(tools, config, passes, sil_opt_invoker, reduce_sil):
     filename = sil_opt_invoker.get_suffixed_filename('base_case')
     result = sil_opt_invoker.invoke_with_passlist(passes, filename)
     # If we succeed, there is no further work to do.
-    if result == 0:
+    if result['exit_code'] == 0:
         print("Success with base case: %s" % (' '.join(passes)))
         return True
     print("Base case crashes! First trying to reduce the pass list!")

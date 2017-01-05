@@ -34,7 +34,7 @@ list of passes that the perf pipeline"""
         random.shuffle(passes)
         filename = sil_opt_invoker.get_suffixed_filename(str(count))
         result = sil_opt_invoker.invoke_with_passlist(passes, filename)
-        if result == 0:
+        if result['exit_code'] == 0:
             print("*** Success with PassList: %s" % (' '.join(passes)))
             continue
 

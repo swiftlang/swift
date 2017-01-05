@@ -87,12 +87,12 @@ class OptimizerTester(object):
         sys.stdout.write("Trying to optimize functions...")
         self.silopt.input_file = filepath_to_opt
         result = self.silopt.invoke_with_passlist(self.passes, out_optpath)
-        if result == 0:
+        if result['exit_code'] == 0:
             print(' NOCRASH!\n')
         else:
             self.result = self.silopt.input_file
             print(' CRASH!\n')
-        return result
+        return result['exit_code']
 
 
 def function_bug_reducer(input_file, nm, sil_opt_invoker, sil_extract_invoker,
@@ -133,7 +133,7 @@ list of function given a specific pass that causes the perf pipeline to crash
     filename = sil_opt_invoker.get_suffixed_filename('base_case')
     result = sil_opt_invoker.invoke_with_passlist(args.pass_list, filename)
     # If we succeed, there is no further work to do.
-    if result == 0:
+    if result['exit_code'] == 0:
         print("Success with PassList: %s" % (' '.join(args.pass_list)))
         return
 
