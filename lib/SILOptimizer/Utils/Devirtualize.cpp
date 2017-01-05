@@ -463,7 +463,8 @@ getSubstitutionsForCallee(SILModule &M,
 
       // Otherwise, record the replacement and conformances for the mapped
       // type.
-      subMap.addSubstitution(canTy, sub.getReplacement());
+      if (isa<GenericTypeParamType>(canTy))
+        subMap.addSubstitution(canTy, sub.getReplacement());
       subMap.addConformances(canTy, sub.getConformances());
     }
     assert(origSubs.empty());
@@ -898,7 +899,8 @@ static void getWitnessMethodSubstitutions(
       // Otherwise, record the replacement and conformances for the mapped
       // type.
       auto canTy = mappedDepTy->getCanonicalType();
-      subMap.addSubstitution(canTy, sub.getReplacement());
+      if (isa<GenericTypeParamType>(canTy))
+        subMap.addSubstitution(canTy, sub.getReplacement());
       subMap.addConformances(canTy, sub.getConformances());
     }
     assert(subs.empty() && "Did not consume all substitutions");
