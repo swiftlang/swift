@@ -3,7 +3,7 @@ import md5
 import os
 import sys
 
-import bug_reducer_utils
+import swift_tools
 
 import list_reducer
 from list_reducer import TESTRESULT_KEEPPREFIX
@@ -119,13 +119,13 @@ def invoke_function_bug_reducer(args):
     """Given a path to a sib file with canonical sil, attempt to find a perturbed
 list of function given a specific pass that causes the perf pipeline to crash
     """
-    tools = bug_reducer_utils.SwiftTools(args.swift_build_dir)
-    config = bug_reducer_utils.SILToolInvokerConfig(args)
-    nm = bug_reducer_utils.SILNMInvoker(config, tools)
+    tools = swift_tools.SwiftTools(args.swift_build_dir)
+    config = swift_tools.SILToolInvokerConfig(args)
+    nm = swift_tools.SILNMInvoker(config, tools)
 
     input_file = args.input_file
     extra_args = args.extra_args
-    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(config, tools,
+    sil_opt_invoker = swift_tools.SILOptInvoker(config, tools,
                                                       input_file,
                                                       extra_args)
 
@@ -137,9 +137,9 @@ list of function given a specific pass that causes the perf pipeline to crash
         print("Success with PassList: %s" % (' '.join(args.pass_list)))
         return
 
-    sil_extract_invoker = bug_reducer_utils.SILFuncExtractorInvoker(config,
-                                                                    tools,
-                                                                    input_file)
+    sil_extract_invoker = swift_tools.SILFuncExtractorInvoker(config,
+                                                              tools,
+                                                              input_file)
 
     function_bug_reducer(input_file, nm, sil_opt_invoker, sil_extract_invoker,
                          args.pass_list)

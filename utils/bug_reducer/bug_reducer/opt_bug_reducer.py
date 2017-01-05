@@ -3,7 +3,7 @@ import json
 import md5
 import subprocess
 
-import bug_reducer_utils
+import swift_tools
 
 import func_bug_reducer
 
@@ -114,8 +114,8 @@ def pass_bug_reducer(tools, config, passes, sil_opt_invoker, reduce_sil):
 
     print("*** User requested that we try to reduce SIL. Lets try.")
     input_file = sil_opt_invoker.input_file
-    nm = bug_reducer_utils.SILNMInvoker(config, tools)
-    sil_extract_invoker = bug_reducer_utils.SILFuncExtractorInvoker(config,
+    nm = swift_tools.SILNMInvoker(config, tools)
+    sil_extract_invoker = swift_tools.SILFuncExtractorInvoker(config,
                                                                     tools,
                                                                     input_file)
 
@@ -129,8 +129,8 @@ def pass_bug_reducer(tools, config, passes, sil_opt_invoker, reduce_sil):
 def invoke_pass_bug_reducer(args):
     """Given a path to a sib file with canonical sil, attempt to find a perturbed
 list of passes that the perf pipeline"""
-    tools = bug_reducer_utils.SwiftTools(args.swift_build_dir)
-    config = bug_reducer_utils.SILToolInvokerConfig(args)
+    tools = swift_tools.SwiftTools(args.swift_build_dir)
+    config = swift_tools.SILToolInvokerConfig(args)
 
     passes = []
     if args.pass_list is None:
@@ -144,9 +144,9 @@ list of passes that the perf pipeline"""
     extra_args = []
     if args.extra_args is not None:
         extra_args = args.extra_args
-    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(config, tools,
-                                                      args.input_file,
-                                                      extra_args)
+    sil_opt_invoker = swift_tools.SILOptInvoker(config, tools,
+                                                args.input_file,
+                                                extra_args)
     pass_bug_reducer(tools, config, passes, sil_opt_invoker, args.reduce_sil)
 
 
