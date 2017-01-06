@@ -730,7 +730,7 @@ private:
             && !AvAttr->isUnconditionallyUnavailable()) {
           continue;
         }
-        const char *plat = NULL;
+        const char *plat = nullptr;
         switch (AvAttr->Platform) {
         case PlatformKind::OSX:
           plat = "macos";
@@ -759,7 +759,7 @@ private:
         default:
           break;
         }
-        if (plat == NULL) continue;
+        if (!plat) continue;
         os << " SWIFT_AVAILABILITY(" << plat;
         if (AvAttr->isUnconditionallyUnavailable()) {
           os << ",unavailable";
