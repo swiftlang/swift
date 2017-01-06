@@ -859,10 +859,15 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
       // Get the innermost nominal type context.
       DeclContext *DC;
-      if (isa<NominalTypeDecl>(Current) || isa<ExtensionDecl>(Current))
+      if (isa<NominalTypeDecl>(Current))
         DC = Current->getInnermostDeclContext();
+      else if (isa<ExtensionDecl>(Current))
+        DC = Current->getInnermostDeclContext()->
+          getAsNominalTypeOrNominalTypeExtensionContext();
       else
         DC = Current->getDeclContext();
+
+      assert(DC->isTypeContext());
 
       // Get the substitutions from our base type.
       auto subMap = CurrentType->getContextSubstitutions(DC);
