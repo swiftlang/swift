@@ -967,8 +967,7 @@ void ModuleFile::configureGenericEnvironment(
 llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
 ModuleFile::readGenericSignatureOrEnvironment(
                         llvm::BitstreamCursor &cursor,
-                        bool wantEnvironment,
-                        Optional<ArrayRef<Requirement>> optRequirements) {
+                        bool wantEnvironment) {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
@@ -1068,14 +1067,8 @@ ModuleFile::readGenericSignatureOrEnvironment(
   }
 
   // Read the generic requirements.
-  ArrayRef<Requirement> requirements;
-  SmallVector<Requirement, 4> requirementsVec;
-  if (optRequirements) {
-    requirements = *optRequirements;
-  } else {
-    readGenericRequirements(requirementsVec, cursor);
-    requirements = requirementsVec;
-  }
+  SmallVector<Requirement, 4> requirements;
+  readGenericRequirements(requirements, cursor);
 
   // Construct the generic signature from the loaded parameters and
   // requirements.
@@ -1113,12 +1106,17 @@ ModuleFile::getGenericSignatureOrEnvironment(
   // Read the generic environment.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(envOrOffset);
+  DeserializingEntityRAII deserializingEntity(*this);
 
   auto result = readGenericSignatureOrEnvironment(DeclTypeCursor,
-                                                  wantEnvironment,
-                                                  None);
+                                                  wantEnvironment);
   if (result.isNull()) {
     envOrOffset = nullptr;
+    return envOrOffset.get();
+  }
+
+  // If we've already deserialized this generic environment, return it.
+  if (envOrOffset.isComplete()) {
     return envOrOffset.get();
   }
 
