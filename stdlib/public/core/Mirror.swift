@@ -817,7 +817,7 @@ extension DictionaryLiteral : RandomAccessCollection {
   /// `startIndex`.
   public var endIndex: Int { return _elements.endIndex }
 
-  // FIXME: a typealias is needed to prevent <rdar://20248032>
+  // FIXME(ABI)#174 (Type checker): a typealias is needed to prevent <rdar://20248032>
   /// The element type of a `DictionaryLiteral`: a tuple containing an
   /// individual key-value pair.
   public typealias Element = (key: Key, value: Value)

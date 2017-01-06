@@ -1136,19 +1136,18 @@ static void recordSelfContextType(AbstractFunctionDecl *func) {
 namespace {
 
 class AccessScopeChecker {
-  ASTContext &Context;
   const SourceFile *File;
   TypeChecker::TypeAccessScopeCacheMap &Cache;
 
 protected:
-  Optional<AccessScope> Scope;
+  ASTContext &Context;
+  Optional<AccessScope> Scope = AccessScope::getPublic();
 
   AccessScopeChecker(const DeclContext *useDC,
                      decltype(TypeChecker::TypeAccessScopeCache) &caches)
-      : Context(useDC->getASTContext()),
-        File(useDC->getParentSourceFile()),
+      : File(useDC->getParentSourceFile()),
         Cache(caches[File]),
-        Scope(AccessScope::getPublic()) {}
+        Context(File->getASTContext()) {}
 
   bool visitDecl(ValueDecl *VD, bool isInParameter = false) {
     if (!VD || isa<GenericTypeParamDecl>(VD))
@@ -1211,6 +1210,17 @@ class TypeReprAccessScopeChecker : private ASTWalker, AccessScopeChecker {
 
   bool walkToTypeReprPre(TypeRepr *TR) override {
     if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR)) {
+      // In Swift 3, components other than the last one were not properly
+      // checked for availability.
+      // FIXME: We should try to downgrade these errors to warnings, not just
+      // skip diagnosing them.
+      if (Context.LangOpts.isSwiftVersion3()) {
+        const TypeRepr *parent = Parent.getAsTypeRepr();
+        if (auto *compound = dyn_cast_or_null<CompoundIdentTypeRepr>(parent))
+          if (compound->Components.back() != CITR)
+            return true;
+      }
+
       return visitDecl(CITR->getBoundDecl(),
                        isParamParent(Parent.getAsTypeRepr()));
     }
@@ -2488,11 +2498,11 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   if (requirementObjCName) {
     if (attr)
       const_cast<ObjCAttr *>(attr)->setName(*requirementObjCName,
-                                            /*implicitName=*/true);
+                                            /*implicit=*/true);
     else
       decl->getAttrs().add(
         ObjCAttr::create(tc.Context, *requirementObjCName,
-                         /*isNameImplicit=*/true));
+                         /*implicitName=*/true));
   }
 }
 
@@ -2891,7 +2901,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   auto behaviorSelf = conformance->getType();
   auto behaviorInterfaceSelf = conformance->getInterfaceType();
   auto behaviorProto = conformance->getProtocol();
-  auto behaviorProtoTy = ProtocolType::get(behaviorProto, TC.Context);
+  auto behaviorProtoTy = behaviorProto->getDeclaredType();
   
   // Treat any inherited protocols as constraints on `Self`, and gather
   // conformances from the containing type.
@@ -3547,7 +3557,7 @@ public:
       }
     }
 
-    if (IsSecondPass && !IsFirstPass) {
+    if (!IsFirstPass) {
       TC.checkUnsupportedProtocolType(decl);
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         TC.checkDeclCircularity(nominal);
@@ -3922,14 +3932,14 @@ public:
       TC.validateDecl(assocType);
   }
 
-  bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
+  void checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
     // We don't support protocols outside the top level of a file.
     if (isa<ProtocolDecl>(NTD) &&
         !NTD->getParent()->isModuleScopeContext()) {
       TC.diagnose(NTD->getLoc(),
                   diag::unsupported_nested_protocol,
                   NTD->getName());
-      return true;
+      return;
     }
 
     // We don't support nested types in generics yet.
@@ -3947,8 +3957,6 @@ public:
                       NTD->getName(),
                       proto->getName());
         }
-        NTD->setInvalid();
-        return true;
       }
 
       if (DC->isLocalContext() && DC->isGenericContext()) {
@@ -3958,11 +3966,9 @@ public:
                       diag::unsupported_type_nested_in_generic_function,
                       NTD->getName(),
                       AFD->getName());
-          return true;
         }
       }
     }
-    return false;
   }
 
   void visitEnumDecl(EnumDecl *ED) {
@@ -5337,7 +5343,6 @@ public:
     // one.
     auto attempt = OverrideCheckingAttempt::PerfectMatch;
     SmallVector<OverrideMatch, 2> matches;
-    auto superclassMetaTy = MetatypeType::get(superclass);
     DeclName name = decl->getFullName();
     bool hadExactMatch = false;
     LookupResult members;
@@ -5381,7 +5386,7 @@ public:
         lookupOptions -= NameLookupFlags::ProtocolMembers;
         lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
-        members = TC.lookupMember(decl->getDeclContext(), superclassMetaTy,
+        members = TC.lookupMember(decl->getDeclContext(), superclass,
                                   name, lookupOptions);
       }
 

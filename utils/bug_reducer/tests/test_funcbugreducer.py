@@ -89,7 +89,8 @@ class FuncBugReducerTestCase(unittest.TestCase):
             '--module-name=%s' % name,
             '--work-dir=%s' % self.tmp_dir,
             ('--extra-silopt-arg='
-             '-bug-reducer-tester-target-func=__TF_test_target')
+             '-bug-reducer-tester-target-func=__TF_test_target'),
+            '--extra-silopt-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")
@@ -101,7 +102,10 @@ class FuncBugReducerTestCase(unittest.TestCase):
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 1)
-
+        # Make sure our final output command does not have -emit-sib in the
+        # output. We want users to get sil output when they type in the relevant
+        # command.
+        self.assertEquals([], [o for o in output if '-emit-sib' in o])
 
 if __name__ == '__main__':
     unittest.main()

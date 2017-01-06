@@ -123,6 +123,9 @@ enum class ConstraintKind : char {
   /// \brief The first type is an optional type whose object type is the second
   /// type, preserving lvalue-ness.
   OptionalObject,
+  /// \brief The first type is the same function type as the second type, but
+  /// made @escaping.
+  EscapableFunctionOf,
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -154,8 +157,6 @@ enum class ConversionRestrictionKind {
   TupleToTuple,
   /// Scalar-to-tuple conversion.
   ScalarToTuple,
-  /// Tuple-to-scalar conversion.
-  TupleToScalar,
   /// Deep equality comparison.
   DeepEquality,
   /// Subclass-to-superclass conversion.
@@ -480,6 +481,7 @@ public:
       return ConstraintClassification::Member;
 
     case ConstraintKind::DynamicTypeOf:
+    case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::Defaultable:
       return ConstraintClassification::TypeProperty;
 

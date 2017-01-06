@@ -1493,6 +1493,14 @@ class infer_instanceVar2<
   @objc func func_GP_Unconstrained_(a: GP_Unconstrained) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
+
+  @objc func func_GP_Unconstrained_() -> GP_Unconstrained {}
+  // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
+
+  @objc func func_GP_Class_ObjC__() -> GP_Class_ObjC {}
+  // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 }
 
 class infer_instanceVar3 : Class_ObjC1 {
@@ -2199,4 +2207,8 @@ class SubclassInfersFromProtocol2 : SuperclassImplementsProtocol {
 extension SubclassInfersFromProtocol2 {
   // CHECK: {{^}} @objc dynamic func method1(value: Int)
   func method1(value: Int) { }
+}
+
+@objc class NeverReturningMethod {
+  @objc func doesNotReturn() -> Never {}
 }

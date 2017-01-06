@@ -55,6 +55,20 @@ namespace constraints {
 typedef llvm::DenseMap<SubstitutableType *,
                        SmallVector<ProtocolConformance *, 2>> ConformanceMap;
 
+/// Special-case type checking semantics for certain declarations.
+enum class DeclTypeCheckingSemantics {
+  /// A normal declaration.
+  Normal,
+  
+  /// The type(of:) declaration, which performs a "dynamic type" operation,
+  /// with different behavior for existential and non-existential arguments.
+  TypeOf,
+  
+  /// The withoutActuallyEscaping(_:do:) declaration, which makes a nonescaping
+  /// closure temporarily escapable.
+  WithoutActuallyEscaping,
+};
+
 /// The result of name lookup.
 class LookupResult {
 public:
@@ -232,11 +246,9 @@ enum class NameLookupFlags {
   /// Whether to perform 'dynamic' name lookup that finds @objc
   /// members of any class or protocol.
   DynamicLookup = 0x08,
-  /// Whether we're only looking for types.
-  OnlyTypes = 0x10,
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
-  IgnoreAccessibility = 0x20,
+  IgnoreAccessibility = 0x10,
 };
 
 /// A set of options that control name lookup.
@@ -811,14 +823,11 @@ public:
   /// \param isSpecialized Whether this type is immediately specialized.
   /// \param resolver The resolver for generic types.
   ///
-  /// \returns the resolved type, or emits a diagnostic and returns null if the
-  /// type cannot be resolved.
+  /// \returns the resolved type.
   Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *fromDC,
                             TypeResolutionOptions options,
                             bool isSpecialized,
-                            GenericTypeResolver *resolver = nullptr,
-                            UnsatisfiedDependency *unsatisfiedDependency
-                              = nullptr);
+                            GenericTypeResolver *resolver = nullptr);
 
   /// Apply generic arguments to the given type.
   ///
@@ -877,7 +886,7 @@ public:
   /// \param member The member whose type projection is being computed.
   /// \param baseTy The base type that will be substituted for the 'Self' of the
   /// member.
-  Type substMemberTypeWithBase(Module *module, const TypeDecl *member, Type baseTy);
+  Type substMemberTypeWithBase(Module *module, TypeDecl *member, Type baseTy);
 
   /// \brief Retrieve the superclass type of the given type, or a null type if
   /// the type has no supertype.
@@ -1705,6 +1714,18 @@ public:
                                  NameLookupOptions options
                                    = defaultUnqualifiedLookupOptions);
 
+  /// Perform unqualified type lookup at the given source location
+  /// within a particular declaration context.
+  ///
+  /// \param dc The declaration context in which to perform name lookup.
+  /// \param name The name of the entity to look for.
+  /// \param loc The source location at which name lookup occurs.
+  /// \param options Options that control name lookup.
+  SmallVector<TypeDecl *, 1>
+  lookupUnqualifiedType(DeclContext *dc, DeclName name, SourceLoc loc,
+                        NameLookupOptions options
+                          = defaultUnqualifiedLookupOptions);
+
   /// \brief Lookup a member in the given type.
   ///
   /// \param dc The context that needs the member.
@@ -2016,6 +2037,9 @@ public:
   VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
                                                  UnresolvedDotExpr *ctorRef);
 
+  /// Diagnose assigning variable to itself.
+  bool diagnoseSelfAssignment(const Expr *E);
+
   /// When referencing a class initializer, check that the base expression is
   /// either a static metatype or that the initializer is 'required'.
   bool
@@ -2060,6 +2084,10 @@ public:
 
   void noteTypoCorrection(DeclName name, DeclNameLoc nameLoc,
                           const LookupResult::Result &suggestion);
+  
+  /// Check if the given decl has a @_semantics attribute that gives it
+  /// special case type-checking behavior.
+  DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
 };
 
 /// \brief RAII object that cleans up the given expression if not explicitly

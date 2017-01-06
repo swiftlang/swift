@@ -19,6 +19,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Debug.h"
@@ -39,15 +40,25 @@ SerializedModuleLoader::~SerializedModuleLoader() = default;
 static std::error_code
 openModuleFiles(StringRef DirName, StringRef ModuleFilename,
                 StringRef ModuleDocFilename,
-                std::unique_ptr<llvm::MemoryBuffer> &ModuleBuffer,
-                std::unique_ptr<llvm::MemoryBuffer> &ModuleDocBuffer,
+                std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                 llvm::SmallVectorImpl<char> &Scratch) {
+  assert(((ModuleBuffer && ModuleDocBuffer)
+            || (!ModuleBuffer && !ModuleDocBuffer))
+         && "Module and Module Doc buffer must both be initialized or NULL");
   // Try to open the module file first.  If we fail, don't even look for the
   // module documentation file.
   Scratch.clear();
   llvm::sys::path::append(Scratch, DirName, ModuleFilename);
+  // If there are no buffers to load into, simply check for the existence of
+  // the module file.
+  if (!(ModuleBuffer || ModuleDocBuffer)) {
+    return llvm::sys::fs::access(StringRef(Scratch.data(), Scratch.size()),
+                                 llvm::sys::fs::AccessMode::Exist);
+  }
+
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
-    llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
+  llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
@@ -56,21 +67,23 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   Scratch.clear();
   llvm::sys::path::append(Scratch, DirName, ModuleDocFilename);
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
-    llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
+  llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
   if (!ModuleDocOrErr &&
       ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
     return ModuleDocOrErr.getError();
   }
-  ModuleBuffer = std::move(ModuleOrErr.get());
+
+  *ModuleBuffer = std::move(ModuleOrErr.get());
   if (ModuleDocOrErr)
-    ModuleDocBuffer = std::move(ModuleDocOrErr.get());
+    *ModuleDocBuffer = std::move(ModuleDocOrErr.get());
+
   return std::error_code();
 }
 
 static bool
 findModule(ASTContext &ctx, AccessPathElem moduleID,
-           std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer,
-           std::unique_ptr<llvm::MemoryBuffer> &moduleDocBuffer,
+           std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+           std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
            bool &isFramework) {
   llvm::SmallString<64> moduleFilename(moduleID.first.str());
   moduleFilename += '.';
@@ -95,7 +108,6 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
 
   llvm::SmallString<128> scratch;
   llvm::SmallString<128> currPath;
-
   isFramework = false;
   for (auto path : ctx.SearchPathOpts.ImportSearchPaths) {
     auto err = openModuleFiles(path,
@@ -353,6 +365,21 @@ FileUnit *SerializedModuleLoader::loadAST(
   return nullptr;
 }
 
+bool
+SerializedModuleLoader::canImportModule(std::pair<Identifier, SourceLoc> mID) {
+  // First see if we find it in the registered memory buffers.
+  if (!MemoryBuffers.empty()) {
+    auto bufIter = MemoryBuffers.find(mID.first.str());
+    if (bufIter != MemoryBuffers.end()) {
+      return true;
+    }
+  }
+
+  // Otherwise look on disk.
+  bool isFramework = false;
+  return findModule(Ctx, mID, nullptr, nullptr, isFramework);
+}
+
 Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
                                            Module::AccessPathTy path) {
   // FIXME: Swift submodules?
@@ -378,7 +405,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   // Otherwise look on disk.
   if (!moduleInputBuffer) {
-    if (!findModule(Ctx, moduleID, moduleInputBuffer, moduleDocInputBuffer,
+    if (!findModule(Ctx, moduleID, &moduleInputBuffer, &moduleDocInputBuffer,
                     isFramework)) {
       return nullptr;
     }

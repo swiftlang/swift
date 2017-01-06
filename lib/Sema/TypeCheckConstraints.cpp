@@ -1841,7 +1841,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         return true;
 
       // Add a conversion constraint between the types.
-      cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        InitType, Locator, /*isFavored*/true);
 
       // The expression has been pre-checked; save it in case we fail later.
@@ -1851,7 +1851,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Figure out what type the constraints decided on.
-      auto &tc = solution.getConstraintSystem().getTypeChecker();
+      auto &cs = solution.getConstraintSystem();
+      auto &tc = cs.getTypeChecker();
       InitType = solution.simplifyType(tc, InitType);
 
       // Convert the initializer to the type of the pattern.
@@ -2009,7 +2010,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       SequenceType =
         cs.createTypeVariable(Locator, /*options=*/TVO_MustBeMaterializable);
-      cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
                        sequenceProto->getDeclaredType(), Locator);
@@ -2036,7 +2037,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       if (isa<AbstractFunctionDecl>(cs.DC))
         lookupOptions |= NameLookupFlags::KnownPrivate;
 
-      auto sequenceType = expr->getType()->getRValueType();
+      auto sequenceType = cs.getType(expr)->getRValueType();
 
       // Look through one level of optional; this improves recovery but doesn't
       // change the result.
@@ -2048,17 +2049,17 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // types of existentials.
       //
       // We will diagnose it later.
-      if (!sequenceType->isExistentialType()) {
+      if (!sequenceType->isExistentialType() &&
+          (sequenceType->mayHaveMembers() ||
+           sequenceType->isTypeVariableOrMember())) {
         ASTContext &ctx = tc.Context;
         auto iteratorAssocType =
           cast<AssociatedTypeDecl>(
             sequenceProto->lookupDirect(ctx.Id_Iterator).front());
 
-        iteratorType = sequenceType->getTypeOfMember(
-                         cs.DC->getParentModule(),
-                         iteratorAssocType,
-                         &tc,
-                         iteratorAssocType->getDeclaredInterfaceType());
+        iteratorType = iteratorAssocType->getDeclaredInterfaceType()
+            .subst(cs.DC->getParentModule(),
+                   sequenceType->getContextSubstitutions(sequenceProto));
 
         if (iteratorType) {
           auto iteratorProto =
@@ -2105,6 +2106,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return nullptr;
       }
 
+      cs.cacheExprTypes(expr);
+
       // Apply the solution to the iteration pattern as well.
       Pattern *pattern = Stmt->getPattern();
       TypeResolutionOptions options;
@@ -2117,6 +2120,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       Stmt->setPattern(pattern);
       Stmt->setSequence(expr);
+
+      cs.setExprTypes(expr);
       return expr;
     }
   };
@@ -2147,7 +2152,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   }
 
   Type destTy = simplifyType(getType(dest));
-  if (destTy->hasError() || destTy->getRValueType()->is<UnresolvedType>())
+  if (destTy->hasError())
     return Type();
 
   // If we have already resolved a concrete lvalue destination type, return it.
@@ -2159,8 +2164,10 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   // @lvalue T, where T is a fresh type variable that will be the object type of
   // this particular expression type.
   if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
+    // Newly allocated type should be explicitly materializable,
+    // it's invalid to use non-materializable types as assignment destination.
     auto objectTv = createTypeVariable(getConstraintLocator(dest),
-                                       /*options=*/0);
+                                       TVO_MustBeMaterializable);
     auto refTv = LValueType::get(objectTv);
     addConstraint(ConstraintKind::Bind, typeVar, refTv,
                   getConstraintLocator(dest));
@@ -2204,7 +2211,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
         return true;
       
       // Condition must convert to Bool.
-      cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        boolDecl->getDeclaredType(),
                        cs.getConstraintLocator(expr));
       return false;
@@ -2214,8 +2221,12 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     Expr *appliedSolution(constraints::Solution &solution,
                                   Expr *expr) override {
       auto &cs = solution.getConstraintSystem();
-      return solution.convertBooleanTypeToBuiltinI1(expr,
-                                            cs.getConstraintLocator(OrigExpr));
+
+      auto converted =
+        solution.convertBooleanTypeToBuiltinI1(expr,
+                                             cs.getConstraintLocator(OrigExpr));
+      cs.setExprTypes(converted);
+      return converted;
     }
     
   };
@@ -2496,11 +2507,9 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
 
-  cs.cacheExprTypes(expr);
-
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr), type,
+  cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,
                    cs.getConstraintLocator(expr));
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -2525,6 +2534,8 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
     solution.dump(log);
   }
 
+  cs.cacheExprTypes(expr);
+
   // Perform the conversion.
   Expr *result = solution.coerceToType(expr, type,
                                        cs.getConstraintLocator(expr),
@@ -2534,6 +2545,8 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   if (!result) {
     return true;
   }
+
+  cs.setExprTypes(expr);
 
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();

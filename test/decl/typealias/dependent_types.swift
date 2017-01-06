@@ -31,7 +31,12 @@ struct GenericStruct<T> {
   func methodTwo() -> MetaAlias {}
 
   func methodOne() -> Alias.BadType {}
-  // expected-error@-1 {{'BadType' is not a member type of 'T'}}
+  // expected-error@-1 {{'BadType' is not a member type of 'GenericStruct.Alias'}}
   func methodTwo() -> MetaAlias.BadType {}
   // expected-error@-1 {{'BadType' is not a member type of 'GenericStruct.MetaAlias'}}
+
+  var propertyOne: Alias.BadType
+  // expected-error@-1 {{'BadType' is not a member type of 'T'}}
+  var propertyTwo: MetaAlias.BadType
+  // expected-error@-1 {{'BadType' is not a member type of 'T.Type'}}
 }

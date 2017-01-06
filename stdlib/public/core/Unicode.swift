@@ -219,7 +219,7 @@ public struct UTF8 : UnicodeCodec {
       // Non-ASCII, proceed to buffering mode.
       _decodeBuffer = UInt32(codeUnit)
       _bitsInBuffer = 8
-    } else if (_decodeBuffer & 0x80 == 0) {
+    } else if _decodeBuffer & 0x80 == 0 {
       // ASCII in buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
       let codeUnit = _decodeBuffer & 0xff

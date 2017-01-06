@@ -38,52 +38,6 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
   return nullptr;
 }
 
-//===----------------------------------------------------------------------===//
-// Diagnose assigning variable to itself.
-//===----------------------------------------------------------------------===//
-
-static Decl *findSimpleReferencedDecl(const Expr *E) {
-  if (auto *LE = dyn_cast<LoadExpr>(E))
-    E = LE->getSubExpr();
-
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-    return DRE->getDecl();
-
-  return nullptr;
-}
-
-static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
-  if (auto *LE = dyn_cast<LoadExpr>(E))
-    E = LE->getSubExpr();
-
-  if (auto *D = findSimpleReferencedDecl(E))
-    return std::make_pair(nullptr, D);
-
-  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    if (auto *BaseDecl = findSimpleReferencedDecl(MRE->getBase()))
-      return std::make_pair(BaseDecl, MRE->getMember().getDecl());
-  }
-
-  return std::make_pair(nullptr, nullptr);
-}
-
-/// Diagnose assigning variable to itself.
-static void diagSelfAssignment(TypeChecker &TC, const Expr *E) {
-  auto *AE = dyn_cast<AssignExpr>(E);
-  if (!AE)
-    return;
-
-  auto LHSDecl = findReferencedDecl(AE->getDest());
-  auto RHSDecl = findReferencedDecl(AE->getSrc());
-  if (LHSDecl.second && LHSDecl == RHSDecl) {
-    TC.diagnose(AE->getLoc(), LHSDecl.first ? diag::self_assignment_prop
-                                            : diag::self_assignment_var)
-        .highlight(AE->getDest()->getSourceRange())
-        .highlight(AE->getSrc()->getSourceRange());
-  }
-}
-
-
 /// Diagnose syntactic restrictions of expressions.
 ///
 ///   - Module values may only occur as part of qualification.
@@ -258,6 +212,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
+        
+        // Verify that special decls are eliminated.
+        checkForDeclWithSpecialTypeCheckingSemantics(DRE);
       }
       if (auto *MRE = dyn_cast<MemberRefExpr>(Base)) {
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
@@ -273,6 +230,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             AcceptableInOutExprs.insert(IOE);
       }
 
+      // Check decl refs in withoutActuallyEscaping blocks.
+      if (auto MakeEsc = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
+        if (auto DRE =
+              dyn_cast<DeclRefExpr>(MakeEsc->getNonescapingClosureValue()))
+          checkNoEscapeParameterUse(DRE, MakeEsc);
+      }
 
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
@@ -365,7 +328,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Diagnose 'self.init' or 'super.init' nested in another expression.
       if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
-        if (!Parent.isNull() || !IsExprStmt) {
+        bool inDefer = false;
+        auto *innerDecl = DC->getInnermostDeclarationDeclContext();
+        if (auto *FD = dyn_cast_or_null<FuncDecl>(innerDecl)) {
+          inDefer = FD->isDeferBody();
+        }
+
+        if (!Parent.isNull() || !IsExprStmt || inDefer) {
           bool isChainToSuper;
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           TC.diagnose(E->getLoc(), diag::init_delegation_nested,
@@ -478,8 +447,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // The only valid use of the noescape parameter is an immediate call,
       // either as the callee or as an argument (in which case, the typechecker
-      // validates that the noescape bit didn't get stripped off).
-      if (ParentExpr && isa<ApplyExpr>(ParentExpr)) // param()
+      // validates that the noescape bit didn't get stripped off), or as
+      // a special case, in the binding of a withoutActuallyEscaping block.
+      if (ParentExpr
+          && (isa<ApplyExpr>(ParentExpr) // param()
+              || isa<MakeTemporarilyEscapableExpr>(ParentExpr)))
         return;
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
@@ -548,13 +520,16 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
       bool isExistential = false;
-      if (auto metaTy = E->getType()->getAs<MetatypeType>())
-        isExistential = metaTy->getInstanceType()->isAnyExistentialType();
-      if (!isExistential &&
-          !TC.lookupConstructors(const_cast<DeclContext *>(DC),
-                                 E->getType()).empty()) {
-        TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
-          .fixItInsertAfter(E->getEndLoc(), "()");
+      if (auto metaTy = E->getType()->getAs<MetatypeType>()) {
+        auto instanceTy = metaTy->getInstanceType();
+        isExistential = instanceTy->isExistentialType();
+        if (!isExistential &&
+            instanceTy->mayHaveMembers() &&
+            !TC.lookupConstructors(const_cast<DeclContext *>(DC),
+                                   instanceTy).empty()) {
+          TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
+            .fixItInsertAfter(E->getEndLoc(), "()");
+        }
       }
 
       // Add fix-it to insert ".self".
@@ -636,6 +611,17 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         TC.diagnose(DRE->getLoc(), topLevelDiag,
                     namePlusDot, k, pair.first->getName())
           .fixItInsert(DRE->getStartLoc(), namePlusDot);
+      }
+    }
+    
+    void checkForDeclWithSpecialTypeCheckingSemantics(const DeclRefExpr *DRE) {
+      // Referencing type(of:) and other decls with special type-checking
+      // behavior as functions is not implemented. Maybe we could wrap up the
+      // special-case behavior in a closure someday...
+      if (TC.getDeclTypeCheckingSemantics(DRE->getDecl())
+            != DeclTypeCheckingSemantics::Normal) {
+        TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
+                    DRE->getDecl()->getName());
       }
     }
     
@@ -3335,7 +3321,8 @@ class ObjCSelectorWalker : public ASTWalker {
     auto nominal =
       method->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
     auto result = TC.lookupMember(const_cast<DeclContext *>(DC),
-                                  nominal->getInterfaceType(), lookupName,
+                                  nominal->getDeclaredInterfaceType(),
+                                  lookupName,
                                   (defaultMemberLookupOptions |
                                    NameLookupFlags::KnownPrivate));
 
@@ -3802,7 +3789,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
                                             const DeclContext *DC,
                                             bool isExprStmt) {
-  diagSelfAssignment(TC, E);
+  TC.diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);

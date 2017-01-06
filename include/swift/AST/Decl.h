@@ -578,6 +578,20 @@ class alignas(1 << DeclAlignInBits) Decl {
   enum { NumExtensionDeclBits = NumDeclBits + 6 };
   static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
 
+  class IfConfigDeclBitfields {
+    friend class IfConfigDecl;
+    unsigned : NumDeclBits;
+
+    /// Whether this decl is missing its closing '#endif'.
+    unsigned HadMissingEnd : 1;
+
+    /// Whether this condition has been resolved either statically by Parse or
+    /// later by Condition Resolution.
+    unsigned HasBeenResolved : 1;
+  };
+  enum { NumIfConfigDeclBits = NumDeclBits + 2 };
+  static_assert(NumIfConfigDeclBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     DeclBitfields DeclBits;
@@ -601,6 +615,7 @@ protected:
     PrecedenceGroupDeclBitfields PrecedenceGroupDeclBits;
     ImportDeclBitfields ImportDeclBits;
     ExtensionDeclBitfields ExtensionDeclBits;
+    IfConfigDeclBitfields IfConfigDeclBits;
     uint32_t OpaqueBits;
   };
 
@@ -1931,14 +1946,16 @@ class IfConfigDecl : public Decl {
   /// The array is ASTContext allocated.
   ArrayRef<IfConfigDeclClause> Clauses;
   SourceLoc EndLoc;
-  bool HadMissingEnd;
-  bool HasBeenResolved = false;
+
 public:
   
   IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigDeclClause> Clauses,
                SourceLoc EndLoc, bool HadMissingEnd)
-    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses),
-      EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
+    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc)
+  {
+    IfConfigDeclBits.HadMissingEnd = HadMissingEnd;
+    IfConfigDeclBits.HasBeenResolved = false;
+  }
 
   ArrayRef<IfConfigDeclClause> getClauses() const { return Clauses; }
 
@@ -1955,13 +1972,13 @@ public:
     return {};
   }
 
-  bool isResolved() const { return HasBeenResolved; }
-  void setResolved() { HasBeenResolved = true; }
+  bool isResolved() const { return IfConfigDeclBits.HasBeenResolved; }
+  void setResolved() { IfConfigDeclBits.HasBeenResolved = true; }
   
   SourceLoc getEndLoc() const { return EndLoc; }
   SourceLoc getLoc() const { return Clauses[0].Loc; }
 
-  bool hadMissingEnd() const { return HadMissingEnd; }
+  bool hadMissingEnd() const { return IfConfigDeclBits.HadMissingEnd; }
   
   SourceRange getSourceRange() const;
   
@@ -5069,13 +5086,6 @@ public:
   void setDynamicSelf(bool hasDynamicSelf) { 
     FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
   }
-
-  /// Determine whether this method has an archetype \c Self return
-  /// type. This is when a method defined in a protocol extension
-  /// returns Self. In this case, the type is not quite as constrained
-  /// as a dynamic Self, because it is bound to the conforming type,
-  /// not the dynamic type of the value.
-  bool hasArchetypeSelf() const;
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);

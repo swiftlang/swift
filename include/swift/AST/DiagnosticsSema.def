@@ -2432,6 +2432,9 @@ NOTE(fix_unqualified_access_top_level_multi,none,
      "use '%0' to reference the %1 in module %2",
      (StringRef, DescriptiveDeclKind, Identifier))
 
+ERROR(unsupported_special_decl_ref, none,
+      "referencing %0 as a function value is not implemented", (Identifier))
+
 WARNING(use_of_qq_on_non_optional_value,none,
         "left side of nil coalescing operator '?""?' has non-optional type %0, "
         "so the right side is never used", (Type))

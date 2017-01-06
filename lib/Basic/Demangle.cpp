@@ -2544,6 +2544,8 @@ private:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
     case Node::Kind::VariadicMarker:
+    case Node::Kind::OutlinedCopy:
+    case Node::Kind::OutlinedConsume:
       return false;
     }
     unreachable("bad node kind");
@@ -2973,6 +2975,14 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::CurryThunk:
     Printer << "curry thunk of ";
+    print(pointer->getChild(0), asContext, suppressType);
+    return;
+  case Node::Kind::OutlinedCopy:
+    Printer << "outlined copy of ";
+    print(pointer->getChild(0), asContext, suppressType);
+    return;
+  case Node::Kind::OutlinedConsume:
+    Printer << "outlined consume of ";
     print(pointer->getChild(0), asContext, suppressType);
     return;
   case Node::Kind::Directness:

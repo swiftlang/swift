@@ -535,7 +535,10 @@ public:
                                     : NameLoc;
   }
   SourceLoc getEndLoc() const {
-    return SubPattern ? SubPattern->getSourceRange().End : NameLoc;
+    if (SubPattern && SubPattern->getSourceRange().isValid()) {
+      return SubPattern->getSourceRange().End;
+    }
+    return NameLoc;
   }
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
   

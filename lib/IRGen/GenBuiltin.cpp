@@ -705,7 +705,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *FnCode = args.claimNext();
     
     // If we know the platform runtime's "done" value, emit the check inline.
-    llvm::BasicBlock *notDoneBB, *doneBB;
+    llvm::BasicBlock *doneBB = nullptr;
 
     if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {
       auto PredValue = IGF.Builder.CreateLoad(PredPtr,
@@ -714,7 +714,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
                                                             *ExpectedPred);
       auto PredIsDone = IGF.Builder.CreateICmpEQ(PredValue, ExpectedPredValue);
       
-      notDoneBB = IGF.createBasicBlock("once_not_done");
+      auto notDoneBB = IGF.createBasicBlock("once_not_done");
       doneBB = IGF.createBasicBlock("once_done");
       
       IGF.Builder.CreateCondBr(PredIsDone, doneBB, notDoneBB);

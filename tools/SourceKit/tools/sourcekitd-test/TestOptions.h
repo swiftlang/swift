@@ -82,6 +82,7 @@ struct TestOptions {
   bool PrintRawResponse = false;
   bool SimplifiedDemangling = false;
   bool SynthesizedExtensions = false;
+  bool CollectActionables = false;
   bool isAsyncRequest = false;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
 };

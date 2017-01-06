@@ -766,48 +766,36 @@ static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
   return nullptr;
 }
 
-static CanType stripImmediateLabels(CanType type) {
-  while (auto tuple = dyn_cast<TupleType>(type)) {
-    if (tuple->getNumElements() == 1) {
-      type = tuple.getElementType(0);
-    } else {
-      break;
-    }
-  }
-  return type;
-}
-
 /// Check whether the given function is non-generic.
 static bool isNonGenericIntrinsic(FuncDecl *fn, bool allowTypeMembers,
-                                  CanType &input,
-                                  CanType &output) {
-  CanType type = fn->getInterfaceType()->getCanonicalType();
+                                  Type &input,
+                                  Type &output) {
+  auto type = fn->getInterfaceType();
   if (allowTypeMembers && fn->getDeclContext()->isTypeContext()) {
-    auto fnType = dyn_cast<FunctionType>(type);
+    auto fnType = type->getAs<FunctionType>();
     if (!fnType) return false;
 
-    type = fnType.getResult();
+    type = fnType->getResult();
   }
 
-  auto fnType = dyn_cast<FunctionType>(type);
-  if (!fnType)
-    return false;
+  auto fnType = type->getAs<FunctionType>();
+  if (!fnType) return false;
 
-  input = stripImmediateLabels(fnType.getInput());
-  output = stripImmediateLabels(fnType.getResult());
+  input = fnType->getInput()->getWithoutImmediateLabel();
+  output = fnType->getResult();
   return true;
 }
 
 /// Check whether the given type is Builtin.Int1.
-static bool isBuiltinInt1Type(CanType type) {
-  if (auto intType = dyn_cast<BuiltinIntegerType>(type))
+static bool isBuiltinInt1Type(Type type) {
+  if (auto intType = type->getAs<BuiltinIntegerType>())
     return intType->isFixedWidth() && intType->getFixedWidth() == 1;
   return false;
 }
 
 /// Check whether the given type is Builtin.Word.
-static bool isBuiltinWordType(CanType type) {
-  if (auto intType = dyn_cast<BuiltinIntegerType>(type))
+static bool isBuiltinWordType(Type type) {
+  if (auto intType = type->getAs<BuiltinIntegerType>())
     return intType->getWidth().isPointerWidth();
   return false;
 }
@@ -817,7 +805,7 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
     return Impl.GetBoolDecl;
 
   // Look for the function.
-  CanType input, output;
+  Type input, output;
   auto decl = findLibraryIntrinsic(*this, "_getBool", resolver);
   if (!decl ||
       !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
@@ -828,10 +816,7 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
     return nullptr;
 
   // Output must be a global type named Bool.
-  auto nominalType = dyn_cast<NominalType>(output);
-  if (!nominalType ||
-      nominalType.getParent() ||
-      nominalType->getDecl()->getName().str() != "Bool")
+  if (!output->isEqual(getBoolDecl()->getDeclaredType()))
     return nullptr;
 
   Impl.GetBoolDecl = decl;
@@ -841,9 +826,9 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
 FuncDecl *ASTContext::getEqualIntDecl() const {
   if (Impl.EqualIntDecl)
     return Impl.EqualIntDecl;
-  
-  CanType intType = getIntDecl()->getDeclaredType().getCanonicalTypeOrNull();
-  CanType boolType = getBoolDecl()->getDeclaredType().getCanonicalTypeOrNull();
+
+  auto intType = getIntDecl()->getDeclaredType();
+  auto boolType = getBoolDecl()->getDeclaredType();
   SmallVector<ValueDecl *, 30> equalFuncs;
   lookupInSwiftModule("==", equalFuncs);
   
@@ -862,20 +847,22 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
     if (auto resolver = getLazyResolver())
       resolver->resolveDeclSignature(funcDecl);
 
-    CanType input, resultType;
+    Type input, resultType;
     if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, input,
                                resultType))
       continue;
     
     // Check for the signature: (Int, Int) -> Bool
-    auto tType = dyn_cast<TupleType>(input.getPointer());
-    assert(tType);
-    if (tType->getNumElements() != 2)
+    auto tupleType = dyn_cast<TupleType>(input.getPointer());
+    assert(tupleType);
+    if (tupleType->getNumElements() != 2)
       continue;
 
-    CanType argType1 = tType->getElementType(0).getCanonicalTypeOrNull();
-    CanType argType2 = tType->getElementType(1).getCanonicalTypeOrNull();
-    if (argType1 == intType && argType2 == intType && resultType == boolType) {
+    auto argType1 = tupleType->getElementType(0);
+    auto argType2 = tupleType->getElementType(1);
+    if (argType1->isEqual(intType) &&
+        argType2->isEqual(intType) &&
+        resultType->isEqual(boolType)) {
       Impl.EqualIntDecl = funcDecl;
       return funcDecl;
     }
@@ -889,7 +876,7 @@ ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
     return Impl.UnimplementedInitializerDecl;
 
   // Look for the function.
-  CanType input, output;
+  Type input, output;
   auto decl = findLibraryIntrinsic(*this, "_unimplementedInitializer",
                                    resolver);
   if (!decl ||
@@ -922,7 +909,7 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl(LazyResolver *resolver) const {
     return Impl.IsOSVersionAtLeastDecl;
 
   // Look for the function.
-  CanType input, output;
+  Type input, output;
   auto decl =
       findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast", resolver);
   if (!decl ||
@@ -930,14 +917,11 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl(LazyResolver *resolver) const {
     return nullptr;
 
   // Input must be (Builtin.Word, Builtin.Word, Builtin.Word)
-  auto inputTuple = dyn_cast<TupleType>(input);
+  auto inputTuple = input->getAs<TupleType>();
   if (!inputTuple || inputTuple->getNumElements() != 3 ||
-      !isBuiltinWordType(
-          inputTuple->getElementType(0).getCanonicalTypeOrNull()) ||
-      !isBuiltinWordType(
-          inputTuple->getElementType(1).getCanonicalTypeOrNull()) ||
-      !isBuiltinWordType(
-          inputTuple->getElementType(2).getCanonicalTypeOrNull())) {
+      !isBuiltinWordType(inputTuple->getElementType(0)) ||
+      !isBuiltinWordType(inputTuple->getElementType(1)) ||
+      !isBuiltinWordType(inputTuple->getElementType(2))) {
     return nullptr;
   }
 
@@ -1107,7 +1091,7 @@ Optional<ArrayRef<Substitution>>
 ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
                                        DeclContext *gpContext) const {
   assert(gpContext && "No generic parameter context");
-  assert(gpContext->isValidGenericContext() &&
+  assert(gpContext->getGenericEnvironmentOfContext() != nullptr &&
          "Not type-checked yet");
   assert(BGT->getGenericArgs().size() == 1);
   Substitution Subst(BGT->getGenericArgs()[0], {});
@@ -1279,6 +1263,20 @@ GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
   return env;
 }
 
+bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
+  // If this module has already been successfully imported, it is importable.
+  if (getLoadedModule(ModulePath) != nullptr)
+    return true;
+
+  // Otherwise, ask the module loaders.
+  for (auto &importer : Impl.ModuleLoaders) {
+    if (importer->canImportModule(ModulePath)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 Module *
 ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
   assert(!ModulePath.empty());
@@ -1395,6 +1393,8 @@ ASTContext::getConformance(Type conformingType,
                            SourceLoc loc,
                            DeclContext *dc,
                            ProtocolConformanceState state) {
+  assert(dc->isTypeContext());
+
   llvm::FoldingSetNodeID id;
   NormalProtocolConformance::Profile(id, protocol, dc);
 
@@ -2645,7 +2645,7 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext 
   case DeclKind::Class:
     return ClassType::get(cast<ClassDecl>(D), Parent, C);
   case DeclKind::Protocol: {
-    return ProtocolType::get(cast<ProtocolDecl>(D), C);
+    return ProtocolType::get(cast<ProtocolDecl>(D), Parent, C);
   }
 
   default:
@@ -3288,12 +3288,8 @@ ImplicitlyUnwrappedOptionalType *ImplicitlyUnwrappedOptionalType::get(Type base)
   return entry = new (C, arena) ImplicitlyUnwrappedOptionalType(C, base, properties);
 }
 
-ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {
-  // Protocol types can never be nested inside other types, but we should
-  // model this anyway to fix some compiler crashes when computing
-  // substitutions on invalid code.
-  Type Parent;
-
+ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
+                                const ASTContext &C) {
   llvm::FoldingSetNodeID id;
   ProtocolType::Profile(id, D, Parent);
 
@@ -3306,15 +3302,16 @@ ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {
         = C.Impl.getArena(arena).ProtocolTypes.FindNodeOrInsertPos(id, insertPos))
     return protoTy;
 
-  auto protoTy = new (C, arena) ProtocolType(D, C);
+  auto protoTy = new (C, arena) ProtocolType(D, Parent, C, properties);
   C.Impl.getArena(arena).ProtocolTypes.InsertNode(protoTy, insertPos);
 
   return protoTy;
 }
 
-ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)
-  : NominalType(TypeKind::Protocol, &Ctx, TheDecl, /*Parent=*/Type(),
-                RecursiveTypeProperties()) { }
+ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
+                           const ASTContext &Ctx,
+                           RecursiveTypeProperties properties)
+  : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
 
 void ProtocolType::Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D,
                            Type Parent) {

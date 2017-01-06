@@ -303,3 +303,23 @@ func testOptionalSelf(_ y : Y) {
     clone.operationThatOnlyExistsOnY() // expected-error {{value of type 'X' has no member 'operationThatOnlyExistsOnY'}}
   }
 }
+
+// ----------------------------------------------------------------------------
+// Conformance lookup on Self
+
+protocol Runcible {
+}
+
+extension Runcible {
+  func runce() {}
+}
+
+func wantsRuncible<T : Runcible>(_: T) {}
+
+class Runce : Runcible {
+  func getRunced() -> Self {
+    runce()
+    wantsRuncible(self)
+    return self
+  }
+}

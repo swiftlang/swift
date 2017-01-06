@@ -1,3 +1,0 @@
-// RUN: not --crash %target-sil-opt %s
-// REQUIRES: asserts
-if(import Swift

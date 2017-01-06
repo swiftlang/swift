@@ -90,6 +90,7 @@ public protocol _IndexableBase {
   subscript(position: Index) -> _Element { get }
 
   // WORKAROUND: rdar://25214066
+  // FIXME(ABI)#178 (Type checker)
   /// A sequence that represents a contiguous subrange of the collection's
   /// elements.
   associatedtype SubSequence
@@ -557,7 +558,7 @@ public protocol Collection : _Indexable, Sequence {
   /// type.
   associatedtype Iterator : IteratorProtocol = IndexingIterator<Self>
 
-  // FIXME: Needed here so that the `Iterator` is properly deduced from
+  // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
   // a custom `makeIterator()` function.  Otherwise we get an
   // `IndexingIterator`. <rdar://problem/21539115>
   /// Returns an iterator over the elements of the collection.

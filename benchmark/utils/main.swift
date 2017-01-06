@@ -84,6 +84,7 @@ import RC4
 import RGBHistogram
 import RangeAssignment
 import RecursiveOwnedParameter
+import ReversedCollections
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -109,24 +110,24 @@ precommitTests = [
   "AnyHashableWithAClass": run_AnyHashableWithAClass,
   "Array2D": run_Array2D,
   "ArrayAppend": run_ArrayAppend,
+  "ArrayAppendArrayOfInt": run_ArrayAppendArrayOfInt,
+  "ArrayAppendFromGeneric": run_ArrayAppendFromGeneric,
+  "ArrayAppendGenericStructs": run_ArrayAppendGenericStructs,
+  "ArrayAppendLazyMap": run_ArrayAppendLazyMap,
+  "ArrayAppendOptionals": run_ArrayAppendOptionals,
+  "ArrayAppendRepeatCol": run_ArrayAppendRepeatCol,
   "ArrayAppendReserved": run_ArrayAppendReserved,
   "ArrayAppendSequence": run_ArrayAppendSequence,
-  "ArrayAppendArrayOfInt": run_ArrayAppendArrayOfInt,
-  "ArrayPlusEqualArrayOfInt": run_ArrayPlusEqualArrayOfInt,
   "ArrayAppendStrings": run_ArrayAppendStrings,
-  "ArrayAppendGenericStructs": run_ArrayAppendGenericStructs,
-  "ArrayAppendOptionals": run_ArrayAppendOptionals,
-  "ArrayAppendLazyMap": run_ArrayAppendLazyMap,
-  "ArrayAppendRepeatCol": run_ArrayAppendRepeatCol,
-  "ArrayAppendToGeneric": run_ArrayAppendToGeneric,
-  "ArrayAppendFromGeneric": run_ArrayAppendFromGeneric,
   "ArrayAppendToFromGeneric": run_ArrayAppendToFromGeneric,
+  "ArrayAppendToGeneric": run_ArrayAppendToGeneric,
   "ArrayInClass": run_ArrayInClass,
   "ArrayLiteral": run_ArrayLiteral,
   "ArrayOfGenericPOD": run_ArrayOfGenericPOD,
   "ArrayOfGenericRef": run_ArrayOfGenericRef,
   "ArrayOfPOD": run_ArrayOfPOD,
   "ArrayOfRef": run_ArrayOfRef,
+  "ArrayPlusEqualArrayOfInt": run_ArrayPlusEqualArrayOfInt,
   "ArraySubscript": run_ArraySubscript,
   "ArrayValueProp": run_ArrayValueProp,
   "ArrayValueProp2": run_ArrayValueProp2,
@@ -223,6 +224,9 @@ precommitTests = [
   "RGBHistogramOfObjects": run_RGBHistogramOfObjects,
   "RangeAssignment": run_RangeAssignment,
   "RecursiveOwnedParameter": run_RecursiveOwnedParameter,
+  "ReversedArray": run_ReversedArray,
+  "ReversedBidirectonal": run_ReversedBidirectonal,
+  "ReversedDictionary": run_ReversedDictionary,
   "SetExclusiveOr": run_SetExclusiveOr,
   "SetExclusiveOr_OfObjects": run_SetExclusiveOr_OfObjects,
   "SetIntersect": run_SetIntersect,
@@ -234,6 +238,7 @@ precommitTests = [
   "SevenBoom": run_SevenBoom,
   "Sim2DArray": run_Sim2DArray,
   "SortLettersInPlace": run_SortLettersInPlace,
+  "SortSortedStrings": run_SortSortedStrings,
   "SortStrings": run_SortStrings,
   "SortStringsUnicode": run_SortStringsUnicode,
   "StackPromo": run_StackPromo,

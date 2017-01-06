@@ -82,9 +82,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d.count)
-    d.enumerateKeysAndObjects({
-      (anyKey: Any, anyValue: Any,
-       stop: UnsafeMutablePointer<ObjCBool>) in
+    d.enumerateKeysAndObjects({ (anyKey: Any, anyValue: Any, _) in
       let anyObjectKey = anyKey as AnyObject
       let anyObjectValue = anyValue as AnyObject
       builder.add(
@@ -130,9 +128,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d!.count)
-    d!.enumerateKeysAndObjects({
-      (anyKey: Any, anyValue: Any,
-       stop: UnsafeMutablePointer<ObjCBool>) in
+    d!.enumerateKeysAndObjects({ (anyKey: Any, anyValue: Any, _) in
       builder.add(
           key: Swift._forceBridgeFromObjectiveC(anyKey as AnyObject, Key.self),
           value: Swift._forceBridgeFromObjectiveC(anyValue as AnyObject, Value.self))

@@ -606,3 +606,131 @@ internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
   return any as! AnyObject
 #endif
 }
+
+// Game the SIL diagnostic pipeline by inlining this into the transparent
+// definitions below after the stdlib's diagnostic passes run, so that the
+// `staticReport`s don't fire while building the standard library, but do
+// fire if they ever show up in code that uses the standard library.
+@inline(__always)
+public // internal with availability
+func _trueAfterDiagnostics() -> Builtin.Int1 {
+  return true._value
+}
+
+/// Returns the dynamic type of a value.
+///
+/// - Parameter of: The value to take the dynamic type of.
+/// - Returns: The dynamic type, which will be a value of metatype type.
+///
+/// - Remark: If the parameter is statically of a protocol or protocol
+///   composition type, the result will be an *existential metatype*
+///   (`P.Type` for a protocol `P`), and will represent the type of the value
+///   inside the existential container with the same protocol conformances
+///   as the value. Otherwise, the result will be a *concrete metatype*
+///   (`T.Type` for a non-protocol type `T`, or `P.Protocol` for a protocol
+///   `P`). Normally, this will do what you mean, but one wart to be aware
+///   of is when you use `type(of:)` in a generic context with a type
+///   parameter bound to a protocol type:
+///
+///   ```
+///   func foo<T>(x: T) -> T.Type {
+///     return type(of: x)
+///   }
+///   protocol P {}
+///   func bar(x: P) {
+///     foo(x: x) // Call foo with T == P
+///   }
+///   ```
+///
+///   since the call to `type(of:)` inside `foo` only sees `T` as a concrete
+///   type, foo will end up returning `P.self` instead of the dynamic type
+///   inside `x`. This can be worked around by writing `type(of: x as Any)`
+///   to get the dynamic type inside `x` as an `Any.Type`.
+@_transparent
+@_semantics("typechecker.type(of:)")
+public func type<Type, Metatype>(of: Type) -> Metatype {
+  // This implementation is never used, since calls to `Swift.type(of:)` are
+  // resolved as a special case by the type checker.
+  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: 'type(of:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
+/// Allows a nonescaping closure to temporarily be used as if it were
+/// allowed to escape.
+///
+/// This is useful when you need to pass a closure to an API that can't
+/// statically guarantee the closure won't escape when used in a way that
+/// won't allow it to escape in practice, such as in a lazy collection
+/// view:
+///
+/// ```
+/// func allValues(in array: [Int], matchPredicate: (Int) -> Bool) -> Bool {
+///   // Error because `lazy.filter` may escape the closure if the `lazy`
+///   // collection is persisted; however, in this case, we discard the
+///   // lazy collection immediately before returning.
+///   return array.lazy.filter { !matchPredicate($0) }.isEmpty
+/// }
+/// ```
+///
+/// or with `async`:
+///
+/// ```
+/// func perform(_ f: () -> Void, simultaneouslyWith g: () -> Void,
+///              on queue: DispatchQueue) {
+///   // Error: `async` normally escapes the closure, but in this case
+///   // we explicitly barrier before the closure would escape
+///   queue.async(f)
+///   queue.async(g)
+///   queue.sync(flags: .barrier) {}
+/// }
+/// ```
+///
+/// `withoutActuallyEscaping` provides a temporarily-escapable copy of the
+/// closure that can be used in these situations:
+///
+/// ```
+/// func allValues(in array: [Int], matchPredicate: (Int) -> Bool) -> Bool {
+///   return withoutActuallyEscaping(matchPredicate) { escapablePredicate in
+///     array.lazy.filter { !escapableMatchPredicate($0) }.isEmpty
+///   }
+/// }
+///
+/// func perform(_ f: () -> Void, simultaneouslyWith g: () -> Void,
+///              on queue: DispatchQueue) {
+///   withoutActuallyEscaping(f) { escapableF in
+///     withoutActuallyEscaping(g) { escapableG in
+///       queue.async(escapableF)
+///       queue.async(escapableG)
+///       queue.sync(flags: .barrier) {}
+///     }
+///   }
+/// }
+/// ```
+///
+/// - Parameter closure: A non-escaping closure value that will be made
+///   escapable for the duration of the execution of the `do` block.
+/// - Parameter do: A code block that will be immediately executed, receiving
+///   an escapable copy of `closure` as an argument.
+/// - Returns: the forwarded return value from the `do` block.
+/// - Remark: It is undefined behavior for the escapable closure to be stored,
+///   referenced, or executed after `withoutActuallyEscaping` returns. A
+///   future version of Swift will introduce a dynamic check to trap if
+///   the escapable closure is still referenced at the point
+///   `withoutActuallyEscaping` returns.
+@_transparent
+@_semantics("typechecker.withoutActuallyEscaping(_:do:)")
+public func withoutActuallyEscaping<ClosureType, ResultType>(
+  _ closure: ClosureType,
+  do: (_ escapingClosure: ClosureType) throws -> ResultType
+) rethrows -> ResultType {
+  // This implementation is never used, since calls to
+  // `Swift.withoutActuallyEscaping(_:do:)` are resolved as a special case by
+  // the type checker.
+  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: 'withoutActuallyEscaping(_:do:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+

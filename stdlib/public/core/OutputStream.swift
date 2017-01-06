@@ -318,7 +318,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
           printTypeName(mirror.subjectType)
         }
         if let (_, value) = mirror.children.first {
-          if (Mirror(reflecting: value).displayStyle == .tuple) {
+          if Mirror(reflecting: value).displayStyle == .tuple {
             _debugPrint_unlocked(value, &target)
           } else {
             target.write("(")

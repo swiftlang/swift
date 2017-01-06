@@ -693,6 +693,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -818,6 +819,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -905,20 +907,6 @@ ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
                     locator.withPathElement(ConstraintLocator::ScalarToTuple));
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::matchTupleToScalarTypes(TupleType *tuple1, Type type2,
-                                          ConstraintKind kind, TypeMatchOptions flags,
-                                          ConstraintLocatorBuilder locator) {
-  assert(tuple1->getNumElements() == 1 && "Wrong number of elements");
-  assert(!tuple1->getElement(0).isVararg() && "Should not be variadic");
-
-  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
-  return matchTypes(tuple1->getElementType(0),
-                    type2, kind, subflags,
-                    locator.withPathElement(
-                      LocatorPathElt::getTupleElement(0)));
-}
-
 // Returns 'false' (i.e. no error) if it is legal to match functions with the
 // corresponding function type representations and the given match kind.
 static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
@@ -945,6 +933,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -1011,6 +1000,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -1437,6 +1427,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::Defaultable:
     case ConstraintKind::Disjunction:
     case ConstraintKind::DynamicTypeOf:
+    case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::SelfObjectOfProtocol:
@@ -1681,15 +1672,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
         // FIXME: Prohibits some user-defined conversions for tuples.
         goto commit_to_conversions;
-      }
-    }
-
-    if (tuple1 && !tuplesWithMismatchedNames) {
-      // A single-element tuple can be a trivial subtype of a scalar.
-      if (tuple1->getNumElements() == 1 &&
-          !tuple1->getElement(0).isVararg()) {
-        conversionsOrFixes.push_back(
-          ConversionRestrictionKind::TupleToScalar);
       }
     }
 
@@ -2004,18 +1986,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
   // literals.
-  {
-    if (concrete && kind >= ConstraintKind::Subtype &&
-        (type1->isUninhabited() || type2->isVoid())) {
-      SmallVector<LocatorPathElt, 2> parts;
-      locator.getLocatorParts(parts);
-      
-      while (!parts.empty()) {
-        if (parts.back().getKind() == ConstraintLocator::ClosureResult) {
-          increaseScore(SK_FunctionConversion);
-          return SolutionKind::Solved;
-        }
-        parts.pop_back();
+  if (auto elt = locator.last()) {
+    if (elt->getKind() == ConstraintLocator::ClosureResult) {
+      if (concrete && kind >= ConstraintKind::Subtype &&
+          (type1->isUninhabited() || type2->isVoid())) {
+        increaseScore(SK_FunctionConversion);
+        return SolutionKind::Solved;
       }
     }
   }
@@ -2668,9 +2644,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     return result;
   }
 
-  if (instanceTy->isTypeParameter())
-    return MemberLookupResult();
-
   // Okay, start building up the result list.
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
@@ -2700,7 +2673,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     result.ViableCandidates.push_back(OverloadChoice(baseTy, fieldIdx));
     return result;
   }
-  
+
+  if (auto *selfTy = instanceTy->getAs<DynamicSelfType>())
+    instanceTy = selfTy->getSelfType();
+
+  if (!instanceTy->mayHaveMembers())
+    return result;
 
   // If we have a simple name, determine whether there are argument
   // labels we can use to restrict the set of lookup results.
@@ -2765,7 +2743,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // extensions cannot yet define designated initializers.
     lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
-    LookupResult ctors = TC.lookupConstructors(DC, baseObjTy, lookupOptions);
+    LookupResult ctors = TC.lookupConstructors(DC, instanceTy, lookupOptions);
     if (!ctors)
       return result;    // No result.
     
@@ -2855,7 +2833,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   }
 
   // Look for members within the base.
-  LookupResult &lookup = lookupMember(baseObjTy, memberName);
+  LookupResult &lookup = lookupMember(instanceTy, memberName);
 
   // The set of directly accessible types, which is only used when
   // we're performing dynamic lookup into an existential type.
@@ -3041,10 +3019,11 @@ retry_after_fail:
   if (result.ViableCandidates.empty() && isMetatype &&
       constraintKind == ConstraintKind::UnresolvedValueMember) {
     if (auto objectType = instanceTy->getAnyOptionalObjectType()) {
-      LookupResult &optionalLookup = lookupMember(MetatypeType::get(objectType),
-                                                  memberName);
-      for (auto result : optionalLookup)
-        addChoice(result, /*bridged*/false, /*isUnwrappedOptional=*/true);
+      if (objectType->mayHaveMembers()) {
+        LookupResult &optionalLookup = lookupMember(objectType, memberName);
+        for (auto result : optionalLookup)
+          addChoice(result, /*bridged*/false, /*isUnwrappedOptional=*/true);
+      }
     }
   }
 
@@ -3069,7 +3048,7 @@ retry_after_fail:
     // This is only used for diagnostics, so always use KnownPrivate.
     lookupOptions |= NameLookupFlags::KnownPrivate;
     
-    auto lookup = TC.lookupMember(DC, baseObjTy->getCanonicalType(),
+    auto lookup = TC.lookupMember(DC, instanceTy,
                                   memberName, lookupOptions);
     for (auto cand : lookup) {
       // If the result is invalid, skip it.
@@ -3486,6 +3465,60 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyEscapableFunctionOfConstraint(
+                                        Type type1, Type type2,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+
+  // Local function to form an unsolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::EscapableFunctionOf,
+                           type1, type2,
+                           DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+
+  type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
+  if (auto fn2 = type2->getAs<FunctionType>()) {
+    // We should have the noescape end of the relation.
+    if (!fn2->getExtInfo().isNoEscape())
+      return SolutionKind::Error;
+    // Solve forward by binding the other type variable to the escapable
+    // variation of this type.
+    auto fn1 = fn2->withExtInfo(fn2->getExtInfo().withNoEscape(false));
+    return matchTypes(type1, fn1, ConstraintKind::Bind, subflags, locator);
+  }
+  if (!type2->isTypeVariableOrMember())
+    // We definitely don't have a function, so bail.
+    return SolutionKind::Error;
+  
+  type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
+  if (auto fn1 = type1->getAs<FunctionType>()) {
+    // We should have the escaping end of the relation.
+    if (fn1->getExtInfo().isNoEscape())
+      return SolutionKind::Error;
+    
+    // Solve backward by binding the other type variable to the noescape
+    // variation of this type.
+    auto fn2 = fn1->withExtInfo(fn1->getExtInfo().withNoEscape(true));
+    return matchTypes(type2, fn2, ConstraintKind::Bind, subflags, locator);
+  }
+  if (!type1->isTypeVariableOrMember())
+    // We definitely don't have a function, so bail.
+    return SolutionKind::Error;
+
+  return formUnsolved();
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(
                                            Type type1,
                                            Type type2,
@@ -3668,12 +3701,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //   T <c U ===> T <c (U)
   case ConversionRestrictionKind::ScalarToTuple:
     return matchScalarToTupleTypes(type1, type2->castTo<TupleType>(),
-                                   matchKind, subflags, locator);
-
-  // for $< in { <, <c, <oc }:
-  //   T $< U ===> (T) $< U
-  case ConversionRestrictionKind::TupleToScalar:
-    return matchTupleToScalarTypes(type1->castTo<TupleType>(), type2,
                                    matchKind, subflags, locator);
 
   case ConversionRestrictionKind::DeepEquality:
@@ -3936,7 +3963,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   // T1 <c T2 && T2 : Hashable ===> T1 <c AnyHashable
   case ConversionRestrictionKind::HashableToAnyHashable: {
     // We never want to do this if the LHS is already AnyHashable.
-    if (isAnyHashableType(type1->getRValueType())) {
+    if (isAnyHashableType(
+            type1->getRValueType()->lookThroughAllAnyOptionalTypes())) {
       return SolutionKind::Error;
     }
 
@@ -4114,6 +4142,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::DynamicTypeOf:
     return simplifyDynamicTypeOfConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::EscapableFunctionOf:
+    return simplifyEscapableFunctionOfConstraint(first, second,
+                                                 subflags, locator);
+
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -4256,6 +4288,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                            constraint.getSecondType(),
                                            None,
                                            constraint.getLocator());
+
+  case ConstraintKind::EscapableFunctionOf:
+    return simplifyEscapableFunctionOfConstraint(constraint.getFirstType(),
+                                                 constraint.getSecondType(),
+                                                 None,
+                                                 constraint.getLocator());
 
   case ConstraintKind::BindOverload:
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),

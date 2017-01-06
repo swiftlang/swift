@@ -1789,8 +1789,8 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
           if (!fullCheck) {
             return None;
           }
-          return
-            Context.getModule({ { argumentIdent, UDRE->getLoc() } }) != nullptr;
+
+          return Context.canImportModule({ argumentIdent, UDRE->getLoc() });
         }
 
         if (!fullCheck) {

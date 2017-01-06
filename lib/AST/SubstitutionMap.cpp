@@ -90,9 +90,8 @@ SubstitutionMap::lookupConformance(CanType type,
 }
 
 void SubstitutionMap::
-addSubstitution(CanType type, Type replacement) {
-  auto result = subMap.insert(std::make_pair(type->castTo<SubstitutableType>(),
-                                             replacement));
+addSubstitution(CanSubstitutableType type, Type replacement) {
+  auto result = subMap.insert(std::make_pair(type, replacement));
   assert(result.second);
   (void) result;
 }
@@ -182,14 +181,12 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
     assert(baseParams.size() == derivedParams.size());
 
     for (unsigned i = 0, e = derivedParams.size(); i < e; i++) {
-      auto paramTy = baseParams[i]->getCanonicalType()
-          ->castTo<GenericTypeParamType>();
+      auto paramTy = cast<GenericTypeParamType>(baseParams[i]->getCanonicalType());
       assert(paramTy->getDepth() >= minDepth);
       Type replacementTy = derivedParams[i];
       if (derivedSubs)
         replacementTy = replacementTy.subst(*derivedSubs);
-      subMap.addSubstitution(paramTy->getCanonicalType(),
-                             replacementTy);
+      subMap.addSubstitution(paramTy, replacementTy);
     }
 
     auto isRootedInInnermostParameter = [&](Type t) -> bool {

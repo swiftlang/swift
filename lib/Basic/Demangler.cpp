@@ -383,6 +383,8 @@ NodePointer Demangler::demangleIdentifier() {
     int numChars = demangleNatural();
     if (numChars <= 0)
       return nullptr;
+    if (isPunycoded)
+      nextIf('_');
     if (Pos + numChars >= Text.size())
       return nullptr;
     StringRef Slice = StringRef(Text.data() + Pos, numChars);
@@ -1319,6 +1321,14 @@ NodePointer Demangler::demangleWitness() {
       NodePointer Conf = popProtocolConformance();
       return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
                                 Conf, Name, ProtoTy);
+    }
+    case 'y': {
+      return createWithChild(Node::Kind::OutlinedCopy,
+                             popNode(Node::Kind::Type));
+    }
+    case 'e': {
+      return createWithChild(Node::Kind::OutlinedConsume,
+                             popNode(Node::Kind::Type));
     }
     default:
       return nullptr;

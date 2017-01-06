@@ -432,7 +432,7 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
 
   sharedState.raceData.removeAll(keepingCapacity: true)
 
-  sharedState.raceData.append(contentsOf: (0..<raceDataCount).lazy.map { i in
+  sharedState.raceData.append(contentsOf: (0..<raceDataCount).lazy.map { _ in
     rt.makeRaceData()
   })
 
@@ -440,7 +440,7 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
   sharedState.workerStates.removeAll(keepingCapacity: true)
   
   sharedState.workerStates.append(contentsOf: (0..<racingThreadCount).lazy.map {
-    i in
+    _ in
     let workerState = _RaceTestWorkerState<RT>()
 
     // Shuffle the data so that threads process it in different order.
@@ -678,7 +678,7 @@ public func consumeCPU(units amountOfWork: Int) {
 }
 
 internal struct ClosureBasedRaceTest : RaceTestWithPerTrialData {
-  static var thread: () -> () = {}
+  static var thread: () -> Void = {}
 
   class RaceData {}
   typealias ThreadLocalData = Void
@@ -703,7 +703,7 @@ public func runRaceTest(
   trials: Int,
   timeoutInSeconds: Int? = nil,
   threads: Int? = nil,
-  invoking body: @escaping () -> ()
+  invoking body: @escaping () -> Void
 ) {
   ClosureBasedRaceTest.thread = body
   runRaceTest(ClosureBasedRaceTest.self, trials: trials,
@@ -714,7 +714,7 @@ public func runRaceTest(
   operations: Int,
   timeoutInSeconds: Int? = nil,
   threads: Int? = nil,
-  invoking body: @escaping () -> ()
+  invoking body: @escaping () -> Void
 ) {
   ClosureBasedRaceTest.thread = body
   runRaceTest(ClosureBasedRaceTest.self, operations: operations,

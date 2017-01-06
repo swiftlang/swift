@@ -70,6 +70,22 @@ class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
 
 } // unnamed namespace
 
+bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
+  // Search the memory buffers to see if we can find this file on disk.
+  FileOrError inputFileOrError = findModule(Ctx, ID.first.str(),
+                                            ID.second);
+  if (!inputFileOrError) {
+    auto err = inputFileOrError.getError();
+    if (err != std::errc::no_such_file_or_directory) {
+      Ctx.Diags.diagnose(ID.second, diag::sema_opening_import,
+                         ID.first, err.message());
+    }
+
+    return false;
+  }
+  return true;
+}
+
 Module *SourceLoader::loadModule(SourceLoc importLoc,
                              ArrayRef<std::pair<Identifier, SourceLoc>> path) {
   // FIXME: Swift submodules?

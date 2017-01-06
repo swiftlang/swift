@@ -104,16 +104,8 @@ Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
-  auto *dc = decl->getDeclContext();
-
-  // Hack for 'out of context' GenericTypeParamDecls when resolving
-  // a generic typealias
-  if (auto *paramDecl = dyn_cast<GenericTypeParamDecl>(decl)) {
-    return dc->mapTypeIntoContext(paramDecl->getDeclaredInterfaceType());
-  }
-
   return GenericEnvironment::mapTypeIntoContext(
-      dc->getParentModule(), GenericEnv,
+      decl->getDeclContext()->getParentModule(), GenericEnv,
       decl->getDeclaredInterfaceType());
 }
 
@@ -189,6 +181,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // If the nested type comes from a type alias, use either the alias's
   // concrete type, or resolve its components down to another dependent member.
   if (auto alias = nestedPA->getTypeAliasDecl()) {
+    assert(!alias->getGenericParams() && "Generic typealias in protocol");
     ref->setValue(alias);
     return TC.substMemberTypeWithBase(DC->getParentModule(), alias, baseTy);
   }

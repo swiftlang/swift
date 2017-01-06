@@ -67,5 +67,4 @@ enum OuterEnum {
 class OuterClass<T> {
   protocol InnerProtocol : OuterClass { }
   // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
-  // expected-error@-2{{non-class type 'InnerProtocol' cannot inherit from class 'OuterClass<T>'}}
 }

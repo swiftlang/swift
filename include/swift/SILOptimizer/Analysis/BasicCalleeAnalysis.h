@@ -76,7 +76,7 @@ public:
 class CalleeCache {
   typedef llvm::SmallVector<SILFunction *, 16> Callees;
   typedef llvm::PointerIntPair<Callees *, 1> CalleesAndCanCallUnknown;
-  typedef llvm::DenseMap<AbstractFunctionDecl *, CalleesAndCanCallUnknown>
+  typedef llvm::DenseMap<SILDeclRef, CalleesAndCanCallUnknown>
       CacheType;
 
   SILModule &M;
@@ -110,10 +110,11 @@ private:
   void sortAndUniqueCallees();
   CalleesAndCanCallUnknown &getOrCreateCalleesForMethod(SILDeclRef Decl);
   void computeClassMethodCalleesForClass(ClassDecl *CD);
+  void computeClassMethodCallees(ClassDecl *CD, SILDeclRef Method);
   void computeWitnessMethodCalleesForWitnessTable(SILWitnessTable &WT);
   void computeMethodCallees();
   SILFunction *getSingleCalleeForWitnessMethod(WitnessMethodInst *WMI) const;
-  CalleeList getCalleeList(AbstractFunctionDecl *Decl) const;
+  CalleeList getCalleeList(SILDeclRef Decl) const;
   CalleeList getCalleeList(WitnessMethodInst *WMI) const;
   CalleeList getCalleeList(ClassMethodInst *CMI) const;
   CalleeList getCalleeListForCalleeKind(SILValue Callee) const;

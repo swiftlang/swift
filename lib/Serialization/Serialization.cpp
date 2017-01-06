@@ -2217,11 +2217,9 @@ void Serializer::writeDecl(const Decl *D) {
                                         addIdentifierRef(discriminator));
       }
     }
-  }
 
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->getDeclContext()->isLocalContext()) {
-      auto discriminator = VD->getLocalDiscriminator();
+    if (value->getDeclContext()->isLocalContext()) {
+      auto discriminator = value->getLocalDiscriminator();
       auto abbrCode = DeclTypeAbbrCodes[LocalDiscriminatorLayout::Code];
       LocalDiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            discriminator);
@@ -3187,13 +3185,18 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
     SILLayoutID layoutRef = addSILLayoutRef(boxTy->getLayout());
-    
-    SmallVector<TypeID, 4> genericArgs;
-    for (auto &arg : boxTy->getGenericArgs())
-      genericArgs.push_back(addTypeRef(arg.getReplacement()));
-    
-    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 layoutRef, genericArgs);
+
+#ifndef NDEBUG
+    if (auto sig = boxTy->getLayout()->getGenericSignature()) {
+      assert(sig->getAllDependentTypes().size()
+               == boxTy->getGenericArgs().size());
+    }
+#endif
+
+    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef);
+
+    // Write the set of substitutions.
+    writeSubstitutions(boxTy->getGenericArgs(), DeclTypeAbbrCodes);
     break;
   }
       
