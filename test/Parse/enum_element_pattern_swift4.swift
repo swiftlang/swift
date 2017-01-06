@@ -37,7 +37,7 @@ func testE(e: E) {
   guard
     // Currently, these will be asserted in SILGen,
     // or in no-assert build, verify-failed in IRGen
-    case .C() = e, // FIXME: Should be rejeceted.
+    case .C() = e, // FIXME: Should be rejected.
     case .D(let payload) = e // FIXME: ditto.
   else { return }
 }
@@ -49,7 +49,7 @@ func canThrow() throws {
 
 do {
   try canThrow()
-} catch E.A() { // FIXME: Should be rejeceted.
+} catch E.A() { // FIXME: Should be rejected.
   // ..
 } catch E.B(let payload) { // FIXME: ditto.
   let _: () = payload

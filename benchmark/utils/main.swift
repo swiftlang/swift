@@ -225,7 +225,7 @@ precommitTests = [
   "RangeAssignment": run_RangeAssignment,
   "RecursiveOwnedParameter": run_RecursiveOwnedParameter,
   "ReversedArray": run_ReversedArray,
-  "ReversedBidirectonal": run_ReversedBidirectonal,
+  "ReversedBidirectional": run_ReversedBidirectional,
   "ReversedDictionary": run_ReversedDictionary,
   "SetExclusiveOr": run_SetExclusiveOr,
   "SetExclusiveOr_OfObjects": run_SetExclusiveOr_OfObjects,

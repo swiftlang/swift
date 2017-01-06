@@ -6135,7 +6135,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   auto destType = destExpr->getType();
   if (destType->is<UnresolvedType>() || destType->hasTypeVariable()) {
     // Look closer into why destination has unresolved types since such
-    // means that destination has diagnosible structural problems, and it's
+    // means that destination has diagnosable structural problems, and it's
     // better to diagnose destination (if possible) before moving on to
     // the source of the assignment.
     destExpr = typeCheckChildIndependently(
@@ -7296,8 +7296,8 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       ConcreteDeclRef decl = nullptr;
 
       // If return expression uses closure parameters, which have/are
-      // type variables, such means that we won't be be able to
-      // type-check result correctly and, unfornutately,
+      // type variables, such means that we won't be able to
+      // type-check result correctly and, unfortunately,
       // we are going to leak type variables from the parent
       // constraint system through declaration types.
       bool hasUnresolvedParams = false;
@@ -7319,8 +7319,8 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
 
       // Obtain type of the result expression without applying solutions,
       // because otherwise this might result in leaking of type variables,
-      // since we are not reseting result statement and if expression is
-      // sucessfully type-checked its type cleanup is going to be disabled
+      // since we are not resetting result statement and if expression is
+      // successfully type-checked its type cleanup is going to be disabled
       // (we are allowing unresolved types), and as a side-effect it might
       // also be transformed e.g. OverloadedDeclRefExpr -> DeclRefExpr.
       auto type = CS->TC.getTypeOfExpressionWithoutApplying(resultExpr,

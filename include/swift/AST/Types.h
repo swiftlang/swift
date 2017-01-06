@@ -652,7 +652,7 @@ public:
   /// name lookup, which is the case for nominal types, protocol compositions
   /// and archetypes.
   ///
-  /// Generally, the static vs instanec and mutating vs nonmutating distinction
+  /// Generally, the static vs instance and mutating vs nonmutating distinction
   /// is handled elsewhere, so metatypes, lvalue types and inout types are not
   /// allowed here.
   ///

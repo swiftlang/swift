@@ -1276,7 +1276,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     return origSourceType;
   }
 
-  swift_unreachable("Unhandled MetdataKind in switch.");
+  swift_unreachable("Unhandled MetadataKind in switch.");
 }
 
 const Metadata *
@@ -1388,7 +1388,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     return origSourceType;
   }
 
-  swift_unreachable("Unhandled MetdataKind in switch.");
+  swift_unreachable("Unhandled MetadataKind in switch.");
 }
 
 /******************************************************************************/
@@ -1994,7 +1994,7 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
     return _fail(src, srcType, targetType, flags);
   }
 
-  swift_unreachable("Unhandled MetdataKind in switch.");
+  swift_unreachable("Unhandled MetadataKind in switch.");
 }
 
 /******************************************************************************/

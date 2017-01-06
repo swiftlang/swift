@@ -503,7 +503,7 @@ public:
     if (!TC.Context.isSwiftVersion3()) {
       // swift(>=4) mode.
       // Specialized call are not allowed anyway.
-      // Let it be diagnosed as a expression.
+      // Let it be diagnosed as an expression.
       // For Swift3 mode, we emit warnings just before constructing the
       // enum-element-pattern below.
       if (isa<UnresolvedSpecializeExpr>(ce->getFn()))
