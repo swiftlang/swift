@@ -37,22 +37,15 @@ public struct URLThumbnailSizeKey : RawRepresentable, Hashable {
 */
 public struct URLResourceValues {
     fileprivate var _values: [URLResourceKey: Any]
-    fileprivate var _keys: Set<URLResourceKey>
-    
+
     public init() {
         _values = [:]
-        _keys = []
     }
-    
-    fileprivate init(keys: Set<URLResourceKey>, values: [URLResourceKey: Any]) {
+
+    fileprivate init(_ values: [URLResourceKey: Any]) {
         _values = values
-        _keys = keys
     }
-    
-    private func contains(_ key: URLResourceKey) -> Bool {
-        return _keys.contains(key)
-    }
-    
+
     private func _get<T>(_ key : URLResourceKey) -> T? {
         return _values[key] as? T
     }
@@ -62,44 +55,11 @@ public struct URLResourceValues {
     private func _get(_ key: URLResourceKey) -> Int? {
         return (_values[key] as? NSNumber)?.intValue
     }
-    
+
     private mutating func _set(_ key : URLResourceKey, newValue : Any?) {
-        _keys.insert(key)
         _values[key] = newValue
     }
-    private mutating func _set(_ key : URLResourceKey, newValue : String?) {
-        _keys.insert(key)
-        _values[key] = newValue as NSString?
-    }
-    private mutating func _set(_ key : URLResourceKey, newValue : [String]?) {
-        _keys.insert(key)
-        _values[key] = newValue as NSObject?
-    }
-    private mutating func _set(_ key : URLResourceKey, newValue : Date?) {
-        _keys.insert(key)
-        _values[key] = newValue as NSDate?
-    }
-    private mutating func _set(_ key : URLResourceKey, newValue : URL?) {
-        _keys.insert(key)
-        _values[key] = newValue as NSURL?
-    }
-    private mutating func _set(_ key : URLResourceKey, newValue : Bool?) {
-        _keys.insert(key)
-        if let value = newValue {
-            _values[key] = NSNumber(value: value)
-        } else {
-            _values[key] = nil
-        }
-    }
-    private mutating func _set(_ key : URLResourceKey, newValue : Int?) {
-        _keys.insert(key)
-        if let value = newValue {
-            _values[key] = NSNumber(value: value)
-        } else {
-            _values[key] = nil
-        }
-    }
-    
+
     /// A loosely-typed dictionary containing all keys and values.
     ///
     /// If you have set temporary keys or non-standard keys, you can find them in here.
@@ -287,22 +247,9 @@ public struct URLResourceValues {
     /// The quarantine properties as defined in LSQuarantine.h. To remove quarantine information from a file, pass `nil` as the value when setting this property.
     @available(OSX 10.10, *)
     public var quarantineProperties: [String : Any]? {
-        get {
-            // If a caller has caused us to stash NSNull in the dictionary (via set), make sure to return nil instead of NSNull
-            if let isNull = _values[.quarantinePropertiesKey] as? NSNull {
-                return nil
-            } else {
-                return _values[.quarantinePropertiesKey] as? [String : Any]
-            }
-        }
-        set {
-            if let v = newValue {
-                _set(.quarantinePropertiesKey, newValue: newValue as NSObject?)
-            } else {
-                // Set to NSNull, a special case for deleting quarantine properties
-                _set(.quarantinePropertiesKey, newValue: NSNull())
-            }
-        }
+        get { return _get(.quarantinePropertiesKey) }
+        // To remove a quarantine property `NSNull` must be passed
+        set { _set(.quarantinePropertiesKey, newValue: newValue ?? NSNull()) }
     }
 #endif
     
@@ -1021,7 +968,7 @@ public struct URL : ReferenceConvertible, Equatable {
     ///
     /// Only the values for the keys specified in `keys` will be populated.
     public func resourceValues(forKeys keys: Set<URLResourceKey>) throws -> URLResourceValues {
-        return URLResourceValues(keys: keys, values: try _url.resourceValues(forKeys: Array(keys)))
+        return URLResourceValues(try _url.resourceValues(forKeys: Array(keys)))
     }
 
     /// Sets a temporary resource value on the URL object.
@@ -1061,7 +1008,7 @@ public struct URL : ReferenceConvertible, Equatable {
     /// Most of the URL resource value keys will work with these APIs. However, there are some that are tied to the item's contents that will not work, such as `contentAccessDateKey` or `generationIdentifierKey`. If one of these keys is used, the method will return a `URLResourceValues` value, but the value for that property will be nil.
     @available(OSX 10.10, iOS 8.0, *)
     public func promisedItemResourceValues(forKeys keys: Set<URLResourceKey>) throws -> URLResourceValues {
-        return URLResourceValues(keys: keys, values: try _url.promisedItemResourceValues(forKeys: Array(keys)))
+        return URLResourceValues(try _url.promisedItemResourceValues(forKeys: Array(keys)))
     }
     
     @available(*, unavailable, message: "Use struct URLResourceValues and URL.setResourceValues(_:) instead")
@@ -1089,7 +1036,7 @@ public struct URL : ReferenceConvertible, Equatable {
     
     /// Returns the resource values for properties identified by a specified array of keys contained in specified bookmark data. If the result dictionary does not contain a resource value for one or more of the requested resource keys, it means those resource properties are not available in the bookmark data.
     public static func resourceValues(forKeys keys: Set<URLResourceKey>, fromBookmarkData data: Data) -> URLResourceValues? {
-        return NSURL.resourceValues(forKeys: Array(keys), fromBookmarkData: data).map { URLResourceValues(keys: keys, values: $0) }
+        return NSURL.resourceValues(forKeys: Array(keys), fromBookmarkData: data).map(URLResourceValues.init(_:))
     }
     
     /// Creates an alias file on disk at a specified location with specified bookmark data. bookmarkData must have been created with the URLBookmarkCreationSuitableForBookmarkFile option. bookmarkFileURL must either refer to an existing file (which will be overwritten), or to location in an existing directory.

@@ -254,16 +254,16 @@ extension URLRequest : CustomStringConvertible, CustomDebugStringConvertible, Cu
     
     public var customMirror: Mirror {
         var c: [(label: String?, value: Any)] = []
-        c.append((label: "url", value: url))
+        c.append((label: "url", value: url as Any))
         c.append((label: "cachePolicy", value: cachePolicy.rawValue))
         c.append((label: "timeoutInterval", value: timeoutInterval))
-        c.append((label: "mainDocumentURL", value: mainDocumentURL))
+        c.append((label: "mainDocumentURL", value: mainDocumentURL as Any))
         c.append((label: "networkServiceType", value: networkServiceType))
         c.append((label: "allowsCellularAccess", value: allowsCellularAccess))
-        c.append((label: "httpMethod", value: httpMethod))
-        c.append((label: "allHTTPHeaderFields", value: allHTTPHeaderFields))
-        c.append((label: "httpBody", value: httpBody))
-        c.append((label: "httpBodyStream", value: httpBodyStream))
+        c.append((label: "httpMethod", value: httpMethod as Any))
+        c.append((label: "allHTTPHeaderFields", value: allHTTPHeaderFields as Any))
+        c.append((label: "httpBody", value: httpBody as Any))
+        c.append((label: "httpBodyStream", value: httpBodyStream as Any))
         c.append((label: "httpShouldHandleCookies", value: httpShouldHandleCookies))
         c.append((label: "httpShouldUsePipelining", value: httpShouldUsePipelining))
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)

@@ -289,8 +289,8 @@ public func XCTAssertEqual<T : Equatable>(_ expression1: @autoclosure () throws 
             // TODO: @auto_string expression1
             // TODO: @auto_string expression2
 
-            let expressionValueStr1 = "\(expressionValue1Optional)"
-            let expressionValueStr2 = "\(expressionValue2Optional)"
+            let expressionValueStr1 = String(describing: expressionValue1Optional)
+            let expressionValueStr2 = String(describing: expressionValue2Optional)
 
             _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
         }
@@ -520,8 +520,8 @@ public func XCTAssertNotEqual<T : Equatable>(_ expression1: @autoclosure () thro
             // TODO: @auto_string expression1
             // TODO: @auto_string expression2
 
-            let expressionValueStr1 = "\(expressionValue1Optional)"
-            let expressionValueStr2 = "\(expressionValue2Optional)"
+            let expressionValueStr1 = String(describing: expressionValue1Optional)
+            let expressionValueStr2 = String(describing: expressionValue2Optional)
 
             _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
         }
