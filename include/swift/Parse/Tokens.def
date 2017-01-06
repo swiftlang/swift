@@ -9,57 +9,98 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines macros used for macro-metaprogramming lexer tokens.
-//
+///
+/// This file defines macros used for macro-metaprogramming lexer tokens.
+///
+/// To use, simply define one or more of the macro functions listed below and
+/// then import this file. The macro functions follow a hierarchical pattern,
+/// and defining a higher-level macro will expend (by default) all the patterns
+/// beneath it. All of the macro functions will be undefined automatically at
+/// the end, there is no need to do this manually.
+///
+/// KEYWORD(kw)
+///   SWIFT_KEYWORD(kw)
+///     DECL_KEYWORD(kw)
+///     STMT_KEYWORD(kw)
+///     EXPR_KEYWORD(kw)
+///     PAT_KEYWORD(kw)
+///   SIL_KEYWORD(kw)
+/// POUND_KEYWORD(kw)
+///   POUND_OBJECT_LITERAL(kw, desc, proto)
+///   POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
+///   POUND_CONFIG(kw)
+/// PUNCTUATOR(name, str)
+///
 //===----------------------------------------------------------------------===//
 
 /// KEYWORD(kw)
-///   Expands for every Swift keyword, such as 'if', 'else', etc.
+///   Expands by default for every Swift keyword and every SIL keyword, such as
+///   'if', 'else', 'sil_global', etc. If you only want to use Swift keywords
+///   see SWIFT_KEYWORD.
 #ifndef KEYWORD
 #define KEYWORD(kw)
+#endif
+
+/// SWIFT_KEYWORD(kw)
+///   Expands for every Swift keyword.
+#ifndef SWIFT_KEYWORD
+#define SWIFT_KEYWORD(kw) KEYWORD(kw)
 #endif
 
 /// DECL_KEYWORD(kw)
 ///   Expands for every Swift keyword that can be used in a declaration.
 #ifndef DECL_KEYWORD
-#define DECL_KEYWORD(kw) KEYWORD(kw)
+#define DECL_KEYWORD(kw) SWIFT_KEYWORD(kw)
 #endif
 
 /// STMT_KEYWORD(kw)
 ///   Expands for every Swift keyword used in statement grammar.
 #ifndef STMT_KEYWORD
-#define STMT_KEYWORD(kw) KEYWORD(kw)
+#define STMT_KEYWORD(kw) SWIFT_KEYWORD(kw)
 #endif
 
-/// POUND_KEYWORD(kw)
-///   Every keyword in the #foo namespace.
-#ifndef POUND_KEYWORD
-#define POUND_KEYWORD(kw)
+/// EXPR_KEYWORD(kw)
+///   Expands for every Swift keyword used in an expression, such as 'true',
+///   'false', and 'as'
+#ifndef EXPR_KEYWORD
+#define EXPR_KEYWORD(kw) SWIFT_KEYWORD(kw)
 #endif
 
-/// POUND_OBJECT_LITERAL(kw, desc, proto)
-///   Every keyword in the #foo namespace representing an object literal.
-#ifndef POUND_OBJECT_LITERAL
-#define POUND_OBJECT_LITERAL(kw, desc, proto) POUND_KEYWORD(kw)
-#endif
-
-/// POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
-///   Every keyword in the #foo namespace representing an object literal.
-#ifndef POUND_OLD_OBJECT_LITERAL
-#define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg) POUND_KEYWORD(kw)
-#endif
-
-/// POUND_CONFIG(kw)
-///   Every keyword in the #foo namespace representing a configuration.
-#ifndef POUND_CONFIG
-#define POUND_CONFIG(kw) POUND_KEYWORD(kw)
+/// PAT_KEYWORD(kw)
+///   Expands for every Swift keyword used in a pattern, which is currently
+///   limited to '_'
+#ifndef PAT_KEYWORD
+#define PAT_KEYWORD(kw) SWIFT_KEYWORD(kw)
 #endif
 
 /// SIL_KEYWORD(kw)
 ///   Expands for every SIL keyword. These are only keywords when parsing SIL.
 #ifndef SIL_KEYWORD
 #define SIL_KEYWORD(kw) KEYWORD(kw)
+#endif
+
+/// POUND_KEYWORD(kw)
+///   Every keyword in the # namespace.
+#ifndef POUND_KEYWORD
+#define POUND_KEYWORD(kw)
+#endif
+
+/// POUND_OBJECT_LITERAL(kw, desc, proto)
+///   Every keyword in the # namespace representing a new-form object literal.
+#ifndef POUND_OBJECT_LITERAL
+#define POUND_OBJECT_LITERAL(kw, desc, proto) POUND_KEYWORD(kw)
+#endif
+
+/// POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
+///   Every keyword in the # namespace representing an old-form object literal.
+#ifndef POUND_OLD_OBJECT_LITERAL
+#define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg) POUND_KEYWORD(kw)
+#endif
+
+/// POUND_CONFIG(kw)
+///   Every keyword in the # namespace representing a configuration.
+#ifndef POUND_CONFIG
+#define POUND_CONFIG(kw) POUND_KEYWORD(kw)
 #endif
 
 /// PUNCTUATOR(name, str)
@@ -128,19 +169,19 @@ STMT_KEYWORD(where)
 STMT_KEYWORD(catch)
 
 // Expression keywords.
-KEYWORD(as)
-KEYWORD(Any)
-KEYWORD(false)
-KEYWORD(is)
-KEYWORD(nil)
-KEYWORD(rethrows)
-KEYWORD(super)
-KEYWORD(self)
-KEYWORD(Self)
-KEYWORD(throw)
-KEYWORD(true)
-KEYWORD(try)
-KEYWORD(throws)
+EXPR_KEYWORD(as)
+EXPR_KEYWORD(Any)
+EXPR_KEYWORD(false)
+EXPR_KEYWORD(is)
+EXPR_KEYWORD(nil)
+EXPR_KEYWORD(rethrows)
+EXPR_KEYWORD(super)
+EXPR_KEYWORD(self)
+EXPR_KEYWORD(Self)
+EXPR_KEYWORD(throw)
+EXPR_KEYWORD(true)
+EXPR_KEYWORD(try)
+EXPR_KEYWORD(throws)
 KEYWORD(__FILE__)
 KEYWORD(__LINE__)
 KEYWORD(__COLUMN__)
@@ -148,7 +189,7 @@ KEYWORD(__FUNCTION__)
 KEYWORD(__DSO_HANDLE__)
 
 // Pattern keywords.
-KEYWORD(_)
+PAT_KEYWORD(_)
 
 // Punctuators.
 PUNCTUATOR(l_paren,       "(")
@@ -216,11 +257,14 @@ POUND_KEYWORD(dsohandle)
 
 
 #undef KEYWORD
+#undef SWIFT_KEYWORD
 #undef DECL_KEYWORD
 #undef STMT_KEYWORD
+#undef EXPR_KEYWORD
+#undef PAT_KEYWORD
 #undef SIL_KEYWORD
-#undef PUNCTUATOR
 #undef POUND_KEYWORD
 #undef POUND_OBJECT_LITERAL
 #undef POUND_OLD_OBJECT_LITERAL
 #undef POUND_CONFIG
+#undef PUNCTUATOR
