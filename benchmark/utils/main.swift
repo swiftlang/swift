@@ -81,6 +81,7 @@ import Prims
 import ProtocolDispatch
 import ProtocolDispatch2
 import RC4
+import ReversedCollections
 import RGBHistogram
 import RangeAssignment
 import RecursiveOwnedParameter
@@ -220,6 +221,9 @@ precommitTests = [
   "ProtocolDispatch": run_ProtocolDispatch,
   "ProtocolDispatch2": run_ProtocolDispatch2,
   "RC4": run_RC4,
+  "ReversedArray": run_ReversedArray,
+  "ReversedBidirectonal": run_ReversedBidirectonal,
+  "ReversedDictionary": run_ReversedDictionary,
   "RGBHistogram": run_RGBHistogram,
   "RGBHistogramOfObjects": run_RGBHistogramOfObjects,
   "RangeAssignment": run_RangeAssignment,
