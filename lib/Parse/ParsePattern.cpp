@@ -819,8 +819,9 @@ ParserResult<Pattern> Parser::parsePattern() {
 
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                           bool isLet) {
-  auto var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ isLet,
-                                   loc, name, Type(), CurDeclContext);
+  auto var = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/isLet,
+                                   /*IsCaptureList*/false, loc, name, Type(),
+                                   CurDeclContext);
   return new (Context) NamedPattern(var);
 }
 

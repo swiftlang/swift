@@ -903,10 +903,10 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   if (VD->getDidSetFunc()) {
     Expr *OldValueExpr
       = createPropertyLoadOrCallSuperclassGetter(Set, VD, TC);
-    
-    OldValue = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/ true,
-                                 SourceLoc(), Ctx.getIdentifier("tmp"),
-                                 Type(), Set);
+
+    OldValue = new (Ctx) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                 /*IsCaptureList*/false, SourceLoc(),
+                                 Ctx.getIdentifier("tmp"), Type(), Set);
     OldValue->setImplicit();
     auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
     auto tmpPBD = PatternBindingDecl::create(Ctx, SourceLoc(),
@@ -917,7 +917,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     SetterBody.push_back(tmpPBD);
     SetterBody.push_back(OldValue);
   }
-  
+
   // Create:
   //   (call_expr (dot_syntax_call_expr (decl_ref_expr(willSet)),
   //                                    (decl_ref_expr(self))),
@@ -1027,7 +1027,8 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   SmallVector<ASTNode, 6> Body;
 
   // Load the existing storage and store it into the 'tmp1' temporary.
-  auto *Tmp1VD = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/true,SourceLoc(),
+  auto *Tmp1VD = new (Ctx) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                   /*IsCaptureList*/false, SourceLoc(),
                                    Ctx.getIdentifier("tmp1"), Type(), Get);
   Tmp1VD->setImplicit();
 
@@ -1058,15 +1059,16 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
                                    constraints::ConstraintSystemOptions());
   constraints::Solution solution(cs, constraints::Score());
   auto HasValueExpr = solution.convertOptionalToBool(Tmp1DRE, nullptr);
-  
+
   Body.push_back(new (Ctx) IfStmt(SourceLoc(), HasValueExpr, Return,
                                   /*elseloc*/SourceLoc(), /*else*/nullptr,
                                   /*implicit*/ true, Ctx));
 
 
-  auto *Tmp2VD = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/true,
-                                   SourceLoc(), Ctx.getIdentifier("tmp2"),
-                                   VD->getType(), Get);
+  auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                   /*IsCaptureList*/false, SourceLoc(),
+                                   Ctx.getIdentifier("tmp2"), VD->getType(),
+                                   Get);
   Tmp2VD->setImplicit();
 
 
@@ -1140,12 +1142,10 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   SmallString<64> NameBuf = VD->getName().str();
   NameBuf += ".storage";
   auto StorageName = Context.getIdentifier(NameBuf);
-  auto *Storage = new (Context) VarDecl(VD->isStatic(),
-                                       /*let*/ !BehaviorStorage->isSettable(DC),
-                                       VD->getLoc(),
-                                       StorageName,
-                                       SubstStorageContextTy,
-                                       DC);
+  auto *Storage = new (Context) VarDecl(
+      /*IsStatic*/VD->isStatic(), /*IsLet*/!BehaviorStorage->isSettable(DC),
+      /*IsCaptureList*/false, VD->getLoc(), StorageName, SubstStorageContextTy,
+      DC);
   Storage->setInterfaceType(SubstStorageInterfaceTy);
   Storage->setUserAccessible(false);
   // Mark the vardecl to be final, implicit, and private.  In a class, this
@@ -1426,8 +1426,8 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
     if (!fromMutating
         && toAccessor->getImplicitSelfDecl()->isSettable(toAccessor)) {
       selfExpr->setType(selfTy);
-      auto var = new (Context) VarDecl(/*static*/false, /*let*/false,
-                                       SourceLoc(),
+      auto var = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/false,
+                                       /*IsCaptureList*/false, SourceLoc(),
                                        Context.getIdentifier("tempSelf"),
                                        selfTy, fromAccessor);
       var->setInterfaceType(selfIfaceTy);
@@ -1537,8 +1537,9 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   auto StorageTy = OptionalType::get(VD->getType());
   auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());
 
-  auto *Storage = new (Context) VarDecl(/*isStatic*/false, /*isLet*/false,
-                                        VD->getLoc(), StorageName, StorageTy,
+  auto *Storage = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/false,
+                                        /*IsCaptureList*/false, VD->getLoc(),
+                                        StorageName, StorageTy,
                                         VD->getDeclContext());
   Storage->setInterfaceType(StorageInterfaceTy);
   Storage->setUserAccessible(false);

@@ -472,9 +472,9 @@ public:
     }
 
     VarDecl *VD =
-        new (Context) VarDecl(false, // static
-                              true,  // let
-                              SourceLoc(), Context.getIdentifier(NameBuf),
+        new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                              /*IsCaptureList*/false, SourceLoc(),
+                              Context.getIdentifier(NameBuf),
                               MaybeLoadInitExpr->getType(), TypeCheckDC);
 
     VD->setImplicit();

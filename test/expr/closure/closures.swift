@@ -22,6 +22,11 @@ var closure6 = $0  // expected-error {{anonymous closure argument not contained 
 var closure7 : Int =
    { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{9-9=()}}
 
+var capturedVariable = 1
+var closure8 = { [capturedVariable] in
+  capturedVariable += 1 // expected-error {{left side of mutating operator isn't mutable: 'capturedVariable' is an immutable capture}}
+}
+
 func funcdecl1(_ a: Int, _ y: Int) {}
 func funcdecl3() -> Int {}
 func funcdecl4(_ a: ((Int) -> Int), _ b: Int) {}

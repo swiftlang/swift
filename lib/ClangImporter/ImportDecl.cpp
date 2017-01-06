@@ -123,8 +123,10 @@ createVarWithPattern(ASTContext &cxt, DeclContext *dc, Identifier name, Type ty,
                      Accessibility setterAccessibility) {
   // Create a variable to store the underlying value.
   auto var = new (cxt) VarDecl(
-      /*static*/ false,
-      /*IsLet*/ isLet, SourceLoc(), name, ty, dc);
+      /*IsStatic*/false,
+      /*IsLet*/isLet,
+      /*IsCaptureList*/false,
+      SourceLoc(), name, ty, dc);
   if (isImplicit)
     var->setImplicit();
   var->setInterfaceType(ty);
@@ -1191,8 +1193,8 @@ static void makeStructRawValuedWithBridge(
   //
   // Create a computed value variable
   auto computedVar = new (cxt) VarDecl(
-      /*static*/ false,
-      /*IsLet*/ false, SourceLoc(), computedVarName, bridgedType, structDecl);
+      /*IsStatic*/false, /*IsLet*/false, /*IsCaptureList*/false,
+      SourceLoc(), computedVarName, bridgedType, structDecl);
   computedVar->setInterfaceType(bridgedType);
   computedVar->setImplicit();
   computedVar->setAccessibility(Accessibility::Public);
@@ -1496,8 +1498,8 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
-      isStatic,
-      /*IsLet=*/false, SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
+      /*IsStatic*/isStatic, /*IsLet*/false, /*IsCaptureList*/false,
+      SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setAccessibility(Accessibility::Public);
 
@@ -2195,7 +2197,8 @@ namespace {
           // Create the _nsError member.
           //   public let _nsError: NSError
           auto nsErrorType = nsErrorDecl->getDeclaredInterfaceType();
-          auto nsErrorProp = new (C) VarDecl(/*static*/ false, /*IsLet*/ true,
+          auto nsErrorProp = new (C) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                             /*IsCaptureList*/false,
                                              loc, C.Id_nsError, nsErrorType,
                                              errorWrapper);
           nsErrorProp->setImplicit();
@@ -2261,10 +2264,10 @@ namespace {
         auto rawValueConstructor = makeEnumRawValueConstructor(Impl, enumDecl);
 
         auto varName = C.Id_rawValue;
-        auto rawValue = new (C) VarDecl(/*static*/ false,
-                                               /*IsLet*/ false,
-                                               SourceLoc(), varName,
-                                               underlyingType, enumDecl);
+        auto rawValue = new (C) VarDecl(/*IsStatic*/false, /*IsLet*/ false,
+                                        /*IsCaptureList*/false,
+                                        SourceLoc(), varName, underlyingType,
+                                        enumDecl);
         rawValue->setImplicit();
         rawValue->setAccessibility(Accessibility::Public);
         rawValue->setSetterAccessibility(Accessibility::Private);
@@ -2789,7 +2792,8 @@ namespace {
       // Map this indirect field to a Swift variable.
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
                        Accessibility::Public,
-                       /*static*/ false, /*IsLet*/ false,
+                       /*IsStatic*/false, /*IsLet*/ false,
+                       /*IsCaptureList*/false,
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, type, dc);
       result->setInterfaceType(type);
@@ -2980,7 +2984,8 @@ namespace {
 
       auto result =
         Impl.createDeclWithClangNode<VarDecl>(decl, Accessibility::Public,
-                              /*static*/ false, /*IsLet*/ false,
+                              /*IsStatic*/ false, /*IsLet*/ false,
+                              /*IsCaptureList*/false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
       result->setInterfaceType(type);
@@ -3053,8 +3058,10 @@ namespace {
         isStatic = true;
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
-                       Accessibility::Public, isStatic,
-                       Impl.shouldImportGlobalAsLet(decl->getType()),
+                       Accessibility::Public,
+                       /*IsStatic*/isStatic,
+                       /*IsLet*/Impl.shouldImportGlobalAsLet(decl->getType()),
+                       /*IsCaptureList*/false,
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
       result->setInterfaceType(type);
@@ -4113,8 +4120,8 @@ namespace {
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
           getOverridableAccessibility(dc),
-          decl->isClassProperty(), /*IsLet*/ false,
-          Impl.importSourceLoc(decl->getLocation()),
+          /*IsStatic*/decl->isClassProperty(), /*IsLet*/false,
+          /*IsCaptureList*/false, Impl.importSourceLoc(decl->getLocation()),
           name, type, dc);
       result->setInterfaceType(dc->mapTypeOutOfContext(type));
 
@@ -4987,8 +4994,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
     return nullptr;
 
   auto property = Impl.createDeclWithClangNode<VarDecl>(
-      getter, Accessibility::Public, isStatic,
-      /*isLet=*/false, SourceLoc(), propertyName, swiftPropertyType, dc);
+      getter, Accessibility::Public, /*IsStatic*/isStatic, /*isLet*/false,
+      /*IsCaptureList*/false, SourceLoc(), propertyName, swiftPropertyType, dc);
   property->setInterfaceType(swiftPropertyType);
 
   // Note that we've formed this property.
@@ -7039,11 +7046,13 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   VarDecl *var = nullptr;
   if (ClangN) {
     var = createDeclWithClangNode<VarDecl>(ClangN, Accessibility::Public,
-                                           isStatic, /*IsLet*/ false,
-                                           SourceLoc(), name, type, dc);
+                                           /*IsStatic*/isStatic, /*IsLet*/false,
+                                           /*IsCaptureList*/false, SourceLoc(),
+                                           name, type, dc);
   } else {
     var = new (SwiftContext)
-        VarDecl(isStatic, /*IsLet*/ false, SourceLoc(), name, type, dc);
+        VarDecl(/*IsStatic*/isStatic, /*IsLet*/false, /*IsCaptureList*/false,
+                SourceLoc(), name, type, dc);
   }
 
   var->setInterfaceType(type);
@@ -7147,7 +7156,9 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
   // Create a new VarDecl with dummy type.
   auto var = createDeclWithClangNode<VarDecl>(ClangN, Accessibility::Public,
-                                              isStatic, /*IsLet*/ false,
+                                              /*IsStatic*/isStatic,
+                                              /*IsLet*/false,
+                                              /*IsCaptureList*/false,
                                               SourceLoc(), name, type, dc);
   var->setInterfaceType(type);
   markUnavailable(var, UnavailableMessage);
