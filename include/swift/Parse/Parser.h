@@ -59,11 +59,10 @@ namespace swift {
     TopLevelCode,
     /// The top-level of a file, when in parse-as-library mode.
     TopLevelLibrary,
-    /// The body of the clause of an #if/#else/#endif block
-    ConditionalBlock,
-    /// The body of the clause of an #if/#else/#endif block that was statically
-    /// determined to be inactive.
-    StaticallyInactiveConditionalBlock,
+    /// The body of the inactive clause of an #if/#else/#endif block
+    InactiveConditionalBlock,
+    /// The body of the active clause of an #if/#else/#endif block
+    ActiveConditionalBlock,
   };
 
   
@@ -619,10 +618,6 @@ public:
                                BraceItemListKind ConditionalBlockKind =
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
-  
-  void parseIfConfigClauseElements(bool isInactive,
-                                   BraceItemListKind Kind,
-                                   SmallVectorImpl<ASTNode> &Elements);
   
   void parseTopLevelCodeDeclDelayed();
 

@@ -157,8 +157,8 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
     return false;
   case BraceItemListKind::TopLevelLibrary:
     return false;
-  case BraceItemListKind::ConditionalBlock:
-  case BraceItemListKind::StaticallyInactiveConditionalBlock:
+  case BraceItemListKind::ActiveConditionalBlock:
+  case BraceItemListKind::InactiveConditionalBlock:
     return Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
            Tok.isNot(tok::pound_elseif);
   }
@@ -235,17 +235,18 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
                     (Kind == BraceItemListKind::TopLevelLibrary);
-  bool isConditionalBlock
-    = (ConditionalBlockKind == BraceItemListKind::ConditionalBlock) ||
-      (ConditionalBlockKind == BraceItemListKind::StaticallyInactiveConditionalBlock);
+  bool isActiveConditionalBlock =
+    ConditionalBlockKind == BraceItemListKind::ActiveConditionalBlock;
+  bool isConditionalBlock = isActiveConditionalBlock ||
+    ConditionalBlockKind == BraceItemListKind::InactiveConditionalBlock;
 
-  // If we're not parsing an inactive #if block, form a new lexical scope.
+  // If we're not parsing an active #if block, form a new lexical scope.
   Optional<Scope> initScope;
-  bool isInactiveConditionalBlock =
-    ConditionalBlockKind == BraceItemListKind::StaticallyInactiveConditionalBlock;
-  if (!isInactiveConditionalBlock) {
+  if (!isActiveConditionalBlock) {
     auto scopeKind =  IsTopLevel ? ScopeKind::TopLevel : ScopeKind::Brace;
-    initScope.emplace(this, scopeKind, isInactiveConditionalBlock);
+    initScope.emplace(this, scopeKind,
+                      ConditionalBlockKind ==
+                        BraceItemListKind::InactiveConditionalBlock);
   }
 
   ParserStatus BraceItemsStatus;
@@ -606,16 +607,6 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 
   return makeParserResult(Status,
                           BraceStmt::create(Context, LBLoc, Entries, RBLoc));
-}
-
-/// \brief Parses the elements in active or inactive if config clauses.
-void Parser::parseIfConfigClauseElements(bool isInactive,
-                                         BraceItemListKind Kind,
-                                         SmallVectorImpl<ASTNode> &Elements) {
-  parseBraceItems(Elements, Kind,
-                  isInactive
-                    ? BraceItemListKind::StaticallyInactiveConditionalBlock
-                    : BraceItemListKind::ConditionalBlock);
 }
 
 /// parseStmtBreak
@@ -1641,8 +1632,7 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
         !fnName.equals("_endian") &&
         !fnName.equals("_runtime") &&
         !fnName.equals("swift") &&
-        !fnName.equals("_compiler_version") &&
-        !fnName.equals("canImport")) {
+        !fnName.equals("_compiler_version")) {
       D.diagnose(CE->getLoc(), diag::unsupported_platform_condition_expression);
       return ConditionalCompilationExprState::error();
     }
@@ -1736,11 +1726,6 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
             D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
                        "endianness", fnName);
           }
-        } else if (fnName == "canImport") {
-          bool result =
-            Context.canImportModule({ argumentIdent, UDRE->getLoc() });
-          return {result,
-            ConditionalCompilationExprKind::Import};
         }
 
         // FIXME: Perform the replacement macOS -> OSX elsewhere.
@@ -1819,10 +1804,12 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
     }
 
     SmallVector<ASTNode, 16> Elements;
-    if (ConfigState.shouldParse())
-      parseIfConfigClauseElements(ConfigState.isConditionActive(), Kind,
-                                  Elements);
-    else {
+    if (ConfigState.shouldParse()) {
+      parseBraceItems(Elements, Kind,
+                      ConfigState.isConditionActive()
+                        ? BraceItemListKind::ActiveConditionalBlock
+                        : BraceItemListKind::InactiveConditionalBlock);
+    } else {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();
       DT.abort();
