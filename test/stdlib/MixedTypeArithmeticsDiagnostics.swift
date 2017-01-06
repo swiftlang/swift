@@ -1,4 +1,4 @@
-//===--- MixtypeArithmeticsDiagnostics.swift ------------------------------===//
+//===--- MixedTypeArithmeticsDiagnostics.swift ----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,7 @@
 // RUN: %target-typecheck-verify-swift
 
 
-func mixtypeArithemtics() {
+func mixedTypeArithemtics() {
   _ = (42 as Int64) + (0 as Int) // expected-warning {{'+' is deprecated:}}
 
   do {
