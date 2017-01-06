@@ -2484,8 +2484,12 @@ buildThunkSignature(SILGenFunction &gen,
     auto newArchetype = genericEnv->mapTypeIntoContext(mod, depTy)
         ->castTo<ArchetypeType>();
 
-    contextSubs.addSubstitution(CanType(oldArchetype), newArchetype);
-    interfaceSubs.addSubstitution(canTy, oldArchetype);
+    contextSubs.addSubstitution(CanArchetypeType(oldArchetype), newArchetype);
+
+    if (isa<SubstitutableType>(canTy)) {
+      interfaceSubs.addSubstitution(cast<SubstitutableType>(canTy),
+                                  oldArchetype);
+    }
 
     contextSubs.addConformances(CanType(oldArchetype), conformances);
     interfaceSubs.addConformances(canTy, conformances);

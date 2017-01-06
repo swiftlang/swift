@@ -1438,7 +1438,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     }
 
     tl.setType(ty, /*validated=*/true);
-    subMap.addSubstitution(genericTypeParamTy->getCanonicalType(), ty);
+    subMap.addSubstitution(
+        cast<GenericTypeParamType>(genericTypeParamTy->getCanonicalType()), ty);
   }
 
   // Capture the conformances needed for the substitution map.

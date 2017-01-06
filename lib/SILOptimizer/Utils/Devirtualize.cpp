@@ -463,8 +463,10 @@ getSubstitutionsForCallee(SILModule &M,
 
       // Otherwise, record the replacement and conformances for the mapped
       // type.
-      if (isa<GenericTypeParamType>(canTy))
-        subMap.addSubstitution(canTy, sub.getReplacement());
+      if (isa<SubstitutableType>(canTy)) {
+        subMap.addSubstitution(cast<SubstitutableType>(canTy),
+                               sub.getReplacement());
+      }
       subMap.addConformances(canTy, sub.getConformances());
     }
     assert(origSubs.empty());
@@ -834,7 +836,8 @@ static void getWitnessMethodSubstitutions(
   unsigned depth = 0;
   if (isDefaultWitness) {
     // For default witnesses, we substitute all of Self.
-    auto gp = witnessThunkSig->getGenericParams().front()->getCanonicalType();
+    auto gp = cast<GenericTypeParamType>(witnessThunkSig->getGenericParams()
+                                                 .front()->getCanonicalType());
     subMap.addSubstitution(gp, origSubs.front().getReplacement());
     subMap.addConformances(gp, origSubs.front().getConformances());
 
@@ -899,8 +902,10 @@ static void getWitnessMethodSubstitutions(
       // Otherwise, record the replacement and conformances for the mapped
       // type.
       auto canTy = mappedDepTy->getCanonicalType();
-      if (isa<GenericTypeParamType>(canTy))
-        subMap.addSubstitution(canTy, sub.getReplacement());
+      if (isa<SubstitutableType>(canTy)) {
+        subMap.addSubstitution(cast<SubstitutableType>(canTy),
+                               sub.getReplacement());
+      }
       subMap.addConformances(canTy, sub.getConformances());
     }
     assert(subs.empty() && "Did not consume all substitutions");

@@ -36,6 +36,9 @@ namespace swift {
 
 class SubstitutableType;
 
+template<class Type> class CanTypeWrapper;
+typedef CanTypeWrapper<SubstitutableType> CanSubstitutableType;
+
 class SubstitutionMap {
   using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
 
@@ -61,7 +64,7 @@ public:
   /// Retrieve the conformances for the given type.
   ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
 
-  void addSubstitution(CanType type, Type replacement);
+  void addSubstitution(CanSubstitutableType type, Type replacement);
 
   void addConformances(CanType type, ArrayRef<ProtocolConformanceRef> conformances);
 

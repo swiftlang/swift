@@ -645,7 +645,8 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   auto OldOpenedArchetype = getOpenedArchetypeOf(Inst);
   auto NewOpenedArchetype = getOpenedArchetypeOf(dyn_cast<SILInstruction>(V));
   SubstitutionMap TypeSubstMap;
-  TypeSubstMap.addSubstitution(CanType(OldOpenedArchetype), NewOpenedArchetype);
+  TypeSubstMap.addSubstitution(CanArchetypeType(OldOpenedArchetype),
+                               NewOpenedArchetype);
   // Collect all candidates that may contain opened archetypes
   // that need to be replaced.
   for (auto Use : Inst->getUses()) {

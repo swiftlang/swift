@@ -357,7 +357,7 @@ getSubstitutionMap(ModuleDecl *mod,
 
     // Record the replacement type and its conformances.
     if (auto *archetype = contextTy->getAs<ArchetypeType>()) {
-      result.addSubstitution(CanType(archetype), sub.getReplacement());
+      result.addSubstitution(CanArchetypeType(archetype), sub.getReplacement());
       result.addConformances(CanType(archetype), sub.getConformances());
       continue;
     }
