@@ -589,11 +589,10 @@ getCodeCompletionLiteralKindForUID(UIdent uid) {
 
 static CodeCompletionKeywordKind
 getCodeCompletionKeywordKindForUID(UIdent uid) {
-#define SIL_KEYWORD(kw)
-#define KEYWORD(kw)                                                            \
-  static UIdent Keyword##kw##UID("source.lang.swift.keyword." #kw);            \
-  if (uid == Keyword##kw##UID) {                                               \
-    return CodeCompletionKeywordKind::kw_##kw;                                 \
+#define SWIFT_KEYWORD(kw) \
+  static UIdent Keyword##kw##UID("source.lang.swift.keyword." #kw); \
+  if (uid == Keyword##kw##UID) { \
+    return CodeCompletionKeywordKind::kw_##kw; \
   }
 #include "swift/Parse/Tokens.def"
 
