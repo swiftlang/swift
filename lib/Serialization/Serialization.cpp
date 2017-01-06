@@ -3074,21 +3074,25 @@ void Serializer::writeType(Type ty) {
       break;
     }
 
-    TypeID parentID = addTypeRef(archetypeTy->getParent());
-
     SmallVector<DeclID, 4> conformances;
     for (auto proto : archetypeTy->getConformsTo())
       conformances.push_back(addDeclRef(proto));
 
+    TypeID parentOrGenericEnv;
     DeclID assocTypeOrNameID;
-    if (archetypeTy->getParent())
+    if (archetypeTy->getParent()) {
+      parentOrGenericEnv = addTypeRef(archetypeTy->getParent());
       assocTypeOrNameID = addDeclRef(archetypeTy->getAssocType());
-    else
+    } else {
+      parentOrGenericEnv =
+        addGenericEnvironmentRef(archetypeTy->getGenericEnvironment());
       assocTypeOrNameID = addIdentifierRef(archetypeTy->getName());
+    }
 
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    parentID,
+                                    archetypeTy->isPrimary(),
+                                    parentOrGenericEnv,
                                     assocTypeOrNameID,
                                     addTypeRef(archetypeTy->getSuperclass()),
                                     conformances);

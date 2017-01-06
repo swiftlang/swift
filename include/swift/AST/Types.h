@@ -3875,7 +3875,7 @@ public:
 
   /// Retrieve the generic environment in which this archetype resides.
   ///
-  /// FIXME: Not all archetypes have generic environments, yet.
+  /// Note: opened archetypes currently don't have generic environments.
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the associated type to which this archetype (if it is a nested

@@ -21,24 +21,16 @@
 
 using namespace swift;
 
-GenericEnvironment::GenericEnvironment(
-    GenericSignature *signature,
-    ArchetypeBuilder *builder,
-    TypeSubstitutionMap interfaceToArchetypeMap)
+GenericEnvironment::GenericEnvironment(GenericSignature *signature,
+                                       ArchetypeBuilder *builder)
   : Signature(signature), Builder(builder)
 {
   NumMappingsRecorded = 0;
   NumArchetypeToInterfaceMappings = 0;
 
   // Clear out the memory that holds the context types.
-  std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(), Type());
-
-  // Build a mapping in both directions, making sure to canonicalize the
-  // interface type where it is used as a key, so that substitution can
-  // find them, and to preserve sugar otherwise, so that
-  // mapTypeOutOfContext() produces a human-readable type.
-  for (auto entry : interfaceToArchetypeMap)
-    addMapping(entry.first->castTo<GenericTypeParamType>(), entry.second);
+  std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
+                          Type());
 }
 
 /// Compute the depth of the \c DeclContext chain.

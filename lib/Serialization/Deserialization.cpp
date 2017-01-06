@@ -965,33 +965,49 @@ void ModuleFile::configureGenericEnvironment(
 }
 
 llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-ModuleFile::readGenericSignatureOrEnvironment(
-                        llvm::BitstreamCursor &cursor,
-                        bool wantEnvironment) {
-  using namespace decls_block;
-
-  SmallVector<uint64_t, 8> scratch;
-  SmallVector<GenericTypeParamType *, 4> paramTypes;
-  StringRef blobData;
-
-  // Make sure we give the caller the requested type.
-  llvm::PointerUnion<GenericSignature *, GenericEnvironment *> emptyResult;
+ModuleFile::getGenericSignatureOrEnvironment(
+                                         serialization::GenericEnvironmentID ID,
+                                         bool wantEnvironment) {
+  // The empty result with the type the caller expects.
+  llvm::PointerUnion<GenericSignature *, GenericEnvironment *> result;
   if (wantEnvironment)
-    emptyResult = static_cast<GenericEnvironment *>(nullptr);
+    result = static_cast<GenericEnvironment *>(nullptr);
 
-  TypeSubstitutionMap interfaceToArchetypeMap;
+  // Zero is a sentinel for having no generic environment.
+  if (ID == 0) return result;
+
+  assert(ID <= GenericEnvironments.size() && "invalid GenericEnvironment ID");
+  auto &envOrOffset = GenericEnvironments[ID-1];
+
+  // If we've already deserialized this generic environment, return it.
+  if (envOrOffset.isComplete()) {
+    return envOrOffset.get();
+  }
+
+  // Read the generic environment.
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(envOrOffset);
+  DeserializingEntityRAII deserializingEntity(*this);
+
+  SmallVector<GenericTypeParamType *, 4> paramTypes;
+  SmallVector<uint64_t, 4> rawContextTypeIDs;
   {
+    using namespace decls_block;
+
+    StringRef blobData;
+    SmallVector<uint64_t, 8> scratch;
+
     // we only want to be tracking the offset for this part of the function,
     // since loading the generic signature (a) may read the record we reject,
     // and (b) shouldn't have its progress erased. (That function also does its
     // own internal tracking.)
-    BCOffsetRAII lastRecordOffset(cursor);
+    BCOffsetRAII lastRecordOffset(DeclTypeCursor);
 
-    auto entry = cursor.advance(AF_DontPopBlockAtEnd);
+    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
     if (entry.Kind != llvm::BitstreamEntry::Record)
-      return emptyResult;
+      return result;
 
-    unsigned recordID = cursor.readRecord(entry.ID, scratch, &blobData);
+    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
     switch (recordID) {
     case GENERIC_ENVIRONMENT: {
       lastRecordOffset.reset();
@@ -1001,20 +1017,13 @@ ModuleFile::readGenericSignatureOrEnvironment(
 
       if (rawParamIDs.size() % 2 != 0) {
         error();
-        return emptyResult;
+        return result;
       }
 
       for (unsigned i = 0, n = rawParamIDs.size(); i != n; i += 2) {
         auto paramTy = getType(rawParamIDs[i])->castTo<GenericTypeParamType>();
         paramTypes.push_back(paramTy);
-
-        if (wantEnvironment) {
-          auto contextTy = getType(rawParamIDs[i+1]);
-
-          auto result = interfaceToArchetypeMap.insert(
-                                              std::make_pair(paramTy, contextTy));
-          assert(result.second);
-        }
+        rawContextTypeIDs.push_back(rawParamIDs[i+1]);
       }
       break;
     }
@@ -1026,7 +1035,7 @@ ModuleFile::readGenericSignatureOrEnvironment(
 
       if (rawParamIDs.size() % 3 != 0) {
         error();
-        return emptyResult;
+        return result;
       }
 
       for (unsigned i = 0, n = rawParamIDs.size(); i != n; i += 3) {
@@ -1045,88 +1054,54 @@ ModuleFile::readGenericSignatureOrEnvironment(
         }
 
         paramTypes.push_back(paramTy);
-
-        if (wantEnvironment) {
-          auto contextTy = getType(rawParamIDs[i+2]);
-
-          auto result = interfaceToArchetypeMap.insert(
-                                              std::make_pair(paramTy, contextTy));
-          assert(result.second);
-        }
+        rawContextTypeIDs.push_back(rawParamIDs[i+2]);
       }
       break;
     }
 
     default:
-      return emptyResult;
+      error();
+      return result;
     }
   }
 
+  // If there are no parameters, the environment is empty.
   if (paramTypes.empty()) {
-    return emptyResult;
+    if (wantEnvironment)
+      envOrOffset = nullptr;
+
+    return result;
   }
 
   // Read the generic requirements.
   SmallVector<Requirement, 4> requirements;
-  readGenericRequirements(requirements, cursor);
+  readGenericRequirements(requirements, DeclTypeCursor);
 
   // Construct the generic signature from the loaded parameters and
   // requirements.
   auto signature = GenericSignature::get(paramTypes, requirements);
 
-  // If the caller didn't want the full environment, we're done.
+  // If we only want the signature, return it now.
   if (!wantEnvironment) return signature;
 
-  // Create the generic requirement.
-  return GenericEnvironment::get(signature, interfaceToArchetypeMap);
-}
-
-llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-ModuleFile::getGenericSignatureOrEnvironment(
-                                         serialization::GenericEnvironmentID ID,
-                                         bool wantEnvironment) {
-  // Zero is a sentinel for having no generic environment.
-  if (ID == 0) {
-    // Make sure we give the caller the requested type.
-    llvm::PointerUnion<GenericSignature *, GenericEnvironment *> result;
-    if (wantEnvironment)
-      result = static_cast<GenericEnvironment *>(nullptr);
-
-    return result;
-  }
-
-  assert(ID <= GenericEnvironments.size() && "invalid GenericEnvironment ID");
-  auto &envOrOffset = GenericEnvironments[ID-1];
-
   // If we've already deserialized this generic environment, return it.
   if (envOrOffset.isComplete()) {
     return envOrOffset.get();
   }
 
-  // Read the generic environment.
-  BCOffsetRAII restoreOffset(DeclTypeCursor);
-  DeclTypeCursor.JumpToBit(envOrOffset);
-  DeserializingEntityRAII deserializingEntity(*this);
-
-  auto result = readGenericSignatureOrEnvironment(DeclTypeCursor,
-                                                  wantEnvironment);
-  if (result.isNull()) {
-    envOrOffset = nullptr;
-    return envOrOffset.get();
-  }
-
-  // If we've already deserialized this generic environment, return it.
-  if (envOrOffset.isComplete()) {
-    return envOrOffset.get();
-  }
-
-  if (auto signature = result.dyn_cast<GenericSignature *>()) {
-    assert(!wantEnvironment && "Reader should have produced the environment");
-    return signature;
-  }
-
-  auto genericEnv = result.get<GenericEnvironment *>();
+  // Form the generic environment. Record it now so that deserialization of
+  // the archetypes in the environment can refer to this environment.
+  auto genericEnv = GenericEnvironment::getIncomplete(signature, nullptr);
   envOrOffset = genericEnv;
+
+  // Fill in the interface type -> context type mappings to complete the
+  // generic environment.
+  // FIXME: Eventually, these mappings will go away.
+  assert(paramTypes.size() == rawContextTypeIDs.size());
+  for (unsigned i : indices(paramTypes))
+    genericEnv->addMapping(paramTypes[i], getType(rawContextTypeIDs[i]));
+
+  // The generic environment is complete.
   return genericEnv;
 }
 
@@ -3750,26 +3725,30 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
   case decls_block::ARCHETYPE_TYPE: {
-    TypeID parentID;
+    uint8_t isPrimary;
+    TypeID parentOrGenericEnvID;
     DeclID assocTypeOrNameID;
     TypeID superclassID;
     ArrayRef<uint64_t> rawConformanceIDs;
 
-    decls_block::ArchetypeTypeLayout::readRecord(scratch, parentID,
+    decls_block::ArchetypeTypeLayout::readRecord(scratch, isPrimary,
+                                                 parentOrGenericEnvID,
                                                  assocTypeOrNameID,
                                                  superclassID,
                                                  rawConformanceIDs);
 
+    GenericEnvironment *genericEnv = nullptr;
     ArchetypeType *parent = nullptr;
+    if (isPrimary) {
+      genericEnv = getGenericEnvironment(parentOrGenericEnvID);
+    } else {
+      parent = getType(parentOrGenericEnvID)->castTo<ArchetypeType>();
+    }
+
     Type superclass;
-    SmallVector<ProtocolDecl *, 4> conformances;
-
-    if (auto parentType = getType(parentID))
-      parent = parentType->castTo<ArchetypeType>();
-
-
     superclass = getType(superclassID);
 
+    SmallVector<ProtocolDecl *, 4> conformances;
     for (DeclID protoID : rawConformanceIDs)
       conformances.push_back(cast<ProtocolDecl>(getDecl(protoID)));
 
@@ -3783,7 +3762,7 @@ Type ModuleFile::getType(TypeID TID) {
       archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
                                         conformances, superclass);
     } else {
-      archetype = ArchetypeType::getNew(ctx, nullptr,
+      archetype = ArchetypeType::getNew(ctx, genericEnv,
                                         getIdentifier(assocTypeOrNameID),
                                         conformances, superclass);
     }

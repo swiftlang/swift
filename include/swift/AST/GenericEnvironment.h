@@ -107,8 +107,7 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   }
 
   GenericEnvironment(GenericSignature *signature,
-                     ArchetypeBuilder *builder,
-                     TypeSubstitutionMap interfaceToArchetypeMap);
+                     ArchetypeBuilder *builder);
 
   friend class ArchetypeType;
   friend class ArchetypeBuilder;
@@ -154,10 +153,6 @@ public:
   /// Determine whether this generic environment contains the given
   /// primary archetype.
   bool containsPrimaryArchetype(ArchetypeType *archetype) const;
-
-  static
-  GenericEnvironment *get(GenericSignature *signature,
-                          TypeSubstitutionMap interfaceToArchetypeMap);
 
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().
