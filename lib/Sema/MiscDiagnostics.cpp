@@ -62,6 +62,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
   class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedNoEscapes;
+    SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
     
     // Keep track of acceptable DiscardAssignmentExpr's.
     SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
@@ -215,6 +216,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         
         // Verify that special decls are eliminated.
         checkForDeclWithSpecialTypeCheckingSemantics(DRE);
+        
+        // Verify that `unsafeBitCast` isn't misused.
+        checkForSuspiciousBitCasts(DRE, nullptr);
       }
       if (auto *MRE = dyn_cast<MemberRefExpr>(Base)) {
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
@@ -250,8 +254,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         auto Base = Call->getFn();
         while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
           Base = Conv->getSubExpr();
-        if (auto *DRE = dyn_cast<DeclRefExpr>(Base))
+        while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(Base))
+          Base = ignoredBase->getRHS();
+        if (auto *DRE = dyn_cast<DeclRefExpr>(Base)) {
           checkNoEscapeParameterUse(DRE, Call);
+          checkForSuspiciousBitCasts(DRE, Call);
+        }
 
         auto *Arg = Call->getArg();
 
@@ -623,6 +631,512 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
                     DRE->getDecl()->getName());
       }
+    }
+    
+    enum BitcastableNumberKind {
+      BNK_None = 0,
+      BNK_Int8,
+      BNK_Int16,
+      BNK_Int32,
+      BNK_Int64,
+      BNK_Int,
+      BNK_UInt8,
+      BNK_UInt16,
+      BNK_UInt32,
+      BNK_UInt64,
+      BNK_UInt,
+      BNK_Float,
+      BNK_Double,
+    };
+    BitcastableNumberKind getBitcastableNumberKind(Type t) const {
+      auto decl = t->getNominalOrBoundGenericNominal();
+#define MATCH_DECL(type) \
+      if (decl == TC.Context.get##type##Decl()) \
+        return BNK_##type;
+      MATCH_DECL(Int8)
+      MATCH_DECL(Int16)
+      MATCH_DECL(Int32)
+      MATCH_DECL(Int64)
+      MATCH_DECL(Int)
+      MATCH_DECL(UInt8)
+      MATCH_DECL(UInt16)
+      MATCH_DECL(UInt32)
+      MATCH_DECL(UInt64)
+      MATCH_DECL(UInt)
+      MATCH_DECL(Float)
+      MATCH_DECL(Double)
+#undef MATCH_DECL
+      
+      return BNK_None;
+    }
+    
+    static constexpr unsigned BNKPair(BitcastableNumberKind a,
+                                      BitcastableNumberKind b) {
+      return (a << 8) | b;
+    }
+    
+    void checkForSuspiciousBitCasts(DeclRefExpr *DRE,
+                                    Expr *Parent = nullptr) {
+      if (DRE->getDecl() != TC.Context.getUnsafeBitCast(&TC))
+        return;
+      
+      if (DRE->getDeclRef().getSubstitutions().size() != 2)
+        return;
+      
+      // Don't check the same use of unsafeBitCast twice.
+      if (!AlreadyDiagnosedBitCasts.insert(DRE).second)
+        return;
+      
+      auto fromTy = DRE->getDeclRef().getSubstitutions()[0].getReplacement();
+      auto toTy = DRE->getDeclRef().getSubstitutions()[1].getReplacement();
+    
+      // Warn about `unsafeBitCast` formulations that are undefined behavior
+      // or have better-defined alternative APIs that can be used instead.
+      
+      // If we have a parent ApplyExpr that calls bitcast, extract the argument
+      // for fixits.
+      Expr *subExpr = nullptr;
+      CharSourceRange removeBeforeRange, removeAfterRange;
+      if (auto apply = dyn_cast_or_null<ApplyExpr>(Parent)) {
+        if (auto args = dyn_cast<TupleExpr>(apply->getArg())) {
+          subExpr = args->getElement(0);
+          // Determine the fixit range from the start of the application to
+          // the first argument, `unsafeBitCast(`
+          removeBeforeRange = CharSourceRange(TC.Context.SourceMgr,
+                                              DRE->getLoc(),
+                                              subExpr->getStartLoc());
+          // Determine the fixit range from the end of the first argument to
+          // the end of the application, `, to: T.self)`
+          removeAfterRange = CharSourceRange(TC.Context.SourceMgr,
+                         Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                    subExpr->getEndLoc()),
+                         Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                    apply->getEndLoc()));          
+        }
+      }
+  
+      // Casting to the same type or a superclass is a no-op.
+      if (toTy->isEqual(fromTy) ||
+          toTy->isExactSuperclassOf(fromTy, &TC)) {
+        auto d = TC.diagnose(DRE->getLoc(), diag::bitcasting_is_no_op,
+                             fromTy, toTy);
+        if (subExpr) {
+          d.fixItRemoveChars(removeBeforeRange.getStart(),
+                             removeBeforeRange.getEnd())
+           .fixItRemoveChars(removeAfterRange.getStart(),
+                             removeAfterRange.getEnd());
+        }
+        return;
+      }
+      
+     if (auto fromFnTy = fromTy->getAs<FunctionType>()) {
+        if (auto toFnTy = toTy->getAs<FunctionType>()) {
+          // Casting a nonescaping function to escaping is UB.
+          // `withoutActuallyEscaping` ought to be used instead.
+          if (fromFnTy->isNoEscape() && !toFnTy->isNoEscape()) {
+            TC.diagnose(DRE->getLoc(), diag::bitcasting_away_noescape,
+                        fromTy, toTy);
+          }
+          // Changing function representation (say, to try to force a
+          // @convention(c) function pointer to exist) is also unlikely to work.
+          if (fromFnTy->getRepresentation() != toFnTy->getRepresentation()) {
+            TC.diagnose(DRE->getLoc(), diag::bitcasting_to_change_function_rep,
+                        fromTy, toTy);
+          }
+          return;
+        }
+      }
+      
+      // Unchecked casting to a subclass is better done by unsafeDowncast.
+      if (fromTy->isBindableToSuperclassOf(toTy, &TC)) {
+        TC.diagnose(DRE->getLoc(), diag::bitcasting_to_downcast,
+                    fromTy, toTy)
+          .fixItReplace(DRE->getNameLoc().getBaseNameLoc(),
+                        "unsafeDowncast");
+        return;
+      }
+
+      // Casting among pointer types should use the Unsafe*Pointer APIs for
+      // rebinding typed memory or accessing raw memory instead.
+      PointerTypeKind fromPTK, toPTK;
+      Type fromPointee = fromTy->getAnyPointerElementType(fromPTK);
+      Type toPointee = toTy->getAnyPointerElementType(toPTK);
+      if (fromPointee && toPointee) {
+        // Casting to a pointer to the same type or UnsafeRawPointer can use
+        // normal initializers on the destination type.
+        if (toPointee->isEqual(fromPointee)
+            || isRawPointerKind(toPTK)) {
+          auto d = TC.diagnose(DRE->getLoc(),
+                         diag::bitcasting_to_change_pointer_kind,
+                         fromTy, toTy,
+                         toTy->getStructOrBoundGenericStruct()->getName());
+          if (subExpr) {
+            StringRef before, after;
+            switch (toPTK) {
+            case PTK_UnsafePointer:
+              // UnsafePointer(mutablePointer)
+              before = "UnsafePointer(";
+              after = ")";
+              break;
+            case PTK_UnsafeMutablePointer:
+            case PTK_AutoreleasingUnsafeMutablePointer:
+              before = "UnsafeMutablePointer(mutating: ";
+              after = ")";
+              break;
+              
+            case PTK_UnsafeRawPointer:
+              // UnsafeRawPointer(pointer)
+              before = "UnsafeRawPointer(";
+              after = ")";
+              break;
+              
+            case PTK_UnsafeMutableRawPointer:
+              // UnsafeMutableRawPointer(mutating: rawPointer)
+              before = fromPTK == PTK_UnsafeMutablePointer
+                ? "UnsafeMutableRawPointer("
+                : "UnsafeMutableRawPointer(mutating: ";
+              after = ")";
+              break;
+            }
+            d.fixItReplaceChars(removeBeforeRange.getStart(),
+                                removeBeforeRange.getEnd(),
+                                before)
+             .fixItReplaceChars(removeAfterRange.getStart(),
+                                removeAfterRange.getEnd(),
+                                after);
+          }
+          return;
+        }
+        
+        // Casting to a different typed pointer type should use
+        // withMemoryRebound.
+        if (!isRawPointerKind(fromPTK) && !isRawPointerKind(toPTK)) {
+          TC.diagnose(DRE->getLoc(),
+                      diag::bitcasting_to_change_pointee_type,
+                      fromTy, toTy);
+          return;
+        }
+        
+        // Casting a raw pointer to a typed pointer should bind the memory
+        // (or assume it's already bound).
+        assert(isRawPointerKind(fromPTK) && !isRawPointerKind(toPTK)
+               && "unhandled cast combo?!");
+        TC.diagnose(DRE->getLoc(),
+                    diag::bitcasting_to_give_type_to_raw_pointer,
+                    fromTy, toTy);
+        if (subExpr) {
+          SmallString<64> fixitBuf;
+          {
+            llvm::raw_svector_ostream os(fixitBuf);
+            os << ".assumingMemoryBound(to: ";
+            toPointee->print(os);
+            os << ".self)";
+          }
+          TC.diagnose(DRE->getLoc(),
+                      diag::bitcast_assume_memory_rebound,
+                      toPointee)
+            .fixItRemoveChars(removeBeforeRange.getStart(),
+                              removeBeforeRange.getEnd())
+            .fixItReplaceChars(removeAfterRange.getStart(),
+                               removeAfterRange.getEnd(),
+                               fixitBuf);
+          fixitBuf.clear();
+          {
+            llvm::raw_svector_ostream os(fixitBuf);
+            os << ".bindMemory(to: ";
+            toPointee->print(os);
+            os << ".self, capacity: <""#capacity#"">)";
+          }
+          TC.diagnose(DRE->getLoc(),
+                      diag::bitcast_bind_memory,
+                      toPointee)
+            .fixItRemoveChars(removeBeforeRange.getStart(),
+                              removeBeforeRange.getEnd())
+            .fixItReplaceChars(removeAfterRange.getStart(),
+                               removeAfterRange.getEnd(),
+                               fixitBuf);
+        }
+        return;
+      }
+      
+      StringRef replaceBefore, replaceAfter;
+      Optional<Diag<Type, Type>> diagID;
+      SmallString<64> replaceBeforeBuf;
+
+      // Bitcasting among numeric types should use `bitPattern:` initializers.
+      auto fromBNK = getBitcastableNumberKind(fromTy);
+      auto toBNK = getBitcastableNumberKind(toTy);
+      if (fromBNK && toBNK) {
+        switch (BNKPair(fromBNK, toBNK)) {
+        // Combos that can be bitPattern-ed with a constructor
+        case BNKPair(BNK_Int8, BNK_UInt8):
+        case BNKPair(BNK_UInt8, BNK_Int8):
+        case BNKPair(BNK_Int16, BNK_UInt16):
+        case BNKPair(BNK_UInt16, BNK_Int16):
+        case BNKPair(BNK_Int32, BNK_UInt32):
+        case BNKPair(BNK_UInt32, BNK_Int32):
+        case BNKPair(BNK_Int64, BNK_UInt64):
+        case BNKPair(BNK_UInt64, BNK_Int64):
+        case BNKPair(BNK_Int, BNK_UInt):
+        case BNKPair(BNK_UInt, BNK_Int):
+        case BNKPair(BNK_UInt32, BNK_Float):
+        case BNKPair(BNK_UInt64, BNK_Double):
+          diagID = diag::bitcasting_for_number_bit_pattern_init;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << "(bitPattern: ";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = ")";
+          break;
+        
+        // Combos that can be bitPattern-ed with a constructor and sign flip
+        case BNKPair(BNK_Int32, BNK_Float):
+        case BNKPair(BNK_Int64, BNK_Double):
+          diagID = diag::bitcasting_for_number_bit_pattern_init;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << "(bitPattern: ";
+            if (fromBNK == BNK_Int32)
+              os << "UInt32(bitPattern: ";
+            else
+              os << "UInt64(bitPattern: ";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = "))";
+          break;
+        
+        // Combos that can be bitPattern-ed with a property
+        case BNKPair(BNK_Float, BNK_UInt32):
+        case BNKPair(BNK_Double, BNK_UInt64):
+          diagID = diag::bitcasting_for_number_bit_pattern_property;
+          replaceAfter = ".bitPattern";
+          break;
+        
+        // Combos that can be bitPattern-ed with a property and sign flip
+        case BNKPair(BNK_Float, BNK_Int32):
+        case BNKPair(BNK_Double, BNK_Int64):
+          diagID = diag::bitcasting_for_number_bit_pattern_property;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << "(bitPattern: ";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = ")";
+          break;
+
+        // Combos that can be bitPattern-ed with a constructor once (U)Int is
+        // converted to a sized type.
+        case BNKPair(BNK_UInt, BNK_Float):
+        case BNKPair(BNK_Int, BNK_UInt32):
+        case BNKPair(BNK_UInt, BNK_Int32):
+        case BNKPair(BNK_Int, BNK_UInt64):
+        case BNKPair(BNK_UInt, BNK_Int64):
+        case BNKPair(BNK_UInt, BNK_Double):
+          diagID = diag::bitcasting_for_number_bit_pattern_init;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << "(bitPattern: ";
+            
+            if (fromBNK == BNK_Int)
+              os << "Int";
+            else
+              os << "UInt";
+            
+            if (toBNK == BNK_Float
+                || toBNK == BNK_Int32
+                || toBNK == BNK_UInt32)
+              os << "32(";
+            else
+              os << "64(";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = "))";
+          break;
+
+        case BNKPair(BNK_Int, BNK_Float):
+        case BNKPair(BNK_Int, BNK_Double):
+          diagID = diag::bitcasting_for_number_bit_pattern_init;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << "(bitPattern: UInt";
+            
+            if (toBNK == BNK_Float
+                || toBNK == BNK_Int32
+                || toBNK == BNK_UInt32)
+              os << "32(bitPattern: Int32(";
+            else
+              os << "64(bitPattern: Int64(";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = ")))";
+          break;
+    
+        // Combos that can be bitPattern-ed then converted from a sized type
+        // to (U)Int.
+        case BNKPair(BNK_Int32, BNK_UInt):
+        case BNKPair(BNK_UInt32, BNK_Int):
+        case BNKPair(BNK_Int64, BNK_UInt):
+        case BNKPair(BNK_UInt64, BNK_Int):
+          diagID = diag::bitcasting_for_number_bit_pattern_init;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << "(";
+            if (toBNK == BNK_UInt)
+              os << "UInt";
+            else
+              os << "Int";
+            if (fromBNK == BNK_Int32 || fromBNK == BNK_UInt32)
+              os << "32(bitPattern: ";
+            else
+              os << "64(bitPattern: ";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = "))";
+          break;
+        
+        case BNKPair(BNK_Float, BNK_UInt):
+        case BNKPair(BNK_Double, BNK_UInt):
+          diagID = diag::bitcasting_for_number_bit_pattern_property;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << "(";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = ".bitPattern)";
+          break;
+          
+        case BNKPair(BNK_Float, BNK_Int):
+        case BNKPair(BNK_Double, BNK_Int):
+          diagID = diag::bitcasting_for_number_bit_pattern_property;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << "(bitPattern: UInt(";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = ".bitPattern))";
+          break;
+        
+        // Combos that should be done with a value-preserving initializer.
+        case BNKPair(BNK_Int, BNK_Int32):
+        case BNKPair(BNK_Int, BNK_Int64):
+        case BNKPair(BNK_UInt, BNK_UInt32):
+        case BNKPair(BNK_UInt, BNK_UInt64):
+        case BNKPair(BNK_Int32, BNK_Int):
+        case BNKPair(BNK_Int64, BNK_Int):
+        case BNKPair(BNK_UInt32, BNK_UInt):
+        case BNKPair(BNK_UInt64, BNK_UInt):
+          diagID = diag::bitcasting_to_change_from_unsized_to_sized_int;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << '(';
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = ")";
+          break;
+        
+        default:
+          // Leave other combos alone.
+          break;
+        }
+      }
+      
+      // Casting a pointer to an int or back should also use bitPattern
+      // initializers.
+      if (fromPointee && toBNK) {
+        switch (toBNK) {
+        case BNK_UInt:
+        case BNK_Int:
+          diagID = diag::bitcasting_for_number_bit_pattern_init;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << "(bitPattern: ";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = ")";
+          break;
+          
+        case BNK_UInt64:
+        case BNK_UInt32:
+        case BNK_Int64:
+        case BNK_Int32:
+          diagID = diag::bitcasting_for_number_bit_pattern_init;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << '(';
+            if (toBNK == BNK_UInt32 || toBNK == BNK_UInt64)
+              os << "UInt(bitPattern: ";
+            else
+              os << "Int(bitPattern: ";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = "))";
+          break;
+        
+        default:
+          break;
+        }
+      }
+      if (fromBNK && toPointee) {
+        switch (fromBNK) {
+        case BNK_UInt:
+        case BNK_Int:
+          diagID = diag::bitcasting_for_number_bit_pattern_init;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << "(bitPattern: ";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = ")";
+          break;
+          
+        case BNK_UInt64:
+        case BNK_UInt32:
+        case BNK_Int64:
+        case BNK_Int32:
+          diagID = diag::bitcasting_for_number_bit_pattern_init;
+          {
+            llvm::raw_svector_ostream os(replaceBeforeBuf);
+            toTy->print(os);
+            os << "(bitPattern: ";
+            if (fromBNK == BNK_Int32 || fromBNK == BNK_Int64)
+              os << "Int(";
+            else
+              os << "UInt(";
+          }
+          replaceBefore = replaceBeforeBuf;
+          replaceAfter = "))";
+          break;
+
+        default:
+          break;
+        }
+      }
+      
+      if (diagID) {
+        auto d = TC.diagnose(DRE->getLoc(), *diagID, fromTy, toTy);
+        if (subExpr) {
+          d.fixItReplaceChars(removeBeforeRange.getStart(),
+                              removeBeforeRange.getEnd(),
+                              replaceBefore);
+          d.fixItReplaceChars(removeAfterRange.getStart(),
+                              removeAfterRange.getEnd(),
+                              replaceAfter);
+        }
+      }
+
     }
     
     /// Return true if this is 'nil' type checked as an Optional.  This looks

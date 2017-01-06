@@ -2435,6 +2435,54 @@ NOTE(fix_unqualified_access_top_level_multi,none,
 ERROR(unsupported_special_decl_ref, none,
       "referencing %0 as a function value is not implemented", (Identifier))
 
+WARNING(bitcasting_away_noescape, none,
+        "'unsafeBitCast' from non-escaping function type %0 to escaping "
+        "function type %1 is undefined; use "
+        "'withoutActuallyEscaping' to temporarily escape a function",
+        (Type, Type))
+WARNING(bitcasting_to_change_function_rep, none,
+        "'unsafeBitCast' from function type %0 to %1 changes @convention and "
+        "is undefined; use an implicit conversion to change conventions",
+        (Type, Type))
+WARNING(bitcasting_to_downcast, none,
+        "'unsafeBitCast' from %0 to %1 can be replaced with 'unsafeDowncast'",
+        (Type, Type))
+WARNING(bitcasting_is_no_op, none,
+        "'unsafeBitCast' from %0 to %1 is unnecessary and can be removed",
+        (Type, Type))
+WARNING(bitcasting_to_change_pointer_kind, none,
+        "'unsafeBitCast' from %0 to %1 can be replaced with %2 initializer",
+        (Type, Type, Identifier))
+WARNING(bitcasting_to_change_pointee_type, none,
+        "'unsafeBitCast' from %0 to %1 changes pointee type and may lead to "
+        "undefined behavior; use the 'withMemoryRebound' method on %0 to "
+        "rebind the type of memory",
+        (Type, Type))
+WARNING(bitcasting_to_give_type_to_raw_pointer, none,
+        "'unsafeBitCast' from %0 to %1 gives a type to a raw pointer and may "
+        "lead to undefined behavior",
+        (Type, Type))
+NOTE(bitcast_assume_memory_rebound, none,
+     "use the 'assumingMemoryBound' method if the pointer is known to point to "
+     "an existing value or array of type %0 in memory",
+     (Type))
+NOTE(bitcast_bind_memory, none,
+     "use the 'bindMemory' method to assign type %0 to uninitialized raw "
+     "memory",
+     (Type))
+WARNING(bitcasting_for_number_bit_pattern_init, none,
+        "'unsafeBitCast' from %0 to %1 can be replaced with 'bitPattern:' "
+        "initializer on %1",
+        (Type, Type))
+WARNING(bitcasting_for_number_bit_pattern_property, none,
+        "'unsafeBitCast' from %0 to %1 can be replaced with 'bitPattern' "
+        "property on %0",
+        (Type, Type))
+WARNING(bitcasting_to_change_from_unsized_to_sized_int, none,
+        "'unsafeBitCast' from %0 to %1 can be replaced with %1 "
+        "initializer",
+        (Type, Type))
+
 WARNING(use_of_qq_on_non_optional_value,none,
         "left side of nil coalescing operator '?""?' has non-optional type %0, "
         "so the right side is never used", (Type))
