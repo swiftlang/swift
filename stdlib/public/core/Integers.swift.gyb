@@ -2436,6 +2436,14 @@ public struct ${Self}
     _value = x._value
   }
 
+%   if Self in ['Int32', 'Int64']:
+%     Floating = {32 : 'Float', 64 : 'Double'}[bits]
+  @_transparent
+  public init(bitPattern x: ${Floating}) {
+    _value = Builtin.bitcast_FPIEEE${bits}_Int${bits}(x._value)
+  }
+%   end
+
 %   for (FloatType, FloatBits) in [
 %     ('Float', 32), ('Double', 64), ('Float80', 80)]:
 %     (lower, upper) = getFtoIBounds(floatBits=FloatBits, intBits=int(bits), signed=signed)
