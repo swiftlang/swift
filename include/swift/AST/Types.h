@@ -3878,6 +3878,12 @@ public:
   /// FIXME: Not all archetypes have generic environments, yet.
   GenericEnvironment *getGenericEnvironment() const;
 
+  /// Set the generic environment for this primary archetype.
+  ///
+  /// Note: only used when building a generic environment from already-
+  /// constructed archetypes.
+  void setGenericEnvironment(GenericEnvironment *genericEnv);
+
   /// Retrieve the associated type to which this archetype (if it is a nested
   /// archetype) corresponds.
   ///

@@ -37,8 +37,14 @@ GenericEnvironment::GenericEnvironment(
   // interface type where it is used as a key, so that substitution can
   // find them, and to preserve sugar otherwise, so that
   // mapTypeOutOfContext() produces a human-readable type.
-  for (auto entry : interfaceToArchetypeMap)
+  for (auto entry : interfaceToArchetypeMap) {
     addMapping(entry.first->castTo<GenericTypeParamType>(), entry.second);
+
+    if (auto archetype = entry.second->getAs<ArchetypeType>()) {
+      if (archetype->isPrimary())
+        archetype->setGenericEnvironment(this);
+    }
+  }
 }
 
 /// Compute the depth of the \c DeclContext chain.
