@@ -2763,7 +2763,7 @@ public struct ${Self}
     fatalError("Operation is not supported")
 %   else:
     // FIXME(integers): handle division by zero and overflows
-    _precondition(rhs > 0, "Division by zero")
+    _precondition(rhs != 0, "Division by zero")
     let lhsHigh = Builtin.${z}ext_Int${bits}_Int${dbits}(lhs.high._value)
     let shift = Builtin.zextOrBitCast_Int8_Int${dbits}(UInt8(${bits})._value)
     let lhsHighShifted = Builtin.shl_Int${dbits}(lhsHigh, shift)
