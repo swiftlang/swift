@@ -1330,13 +1330,13 @@ func getHomeDir() -> String {
 #endif
 }
 
-NSStringAPIs.test("addingPercentEscapes(using:)") {
-  expectNil(
-    "abcd абвг".addingPercentEscapes(
-      using: .ascii))
-  expectOptionalEqual("abcd%20%D0%B0%D0%B1%D0%B2%D0%B3",
-    "abcd абвг".addingPercentEscapes(
-      using: .utf8))
+NSStringAPIs.test("addingPercentEncoding(withAllowedCharacters:)") {
+  expectOptionalEqual(
+    "abcd1234",
+    "abcd1234".addingPercentEncoding(withAllowedCharacters: .alphanumerics))
+  expectOptionalEqual(
+    "abcd%20%D0%B0%D0%B1%D0%B2%D0%B3",
+    "abcd абвг".addingPercentEncoding(withAllowedCharacters: .alphanumerics))
 }
 
 NSStringAPIs.test("appendingFormat(_:_:...)") {
@@ -1400,21 +1400,6 @@ NSStringAPIs.test("padding(toLength:withPad:startingAtIndex:)") {
     "abc абв \u{0001F60A}YZXYZ",
     "abc абв \u{0001F60A}".padding(
       toLength: 15, withPad: "XYZ", startingAt: 1))
-}
-
-NSStringAPIs.test("removingPercentEncoding/OSX 10.9")
-  .xfail(.osxMinor(10, 9, reason: "looks like a bug in Foundation in OS X 10.9"))
-  .xfail(.iOSMajor(7, reason: "same bug in Foundation in iOS 7.*"))
-  .skip(.iOSSimulatorAny("same bug in Foundation in iOS Simulator 7.*"))
-  .code {
-  expectOptionalEqual("", "".removingPercentEncoding)
-}
-
-NSStringAPIs.test("removingPercentEncoding") {
-  expectNil("%".removingPercentEncoding)
-  expectOptionalEqual(
-    "abcd абвг",
-    "ab%63d %D0%B0%D0%B1%D0%B2%D0%B3".removingPercentEncoding)
 }
 
 NSStringAPIs.test("replacingCharacters(in:with:)") {
@@ -1543,39 +1528,38 @@ NSStringAPIs.test("replacingOccurrences(of:with:options:range:)") {
       range: s.index(s.startIndex, offsetBy: 1)..<s.index(s.startIndex, offsetBy: 3)))
 }
 
-NSStringAPIs.test("replacingPercentEscapes(using:)") {
+NSStringAPIs.test("removingPercentEncoding") {
   expectOptionalEqual(
     "abcd абвг",
-    "abcd абвг".replacingPercentEscapes(
-      using: .ascii))
+    "abcd абвг".removingPercentEncoding)
 
   expectOptionalEqual(
     "abcd абвг\u{0000}\u{0001}",
-    "abcd абвг%00%01".replacingPercentEscapes(
-      using: .ascii))
+    "abcd абвг%00%01".removingPercentEncoding)
 
   expectOptionalEqual(
     "abcd абвг",
-    "%61%62%63%64%20%D0%B0%D0%B1%D0%B2%D0%B3"
-      .replacingPercentEscapes(using: .utf8))
+    "%61%62%63%64%20%D0%B0%D0%B1%D0%B2%D0%B3".removingPercentEncoding)
 
-  expectNil("%ED%B0".replacingPercentEscapes(
-    using: .utf8))
+  expectOptionalEqual(
+    "abcd абвг",
+    "ab%63d %D0%B0%D0%B1%D0%B2%D0%B3".removingPercentEncoding)
 
-  expectNil("%zz".replacingPercentEscapes(
-    using: .utf8))
+  expectNil("%ED%B0".removingPercentEncoding)
+
+  expectNil("%zz".removingPercentEncoding)
+
+  expectNil("abcd%FF".removingPercentEncoding)
+
+  expectNil("%".removingPercentEncoding)
 }
 
-NSStringAPIs.test("replacingPercentEscapes(using:)/rdar18029471")
-  .xfail(
-    .custom({ true },
-    reason: "<rdar://problem/18029471> NSString " +
-      "replacingPercentEscapesUsingEncoding: does not return nil " +
-      "when a byte sequence is not legal in ASCII"))
+NSStringAPIs.test("removingPercentEncoding/OSX 10.9")
+  .xfail(.osxMinor(10, 9, reason: "looks like a bug in Foundation in OS X 10.9"))
+  .xfail(.iOSMajor(7, reason: "same bug in Foundation in iOS 7.*"))
+  .skip(.iOSSimulatorAny("same bug in Foundation in iOS Simulator 7.*"))
   .code {
-  expectNil(
-    "abcd%FF".replacingPercentEscapes(
-      using: .ascii))
+  expectOptionalEqual("", "".removingPercentEncoding)
 }
 
 NSStringAPIs.test("trimmingCharacters(in:)") {
