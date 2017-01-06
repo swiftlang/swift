@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -183,7 +183,6 @@ def run(*args, **kwargs):
     echo_output = kwargs.pop('echo', False)
     dry_run = kwargs.pop('dry_run', False)
     env = kwargs.pop('env', None)
-    allow_non_zero_exit = kwargs.pop('allow_non_zero_exit', False)
     if dry_run:
         _echo_command(dry_run, *args, env=env)
         return(None, 0, args)
