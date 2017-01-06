@@ -20,6 +20,33 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* The `withoutActuallyEscaping` function from [SE-0103][] has been implemented.
+  To pass off a non-escaping closure to an API that formally takes an
+  `@escaping` closure, but which is used in a way that will not in fact 
+  escape it in practice, use `withoutActuallyEscaping` to get an escapable
+  copy of the closure and delimit its expected lifetime. For example:
+
+  ```swift
+  func doSimultaneously(_ f: () -> (), and g: () -> (), on q: DispatchQueue) {
+    // DispatchQueue.async normally has to be able to escape its closure
+    // since it may be called at any point after the operation is queued.
+    // By using a barrier, we ensure it does not in practice escape.
+    withoutActuallyEscaping(f) { escapableF in
+      withoutActuallyEscaping(g) { escapableG in
+        q.async(escapableF)
+        q.async(escapableG)
+        q.sync(flags: .barrier) {}
+      }
+    }
+    // `escapableF` and `escapableG` must be dequeued by the point
+    // `withoutActuallyEscaping` returns.
+  }
+  ```
+
+  The old workaround of using `unsafeBitCast` to cast to an `@escaping` type
+  is not guaranteed to work in future versions of Swift, and will
+  now raise a warning.
+
 * [SR-1446](https://bugs.swift.org/browse/SR-1446)
 
   Nested types may now appear inside generic types, and nested types may have their own generic parameters:
