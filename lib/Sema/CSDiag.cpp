@@ -7296,7 +7296,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       ConcreteDeclRef decl = nullptr;
 
       // If return expression uses closure parameters, which have/are
-      // type variables, such means that we won't be be able to
+      // type variables, such means that we won't be able to
       // type-check result correctly and, unfornutately,
       // we are going to leak type variables from the parent
       // constraint system through declaration types.
