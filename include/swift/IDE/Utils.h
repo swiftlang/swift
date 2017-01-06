@@ -209,8 +209,8 @@ enum class RangeKind : int8_t{
 
 struct DeclaredDecl {
   ValueDecl *VD;
-  bool ReferedAfterRange;
-  DeclaredDecl(ValueDecl* VD) : VD(VD), ReferedAfterRange(false) {}
+  bool ReferredAfterRange;
+  DeclaredDecl(ValueDecl* VD) : VD(VD), ReferredAfterRange(false) {}
   DeclaredDecl(): DeclaredDecl(nullptr) {}
   bool operator==(const DeclaredDecl& other);
 };

@@ -436,7 +436,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 %  end # mutable
 
-  /// Deallocates memory referenced by the pointer with the specifed size and
+  /// Deallocates memory referenced by the pointer with the specified size and
   /// alignment.
   ///
   /// The memory to be deallocated must be uninitialized or initialized to a
@@ -698,7 +698,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// The memory in the region `source..<(source + count)` may overlap with the
   /// destination region. The `moveInitializeMemory(as:from:count:)` method
-  /// automatically perfoms a forward or backward copy of all instances from
+  /// automatically performs a forward or backward copy of all instances from
   /// the source region to their destination.
   ///
   /// After calling this method on a raw pointer `p`, the region starting at

@@ -2609,7 +2609,7 @@ Metadata::getClassObject() const {
     return nullptr;
   }
 
-  swift_unreachable("Unhandled MetdataKind in switch.");
+  swift_unreachable("Unhandled MetadataKind in switch.");
 }
 
 #ifndef NDEBUG

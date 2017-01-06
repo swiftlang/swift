@@ -30,7 +30,7 @@ public func run_ReversedArray(_ N: Int) {
 }
 
 @inline(never)
-public func run_ReversedBidirectonal(_ N: Int) {
+public func run_ReversedBidirectional(_ N: Int) {
   let bidirectional = AnyBidirectionalCollection(0..<length)
   let reversedBidirectional = bidirectional.reversed()
 

@@ -477,7 +477,7 @@ public struct ${Self}<Pointee>
   /// Initializes this pointer's memory with the specified number of
   /// consecutive copies of the given value.
   ///
-  /// The destination memory must be uninititalized or the pointer's `Pointee`
+  /// The destination memory must be uninitialized or the pointer's `Pointee`
   /// must be a trivial type. After a call to `initialize(to:count:)`, the
   /// memory referenced by this pointer is initialized.
   ///

@@ -214,7 +214,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   for (auto &VD : DeclaredDecls) {
     OS << "<Declared>" << VD.VD->getNameStr() << "</Declared>";
     OS << "<OutscopeReference>";
-    if (VD.ReferedAfterRange)
+    if (VD.ReferredAfterRange)
       OS << "true";
     else
       OS << "false";
@@ -469,7 +469,7 @@ public:
       auto It = std::find(Impl->DeclaredDecls.begin(),
                           Impl->DeclaredDecls.end(), D);
       if (It != Impl->DeclaredDecls.end()) {
-        It->ReferedAfterRange = true;
+        It->ReferredAfterRange = true;
       }
       return true;
     }
