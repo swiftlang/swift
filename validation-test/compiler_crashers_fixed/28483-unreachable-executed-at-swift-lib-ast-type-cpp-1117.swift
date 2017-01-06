@@ -5,8 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-// REQUIRES: non_escaping_type_variables
-{{}
-return.h.h == Int
+// RUN: not %target-swift-frontend %s -emit-ir
+enum ST:a b{class b::{return.h.E == Int S}}a
