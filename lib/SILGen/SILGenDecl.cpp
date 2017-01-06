@@ -1758,8 +1758,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     genericEnv = witnessRef.getDecl()->getInnermostDeclContext()
                    ->getGenericEnvironmentOfContext();
 
-    auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
-                    ->getCanonicalType();
+    auto selfTy = cast<GenericTypeParamType>(
+                    conformance->getProtocol()->getSelfInterfaceType()
+                                                          ->getCanonicalType());
 
     Type concreteTy = conformance->getInterfaceType();
 

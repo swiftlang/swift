@@ -270,8 +270,10 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> subs,
     subs = subs.slice(1);
 
     auto canTy = depTy->getCanonicalType();
-    if (isa<GenericTypeParamType>(canTy))
-      result.addSubstitution(canTy, sub.getReplacement());
+    if (isa<SubstitutableType>(canTy)) {
+      result.addSubstitution(cast<SubstitutableType>(canTy),
+                             sub.getReplacement());
+    }
     result.addConformances(canTy, sub.getConformances());
   }
 
