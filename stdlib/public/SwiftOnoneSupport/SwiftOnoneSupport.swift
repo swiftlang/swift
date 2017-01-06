@@ -48,6 +48,12 @@ struct _Prespecialize {
         print("Value: \(e)")
       }
 
+      // Iterate in reverse
+      for e in a.reversed() {
+        print(e)
+        print("Value: \(e)")
+      }
+
       print(a)
 
       // Reserve capacity
@@ -92,6 +98,12 @@ struct _Prespecialize {
 
       // Iterate over array
       for e in a {
+        print(e)
+        print("Value: \(e)")
+      }
+
+      // Iterate in reverse
+      for e in a.reversed() {
         print(e)
         print("Value: \(e)")
       }
