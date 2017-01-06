@@ -1,0 +1,40 @@
+// RUN: %target-swiftc_driver %s -g -sanitize=thread -o %t_tsan-binary
+// RUN: env TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=1 %target-run %t_tsan-binary 2>&1 | %FileCheck %s
+// REQUIRES: executable_test
+// REQUIRES: objc_interop
+// REQUIRES: CPU=x86_64
+// REQUIRES: tsan_runtime
+// XFAIL: linux
+
+// Test that we do not report a race on block release operation.
+import Foundation
+
+public class Sad : NSObject {
+    private var _source: DispatchSourceTimer?
+    public override init() {
+        _source = DispatchSource.makeTimerSource()
+
+        // If this line is commented out no data race.
+        _source?.setEventHandler(handler: globalFuncHandler)
+
+        super.init()
+        _source?.resume()
+    }
+    deinit {
+        _source?.cancel()
+    }
+}
+
+func globalFuncHandler() {
+}
+
+func dotest() {
+    _ = Sad()
+}
+
+dotest()
+sleep(1)
+print("Done.")
+
+// CHECK: Done.
+// CHECK-NOT: ThreadSanitizer: data race
