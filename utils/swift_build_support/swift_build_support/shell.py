@@ -183,7 +183,6 @@ def run(*args, **kwargs):
     echo_output = kwargs.pop('echo', False)
     dry_run = kwargs.pop('dry_run', False)
     env = kwargs.pop('env', None)
-    allow_non_zero_exit = kwargs.pop('allow_non_zero_exit', False)
     if dry_run:
         _echo_command(dry_run, *args, env=env)
         return(None, 0, args)
