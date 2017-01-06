@@ -4272,7 +4272,7 @@ bool Parser::parseSILVTable() {
   Lexer::SILBodyRAII Tmp(*L);
   Scope S(this, ScopeKind::TopLevel);
   // Parse the entry list.
-  std::vector<SILVTable::Pair> vtableEntries;
+  std::vector<SILVTable::Entry> vtableEntries;
   if (Tok.isNot(tok::r_brace)) {
     do {
       SILDeclRef Ref;
@@ -4281,10 +4281,12 @@ bool Parser::parseSILVTable() {
       if (VTableState.parseSILDeclRef(Ref))
         return true;
       SILFunction *Func = nullptr;
+      Optional<SILLinkage> Linkage = SILLinkage::Private;
       if (Tok.is(tok::kw_nil)) {
         consumeToken();
       } else {
         if (parseToken(tok::colon, diag::expected_sil_vtable_colon) ||
+          parseSILLinkage(Linkage, *this) ||
           VTableState.parseSILIdentifier(FuncName, FuncLoc,
                                          diag::expected_sil_value_name))
         return true;
@@ -4293,8 +4295,10 @@ bool Parser::parseSILVTable() {
           diagnose(FuncLoc, diag::sil_vtable_func_not_found, FuncName);
           return true;
         }
+        if (!Linkage)
+          Linkage = stripExternalFromLinkage(Func->getLinkage());
       }
-      vtableEntries.emplace_back(Ref, Func);
+      vtableEntries.emplace_back(Ref, Func, Linkage.getValue());
     } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
   }
 
