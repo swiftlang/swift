@@ -225,7 +225,7 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
 ///   performed to ensure that `x` actually has dynamic type `T`.
 ///
 /// - Warning: Trades safety for performance.  Use `unsafeDowncast`
-///   only when `x as T` has proven to be a performance problem and you
+///   only when `x as! T` has proven to be a performance problem and you
 ///   are confident that, always, `x is T`.  It is better than an
 ///   `unsafeBitCast` because it's more restrictive, and because
 ///   checking is still performed in debug builds.

@@ -68,4 +68,6 @@ FUNC_DECL(DiagnoseUnexpectedNilOptional, "_diagnoseUnexpectedNilOptional")
 
 FUNC_DECL(GetErrorEmbeddedNSError, "_stdlib_getErrorEmbeddedNSError")
 
+FUNC_DECL(UnsafeBitCast, "unsafeBitCast")
+
 #undef FUNC_DECL
