@@ -584,12 +584,8 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether this decl is missing its closing '#endif'.
     unsigned HadMissingEnd : 1;
-
-    /// Whether this condition has been resolved either statically by Parse or
-    /// later by Condition Resolution.
-    unsigned HasBeenResolved : 1;
   };
-  enum { NumIfConfigDeclBits = NumDeclBits + 2 };
+  enum { NumIfConfigDeclBits = NumDeclBits + 1 };
   static_assert(NumIfConfigDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -1932,8 +1928,7 @@ struct IfConfigDeclClause {
 
   IfConfigDeclClause(SourceLoc Loc, Expr *Cond, ArrayRef<Decl*> Members,
                      bool isActive)
-    : Loc(Loc), Cond(Cond), Members(Members), isActive(isActive) {
-  }
+    : Loc(Loc), Cond(Cond), Members(Members), isActive(isActive) {}
 };
   
   

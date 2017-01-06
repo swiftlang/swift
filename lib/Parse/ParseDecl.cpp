@@ -1850,8 +1850,9 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   if (!CurLocalContext || !D->getDeclContext()->isLocalContext())
     return;
 
-  if (getScopeInfo().isStaticallyInactiveConfigBlock())
-    return;
+  if (auto TD = dyn_cast<TypeDecl>(D))
+    if (!getScopeInfo().isInactiveConfigBlock())
+      SF.LocalTypeDecls.insert(TD);
 
   Identifier name = D->getName();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
@@ -2215,6 +2216,15 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
 
     // If we 'break' out of the switch, break out of the loop too.
     break;
+  }
+
+  if (auto SF = CurDeclContext->getParentSourceFile()) {
+    if (!getScopeInfo().isInactiveConfigBlock()) {
+      for (auto Attr : Attributes) {
+        if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
+          SF->AttrsRequiringFoundation.insert(Attr);
+      }
+    }
   }
 
   if (FoundCCTokenInAttr) {
