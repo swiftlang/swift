@@ -79,7 +79,7 @@ LayoutConstraintInfo getLayoutConstraintInfo(TypeRepr *TyR) {
 /// constraint. If ID does not match any known layout constrains,
 /// returns UnknownLayout.
 LayoutConstraintInfo getLayoutConstraintInfo(Type Ty) {
-  auto CanTy = Ty.getCanonicalTypeOrNull();
+  auto CanTy = Ty->getCanonicalType();
   if (auto Archetype = dyn_cast<ArchetypeType>(CanTy.getPointer())) {
     auto Protocols = Archetype->getConformsTo();
     for (auto Proto : Protocols) {

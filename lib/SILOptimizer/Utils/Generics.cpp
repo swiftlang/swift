@@ -247,7 +247,7 @@ static void copySubstitutionMapEntry(Type FromTy, SubstitutionMap &FromMap,
     if (!SkipSubstIfExists || !ToMap.getMap().lookup(ToSubTy)) {
       auto FromSubstTy =
           (Replacement) ? Replacement : FromMap.getMap().lookup(FromSubTy);
-      ToMap.addSubstitution(ToCanTy, FromSubstTy);
+      ToMap.addSubstitution(ToSubTy, FromSubstTy);
     }
   }
 }
@@ -655,7 +655,7 @@ void ReabstractionInfo::SpecializeConcreteAndGenericSubstitutions(
     Builder.addGenericParameter(SubstGenericParam);
 
     CalleeInterfaceToSpecializedInterfaceMap.addSubstitution(
-        CanTy, SubstGenericParamCanTy);
+        CanSubstitutableType(GP), SubstGenericParamCanTy);
 
     copySubstitutionMapEntry(GP, CalleeInterfaceToCallerArchetypeMap,
                              SubstGenericParam,
@@ -680,15 +680,15 @@ void ReabstractionInfo::SpecializeConcreteAndGenericSubstitutions(
 
     // Map the caller archetype to the new generic parameter type.
     CallerArchetypeToSpecializedInterfaceMap.addSubstitution(
-        CallerArchetype, SubstGenericParam);
+        cast<SubstitutableType>(CallerArchetype), SubstGenericParam);
     // Add a reverse mapping.
     SpecializedInterfaceToCallerArchetypeMap.addSubstitution(
-        SubstGenericParamCanTy, CallerArchetype);
+        CanSubstitutableType(SubstGenericParam), CallerArchetype);
 
     // Map the original generic parameter type to the new generic parameter
     // type in the specialized generic environment.
     CallerInterfaceToSpecializedInterfaceMap.addSubstitution(
-        CallerGenericParam, SubstGenericParamCanTy);
+        cast<SubstitutableType>(CallerGenericParam), SubstGenericParamCanTy);
   }
 
   // Copy entries for the generic type parameters mapped to concrete types.
@@ -696,7 +696,6 @@ void ReabstractionInfo::SpecializeConcreteAndGenericSubstitutions(
     // Skip if this generic parameter is not substituted.
     if (CalleeInterfaceToSpecializedInterfaceMap.getMap().lookup(GP))
       continue;
-    auto CanTy = GP->getCanonicalType();
     auto Replacement = CalleeInterfaceToCallerArchetypeMap.getMap().lookup(GP);
     if (!Replacement)
       continue;
@@ -707,7 +706,7 @@ void ReabstractionInfo::SpecializeConcreteAndGenericSubstitutions(
             ->getCanonicalType();
 
     CalleeInterfaceToSpecializedInterfaceMap.addSubstitution(
-        CanTy, SpecializedReplacementTy);
+        CanSubstitutableType(GP), SpecializedReplacementTy);
   }
 
   // Next, add each of the requirements (mapped from the requirement's
@@ -738,7 +737,6 @@ void ReabstractionInfo::SpecializeConcreteAndGenericSubstitutions(
     // Create the updated SubstitutionMap to be used by the cloner.
     for (auto GP : CalleeGenericSig->getGenericParams()) {
       auto Ty = GP;
-      auto CanTy = GP->getCanonicalType();
       auto Replacement =
           CalleeInterfaceToCallerArchetypeMap.getMap().lookup(GP);
       if (!Replacement)
@@ -750,7 +748,7 @@ void ReabstractionInfo::SpecializeConcreteAndGenericSubstitutions(
 
       if (SpecializedGP) {
         CalleeInterfaceToSpecializedArchetypeMap.addSubstitution(
-            CanTy,
+            CanSubstitutableType(GP),
             SpecializedGenericEnv->mapTypeIntoContext(SM, SpecializedGP));
         continue;
       }
@@ -770,7 +768,7 @@ void ReabstractionInfo::SpecializeConcreteAndGenericSubstitutions(
           SM, SubstInterfaceReplacementTy);
 
       CalleeInterfaceToSpecializedArchetypeMap.addSubstitution(
-          CanTy, SubstReplacementTy);
+          CanSubstitutableType(GP), SubstReplacementTy);
     }
   } else {
     SpecializedGenericSig = nullptr;
@@ -1000,13 +998,13 @@ void ReabstractionInfo::SpecializeConcreteSubstitutions(
         // Map generic parameter type to an interface type in the
         // old generic environment.
         Ty = CalleeGenericEnv->mapTypeOutOfContext(CanTy)->getCanonicalType();
-        CallerInterfaceSubs.addSubstitution(CanTy, Ty);
+        CallerInterfaceSubs.addSubstitution(ST, Ty);
 
         // Map generic parameter type to a contextual type in the
         // new generic environment. This will be used by the cloner.
         Ty = SpecializedGenericEnv->mapTypeIntoContext(SM, CanTy)
                  ->getCanonicalType();
-        ClonerSubsMap.addSubstitution(CanTy, Ty);
+        ClonerSubsMap.addSubstitution(ST, Ty);
       } else {
         // Copy entries if a replacement is a concrete type.
         copySubstitutionMapEntry(CanTy, InterfaceSubs, CanTy, CallerInterfaceSubs);
@@ -1423,11 +1421,11 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
       // Remember that a given generic parameter is mapped
       // to a concrete type.
       CallerInterfaceSubs.addSubstitution(
-          Req.getFirstType()->getCanonicalType(),
+          dyn_cast<SubstitutableType>(Req.getFirstType()->getCanonicalType()),
           Req.getSecondType()->getCanonicalType());
 
       ClonerInterfaceSubs.addSubstitution(
-          Req.getFirstType()->getCanonicalType(),
+          dyn_cast<SubstitutableType>(Req.getFirstType()->getCanonicalType()),
           Req.getSecondType()->getCanonicalType());
       continue;
     }
