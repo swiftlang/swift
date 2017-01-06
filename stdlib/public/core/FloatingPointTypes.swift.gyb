@@ -48,10 +48,7 @@ def intName(name, signed):
 %for bits in [32,64]:
 extension UInt${bits} {
   var signBitIndex: Int {
-    return ${bits-1} - Int(Int${bits}(Builtin.int_ctlz_Int${bits}(self._value, false._value)))
-  }
-  var countTrailingZeros: Int {
-    return Int(Int${bits}(Builtin.int_cttz_Int${bits}(self._value, false._value)))
+    return ${bits-1} - leadingZeros
   }
 }
 %end
@@ -669,7 +666,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   public var significandWidth: Int {
-    let trailingZeros = significandBitPattern.countTrailingZeros
+    let trailingZeros = significandBitPattern.trailingZeros
     if isNormal {
       guard significandBitPattern != 0 else { return 0 }
       return ${Self}.significandBitCount - trailingZeros
