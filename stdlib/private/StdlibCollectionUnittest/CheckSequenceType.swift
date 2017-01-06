@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -460,11 +460,11 @@ public let enumerateTests = [
 public let filterTests = [
   FilterTest(
     [], [],
-    { (x: Int) -> Bool in expectUnreachable(); return true }),
+    { _ -> Bool in expectUnreachable(); return true }),
 
-  FilterTest([], [ 0, 30, 10, 90 ], { (x: Int) -> Bool in false }),
+  FilterTest([], [ 0, 30, 10, 90 ], { _ -> Bool in false }),
   FilterTest(
-    [ 0, 30, 10, 90 ], [ 0, 30, 10, 90 ], { (x: Int) -> Bool in true }
+    [ 0, 30, 10, 90 ], [ 0, 30, 10, 90 ], { _ -> Bool in true }
   ),
   FilterTest(
     [ 0, 30, 90 ], [ 0, 30, 10, 90 ], { (x: Int) -> Bool in x % 3 == 0 }
@@ -572,7 +572,7 @@ public let flatMapTests = [
   FlatMapTest(
     expected: [],
     sequence: [],
-    transform: { (x: Int) -> [Int32] in
+    transform: { _ -> [Int32] in
       expectUnreachable()
       return [ 0xffff ]
     }),
@@ -580,15 +580,15 @@ public let flatMapTests = [
   FlatMapTest(
     expected: [],
     sequence: [ 1 ],
-    transform: { (x: Int) -> [Int32] in [] }),
+    transform: { _ -> [Int32] in [] }),
   FlatMapTest(
     expected: [],
     sequence: [ 1, 2 ],
-    transform: { (x: Int) -> [Int32] in [] }),
+    transform: { _ -> [Int32] in [] }),
   FlatMapTest(
     expected: [],
     sequence: [ 1, 2, 3 ],
-    transform: { (x: Int) -> [Int32] in [] }),
+    transform: { _ -> [Int32] in [] }),
 
   FlatMapTest(
     expected: [ 101 ],
@@ -659,11 +659,11 @@ public let flatMapTests = [
 public let flatMapToOptionalTests = [
   FlatMapToOptionalTest(
     [], [],
-    { (x: Int) -> Int32? in expectUnreachable(); return 0xffff }),
+    { _ -> Int32? in expectUnreachable(); return 0xffff }),
 
-  FlatMapToOptionalTest([], [ 1 ], { (x: Int) -> Int32? in nil }),
-  FlatMapToOptionalTest([], [ 1, 2 ], { (x: Int) -> Int32? in nil }),
-  FlatMapToOptionalTest([], [ 1, 2, 3 ], { (x: Int) -> Int32? in nil }),
+  FlatMapToOptionalTest([], [ 1 ], { _ -> Int32? in nil }),
+  FlatMapToOptionalTest([], [ 1, 2 ], { _ -> Int32? in nil }),
+  FlatMapToOptionalTest([], [ 1, 2, 3 ], { _ -> Int32? in nil }),
 
   FlatMapToOptionalTest(
     [ 1 ], [ 1 ],
@@ -788,7 +788,7 @@ public let lexicographicallyPrecedesTests = [
 public let mapTests = [
   MapTest(
     [], [],
-    { (x: Int) -> Int32 in expectUnreachable(); return 0xffff }),
+    { _ -> Int32 in expectUnreachable(); return 0xffff }),
 
   MapTest([ 101 ], [ 1 ],
     { (x: Int) -> Int32 in Int32(x + 100) }),
@@ -1945,7 +1945,7 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
     var result: OpaqueValue<Int>?
     do {
       result = try s._preprocessingPass {
-        (sequence) -> OpaqueValue<Int> in
+        _ -> OpaqueValue<Int> in
         wasInvoked = true
         throw TestError.error2
       }

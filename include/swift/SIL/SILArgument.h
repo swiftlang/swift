@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,56 +13,14 @@
 #ifndef SWIFT_SIL_SILARGUMENT_H
 #define SWIFT_SIL_SILARGUMENT_H
 
-#include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILArgumentConvention.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILValue.h"
 
 namespace swift {
 
 class SILBasicBlock;
 class SILModule;
-
-/// Conventions for apply operands and function-entry arguments in SIL.
-///
-/// By design, this is exactly the same as ParameterConvention, plus
-/// Indirect_Out.
-enum class SILArgumentConvention : uint8_t {
-  Indirect_In,
-  Indirect_In_Guaranteed,
-  Indirect_Inout,
-  Indirect_InoutAliasable,
-  Indirect_Out,
-  Direct_Owned,
-  Direct_Unowned,
-  Direct_Deallocating,
-  Direct_Guaranteed,
-};
-
-inline bool isIndirectConvention(SILArgumentConvention convention) {
-  return convention <= SILArgumentConvention::Indirect_Out;
-}
-
-/// Turn a ParameterConvention into a SILArgumentConvention.
-inline SILArgumentConvention getSILArgumentConvention(ParameterConvention conv){
-  switch (conv) {
-  case ParameterConvention::Indirect_In:
-    return SILArgumentConvention::Indirect_In;
-  case ParameterConvention::Indirect_Inout:
-    return SILArgumentConvention::Indirect_Inout;
-  case ParameterConvention::Indirect_InoutAliasable:
-    return SILArgumentConvention::Indirect_InoutAliasable;
-  case ParameterConvention::Indirect_In_Guaranteed:
-    return SILArgumentConvention::Indirect_In_Guaranteed;
-  case ParameterConvention::Direct_Unowned:
-    return SILArgumentConvention::Direct_Unowned;
-  case ParameterConvention::Direct_Guaranteed:
-    return SILArgumentConvention::Direct_Guaranteed;
-  case ParameterConvention::Direct_Owned:
-    return SILArgumentConvention::Direct_Owned;
-  case ParameterConvention::Direct_Deallocating:
-    return SILArgumentConvention::Direct_Deallocating;
-  }
-  llvm_unreachable("covered switch isn't covered?!");
-}
 
 inline SILArgumentConvention
 SILFunctionType::getSILArgumentConvention(unsigned index) const {
@@ -72,44 +30,8 @@ SILFunctionType::getSILArgumentConvention(unsigned index) const {
     return SILArgumentConvention::Indirect_Out;
   } else {
     auto param = getParameters()[index - numIndirectResults];
-    return swift::getSILArgumentConvention(param.getConvention());
+    return SILArgumentConvention(param.getConvention());
   }
-}
-
-enum class InoutAliasingAssumption {
-  /// Assume that an inout indirect parameter may alias other objects.
-  /// This is the safe assumption an optimization should make if it may break
-  /// memory safety in case the inout aliasing rule is violation.
-  Aliasing,
-
-  /// Assume that an inout indirect parameter cannot alias other objects.
-  /// Optimizations should only use this if they can guarantee that they will
-  /// not break memory safety even if the inout aliasing rule is violated.
-  NotAliasing
-};
-
-/// Returns true if \p conv is a not-aliasing indirect parameter.
-/// The \p isInoutAliasing specifies what to assume about the inout convention.
-/// See InoutAliasingAssumption.
-inline bool isNotAliasedIndirectParameter(SILArgumentConvention conv,
-                                     InoutAliasingAssumption isInoutAliasing) {
-  switch (conv) {
-  case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_Out:
-  case SILArgumentConvention::Indirect_In_Guaranteed:
-    return true;
-
-  case SILArgumentConvention::Indirect_Inout:
-    return isInoutAliasing == InoutAliasingAssumption::NotAliasing;
-
-  case SILArgumentConvention::Indirect_InoutAliasable:
-  case SILArgumentConvention::Direct_Unowned:
-  case SILArgumentConvention::Direct_Guaranteed:
-  case SILArgumentConvention::Direct_Owned:
-  case SILArgumentConvention::Direct_Deallocating:
-    return false;
-  }
-  llvm_unreachable("covered switch isn't covered?!");
 }
 
 class SILArgument : public ValueBase {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -427,6 +427,8 @@ public:
     case Kind::DynamicMethod:
       return Constant.uncurryLevel;
     }
+
+    llvm_unreachable("Unhandled Kind in switch.");
   }
 
   EnumElementDecl *getEnumElementDecl() {
@@ -556,14 +558,14 @@ public:
       assert(level <= Constant.uncurryLevel
              && "uncurrying past natural uncurry level of method");
 
-      auto constant = Constant.atUncurryLevel(level);
+      constant = Constant.atUncurryLevel(level);
       // Lower the substituted type from the AST, which should have any generic
       // parameters in the original signature erased to their upper bounds.
       auto objcFormalType = SubstFormalType.withExtInfo(
          SubstFormalType->getExtInfo()
            .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod));
       auto fnType = gen.SGM.M.Types
-        .getUncachedSILFunctionTypeForConstant(constant, objcFormalType);
+        .getUncachedSILFunctionTypeForConstant(*constant, objcFormalType);
 
       auto closureType =
         replaceSelfTypeForDynamicLookup(gen.getASTContext(), fnType,
@@ -572,9 +574,9 @@ public:
 
       SILValue fn = gen.B.createDynamicMethod(Loc,
                           SelfValue,
-                          constant,
+                          *constant,
                           SILType::getPrimitiveObjectType(closureType),
-                          /*volatile*/ constant.isForeign);
+                          /*volatile*/ Constant.isForeign);
       mv = ManagedValue::forUnmanaged(fn);
       break;
     }
@@ -1102,11 +1104,9 @@ public:
       }
     }
 
-    // If this is a direct reference to a vardecl, it must be a let constant
-    // (which doesn't need to be loaded).  Just emit its value directly.
-    if (auto *vd = dyn_cast<VarDecl>(e->getDecl())) {
-      (void)vd;
-      assert(vd->isLet() && "Direct reference to vardecl that isn't a let?");
+    // If this is a direct reference to a vardecl, just emit its value directly.
+    // Recursive references to callable declarations are allowed.
+    if (isa<VarDecl>(e->getDecl())) {
       visitExpr(e);
       return;
     }
@@ -1487,7 +1487,7 @@ public:
 
   Callee getCallee() {
     assert(ApplyCallee && "did not find callee?!");
-    return *std::move(ApplyCallee);
+    return std::move(*ApplyCallee);
   }
 
   /// Ignore parentheses and implicit conversions.
@@ -3633,7 +3633,10 @@ void ArgEmitter::emitShuffle(Expr *inner,
     // fill out varargsAddrs if necessary.
     for (auto &extent : innerExtents) {
       assert(extent.Used && "didn't use all the inner tuple elements!");
-      innerParams.append(extent.Params.begin(), extent.Params.end());
+
+      for (auto param : extent.Params) {
+        innerParams.push_back(param);
+      }
 
       // Fill in the special destinations array.
       if (innerSpecialDests) {
@@ -4691,15 +4694,16 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   {
     // Determine the self metatype type.
     CanSILFunctionType substFnType =
-      SGF.getLoweredType(substFormalType, /*uncurryLevel=*/1)
-      .castTo<SILFunctionType>();
+      initConstant.SILFnType->substGenericArgs(SGF.SGM.M, subs);
     SILType selfParamMetaTy = substFnType->getSelfParameter().getSILType();
 
     if (overriddenSelfType) {
       // If the 'self' type has been overridden, form a metatype to the
       // overriding 'Self' type.
       Type overriddenSelfMetaType =
-        MetatypeType::get(overriddenSelfType, SGF.getASTContext());
+        MetatypeType::get(overriddenSelfType,
+                          selfParamMetaTy.castTo<MetatypeType>()
+                              ->getRepresentation());
       selfMetaTy =
         SGF.getLoweredType(overriddenSelfMetaType->getCanonicalType());
     } else {

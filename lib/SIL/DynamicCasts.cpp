@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -262,7 +262,7 @@ classifyClassHierarchyCast(CanType source, CanType target) {
   return DynamicCastFeasibility::WillFail;
 }
 
-static CanType getNSBridgedClassOfCFClass(Module *M, CanType type) {
+CanType swift::getNSBridgedClassOfCFClass(Module *M, CanType type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
     if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       if (auto bridgedAttr =
@@ -637,7 +637,7 @@ swift::classifyDynamicCast(Module *M,
       // If the bridged ObjC type is known, check if
       // source type can be cast into it.
       return classifyDynamicCast(M, source,
-          ObjCTy.getCanonicalTypeOrNull(),
+          ObjCTy->getCanonicalType(),
           /* isSourceTypeExact */ false, isWholeModuleOpts);
     }
     return DynamicCastFeasibility::MaySucceed;
@@ -650,7 +650,7 @@ swift::classifyDynamicCast(Module *M,
       // If the bridged ObjC type is known, check if
       // this type can be cast into target type.
       return classifyDynamicCast(M,
-          ObjCTy.getCanonicalTypeOrNull(),
+          ObjCTy->getCanonicalType(),
           target,
           /* isSourceTypeExact */ false, isWholeModuleOpts);
     }

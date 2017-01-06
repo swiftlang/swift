@@ -4,14 +4,12 @@
 // CHECK: [
 // CHECK:     [
 // CHECK:         "Prespecialization",
-// CHECK:         "until_fix_point",
-// CHECK:         ["UsePrespecialized","use-prespecialized"]
+// CHECK-NEXT:         ["UsePrespecialized","use-prespecialized"]
 // CHECK:     ],
 // CHECK:     [
 // CHECK:         "Rest of Onone",
-// CHECK:         "one_iteration",
-// CHECK:         ["ExternalDefsToDecls","external-defs-to-decls"],
-// CHECK:         ["AssumeSingleThreaded","sil-assume-single-threaded"],
-// CHECK:         ["SILDebugInfoGenerator","sil-debuginfo-gen"]
+// CHECK-NEXT:         ["ExternalDefsToDecls","external-defs-to-decls"],
+// CHECK-NEXT:         ["AssumeSingleThreaded","sil-assume-single-threaded"],
+// CHECK-NEXT:         ["SILDebugInfoGenerator","sil-debuginfo-gen"]
 // CHECK:     ]
 // CHECK: ]

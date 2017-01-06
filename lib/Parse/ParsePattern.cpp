@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -819,8 +819,9 @@ ParserResult<Pattern> Parser::parsePattern() {
 
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                           bool isLet) {
-  auto var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ isLet,
-                                   loc, name, Type(), CurDeclContext);
+  auto var = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/isLet,
+                                   /*IsCaptureList*/false, loc, name, Type(),
+                                   CurDeclContext);
   return new (Context) NamedPattern(var);
 }
 
@@ -917,7 +918,7 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
   // In an if-let, the actual type of the expression is Optional of whatever
   // was written.
   if (isOptional)
-    repr = new (Context) OptionalTypeRepr(repr, Tok.getLoc());
+    repr = new (Context) OptionalTypeRepr(repr, Tok.isNot(tok::eof) ? Tok.getLoc() : PreviousLoc);
 
   return makeParserResult(new (Context) TypedPattern(P, repr));
 }

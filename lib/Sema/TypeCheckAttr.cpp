@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1152,14 +1152,13 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   ProtocolDecl *ApplicationDelegateProto = nullptr;
   if (KitModule) {
     auto lookupOptions = defaultUnqualifiedLookupOptions;
-    lookupOptions |= NameLookupFlags::OnlyTypes;
     lookupOptions |= NameLookupFlags::KnownPrivate;
 
-    auto lookup = TC.lookupUnqualified(KitModule, Id_ApplicationDelegate,
-                                       SourceLoc(),
-                                       lookupOptions);
-    ApplicationDelegateProto = dyn_cast_or_null<ProtocolDecl>(
-                                   lookup.getSingleTypeResult());
+    auto lookup = TC.lookupUnqualifiedType(KitModule, Id_ApplicationDelegate,
+                                           SourceLoc(),
+                                           lookupOptions);
+    if (lookup.size() == 1)
+      ApplicationDelegateProto = dyn_cast<ProtocolDecl>(lookup[0]);
   }
 
   if (!ApplicationDelegateProto ||
@@ -1439,7 +1438,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     }
 
     tl.setType(ty, /*validated=*/true);
-    subMap.addSubstitution(genericTypeParamTy->getCanonicalType(), ty);
+    subMap.addSubstitution(
+        cast<GenericTypeParamType>(genericTypeParamTy->getCanonicalType()), ty);
   }
 
   // Capture the conformances needed for the substitution map.
@@ -1513,7 +1513,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
   // Compute the substitutions.
   SmallVector<Substitution, 4> substitutions;
-  genericSig->getSubstitutions(*FD->getParentModule(), subMap, substitutions);
+  genericSig->getSubstitutions(subMap, substitutions);
 
   // Package the Substitution list in the SpecializeAttr's ConcreteDeclRef.
   attr->setConcreteDecl(

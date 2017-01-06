@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -128,30 +128,26 @@ public:
   void getSubstitutionMap(ArrayRef<Substitution> args,
                           SubstitutionMap &subMap) const;
 
-  using LookupConformanceFn =
-      llvm::function_ref<auto(CanType dependentType,
-                              Type conformingReplacementType,
-                              ProtocolType *conformedProtocol)
-                         -> Optional<ProtocolConformanceRef>>;
+  using GenericFunction = auto(CanType canType, Type conformingReplacementType,
+    ProtocolType *conformedProtocol)
+    ->Optional<ProtocolConformanceRef>;
+  using LookupConformanceFn = llvm::function_ref<GenericFunction>;
 
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
-  void getSubstitutions(ModuleDecl &mod,
-                        TypeSubstitutionFn substitution,
+  void getSubstitutions(TypeSubstitutionFn substitution,
                         LookupConformanceFn lookupConformance,
                         SmallVectorImpl<Substitution> &result) const;
 
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
-  void getSubstitutions(ModuleDecl &mod,
-                        const TypeSubstitutionMap &subMap,
+  void getSubstitutions(const TypeSubstitutionMap &subMap,
                         LookupConformanceFn lookupConformance,
                         SmallVectorImpl<Substitution> &result) const;
 
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
-  void getSubstitutions(ModuleDecl &mod,
-                        const SubstitutionMap &subMap,
+  void getSubstitutions(const SubstitutionMap &subMap,
                         SmallVectorImpl<Substitution> &result) const;
 
   /// Return a range that iterates through all of the types that require

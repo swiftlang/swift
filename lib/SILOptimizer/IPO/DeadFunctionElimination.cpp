@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -403,21 +403,24 @@ public:
 
     // First drop all references so that we don't get problems with non-zero
     // reference counts of dead functions.
-    for (SILFunction &F : *Module)
-      if (!isAlive(&F))
+    std::vector<SILFunction *> DeadFunctions;
+    for (SILFunction &F : *Module) {
+      if (!isAlive(&F)) {
         F.dropAllReferences();
+        DeadFunctions.push_back(&F);
+      }
+    }
 
     // Next step: delete all dead functions.
-    for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
-      SILFunction *F = &*FI;
-      ++FI;
-      if (!isAlive(F)) {
-        DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
-        NumDeadFunc++;
-        DFEPass->invalidateAnalysisForDeadFunction(F,
-                                     SILAnalysis::InvalidationKind::Everything);
-        Module->eraseFunction(F);
-      }
+    auto InvalidateEverything = SILAnalysis::InvalidationKind::Everything;
+    while (!DeadFunctions.empty()) {
+      SILFunction *F = DeadFunctions.back();
+      DeadFunctions.pop_back();
+
+      DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
+      NumDeadFunc++;
+      DFEPass->invalidateAnalysisForDeadFunction(F, InvalidateEverything);
+      Module->eraseFunction(F);
     }
   }
 };
@@ -457,8 +460,47 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
 
   /// ExternalFunctionDefinitionsElimination pass does not take functions
   /// reachable via vtables and witness_tables into account when computing
-  /// a function liveness information.
+  /// a function liveness information. The only exceptions are external
+  /// transparent functions, because bodies of external transparent functions
+  /// should never be removed.
   void findAnchorsInTables() override {
+    // Check vtable methods.
+    for (SILVTable &vTable : Module->getVTableList()) {
+      for (auto &entry : vTable.getEntries()) {
+        SILFunction *F = entry.second;
+        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
+          ensureAlive(F);
+      }
+    }
+
+    // Check witness methods.
+    for (SILWitnessTable &WT : Module->getWitnessTableList()) {
+      isVisibleExternally(WT.getConformance()->getProtocol());
+      for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
+        if (entry.getKind() != SILWitnessTable::Method)
+          continue;
+
+        auto methodWitness = entry.getMethodWitness();
+        SILFunction *F = methodWitness.Witness;
+        if (!F)
+          continue;
+        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
+          ensureAlive(F);
+      }
+    }
+
+    // Check default witness methods.
+    for (SILDefaultWitnessTable &WT : Module->getDefaultWitnessTableList()) {
+      for (const SILDefaultWitnessTable::Entry &entry : WT.getEntries()) {
+        if (!entry.isValid())
+          continue;
+
+        SILFunction *F = entry.getWitness();
+        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
+          ensureAlive(F);
+      }
+    }
+
   }
 
   bool findAliveFunctions() {
@@ -608,6 +650,6 @@ SILTransform *swift::createExternalFunctionDefinitionsElimination() {
 void swift::performSILDeadFunctionElimination(SILModule *M) {
   SILPassManager PM(M);
   llvm::SmallVector<PassKind, 1> Pass = {PassKind::DeadFunctionElimination};
-  PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
-      SILPassPipelinePlan::ExecutionKind::UntilFixPoint, Pass));
+  PM.executePassPipelinePlan(
+      SILPassPipelinePlan::getPassPipelineForKinds(Pass));
 }

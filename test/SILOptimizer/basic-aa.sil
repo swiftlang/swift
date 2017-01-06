@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name Swift %s -aa=basic-aa -aa-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name Swift %s -aa-kind=basic-aa -aa-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 

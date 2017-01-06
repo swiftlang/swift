@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -89,9 +90,8 @@ SubstitutionMap::lookupConformance(CanType type,
 }
 
 void SubstitutionMap::
-addSubstitution(CanType type, Type replacement) {
-  auto result = subMap.insert(std::make_pair(type->castTo<SubstitutableType>(),
-                                             replacement));
+addSubstitution(CanSubstitutableType type, Type replacement) {
+  auto result = subMap.insert(std::make_pair(type, replacement));
   assert(result.second);
   (void) result;
 }
@@ -118,4 +118,110 @@ void SubstitutionMap::
 addParent(CanType type, CanType parent, AssociatedTypeDecl *assocType) {
   assert(type && parent && assocType);
   parentMap[type.getPointer()].push_back(std::make_pair(parent, assocType));
+}
+
+SubstitutionMap
+SubstitutionMap::getOverrideSubstitutions(const ValueDecl *baseDecl,
+                                          const ValueDecl *derivedDecl,
+                                          Optional<SubstitutionMap> derivedSubs,
+                                          LazyResolver *resolver) {
+  auto *baseClass = baseDecl->getDeclContext()
+      ->getAsClassOrClassExtensionContext();
+  auto *derivedClass = derivedDecl->getDeclContext()
+      ->getAsClassOrClassExtensionContext();
+
+  auto *baseSig = baseDecl->getInnermostDeclContext()
+      ->getGenericSignatureOfContext();
+  auto *derivedSig = derivedDecl->getInnermostDeclContext()
+      ->getGenericSignatureOfContext();
+
+  return getOverrideSubstitutions(baseClass, derivedClass,
+                                  baseSig, derivedSig,
+                                  derivedSubs,
+                                  resolver);
+}
+
+SubstitutionMap
+SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
+                                          const ClassDecl *derivedClass,
+                                          GenericSignature *baseSig,
+                                          GenericSignature *derivedSig,
+                                          Optional<SubstitutionMap> derivedSubs,
+                                          LazyResolver *resolver) {
+  SubstitutionMap subMap;
+
+  if (baseSig == nullptr)
+    return subMap;
+
+  unsigned minDepth = 0;
+
+  // Get the substitutions for the self type.
+  if (auto *genericSig = baseClass->getGenericSignature()) {
+    auto derivedClassTy = derivedClass->getDeclaredInterfaceType();
+    if (derivedSubs)
+      derivedClassTy = derivedClassTy.subst(*derivedSubs);
+    auto baseClassTy = derivedClassTy->getSuperclassForDecl(baseClass, resolver);
+
+    auto *M = baseClass->getParentModule();
+    auto subs = baseClassTy->gatherAllSubstitutions(M, resolver);
+    genericSig->getSubstitutionMap(subs, subMap);
+
+    minDepth = genericSig->getGenericParams().back()->getDepth() + 1;
+  }
+
+  // Map the innermost generic parameters of the derived function to
+  // the base.
+  auto &ctx = baseClass->getASTContext();
+
+  auto baseParams = baseSig->getInnermostGenericParams();
+  if (baseParams.back()->getDepth() >= minDepth) {
+    assert(derivedSig);
+    auto derivedParams = derivedSig->getInnermostGenericParams();
+
+    assert(baseParams.size() == derivedParams.size());
+
+    for (unsigned i = 0, e = derivedParams.size(); i < e; i++) {
+      auto paramTy = cast<GenericTypeParamType>(baseParams[i]->getCanonicalType());
+      assert(paramTy->getDepth() >= minDepth);
+      Type replacementTy = derivedParams[i];
+      if (derivedSubs)
+        replacementTy = replacementTy.subst(*derivedSubs);
+      subMap.addSubstitution(paramTy, replacementTy);
+    }
+
+    auto isRootedInInnermostParameter = [&](Type t) -> bool {
+      while (auto *dmt = t->getAs<DependentMemberType>())
+        t = dmt->getBase();
+      return t->castTo<GenericTypeParamType>()->getDepth() >= minDepth;
+    };
+
+    // Add trivial conformances for the above.
+    // FIXME: This should be less awkward.
+    baseSig->enumeratePairedRequirements(
+      [&](Type t, ArrayRef<Requirement> reqs) -> bool {
+        auto canTy = t->getCanonicalType();
+
+        if (isRootedInInnermostParameter(t)) {
+          auto conformances =
+              ctx.AllocateUninitialized<ProtocolConformanceRef>(
+                  reqs.size());
+          for (unsigned i = 0, e = reqs.size(); i < e; i++) {
+            auto reqt = reqs[i];
+            assert(reqt.getKind() == RequirementKind::Conformance);
+            auto *proto = reqt.getSecondType()
+                ->castTo<ProtocolType>()->getDecl();
+            if (derivedSubs)
+              conformances[i] = *derivedSubs->lookupConformance(canTy, proto);
+            else
+              conformances[i] = ProtocolConformanceRef(proto);
+          }
+
+          subMap.addConformances(canTy, conformances);
+        }
+
+        return false;
+    });
+  }
+
+  return subMap;
 }

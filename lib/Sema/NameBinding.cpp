@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -341,10 +341,6 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   }
 
   SF.addImports(ImportedModules);
-
-  // FIXME: This algorithm has quadratic memory usage.  (In practice,
-  // import statements after the first "chunk" should be rare, though.)
-  // FIXME: Can we make this more efficient?
 
   SF.ASTStage = SourceFile::NameBound;
   verify(SF);

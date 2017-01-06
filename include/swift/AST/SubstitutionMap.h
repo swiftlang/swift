@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -36,6 +36,9 @@ namespace swift {
 
 class SubstitutableType;
 
+template<class Type> class CanTypeWrapper;
+typedef CanTypeWrapper<SubstitutableType> CanSubstitutableType;
+
 class SubstitutionMap {
   using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
 
@@ -61,7 +64,7 @@ public:
   /// Retrieve the conformances for the given type.
   ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
 
-  void addSubstitution(CanType type, Type replacement);
+  void addSubstitution(CanSubstitutableType type, Type replacement);
 
   void addConformances(CanType type, ArrayRef<ProtocolConformanceRef> conformances);
 
@@ -71,6 +74,26 @@ public:
   bool empty() const {
     return subMap.empty();
   }
+
+  /// Given that 'derivedDecl' is an override of 'baseDecl' in a subclass,
+  /// and 'derivedSubs' is a set of substitutions written in terms of the
+  /// generic signature of 'derivedDecl', produce a set of substitutions
+  /// written in terms of the generic signature of 'baseDecl'.
+  static SubstitutionMap
+  getOverrideSubstitutions(const ValueDecl *baseDecl,
+                           const ValueDecl *derivedDecl,
+                           Optional<SubstitutionMap> derivedSubs,
+                           LazyResolver *resolver);
+
+  /// Variant of the above for when we have the generic signatures but not
+  /// the decls for 'derived' and 'base'.
+  static SubstitutionMap
+  getOverrideSubstitutions(const ClassDecl *baseClass,
+                           const ClassDecl *derivedClass,
+                           GenericSignature *baseSig,
+                           GenericSignature *derivedSig,
+                           Optional<SubstitutionMap> derivedSubs,
+                           LazyResolver *resolver);
 };
 
 } // end namespace swift

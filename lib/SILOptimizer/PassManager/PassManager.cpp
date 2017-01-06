@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -239,6 +239,12 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
     A->initialize(this);
     M->registerDeleteNotificationHandler(A);
   }
+}
+
+SILPassManager::SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
+                               llvm::StringRef Stage)
+    : SILPassManager(M, Stage) {
+  this->IRMod = IRMod;
 }
 
 bool SILPassManager::continueTransforming() {
@@ -511,36 +517,11 @@ void SILPassManager::runOneIteration() {
   }
 }
 
-void SILPassManager::run() {
-  const SILOptions &Options = getOptions();
-  (void) Options;
-
-  if (SILPrintAll) {
-    if (SILPrintOnlyFun.empty() && SILPrintOnlyFuns.empty()) {
-      llvm::dbgs() << "*** SIL module before transformation ("
-                   << NumOptimizationIterations << ") ***\n";
-      Mod->dump(Options.EmitVerboseSIL);
-    } else {
-      for (auto &F : *Mod) {
-        if (!SILPrintOnlyFun.empty() && F.getName().str() == SILPrintOnlyFun) {
-          llvm::dbgs() << "*** SIL function before transformation ("
-                       << NumOptimizationIterations << ") ***\n";
-          F.dump(Options.EmitVerboseSIL);
-        }
-        if (!SILPrintOnlyFuns.empty() &&
-            F.getName().find(SILPrintOnlyFuns, 0) != StringRef::npos) {
-          llvm::dbgs() << "*** SIL function before transformation ("
-                       << NumOptimizationIterations << ") ***\n";
-          F.dump(Options.EmitVerboseSIL);
-        }
-      }
-    }
-  }
-  runOneIteration();
-}
-
 /// D'tor.
 SILPassManager::~SILPassManager() {
+  assert(IRGenPasses.empty() && "Must add IRGen SIL passes that were "
+                                "registered to the list of transformations");
+
   // Free all transformations.
   for (auto *T : Transformations)
     delete T;
@@ -633,6 +614,15 @@ void SILPassManager::addPass(PassKind Kind) {
     SILTransform *T = swift::create##ID();                                     \
     T->setPassKind(PassKind::ID);                                              \
     Transformations.push_back(T);                                              \
+    break;                                                                     \
+  }
+#define IRGEN_PASS(ID, NAME, DESCRIPTION)                                      \
+  case PassKind::ID: {                                                         \
+    SILTransform *T = IRGenPasses[unsigned(Kind)];                             \
+    assert(T && "Missing IRGen pass?");                                        \
+    T->setPassKind(PassKind::ID);                                              \
+    Transformations.push_back(T);                                              \
+    IRGenPasses.erase(unsigned(Kind));                                         \
     break;                                                                     \
   }
 #include "swift/SILOptimizer/PassManager/Passes.def"

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -95,7 +95,7 @@ std::string PartialSpecializationMangler::mangle() {
 //===----------------------------------------------------------------------===//
 
 FunctionSignatureSpecializationMangler::
-FunctionSignatureSpecializationMangler(SpecializationPass P,
+FunctionSignatureSpecializationMangler(Demangle::SpecializationPass P,
                                        IsFragile_t Fragile, SILFunction *F)
   : SpecializationMangler(P, Fragile, F) {
   for (unsigned i = 0, e = F->getLoweredFunctionType()->getNumSILArguments();
@@ -309,8 +309,12 @@ mangleReturnValue(ReturnValueModifierIntBase RetMod) {
   }
 }
 
-std::string FunctionSignatureSpecializationMangler::mangle() {
+std::string FunctionSignatureSpecializationMangler::mangle(int UniqueID) {
+  ArgOpStorage.clear();
   beginMangling();
+
+  if (UniqueID)
+    ArgOpBuffer << UniqueID;
 
   for (unsigned i : indices(Args)) {
     ArgumentModifierIntBase ArgMod;

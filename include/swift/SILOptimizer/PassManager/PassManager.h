@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -32,12 +32,17 @@ class SILModuleTransform;
 class SILOptions;
 class SILTransform;
 
+namespace irgen {
+class IRGenModule;
+}
+
 /// \brief The SIL pass manager.
 class SILPassManager {
-  using ExecutionKind = SILPassPipelinePlan::ExecutionKind;
-
   /// The module that the pass manager will transform.
   SILModule *Mod;
+
+  /// An optional IRGenModule associated with this PassManager.
+  irgen::IRGenModule *IRMod;
 
   /// The list of transformations to run.
   llvm::SmallVector<SILTransform *, 16> Transformations;
@@ -92,10 +97,19 @@ class SILPassManager {
   /// same function.
   bool RestartPipeline = false;
 
+
+  /// The IRGen SIL passes. These have to be dynamically added by IRGen.
+  llvm::DenseMap<unsigned, SILFunctionTransform *> IRGenPasses;
+
 public:
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def.
   SILPassManager(SILModule *M, llvm::StringRef Stage = "");
+
+  /// C'tor. It creates an IRGen pass manager. Passes can query for the
+  /// IRGenModule.
+  SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
+                 llvm::StringRef Stage = "");
 
   const SILOptions &getOptions() const;
 
@@ -113,8 +127,9 @@ public:
   /// \returns the module that the pass manager owns.
   SILModule *getModule() { return Mod; }
 
-  /// \brief Run the transformations on the module.
-  void run();
+  /// \returns the associated IGenModule or null if this is not an IRGen
+  /// pass manager.
+  irgen::IRGenModule *getIRGenModule() { return IRMod; }
 
   /// \brief Run one iteration of the optimization pipeline.
   void runOneIteration();
@@ -219,22 +234,22 @@ public:
       for (PassKind Kind : Plan.getPipelinePasses(Pipeline)) {
         addPass(Kind);
       }
-      execute(Pipeline.ExecutionKind);
+      execute();
     }
   }
 
+  void registerIRGenPass(PassKind Kind, SILFunctionTransform *Transform) {
+    assert(IRGenPasses.find(unsigned(Kind)) == IRGenPasses.end() &&
+           "Pass already registered");
+    assert(
+        IRMod &&
+        "Attempting to register an IRGen pass with a non-IRGen pass manager");
+    IRGenPasses[unsigned(Kind)] = Transform;
+  }
+
 private:
-  void execute(ExecutionKind K) {
-    switch (K) {
-    case ExecutionKind::OneIteration:
-      runOneIteration();
-      break;
-    case ExecutionKind::UntilFixPoint:
-      run();
-      break;
-    case ExecutionKind::Invalid:
-      llvm_unreachable("Invalid execution kind?!");
-    }
+  void execute() {
+    runOneIteration();
   }
 
   /// Add a pass of a specific kind.

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -576,7 +576,7 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     if (Tok.is(tok::r_paren))
       rParenLoc = consumeToken();
     else
-      rParenLoc = Tok.getLoc();
+      rParenLoc = PreviousLoc;
   } else {
     parseMatchingToken(tok::r_paren, rParenLoc,
                        diag::expr_keypath_expected_rparen, lParenLoc);
@@ -654,7 +654,7 @@ ParserResult<Expr> Parser::parseExprSelector() {
   if (subExpr.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
 
-  // Parse the closing ')'
+  // Parse the closing ')'.
   SourceLoc rParenLoc;
   if (subExpr.isParseError()) {
     skipUntilDeclStmtRBrace(tok::r_paren);
@@ -968,6 +968,11 @@ getMagicIdentifierLiteralKind(tok Kind) {
 
 /// See if type(of: <expr>) can be parsed backtracking on failure.
 static bool canParseTypeOf(Parser &P) {
+  // We parsed `type(of:)` as a special syntactic form in Swift 3. In Swift 4
+  // it is handled by overload resolution.
+  if (!P.Context.LangOpts.isSwiftVersion3())
+    return false;
+
   if (!(P.Tok.getText() == "type" && P.peekToken().is(tok::l_paren))) {
     return false;
   }
@@ -1505,7 +1510,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       }
 
       DeclNameLoc NameLoc;
-      DeclName Name = parseUnqualifiedDeclName(/*allowDot=*/true,
+      DeclName Name = parseUnqualifiedDeclName(/*afterDot=*/true,
                                                NameLoc,
                                                diag::expected_member_name);
       if (!Name) return nullptr;
@@ -2154,23 +2159,23 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // the initializer expression is evaluated before the closure is formed.
       auto *VD = new (Context) VarDecl(/*isStatic*/false,
                                        /*isLet*/ownershipKind !=Ownership::Weak,
+                                       /*isCaptureList*/true,
                                        nameLoc, name, Type(), CurDeclContext);
+
       // Attributes.
       if (ownershipKind != Ownership::Strong)
         VD->getAttrs().add(new (Context) OwnershipAttr(ownershipKind));
-      
+
       auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
-      
+
       auto *PBD = PatternBindingDecl::create(Context, /*staticloc*/SourceLoc(),
                                              StaticSpellingKind::None,
                                              nameLoc, pattern, initializer,
                                              CurDeclContext);
-                                                   
-      
-      
+
       captureList.push_back(CaptureListEntry(VD, PBD));
     } while (consumeIf(tok::comma));
-    
+
     // The capture list needs to be closed off with a ']'.
     if (!consumeIf(tok::r_square)) {
       diagnose(Tok, diag::expected_capture_list_end_rsquare);

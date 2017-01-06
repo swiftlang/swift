@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -914,9 +914,9 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       P.Tok.isAny(tok::l_brace, tok::kw_where)) {
     auto loc = P.Tok.getLoc();
     auto errorName = P.Context.Id_error;
-    auto var = new (P.Context) VarDecl(/*static*/ false, /*IsLet*/true,
-                                       loc, errorName, Type(),
-                                       P.CurDeclContext);
+    auto var = new (P.Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                       /*IsCaptureList*/false, loc, errorName,
+                                       Type(), P.CurDeclContext);
     var->setImplicit();
     auto namePattern = new (P.Context) NamedPattern(var);
     auto varPattern = new (P.Context) VarPattern(loc, /*isLet*/true,
@@ -1789,8 +1789,8 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
           if (!fullCheck) {
             return None;
           }
-          return
-            Context.getModule({ { argumentIdent, UDRE->getLoc() } }) != nullptr;
+
+          return Context.canImportModule({ argumentIdent, UDRE->getLoc() });
         }
 
         if (!fullCheck) {

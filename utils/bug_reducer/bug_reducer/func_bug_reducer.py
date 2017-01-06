@@ -68,6 +68,7 @@ class OptimizerTester(object):
 
     def __init__(self, silopt, passes):
         self.silopt = silopt
+        self.result = None
         self.passes = ['-' + p for p in passes]
         m = md5.new()
         for p in passes:
@@ -89,6 +90,7 @@ class OptimizerTester(object):
         if result == 0:
             print(' NOCRASH!\n')
         else:
+            self.result = self.silopt.input_file
             print(' CRASH!\n')
         return result
 
@@ -100,11 +102,12 @@ def function_bug_reducer(input_file, nm, sil_opt_invoker, sil_extract_invoker,
     print("Base case crashes! Trying to reduce *.sib file")
 
     # Otherwise, reduce the list of pases that cause the optimzier to crash.
+    tester = OptimizerTester(sil_opt_invoker, pass_list)
     r = ReduceMiscompilingFunctions(functions, sil_extract_invoker,
-                                    OptimizerTester(sil_opt_invoker,
-                                                    pass_list))
+                                    tester)
     if not r.reduce_list():
         print("Failed to find miscompiling pass list!")
+    sil_opt_invoker.input_file = tester.result
     cmdline = sil_opt_invoker.cmdline_with_passlist(pass_list)
     print("*** Successfully Reduced file!")
     print("*** Final File: %s" % sil_opt_invoker.input_file)

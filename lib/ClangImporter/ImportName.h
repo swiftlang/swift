@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -90,8 +90,10 @@ class ImportedName {
     /// For an initializer, the kind of initializer to import.
     CtorInitializerKind initKind;
 
-    /// The version of Swift this name corresponds to
-    ImportNameVersion version : NumImportNameVersions;
+    /// The version of Swift this name corresponds to.
+    ///
+    /// \see ImportNameVersion
+    unsigned rawVersion : 2;
 
     /// What kind of accessor this name refers to, if any.
     ImportedAccessorKind accessorKind : NumImportedAccessorKindBits;
@@ -114,7 +116,7 @@ class ImportedName {
 
     Info()
         : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
-          version(), accessorKind(ImportedAccessorKind::None),
+          rawVersion(), accessorKind(ImportedAccessorKind::None),
           hasCustomName(false), droppedVariadic(false), importAsMember(false),
           hasSelfIndex(false), hasErrorInfo(false) {}
   } info;
@@ -137,7 +139,14 @@ public:
   }
 
   /// The highest version of Swift that this name comes from
-  ImportNameVersion getVersion() const { return info.version; }
+  ImportNameVersion getVersion() const {
+    return static_cast<ImportNameVersion>(info.rawVersion);
+  }
+
+  void setVersion(ImportNameVersion version) {
+    info.rawVersion = static_cast<unsigned>(version);
+    assert(getVersion() == version && "not enough bits");
+  }
 
   /// For an initializer, the kind of initializer to import.
   CtorInitializerKind getInitKind() const { return info.initKind; }

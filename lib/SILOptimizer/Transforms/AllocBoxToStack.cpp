@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -194,8 +194,8 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
 
       // apply instructions do not capture the pointer when it is passed
       // indirectly
-      if (isIndirectConvention(
-            apply->getArgumentConvention(UI->getOperandNumber()-1)))
+      if (apply->getArgumentConvention(UI->getOperandNumber() - 1)
+              .isIndirectConvention())
         continue;
 
       // Optionally drill down into an apply to see if the operand is
@@ -521,7 +521,7 @@ static std::string getClonedName(SILFunction *F,
                                  IsFragile_t Fragile,
                                  ParamIndexList &PromotedParamIndices) {
   Mangle::Mangler M;
-  auto P = SpecializationPass::AllocBoxToStack;
+  auto P = Demangle::SpecializationPass::AllocBoxToStack;
   FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
   NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
   for (unsigned i : PromotedParamIndices) {

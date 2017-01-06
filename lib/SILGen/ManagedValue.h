@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,6 +26,7 @@
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
+
 enum class CastConsumptionKind : unsigned char;
 
 namespace Lowering {
@@ -44,8 +45,9 @@ namespace Lowering {
 ///                this represents a value that was emitted directly into an
 ///                initialization stored by an SGFContext.
 ///
-/// The RValue cases may or may not have a cleanup associated with the value.
-/// A cleanup is associated with +1 values of non-trivial type.
+/// The RValue cases may or may not have a cleanup associated with the value.  A
+/// cleanup is associated with +1 values of non-trivial type and +0 values of
+/// non-trivial type.
 ///
 class ManagedValue {
   /// The value (or address of an address-only value) being managed, and
@@ -76,6 +78,7 @@ public:
     assert(value && "No value specified");
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
+
   /// Create a managed value for an l-value.
   static ManagedValue forLValue(SILValue value) {
     assert(value && "No value specified");

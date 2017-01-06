@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -27,6 +27,7 @@
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -106,7 +107,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       SmallVector<ValueDecl *, 2> decls;
       mod->lookupQualified(ModuleType::get(mod), C.getIdentifier(typeName),
                            NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                           /*resolver=*/nullptr, decls);
+                           /*typeResolver=*/nullptr, decls);
       if (decls.size() != 1)
         return CanType();
 
@@ -1426,7 +1427,7 @@ static SelectorFamily getSelectorFamily(Identifier name) {
     if (!text.startswith(prefix)) return false;
     if (text.size() == prefix.size()) return true;
     assert(text.size() > prefix.size());
-    return !islower(text[prefix.size()]);
+    return !clang::isLowercase(text[prefix.size()]);
   };
 
   auto result = SelectorFamily::None;
@@ -2044,7 +2045,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
 
   auto overrideInterfaceTy =
       selfInterfaceTy->adjustSuperclassMemberDeclType(
-          derived.getDecl(), base.getDecl(), baseInterfaceTy,
+          base.getDecl(), derived.getDecl(), baseInterfaceTy,
           /*resolver=*/nullptr);
 
   // Copy generic signature from derived to the override type, to handle
@@ -2206,6 +2207,28 @@ namespace {
       CanType substObjectType = visit(origObjectType);
       return CanType(BoundGenericType::get(origType->getDecl(), Type(),
                                            substObjectType));
+    }
+
+    /// Metatypes get DynamicSelfType stripped off the instance type.
+    CanType visitMetatypeType(CanMetatypeType origType) {
+      CanType origInstanceType = origType.getInstanceType();
+      CanType substInstanceType = origInstanceType.subst(
+            Subst, Conformances, None)->getCanonicalType();
+
+      // If the substitution didn't change anything, we know that the
+      // original type was a lowered type, so we're good.
+      if (origInstanceType == substInstanceType) {
+        return origType;
+      }
+
+      // If this is a DynamicSelf metatype, turn it into a metatype of the
+      // underlying self type.
+      if (auto dynamicSelf = dyn_cast<DynamicSelfType>(substInstanceType)) {
+        substInstanceType = dynamicSelf.getSelfType();
+      }
+
+      return CanMetatypeType::get(substInstanceType,
+                                  origType->getRepresentation());
     }
 
     /// Any other type is would be a valid type in the AST.  Just

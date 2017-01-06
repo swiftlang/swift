@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -123,8 +123,10 @@ createVarWithPattern(ASTContext &cxt, DeclContext *dc, Identifier name, Type ty,
                      Accessibility setterAccessibility) {
   // Create a variable to store the underlying value.
   auto var = new (cxt) VarDecl(
-      /*static*/ false,
-      /*IsLet*/ isLet, SourceLoc(), name, ty, dc);
+      /*IsStatic*/false,
+      /*IsLet*/isLet,
+      /*IsCaptureList*/false,
+      SourceLoc(), name, ty, dc);
   if (isImplicit)
     var->setImplicit();
   var->setInterfaceType(ty);
@@ -1191,8 +1193,8 @@ static void makeStructRawValuedWithBridge(
   //
   // Create a computed value variable
   auto computedVar = new (cxt) VarDecl(
-      /*static*/ false,
-      /*IsLet*/ false, SourceLoc(), computedVarName, bridgedType, structDecl);
+      /*IsStatic*/false, /*IsLet*/false, /*IsCaptureList*/false,
+      SourceLoc(), computedVarName, bridgedType, structDecl);
   computedVar->setInterfaceType(bridgedType);
   computedVar->setImplicit();
   computedVar->setAccessibility(Accessibility::Public);
@@ -1496,8 +1498,8 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
-      isStatic,
-      /*IsLet=*/false, SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
+      /*IsStatic*/isStatic, /*IsLet*/false, /*IsCaptureList*/false,
+      SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setAccessibility(Accessibility::Public);
 
@@ -2195,7 +2197,8 @@ namespace {
           // Create the _nsError member.
           //   public let _nsError: NSError
           auto nsErrorType = nsErrorDecl->getDeclaredInterfaceType();
-          auto nsErrorProp = new (C) VarDecl(/*static*/ false, /*IsLet*/ true,
+          auto nsErrorProp = new (C) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                             /*IsCaptureList*/false,
                                              loc, C.Id_nsError, nsErrorType,
                                              errorWrapper);
           nsErrorProp->setImplicit();
@@ -2261,10 +2264,10 @@ namespace {
         auto rawValueConstructor = makeEnumRawValueConstructor(Impl, enumDecl);
 
         auto varName = C.Id_rawValue;
-        auto rawValue = new (C) VarDecl(/*static*/ false,
-                                               /*IsLet*/ false,
-                                               SourceLoc(), varName,
-                                               underlyingType, enumDecl);
+        auto rawValue = new (C) VarDecl(/*IsStatic*/false, /*IsLet*/ false,
+                                        /*IsCaptureList*/false,
+                                        SourceLoc(), varName, underlyingType,
+                                        enumDecl);
         rawValue->setImplicit();
         rawValue->setAccessibility(Accessibility::Public);
         rawValue->setSetterAccessibility(Accessibility::Private);
@@ -2789,7 +2792,8 @@ namespace {
       // Map this indirect field to a Swift variable.
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
                        Accessibility::Public,
-                       /*static*/ false, /*IsLet*/ false,
+                       /*IsStatic*/false, /*IsLet*/ false,
+                       /*IsCaptureList*/false,
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, type, dc);
       result->setInterfaceType(type);
@@ -2897,13 +2901,11 @@ namespace {
       ParameterList *bodyParams = nullptr;
       Type type = Impl.importFunctionType(dc,
                                           decl,
-                                          decl->getReturnType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
                                           decl->isVariadic(),
-                                          decl->isNoReturn(),
                                           isInSystemModule(dc),
-                                          hasCustomName, bodyParams, name);
+                                          name, bodyParams);
       if (!type)
         return nullptr;
 
@@ -2982,7 +2984,8 @@ namespace {
 
       auto result =
         Impl.createDeclWithClangNode<VarDecl>(decl, Accessibility::Public,
-                              /*static*/ false, /*IsLet*/ false,
+                              /*IsStatic*/ false, /*IsLet*/ false,
+                              /*IsCaptureList*/false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
       result->setInterfaceType(type);
@@ -3055,8 +3058,10 @@ namespace {
         isStatic = true;
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
-                       Accessibility::Public, isStatic,
-                       Impl.shouldImportGlobalAsLet(decl->getType()),
+                       Accessibility::Public,
+                       /*IsStatic*/isStatic,
+                       /*IsLet*/Impl.shouldImportGlobalAsLet(decl->getType()),
+                       /*IsCaptureList*/false,
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
       result->setInterfaceType(type);
@@ -3114,7 +3119,7 @@ namespace {
     /// The importer should use this rather than adding the attribute directly.
     void addObjCAttribute(ValueDecl *decl, Optional<ObjCSelector> name) {
       auto &ctx = Impl.SwiftContext;
-      decl->getAttrs().add(ObjCAttr::create(ctx, name, /*implicit=*/true));
+      decl->getAttrs().add(ObjCAttr::create(ctx, name, /*implicitName=*/true));
 
       // If the declaration we attached the 'objc' attribute to is within a
       // class, record it in the class.
@@ -3302,29 +3307,31 @@ namespace {
       }
 
       SpecialMethodKind kind = SpecialMethodKind::Regular;
-      // FIXME: This doesn't handle implicit properties.
-      if (decl->isPropertyAccessor())
-        kind = SpecialMethodKind::PropertyAccessor;
-      else if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
+      if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.
-      DeclName name = importedName.getDeclName();
       Optional<ForeignErrorConvention> errorConvention;
       bodyParams.push_back(nullptr);
-      auto type = Impl.importMethodType(dc,
-                                        decl,
-                                        decl->getReturnType(),
-                                        { decl->param_begin(),
-                                          decl->param_size() },
-                                        decl->isVariadic(),
-                                        decl->hasAttr<clang::NoReturnAttr>(),
-                                        isInSystemModule(dc),
-                                        &bodyParams.back(),
-                                        importedName,
-                                        name,
-                                        errorConvention,
-                                        kind);
+      Type type;
+      if (decl->isPropertyAccessor()) {
+        const clang::ObjCPropertyDecl *prop = decl->findPropertyDecl();
+        if (!prop)
+          return nullptr;
+        // If the matching property is in a superclass, or if the getter and
+        // setter are redeclared in a potentially incompatible way, bail out.
+        if (prop->getGetterMethodDecl() != decl &&
+            prop->getSetterMethodDecl() != decl)
+          return nullptr;
+        type = Impl.importAccessorMethodType(dc, prop, decl,
+                                             isInSystemModule(dc),
+                                             &bodyParams.back());
+      } else {
+        type = Impl.importMethodType(dc, decl, decl->parameters(),
+                                     decl->isVariadic(), isInSystemModule(dc),
+                                     &bodyParams.back(), importedName,
+                                     errorConvention, kind);
+      }
       if (!type)
         return nullptr;
 
@@ -3341,11 +3348,10 @@ namespace {
 
       auto result = FuncDecl::create(
           Impl.SwiftContext, /*StaticLoc=*/SourceLoc(),
-          StaticSpellingKind::None,
-          /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
+          StaticSpellingKind::None, /*FuncLoc=*/SourceLoc(),
+          importedName.getDeclName(), /*NameLoc=*/SourceLoc(),
           /*Throws=*/importedName.getErrorInfo().hasValue(),
-          /*ThrowsLoc=*/SourceLoc(),
-          /*AccessorKeywordLoc=*/SourceLoc(),
+          /*ThrowsLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
           /*GenericParams=*/nullptr, bodyParams, TypeLoc(), dc, decl);
 
       result->setAccessibility(getOverridableAccessibility(dc));
@@ -4114,8 +4120,8 @@ namespace {
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
           getOverridableAccessibility(dc),
-          decl->isClassProperty(), /*IsLet*/ false,
-          Impl.importSourceLoc(decl->getLocation()),
+          /*IsStatic*/decl->isClassProperty(), /*IsLet*/false,
+          /*IsCaptureList*/false, Impl.importSourceLoc(decl->getLocation()),
           name, type, dc);
       result->setInterfaceType(dc->mapTypeOutOfContext(type));
 
@@ -4753,8 +4759,8 @@ SwiftDeclConverter::importGlobalAsInitializer(const clang::FunctionDecl *decl,
                                          /*isInOut=*/selfIsInOut);
 
   OptionalTypeKind initOptionality;
-  auto resultType = Impl.importFunctionReturnType(
-      dc, decl, decl->getReturnType(), allowNSUIntegerAsInt);
+  auto resultType = Impl.importFunctionReturnType(dc, decl,
+                                                  allowNSUIntegerAsInt);
   (void)resultType->getAnyOptionalObjectType(initOptionality);
 
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
@@ -4822,8 +4828,8 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(const clang::FunctionDecl *decl,
   bodyParams.push_back(getNonSelfParamList(
       dc, decl, selfIdx, name.getArgumentNames(), allowNSUIntegerAsInt, !name));
 
-  auto swiftResultTy = Impl.importFunctionReturnType(
-      dc, decl, decl->getReturnType(), allowNSUIntegerAsInt);
+  auto swiftResultTy = Impl.importFunctionReturnType(dc, decl,
+                                                     allowNSUIntegerAsInt);
   auto fnType =
       ParameterList::getFullInterfaceType(swiftResultTy, bodyParams, C);
 
@@ -4988,8 +4994,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
     return nullptr;
 
   auto property = Impl.createDeclWithClangNode<VarDecl>(
-      getter, Accessibility::Public, isStatic,
-      /*isLet=*/false, SourceLoc(), propertyName, swiftPropertyType, dc);
+      getter, Accessibility::Public, /*IsStatic*/isStatic, /*isLet*/false,
+      /*IsCaptureList*/false, SourceLoc(), propertyName, swiftPropertyType, dc);
   property->setInterfaceType(swiftPropertyType);
 
   // Note that we've formed this property.
@@ -5232,12 +5238,10 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Import the type that this method will have.
   Optional<ForeignErrorConvention> errorConvention;
-  DeclName name = importedName.getDeclName();
   bodyParams.push_back(nullptr);
   auto type = Impl.importMethodType(
-      dc, objcMethod, objcMethod->getReturnType(), args, variadic,
-      objcMethod->hasAttr<clang::NoReturnAttr>(), isInSystemModule(dc),
-      &bodyParams.back(), importedName, name, errorConvention,
+      dc, objcMethod, args, variadic, isInSystemModule(dc),
+      &bodyParams.back(), importedName, errorConvention,
       SpecialMethodKind::Constructor);
   if (!type)
     return nullptr;
@@ -5265,7 +5269,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
                             ->getResult()
                             ->castTo<AnyFunctionType>()
                             ->getInput();
-  for (auto other : ownerNominal->lookupDirect(name)) {
+  for (auto other : ownerNominal->lookupDirect(importedName.getDeclName())) {
     auto ctor = dyn_cast<ConstructorDecl>(other);
     if (!ctor || ctor->isInvalid() ||
         ctor->getAttrs().isUnavailable(Impl.SwiftContext) ||
@@ -5342,8 +5346,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Create the actual constructor.
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-      objcMethod, Accessibility::Public, name, /*NameLoc=*/SourceLoc(),
-      failability, /*FailabilityLoc=*/SourceLoc(),
+      objcMethod, Accessibility::Public, importedName.getDeclName(),
+      /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().hasValue(),
       /*ThrowsLoc=*/SourceLoc(), selfVar, bodyParams.back(),
       /*GenericParams=*/nullptr, dc);
@@ -7042,11 +7046,13 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   VarDecl *var = nullptr;
   if (ClangN) {
     var = createDeclWithClangNode<VarDecl>(ClangN, Accessibility::Public,
-                                           isStatic, /*IsLet*/ false,
-                                           SourceLoc(), name, type, dc);
+                                           /*IsStatic*/isStatic, /*IsLet*/false,
+                                           /*IsCaptureList*/false, SourceLoc(),
+                                           name, type, dc);
   } else {
     var = new (SwiftContext)
-        VarDecl(isStatic, /*IsLet*/ false, SourceLoc(), name, type, dc);
+        VarDecl(/*IsStatic*/isStatic, /*IsLet*/false, /*IsCaptureList*/false,
+                SourceLoc(), name, type, dc);
   }
 
   var->setInterfaceType(type);
@@ -7150,7 +7156,9 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
   // Create a new VarDecl with dummy type.
   auto var = createDeclWithClangNode<VarDecl>(ClangN, Accessibility::Public,
-                                              isStatic, /*IsLet*/ false,
+                                              /*IsStatic*/isStatic,
+                                              /*IsLet*/false,
+                                              /*IsCaptureList*/false,
                                               SourceLoc(), name, type, dc);
   var->setInterfaceType(type);
   markUnavailable(var, UnavailableMessage);

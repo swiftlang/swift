@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -247,9 +247,6 @@ if True:
 ///
 ///     print(emptyDoubles[0])
 ///     // Triggers runtime error: Index out of range
-///
-/// See the `Sequence`, `Collection`, and `RangeReplaceableCollection`
-/// protocols for more methods available to arrays.
 ///
 /// Adding and Removing Elements
 /// ============================
@@ -553,9 +550,8 @@ public struct ${Self}<Element>
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
@@ -564,8 +560,6 @@ public struct ${Self}<Element>
   ///   this is the same value as the result of `n` calls to `index(after:)`.
   ///   If `n` is negative, this is the same value as the result of `-n` calls
   ///   to `index(before:)`.
-  ///
-  /// - Complexity: O(1)
   public func index(_ i: Int, offsetBy n: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
@@ -584,10 +578,11 @@ public struct ${Self}<Element>
   /// value, so it succeeds.
   ///
   ///     let numbers = [10, 20, 30, 40, 50]
-  ///     let i = numbers.index(numbers.startIndex,
-  ///                           offsetBy: 4,
-  ///                           limitedBy: numbers.endIndex)
-  ///     print(numbers[i])
+  ///     if let i = numbers.index(numbers.startIndex,
+  ///                              offsetBy: 4,
+  ///                              limitedBy: numbers.endIndex) {
+  ///         print(numbers[i])
+  ///     }
   ///     // Prints "50"
   ///
   /// The next example attempts to retrieve an index ten positions from
@@ -600,9 +595,9 @@ public struct ${Self}<Element>
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
@@ -615,7 +610,6 @@ public struct ${Self}<Element>
   ///   the method returns `nil`.
   ///
   /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
-  /// - Complexity: O(1)
   public func index(
     _ i: Int, offsetBy n: Int, limitedBy limit: Int
   ) -> Int? {
@@ -1209,6 +1203,55 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// For performance reasons, the size of the newly allocated storage might be
   /// greater than the requested capacity. Use the array's `capacity` property
   /// to determine the size of the new storage.
+  ///
+  /// Preserving an Array's Geometric Growth Strategy
+  /// ===============================================
+  ///
+  /// If you implement a custom data structure backed by an array that grows
+  /// dynamically, naively calling the `reserveCapacity(_:)` method can lead
+  /// to worse than expected performance. Arrays need to follow a geometric
+  /// allocation pattern for appending elements to achieve amortized
+  /// constant-time performance. The `Array` type's `append(_:)` and
+  /// `append(contentsOf:)` methods take care of this detail for you, but
+  /// `reserveCapacity(_:)` allocates only as much space as you tell it to
+  /// (padded to a round value), and no more. This avoids over-allocation, but
+  /// can result in insertion not having amortized constant-time performance.
+  ///
+  /// The following code declares `values`, an array of integers, and the
+  /// `addTenQuadratic()` function, which adds ten more values to the `values`
+  /// array on each call.
+  ///
+  ///       var values: [Int] = [0, 1, 2, 3]
+  ///
+  ///       // Don't use 'reserveCapacity(_:)' like this
+  ///       func addTenQuadratic() {
+  ///           let newCount = values.count + 10
+  ///           values.reserveCapacity(newCount)
+  ///           for n in values.count..<newCount {
+  ///               values.append(n)
+  ///           }
+  ///       }
+  ///
+  /// The call to `reserveCapacity(_:)` increases the `values` array's capacity
+  /// by exactly 10 elements on each pass through `addTenQuadratic()`, which
+  /// is linear growth. Instead of having constant time when averaged over
+  /// many calls, the function may decay to performance that is linear in
+  /// `values.count`. This is almost certainly not what you want.
+  ///
+  /// In cases like this, the simplest fix is often to simply remove the call
+  /// to `reserveCapacity(_:)`, and let the `append(_:)` method grow the array
+  /// for you.
+  ///
+  ///       func addTen() {
+  ///           let newCount = values.count + 10
+  ///           for n in values.count..<newCount {
+  ///               values.append(n)
+  ///           }
+  ///       }
+  ///
+  /// If you need more control over the capacity of your array, implement your
+  /// own geometric growth strategy, passing the size you compute to
+  /// `reserveCapacity(_:)`.
   ///
   /// - Parameter minimumCapacity: The requested number of elements to store.
   ///

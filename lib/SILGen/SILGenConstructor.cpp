@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -505,9 +505,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ArrayRef<Substitution> subs;
   // Call the initializer.
   ArrayRef<Substitution> forwardingSubs;
-  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
-    forwardingSubs = genericEnv->getForwardingSubstitutions(SGM.SwiftModule);
-  }
+  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext())
+    forwardingSubs = genericEnv->getForwardingSubstitutions();
   std::tie(initVal, initTy, subs)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
 
@@ -873,8 +872,8 @@ static SILValue getBehaviorSetterFn(SILGenFunction &gen, VarDecl *behaviorVar) {
 
 static Type getInitializationTypeInContext(
     DeclContext *fromDC, DeclContext *toDC,
-    Expr *init) {
-  auto interfaceType = fromDC->mapTypeOutOfContext(init->getType());
+    Pattern *pattern) {
+  auto interfaceType = fromDC->mapTypeOutOfContext(pattern->getType());
   auto resultType = toDC->mapTypeIntoContext(interfaceType);
 
   return resultType;
@@ -910,7 +909,6 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
           // replacement types are the archetypes of the initializer itself.
           SmallVector<Substitution, 4> subsVec;
           typeGenericSig->getSubstitutions(
-                       *SGM.SwiftModule,
                        [&](SubstitutableType *type) {
                          if (auto gp = type->getAs<GenericTypeParamType>()) {
                            return genericEnv->mapTypeIntoContext(gp);
@@ -931,7 +929,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // Get the type of the initialization result, in terms
         // of the constructor context's archetypes.
         CanType resultType = getInitializationTypeInContext(
-            pbd->getDeclContext(), dc, init)->getCanonicalType();
+            pbd->getDeclContext(), dc, entry.getPattern())->getCanonicalType();
         AbstractionPattern origResultType(resultType);
 
         // FIXME: Can emitMemberInit() share code with

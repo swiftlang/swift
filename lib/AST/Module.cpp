@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -602,6 +602,12 @@ TypeBase::gatherAllSubstitutions(Module *module,
       continue;
     }
 
+    if (auto protocol = parent->getAs<ProtocolType>()) {
+      parent = protocol->getParent();
+      lastGenericIndex--;
+      continue;
+    }
+
     if (auto nominal = parent->getAs<NominalType>()) {
       parent = nominal->getParent();
       continue;
@@ -610,16 +616,18 @@ TypeBase::gatherAllSubstitutions(Module *module,
     llvm_unreachable("Not a nominal or bound generic type");
   }
 
+  auto *genericEnv = gpContext->getGenericEnvironmentOfContext();
+
   // Add forwarding substitutions from the outer context if we have
   // a type nested inside a generic function.
   auto *parentDC = gpContext;
   while (parentDC->isTypeContext())
     parentDC = parentDC->getParent();
-  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext()) {
-    for (auto gp : outerEnv->getGenericParams()) {
+  if (auto *outerSig = parentDC->getGenericSignatureOfContext()) {
+    for (auto gp : outerSig->getGenericParams()) {
       auto result = substitutions.insert(
                       {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
-                       outerEnv->mapTypeIntoContext(gp)});
+                       genericEnv->mapTypeIntoContext(gp)});
       assert(result.second);
     }
   }
@@ -647,7 +655,7 @@ TypeBase::gatherAllSubstitutions(Module *module,
       };
 
   SmallVector<Substitution, 4> result;
-  genericSig->getSubstitutions(*module, substitutions,
+  genericSig->getSubstitutions(substitutions,
                                lookupConformanceFn,
                                result);
 
@@ -669,6 +677,11 @@ Optional<ProtocolConformanceRef>
 Module::lookupConformance(Type type, ProtocolDecl *protocol,
                           LazyResolver *resolver) {
   ASTContext &ctx = getASTContext();
+
+  // A dynamic Self type conforms to whatever its underlying type
+  // conforms to.
+  if (auto selfType = type->getAs<DynamicSelfType>())
+    type = selfType->getSelfType();
 
   // An archetype conforms to a protocol if the protocol is listed in the
   // archetype's list of conformances, or if the archetype has a superclass
@@ -754,11 +767,8 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
   // intended type might have.
-  if (type->is<UnresolvedType>()) {
-    return ProtocolConformanceRef(
-             ctx.getConformance(type, protocol, protocol->getLoc(), this,
-                                ProtocolConformanceState::Complete));
-  }
+  if (type->is<UnresolvedType>())
+    return ProtocolConformanceRef(protocol);
 
   auto nominal = type->getAnyNominal();
 
@@ -813,11 +823,6 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
       // the specialized conformance.
       auto substitutions = type->gatherAllSubstitutions(this, resolver,
                                                         explicitConformanceDC);
-      
-      for (auto sub : substitutions) {
-        if (sub.getReplacement()->hasError())
-          return None;
-      }
 
       // Create the specialized conformance entry.
       auto result = ctx.getSpecializedConformance(type, conformance,

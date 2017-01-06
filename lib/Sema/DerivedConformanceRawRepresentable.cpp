@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -327,7 +327,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   return initDecl;
 }
 
-static bool canSynthesizeRawRepresentable(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
+static bool canSynthesizeRawRepresentable(TypeChecker &tc, Decl *parentDecl,
+                                          EnumDecl *enumDecl) {
 
   // It must have a valid raw type.
   Type rawType = enumDecl->getRawType();
@@ -340,17 +341,15 @@ static bool canSynthesizeRawRepresentable(TypeChecker &tc, Decl *parentDecl, Enu
       enumDecl->getInherited().front().isError())
     return false;
 
-  // The raw type must be Equatable, so that we have a suitable ~= for synthesized switch statements.
+  // The raw type must be Equatable, so that we have a suitable ~= for
+  // synthesized switch statements.
   auto equatableProto = tc.getProtocol(enumDecl->getLoc(),
                                        KnownProtocolKind::Equatable);
   if (!equatableProto)
     return false;
 
-  if (!tc.conformsToProtocol(rawType, equatableProto, enumDecl, None)) {
-    SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
-    tc.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
+  if (!tc.conformsToProtocol(rawType, equatableProto, enumDecl, None))
     return false;
-  }
   
   // There must be enum elements.
   if (enumDecl->getAllElements().empty())

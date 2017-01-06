@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -50,7 +50,6 @@
 #include <queue>
 
 using namespace swift;
-namespace swift {
 
 struct SynthesizedExtensionAnalyzer::Implementation {
   static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
@@ -225,7 +224,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     // the extension to the interface types of the base type's
     // declaration.
     TypeSubstitutionMap subMap;
-    if (!BaseType->isAnyExistentialType())
+    if (!BaseType->isExistentialType())
       subMap = BaseType->getContextSubstitutions(Ext);
     auto *M = DC->getParentModule();
 
@@ -429,7 +428,6 @@ hasMergeGroup(MergeGroupKind Kind) {
   }
   return false;
 }
-} // end anonymous namespace
 
 PrintOptions PrintOptions::printTypeInterface(Type T) {
   PrintOptions result = printInterface();
@@ -455,7 +453,9 @@ void PrintOptions::clearSynthesizedExtension() {
 }
 
 TypeTransformContext::TypeTransformContext(Type T)
-    : BaseType(T.getPointer()) {}
+    : BaseType(T.getPointer()) {
+  assert(T->mayHaveMembers());
+}
 
 TypeTransformContext::TypeTransformContext(NominalTypeDecl *NTD)
     : BaseType(NTD->getDeclaredTypeInContext().getPointer()), Nominal(NTD) {}
@@ -859,7 +859,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
       // Get the innermost nominal type context.
       DeclContext *DC;
-      if (isa<NominalTypeDecl>(Current))
+      if (isa<NominalTypeDecl>(Current) || isa<ExtensionDecl>(Current))
         DC = Current->getInnermostDeclContext();
       else
         DC = Current->getDeclContext();
@@ -986,8 +986,9 @@ public:
     Type OldType = CurrentType;
     if (CurrentType && (Old != nullptr || Options.PrintAsMember)) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        CurrentType = CurrentType->getTypeOfMember(
-            Options.CurrentModule, NTD, nullptr);
+        CurrentType = NTD->getDeclaredInterfaceType().subst(
+            Options.CurrentModule,
+            CurrentType->getContextSubstitutions(NTD->getDeclContext()));
       }
     }
 
@@ -1261,7 +1262,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
   ModuleDecl *M = nullptr;
 
   if (CurrentType) {
-    if (!CurrentType->isAnyExistentialType()) {
+    if (!CurrentType->isExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
       subMap = CurrentType->getContextSubstitutions(DC);
       M = DC->getParentModule();
@@ -4110,8 +4111,8 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "dictionary_downcast";
   case CheckedCastKind::SetDowncast:
     return "set_downcast";
-  case CheckedCastKind::BridgeFromObjectiveC:
-    return "bridge_from_objc";
+  case CheckedCastKind::BridgingCast:
+    return "bridging_cast";
   }
   llvm_unreachable("bad checked cast name");
 }

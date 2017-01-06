@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -80,6 +80,41 @@ class ModuleFile : public LazyMemberLoader {
 
   /// A callback to be invoked every time a type was deserialized.
   std::function<void(Type)> DeserializedTypeCallback;
+
+  /// The number of entities that are currently being deserialized.
+  unsigned NumCurrentDeserializingEntities = 0;
+
+  /// Declaration contexts with delayed generic environments, which will be
+  /// completed as a pending action.
+  ///
+  /// FIXME: This is needed because completing a generic environment can
+  /// require the type checker, which might be gone if we delay generic
+  /// environments too far. It is a hack.
+  std::vector<DeclContext *> DelayedGenericEnvironments;
+
+  /// RAII class to be used when deserializing an entity.
+  class DeserializingEntityRAII {
+    ModuleFile &MF;
+
+  public:
+    DeserializingEntityRAII(ModuleFile &MF) : MF(MF) {
+      ++MF.NumCurrentDeserializingEntities;
+    }
+    ~DeserializingEntityRAII() {
+      assert(MF.NumCurrentDeserializingEntities > 0 &&
+             "Imbalanced currently-deserializing count?");
+      if (MF.NumCurrentDeserializingEntities == 1) {
+        MF.finishPendingActions();
+      }
+
+      --MF.NumCurrentDeserializingEntities;
+    }
+  };
+  friend class DeserializingEntityRAII;
+
+  /// Finish any pending actions that were waiting for the topmost entity to
+  /// be deserialized.
+  void finishPendingActions();
 
 public:
   /// Represents another module that has been imported as a dependency.
@@ -705,20 +740,6 @@ public:
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
   Module *getModule(ArrayRef<Identifier> name);
-
-  /// Return the generic signature or environment at the current position in
-  /// the given cursor.
-  ///
-  /// \param cursor The cursor to read from.
-  /// \param wantEnvironment Whether we always want to receive a generic
-  /// environment vs. being able to handle the generic signature.
-  /// \param optRequirements If not \c None, use these generic requirements
-  /// rather than deserializing requirements.
-  llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-  readGenericSignatureOrEnvironment(
-                        llvm::BitstreamCursor &cursor,
-                        bool wantEnvironment,
-                        Optional<ArrayRef<Requirement>> optRequirements);
 
   /// Returns the generic signature or environment for the given ID,
   /// deserializing it if needed.

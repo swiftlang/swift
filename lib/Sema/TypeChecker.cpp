@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -326,9 +326,11 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
-      extendedType = aliasDecl->getDeclaredInterfaceType()->getAnyNominal()
-          ->getDeclaredType();
-      ED->getExtendedTypeLoc().setType(extendedType);
+      auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
+      if (extendedNominal) {
+        extendedType = extendedNominal->getDeclaredType();
+        ED->getExtendedTypeLoc().setType(extendedType);
+      }
     }
   }
 
@@ -771,15 +773,18 @@ static Optional<Type> getTypeOfCompletionContextExpr(
     return None;
   }
 
-  CanType originalType = parsedExpr->getType().getCanonicalTypeOrNull();
+  Type originalType = parsedExpr->getType();
   if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
                  referencedDecl, FreeTypeVariableBinding::GenericParameters))
     return T;
 
   // Try to recover if we've made any progress.
-  if (parsedExpr && !isa<ErrorExpr>(parsedExpr) && parsedExpr->getType() &&
+  if (parsedExpr &&
+      !isa<ErrorExpr>(parsedExpr) &&
+      parsedExpr->getType() &&
       !parsedExpr->getType()->hasError() &&
-      parsedExpr->getType().getCanonicalTypeOrNull() != originalType) {
+      (originalType.isNull() ||
+       !parsedExpr->getType()->isEqual(originalType))) {
     return parsedExpr->getType();
   }
 
@@ -2327,4 +2332,16 @@ void TypeChecker::checkForForbiddenPrefix(StringRef Name) {
     Msg += Name;
     llvm::report_fatal_error(Msg);
   }
+}
+
+DeclTypeCheckingSemantics
+TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
+  // Check for a @_semantics attribute.
+  if (auto semantics = decl->getAttrs().getAttribute<SemanticsAttr>()) {
+    if (semantics->Value.equals("typechecker.type(of:)"))
+      return DeclTypeCheckingSemantics::TypeOf;
+    if (semantics->Value.equals("typechecker.withoutActuallyEscaping(_:do:)"))
+      return DeclTypeCheckingSemantics::WithoutActuallyEscaping;
+  }
+  return DeclTypeCheckingSemantics::Normal;
 }

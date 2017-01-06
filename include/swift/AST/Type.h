@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -71,11 +71,11 @@ struct QueryTypeSubstitutionMap {
 };
 
 /// Function used to resolve conformances.
-using LookupConformanceFn
-  = llvm::function_ref<auto(CanType dependentType,
-                            Type conformingReplacementType,
-                            ProtocolType *conformedProtocol)
-                       -> Optional<ProtocolConformanceRef>>;
+using GenericFunction = auto(CanType dependentType,
+  Type conformingReplacementType,
+  ProtocolType *conformedProtocol)
+  ->Optional<ProtocolConformanceRef>;
+using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
 /// conformance through a module.
@@ -279,9 +279,6 @@ public:
 
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
-
-  /// Get the canonical type, or return null if the type is null.
-  CanType getCanonicalTypeOrNull() const; // in Types.h
 
   /// Computes the join between two types.
   ///

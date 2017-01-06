@@ -40,7 +40,6 @@ private struct PrivateStruct {
 
 func localTypes() {
   struct LocalStruct {
-    // CHECK-LABEL: sil shared @_TZFVF16mangling_private10localTypesFT_T_L_11LocalStruct13privateMethodfT_T_
     private static func privateMethod() {}
   }
 }
@@ -54,6 +53,7 @@ extension PrivateStruct {
   private func extPrivateMethod() {}
 }
 
+// CHECK-LABEL: sil shared @_TZFVF16mangling_private10localTypesFT_T_L_11LocalStruct13privateMethodfT_T_
 
 // CHECK-LABEL: sil_vtable Sub {
 class Sub : Base {

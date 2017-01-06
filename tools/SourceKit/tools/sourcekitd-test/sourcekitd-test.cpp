@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -91,12 +91,14 @@ static sourcekitd_uid_t KeyOffset;
 static sourcekitd_uid_t KeySourceFile;
 static sourcekitd_uid_t KeyModuleName;
 static sourcekitd_uid_t KeyGroupName;
+static sourcekitd_uid_t KeyActionName;
 static sourcekitd_uid_t KeySynthesizedExtension;
 static sourcekitd_uid_t KeyName;
 static sourcekitd_uid_t KeyNames;
 static sourcekitd_uid_t KeyFilePath;
 static sourcekitd_uid_t KeyModuleInterfaceName;
 static sourcekitd_uid_t KeyLength;
+static sourcekitd_uid_t KeyActionable;
 static sourcekitd_uid_t KeySourceText;
 static sourcekitd_uid_t KeyUSR;
 static sourcekitd_uid_t KeyOriginalUSR;
@@ -204,12 +206,14 @@ static int skt_main(int argc, const char **argv) {
   KeySourceFile = sourcekitd_uid_get_from_cstr("key.sourcefile");
   KeyModuleName = sourcekitd_uid_get_from_cstr("key.modulename");
   KeyGroupName = sourcekitd_uid_get_from_cstr("key.groupname");
+  KeyActionName = sourcekitd_uid_get_from_cstr("key.actionname");
   KeySynthesizedExtension = sourcekitd_uid_get_from_cstr("key.synthesizedextensions");
   KeyName = sourcekitd_uid_get_from_cstr("key.name");
   KeyNames = sourcekitd_uid_get_from_cstr("key.names");
   KeyFilePath = sourcekitd_uid_get_from_cstr("key.filepath");
   KeyModuleInterfaceName = sourcekitd_uid_get_from_cstr("key.module_interface_name");
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
+  KeyActionable = sourcekitd_uid_get_from_cstr("key.actionable");
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyUSR = sourcekitd_uid_get_from_cstr("key.usr");
   KeyOriginalUSR = sourcekitd_uid_get_from_cstr("key.original_usr");
@@ -1099,6 +1103,17 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                                              KeyAnnotatedDecl));
   }
 
+  std::vector<const char *> AvailableActions;
+  sourcekitd_variant_t ActionsObj =
+  sourcekitd_variant_dictionary_get_value(Info, KeyActionable);
+  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(ActionsObj);
+       i != e; ++i) {
+    sourcekitd_variant_t Entry =
+    sourcekitd_variant_array_get_value(ActionsObj, i);
+    AvailableActions.push_back(sourcekitd_variant_dictionary_get_string(Entry,
+                                                                KeyActionName));
+  }
+
   OS << Kind << " (";
   if (Offset.hasValue()) {
     if (Filename != FilePath)
@@ -1148,6 +1163,10 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   for (auto Group : GroupNames)
     OS << Group << '\n';
   OS << "MODULE GROUPS END\n";
+  OS << "ACTIONS BEGIN\n";
+  for (auto Action : AvailableActions)
+    OS << Action << '\n';
+  OS << "ACTIONS END\n";
 }
 
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,

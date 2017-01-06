@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -97,7 +97,8 @@ class OptBugReducerTestCase(unittest.TestCase):
             '--module-cache=%s' % self.module_cache,
             '--module-name=%s' % name,
             '--work-dir=%s' % self.tmp_dir,
-            '--extra-arg=-bug-reducer-tester-target-func=test_target'
+            '--extra-arg=-bug-reducer-tester-target-func=test_target',
+            '--extra-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")
@@ -108,6 +109,10 @@ class OptBugReducerTestCase(unittest.TestCase):
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 1)
+        # Make sure our final output command does not have -emit-sib in the
+        # output. We want users to get sil output when they type in the relevant
+        # command.
+        self.assertEquals([], [o for o in output if '-emit-sib' in o])
 
     def test_suffix_in_need_of_prefix(self):
         name = 'testsuffixinneedofprefix'
@@ -121,7 +126,8 @@ class OptBugReducerTestCase(unittest.TestCase):
             '--module-cache=%s' % self.module_cache,
             '--module-name=%s' % name,
             '--work-dir=%s' % self.tmp_dir,
-            '--extra-arg=-bug-reducer-tester-target-func=closure_test_target'
+            '--extra-arg=-bug-reducer-tester-target-func=closure_test_target',
+            '--extra-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")
@@ -132,6 +138,10 @@ class OptBugReducerTestCase(unittest.TestCase):
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 0)
+        # Make sure our final output command does not have -emit-sib in the
+        # output. We want users to get sil output when they type in the relevant
+        # command.
+        self.assertEquals([], [o for o in output if '-emit-sib' in o])
 
     def test_reduce_function(self):
         name = 'testreducefunction'
@@ -146,6 +156,7 @@ class OptBugReducerTestCase(unittest.TestCase):
             '--module-name=%s' % name,
             '--work-dir=%s' % self.tmp_dir,
             '--extra-arg=-bug-reducer-tester-target-func=__TF_test_target',
+            '--extra-arg=-bug-reducer-tester-failure-kind=opt-crasher',
             '--reduce-sil'
         ]
         args.extend(self.passes)
@@ -160,6 +171,11 @@ class OptBugReducerTestCase(unittest.TestCase):
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 1)
+        # Make sure our final output command does not have -emit-sib in the
+        # output. We want users to get sil output when they type in the relevant
+        # command.
+        print output
+        self.assertEquals([], [o for o in output if '-emit-sib' in o])
 
 
 if __name__ == '__main__':

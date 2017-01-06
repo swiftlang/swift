@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -2544,6 +2544,8 @@ private:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
     case Node::Kind::VariadicMarker:
+    case Node::Kind::OutlinedCopy:
+    case Node::Kind::OutlinedConsume:
       return false;
     }
     unreachable("bad node kind");
@@ -2973,6 +2975,14 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::CurryThunk:
     Printer << "curry thunk of ";
+    print(pointer->getChild(0), asContext, suppressType);
+    return;
+  case Node::Kind::OutlinedCopy:
+    Printer << "outlined copy of ";
+    print(pointer->getChild(0), asContext, suppressType);
+    return;
+  case Node::Kind::OutlinedConsume:
+    Printer << "outlined consume of ";
     print(pointer->getChild(0), asContext, suppressType);
     return;
   case Node::Kind::Directness:
@@ -3610,12 +3620,22 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     NodePointer child0 = pointer->getChild(0);
     NodePointer child1 = pointer->getChild(1);
     NodePointer child2 = pointer->getChild(2);
-    print(child0);
-    if (Options.DisplayProtocolConformances) {
+    if (pointer->getNumChildren() == 4) {
+      // TODO: check if this is correct
+      Printer << "property behavior storage of ";
+      print(child2);
+      Printer << " in ";
+      print(child0);
       Printer << " : ";
       print(child1);
-      Printer << " in ";
-      print(child2);
+    } else {
+      print(child0);
+      if (Options.DisplayProtocolConformances) {
+        Printer << " : ";
+        print(child1);
+        Printer << " in ";
+        print(child2);
+      }
     }
     return;
   }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -441,7 +441,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // Stored property initializers have hidden linkage, since they are
   // not meant to be used from outside of their module.
   if (isStoredPropertyInitializer())
-    return SILLinkage::Hidden;
+    return (forDefinition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
 
   // Declarations imported from Clang modules have shared linkage.
   const SILLinkage ClangLinkage = SILLinkage::Shared;

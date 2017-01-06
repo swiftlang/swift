@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -394,22 +394,22 @@ public func reflect<T: Error>(error: T) {
 
 /// Wraps a thick function with arity 0.
 struct ThickFunction0 {
-  var function: () -> ()
+  var function: () -> Void
 }
 
 /// Wraps a thick function with arity 1.
 struct ThickFunction1 {
-  var function: (Int) -> ()
+  var function: (Int) -> Void
 }
 
 /// Wraps a thick function with arity 2.
 struct ThickFunction2 {
-  var function: (Int, String) -> ()
+  var function: (Int, String) -> Void
 }
 
 /// Wraps a thick function with arity 3.
 struct ThickFunction3 {
-  var function: (Int, String, AnyObject?) -> ()
+  var function: (Int, String, AnyObject?) -> Void
 }
 
 struct ThickFunctionParts {
@@ -419,7 +419,7 @@ struct ThickFunctionParts {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping () -> ()) {
+public func reflect(function: @escaping () -> Void) {
   let fn = UnsafeMutablePointer<ThickFunction0>.allocate(
     capacity: MemoryLayout<ThickFunction0>.size)
   fn.initialize(to: ThickFunction0(function: function))
@@ -434,7 +434,7 @@ public func reflect(function: @escaping () -> ()) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping (Int) -> ()) {
+public func reflect(function: @escaping (Int) -> Void) {
   let fn =
   UnsafeMutablePointer<ThickFunction1>.allocate(
     capacity: MemoryLayout<ThickFunction1>.size)
@@ -450,7 +450,7 @@ public func reflect(function: @escaping (Int) -> ()) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping (Int, String) -> ()) {
+public func reflect(function: @escaping (Int, String) -> Void) {
   let fn = UnsafeMutablePointer<ThickFunction2>.allocate(
       capacity: MemoryLayout<ThickFunction2>.size)
   fn.initialize(to: ThickFunction2(function: function))
@@ -465,7 +465,7 @@ public func reflect(function: @escaping (Int, String) -> ()) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping (Int, String, AnyObject?) -> ()) {
+public func reflect(function: @escaping (Int, String, AnyObject?) -> Void) {
   let fn = UnsafeMutablePointer<ThickFunction3>.allocate(
       capacity: MemoryLayout<ThickFunction3>.size)
   fn.initialize(to: ThickFunction3(function: function))

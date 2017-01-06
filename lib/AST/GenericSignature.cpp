@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -98,9 +98,11 @@ CanGenericSignature GenericSignature::getCanonical(
   SmallVector<Requirement, 8> canonicalRequirements;
   canonicalRequirements.reserve(requirements.size());
   for (auto &reqt : requirements) {
+    auto secondTy = reqt.getSecondType();
     canonicalRequirements.push_back(Requirement(reqt.getKind(),
                               reqt.getFirstType()->getCanonicalType(),
-                              reqt.getSecondType().getCanonicalTypeOrNull()));
+                              secondTy ? secondTy->getCanonicalType()
+                                       : CanType()));
   }
   auto canSig = get(canonicalParams, canonicalRequirements,
                     /*isKnownCanonical=*/true);
@@ -268,12 +270,35 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> subs,
     subs = subs.slice(1);
 
     auto canTy = depTy->getCanonicalType();
-    if (isa<GenericTypeParamType>(canTy))
-      result.addSubstitution(canTy, sub.getReplacement());
+    if (isa<SubstitutableType>(canTy)) {
+      result.addSubstitution(cast<SubstitutableType>(canTy),
+                             sub.getReplacement());
+    }
     result.addConformances(canTy, sub.getConformances());
   }
 
-  // TODO: same-type constraints
+  for (auto reqt : getRequirements()) {
+    if (reqt.getKind() != RequirementKind::SameType)
+      continue;
+
+    auto first = reqt.getFirstType();
+    auto second = reqt.getSecondType();
+
+    if (!first->isTypeParameter() || !second->isTypeParameter())
+      continue;
+
+    if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
+      result.addParent(second->getCanonicalType(),
+                       firstMemTy->getBase()->getCanonicalType(),
+                       firstMemTy->getAssocType());
+    }
+
+    if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
+      result.addParent(first->getCanonicalType(),
+                       secondMemTy->getBase()->getCanonicalType(),
+                       secondMemTy->getAssocType());
+    }
+  }
 
   assert(subs.empty() && "did not use all substitutions?!");
 }
@@ -289,17 +314,15 @@ SmallVector<Type, 4> GenericSignature::getAllDependentTypes() const {
 }
 
 void GenericSignature::
-getSubstitutions(ModuleDecl &mod,
-                 const TypeSubstitutionMap &subs,
+getSubstitutions(const TypeSubstitutionMap &subs,
                  GenericSignature::LookupConformanceFn lookupConformance,
                  SmallVectorImpl<Substitution> &result) const {
-  getSubstitutions(mod, QueryTypeSubstitutionMap{subs}, lookupConformance,
+  getSubstitutions(QueryTypeSubstitutionMap{subs}, lookupConformance,
                    result);
 }
 
 void GenericSignature::
-getSubstitutions(ModuleDecl &mod,
-                 TypeSubstitutionFn subs,
+getSubstitutions(TypeSubstitutionFn subs,
                  GenericSignature::LookupConformanceFn lookupConformance,
                  SmallVectorImpl<Substitution> &result) const {
   // Enumerate all of the requirements that require substitution.
@@ -307,8 +330,7 @@ getSubstitutions(ModuleDecl &mod,
     auto &ctx = getASTContext();
 
     // Compute the replacement type.
-    Type currentReplacement = depTy.subst(subs,
-                                          LookUpConformanceInModule(&mod));
+    Type currentReplacement = depTy.subst(subs, lookupConformance);
     if (!currentReplacement)
       currentReplacement = ErrorType::get(depTy);
 
@@ -334,8 +356,7 @@ getSubstitutions(ModuleDecl &mod,
 }
 
 void GenericSignature::
-getSubstitutions(ModuleDecl &mod,
-                 const SubstitutionMap &subMap,
+getSubstitutions(const SubstitutionMap &subMap,
                  SmallVectorImpl<Substitution> &result) const {
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
@@ -343,7 +364,7 @@ getSubstitutions(ModuleDecl &mod,
         return subMap.lookupConformance(original, protoType->getDecl());
       };
 
-  getSubstitutions(mod, subMap.getMap(), lookupConformanceFn, result);
+  getSubstitutions(subMap.getMap(), lookupConformanceFn, result);
 }
 
 bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {

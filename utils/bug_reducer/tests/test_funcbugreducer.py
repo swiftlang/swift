@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -54,7 +54,8 @@ class FuncBugReducerTestCase(unittest.TestCase):
 
     def _get_test_file_path(self, module_name):
         return os.path.join(self.file_dir,
-                            '{}_{}.swift'.format(self.root_basename, module_name))
+                            '{}_{}.swift'.format(
+                                self.root_basename, module_name))
 
     def _get_sib_file_path(self, filename):
         (root, ext) = os.path.splitext(filename)
@@ -87,7 +88,9 @@ class FuncBugReducerTestCase(unittest.TestCase):
             '--module-cache=%s' % self.module_cache,
             '--module-name=%s' % name,
             '--work-dir=%s' % self.tmp_dir,
-            '--extra-silopt-arg=-bug-reducer-tester-target-func=__TF_test_target'
+            ('--extra-silopt-arg='
+             '-bug-reducer-tester-target-func=__TF_test_target'),
+            '--extra-silopt-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")
@@ -99,7 +102,10 @@ class FuncBugReducerTestCase(unittest.TestCase):
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 1)
-
+        # Make sure our final output command does not have -emit-sib in the
+        # output. We want users to get sil output when they type in the relevant
+        # command.
+        self.assertEquals([], [o for o in output if '-emit-sib' in o])
 
 if __name__ == '__main__':
     unittest.main()

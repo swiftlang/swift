@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -127,12 +127,12 @@ enum class DeclTypeKind : unsigned {
 };
 
 static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
-  if (ED->isInvalid())
-    return ErrorType::get(ED->getASTContext());
-
   auto type = ED->getExtendedType();
-  if (!type)
+  if (!type) {
+    if (ED->isInvalid())
+      return ErrorType::get(ED->getASTContext());
     return Type();
+  }
 
   if (type->is<UnboundGenericType>()) {
     ED->getASTContext().getLazyResolver()->resolveExtension(
@@ -147,8 +147,6 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
   case DeclTypeKind::DeclaredType:
     return type->getAnyNominal()->getDeclaredType();
   case DeclTypeKind::DeclaredTypeInContext:
-    if (type->is<UnboundGenericType>())
-      return Type();
     return type;
   case DeclTypeKind::DeclaredInterfaceType:
     // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
@@ -231,25 +229,14 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
       // can occur in generic contexts.
       continue;
 
-    case DeclContextKind::AbstractFunctionDecl: {
-      auto *AFD = cast<AbstractFunctionDecl>(dc);
-      if (auto genericSig = AFD->getGenericSignature())
-        return genericSig;
-      continue;
-    }
+    case DeclContextKind::AbstractFunctionDecl:
+      return cast<AbstractFunctionDecl>(dc)->getGenericSignature();
 
-    case DeclContextKind::GenericTypeDecl: {
-      auto GTD = cast<GenericTypeDecl>(dc);
-      if (auto genericSig = GTD->getGenericSignature())
-        return genericSig;
-      continue;
-    }
+    case DeclContextKind::GenericTypeDecl:
+      return cast<GenericTypeDecl>(dc)->getGenericSignature();
 
-    case DeclContextKind::ExtensionDecl: {
-      auto ED = cast<ExtensionDecl>(dc);
-      // Extensions do not capture outer generic parameters.
-      return ED->getGenericSignature();
-    }
+    case DeclContextKind::ExtensionDecl:
+      return cast<ExtensionDecl>(dc)->getGenericSignature();
     }
     llvm_unreachable("bad DeclContextKind");
   }
@@ -271,25 +258,14 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
       // can occur in generic contexts.
       continue;
 
-    case DeclContextKind::AbstractFunctionDecl: {
-      auto *AFD = cast<AbstractFunctionDecl>(dc);
-      if (auto genericCtx = AFD->getGenericEnvironment())
-        return genericCtx;
-      continue;
-    }
+    case DeclContextKind::AbstractFunctionDecl:
+      return cast<AbstractFunctionDecl>(dc)->getGenericEnvironment();
 
-    case DeclContextKind::GenericTypeDecl: {
-      auto GTD = cast<GenericTypeDecl>(dc);
-      if (auto genericCtx = GTD->getGenericEnvironment())
-        return genericCtx;
-      continue;
-    }
+    case DeclContextKind::GenericTypeDecl:
+      return cast<GenericTypeDecl>(dc)->getGenericEnvironment();
 
-    case DeclContextKind::ExtensionDecl: {
-      auto ED = cast<ExtensionDecl>(dc);
-      // Extensions do not capture outer generic parameters.
-      return ED->getGenericEnvironment();
-    }
+    case DeclContextKind::ExtensionDecl:
+      return cast<ExtensionDecl>(dc)->getGenericEnvironment();
     }
     llvm_unreachable("bad DeclContextKind");
   }
@@ -482,35 +458,6 @@ bool DeclContext::isGenericContext() const {
   llvm_unreachable("illegal declcontext hierarchy");
 }
 
-bool DeclContext::isValidGenericContext() const {
-  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
-    switch (dc->getContextKind()) {
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-    case DeclContextKind::TopLevelCodeDecl:
-      return false;
-
-    case DeclContextKind::Initializer:
-    case DeclContextKind::AbstractClosureExpr:
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::SubscriptDecl:
-      // Check parent context.
-      continue;
-
-    case DeclContextKind::AbstractFunctionDecl:
-      return cast<AbstractFunctionDecl>(dc)->getGenericEnvironment();
-
-    case DeclContextKind::GenericTypeDecl:
-      return cast<GenericTypeDecl>(dc)->getGenericEnvironment();
-
-    case DeclContextKind::ExtensionDecl:
-      return cast<ExtensionDecl>(dc)->getGenericEnvironment();
-    }
-    llvm_unreachable("bad decl context kind");
-  }
-  llvm_unreachable("illegal declcontext hierarchy");
-}
-
 /// Get the most optimal resilience expansion for the body of this function.
 /// If the body is able to be inlined into functions in other resilience
 /// domains, this ensures that only sufficiently-conservative access patterns
@@ -667,7 +614,7 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
 }
 
 void DeclContext::dumpContext() const {
-  printContext(llvm::outs());
+  printContext(llvm::errs());
 }
 
 template <typename DCType>
@@ -728,7 +675,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   case DeclContextKind::AbstractFunctionDecl:
     Kind = "AbstractFunctionDecl";
     break;
-    case DeclContextKind::SubscriptDecl:  Kind = "SubscriptDecl"; break;
+  case DeclContextKind::SubscriptDecl:    Kind = "SubscriptDecl"; break;
   }
   OS.indent(Depth*2 + indent) << "0x" << (void*)this << " " << Kind;
 
@@ -917,7 +864,7 @@ void IterableDeclContext::loadAllMembers() const {
   // Don't try to load all members re-entrant-ly.
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
-                                                            /*loader=*/nullptr);
+    /*lazyLoader=*/nullptr);
   FirstDeclAndLazyMembers.setInt(false);
 
   const Decl *container = nullptr;

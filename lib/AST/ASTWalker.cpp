@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -845,6 +845,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (!sub) return nullptr;
 
     E->setExistentialValue(existential);
+    E->setSubExpr(sub);
+    return E;
+  }
+
+  Expr *visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *E) {
+    Expr *closure = doIt(E->getNonescapingClosureValue());
+    if (!closure) return nullptr;
+
+    Expr *sub = doIt(E->getSubExpr());
+    if (!sub) return nullptr;
+
+    E->setNonescapingClosureValue(closure);
     E->setSubExpr(sub);
     return E;
   }

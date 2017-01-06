@@ -156,3 +156,8 @@ extension Error {
 		return self as NSError
 	}
 }
+
+class Gizmoid : NSObject {
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC10objc_error7GizmoidcfzT3fooT__S0_ : $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned Gizmoid) -> @owned Optional<Gizmoid>
+  @objc init(foo: ()) throws {}
+}

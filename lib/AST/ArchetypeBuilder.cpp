@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1343,9 +1343,11 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
 
   // If this is an associated type that already has an archetype assigned,
   // use that information.
-  if (isa<AssociatedTypeDecl>(decl) &&
-      decl->getDeclContext()->isValidGenericContext()) {
-    auto *archetype = decl->getDeclContext()->mapTypeIntoContext(
+  auto *genericEnv = decl->getDeclContext()
+      ->getGenericEnvironmentOfContext();
+  if (isa<AssociatedTypeDecl>(decl) && genericEnv != nullptr) {
+    auto *archetype = genericEnv->mapTypeIntoContext(
+        &Mod,
         decl->getDeclaredInterfaceType())
             ->getAs<ArchetypeType>();
 
@@ -1993,6 +1995,17 @@ static void collectRequirements(ArchetypeBuilder &builder,
     if (auto concreteTy = type.dyn_cast<Type>()) {
       // Maybe we were equated to a concrete type...
       repTy = concreteTy;
+
+      // Drop requirements involving concrete types containing
+      // unresolved associated types.
+      if (repTy.findIf([](Type t) -> bool {
+            if (auto *depTy = dyn_cast<DependentMemberType>(t.getPointer()))
+              if (depTy->getAssocType() == nullptr)
+                return true;
+            return false;
+          })) {
+        return;
+      }
     } else {
       // ...or to a dependent type.
       repTy = type.get<ArchetypeBuilder::PotentialArchetype *>()

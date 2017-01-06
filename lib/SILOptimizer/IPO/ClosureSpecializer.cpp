@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -398,7 +398,7 @@ IsFragile_t CallSiteDescriptor::isFragile() const {
 
 std::string CallSiteDescriptor::createName() const {
   Mangle::Mangler M;
-  auto P = SpecializationPass::ClosureSpecializer;
+  auto P = Demangle::SpecializationPass::ClosureSpecializer;
   FunctionSignatureSpecializationMangler OldFSSM(P, M, isFragile(),
                                                  getApplyCallee());
   NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, isFragile(),

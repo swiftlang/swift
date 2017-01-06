@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -152,6 +152,11 @@ namespace swift {
   /// \param HighPerformance True if the playground transform should omit
   /// instrumentation that has a high runtime performance impact.
   void performPlaygroundTransform(SourceFile &SF, bool HighPerformance);
+  
+  /// Once parsing and name-binding are complete this optionally walks the ASTs
+  /// to add calls to externally provided functions that simulate
+  /// "program counter"-like debugging events.
+  void performPCMacro(SourceFile &SF, TopLevelContext &TLC);
   
   /// Flags used to control type checking.
   enum class TypeCheckingFlags : unsigned {

@@ -136,7 +136,7 @@ list of passes that the perf pipeline"""
     if args.pass_list is None:
         json_data = json.loads(subprocess.check_output(
             [tools.sil_passpipeline_dumper, '-Performance']))
-        passes = sum((p[2:] for p in json_data), [])
+        passes = sum((p[1:] for p in json_data), [])
         passes = ['-' + x[1] for x in passes]
     else:
         passes = ['-' + x for x in args.pass_list]

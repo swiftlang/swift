@@ -3,7 +3,7 @@
 #
 ## This source file is part of the Swift.org open source project
 ##
-## Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+## Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 ## Licensed under Apache License v2.0 with Runtime Library Exception
 ##
 ## See https://swift.org/LICENSE.txt for license information
@@ -78,6 +78,7 @@ KNOWN_SETTINGS=(
     playgroundlogger-build-type "Debug"          "the build variant for PlaygroundLogger"
     playgroundsupport-build-type "Debug"         "the build variant for PlaygroundSupport"
     xctest-build-type           "Debug"          "the build variant for xctest"
+    swiftpm-build-type          "Debug"          "the build variant for swiftpm"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
     cmake                       ""               "path to the cmake binary"
@@ -1755,6 +1756,10 @@ function set_swiftpm_bootstrap_command() {
         exit 1
     fi
     swiftpm_bootstrap_command=("${SWIFTPM_SOURCE_DIR}/Utilities/bootstrap" "${swiftpm_bootstrap_options[@]}")
+    # Add --release if we have to build in release mode.
+    if [[ "${SWIFTPM_BUILD_TYPE}" ==  "Release" ]] ; then
+        swiftpm_bootstrap_command+=(--release)
+    fi
     if [[ "${VERBOSE_BUILD}" ]] ; then
         swiftpm_bootstrap_command+=(-v)
     fi
@@ -2012,7 +2017,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCLANG_TOOL_ARCMT_TEST_BUILD=NO
                     -DCLANG_TOOL_C_ARCMT_TEST_BUILD=NO
                     -DCLANG_TOOL_C_INDEX_TEST_BUILD=NO
-                    -DCLANG_TOOL_DRIVER_BUILD=NO
+                    -DCLANG_TOOL_DRIVER_BUILD=$(false_true "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     -DCLANG_TOOL_DIAGTOOL_BUILD=NO
                     -DCLANG_TOOL_SCAN_BUILD_BUILD=NO
                     -DCLANG_TOOL_SCAN_VIEW_BUILD=NO

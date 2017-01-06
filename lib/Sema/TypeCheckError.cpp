@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1396,7 +1396,14 @@ private:
                    classification.getResult() == ThrowingKind::Throws);
     }
 
-    return ShouldRecurse;
+    // If current apply expression did not type-check, don't attempt
+    // walking inside of it. This accounts for the fact that we don't
+    // erase types without type variables to enable better code complication,
+    // so DeclRefExpr(s) or ApplyExpr with DeclRefExpr as function contained
+    // inside would have their types preserved, which makes classification
+    // incorrect.
+    auto type = E->getType();
+    return !type || type->hasError() ? ShouldNotRecurse : ShouldRecurse;
   }
 
   ShouldRecurse_t checkIfConfig(IfConfigStmt *S) {

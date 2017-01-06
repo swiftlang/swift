@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -705,7 +705,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *FnCode = args.claimNext();
     
     // If we know the platform runtime's "done" value, emit the check inline.
-    llvm::BasicBlock *notDoneBB, *doneBB;
+    llvm::BasicBlock *doneBB = nullptr;
 
     if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {
       auto PredValue = IGF.Builder.CreateLoad(PredPtr,
@@ -714,7 +714,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
                                                             *ExpectedPred);
       auto PredIsDone = IGF.Builder.CreateICmpEQ(PredValue, ExpectedPredValue);
       
-      notDoneBB = IGF.createBasicBlock("once_not_done");
+      auto notDoneBB = IGF.createBasicBlock("once_not_done");
       doneBB = IGF.createBasicBlock("once_done");
       
       IGF.Builder.CreateCondBr(PredIsDone, doneBB, notDoneBB);

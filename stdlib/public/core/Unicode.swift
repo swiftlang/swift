@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -220,7 +220,7 @@ public struct UTF8 : UnicodeCodec {
       // Non-ASCII, proceed to buffering mode.
       _decodeBuffer = UInt32(extendingOrTruncating: codeUnit)
       _bitsInBuffer = 8
-    } else if (_decodeBuffer & 0x80 == 0) {
+    } else if _decodeBuffer & 0x80 == 0 {
       // ASCII in buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
       let codeUnit = _decodeBuffer & 0xff

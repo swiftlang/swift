@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -297,7 +297,8 @@ bool Pattern::isRefutablePattern() const {
 
     // If this is an always matching 'is' pattern, then it isn't refutable.
     if (auto *is = dyn_cast<IsPattern>(Node))
-      if (is->getCastKind() == CheckedCastKind::Coercion)
+      if (is->getCastKind() == CheckedCastKind::Coercion ||
+          is->getCastKind() == CheckedCastKind::BridgingCast)
         return;
 
     // If this is an ExprPattern that isn't resolved yet, do some simple

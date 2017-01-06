@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
@@ -116,6 +117,8 @@ const {
     // The record does not apply to a single type.
     return nullptr;
   }
+
+  swift_unreachable("Unhandled TypeMetadataRecordKind in switch.");
 }
 
 template<>
@@ -129,6 +132,8 @@ const {
   case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     return getWitnessTableAccessor()(type);
   }
+
+  swift_unreachable("Unhandled ProtocolConformanceReferenceKind in switch.");
 }
 
 namespace {
@@ -509,7 +514,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         if (protocol != P)
           continue;
 
-        if (!isRelatedType(type, metadata, /*isMetadata=*/true))
+        if (!isRelatedType(type, metadata, /*candidateIsMetadata=*/true))
           continue;
 
         // Store the type-protocol pair in the cache.
@@ -533,7 +538,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         if (protocol != P)
           continue;
 
-        if (!isRelatedType(type, R, /*isMetadata=*/false))
+        if (!isRelatedType(type, R, /*candidateIsMetadata=*/false))
           continue;
 
         // Store the type-protocol pair in the cache.

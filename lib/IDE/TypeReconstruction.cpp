@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1195,15 +1195,15 @@ static bool CompareFunctionTypes(const AnyFunctionType *f,
   if (nullptr == g)
     return false;
 
-  auto f_input = f->getInput().getCanonicalTypeOrNull();
-  auto g_input = g->getInput().getCanonicalTypeOrNull();
+  auto f_input = f->getInput();
+  auto g_input = g->getInput();
 
-  auto f_output = f->getResult().getCanonicalTypeOrNull();
-  auto g_output = g->getResult().getCanonicalTypeOrNull();
+  auto f_output = f->getResult();
+  auto g_output = g->getResult();
 
-  if (f_input == g_input) {
+  if (f_input->isEqual(g_input)) {
     in_matches = true;
-    if (f_output == g_output)
+    if (f_output->isEqual(g_output))
       out_matches = true;
   }
 

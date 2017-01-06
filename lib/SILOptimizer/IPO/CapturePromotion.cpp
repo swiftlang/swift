@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -387,7 +387,7 @@ static std::string getSpecializedName(SILFunction *F,
                                       IsFragile_t Fragile,
                                       IndicesSet &PromotableIndices) {
   Mangle::Mangler M;
-  auto P = SpecializationPass::CapturePromotion;
+  auto P = Demangle::SpecializationPass::CapturePromotion;
   FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
   NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
   CanSILFunctionType FTy = F->getLoweredFunctionType();
@@ -717,7 +717,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
     auto argIndex = O->getOperandNumber()-1;
     auto convention =
       AI->getSubstCalleeType()->getSILArgumentConvention(argIndex);
-    if (isIndirectConvention(convention)) {
+    if (convention.isIndirectConvention()) {
       Mutations.push_back(AI);
       return true;
     }

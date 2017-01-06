@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -501,6 +501,7 @@ subscriptCommentPost = """\
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection."""
 }%
+// FIXME(ABI)#180 (Type checker)
 // WORKAROUND rdar://25214066 - should be on Collection
 extension ${Self} {
 ${subscriptCommentPre}
@@ -528,6 +529,7 @@ ${subscriptCommentPost}
   }
 }
 
+// FIXME(ABI)#180 (Type checker)
 // WORKAROUND rdar://25214066 - should be on Collection
 extension ${Self} where Index : Strideable, Index.Stride : SignedInteger {
 ${subscriptCommentPre}

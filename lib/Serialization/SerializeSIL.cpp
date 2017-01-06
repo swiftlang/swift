@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -348,6 +348,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     Linkage = addExternalToLinkage(Linkage);
   }
 
+  // If we have a body, we might have a generic environment.
+  GenericEnvironmentID genericEnvID = 0;
+  if (!F.isExternalDeclaration())
+    genericEnvID = S.addGenericEnvironmentRef(F.getGenericEnvironment());
+
   DeclID clangNodeOwnerID;
   if (F.hasClangNode())
     clangNodeOwnerID = S.addDeclRef(F.getClangNodeOwner());
@@ -359,7 +364,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
       (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasQualifiedOwnership(), FnID,
-      clangNodeOwnerID, SemanticsIDs);
+      genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;
@@ -371,12 +376,6 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     SILSpecializeAttrLayout::emitRecord(
       Out, ScratchRecord, specAttrAbbrCode, (unsigned)subs.size());
     S.writeSubstitutions(subs, SILAbbrCodes);
-  }
-
-  // Write the body's context archetypes, unless we don't actually have a body.
-  if (!F.isExternalDeclaration()) {
-    if (auto genericEnv = F.getGenericEnvironment())
-      S.writeGenericEnvironment(genericEnv, SILAbbrCodes, true);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -1918,8 +1917,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<decls_block::NormalProtocolConformanceIdLayout>();
   registerSILAbbr<decls_block::ProtocolConformanceXrefLayout>();
   registerSILAbbr<decls_block::GenericRequirementLayout>();
-  registerSILAbbr<decls_block::GenericEnvironmentLayout>();
-  registerSILAbbr<decls_block::SILGenericEnvironmentLayout>();
 
   for (const SILGlobalVariable &g : SILMod->getSILGlobals())
     writeSILGlobalVar(g);

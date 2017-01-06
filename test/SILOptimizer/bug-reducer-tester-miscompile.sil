@@ -1,0 +1,86 @@
+
+// The tester will only work when asserts file
+// REQUIRES: asserts
+
+// We put in a bunch of checks since we are making platform specific assumptions
+// about putchar, so we are being paranoid.
+
+// REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
+
+// Clear the temporary directory
+// RUN: rm -rfv %t && mkdir -p %t
+
+// We use a driver file to ensure that we are not dependent on how main/start
+// are setup on our platform. The c function interface that we use is very
+// standard, so we should be ok to rely on it. Lets compile it.
+// RUN: %target-swift-frontend -c %S/Inputs/bug-reducer-tester-miscompile-driver.swift -o %t/main.o
+
+// Now test the base case. We emit a sib file/etc to make sure all of the
+// components of our test work, even though we could just use a sil file
+// directly.
+// RUN: %target-sil-opt %s -emit-sib -o %t/good.sib -module-name main
+// RUN: %target-swift-frontend -c %t/good.sib -o %t/good.o -module-name main
+// RUN: %target-swiftc_driver -o %t/good %t/good.o %t/main.o -module-name main
+// RUN: %t/good | %FileCheck %s
+
+// Now try to miscompile
+// RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-failure-kind=miscompile -bug-reducer-tester-target-func='target_func' -emit-sib -o %t/miscompile.sib -module-name main
+// RUN: %target-swift-frontend -c %t/miscompile.sib -o %t/miscompile.o -module-name main
+// RUN: %target-swiftc_driver -o %t/miscompile %t/miscompile.o %t/main.o -module-name main
+// RUN: %t/miscompile | %FileCheck -check-prefix=MISCOMPILE %s
+
+// CHECK: swift
+// CHECK: swift
+// CHECK: swift
+// MISCOMPILE: swift
+// MISCOMPILE: swift
+// MISCOMPILE-NOT: swift
+
+sil_stage canonical
+
+import Builtin
+
+sil @putchar : $@convention(c) (Builtin.Int64) -> ()
+
+sil @target_func : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @putchar : $@convention(c) (Builtin.Int64) -> ()
+  // "swift\n" in ASCII
+  %1 = integer_literal $Builtin.Int64, 115
+  %2 = integer_literal $Builtin.Int64, 119
+  %3 = integer_literal $Builtin.Int64, 105
+  %4 = integer_literal $Builtin.Int64, 102
+  %5 = integer_literal $Builtin.Int64, 116
+  %6 = integer_literal $Builtin.Int64, 10
+  apply %0(%1) : $@convention(c) (Builtin.Int64) -> ()
+  apply %0(%2) : $@convention(c) (Builtin.Int64) -> ()
+  apply %0(%3) : $@convention(c) (Builtin.Int64) -> ()
+  apply %0(%4) : $@convention(c) (Builtin.Int64) -> ()
+  apply %0(%5) : $@convention(c) (Builtin.Int64) -> ()
+  apply %0(%6) : $@convention(c) (Builtin.Int64) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @function_2 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @target_func : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  // Make sure we only eliminate one.
+  apply %0() : $@convention(thin) () -> ()
+  %1 = function_ref @function_3 : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @function_3 : $@convention(thin) () -> () {
+bb0:
+  // Make sure we only eliminate one.
+  %0 = function_ref @target_func : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}

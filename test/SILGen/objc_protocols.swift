@@ -216,7 +216,7 @@ class StoredPropertyCount {
 }
 
 extension StoredPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
 
 class ComputedPropertyCount {
   @objc var count: Int { return 0 }
@@ -280,3 +280,12 @@ extension InitializableConformerByExtension: Initializable {
   }
 }
 // CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols33InitializableConformerByExtensionc
+
+// Make sure we're crashing from trying to use materializeForSet here.
+@objc protocol SelectionItem {
+  var time: Double { get set }
+}
+
+func incrementTime(contents: SelectionItem) {
+  contents.time += 1.0
+}

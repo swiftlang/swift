@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -951,7 +951,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
       assert(OffsetInBits+SizeInBits <= getSizeInBits(Var) && "pars > totum");
 
       // Add the piece DWARF expression.
-      Operands.push_back(llvm::dwarf::DW_OP_bit_piece);
+      Operands.push_back(llvm::dwarf::DW_OP_LLVM_fragment);
       Operands.push_back(OffsetInBits);
       Operands.push_back(SizeInBits);
     }

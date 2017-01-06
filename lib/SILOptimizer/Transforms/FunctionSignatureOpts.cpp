@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -364,8 +364,16 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   }
 
   OldFM.mangle();
-  std::string Old = OldFM.getMangler().finalize();
-  std::string New = NewFM.mangle();
+  SILModule &M = F->getModule();
+  std::string Old = getUniqueName(OldFM.getMangler().finalize(), M);
+
+  int UniqueID = 0;
+  std::string New;
+  do {
+    New = NewFM.mangle(UniqueID);
+    ++UniqueID;
+  } while (M.lookUpFunction(New));
+
   return NewMangling::selectMangling(Old, New);
 }
 
@@ -472,7 +480,7 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
 void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Create the optimized function !
   SILModule &M = F->getModule();
-  std::string Name = getUniqueName(createOptimizedSILFunctionName(), M);
+  std::string Name = createOptimizedSILFunctionName();
   SILLinkage linkage = F->getLinkage();
   if (isAvailableExternally(linkage))
     linkage = SILLinkage::Shared;
@@ -915,7 +923,7 @@ public:
     // going to change, make sure the mangler is aware of all the changes done
     // to the function.
     Mangle::Mangler M;
-    auto P = SpecializationPass::FunctionSignatureOpts;
+    auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
     FunctionSignatureSpecializationMangler OldFM(P, M, F->isFragile(), F);
     NewMangling::FunctionSignatureSpecializationMangler NewFM(P, F->isFragile(),
                                                               F);

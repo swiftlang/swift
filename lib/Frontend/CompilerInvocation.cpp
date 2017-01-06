@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,6 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/Frontend.h"
+
+#if __APPLE__
+# include "AppleHostVersionDetection.h"
+#endif
 
 #include "swift/Strings.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -192,6 +196,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.PlaygroundTransform = false;
   Opts.PlaygroundHighPerformance |=
     Args.hasArg(OPT_playground_high_performance);
+
+  // This can be enabled independently of the playground transform.
+  Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
 
   if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
     if (A->getOption().matches(OPT_help)) {
@@ -901,6 +908,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
   }
+#if __APPLE__
+  else if (FrontendOpts.actionIsImmediate()) {
+    clang::VersionTuple currentOSVersion = inferAppleHostOSVersion();
+    if (currentOSVersion.getMajor() != 0) {
+      llvm::Triple::OSType currentOS = Target.getOS();
+      if (currentOS == llvm::Triple::Darwin)
+        currentOS = llvm::Triple::MacOSX;
+
+      SmallString<16> newOSBuf;
+      llvm::raw_svector_ostream newOS(newOSBuf);
+      newOS << llvm::Triple::getOSTypeName(currentOS) << currentOSVersion;
+      Target.setOSName(newOS.str());
+    }
+  }
+#endif
 
   Opts.EnableObjCInterop = Target.isOSDarwin();
   if (auto A = Args.getLastArg(OPT_enable_objc_interop,

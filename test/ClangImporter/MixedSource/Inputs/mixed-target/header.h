@@ -7,7 +7,10 @@
 #import "used-by-both-headers.h"
 
 @class ForwardClass;
+@protocol ForwardProto;
+
 void doSomething(ForwardClass *arg);
+void doSomethingProto(id <ForwardProto> arg);
 
 @interface Base
 - (NSObject *)safeOverride:(ForwardClass *)arg;
@@ -20,9 +23,6 @@ void doSomething(ForwardClass *arg);
 @property ForwardClass *forward;
 @end
 
-
-@protocol ForwardProto;
-void doSomethingProto(id <ForwardProto> arg);
 
 @interface Base ()
 - (NSObject *)safeOverrideProto:(id <ForwardProto>)arg;
@@ -68,4 +68,10 @@ typedef int NameInProtocol;
 
 @interface WrapperInterface (Category)
 typedef int NameInCategory;
+@end
+
+
+@protocol ForwardProtoFromOtherFile;
+@interface ClassThatHasAProtocolTypedPropertyButMembersAreNeverLoaded
+@property (weak) id <ForwardProtoFromOtherFile> weakProtoProp;
 @end

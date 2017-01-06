@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -200,6 +200,21 @@ void TemporaryInitialization::finishInitialization(SILGenFunction &gen) {
   if (Cleanup.isValid())
     gen.Cleanups.setCleanupState(Cleanup, CleanupState::Active);
 }
+
+namespace {
+class EndBorrowCleanup : public Cleanup {
+  SILValue borrowee;
+  SILValue borrowed;
+
+public:
+  EndBorrowCleanup(SILValue borrowee, SILValue borrowed)
+      : borrowee(borrowee), borrowed(borrowed) {}
+
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.createEndBorrow(l, borrowee, borrowed);
+  }
+};
+} // end anonymous namespace
 
 namespace {
 class ReleaseValueCleanup : public Cleanup {
@@ -1144,6 +1159,12 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
   return Cleanups.getTopCleanup();
 }
 
+CleanupHandle SILGenFunction::enterEndBorrowCleanup(SILValue borrowee,
+                                                    SILValue borrowed) {
+  Cleanups.pushCleanup<EndBorrowCleanup>(borrowee, borrowed);
+  return Cleanups.getTopCleanup();
+}
+
 namespace {
   /// A cleanup that deinitializes an opaque existential container
   /// before a value has been stored into it, or after its value was taken.
@@ -1737,8 +1758,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     genericEnv = witnessRef.getDecl()->getInnermostDeclContext()
                    ->getGenericEnvironmentOfContext();
 
-    auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
-                    ->getCanonicalType();
+    auto selfTy = cast<GenericTypeParamType>(
+                    conformance->getProtocol()->getSelfInterfaceType()
+                                                          ->getCanonicalType());
 
     Type concreteTy = conformance->getInterfaceType();
 

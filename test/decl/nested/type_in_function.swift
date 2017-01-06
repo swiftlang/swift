@@ -79,3 +79,45 @@ func f5<T, U>(x: T, y: U) {
     typealias U = Int
   }
 }
+
+// Issue with gatherAllSubstitutions().
+struct OuterGenericStruct<A> {
+  class MiddleNonGenericClass {
+    func nonGenericFunction() {
+      class InnerGenericClass<T> : MiddleNonGenericClass {
+      // expected-error@-1 {{type 'InnerGenericClass' cannot be nested in generic function 'nonGenericFunction'}}
+        override init() { super.init() }
+      }
+    }
+  }
+
+  func middleFunction() {
+    struct ConformingType : Racoon {
+    // expected-error@-1 {{type 'ConformingType' cannot be nested in generic function 'middleFunction'}}
+      typealias Stripes = A
+    }
+  }
+}
+
+// Issue with diagnoseUnknownType().
+func genericFunction<T>(t: T) {
+  class First : Second<T>.UnknownType { }
+  // expected-error@-1 {{type 'First' cannot be nested in generic function 'genericFunction'}}
+  class Second<T> : Second { }
+  // expected-error@-1 {{type 'Second' cannot be nested in generic function 'genericFunction'}}
+  // expected-error@-2 2 {{circular class inheritance Second}}
+}
+
+// Spurious "Self or associated type requirements" diagnostic.
+protocol ProtoWithAssocType {
+  associatedtype T = Int
+}
+
+func freeFunction() {
+  struct ConformingType : ProtoWithAssocType {
+    typealias T = Int
+
+    func method() -> ProtoWithAssocType {}
+    // expected-error@-1 {{can only be used as a generic constraint because it has Self or associated type requirements}}
+  }
+}

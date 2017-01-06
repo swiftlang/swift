@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -46,7 +46,7 @@ namespace swift {
     llvm::DenseMap<Identifier,
                    std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
     /// A list of all functions forward-declared by a sil_scope.
-    std::vector<SILFunction *> PotentialZombieFns;
+    llvm::DenseSet<SILFunction *> PotentialZombieFns;
 
     /// A map from textual .sil scope number to SILDebugScopes.
     llvm::DenseMap<unsigned, SILDebugScope *> ScopeSlots;
@@ -4972,7 +4972,7 @@ bool Parser::parseSILScope() {
       return true;
     }
     ParentFn = ScopeState.getGlobalNameForReference(FnName, FnTy, FnLoc, true);
-    ScopeState.TUState.PotentialZombieFns.push_back(ParentFn);
+    ScopeState.TUState.PotentialZombieFns.insert(ParentFn);
   }
 
   SILDebugScope *InlinedAt = nullptr;

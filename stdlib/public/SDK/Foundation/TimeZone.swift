@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -223,9 +223,9 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
 
 extension TimeZone : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     private var _kindDescription : String {
-        if (self == TimeZone.autoupdatingCurrent) {
+        if self == TimeZone.autoupdatingCurrent {
             return "autoupdatingCurrent"
-        } else if (self == TimeZone.current) {
+        } else if self == TimeZone.current {
             return "current"
         } else {
             return "fixed"

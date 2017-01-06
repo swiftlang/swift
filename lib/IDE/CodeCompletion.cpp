@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -914,7 +914,7 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
       Ty->getKind() == TypeKind::Error ||
       ExpectedTy->getKind() == TypeKind::Error)
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
-  if (Ty.getCanonicalTypeOrNull() == ExpectedTy.getCanonicalTypeOrNull())
+  if (Ty->isEqual(ExpectedTy))
     return CodeCompletionResult::ExpectedTypeRelation::Identical;
   if (isConvertibleTo(Ty, ExpectedTy, *DC))
     return CodeCompletionResult::ExpectedTypeRelation::Convertible;
@@ -1975,8 +1975,13 @@ public:
       Type ContextTy = VD->getDeclContext()->getDeclaredInterfaceType();
       if (ContextTy) {
         // Look through lvalue types and metatypes
-        Type MaybeNominalType = (*ExprType)->getRValueType()
-            ->getRValueInstanceType();
+        Type MaybeNominalType = (*ExprType)->getRValueType();
+
+        if (auto Metatype = MaybeNominalType->getAs<MetatypeType>())
+          MaybeNominalType = Metatype->getInstanceType();
+
+        if (auto SelfType = MaybeNominalType->getAs<DynamicSelfType>())
+          MaybeNominalType = SelfType->getSelfType();
 
         // For optional protocol requirements and dynamic dispatch,
         // strip off optionality from the base type, but only if
@@ -1987,6 +1992,12 @@ public:
 
         // For dynamic lookup don't substitute in the base type.
         if (MaybeNominalType->isAnyObject())
+          return T;
+
+        // FIXME: Sometimes ExprType is the type of the member here,
+        // and not the type of the base. That is inconsistent and
+        // should be cleaned up.
+        if (!MaybeNominalType->mayHaveMembers())
           return T;
 
         // For everything else, substitute in the base type.
@@ -2865,23 +2876,24 @@ public:
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addNominalTypeRef(NTD, Reason);
-        addConstructorCallsForType(NTD->getInterfaceType(), NTD->getName(),
-                                   Reason);
+        addConstructorCallsForType(NTD->getDeclaredInterfaceType(),
+                                   NTD->getName(), Reason);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
         addTypeAliasRef(TAD, Reason);
         auto type = TAD->mapTypeIntoContext(TAD->getUnderlyingTypeLoc().getType());
-        addConstructorCallsForType(type, TAD->getName(), Reason);
+        if (type->mayHaveMembers())
+          addConstructorCallsForType(type, TAD->getName(), Reason);
         return;
       }
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
         for (auto *protocol : GP->getConformingProtocols())
-          addConstructorCallsForType(protocol->getInterfaceType(), GP->getName(),
-                                     Reason);
+          addConstructorCallsForType(protocol->getDeclaredInterfaceType(),
+                                     GP->getName(), Reason);
         return;
       }
 
@@ -2934,23 +2946,24 @@ public:
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addNominalTypeRef(NTD, Reason);
-        addConstructorCallsForType(NTD->getInterfaceType(), NTD->getName(),
-                                   Reason);
+        addConstructorCallsForType(NTD->getDeclaredInterfaceType(),
+                                   NTD->getName(), Reason);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
         addTypeAliasRef(TAD, Reason);
         auto type = TAD->mapTypeIntoContext(TAD->getDeclaredInterfaceType());
-        addConstructorCallsForType(type, TAD->getName(), Reason);
+        if (type->mayHaveMembers())
+          addConstructorCallsForType(type, TAD->getName(), Reason);
         return;
       }
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
         for (auto *protocol : GP->getConformingProtocols())
-          addConstructorCallsForType(protocol->getInterfaceType(), GP->getName(),
-                                     Reason);
+          addConstructorCallsForType(protocol->getDeclaredInterfaceType(),
+                                     GP->getName(), Reason);
         return;
       }
 

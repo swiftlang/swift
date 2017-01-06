@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -545,11 +545,7 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
   assert(hasSelf() && "Need self parameter");
 
   auto Ty = getSelf()->getType().getSwiftRValueType();
-  auto Canonical = Ty.getCanonicalTypeOrNull();
-  if (Canonical.isNull())
-    return true;
-
-  auto *Struct = Canonical->getStructOrBoundGenericStruct();
+  auto *Struct = Ty->getStructOrBoundGenericStruct();
   assert(Struct && "Array must be a struct !?");
   if (Struct) {
     auto BGT = dyn_cast<BoundGenericType>(Ty);
@@ -558,10 +554,7 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
 
     // Check the array element type parameter.
     bool isClass = true;
-    for (auto TP : BGT->getGenericArgs()) {
-      auto EltTy = TP.getCanonicalTypeOrNull();
-      if (EltTy.isNull())
-        return true;
+    for (auto EltTy : BGT->getGenericArgs()) {
       if (EltTy->isBridgeableObjectType())
         return true;
       isClass = false;

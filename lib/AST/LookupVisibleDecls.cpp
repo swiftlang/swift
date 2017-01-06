@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -336,6 +336,9 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         auto FD = cast<FuncDecl>(D);
         assert(FD->getImplicitSelfDecl() && "should not find free functions");
         (void)FD;
+
+        if (FD->isInvalid())
+          break;
 
         // Get the type without the first uncurry level with 'self'.
         CanType T = D->getInterfaceType()
@@ -826,8 +829,9 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
       // Constructors and destructors don't have 'self' in parameter patterns.
       if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD))
-        Consumer.foundDecl(const_cast<ParamDecl*>(AFD->getImplicitSelfDecl()),
-                           DeclVisibilityKind::FunctionParameter);
+        if (auto *selfParam = AFD->getImplicitSelfDecl())
+          Consumer.foundDecl(const_cast<ParamDecl*>(selfParam),
+                             DeclVisibilityKind::FunctionParameter);
 
       if (AFD->getDeclContext()->isTypeContext()) {
         ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -107,8 +107,7 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   }
 
   GenericEnvironment(GenericSignature *signature,
-                     ArchetypeBuilder *builder,
-                     TypeSubstitutionMap interfaceToArchetypeMap);
+                     ArchetypeBuilder *builder);
 
   friend class ArchetypeType;
   friend class ArchetypeBuilder;
@@ -154,10 +153,6 @@ public:
   /// Determine whether this generic environment contains the given
   /// primary archetype.
   bool containsPrimaryArchetype(ArchetypeType *archetype) const;
-
-  static
-  GenericEnvironment *get(GenericSignature *signature,
-                          TypeSubstitutionMap interfaceToArchetypeMap);
 
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().
@@ -236,7 +231,7 @@ public:
                      ArrayRef<Substitution> subs,
                      SubstitutionMap &subMap) const;
 
-  ArrayRef<Substitution> getForwardingSubstitutions(ModuleDecl *M) const;
+  ArrayRef<Substitution> getForwardingSubstitutions() const;
 
   void dump() const;
 };

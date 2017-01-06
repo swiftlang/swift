@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -39,7 +39,7 @@ namespace swift {
 
 namespace irgen {
   class Address;
-  class ContainedAddress;
+  class StackAddress;
   class IRGenFunction;
   class IRGenModule;
   class Explosion;
@@ -257,17 +257,17 @@ public:
   ExplosionSchema getSchema() const;
 
   /// Allocate a variable of this type on the stack.
-  virtual ContainedAddress allocateStack(IRGenFunction &IGF,
-                                         SILType T,
-                                         const llvm::Twine &name) const = 0;
+  virtual StackAddress allocateStack(IRGenFunction &IGF, SILType T,
+                                     bool isInEntryBlock,
+                                     const llvm::Twine &name) const = 0;
 
   /// Deallocate a variable of this type.
-  virtual void deallocateStack(IRGenFunction &IGF, Address addr,
+  virtual void deallocateStack(IRGenFunction &IGF, StackAddress addr,
                                SILType T) const = 0;
 
   /// Destroy the value of a variable of this type, then deallocate its
   /// memory.
-  virtual void destroyStack(IRGenFunction &IGF, Address addr,
+  virtual void destroyStack(IRGenFunction &IGF, StackAddress addr,
                             SILType T) const = 0;
 
   /// Copy or take a value out of one address and into another, destroying

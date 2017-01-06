@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -230,6 +230,13 @@ public:
 
   /// Indicates whether the playground transformation should be applied.
   bool PlaygroundTransform = false;
+  
+  /// Indicates whether the AST should be instrumented to simulate a debugger's
+  /// program counter. Similar to the PlaygroundTransform, this will instrument
+  /// the AST with function calls that get called when you would see a program
+  /// counter move in a debugger. To adopt this implement the
+  /// __builtin_pc_before and __builtin_pc_after functions.
+  bool PCMacro = false;
 
   /// Indicates whether the playground transformation should omit
   /// instrumentation that has a high runtime performance impact.

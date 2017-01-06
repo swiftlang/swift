@@ -1,4 +1,4 @@
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -898,6 +898,15 @@ class TestData : TestDataSuper {
         
         expectTrue(deallocated)
     }
+
+    func test_doubleDeallocation() {
+        let data = "12345679".data(using: .utf8)!
+        let len = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Int in
+            let slice = Data(bytesNoCopy: UnsafeMutablePointer(mutating: bytes), count: 1, deallocator: .none)
+            return slice.count
+        }
+        expectEqual(len, 1)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -941,6 +950,7 @@ DataTests.test("test_classForCoder") { TestData().test_classForCoder() }
 DataTests.test("test_AnyHashableContainingData") { TestData().test_AnyHashableContainingData() }
 DataTests.test("test_AnyHashableCreatedFromNSData") { TestData().test_AnyHashableCreatedFromNSData() }
 DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
+DataTests.test("test_doubleDeallocation") { TestData().test_doubleDeallocation() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -556,8 +556,6 @@ void Serializer::writeBlockInfoBlock() {
                               decls_block::GENERIC_PARAM);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::GENERIC_REQUIREMENT);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::SIL_GENERIC_ENVIRONMENT);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -1011,24 +1009,31 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   return true;
 }
 
-void Serializer::writeGenericEnvironment(
-       const GenericEnvironment *env,
-       const std::array<unsigned, 256> &abbrCodes,
-       bool SILMode) {
+void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
   using namespace decls_block;
 
   // Record the offset of this generic environment.
-  if (!SILMode) {
-    auto id = GenericEnvironmentIDs[env];
-    assert(id != 0 && "generic environment not referenced properly");
-    (void)id;
+  auto id = GenericEnvironmentIDs[env];
+  assert(id != 0 && "generic environment not referenced properly");
+  (void)id;
 
-    assert((id - 1) == GenericEnvironmentOffsets.size());
-    GenericEnvironmentOffsets.push_back(Out.GetCurrentBitNo());
-  }
+  assert((id - 1) == GenericEnvironmentOffsets.size());
+  GenericEnvironmentOffsets.push_back(Out.GetCurrentBitNo());
 
   if (env == nullptr)
     return;
+
+  // Determine whether we must use SIL mode, because one of the generic
+  // parameters has a declaration with module context.
+  bool SILMode = false;
+  for (auto *paramTy : env->getGenericParams()) {
+    if (auto *decl = paramTy->getDecl()) {
+      if (decl->getDeclContext()->isModuleScopeContext()) {
+        SILMode = true;
+        break;
+      }
+    }
+  }
 
   // Record the generic parameters.
   SmallVector<uint64_t, 4> rawParamIDs;
@@ -1050,20 +1055,17 @@ void Serializer::writeGenericEnvironment(
   }
 
   if (SILMode) {
-    assert(&abbrCodes != &DeclTypeAbbrCodes);
-    auto envAbbrCode = abbrCodes[SILGenericEnvironmentLayout::Code];
+    auto envAbbrCode = DeclTypeAbbrCodes[SILGenericEnvironmentLayout::Code];
     SILGenericEnvironmentLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
                                             rawParamIDs);
-    return;
+  } else {
+    auto envAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
+    GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
+                                         rawParamIDs);
   }
 
-  assert(&abbrCodes == &DeclTypeAbbrCodes);
-  auto envAbbrCode = abbrCodes[GenericEnvironmentLayout::Code];
-  GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
-                                       rawParamIDs);
-
   writeGenericRequirements(env->getGenericSignature()->getRequirements(),
-                           abbrCodes);
+                           DeclTypeAbbrCodes);
 }
 
 void Serializer::writeSILLayout(SILLayout *layout) {
@@ -2217,11 +2219,9 @@ void Serializer::writeDecl(const Decl *D) {
                                         addIdentifierRef(discriminator));
       }
     }
-  }
 
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->getDeclContext()->isLocalContext()) {
-      auto discriminator = VD->getLocalDiscriminator();
+    if (value->getDeclContext()->isLocalContext()) {
+      auto discriminator = value->getLocalDiscriminator();
       auto abbrCode = DeclTypeAbbrCodes[LocalDiscriminatorLayout::Code];
       LocalDiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            discriminator);
@@ -2242,9 +2242,20 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
 
+    // FIXME: Use the canonical type here in order to minimize circularity
+    // issues at deserialization time. A known problematic case here is
+    // "extension of typealias Foo"; "typealias Foo = SomeKit.Bar"; and then
+    // trying to import Bar accidentally asking for all of its extensions
+    // (perhaps because we're searching for a conformance).
+    //
+    // We could limit this to only the problematic cases, but it seems like a
+    // simpler user model to just always desugar extension types.
+    baseTy = baseTy->getCanonicalType();
+
     // Make sure the base type has registered itself as a provider of generic
     // parameters.
-    (void)addDeclRef(baseTy->getAnyNominal());
+    auto baseNominal = baseTy->getAnyNominal();
+    (void)addDeclRef(baseNominal);
 
     auto conformances = extension->getLocalConformances(
                           ConformanceLookupKind::All,
@@ -2265,7 +2276,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 inheritedTypes);
 
     bool isClassExtension = false;
-    if (auto baseNominal = baseTy->getAnyNominal()) {
+    if (baseNominal) {
       isClassExtension = isa<ClassDecl>(baseNominal) ||
                          isa<ProtocolDecl>(baseNominal);
     }
@@ -3063,21 +3074,25 @@ void Serializer::writeType(Type ty) {
       break;
     }
 
-    TypeID parentID = addTypeRef(archetypeTy->getParent());
-
     SmallVector<DeclID, 4> conformances;
     for (auto proto : archetypeTy->getConformsTo())
       conformances.push_back(addDeclRef(proto));
 
+    TypeID parentOrGenericEnv;
     DeclID assocTypeOrNameID;
-    if (archetypeTy->getParent())
+    if (archetypeTy->getParent()) {
+      parentOrGenericEnv = addTypeRef(archetypeTy->getParent());
       assocTypeOrNameID = addDeclRef(archetypeTy->getAssocType());
-    else
+    } else {
+      parentOrGenericEnv =
+        addGenericEnvironmentRef(archetypeTy->getGenericEnvironment());
       assocTypeOrNameID = addIdentifierRef(archetypeTy->getName());
+    }
 
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    parentID,
+                                    archetypeTy->isPrimary(),
+                                    parentOrGenericEnv,
                                     assocTypeOrNameID,
                                     addTypeRef(archetypeTy->getSuperclass()),
                                     conformances);
@@ -3176,13 +3191,18 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
     SILLayoutID layoutRef = addSILLayoutRef(boxTy->getLayout());
-    
-    SmallVector<TypeID, 4> genericArgs;
-    for (auto &arg : boxTy->getGenericArgs())
-      genericArgs.push_back(addTypeRef(arg.getReplacement()));
-    
-    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 layoutRef, genericArgs);
+
+#ifndef NDEBUG
+    if (auto sig = boxTy->getLayout()->getGenericSignature()) {
+      assert(sig->getAllDependentTypes().size()
+               == boxTy->getGenericArgs().size());
+    }
+#endif
+
+    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef);
+
+    // Write the set of substitutions.
+    writeSubstitutions(boxTy->getGenericArgs(), DeclTypeAbbrCodes);
     break;
   }
       
@@ -3423,6 +3443,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<GenericParamLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();
   registerDeclTypeAbbr<GenericEnvironmentLayout>();
+  registerDeclTypeAbbr<SILGenericEnvironmentLayout>();
 
   registerDeclTypeAbbr<ForeignErrorConventionLayout>();
   registerDeclTypeAbbr<DeclContextLayout>();
@@ -3484,7 +3505,7 @@ void Serializer::writeAllDeclsAndTypes() {
     while (!GenericEnvironmentsToWrite.empty()) {
       auto next = GenericEnvironmentsToWrite.front();
       GenericEnvironmentsToWrite.pop();
-      writeGenericEnvironment(next, DeclTypeAbbrCodes, /*SILMode=*/false);
+      writeGenericEnvironment(next);
     }
 
     while (!NormalConformancesToWrite.empty()) {
@@ -4052,7 +4073,7 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
       if (isDerivedTopLevel) {
         topLevelDecls[memberValue->getName()].push_back({
           /*ignored*/0,
-          S.addDeclRef(memberValue, /*force=*/true)
+          S.addDeclRef(memberValue, /*forceSerialization=*/true)
         });
       } else if (memberValue->isOperator()) {
         // Add operator methods.
@@ -4285,11 +4306,11 @@ withOutputFile(ASTContext &ctx, StringRef outputPath,
       Clang.createOutputFile(outputPath, EC,
                              /*Binary=*/true,
                              /*RemoveFileOnSignal=*/true,
-                             /*inputPath=*/"",
+                             /*BaseInput=*/"",
                              path::extension(outputPath),
                              /*UseTemporary=*/true,
-                             /*createDirs=*/false,
-                             /*finalPath=*/nullptr,
+                             /*CreateMissingDirectories=*/false,
+                             /*ResultPathName=*/nullptr,
                              &tmpFilePath);
 
     if (!out) {

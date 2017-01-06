@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -370,24 +370,6 @@ bool AbstractFunctionDecl::isTransparent() const {
   if (const FuncDecl *FD = dyn_cast<FuncDecl>(this)) {
     if (auto *ASD = FD->getAccessorStorageDecl())
       return ASD->isTransparent();
-  }
-
-  return false;
-}
-
-bool Decl::isBeingTypeChecked() {
-  auto decl = this;
-  while (true) {
-    if (decl->DeclBits.BeingTypeChecked)
-      return true;
-
-    auto dc = decl->getDeclContext();
-    if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
-      decl = nominal;
-    else if (auto ext = dyn_cast<ExtensionDecl>(dc))
-      decl = ext;
-    else
-      break;
   }
 
   return false;
@@ -814,15 +796,12 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 }
 
 bool ExtensionDecl::isConstrainedExtension() const {
-  auto nominal = getExtendedType()->getAnyNominal();
-
-  // Error case: erroneous extension.
-  if (!nominal)
-    return false;
-
   // Non-generic extension.
   if (!getGenericSignature())
     return false;
+
+  auto nominal = getExtendedType()->getAnyNominal();
+  assert(nominal);
 
   // If the generic signature differs from that of the nominal type, it's a
   // constrained extension.
@@ -1937,6 +1916,15 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
 
+  if (auto *ATD = dyn_cast<AssociatedTypeDecl>(this)) {
+    auto &ctx = getASTContext();
+    auto selfTy = getDeclContext()->getSelfInterfaceType();
+    if (!selfTy)
+      return ErrorType::get(ctx);
+    return DependentMemberType::get(
+        selfTy, const_cast<AssociatedTypeDecl *>(ATD));
+  }
+
   Type interfaceType = getInterfaceType();
   if (interfaceType.isNull() || interfaceType->is<ErrorType>())
     return interfaceType;
@@ -2055,11 +2043,8 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       return interfaceType;
 
     auto *genericEnv = decl->getGenericEnvironmentOfContext();
-    if (genericEnv == nullptr)
-      return ErrorType::get(ctx);
-
-    return genericEnv->mapTypeIntoContext(decl->getModuleContext(),
-                                          interfaceType)->getCanonicalType();
+    return GenericEnvironment::mapTypeIntoContext(
+        decl->getModuleContext(), genericEnv, interfaceType);
   }
 
   // Get the parent type.
@@ -2076,13 +2061,14 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       Ty = dc->getDeclaredInterfaceType();
       break;
     }
-    if (!Ty || Ty->hasError())
-      return Ty;
+    if (!Ty)
+      return Type();
+    if (Ty->is<ErrorType>())
+      Ty = Type();
   }
 
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    return ProtocolType::get(proto, ctx);
-  } else if (decl->getGenericParams()) {
+  if (decl->getGenericParams() &&
+      !isa<ProtocolDecl>(decl)) {
     switch (kind) {
     case DeclTypeKind::DeclaredType:
       return UnboundGenericType::get(decl, Ty, ctx);
@@ -2298,9 +2284,6 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 
 Type AbstractTypeParamDecl::getSuperclass() const {
   auto *dc = getDeclContext();
-  if (!dc->isValidGenericContext())
-    return nullptr;
-
   auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
     return archetype->getSuperclass();
@@ -2312,9 +2295,6 @@ Type AbstractTypeParamDecl::getSuperclass() const {
 ArrayRef<ProtocolDecl *>
 AbstractTypeParamDecl::getConformingProtocols() const {
   auto *dc = getDeclContext();
-  if (!dc->isValidGenericContext())
-    return {};
-
   auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
     return archetype->getConformsTo();
@@ -2363,11 +2343,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
 
 void AssociatedTypeDecl::computeType() {
   auto &ctx = getASTContext();
-  auto proto = cast<ProtocolDecl>(getDeclContext());
-  auto selfTy = proto->getSelfInterfaceType();
-  if (!selfTy)
-    selfTy = ErrorType::get(ctx);
-  auto interfaceTy = DependentMemberType::get(selfTy, this);
+  auto interfaceTy = getDeclaredInterfaceType();
   setInterfaceType(MetatypeType::get(interfaceTy, ctx));
 }
 
@@ -2719,7 +2695,7 @@ bool ProtocolDecl::requiresClassSlow() {
   ProtocolDeclBits.RequiresClass = false;
 
   // Ensure that the result cannot change in future.
-  assert(isInheritedProtocolsValid() || isBeingTypeChecked());
+  assert(isInheritedProtocolsValid());
 
   if (getAttrs().hasAttribute<ObjCAttr>() || isObjC()) {
     ProtocolDeclBits.RequiresClass = true;
@@ -2906,16 +2882,6 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
   }
 }
 
-bool FuncDecl::hasArchetypeSelf() const {
-  if (auto proto = getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
-    return proto->findProtocolSelfReferences(this,
-                                             /*allowCovariantParameters=*/true,
-                                             /*skipAssocTypes=*/true).result;
-  }
-
-  return false;
-}
-
 bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
   // If the member type uses 'Self' in non-covariant position,
   // we cannot use the existential type.
@@ -3008,7 +2974,7 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
   auto selfId = ctx.Id_Self;
   auto selfDecl = new (ctx) GenericTypeParamDecl(dc, selfId,
                                                  SourceLoc(), depth, 0);
-  auto protoType = ProtocolType::get(this, ctx);
+  auto protoType = getDeclaredType();
   TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
   selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
   selfDecl->setImplicit();
@@ -3595,7 +3561,8 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   if (auto *VP = dyn_cast<VarPattern>(Pat))
     Pat = VP->getSubPattern();
   if (auto *TP = dyn_cast<TypedPattern>(Pat))
-    return TP->getTypeLoc().getTypeRepr()->getSourceRange();
+    if (auto typeRepr = TP->getTypeLoc().getTypeRepr())
+      return typeRepr->getSourceRange();
 
   return SourceRange();
 }
@@ -3652,10 +3619,11 @@ Pattern *VarDecl::getParentPattern() const {
 }
 
 bool VarDecl::isSelfParameter() const {
-  // Note: we need to check the isImplicit() bit here to make sure that we
-  // don't classify explicit parameters declared with `self` as the self param.
-  return isa<ParamDecl>(this) && getName() == getASTContext().Id_self &&
-         isImplicit();
+  if (isa<ParamDecl>(this))
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(getDeclContext()))
+      return AFD->getImplicitSelfDecl() == this;
+
+  return false;
 }
 
 /// Return true if this stored property needs to be accessed with getters and
@@ -3759,7 +3727,10 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
 
   // Besides self, don't suggest mutability for explicit function parameters.
   if (isa<ParamDecl>(this)) return;
-  
+
+  // Don't suggest any fixes for capture list elements.
+  if (isCaptureList()) return;
+
   // If this is a normal variable definition, then we can change 'let' to 'var'.
   // We even are willing to suggest this for multi-variable binding, like
   //   "let (a,b) = "
@@ -3780,8 +3751,8 @@ ParamDecl::ParamDecl(bool isLet,
                      SourceLoc letVarInOutLoc, SourceLoc argumentNameLoc,
                      Identifier argumentName, SourceLoc parameterNameLoc,
                      Identifier parameterName, Type ty, DeclContext *dc)
-  : VarDecl(DeclKind::Param, /*IsStatic=*/false, isLet, parameterNameLoc,
-            parameterName, ty, dc),
+  : VarDecl(DeclKind::Param, /*IsStatic*/false, /*IsLet*/isLet,
+            /*IsCaptureList*/false, parameterNameLoc, parameterName, ty, dc),
   ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc),
   LetVarInOutLoc(letVarInOutLoc) {
 }
@@ -3789,9 +3760,9 @@ ParamDecl::ParamDecl(bool isLet,
 /// Clone constructor, allocates a new ParamDecl identical to the first.
 /// Intentionally not defined as a copy constructor to avoid accidental copies.
 ParamDecl::ParamDecl(ParamDecl *PD)
-  : VarDecl(DeclKind::Param, /*IsStatic=*/false, PD->isLet(), PD->getNameLoc(),
-            PD->getName(), PD->hasType() ? PD->getType() : Type(),
-            PD->getDeclContext()),
+  : VarDecl(DeclKind::Param, /*IsStatic*/false, /*IsLet*/PD->isLet(),
+            /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
+            PD->hasType() ? PD->getType() : Type(), PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     LetVarInOutLoc(PD->getLetVarInOutLoc()),
@@ -3809,15 +3780,8 @@ Type DeclContext::getSelfTypeInContext() const {
   assert(isTypeContext());
 
   // For a protocol or extension thereof, the type is 'Self'.
-  if (getAsProtocolOrProtocolExtensionContext()) {
-    // In the parser, generic parameters won't be wired up yet, just give up on
-    // producing a type.
-    if (!isValidGenericContext())
-      return Type();
-
-    auto *genericEnv = getGenericEnvironmentOfContext();
-    return genericEnv->mapTypeIntoContext(getProtocolSelfType());
-  }
+  if (getAsProtocolOrProtocolExtensionContext())
+    return mapTypeIntoContext(getProtocolSelfType());
   return getDeclaredTypeInContext();
 }
 
@@ -4020,12 +3984,7 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
   auto indexTy = getIndicesInterfaceType();
 
   // Look through a named 1-tuple.
-  if (auto tupleTy = indexTy->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 &&
-        !tupleTy->getElement(0).isVararg()) {
-      indexTy = tupleTy->getElementType(0);
-    }
-  }
+  indexTy = indexTy->getWithoutImmediateLabel();
 
   // If the index type is an integral type, we have an indexed
   // subscript.
@@ -4220,14 +4179,19 @@ void AbstractFunctionDecl::setGenericParams(GenericParamList *GP) {
 /// Note that some functions don't have an implicit 'self' decl, for example,
 /// free functions.  In this case nullptr is returned.
 ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
-  auto paramLists = getParameterLists();
-  if (paramLists.empty())
+  if (!getDeclContext()->isTypeContext())
     return nullptr;
 
   // "self" is always the first parameter list.
-  if (paramLists[0]->size() == 1 && paramLists[0]->get(0)->isSelfParameter())
-    return paramLists[0]->get(0);
-  return nullptr;
+  auto paramLists = getParameterLists();
+  assert(paramLists.size() >= 1);
+  assert(paramLists[0]->size() == 1);
+
+  auto selfParam = paramLists[0]->get(0);
+  assert(selfParam->getName() == getASTContext().Id_self);
+  assert(selfParam->isImplicit());
+
+  return selfParam;
 }
 
 std::pair<DefaultArgumentKind, Type>

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -860,6 +860,11 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
       }
     }
     mangle(Child.get());
+
+    if (Child->getKind() == Node::Kind::SpecializationPassID &&
+        node->hasIndex()) {
+      Buffer << node->getIndex();
+    }
   }
   if (!returnValMangled)
     Buffer << "_n";
@@ -1349,6 +1354,8 @@ void Remangler::mangleProtocolConformance(Node *node) {
     Ty = Ty->getChild(1).get();
   }
   mangle(Ty);
+  if (node->getNumChildren() == 4)
+    mangleChildNode(node, 3);
   manglePureProtocol(node->getChild(1).get());
   mangleChildNode(node, 2);
   if (GenSig)
@@ -1617,6 +1624,16 @@ void Remangler::mangleFirstElementMarker(Node *node) {
 
 void Remangler::mangleVariadicMarker(Node *node) {
   Buffer << 'd';
+}
+
+void Remangler::mangleOutlinedCopy(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wy";
+}
+
+void Remangler::mangleOutlinedConsume(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "We";
 }
 
 void Remangler::mangleSILBoxTypeWithLayout(Node *node) {

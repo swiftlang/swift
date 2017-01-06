@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
@@ -180,7 +181,8 @@ extern "C"
 const Metadata *swift_MagicMirrorData_valueType(HeapObject *owner,
                                                 const OpaqueValue *value,
                                                 const Metadata *type) {
-  return swift_getDynamicType(const_cast<OpaqueValue*>(value), type);
+  return swift_getDynamicType(const_cast<OpaqueValue*>(value), type,
+                              /*existential metatype*/ true);
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -1115,6 +1117,8 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::ErrorObject:
     swift::crash("Swift mirror lookup failure");
   }
+
+  swift_unreachable("Unhandled MetadataKind in switch.");
 }
 
 /// MagicMirror ownership-taking whole-value constructor.

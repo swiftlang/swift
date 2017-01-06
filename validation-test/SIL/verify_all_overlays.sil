@@ -4,6 +4,3 @@
 
 // REQUIRES: long_test
 // REQUIRES: nonexecutable_test
-
-// Disable until IBM fixes logging issue.
-// REQUIRES: OS=macosx

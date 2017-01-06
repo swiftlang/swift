@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -701,7 +701,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::Subtype:
     return true;
   case ConstraintKind::Bind:
@@ -717,6 +717,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::OptionalObject:
     return false;
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
@@ -828,7 +829,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
-    case ConstraintKind::ExplicitConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
@@ -842,7 +842,12 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // than the default.
       break;
 
+    case ConstraintKind::BridgingConversion:
+      // Nothing to infer from bridging conversions.
+      continue;
+
     case ConstraintKind::DynamicTypeOf:
+    case ConstraintKind::EscapableFunctionOf:
       // Constraints from which we can't do anything.
       // FIXME: Record this somehow?
       continue;
@@ -1050,11 +1055,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
           type = funcTy->getResult();
       }
 
-      if (auto tupleTy = type->getAs<TupleType>()) {
-        if (tupleTy->getNumElements() == 1 &&
-            !tupleTy->getElement(0).isVararg())
-          type = tupleTy->getElementType(0);
-      }
+      type = type->getWithoutImmediateLabel();
     }
 
     // Don't deduce IUO types.

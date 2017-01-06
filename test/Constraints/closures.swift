@@ -384,3 +384,14 @@ func g_2994(arg: Int) -> Double {
 C_2994<S_2994>(arg: { (r: S_2994) in f_2994(arg: g_2994(arg: r.dataOffset)) }) // expected-error {{cannot convert value of type 'Double' to expected argument type 'String'}}
 
 let _ = { $0[$1] }(1, 1) // expected-error {{cannot subscript a value of incorrect or ambiguous type}}
+let _ = { $0 = ($0 = {}) } // expected-error {{assigning a variable to itself}}
+let _ = { $0 = $0 = 42 } // expected-error {{assigning a variable to itself}}
+
+// https://bugs.swift.org/browse/SR-403
+// The () -> T => () -> () implicit conversion was kicking in anywhere
+// inside a closure result, not just at the top-level.
+let mismatchInClosureResultType : (String) -> ((Int) -> Void) = {
+  (String) -> ((Int) -> Void) in
+    return { }
+    // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}
+}

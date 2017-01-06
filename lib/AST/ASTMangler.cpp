@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -454,7 +454,7 @@ void ASTMangler::appendType(Type type) {
       TypeAliasDecl *decl = NameAliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
         // It's not possible to mangle the context of the builtin module.
-        return appendType(decl->getDeclaredInterfaceType());
+        return appendType(NameAliasTy->getSinglyDesugaredType());
       }
 
       // For the DWARF output we want to mangle the type alias + context,

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,7 +17,7 @@ extension String {
   /// The index type for subscripting a string.
   public typealias Index = CharacterView.Index
 
-  /// A type used to represent the number of steps between two `String.Index`
+  /// A type that represents the number of steps between two `String.Index`
   /// values, where one value is reachable from the other.
   ///
   /// In Swift, *reachability* refers to the ability to produce one value from
@@ -59,8 +59,8 @@ extension String {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -98,9 +98,9 @@ extension String {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
-  /// `limit` prevents offsetting beyond those bounds.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.

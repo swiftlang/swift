@@ -3,7 +3,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -591,6 +591,7 @@ class BuildScriptInvocation(object):
             "--libdispatch-build-type", args.libdispatch_build_variant,
             "--libicu-build-type", args.libicu_build_variant,
             "--xctest-build-type", args.build_variant,
+            "--swiftpm-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
                 args.swift_stdlib_assertions).lower(),

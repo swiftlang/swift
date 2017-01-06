@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -27,8 +27,13 @@
 #include "swift/Basic/Timer.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IRGen/IRGenPublic.h"
+#include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/LLVMPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/Bitcode/ReaderWriter.h"
@@ -596,6 +601,45 @@ static void initLLVMModule(const IRGenModule &IGM) {
   Module->setDataLayout(IGM.DataLayout.getStringRepresentation());
 }
 
+std::pair<IRGenerator *, IRGenModule *>
+swift::irgen::createIRGenModule(SILModule *SILMod,
+                                llvm::LLVMContext &LLVMContext) {
+
+  IRGenOptions Opts;
+  IRGenerator *irgen = new IRGenerator(Opts, *SILMod);
+  auto targetMachine = irgen->createTargetMachine();
+  if (!targetMachine)
+    return std::make_pair(nullptr, nullptr);
+
+  // Create the IR emitter.
+  IRGenModule *IGM =
+      new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
+                      "", Opts.getSingleOutputFilename());
+
+  initLLVMModule(*IGM);
+
+  return std::pair<IRGenerator *, IRGenModule *>(irgen, IGM);
+}
+
+void swift::irgen::deleteIRGenModule(
+    std::pair<IRGenerator *, IRGenModule *> &IRGenPair) {
+  delete IRGenPair.second;
+  delete IRGenPair.first;
+}
+
+/// \brief Run the IRGen preparation SIL pipeline. Passes have access to the
+/// IRGenModule.
+static void runIRGenPreparePasses(SILModule &Module,
+                                  irgen::IRGenModule &IRModule) {
+  SILPassManager PM(&Module, &IRModule);
+#define PASS(ID, Name, Description)
+#define IRGEN_PASS(ID, Name, Description)                                      \
+    PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());
+#include "swift/SILOptimizer/PassManager/Passes.def"
+  PM.executePassPipelinePlan(
+      SILPassPipelinePlan::getIRGenPreparePassPipeline());
+}
+
 /// Generates LLVM IR, runs the LLVM passes and produces the output file.
 /// All this is done in a single thread.
 static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
@@ -619,6 +663,9 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                   LLVMContext, ModuleName, Opts.getSingleOutputFilename());
 
   initLLVMModule(IGM);
+
+  // Run SIL level IRGen preparation passes.
+  runIRGenPreparePasses(*SILMod, IGM);
   
   {
     SharedTimer timer("IRGen");
@@ -769,6 +816,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 
   auto &Ctx = M->getASTContext();
   // Create an IRGenModule for each source file.
+  bool DidRunSILCodeGenPreparePasses = false;
   for (auto *File : M->getFiles()) {
     auto nextSF = dyn_cast<SourceFile>(File);
     if (!nextSF || nextSF->ASTStage < SourceFile::TypeChecked)
@@ -796,6 +844,12 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     IGMcreated = true;
 
     initLLVMModule(*IGM);
+    if (!DidRunSILCodeGenPreparePasses) {
+      // Run SIL level IRGen preparation passes on the module the first time
+      // around.
+      runIRGenPreparePasses(*SILMod, *IGM);
+      DidRunSILCodeGenPreparePasses = true;
+    }
   }
   
   if (!IGMcreated) {

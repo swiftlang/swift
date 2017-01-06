@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -385,7 +385,8 @@ public:
   /// Given part of the witness's interface type, produce its
   /// substitution according to the witness substitutions.
   CanType getSubstWitnessInterfaceType(CanType type) {
-    auto subs = SubstSelfType->getMemberSubstitutions(WitnessStorage);
+    auto subs = SubstSelfType->getRValueInstanceType()
+        ->getMemberSubstitutions(WitnessStorage);
     return type.subst(SGM.SwiftModule, subs)->getCanonicalType();
   }
 

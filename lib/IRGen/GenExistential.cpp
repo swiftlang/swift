@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1882,7 +1882,8 @@ void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
     emitProjectBufferCall(IGF, metadata, buffer);
   llvm::Value *dynamicType =
     IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
-                           {object, metadata});
+                           {object, metadata,
+                            llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1)});
   out.add(dynamicType);
 
   // Get the witness tables.
@@ -1918,7 +1919,8 @@ void irgen::emitMetatypeOfBoxedExistential(IRGenFunction &IGF, Explosion &value,
 
   auto dynamicType =
     IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
-                           {projectedPtr, metadata});
+                           {projectedPtr, metadata,
+                            llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1)});
 
   auto witnessAddr = IGF.Builder.CreateStructGEP(outAddr, 2,
                                                  2 * IGF.IGM.getPointerSize());

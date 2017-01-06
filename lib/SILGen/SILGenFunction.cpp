@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -128,6 +128,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
     return getMagicFunctionName(cast<EnumElementDecl>(ref.getDecl())
                                   ->getDeclContext());
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
@@ -826,9 +828,8 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
   // Forward substitutions.
   ArrayRef<Substitution> subs;
   auto constantInfo = getConstantInfo(to);
-  if (auto *env = constantInfo.GenericEnv) {
-    subs = env->getForwardingSubstitutions(SGM.SwiftModule);
-  }
+  if (auto *env = constantInfo.GenericEnv)
+    subs = env->getForwardingSubstitutions();
 
   SILValue toFn = getNextUncurryLevelRef(*this, vd, to, from.isDirectReference,
                                          curriedArgs, subs);

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -472,7 +472,7 @@ static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
 static bool isValidIdentifierStartCodePoint(uint32_t c) {
   if (!isValidIdentifierContinuationCodePoint(c))
     return false;
-  if (c < 0x80 && isDigit(c))
+  if (c < 0x80 && (isDigit(c) || c == '$'))
     return false;
 
   // N1518: Recommendations for extended identifier characters for C and C++
@@ -1383,6 +1383,14 @@ void Lexer::lexEscapedIdentifier() {
       NextToken.setEscapedIdentifier(true);
       return;
     }
+  }
+
+  // Special case; allow '`$`'.
+  if (Quote[1] == '$' && Quote[2] == '`') {
+    CurPtr = Quote + 3;
+    formToken(tok::identifier, Quote);
+    NextToken.setEscapedIdentifier(true);
+    return;
   }
 
   // The backtick is punctuation.

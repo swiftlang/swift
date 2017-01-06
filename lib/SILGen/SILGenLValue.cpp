@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -831,10 +831,11 @@ namespace {
         return true;
       }
 
-      // If the declaration is dynamically dispatched through a protocol,
-      // we have to use materializeForSet.
-      if (isa<ProtocolDecl>(decl->getDeclContext()))
-        return true;
+      // If the declaration is dynamically dispatched through a
+      // non-ObjC protocol, we have to use materializeForSet.
+      if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl->getDeclContext()))
+        if (!protoDecl->isObjC())
+          return true;
 
       return false;
     }
@@ -1580,9 +1581,8 @@ ArrayRef<Substitution>
 SILGenModule::getNonMemberVarDeclSubstitutions(VarDecl *var) {
   ArrayRef<Substitution> substitutions;
   auto *dc = var->getDeclContext();
-  if (auto *genericEnv = dc->getGenericEnvironmentOfContext()) {
-    substitutions = genericEnv->getForwardingSubstitutions(SwiftModule);
-  }
+  if (auto *genericEnv = dc->getGenericEnvironmentOfContext())
+    substitutions = genericEnv->getForwardingSubstitutions();
   return substitutions;
 }
 
@@ -2206,7 +2206,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
 
   // NSString * must be bridged to String.
   if (storageType.getSwiftRValueType() == gen.SGM.Types.getNSStringType()) {
-    auto nsstr = gen.B.createLoadBorrow(loc, src);
+    auto nsstr = gen.B.createLoad(loc, src, LoadOwnershipQualifier::Copy);
     auto str = gen.emitBridgedToNativeValue(loc,
                                 ManagedValue::forUnmanaged(nsstr),
                                 SILFunctionTypeRepresentation::CFunctionPointer,

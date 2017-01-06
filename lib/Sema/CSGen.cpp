@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -71,6 +71,19 @@ static bool mergeRepresentativeEquivalenceClasses(ConstraintSystem &CS,
     auto rep2 = CS.getRepresentative(tyvar2);
 
     if (rep1 != rep2) {
+      auto fixedType2 = CS.getFixedType(rep2);
+
+      // If the there exists fixed type associated with the second
+      // type variable, and we simply merge two types together it would
+      // mean that portion of the constraint graph previously associated
+      // with that (second) variable is going to be disconnected from its
+      // new equivalence class, which is going to lead to incorrect solutions,
+      // so we need to make sure to re-bind fixed to the new representative.
+      if (fixedType2) {
+        CS.addConstraint(ConstraintKind::Bind, fixedType2, rep1,
+                         rep1->getImpl().getLocator());
+      }
+
       CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
       return true;
     }
@@ -137,7 +150,12 @@ namespace {
 
           // We'd like to look at the elements of arrays and dictionaries.
           isa<ArrayExpr>(expr) ||
-          isa<DictionaryExpr>(expr)) {
+          isa<DictionaryExpr>(expr) ||
+
+          // assignment expression can involve anonymous closure parameters
+          // as source and destination, so it's beneficial for diagnostics if
+          // we look at the assignment.
+          isa<AssignExpr>(expr)) {
         LinkedExprs.push_back(expr);
         return {false, expr};
       }
@@ -225,6 +243,11 @@ namespace {
           CS.optimizeConstraints(expr);
           return { false, expr };
         }
+      }
+
+      if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
+        LTI.collectedTypes.insert(CS.getType(FVE).getPointer());
+        return { false, expr };
       }
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
@@ -1021,7 +1044,7 @@ namespace {
       if (!decl)
         return nullptr;
       
-      CS.getTypeChecker().validateDecl(decl, true);
+      CS.getTypeChecker().validateDecl(decl);
       if (decl->isInvalid())
         return nullptr;
 
@@ -1312,7 +1335,7 @@ namespace {
       // FIXME: If the decl is in error, we get no information from this.
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
-      CS.getTypeChecker().validateDecl(E->getDecl(), true);
+      CS.getTypeChecker().validateDecl(E->getDecl());
       if (E->getDecl()->isInvalid())
         return nullptr;
 
@@ -1390,7 +1413,7 @@ namespace {
         // If the result is invalid, skip it.
         // FIXME: Note this as invalid, in case we don't find a solution,
         // so we don't let errors cascade further.
-        CS.getTypeChecker().validateDecl(decls[i], true);
+        CS.getTypeChecker().validateDecl(decls[i]);
         if (decls[i]->isInvalid())
           continue;
 
@@ -1678,12 +1701,13 @@ namespace {
       Type contextualArrayElementType = nullptr;
       
       // If a contextual type exists for this expression, apply it directly.
-      if (contextualType && CS.isArrayType(contextualType)) {
+      Optional<Type> arrayElementType;
+      if (contextualType &&
+          (arrayElementType = ConstraintSystem::isArrayType(contextualType))) {
         // Is the array type a contextual type
         contextualArrayType = contextualType;
-        contextualArrayElementType =
-            CS.getBaseTypeForArrayType(contextualType.getPointer());
-        
+        contextualArrayElementType = *arrayElementType;
+
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredType(),
                          locator);
@@ -2303,7 +2327,7 @@ namespace {
           outputTy = fnType->getResult();
         }
       } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
-        outputTy = TE->getInstanceType();
+        outputTy = CS.getInstanceType(TE);
         NominalTypeDecl *NTD = nullptr;
         
         if (auto nominalType = outputTy->getAs<NominalType>()) {
@@ -2521,25 +2545,8 @@ namespace {
       auto fromType = CS.getType(expr->getSubExpr());
       auto locator = CS.getConstraintLocator(expr);
 
-      if (CS.shouldAttemptFixes()) {
-        Constraint *coerceConstraint =
-          Constraint::create(CS, ConstraintKind::ExplicitConversion,
-                             fromType, toType, DeclName(),
-                             FunctionRefKind::Compound,
-                             locator);
-        Constraint *downcastConstraint =
-          Constraint::createFixed(CS, ConstraintKind::CheckedCast,
-                                  FixKind::CoerceToCheckedCast, fromType,
-                                  toType, locator);
-        coerceConstraint->setFavored();
-        auto constraints = { coerceConstraint, downcastConstraint };
-        CS.addDisjunctionConstraint(constraints, locator, RememberChoice);
-      } else {
-        // The source type can be explicitly converted to the destination type.
-        CS.addConstraint(ConstraintKind::ExplicitConversion, fromType, toType,
-                         locator);
-      }
-
+      CS.addExplicitConversionConstraint(fromType, toType, /*allowFixes=*/true,
+                                         locator);
       return toType;
     }
 
@@ -2604,7 +2611,7 @@ namespace {
       // Compute the type to which the source must be converted to allow
       // assignment to the destination.
       auto destTy = CS.computeAssignDestType(expr->getDest(), expr->getLoc());
-      if (!destTy)
+      if (!destTy || destTy->getRValueType()->is<UnresolvedType>())
         return Type();
       
       // The source must be convertible to the destination.
@@ -2683,6 +2690,9 @@ namespace {
     }
 
     Type visitOpenExistentialExpr(OpenExistentialExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    Type visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
     
@@ -2966,7 +2976,7 @@ Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
   // Sanitize the expression.
   expr = SanitizeExpr(getTypeChecker()).walkToExprPost(expr);
 
-  cacheExprTypes(expr);
+  cacheSubExprTypes(expr);
 
   // Visit the top-level expression generating constraints.
   ConstraintGenerator cg(*this);

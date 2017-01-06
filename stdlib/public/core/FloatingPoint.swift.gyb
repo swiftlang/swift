@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -173,7 +173,7 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   // FIXME(integers): document me properly
   associatedtype Magnitude : Comparable = Self
 
-  /// A type that can represent any written exponent.
+  /// A type that represents any written exponent.
   associatedtype Exponent: SignedInteger
 
   /// Creates a new value from the given sign, exponent, and significand.
@@ -1522,10 +1522,10 @@ extension FloatingPoint {
 /// - SeeAlso: `FloatingPoint`
 public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
 
-  /// A type that can represent the encoded significand of a value.
+  /// A type that represents the encoded significand of a value.
   associatedtype RawSignificand: UnsignedInteger
 
-  /// A type that can represent the encoded exponent of a value.
+  /// A type that represents the encoded exponent of a value.
   associatedtype RawExponent: UnsignedInteger
 
   /// Creates a new instance from the specified sign and bit patterns.

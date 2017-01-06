@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -64,8 +64,9 @@ namespace swift {
   class TypeVariableType;
   class ValueDecl;
   class ModuleDecl;
+  class ModuleType;
   class ProtocolConformance;
-  enum class SILArgumentConvention : uint8_t;
+  struct SILArgumentConvention;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
   enum class ValueOwnershipKind : uint8_t;
@@ -489,7 +490,11 @@ public:
 
   /// Erase the given opened existential type by replacing it with its
   /// existential type throughout the given type.
-  Type eraseOpenedExistential(ModuleDecl *module, ArchetypeType *opened);
+  Type eraseOpenedExistential(ArchetypeType *opened);
+
+  /// Erase DynamicSelfType from the given type by replacing it with its
+  /// underlying type.
+  Type eraseDynamicSelfType();
 
   /// \brief Compute and return the set of type variables that occur within this
   /// type.
@@ -643,6 +648,23 @@ public:
   /// with a class type.
   bool mayHaveSuperclass();
 
+  /// \brief Determine whether this type can be used as a base type for AST
+  /// name lookup, which is the case for nominal types, protocol compositions
+  /// and archetypes.
+  ///
+  /// Generally, the static vs instance and mutating vs nonmutating distinction
+  /// is handled elsewhere, so metatypes, lvalue types and inout types are not
+  /// allowed here.
+  ///
+  /// Similarly, tuples formally have members, but this does not go through
+  /// name lookup.
+  bool mayHaveMembers() {
+    return (is<ArchetypeType>() ||
+            is<ModuleType>() ||
+            isExistentialType() ||
+            getAnyNominal());
+  }
+
   /// \brief Retrieve the superclass of this type.
   ///
   /// \param resolver The resolver for lazy type checking, or null if the
@@ -778,6 +800,13 @@ public:
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
 
+  /// Retrieve the type without any labels around it. For example, given
+  /// \code
+  /// (p : int)
+  /// \endcode
+  /// the result would be the (unparenthesized) type 'int'.
+  Type getWithoutImmediateLabel();
+
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
 
@@ -792,8 +821,7 @@ public:
   /// replacing the type. With uncurry level == 0, this simply
   /// replaces the current type with the new result type.
   Type replaceCovariantResultType(Type newResultType,
-                                  unsigned uncurryLevel,
-                                  bool preserveOptionality = true);
+                                  unsigned uncurryLevel);
 
   /// Returns a new function type exactly like this one but with the self
   /// parameter replaced. Only makes sense for function members of types.
@@ -884,8 +912,8 @@ public:
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the
   /// 'self' argument type as appropriate.
-  Type adjustSuperclassMemberDeclType(const ValueDecl *decl,
-                                      const ValueDecl *parentDecl,
+  Type adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
+                                      const ValueDecl *derivedDecl,
                                       Type memberType,
                                       LazyResolver *resolver);
 
@@ -3548,7 +3576,7 @@ class ProtocolType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// \brief Retrieve the type when we're referencing the given protocol.
   /// declaration.
-  static ProtocolType *get(ProtocolDecl *D, const ASTContext &C);
+  static ProtocolType *get(ProtocolDecl *D, Type Parent, const ASTContext &C);
 
   ProtocolDecl *getDecl() const {
     return reinterpret_cast<ProtocolDecl *>(NominalType::getDecl());
@@ -3593,7 +3621,8 @@ public:
 
 private:
   friend class NominalTypeDecl;
-  ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx);
+  ProtocolType(ProtocolDecl *TheDecl, Type Parent, const ASTContext &Ctx,
+               RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
   void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos) {
@@ -3846,7 +3875,7 @@ public:
 
   /// Retrieve the generic environment in which this archetype resides.
   ///
-  /// FIXME: Not all archetypes have generic environments, yet.
+  /// Note: opened archetypes currently don't have generic environments.
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the associated type to which this archetype (if it is a nested
@@ -4431,12 +4460,7 @@ inline Type TypeBase::getRValueObjectType() {
     type = lv->getObjectType();
 
   // Look through argument list tuples.
-  if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
-      type = tupleTy->getElementType(0);
-  }
-  
-  return type;
+  return type->getWithoutImmediateLabel();
 }
 
 /// getLValueOrInOutObjectType - For an @lvalue or inout type, retrieves the
@@ -4524,10 +4548,6 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
   bool escaping = paramTy->is<AnyFunctionType>() &&
                   !paramTy->castTo<AnyFunctionType>()->isNoEscape();
   return {isVariadic, autoclosure, escaping};
-}
-
-inline CanType Type::getCanonicalTypeOrNull() const {
-  return isNull() ? CanType() : getPointer()->getCanonicalType();
 }
 
 #define TYPE(id, parent)

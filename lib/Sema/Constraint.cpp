@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -56,7 +56,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
@@ -66,6 +66,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OptionalObject:
     assert(!First.isNull());
     assert(!Second.isNull());
@@ -153,7 +154,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
@@ -162,6 +163,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::OptionalObject:
@@ -224,7 +226,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::BindToPointerType: Out << " bind to pointer "; break;
   case ConstraintKind::Subtype: Out << " subtype "; break;
   case ConstraintKind::Conversion: Out << " conv "; break;
-  case ConstraintKind::ExplicitConversion: Out << " expl conv "; break;
+  case ConstraintKind::BridgingConversion: Out << " bridging conv "; break;
   case ConstraintKind::ArgumentConversion: Out << " arg conv "; break;
   case ConstraintKind::ArgumentTupleConversion:
       Out << " arg tuple conv "; break;
@@ -238,6 +240,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::SelfObjectOfProtocol: Out << " Self type of "; break;
   case ConstraintKind::ApplicableFunction: Out << " applicable fn "; break;
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
+  case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OptionalObject:
       Out << " optional with object type "; break;
   case ConstraintKind::BindOverload: {
@@ -344,8 +347,6 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[tuple-to-tuple]";
   case ConversionRestrictionKind::ScalarToTuple:
     return "[scalar-to-tuple]";
-  case ConversionRestrictionKind::TupleToScalar:
-    return "[tuple-to-scalar]";
   case ConversionRestrictionKind::DeepEquality:
     return "[deep equality]";
   case ConversionRestrictionKind::Superclass:
@@ -386,10 +387,6 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[dictionary-upcast]";
   case ConversionRestrictionKind::SetUpcast:
     return "[set-upcast]";
-  case ConversionRestrictionKind::BridgeToObjC:
-    return "[bridge-to-objc]";
-  case ConversionRestrictionKind::BridgeFromObjC:
-    return "[bridge-from-objc]";
   case ConversionRestrictionKind::HashableToAnyHashable:
     return "[hashable-to-anyhashable]";
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
@@ -461,7 +458,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
@@ -471,6 +468,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::Defaultable:
     constraint->getSecondType()->getTypeVariables(typeVars);

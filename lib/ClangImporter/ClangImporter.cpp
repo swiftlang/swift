@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -83,7 +83,7 @@ namespace {
       if (!imported)
         return;
       Module *nativeImported = Impl.finishLoadingClangModule(Importer, imported,
-                                                             /*adapter=*/true);
+        /*preferAdapter=*/true);
       Impl.ImportedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
     }
 
@@ -327,8 +327,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
           // Enable modules
           "-fmodules",
           "-Werror=non-modular-include-in-framework-module",
-          // Enable implicit module maps (implied by "-fmodules")
-          "-fimplicit-module-maps",
           "-Xclang", "-fmodule-feature", "-Xclang", "swift",
 
           // Don't emit LLVM IR.
@@ -846,7 +844,7 @@ bool ClangImporter::Implementation::importHeader(
       static_cast<HeaderParsingASTConsumer &>(Instance->getASTConsumer());
   consumer.reset();
 
-  pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*Loc=*/{});
+  pp.EnterSourceFile(bufferID, /*Dir=*/nullptr, /*Loc=*/{});
   // Force the import to occur.
   pp.LookAhead(0);
 
@@ -909,7 +907,7 @@ bool ClangImporter::importHeader(StringRef header, Module *adapter,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*open=*/true);
+                                                           /*OpenFile=*/true);
   if (headerFile && headerFile->getSize() == expectedSize &&
       headerFile->getModificationTime() == expectedModTime) {
     return importBridgingHeader(header, adapter, diagLoc);
@@ -929,7 +927,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, Module *adapter,
                                          bool trackParsedSymbols) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*open=*/true);
+                                                           /*OpenFile=*/true);
   if (!headerFile) {
     Impl.SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_missing,
                                      header);
@@ -1024,6 +1022,23 @@ bool ClangImporter::isModuleImported(const clang::Module *M) {
   return M->NameVisibility == clang::Module::NameVisibilityKind::AllVisible;
 }
 
+bool ClangImporter::canImportModule(std::pair<Identifier, SourceLoc> moduleID) {
+  // Look up the top-level module to see if it exists.
+  // FIXME: This only works with top-level modules.
+  auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
+  clang::Module *clangModule =
+    clangHeaderSearch.lookupModule(moduleID.first.str());
+  if (!clangModule) {
+    return false;
+  }
+
+  clang::Module::Requirement r;
+  clang::Module::UnresolvedHeaderDirective mh;
+  clang::Module *m;
+  auto &ctx = Impl.getClangASTContext();
+  return clangModule->isAvailable(ctx.getLangOpts(), getTargetInfo(), r, mh, m);
+}
+
 Module *ClangImporter::loadModule(
     SourceLoc importLoc,
     ArrayRef<std::pair<Identifier, SourceLoc>> path) {
@@ -1090,7 +1105,8 @@ Module *ClangImporter::loadModule(
   if (!clangModule)
     return nullptr;
 
-  return Impl.finishLoadingClangModule(*this, clangModule, /*adapter=*/false);
+  return Impl.finishLoadingClangModule(*this, clangModule,
+                                       /*preferAdapter=*/false);
 }
 
 Module *ClangImporter::Implementation::finishLoadingClangModule(
@@ -2168,11 +2184,11 @@ void ClangModuleUnit::lookupObjCMethods(
   auto &clangSema = owner.Impl.getClangSema();
   clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
-                                               /*instance=*/true,
+                                               /*InstanceFirst=*/true,
                                                /*CheckTheOther=*/false);
   clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
-                                               /*instance=*/false,
+                                               /*InstanceFirst=*/false,
                                                /*CheckTheOther=*/false);
 
   // Import the methods.

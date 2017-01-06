@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -66,9 +66,8 @@ enum class ConstraintKind : char {
   Subtype,
   /// \brief The first type is convertible to the second type.
   Conversion,
-  /// \brief The first type is convertible to the second type using an 'as'
-  /// statement. This differs from 'Conversion' in that it also allows bridging.
-  ExplicitConversion,
+  /// \brief The first type can be bridged to the second type.
+  BridgingConversion,
   /// \brief The first type is the element of an argument tuple that is
   /// convertible to the second type (which represents the corresponding
   /// parameter type).
@@ -124,6 +123,9 @@ enum class ConstraintKind : char {
   /// \brief The first type is an optional type whose object type is the second
   /// type, preserving lvalue-ness.
   OptionalObject,
+  /// \brief The first type is the same function type as the second type, but
+  /// made @escaping.
+  EscapableFunctionOf,
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -155,8 +157,6 @@ enum class ConversionRestrictionKind {
   TupleToTuple,
   /// Scalar-to-tuple conversion.
   ScalarToTuple,
-  /// Tuple-to-scalar conversion.
-  TupleToScalar,
   /// Deep equality comparison.
   DeepEquality,
   /// Subclass-to-superclass conversion.
@@ -200,10 +200,6 @@ enum class ConversionRestrictionKind {
   SetUpcast,
   /// T:Hashable -> AnyHashable conversion.
   HashableToAnyHashable,
-  /// Implicit bridging from a value type to an Objective-C class.
-  BridgeToObjC,
-  /// Explicit bridging from an Objective-C class to a value type.
-  BridgeFromObjC,
   /// Implicit conversion from a CF type to its toll-free-bridged Objective-C
   /// class type.
   CFTollFreeBridgeToObjC,
@@ -466,7 +462,7 @@ public:
     case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
-    case ConstraintKind::ExplicitConversion:
+    case ConstraintKind::BridgingConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
@@ -485,6 +481,7 @@ public:
       return ConstraintClassification::Member;
 
     case ConstraintKind::DynamicTypeOf:
+    case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::Defaultable:
       return ConstraintClassification::TypeProperty;
 
