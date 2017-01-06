@@ -23,7 +23,7 @@ struct Path: _ExpressibleByFileReferenceLiteral {
 let p1: Path = #fileLiteral(resourceName: "what.txt")
 let p2 = #fileLiteral(resourceName: "what.txt") // expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'URL' as the default file reference literal type}}
 let string = "what.txt"
-let p3: Path = #fileLiteral(resourceName: string) // expected-error{{argument in object literal must be an uninterpolated literal}}
-let p4: Path = #fileLiteral(resourceName: "\(string)") // expected-error{{argument in object literal must be an uninterpolated literal}}
+let p3: Path = #fileLiteral(resourceName: string) // expected-error{{object literal argument must be literal without interpolation}}
+let p4: Path = #fileLiteral(resourceName: "\(string)") // expected-error{{object literal argument must be literal without interpolation}}
 
 let text = #fileLiteral(resourceName: "TextFile.txt").relativeString! // expected-error{{type of expression is ambiguous without more context}}

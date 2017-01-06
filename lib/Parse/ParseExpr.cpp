@@ -2698,12 +2698,10 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
   for (auto arg : args) {
     if (!isa<LiteralExpr>(arg) || isa<InterpolatedStringLiteralExpr>(arg)) {
       if (Context.isSwiftVersion3()) {
-        diagnose(arg->getLoc(),
-               diag::non_literal_or_interpolated_literal_arg_in_object_literal);
+        diagnose(arg->getLoc(), diag::object_literal_arg_deprecated);
         break;
       }
-      diagnose(arg->getLoc(),
-               diag::expected_uninterpolated_literal_arg_in_object_literal);
+      diagnose(arg->getLoc(), diag::object_literal_arg_expected_literal);
       return makeParserError();
     }
   }

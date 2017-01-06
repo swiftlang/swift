@@ -1099,11 +1099,11 @@ ERROR(object_literal_legacy_name,none,
       "'%0' has been renamed to '%1", (StringRef, StringRef))
 ERROR(legacy_object_literal_syntax,none,
       "object literal syntax no longer uses '[# ... #]'", ())
-ERROR(expected_uninterpolated_literal_arg_in_object_literal,none,
-      "argument in object literal must be an uninterpolated literal", ())
-WARNING(non_literal_or_interpolated_literal_arg_in_object_literal,none,
-        "non-literal or interpolated literal arguments in object literals are "
-        "deprecated", ())
+ERROR(object_literal_arg_expected_literal,none,
+      "object literal argument must be literal without interpolation", ())
+WARNING(object_literal_arg_deprecated,none,
+        "object literal arguments that are not literals or that are "
+        "interpolated literals are deprecated", ())
 
 // If expressions
 ERROR(expected_expr_after_if_question,none,
