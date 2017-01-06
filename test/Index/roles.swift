@@ -40,10 +40,10 @@ var z: Int {
 // Write + Read of z
 z = z + 1
 // CHECK: [[@LINE-1]]:1 | variable/Swift | z | s:v14swift_ide_test1zSi | Ref,Writ | rel: 0
-// CHECK: [[@LINE-2]]:1 | accessor(set)/Swift |  | s:F14swift_ide_tests1zSi | Ref,Call,RelCall | rel: 1
+// CHECK: [[@LINE-2]]:1 | accessor(set)/Swift | setter:z | s:F14swift_ide_tests1zSi | Ref,Call,Impl,RelCall | rel: 1
 // CHECK-NEXT: RelCall | z | s:v14swift_ide_test1zSi
 // CHECK: [[@LINE-4]]:5 | variable/Swift | z | s:v14swift_ide_test1zSi | Ref,Read | rel: 0
-// CHECK-NEXT: [[@LINE-5]]:5 | accessor(get)/Swift |  | s:F14swift_ide_testg1zSi | Ref,Call,RelCall | rel: 1
+// CHECK-NEXT: [[@LINE-5]]:5 | accessor(get)/Swift | getter:z | s:F14swift_ide_testg1zSi | Ref,Call,Impl,RelCall | rel: 1
 
 // Call
 func aCalledFunction() {}
@@ -65,10 +65,10 @@ struct aStruct {
   mutating func aMethod() {
     x += 1
     // CHECK: [[@LINE-1]]:5 | instance-property/Swift | x | s:vV14swift_ide_test7aStruct1xSi | Ref,Read,Writ | rel: 0
-    // CHECK: [[@LINE-2]]:5 | accessor(get)/Swift |  | s:FV14swift_ide_test7aStructg1xSi | Ref,Call,RelRec,RelCall | rel: 2
+    // CHECK: [[@LINE-2]]:5 | accessor(get)/Swift | getter:x | s:FV14swift_ide_test7aStructg1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
     // CHECK-NEXT: RelCall | x | s:vV14swift_ide_test7aStruct1xSi
     // CHECK-NEXT: RelRec | aStruct | s:V14swift_ide_test7aStruct
-    // CHECK: [[@LINE-5]]:5 | accessor(set)/Swift |  | s:FV14swift_ide_test7aStructs1xSi | Ref,Call,RelRec,RelCall | rel: 2
+    // CHECK: [[@LINE-5]]:5 | accessor(set)/Swift | setter:x | s:FV14swift_ide_test7aStructs1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
     // CHECK-NEXT: RelCall | x | s:vV14swift_ide_test7aStruct1xSi
     // CHECK-NEXT: RelRec | aStruct | s:V14swift_ide_test7aStruct
     // CHECK: [[@LINE-8]]:7 | infix-operator/Swift | +=(_:_:) | s:Fsoi2peFTRSiSi_T_ | Ref,Call,RelCall | rel: 1

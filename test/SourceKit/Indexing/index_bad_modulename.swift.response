@@ -19,12 +19,14 @@
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.name: "getter:v",
           key.usr: "s:F4maing1vGSqCSo8NSObject_",
           key.line: 7,
           key.column: 5
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
+          key.name: "setter:v",
           key.usr: "s:F4mains1vGSqCSo8NSObject_",
           key.line: 7,
           key.column: 5

@@ -19,12 +19,14 @@
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.name: "getter:globalPrim",
           key.usr: "s:F18forbid_typecheck_2g10globalPrimSi",
           key.line: 1,
           key.column: 5
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
+          key.name: "setter:globalPrim",
           key.usr: "s:F18forbid_typecheck_2s10globalPrimSi",
           key.line: 1,
           key.column: 5

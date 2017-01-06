@@ -19,12 +19,14 @@
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.name: "getter:gCubeVertexData",
           key.usr: "s:F9big_arrayg15gCubeVertexDataGSaSf_",
           key.line: 1,
           key.column: 5
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
+          key.name: "setter:gCubeVertexData",
           key.usr: "s:F9big_arrays15gCubeVertexDataGSaSf_",
           key.line: 1,
           key.column: 5

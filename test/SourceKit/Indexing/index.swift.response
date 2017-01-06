@@ -19,12 +19,14 @@
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.name: "getter:globV",
           key.usr: "s:F5indexg5globVSi",
           key.line: 4,
           key.column: 5
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
+          key.name: "setter:globV",
           key.usr: "s:F5indexs5globVSi",
           key.line: 4,
           key.column: 5
@@ -266,6 +268,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.setter,
+              key.name: "setter:globV",
               key.usr: "s:F5indexs5globVSi",
               key.line: 37,
               key.column: 3
@@ -288,6 +291,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.name: "getter:instV",
               key.usr: "s:FC5index2CCg5instVS0_",
               key.line: 38,
               key.column: 9,
@@ -501,12 +505,14 @@
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.name: "getter:globV2",
           key.usr: "s:F5indexg6globV2CS_5SubCC",
           key.line: 57,
           key.column: 5
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
+          key.name: "setter:globV2",
           key.usr: "s:F5indexs6globV2CS_5SubCC",
           key.line: 57,
           key.column: 5
@@ -750,6 +756,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.name: "getter:value",
               key.usr: "s:FC5index16ComputedPropertyg5valueSi",
               key.line: 92,
               key.column: 14,
@@ -767,6 +774,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.name: "getter:readOnly",
               key.usr: "s:FC5index16ComputedPropertyg8readOnlySi",
               key.line: 93,
               key.column: 10,
@@ -784,6 +792,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.setter,
+              key.name: "setter:value",
               key.usr: "s:FC5index16ComputedPropertys5valueSi",
               key.line: 94,
               key.column: 6,
@@ -808,6 +817,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.name: "getter:value",
               key.usr: "s:FC5index16ComputedPropertyg5valueSi",
               key.line: 95,
               key.column: 8,
@@ -816,6 +826,7 @@
             },
             {
               key.kind: source.lang.swift.ref.function.accessor.setter,
+              key.name: "setter:value",
               key.usr: "s:FC5index16ComputedPropertys5valueSi",
               key.line: 95,
               key.column: 8,
@@ -833,6 +844,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
               key.usr: "s:FC5index3CC2g9subscriptFSiSi",
               key.line: 96,
               key.column: 10,
@@ -850,6 +862,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.setter,
+              key.name: "setter:subscript(_:)",
               key.usr: "s:FC5index3CC2s9subscriptFSiSi",
               key.line: 97,
               key.column: 6,
@@ -874,6 +887,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
               key.usr: "s:FC5index3CC2g9subscriptFSiSi",
               key.line: 98,
               key.column: 8,
@@ -882,6 +896,7 @@
             },
             {
               key.kind: source.lang.swift.ref.function.accessor.setter,
+              key.name: "setter:subscript(_:)",
               key.usr: "s:FC5index3CC2s9subscriptFSiSi",
               key.line: 98,
               key.column: 8,
@@ -956,6 +971,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.name: "getter:globReadOnly",
               key.usr: "s:F5indexg12globReadOnlyVS_2S2",
               key.line: 112,
               key.column: 3

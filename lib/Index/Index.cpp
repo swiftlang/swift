@@ -42,22 +42,19 @@ static SymbolSubKind getSubKindForAccessor(AccessorKind AK) {
 }
 
 static bool
-printArtificialName(const swift::ValueDecl *VD, llvm::raw_ostream &OS) {
-  auto *FD = dyn_cast<FuncDecl>(VD);
-  if (!FD)
-    return true;
-  switch (FD->getAccessorKind()) {
+printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm::raw_ostream &OS) {
+  switch (AK) {
   case AccessorKind::IsGetter:
-    OS << "getter:" << FD->getAccessorStorageDecl()->getFullName();
+    OS << "getter:" << ASD->getFullName();
     return false;
   case AccessorKind::IsSetter:
-    OS << "setter:" << FD->getAccessorStorageDecl()->getFullName();
+    OS << "setter:" << ASD->getFullName();
     return false;
   case AccessorKind::IsDidSet:
-    OS << "didSet:" << FD->getAccessorStorageDecl()->getFullName();
+    OS << "didSet:" << ASD->getFullName();
     return false;
   case AccessorKind::IsWillSet:
-    OS << "willSet:" << FD->getAccessorStorageDecl()->getFullName() ;
+    OS << "willSet:" << ASD->getFullName() ;
     return false;
 
   case AccessorKind::NotAccessor:
@@ -71,8 +68,12 @@ printArtificialName(const swift::ValueDecl *VD, llvm::raw_ostream &OS) {
 }
 
 static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
-  if (!D->hasName())
-    return printArtificialName(D, OS);
+  if (!D->hasName()) {
+    auto *FD = dyn_cast<FuncDecl>(D);
+    if (!FD || FD->getAccessorKind() == AccessorKind::NotAccessor)
+      return true;
+    return printArtificialName(FD->getAccessorStorageDecl(), FD->getAccessorKind(), OS);
+  }
 
   OS << D->getFullName();
   return false;
@@ -146,7 +147,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   };
   typedef llvm::PointerIntPair<Decl *, 3> DeclAccessorPair;
   llvm::DenseMap<Decl *, NameAndUSR> nameAndUSRCache;
-  llvm::DenseMap<DeclAccessorPair, StringRef> accessorUSRCache;
+  llvm::DenseMap<DeclAccessorPair, NameAndUSR> accessorNameAndUSRCache;
   StringScratchSpace stringStorage;
 
   bool getNameAndUSR(ValueDecl *D, StringRef &name, StringRef &USR) {
@@ -173,6 +174,33 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     return false;
   }
 
+  bool getPseudoAccessorNameAndUSR(AbstractStorageDecl *D, AccessorKind AK, StringRef &Name, StringRef &USR) {
+    assert(AK != AccessorKind::NotAccessor);
+    assert(static_cast<int>(AK) < 0x111 && "AccessorKind too big for pair");
+    DeclAccessorPair key(D, static_cast<int>(AK));
+    auto &result = accessorNameAndUSRCache[key];
+    if (result.USR.empty()) {
+      SmallString<128> storage;
+      {
+        llvm::raw_svector_ostream OS(storage);
+        if(ide::printAccessorUSR(D, AK, OS))
+          return true;
+        result.USR = stringStorage.copyString(OS.str());
+      }
+
+      storage.clear();
+      {
+        llvm::raw_svector_ostream OS(storage);
+        printArtificialName(D, AK, OS);
+        result.name = stringStorage.copyString(OS.str());
+      }
+    }
+
+    Name = result.name;
+    USR = result.USR;
+    return false;
+  }
+
   bool addRelation(IndexSymbol &Info, SymbolRoleSet RelationRoles, ValueDecl *D) {
     assert(D);
     StringRef Name, USR;
@@ -191,19 +219,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     return false;
   }
 
-  StringRef getAccessorUSR(AbstractStorageDecl *D, AccessorKind AK) {
-    assert(AK != AccessorKind::NotAccessor);
-    assert(static_cast<int>(AK) < 0x111 && "AccessorKind too big for pair");
-    DeclAccessorPair key(D, static_cast<int>(AK));
-    auto &result = accessorUSRCache[key];
-    if (result.empty()) {
-      SmallString<128> storage;
-      llvm::raw_svector_ostream OS(storage);
-      ide::printAccessorUSR(D, AK, OS);
-      result = stringStorage.copyString(OS.str());
-    }
-    return result;
-  }
+
 
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
@@ -652,27 +668,30 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     return true; // continue walking.
 
   auto updateInfo = [this, D, AccKind](IndexSymbol &Info) {
+    if (getPseudoAccessorNameAndUSR(D, AccKind, Info.name, Info.USR))
+      return true;
     Info.kind = SymbolKind::Accessor;
     Info.subKinds |= getSubKindForAccessor(AccKind);
-    Info.name = "";
-    Info.USR = getAccessorUSR(D, AccKind);
+    Info.roles |= (SymbolRoleSet)SymbolRole::Implicit;
     Info.group = "";
+    return false;
   };
 
   if (IsRef) {
     IndexSymbol Info;
     if (initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info))
       return true; // continue walking.
+    if (updateInfo(Info))
+      return true;
 
-    updateInfo(Info);
     if (!IdxConsumer.startSourceEntity(Info) || !IdxConsumer.finishSourceEntity(Info.kind, Info.subKinds, Info.roles))
       Cancelled = true;
   } else {
     IndexSymbol Info;
     if (initIndexSymbol(D, Loc, IsRef, Info))
       return true; // continue walking.
-
-    updateInfo(Info);
+    if (updateInfo(Info))
+      return true;
     if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationAccessorOf, D))
       return true;
 
