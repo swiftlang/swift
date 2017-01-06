@@ -235,9 +235,7 @@ SWIFT_CLASS("_TtC8comments19HasThrowingFunction")
 
 
   throws:
-  An error if \code
-  x == 0
-  \endcode
+  An error if <code>x == 0</code>
 */
 - (void)f1:(NSInteger)x;
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
@@ -299,9 +297,7 @@ SWIFT_CLASS("_TtC8comments20IndentedBlockComment")
 SWIFT_CLASS("_TtC8comments10InlineCode")
 @interface InlineCode
 /**
-  Aaa \code
-  bbb
-  \endcode ccc.
+  Aaa <code>bbb</code> ccc.
 */
 - (void)f0;
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
