@@ -125,19 +125,6 @@ ArchetypeType *swift::getOpenedArchetypeOf(const SILInstruction *I) {
 }
 
 
-bool hasAtMostOneOpenedArchetype(Type Ty) {
-  if (!Ty->hasOpenedExistential())
-    return true;
-
-  int NumOpenedArchetypes = 0;
-  Ty.visit([&](Type t) {
-    if (t->isOpenedExistential())
-      NumOpenedArchetypes++;
-  });
-
-  return NumOpenedArchetypes <= 1;
-}
-
 /// Find an opened archetype represented by this type.
 /// It is assumed by this method that the type contains
 /// at most one opened archetype.
