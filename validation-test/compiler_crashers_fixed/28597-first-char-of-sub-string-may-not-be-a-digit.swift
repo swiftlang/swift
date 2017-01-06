@@ -6,6 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: %target-swift-frontend %s -emit-ir
-// REQUIRES: asserts
 // non-fuzz
 let β1=0

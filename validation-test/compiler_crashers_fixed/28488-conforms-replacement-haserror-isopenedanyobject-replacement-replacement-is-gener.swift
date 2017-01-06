@@ -6,5 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -emit-ir
-// REQUIRES: asserts
 class a}struct d<U:a>protocol A{class A{let t:d=

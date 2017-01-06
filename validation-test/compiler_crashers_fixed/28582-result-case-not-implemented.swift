@@ -6,5 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -emit-ir
-// REQUIRES: asserts
 {U:{for in{return 0+1
