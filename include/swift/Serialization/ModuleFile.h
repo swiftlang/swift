@@ -529,17 +529,6 @@ private:
                         serialization::DeclID willSet,
                         serialization::DeclID didSet);
 
-  /// Return the generic signature or environment at the current position in
-  /// the given cursor.
-  ///
-  /// \param cursor The cursor to read from.
-  /// \param wantEnvironment Whether we always want to receive a generic
-  /// environment vs. being able to handle the generic signature.
-  llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-  readGenericSignatureOrEnvironment(
-                        llvm::BitstreamCursor &cursor,
-                        bool wantEnvironment);
-
 public:
   /// Loads a module from the given memory buffer.
   ///

@@ -2737,14 +2737,6 @@ GenericEnvironment *ArchetypeType::getGenericEnvironment() const {
   return ParentOrOpenedOrEnvironment.dyn_cast<GenericEnvironment *>();
 }
 
-void ArchetypeType::setGenericEnvironment(GenericEnvironment *genericEnv) {
-  assert(isPrimary() && "Can only set on the primary archetype");
-  assert(genericEnv && "Need to set a generic environment");
-  assert((!getGenericEnvironment() || getGenericEnvironment() == genericEnv) &&
-         "Already have a generic environment");
-  ParentOrOpenedOrEnvironment = genericEnv;
-}
-
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
                                       ArrayRef<Type> Protocols) {
   for (auto P : Protocols)

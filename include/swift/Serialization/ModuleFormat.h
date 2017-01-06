@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 303; // Last change: SIL generic environments
+const uint16_t VERSION_MINOR = 304; // Last change: Archetype generic env
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -630,7 +630,8 @@ namespace decls_block {
 
   using ArchetypeTypeLayout = BCRecordLayout<
     ARCHETYPE_TYPE,
-    TypeIDField,         // parent if non-primary
+    BCFixed<1>,          // whether this is a primary archetype or not
+    TypeIDField,         // parent if non-primary, generic env if primary
     DeclIDField,         // associated type decl if non-primary, name if primary
     TypeIDField,         // superclass
     BCArray<DeclIDField> // conformances
