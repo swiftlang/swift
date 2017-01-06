@@ -338,6 +338,9 @@ private:
   /// Writes the given type.
   void writeType(Type ty);
 
+  /// Writes a generic environment.
+  void writeGenericEnvironment(const GenericEnvironment *env);
+
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
   void registerDeclTypeAbbr() {
@@ -471,11 +474,6 @@ public:
   void writeConformance(ProtocolConformance *conformance,
                         const std::array<unsigned, 256> &abbrCodes,
                         GenericEnvironment *genericEnv = nullptr);
-
-  /// Writes a generic environment.
-  void writeGenericEnvironment(const GenericEnvironment *env,
-                               const std::array<unsigned, 256> &abbrCodes,
-                               bool SILMode);
 };
 } // end namespace serialization
 } // end namespace swift

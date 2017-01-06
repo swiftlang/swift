@@ -529,6 +529,17 @@ private:
                         serialization::DeclID willSet,
                         serialization::DeclID didSet);
 
+  /// Return the generic signature or environment at the current position in
+  /// the given cursor.
+  ///
+  /// \param cursor The cursor to read from.
+  /// \param wantEnvironment Whether we always want to receive a generic
+  /// environment vs. being able to handle the generic signature.
+  llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+  readGenericSignatureOrEnvironment(
+                        llvm::BitstreamCursor &cursor,
+                        bool wantEnvironment);
+
 public:
   /// Loads a module from the given memory buffer.
   ///
@@ -740,20 +751,6 @@ public:
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
   Module *getModule(ArrayRef<Identifier> name);
-
-  /// Return the generic signature or environment at the current position in
-  /// the given cursor.
-  ///
-  /// \param cursor The cursor to read from.
-  /// \param wantEnvironment Whether we always want to receive a generic
-  /// environment vs. being able to handle the generic signature.
-  /// \param optRequirements If not \c None, use these generic requirements
-  /// rather than deserializing requirements.
-  llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-  readGenericSignatureOrEnvironment(
-                        llvm::BitstreamCursor &cursor,
-                        bool wantEnvironment,
-                        Optional<ArrayRef<Requirement>> optRequirements);
 
   /// Returns the generic signature or environment for the given ID,
   /// deserializing it if needed.
