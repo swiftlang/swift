@@ -95,8 +95,8 @@ class SwiftTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         self.assertEqual(set(swift.cmake_options),
                          set(['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
-                          '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
-                          '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE']))
+                              '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
+                              '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE']))
 
     def test_swift_compiler_vendor_flags(self):
         self.args.compiler_vendor = "none"
