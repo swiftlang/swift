@@ -43,10 +43,6 @@ internal protocol _ArrayProtocol
   /// - Complexity: O(`self.count`).
   mutating func reserveCapacity(_ minimumCapacity: Int)
 
-  /// Operator form of `append(contentsOf:)`.
-  static func += <S : Sequence>(lhs: inout Self, rhs: S)
-    where S.Iterator.Element == Iterator.Element
-
   /// Insert `newElement` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.

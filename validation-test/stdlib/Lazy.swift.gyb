@@ -657,12 +657,15 @@ Base.Iterator.Element == S.Iterator.Element {
   }
 
   SequenceLog._copyContents.expectIncrement(baseType) { () -> Void in
-    let buf = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
-
-    let end = s._copyContents(initializing: buf)
-    expectTrue(end <= buf + count)
-    buf.deinitialize(count: end - buf)
-    buf.deallocate(capacity: count)
+    let ptr = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
+    let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
+    var (remainders,writtenUpTo) = s._copyContents(initializing: buf)
+    expectTrue(remainders.next() == nil, 
+      "_copyContents returned unwritten elements")
+    expectTrue(writtenUpTo == buf.endIndex, 
+      "_copyContents failed to use entire buffer")
+    ptr.deinitialize(count: count)
+    ptr.deallocate(capacity: count)
   }
 }
 
