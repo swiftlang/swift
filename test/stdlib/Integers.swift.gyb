@@ -119,19 +119,19 @@ tests.test("Literals") {
   // Testing against the official Int types so as not to depend on
   // unimplemented stuff.
   let a: UInt8 = 0b1_0_11_0_111
-  expectEqual(unsafeBitCast(a, to: Swift.UInt8.self), 0b1_0_11_0_111)
+  expectEqual(a, 0b1_0_11_0_111)
 
   let b: Int16 = 183
-  expectEqual(unsafeBitCast(b, to: Swift.Int16.self), 0b1_0_11_0_111)
+  expectEqual(b, 0b1_0_11_0_111)
 
   let c: Int16 = -183
-  expectEqual(unsafeBitCast(c, to: Swift.Int16.self), -183)
+  expectEqual(c, -183)
 
   let d: Int8 = 127
-  expectEqual(unsafeBitCast(d, to: Swift.Int8.self), 127)
+  expectEqual(d, 127)
 
   let e: UInt8 = 255
-  expectEqual(unsafeBitCast(e, to: Swift.UInt8.self), 255)
+  expectEqual(e, 255)
 }
 
 tests.test("Signed Literal Trap") {
@@ -183,8 +183,11 @@ tests.test("Simple-Arithmetic") {
 %   for prefix in ['U', '']:
 %     Type = '{}Int{}'.format(prefix, w)
 tests.test("${Type}/Add/Overflow") {
+  func f(_ x: ${Type}) -> ${Type} {
+    return x + 1
+  }
   expectCrashLater()
-  _ = ${Type}.max + 1
+  _ = f(${Type}.max)
 }
 
 tests.test("${Type}/Subtract/Underflow") {
@@ -196,9 +199,12 @@ tests.test("${Type}/Subtract/Underflow") {
 }
 
 tests.test("${Type}/AddInPlace/Overflow") {
+  func f(_ x: inout ${Type}) {
+    x += 1
+  }
   expectCrashLater()
   var x = ${Type}.max
-  x += 1
+  f(&x)
 }
 
 tests.test("${Type}/SubtractInPlace/Underflow") {
@@ -238,14 +244,6 @@ tests.test("CountLeadingZeros") {
   expectEqual(8, UInt8.min.leadingZeros)
   expectEqual(1, Int8.max.leadingZeros)
   expectEqual(0, Int8.min.leadingZeros)
-}
-
-tests.test("minimumSignedRepresentationBitWidth") {
-  expectEqual(9, UInt8.max.minimumSignedRepresentationBitWidth)
-  expectEqual(1, UInt8.min.minimumSignedRepresentationBitWidth)
-  expectEqual(8, Int8.max.minimumSignedRepresentationBitWidth)
-  expectEqual(1, (0 as Int8).minimumSignedRepresentationBitWidth)
-  expectEqual(8, Int8.min.minimumSignedRepresentationBitWidth)
 }
 
 tests.test("Conversion8to16") {
