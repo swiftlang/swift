@@ -233,12 +233,13 @@ extension TimeZone : CustomStringConvertible, CustomDebugStringConvertible, Cust
     }
     
     public var customMirror : Mirror {
-        var c: [(label: String?, value: Any)] = []
-        c.append((label: "identifier", value: identifier))
-        c.append((label: "kind", value: _kindDescription))
-        c.append((label: "abbreviation", value: abbreviation()))
-        c.append((label: "secondsFromGMT", value: secondsFromGMT()))
-        c.append((label: "isDaylightSavingTime", value: isDaylightSavingTime()))
+        let c: [(label: String?, value: Any)] = [
+          ("identifier", identifier),
+          ("kind", _kindDescription),
+          ("abbreviation", abbreviation() as Any),
+          ("secondsFromGMT", secondsFromGMT()),
+          ("isDaylightSavingTime", isDaylightSavingTime()),
+        ]
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
     

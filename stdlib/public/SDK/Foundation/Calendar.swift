@@ -1095,13 +1095,14 @@ extension Calendar : CustomDebugStringConvertible, CustomStringConvertible, Cust
     }
     
     public var customMirror : Mirror {
-        var c: [(label: String?, value: Any)] = []
-        c.append((label: "identifier", value: identifier))
-        c.append((label: "kind", value: _kindDescription))
-        c.append((label: "locale", value: locale))
-        c.append((label: "timeZone", value: timeZone))
-        c.append((label: "firstWeekday", value: firstWeekday))
-        c.append((label: "minimumDaysInFirstWeek", value: minimumDaysInFirstWeek))
+        let c: [(label: String?, value: Any)] = [
+          ("identifier", identifier),
+          ("kind", _kindDescription),
+          ("locale", locale as Any),
+          ("timeZone", timeZone),
+          ("firstWeekday", firstWeekday),
+          ("minimumDaysInFirstWeek", minimumDaysInFirstWeek),
+        ]
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
 }
