@@ -430,7 +430,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         // Finding a valid insertion point is tricky:
         // Inlining might add new basic blocks and/or remove the apply
         // We want to add the fix up *just before* where the current apply is!
-        // Unfortunately, we *can’t* add the fix up code here:
+        // Unfortunately, we *can't* add the fix up code here:
         // Inlining might fail for any reason -
         // If that occurred we’d need to undo our fix up code.
         // Instead, we split the current basic block -
