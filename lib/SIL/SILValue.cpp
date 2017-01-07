@@ -91,23 +91,20 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 }
 
 Optional<ValueOwnershipKind>
-swift::ValueOwnershipKindMerge(Optional<ValueOwnershipKind> LHS,
-                               Optional<ValueOwnershipKind> RHS) {
-  if (!LHS.hasValue() || !RHS.hasValue())
-    return NoneType::None;
-  auto LHSVal = LHS.getValue();
-  auto RHSVal = RHS.getValue();
+ValueOwnershipKind::merge(ValueOwnershipKind RHS) const {
+  auto LHSVal = Value;
+  auto RHSVal = RHS.Value;
 
   // Any merges with anything.
   if (LHSVal == ValueOwnershipKind::Any) {
-    return RHSVal;
+    return ValueOwnershipKind(RHSVal);
   }
   // Any merges with anything.
   if (RHSVal == ValueOwnershipKind::Any) {
-    return LHSVal;
+    return ValueOwnershipKind(LHSVal);
   }
 
-  return (LHSVal == RHSVal) ? LHS : None;
+  return (LHSVal == RHSVal) ? Optional<ValueOwnershipKind>(*this) : None;
 }
 
 //===----------------------------------------------------------------------===//
@@ -335,10 +332,10 @@ ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I) {
 
   for (const Operand &Op : Ops.slice(Index+1)) {
     auto OpKind = Op.get().getOwnershipKind();
-    if (ValueOwnershipKindMerge(OpKind, ValueOwnershipKind::Trivial))
+    if (OpKind.merge(ValueOwnershipKind::Trivial))
       continue;
 
-    auto MergedValue = ValueOwnershipKindMerge(Base, OpKind);
+    auto MergedValue = Base.merge(OpKind.Value);
     if (!MergedValue.hasValue()) {
       llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
     }
@@ -440,10 +437,10 @@ ValueOwnershipKindVisitor::visitApplyInst(ApplyInst *AI) {
 
   for (const SILResultInfo &ResultInfo : Results.slice(Index+1)) {
     auto RKind = ResultInfo.getOwnershipKind(M);
-    if (ValueOwnershipKindMerge(RKind, ValueOwnershipKind::Trivial))
+    if (RKind.merge(ValueOwnershipKind::Trivial))
       continue;
 
-    auto MergedValue = ValueOwnershipKindMerge(Base, RKind);
+    auto MergedValue = Base.merge(RKind.Value);
     if (!MergedValue.hasValue()) {
       llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
     }
