@@ -2991,7 +2991,7 @@ retry_after_fail:
   // a lookup into that Objective-C type.
   if (bridgedType) {
     LookupResult &bridgedLookup = lookupMember(bridgedClass, memberName);
-    Module *foundationModule = nullptr;
+    ModuleDecl *foundationModule = nullptr;
     for (auto result : bridgedLookup) {
       // Ignore results from the Objective-C "Foundation"
       // module. Those core APIs are explicitly provided by the

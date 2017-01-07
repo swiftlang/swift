@@ -150,8 +150,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     return;
   switch (Context->getContextKind()) {
   case DeclContextKind::Module:
-    if (Context == cast<Module>(Context)->getASTContext().TheBuiltinModule)
-      Buffer << cast<Module>(Context)->getName() << ".";
+    if (Context == cast<ModuleDecl>(Context)->getASTContext().TheBuiltinModule)
+      Buffer << cast<ModuleDecl>(Context)->getName() << ".";
     return;
 
   case DeclContextKind::FileUnit:
@@ -2075,7 +2075,7 @@ printSILCoverageMaps(SILPrintContext &Ctx,
 }
 
 /// Pretty-print the SILModule to the designated stream.
-void SILModule::print(SILPrintContext &PrintCtx, Module *M,
+void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
                       bool PrintASTDecls) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
   OS << "sil_stage ";

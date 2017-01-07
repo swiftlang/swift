@@ -185,7 +185,7 @@ printTypeInterface(ModuleDecl *M, StringRef TypeUSR, ASTPrinter &Printer,
                             Printer, TypeName, Error);
 }
 
-void swift::ide::printModuleInterface(Module *M, Optional<StringRef> Group,
+void swift::ide::printModuleInterface(ModuleDecl *M, Optional<StringRef> Group,
                                       ModuleTraversalOptions TraversalOptions,
                                       ASTPrinter &Printer,
                                       const PrintOptions &Options,
@@ -210,7 +210,7 @@ static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
 }
 
 ArrayRef<StringRef>
-swift::ide::collectModuleGroups(Module *M, std::vector<StringRef> &Scratch) {
+swift::ide::collectModuleGroups(ModuleDecl *M, std::vector<StringRef> &Scratch) {
   for (auto File : M->getFiles()) {
     File->collectAllGroups(Scratch);
   }
@@ -255,7 +255,7 @@ swift::ide::findGroupNameForUSR(ModuleDecl *M, StringRef USR) {
 }
 
 void swift::ide::printSubmoduleInterface(
-       Module *M,
+       ModuleDecl *M,
        ArrayRef<StringRef> FullModuleName,
        ArrayRef<StringRef> GroupNames,
        ModuleTraversalOptions TraversalOptions,

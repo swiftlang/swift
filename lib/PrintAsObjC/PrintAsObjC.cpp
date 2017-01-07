@@ -175,7 +175,7 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
     specialNames;
   Identifier ID_CFTypeRef;
 
-  Module &M;
+  ModuleDecl &M;
   raw_ostream &os;
 
   SmallVector<const FunctionType *, 4> openFunctionTypes;
@@ -190,7 +190,7 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
   friend TypeVisitor<ObjCPrinter>;
 
 public:
-  explicit ObjCPrinter(Module &mod, raw_ostream &out,
+  explicit ObjCPrinter(ModuleDecl &mod, raw_ostream &out,
                        DelayedMemberSet &delayed, Accessibility access)
     : M(mod), os(out), delayedMembers(delayed), minRequiredAccess(access) {}
 
@@ -1135,7 +1135,7 @@ private:
     // upper-bounded keys.
     else if (swiftNominal == ctx.getDictionaryDecl() &&
              isNSObjectOrAnyHashable(ctx, typeArgs[0])) {
-      if (Module *M = ctx.getLoadedModule(ctx.Id_Foundation)) {
+      if (ModuleDecl *M = ctx.getLoadedModule(ctx.Id_Foundation)) {
         if (!NSCopyingType) {
           UnqualifiedLookup lookup(ctx.getIdentifier("NSCopying"), M, nullptr);
           auto type = lookup.getSingleTypeResult();
@@ -1911,18 +1911,18 @@ class ModuleWriter {
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
 
-  using ImportModuleTy = PointerUnion<Module*, const clang::Module*>;
+  using ImportModuleTy = PointerUnion<ModuleDecl*, const clang::Module*>;
   SmallSetVector<ImportModuleTy, 8,
                  PointerLikeComparator<ImportModuleTy>> imports;
 
   std::string bodyBuffer;
   llvm::raw_string_ostream os{bodyBuffer};
 
-  Module &M;
+  ModuleDecl &M;
   StringRef bridgingHeader;
   ObjCPrinter printer;
 public:
-  ModuleWriter(Module &mod, StringRef header, Accessibility access)
+  ModuleWriter(ModuleDecl &mod, StringRef header, Accessibility access)
     : M(mod), bridgingHeader(header), printer(M, os, delayedMembers, access) {}
 
   /// Returns true if we added the decl's module to the import set, false if
@@ -1931,7 +1931,7 @@ public:
   /// The standard library is special-cased: we assume that any types from it
   /// will be handled explicitly rather than needing an explicit @import.
   bool addImport(const Decl *D) {
-    Module *otherModule = D->getModuleContext();
+    ModuleDecl *otherModule = D->getModuleContext();
 
     if (otherModule == &M)
       return false;
@@ -2419,7 +2419,7 @@ public:
                 "need to add SIMD typedefs here if max elements is increased");
   }
 
-  bool isUnderlyingModule(Module *import) {
+  bool isUnderlyingModule(ModuleDecl *import) {
     if (bridgingHeader.empty())
       return import != &M && import->getName() == M.getName();
 
@@ -2436,7 +2436,7 @@ public:
     llvm::SmallPtrSet<Identifier, 8> seenImports;
     bool includeUnderlying = false;
     for (auto import : imports) {
-      if (auto *swiftModule = import.dyn_cast<Module *>()) {
+      if (auto *swiftModule = import.dyn_cast<ModuleDecl *>()) {
         auto Name = swiftModule->getName();
         if (isUnderlyingModule(swiftModule)) {
           includeUnderlying = true;
@@ -2611,7 +2611,7 @@ public:
 };
 } // end anonymous namespace
 
-bool swift::printAsObjC(llvm::raw_ostream &os, Module *M,
+bool swift::printAsObjC(llvm::raw_ostream &os, ModuleDecl *M,
                         StringRef bridgingHeader,
                         Accessibility minRequiredAccess) {
   llvm::PrettyStackTraceString trace("While generating Objective-C header");

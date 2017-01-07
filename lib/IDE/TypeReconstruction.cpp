@@ -82,7 +82,7 @@ private:
   }
 
   bool lookupValue(ModuleDecl *entry, Identifier name,
-                   Module::AccessPathTy accessPath, NLKind lookupKind,
+                   ModuleDecl::AccessPathTy accessPath, NLKind lookupKind,
                    ValueDecls &decls) {
     if (!entry)
       return false;
@@ -154,7 +154,7 @@ public:
     return;
   }
 
-  void lookupValue(Module::AccessPathTy path, Identifier name, NLKind kind,
+  void lookupValue(ModuleDecl::AccessPathTy path, Identifier name, NLKind kind,
                    ValueDecls &result) {
     if (_type == LookupKind::Crawler) {
       ASTContext *ast_ctx = _crawler._ast;
@@ -482,7 +482,7 @@ static bool FindFirstNamedDeclWithKind(
       }
     }
   } else if (result._module) {
-    Module::AccessPathTy access_path;
+    ModuleDecl::AccessPathTy access_path;
     Identifier name_ident(ast->getIdentifier(name));
     SmallVector<ValueDecl *, 4> decls;
     if (priv_decl_id)
@@ -600,7 +600,7 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
       }
     }
   } else if (result._module) {
-    Module::AccessPathTy access_path;
+    ModuleDecl::AccessPathTy access_path;
     SmallVector<ValueDecl *, 4> decls;
     if (priv_decl_id)
       result._module.lookupMember(

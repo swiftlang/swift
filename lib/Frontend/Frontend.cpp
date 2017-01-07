@@ -223,10 +223,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   return false;
 }
 
-Module *CompilerInstance::getMainModule() {
+ModuleDecl *CompilerInstance::getMainModule() {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-    MainModule = Module::create(ID, *Context);
+    MainModule = ModuleDecl::create(ID, *Context);
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
 
@@ -241,7 +241,7 @@ Module *CompilerInstance::getMainModule() {
 void CompilerInstance::performSema() {
   const FrontendOptions &options = Invocation.getFrontendOptions();
   const InputFileKind Kind = Invocation.getInputKind();
-  Module *MainModule = getMainModule();
+  ModuleDecl *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
 
   auto modImpKind = SourceFile::ImplicitModuleImportKind::Stdlib;
@@ -297,7 +297,7 @@ void CompilerInstance::performSema() {
   auto clangImporter =
     static_cast<ClangImporter *>(Context->getClangModuleLoader());
 
-  Module *underlying = nullptr;
+  ModuleDecl *underlying = nullptr;
   if (options.ImportUnderlyingModule) {
     underlying = clangImporter->loadModule(SourceLoc(),
                                            std::make_pair(MainModule->getName(),
@@ -308,7 +308,7 @@ void CompilerInstance::performSema() {
     }
   }
 
-  Module *importedHeaderModule = nullptr;
+  ModuleDecl *importedHeaderModule = nullptr;
   StringRef implicitHeaderPath = options.ImplicitObjCHeaderPath;
   if (!implicitHeaderPath.empty()) {
     if (!clangImporter->importBridgingHeader(implicitHeaderPath, MainModule)) {
@@ -317,12 +317,12 @@ void CompilerInstance::performSema() {
     }
   }
 
-  SmallVector<Module *, 4> importModules;
+  SmallVector<ModuleDecl *, 4> importModules;
   if (!options.ImplicitImportModuleNames.empty()) {
     for (auto &ImplicitImportModuleName : options.ImplicitImportModuleNames) {
       if (Lexer::isIdentifier(ImplicitImportModuleName)) {
         auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
-        Module *importModule = Context->getModule(std::make_pair(moduleID,
+        ModuleDecl *importModule = Context->getModule(std::make_pair(moduleID,
                                                                  SourceLoc()));
         if (importModule) {
           importModules.push_back(importModule);
@@ -348,7 +348,7 @@ void CompilerInstance::performSema() {
       return;
 
     using ImportPair =
-        std::pair<Module::ImportedModule, SourceFile::ImportOptions>;
+        std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>;
     SmallVector<ImportPair, 4> additionalImports;
 
     if (underlying)
@@ -553,7 +553,7 @@ void CompilerInstance::performSema() {
 
 void CompilerInstance::performParseOnly() {
   const InputFileKind Kind = Invocation.getInputKind();
-  Module *MainModule = getMainModule();
+  ModuleDecl *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
 
   assert((Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_Swift_Library) &&

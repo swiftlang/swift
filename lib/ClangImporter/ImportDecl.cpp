@@ -311,7 +311,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
   }
 
-  Module *M;
+  ModuleDecl *M;
   if (IsSwiftModule)
     M = Impl.getStdlibModule();
   else
@@ -3633,7 +3633,7 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDeclImpl(const U *decl, Identifier name, Module *adapter) {
+    T *resolveSwiftDeclImpl(const U *decl, Identifier name, ModuleDecl *adapter) {
       SmallVector<ValueDecl *, 4> results;
       adapter->lookupValue({}, name, NLKind::QualifiedLookup, results);
       T *found = nullptr;
@@ -3669,7 +3669,7 @@ namespace {
         // Use an index-based loop because new owners can come in as we're
         // iterating.
         for (size_t i = 0; i < Impl.ImportedHeaderOwners.size(); ++i) {
-          Module *owner = Impl.ImportedHeaderOwners[i];
+          ModuleDecl *owner = Impl.ImportedHeaderOwners[i];
           if (T *result = resolveSwiftDeclImpl<T>(decl, name, owner))
             return result;
         }
@@ -6700,7 +6700,7 @@ void ClangImporter::Implementation::finishProtocolConformance(
   });
   // Schedule any that aren't complete.
   for (auto *inherited : inheritedProtos) {
-    Module *M = conformance->getDeclContext()->getParentModule();
+    ModuleDecl *M = conformance->getDeclContext()->getParentModule();
     auto inheritedConformance = M->lookupConformance(conformance->getType(),
                                                      inherited,
                                                      /*resolver=*/nullptr);

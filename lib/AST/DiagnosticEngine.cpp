@@ -675,7 +675,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
           // build the name of the buffer.
           SmallVector<StringRef, 4> nameComponents;
           while (dc) {
-            nameComponents.push_back(cast<Module>(dc)->getName().str());
+            nameComponents.push_back(cast<ModuleDecl>(dc)->getName().str());
             dc = dc->getParent();
           }
 

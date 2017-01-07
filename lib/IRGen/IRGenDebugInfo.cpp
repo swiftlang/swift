@@ -174,7 +174,7 @@ static const char *getFilenameFromDC(const DeclContext *DC) {
   }
   if (auto SF = dyn_cast<SourceFile>(DC))
     return SF->getFilename().data();
-  else if (auto M = dyn_cast<Module>(DC))
+  else if (auto M = dyn_cast<ModuleDecl>(DC))
     return M->getModuleFilename().data();
   else
     return nullptr;
@@ -541,7 +541,7 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     return getOrCreateContext(DC->getParent());
 
   case DeclContextKind::Module:
-    return getOrCreateModule({Module::AccessPathTy(), cast<ModuleDecl>(DC)});
+    return getOrCreateModule({ModuleDecl::AccessPathTy(), cast<ModuleDecl>(DC)});
   case DeclContextKind::FileUnit:
     // A module may contain multiple files.
     return getOrCreateContext(DC->getParent());
@@ -745,7 +745,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
-  swift::Module *M = IGM.Context.getModule(D->getModulePath());
+  swift::ModuleDecl *M = IGM.Context.getModule(D->getModulePath());
   if (!M &&
       D->getModulePath()[0].first == IGM.Context.TheBuiltinModule->getName())
     M = IGM.Context.TheBuiltinModule;

@@ -643,7 +643,7 @@ static void runIRGenPreparePasses(SILModule &Module,
 /// Generates LLVM IR, runs the LLVM passes and produces the output file.
 /// All this is done in a single thread.
 static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
-                                                         swift::Module *M,
+                                                         swift::ModuleDecl *M,
                                             std::unique_ptr<SILModule> SILMod,
                                                          StringRef ModuleName,
                                                  llvm::LLVMContext &LLVMContext,
@@ -716,9 +716,9 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     });
 
     // Hack to handle thunks eagerly synthesized by the Clang importer.
-    swift::Module *prev = nullptr;
+    swift::ModuleDecl *prev = nullptr;
     for (auto external : Ctx.ExternalDefinitions) {
-      swift::Module *next = external->getModuleContext();
+      swift::ModuleDecl *next = external->getModuleContext();
       if (next == prev)
         continue;
       prev = next;
@@ -790,7 +790,7 @@ static void ThreadEntryPoint(IRGenerator *irgen,
 /// Generates LLVM IR, runs the LLVM passes and produces the output files.
 /// All this is done in multiple threads.
 static void performParallelIRGeneration(IRGenOptions &Opts,
-                                        swift::Module *M,
+                                        swift::ModuleDecl *M,
                                         std::unique_ptr<SILModule> SILMod,
                                         StringRef ModuleName, int numThreads) {
 
@@ -897,9 +897,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
                 });
   
   // Hack to handle thunks eagerly synthesized by the Clang importer.
-  swift::Module *prev = nullptr;
+  swift::ModuleDecl *prev = nullptr;
   for (auto external : Ctx.ExternalDefinitions) {
-    swift::Module *next = external->getModuleContext();
+    swift::ModuleDecl *next = external->getModuleContext();
     if (next == prev)
       continue;
     prev = next;
@@ -994,7 +994,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 
 
 std::unique_ptr<llvm::Module> swift::
-performIRGeneration(IRGenOptions &Opts, swift::Module *M,
+performIRGeneration(IRGenOptions &Opts, swift::ModuleDecl *M,
                     std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, llvm::LLVMContext &LLVMContext,
                     llvm::GlobalVariable **outModuleHash) {

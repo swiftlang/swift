@@ -756,7 +756,7 @@ struct ParserUnit::Implementation {
       Diags(SM),
       Ctx(LangOpts, SearchPathOpts, SM, Diags),
       SF(new (Ctx) SourceFile(
-            *Module::create(Ctx.getIdentifier(ModuleName), Ctx),
+            *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,
             SourceFile::ImplicitModuleImportKind::None)) {
   }

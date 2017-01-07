@@ -128,7 +128,7 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
 }
 
 /// Writes SIL out to the given file.
-static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
+static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
                      StringRef OutputFilename, bool SortSIL) {
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
@@ -141,7 +141,7 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
   return false;
 }
 
-static bool printAsObjC(const std::string &outputPath, Module *M,
+static bool printAsObjC(const std::string &outputPath, ModuleDecl *M,
                         StringRef bridgingHeader, bool moduleIsPublic) {
   using namespace llvm::sys;
 
@@ -759,7 +759,7 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
 }
 
 /// Returns true if an error occurred.
-static bool dumpAPI(Module *Mod, StringRef OutDir) {
+static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
   using namespace llvm::sys;
 
   auto getOutPath = [&](SourceFile *SF) -> std::string {

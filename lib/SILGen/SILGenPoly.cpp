@@ -160,7 +160,7 @@ namespace {
 ;
 
 static ArrayRef<ProtocolConformanceRef>
-collectExistentialConformances(Module *M, Type fromType, Type toType) {
+collectExistentialConformances(ModuleDecl *M, Type fromType, Type toType) {
   assert(!fromType->isAnyExistentialType());
   
   SmallVector<ProtocolDecl *, 4> protocols;
