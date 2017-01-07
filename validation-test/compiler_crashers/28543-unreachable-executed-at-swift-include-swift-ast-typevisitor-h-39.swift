@@ -5,7 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// Type checking causes a use-after-free.
+// REQUIRES: OS=linux-gnu
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 ([-.f\n{}{$0(n&[]{
