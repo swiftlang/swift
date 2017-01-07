@@ -60,50 +60,148 @@ func aCaller() {
   // CHECK-NEXT: RelCall | aCaller() | s:F14swift_ide_test7aCallerFT_T_
 }
 
-struct aStruct {
+// RelationChildOf, Implicit
+struct AStruct {
   var x: Int
+  // CHECK: [[@LINE-1]]:7 | instance-property/Swift | x | s:vV14swift_ide_test7AStruct1xSi | Def,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | AStruct | s:V14swift_ide_test7AStruct
+
   mutating func aMethod() {
+    // CHECK: [[@LINE-1]]:17 | instance-method/Swift | aMethod() | s:FV14swift_ide_test7AStruct7aMethodFT_T_ | Def,RelChild | rel: 1
+    // CHECK-NEXT: RelChild | AStruct | s:V14swift_ide_test7AStruct
+
     x += 1
-    // CHECK: [[@LINE-1]]:5 | instance-property/Swift | x | s:vV14swift_ide_test7aStruct1xSi | Ref,Read,Writ | rel: 0
-    // CHECK: [[@LINE-2]]:5 | accessor(get)/Swift | getter:x | s:FV14swift_ide_test7aStructg1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
-    // CHECK-NEXT: RelCall | x | s:vV14swift_ide_test7aStruct1xSi
-    // CHECK-NEXT: RelRec | aStruct | s:V14swift_ide_test7aStruct
-    // CHECK: [[@LINE-5]]:5 | accessor(set)/Swift | setter:x | s:FV14swift_ide_test7aStructs1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
-    // CHECK-NEXT: RelCall | x | s:vV14swift_ide_test7aStruct1xSi
-    // CHECK-NEXT: RelRec | aStruct | s:V14swift_ide_test7aStruct
+    // CHECK: [[@LINE-1]]:5 | instance-property/Swift | x | s:vV14swift_ide_test7AStruct1xSi | Ref,Read,Writ | rel: 0
+    // CHECK: [[@LINE-2]]:5 | accessor(get)/Swift | getter:x | s:FV14swift_ide_test7AStructg1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
+    // CHECK-NEXT: RelCall | x | s:vV14swift_ide_test7AStruct1xSi
+    // CHECK-NEXT: RelRec | AStruct | s:V14swift_ide_test7AStruct
+    // CHECK: [[@LINE-5]]:5 | accessor(set)/Swift | setter:x | s:FV14swift_ide_test7AStructs1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
+    // CHECK-NEXT: RelCall | x | s:vV14swift_ide_test7AStruct1xSi
+    // CHECK-NEXT: RelRec | AStruct | s:V14swift_ide_test7AStruct
     // CHECK: [[@LINE-8]]:7 | infix-operator/Swift | +=(_:_:) | s:Fsoi2peFTRSiSi_T_ | Ref,Call,RelCall | rel: 1
-    // CHECK-NEXT: RelCall | aMethod() | s:FV14swift_ide_test7aStruct7aMethodFT_T_
+    // CHECK-NEXT: RelCall | aMethod() | s:FV14swift_ide_test7AStruct7aMethodFT_T_
+  }
+
+  // RelationChildOf, RelationAccessorOf
+  subscript(index: Int) -> Int {
+    // CHECK: [[@LINE-1]]:3 | subscript/Swift | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi | Def,RelChild | rel: 1
+    // CHECK-NEXT: RelChild | AStruct | s:V14swift_ide_test7AStruct
+
+    get {
+      // CHECK: [[@LINE-1]]:5 | accessor(get)/Swift | getter:subscript(_:) | s:FV14swift_ide_test7AStructg9subscriptFSiSi | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi
+
+      return x
+    }
+    set {
+      // CHECK: [[@LINE-1]]:5 | accessor(set)/Swift | setter:subscript(_:) | s:FV14swift_ide_test7AStructs9subscriptFSiSi | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi
+
+      x = newValue
+    }
   }
 }
 
-class aClass {
-  var y: aStruct;
+class AClass {
+  var y: AStruct;
+  var z: [Int]
 
   init(x: Int) {
-    y = aStruct(x: x)
+    y = AStruct(x: x)
+    self.z = [1, 2, 3]
+  }
+
+  subscript(index: Int) -> Int {
+    get {
+      return z[0]
+    }
+    set {
+      z[0] = newValue
+    }
+  }
+
+  func foo() -> Int {
+    return z[0]
   }
 }
 
-var anInstance = aClass(x: 1)
-// CHECK: [[@LINE-1]]:18 | class/Swift | aClass | s:C14swift_ide_test6aClass | Ref | rel: 0
-// CHECK: [[@LINE-2]]:18 | constructor/Swift | init(x:) | s:FC14swift_ide_test6aClasscFT1xSi_S0_ | Ref,Call | rel: 0
+protocol AProtocol {
+  func foo() -> Int
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | foo() | s:FP14swift_ide_test9AProtocol3fooFT_Si | Def,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | AProtocol | s:P14swift_ide_test9AProtocol
+}
+
+// RelationBaseOf, RelationOverrideOf
+class ASubClass : AClass, AProtocol {
+// CHECK: [[@LINE-1]]:7 | class/Swift | ASubClass | s:C14swift_ide_test9ASubClass | Def | rel: 0
+// CHECK: [[@LINE-2]]:19 | class/Swift | AClass | s:C14swift_ide_test6AClass | Ref,RelBase | rel: 1
+// CHECK-NEXT: RelBase | ASubClass | s:C14swift_ide_test9ASubClass
+// CHECK: [[@LINE-4]]:27 | protocol/Swift | AProtocol | s:P14swift_ide_test9AProtocol | Ref,RelBase | rel: 1
+// CHECK-NEXT: RelBase | ASubClass | s:C14swift_ide_test9ASubClass
+
+  override func foo() -> Int {
+    // CHECK: [[@LINE-1]]:17 | instance-method/Swift | foo() | s:FC14swift_ide_test9ASubClass3fooFT_Si | Def,RelChild,RelOver | rel: 3
+    // CHECK-NEXT: RelOver | foo() | s:FC14swift_ide_test6AClass3fooFT_Si
+    // CHECK-NEXT: RelOver | foo() | s:FP14swift_ide_test9AProtocol3fooFT_Si
+    // CHECK-NEXT: RelChild | ASubClass | s:C14swift_ide_test9ASubClass
+    return 1
+  }
+}
+
+// RelationExtendedBy
+// FIXME give extensions their own USR like ObjC?
+extension AClass {
+  // CHECK: [[@LINE-1]]:11 | extension(extClass)/Swift | AClass | s:C14swift_ide_test6AClass | Def | rel: 0
+  // CHECK: [[@LINE-2]]:11 | class/Swift | AClass | s:C14swift_ide_test6AClass | Ref,RelExt | rel: 1
+  // CHECK-NEXT: RelExt | AClass | s:C14swift_ide_test6AClass
+
+  func bar() -> Int { return 2 }
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | bar() | s:FC14swift_ide_test6AClass3barFT_Si | Def,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | AClass | s:C14swift_ide_test6AClass
+}
+
+var anInstance = AClass(x: 1)
+// CHECK: [[@LINE-1]]:18 | class/Swift | AClass | s:C14swift_ide_test6AClass | Ref | rel: 0
+// CHECK: [[@LINE-2]]:18 | constructor/Swift | init(x:) | s:FC14swift_ide_test6AClasscFT1xSi_S0_ | Ref,Call | rel: 0
+
+anInstance.y.x = anInstance.y.x
+// CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:v14swift_ide_test10anInstanceCS_6AClass | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:12 | instance-property/Swift | y | s:vC14swift_ide_test6AClass1yVS_7AStruct | Ref,Read,Writ | rel: 0
+// CHECK: [[@LINE-3]]:14 | instance-property/Swift | x | s:vV14swift_ide_test7AStruct1xSi | Ref,Writ | rel: 0
+// CHECK: [[@LINE-4]]:18 | variable/Swift | anInstance | s:v14swift_ide_test10anInstanceCS_6AClass | Ref,Read | rel: 0
+// CHECK: [[@LINE-5]]:29 | instance-property/Swift | y | s:vC14swift_ide_test6AClass1yVS_7AStruct | Ref,Read | rel: 0
+// CHECK: [[@LINE-6]]:31 | instance-property/Swift | x | s:vV14swift_ide_test7AStruct1xSi | Ref,Read | rel: 0
 
 anInstance.y.aMethod()
-// CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:v14swift_ide_test10anInstanceCS_6aClass | Ref,Read | rel: 0
-// CHECK: [[@LINE-2]]:12 | instance-property/Swift | y | s:vC14swift_ide_test6aClass1yVS_7aStruct | Ref,Read,Writ | rel: 0
-// CHECK: [[@LINE-3]]:14 | instance-method/Swift | aMethod() | s:FV14swift_ide_test7aStruct7aMethodFT_T_ | Ref,Call | rel: 0
-    
-// Dynamic + Call
-// Implicit
+// CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:v14swift_ide_test10anInstanceCS_6AClass | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:12 | instance-property/Swift | y | s:vC14swift_ide_test6AClass1yVS_7AStruct | Ref,Read,Writ | rel: 0
+// CHECK: [[@LINE-3]]:14 | instance-method/Swift | aMethod() | s:FV14swift_ide_test7AStruct7aMethodFT_T_ | Ref,Call | rel: 0
 
-// ---- RELATIONS --------------------------------------------------------------
+// FIXME Write role of z occurrence on the RHS?
+anInstance.z[1] = anInstance.z[0]
+// CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:v14swift_ide_test10anInstanceCS_6AClass | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:12 | instance-property/Swift | z | s:vC14swift_ide_test6AClass1zGSaSi_ | Ref,Read,Writ | rel: 0
+// CHECK: [[@LINE-3]]:19 | variable/Swift | anInstance | s:v14swift_ide_test10anInstanceCS_6AClass | Ref,Read | rel: 0
+// CHECK: [[@LINE-4]]:30 | instance-property/Swift | z | s:vC14swift_ide_test6AClass1zGSaSi_ | Ref,Read,Writ | rel: 0
 
-// RelationChildOf    
-// RelationBaseOf    
-// RelationOverrideOf
-// RelationReceivedBy
-// RelationCalledBy  
-// RelationExtendedBy
-// RelationAccessorOf
+let otherInstance = AStruct(x: 1)
+// CHECK: [[@LINE-1]]:21 | struct/Swift | AStruct | s:V14swift_ide_test7AStruct | Ref | rel: 0
 
-// ---- ERRONEOUS --------------------------------------------------------------
+let _ = otherInstance[0]
+// CHECK: [[@LINE-1]]:9 | variable/Swift | otherInstance | s:v14swift_ide_test13otherInstanceVS_7AStruct | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:22 | subscript/Swift | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi | Ref,Read | rel: 0
+
+let _ = anInstance[0]
+// CHECK: [[@LINE-1]]:9 | variable/Swift | anInstance | s:v14swift_ide_test10anInstanceCS_6AClass | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:19 | subscript/Swift | subscript(_:) | s:iC14swift_ide_test6AClass9subscriptFSiSi | Ref,Read | rel: 0
+
+let aSubInstance: AClass = ASubClass(x: 1)
+// CHECK: [[@LINE-1]]:5 | variable/Swift | aSubInstance | s:v14swift_ide_test12aSubInstanceCS_6AClass | Def | rel: 0
+// CHECK: [[@LINE-2]]:28 | class/Swift | ASubClass | s:C14swift_ide_test9ASubClass | Ref | rel: 0
+
+// Dynamic, RelationReceivedBy
+let _ = aSubInstance.foo()
+// CHECK: [[@LINE-1]]:9 | variable/Swift | aSubInstance | s:v14swift_ide_test12aSubInstanceCS_6AClass | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:22 | instance-method/Swift | foo() | s:FC14swift_ide_test6AClass3fooFT_Si | Ref,Call,Dyn,RelRec | rel: 1
+// CHECK-NEXT: RelRec | AClass | s:C14swift_ide_test6AClass
+
