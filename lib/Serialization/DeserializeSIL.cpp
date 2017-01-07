@@ -2173,7 +2173,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     return nullptr;
   kind = SILCursor.readRecord(entry.ID, scratch);
 
-  std::vector<SILVTable::Pair> vtableEntries;
+  std::vector<SILVTable::Entry> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
   while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
          kind != SIL_DEFAULT_WITNESS_TABLE &&
@@ -2182,12 +2182,22 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
-    VTableEntryLayout::readRecord(scratch, NameID, ListOfValues);
+    unsigned RawLinkage;
+    VTableEntryLayout::readRecord(scratch, NameID, RawLinkage, ListOfValues);
+
+    Optional<SILLinkage> Linkage = fromStableSILLinkage(RawLinkage);
+    if (!Linkage) {
+      DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
+            << " for VTable Entry\n");
+      MF->error();
+      return nullptr;
+    }
+
     SILFunction *Func = getFuncForReference(MF->getIdentifier(NameID).str());
     if (Func) {
       unsigned NextValueIndex = 0;
-      vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues,
-                                               NextValueIndex), Func);
+      vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, NextValueIndex),
+                                 Func, Linkage.getValue());
     }
 
     // Fetch the next record.
