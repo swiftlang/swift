@@ -1264,7 +1264,7 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
                                                     ArchetypeBuilder *builder) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
-  if (known != Impl.CanonicalGenericEnvironments.find(builder))
+  if (known != Impl.CanonicalGenericEnvironments.end())
     return known->second;
 
   auto sig = builder->getGenericSignature();
