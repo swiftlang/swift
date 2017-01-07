@@ -174,12 +174,6 @@ public:
   /// Erase a specific argument from the arg list.
   void eraseArgument(int Index);
 
-  /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
-  /// ValueDecl
-  /// \p D.
-  SILFunctionArgument *replaceFunctionArgument(unsigned i, SILType Ty,
-                                               const ValueDecl *D = nullptr);
-
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
   SILFunctionArgument *createFunctionArgument(SILType Ty,

@@ -119,29 +119,6 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
   }
 }
 
-/// Replace the ith BB argument with a new one with type Ty (and optional
-/// ValueDecl D).
-SILFunctionArgument *
-SILBasicBlock::replaceFunctionArgument(unsigned i, SILType Ty,
-                                       const ValueDecl *D) {
-  assert(isEntry() && "Function Arguments can only be in the entry block");
-  SILModule &M = getParent()->getModule();
-
-  assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
-
-  // Notify the delete handlers that this argument is being deleted.
-  M.notifyDeleteHandlers(ArgumentList[i]);
-
-  SILFunctionArgument *NewArg = new (M) SILFunctionArgument(Ty, D);
-  NewArg->setParent(this);
-
-  // TODO: When we switch to malloc/free allocation we'll be leaking memory
-  // here.
-  ArgumentList[i] = NewArg;
-
-  return NewArg;
-}
-
 SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,
                                                            const ValueDecl *D) {
   assert(isEntry() && "Function Arguments can only be in the entry block");
