@@ -4317,7 +4317,7 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
                                        ProtocolDecl *Proto,
                                        DeclContext *DC,
                                        SourceLoc ComplainLoc) {
-  if (T->hasError() || T->getCanonicalType()->hasError())
+  if (T->hasError())
     return;
 
   // If we're checking conformance of an existential type to a protocol,

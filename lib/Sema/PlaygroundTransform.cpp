@@ -452,7 +452,7 @@ public:
             }
           }
           if (!Handled &&
-              AE->getType()->getCanonicalType() == Context.TheEmptyTupleType) {
+              AE->getType()->isEqual(Context.TheEmptyTupleType)) {
             if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(AE->getFn())) {
               Expr *TargetExpr = DSCE->getArg();
               Added<Expr *> Target_RE;

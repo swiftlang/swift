@@ -414,8 +414,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
     assert((conforms ||
             specializedType->isTypeVariableOrMember() ||
             specializedType->isTypeParameter() ||
-            specializedType->hasError() ||
-            specializedType->getCanonicalType()->hasError()) &&
+            specializedType->hasError()) &&
            "Improperly checked substitution");
     conformances.push_back(conforms ? *conforms 
                                     : ProtocolConformanceRef(proto));
