@@ -361,7 +361,7 @@ public:
     }
   }
 
-  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) {
+  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) override {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
     typedef SmallVector<swift::ASTNode, 3> ElementVector;
     ElementVector Elements(OriginalElements.begin(), OriginalElements.end());
