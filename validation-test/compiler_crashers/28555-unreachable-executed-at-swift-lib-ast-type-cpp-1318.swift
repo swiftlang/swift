@@ -5,10 +5,8 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// FIXME: Disabled. This test does not always crash, which confuses CI.
-// REQUIRES: deterministic-behavior
-
 // REQUIRES: OS=linux-gnu
+// REQUIRES: deterministic-behavior
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 _&[i
 -{$0
