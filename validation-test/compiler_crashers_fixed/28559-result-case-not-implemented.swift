@@ -5,6 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: OS=linux-gnu
 // RUN: not %target-swift-frontend %s -emit-ir
 {{return 0 &+ 1 + 2){}}t
