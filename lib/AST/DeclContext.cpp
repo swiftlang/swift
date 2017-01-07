@@ -469,13 +469,20 @@ bool DeclContext::isGenericContext() const {
 /// are used.
 ResilienceExpansion DeclContext::getResilienceExpansion() const {
   for (const auto *dc = this; dc->isLocalContext(); dc = dc->getParent()) {
+    // Default argument initializer contexts have their resilience expansion
+    // set when they're type checked.
+    if (auto *DAI = dyn_cast<DefaultArgumentInitializer>(dc))
+      return DAI->getResilienceExpansion();
+
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
       // If the function is a nested function, we will serialize its body if
       // we serialize the parent's body.
       if (AFD->getDeclContext()->isLocalContext())
         continue;
 
-      if (AFD->isInvalid())
+      // FIXME: Make sure this method is never called on decls that have not
+      // been fully validated.
+      if (!AFD->hasAccessibility())
         break;
 
       // If the function is not externally visible, we will not be serializing
@@ -495,8 +502,8 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
         if (attr->getKind() == InlineKind::Always)
           return ResilienceExpansion::Minimal;
 
-      // If a property or subscript is @_fragile, the accessors are
-      // @_fragile also.
+      // If a property or subscript is @_inlineable, the accessors are
+      // @_inlineable also.
       if (auto FD = dyn_cast<FuncDecl>(AFD))
         if (auto *ASD = FD->getAccessorStorageDecl())
           if (ASD->getAttrs().getAttribute<InlineableAttr>())
@@ -505,7 +512,6 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
   }
 
   return ResilienceExpansion::Maximal;
-
 }
 
 /// Determine whether the innermost context is generic.

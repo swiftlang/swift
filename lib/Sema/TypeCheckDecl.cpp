@@ -3940,7 +3940,9 @@ public:
       TC.validateDecl(assocType);
   }
 
-  void checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
+  void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
+    TC.diagnoseInlineableLocalType(NTD);
+
     // We don't support protocols outside the top level of a file.
     if (isa<ProtocolDecl>(NTD) &&
         !NTD->getParent()->isModuleScopeContext()) {
@@ -3988,7 +3990,7 @@ public:
     TC.computeAccessibility(ED);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(ED);
+      checkUnsupportedNestedType(ED);
 
       TC.validateDecl(ED);
 
@@ -4045,7 +4047,7 @@ public:
     TC.computeAccessibility(SD);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(SD);
+      checkUnsupportedNestedType(SD);
 
       TC.validateDecl(SD);
       TC.ValidatedTypes.remove(SD);
@@ -4174,7 +4176,7 @@ public:
     TC.computeAccessibility(CD);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(CD);
+      checkUnsupportedNestedType(CD);
 
       TC.validateDecl(CD);
       if (!CD->hasValidSignature())
@@ -4287,7 +4289,7 @@ public:
     TC.computeAccessibility(PD);
 
     if (!IsSecondPass)
-      checkUnsupportedNestedGeneric(PD);
+      checkUnsupportedNestedType(PD);
 
     if (IsSecondPass) {
       checkAccessibility(TC, PD);

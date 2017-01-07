@@ -80,6 +80,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
     _storage = storage
   }
 
+  @_versioned
   internal var _storage: _ArrayBridgeStorage
 }
 

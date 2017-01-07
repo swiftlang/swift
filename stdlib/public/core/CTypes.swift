@@ -78,6 +78,7 @@ public typealias CBool = Bool
 /// cannot be represented in Swift, such as incomplete struct types.
 @_fixed_layout
 public struct OpaquePointer : Hashable {
+  @_versioned
   internal var _rawValue: Builtin.RawPointer
 
   @_versioned

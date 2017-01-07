@@ -36,6 +36,7 @@ public struct UnicodeScalar :
   _ExpressibleByBuiltinUnicodeScalarLiteral,
   ExpressibleByUnicodeScalarLiteral {
 
+  @_versioned
   var _value: UInt32
 
   /// A numeric representation of the Unicode scalar.
