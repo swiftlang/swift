@@ -74,6 +74,32 @@ SILModule *ValueBase::getModule() const {
 //                             ValueOwnershipKind
 //===----------------------------------------------------------------------===//
 
+ValueOwnershipKind::ValueOwnershipKind(SILModule &M, SILType Type,
+                                       SILArgumentConvention Convention)
+    : Value() {
+  switch (Convention) {
+  case SILArgumentConvention::Indirect_In:
+  case SILArgumentConvention::Indirect_In_Guaranteed:
+  case SILArgumentConvention::Indirect_Inout:
+  case SILArgumentConvention::Indirect_InoutAliasable:
+  case SILArgumentConvention::Indirect_Out:
+    Value = ValueOwnershipKind::Trivial;
+    return;
+  case SILArgumentConvention::Direct_Owned:
+    Value = ValueOwnershipKind::Owned;
+    return;
+  case SILArgumentConvention::Direct_Unowned:
+    Value = Type.isTrivial(M) ? ValueOwnershipKind::Trivial
+                              : ValueOwnershipKind::Unowned;
+    return;
+  case SILArgumentConvention::Direct_Guaranteed:
+    Value = ValueOwnershipKind::Guaranteed;
+    return;
+  case SILArgumentConvention::Direct_Deallocating:
+    llvm_unreachable("Not handled");
+  }
+}
+
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
                                      ValueOwnershipKind Kind) {
   switch (Kind) {

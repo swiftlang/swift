@@ -107,6 +107,8 @@ struct ValueOwnershipKind {
   } Value;
 
   ValueOwnershipKind(innerty NewValue) : Value(NewValue) {}
+  ValueOwnershipKind(SILModule &M, SILType Type,
+                     SILArgumentConvention Convention);
 
   operator innerty() const { return Value; }
 
