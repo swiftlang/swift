@@ -587,12 +587,8 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether this decl is missing its closing '#endif'.
     unsigned HadMissingEnd : 1;
-
-    /// Whether this condition has been resolved either statically by Parse or
-    /// later by Condition Resolution.
-    unsigned HasBeenResolved : 1;
   };
-  enum { NumIfConfigDeclBits = NumDeclBits + 2 };
+  enum { NumIfConfigDeclBits = NumDeclBits + 1 };
   static_assert(NumIfConfigDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -1935,8 +1931,7 @@ struct IfConfigDeclClause {
 
   IfConfigDeclClause(SourceLoc Loc, Expr *Cond, ArrayRef<Decl*> Members,
                      bool isActive)
-    : Loc(Loc), Cond(Cond), Members(Members), isActive(isActive) {
-  }
+    : Loc(Loc), Cond(Cond), Members(Members), isActive(isActive) {}
 };
   
   
@@ -1949,7 +1944,6 @@ class IfConfigDecl : public Decl {
   /// The array is ASTContext allocated.
   ArrayRef<IfConfigDeclClause> Clauses;
   SourceLoc EndLoc;
-
 public:
   
   IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigDeclClause> Clauses,
@@ -1957,7 +1951,6 @@ public:
     : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc)
   {
     IfConfigDeclBits.HadMissingEnd = HadMissingEnd;
-    IfConfigDeclBits.HasBeenResolved = false;
   }
 
   ArrayRef<IfConfigDeclClause> getClauses() const { return Clauses; }
@@ -1974,9 +1967,6 @@ public:
       return Clause->Members;
     return {};
   }
-
-  bool isResolved() const { return IfConfigDeclBits.HasBeenResolved; }
-  void setResolved() { IfConfigDeclBits.HasBeenResolved = true; }
   
   SourceLoc getEndLoc() const { return EndLoc; }
   SourceLoc getLoc() const { return Clauses[0].Loc; }

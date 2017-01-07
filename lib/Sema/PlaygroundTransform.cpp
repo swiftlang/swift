@@ -19,6 +19,7 @@
 #include "swift/Subsystems.h"
 
 #include <random>
+#include <forward_list>
 
 using namespace swift;
 using namespace swift::instrumenter_support;
