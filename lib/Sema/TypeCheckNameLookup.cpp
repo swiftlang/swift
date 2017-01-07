@@ -222,7 +222,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
       options.contains(NameLookupFlags::KnownPrivate),
       loc,
       /*OnlyTypes=*/true,
-      /*ProtocolMembers=*/false,
+      /*AllowProtocolMembers=*/false,
       options.contains(NameLookupFlags::IgnoreAccessibility));
   for (auto found : lookup.Results)
     decls.push_back(cast<TypeDecl>(found.getValueDecl()));
@@ -239,7 +239,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
         options.contains(NameLookupFlags::KnownPrivate),
         loc,
         /*OnlyTypes=*/true,
-        /*ProtocolMembers=*/true,
+        /*AllowProtocolMembers=*/true,
         options.contains(NameLookupFlags::IgnoreAccessibility));
 
     for (auto found : lookup.Results)

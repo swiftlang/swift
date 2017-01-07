@@ -67,7 +67,7 @@ public:
   }
   bool hadError() { return error; }
 };
-}
+} // end anonymous namespace
 
 void InstrumenterBase::anchor() {}
 

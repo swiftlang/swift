@@ -85,7 +85,7 @@ public:
   /// non-overlapping.
   void assignStackLocation(SmallVectorImpl<SILInstruction *> &FunctionExits);
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 /// Erases all dealloc_stack users of an alloc_stack
 static void eraseDeallocStacks(AllocStackInst *AllocStack) {
@@ -213,7 +213,7 @@ public:
     return false;
   }
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 namespace {
 /// Merge alloc_stack instructions.
@@ -237,7 +237,7 @@ public:
   /// block.
   void mergeSlots();
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 MergeStackSlots::MergeStackSlots(SmallVectorImpl<AllocStackInst *> &AllocStacks,
                                  SmallVectorImpl<SILInstruction *> &FuncExits)
@@ -339,7 +339,7 @@ private:
   /// Move the hoistable alloc_stack instructions to the entry block.
   void hoist();
 };
-}
+} // end anonymous namespace
 
 /// Collect generic alloc_stack instructions in the current function can be
 /// hoisted.
