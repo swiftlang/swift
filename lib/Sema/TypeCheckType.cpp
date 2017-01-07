@@ -17,7 +17,7 @@
 
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
-#include "MiscDiagnostics.h"
+#include "TypeCheckAvailability.h"
 
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
