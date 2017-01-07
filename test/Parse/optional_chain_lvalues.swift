@@ -36,7 +36,7 @@ mutT? = T()
 mutT?.mutS = S()
 mutT?.mutS? = S()
 mutT?.mutS?.x += 0
-_ = mutT?.mutS?.x + 0 // expected-error{{value of optional type 'Int?' not unwrapped}} {{5-5=(}} {{18-18=)!}}
+_ = mutT?.mutS?.x + 0 // expected-error{{binary operator '+' cannot be applied to operands of type 'Int?' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (UnsafeMutablePointer<Pointee>, Int), (UnsafePointer<Pointee>, Int)}}
 mutT?.mutS?.y -= 0 // expected-error{{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
 mutT?.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
 mutT?.immS? = S() // expected-error{{cannot assign to value: 'immS' is a 'let' constant}}

@@ -1,4 +1,9 @@
+// FIXME(integers): This test verifies the existense of old protocols that are
+// no longer there.
+// XFAIL: *
+
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
+
 
 sil_stage canonical
 

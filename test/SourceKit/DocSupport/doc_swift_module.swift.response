@@ -1059,18 +1059,18 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.protocol,
+            key.name: "FixedWidthInteger",
+            key.usr: "s:Ps17FixedWidthInteger"
+          },
+          {
+            key.kind: source.lang.swift.ref.protocol,
             key.name: "SignedInteger",
             key.usr: "s:Ps13SignedInteger"
           },
           {
             key.kind: source.lang.swift.ref.protocol,
-            key.name: "Comparable",
-            key.usr: "s:Ps10Comparable"
-          },
-          {
-            key.kind: source.lang.swift.ref.protocol,
-            key.name: "Equatable",
-            key.usr: "s:Ps9Equatable"
+            key.name: "_ExpressibleByBuiltinIntegerLiteral",
+            key.usr: "s:Ps35_ExpressibleByBuiltinIntegerLiteral"
           }
         ]
       },
