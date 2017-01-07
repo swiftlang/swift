@@ -179,11 +179,6 @@ public:
   SILFunctionArgument *createFunctionArgument(SILType Ty,
                                               const ValueDecl *D = nullptr);
 
-  /// Insert a new SILFunctionArgument with type \p Ty and \p Decl at position
-  /// \p Pos.
-  SILFunctionArgument *insertFunctionArgument(arg_iterator Pos, SILType Ty,
-                                              const ValueDecl *D = nullptr);
-
   SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
                                               const ValueDecl *D = nullptr) {
     arg_iterator Pos = ArgumentList.begin();
@@ -346,6 +341,11 @@ private:
   void insertArgument(arg_iterator Iter, SILArgument *Arg) {
     ArgumentList.insert(Iter, Arg);
   }
+
+  /// Insert a new SILFunctionArgument with type \p Ty and \p Decl at position
+  /// \p Pos.
+  SILFunctionArgument *insertFunctionArgument(arg_iterator Pos, SILType Ty,
+                                              const ValueDecl *D = nullptr);
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
