@@ -1086,7 +1086,7 @@ namespace {
         SGF.B.createInitExistentialAddr(Loc, existentialBuf,
                                         inputTupleType,
                                         concreteTL.getLoweredType(),
-                                        /*conformances=*/{});
+                                        /*Conformances=*/{});
 
       auto tupleTemp = SGF.useBufferAsTemporary(tupleBuf, concreteTL);
       translateAndImplodeInto(inputOrigType, inputTupleType,
@@ -1859,7 +1859,7 @@ ResultPlanner::planTupleIntoIndirectResult(AbstractionPattern innerOrigType,
     SILValue outerConcreteResultAddr
       = Gen.B.createInitExistentialAddr(Loc, outerResultAddr, innerSubstType,
                                         Gen.getLoweredType(opaque, innerSubstType),
-                                        /*conformances=*/{});
+                                        /*Conformances=*/{});
 
     // Emit into that address.
     planTupleIntoIndirectResult(innerOrigType, innerSubstType,
