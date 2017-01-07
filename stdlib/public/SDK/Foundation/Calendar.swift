@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1095,13 +1095,14 @@ extension Calendar : CustomDebugStringConvertible, CustomStringConvertible, Cust
     }
     
     public var customMirror : Mirror {
-        var c: [(label: String?, value: Any)] = []
-        c.append((label: "identifier", value: identifier))
-        c.append((label: "kind", value: _kindDescription))
-        c.append((label: "locale", value: locale))
-        c.append((label: "timeZone", value: timeZone))
-        c.append((label: "firstWeekday", value: firstWeekday))
-        c.append((label: "minimumDaysInFirstWeek", value: minimumDaysInFirstWeek))
+        let c: [(label: String?, value: Any)] = [
+          ("identifier", identifier),
+          ("kind", _kindDescription),
+          ("locale", locale as Any),
+          ("timeZone", timeZone),
+          ("firstWeekday", firstWeekday),
+          ("minimumDaysInFirstWeek", minimumDaysInFirstWeek),
+        ]
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
 }

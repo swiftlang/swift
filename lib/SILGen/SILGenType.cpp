@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -57,10 +57,14 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
 }
 
 SILFunction *
-SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
+SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base,
+                               SILLinkage &implLinkage) {
+  SILFunction *implFn = getFunction(derived, NotForDefinition);
+  implLinkage = implFn->getLinkage();
+
   // As a fast path, if there is no override, definitely no thunk is necessary.
   if (derived == base)
-    return getFunction(derived, NotForDefinition);
+    return implFn;
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
@@ -74,7 +78,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
   if (overrideInfo == derivedInfo)
-    return getFunction(derived, NotForDefinition);
+    return implFn;
 
   // Generate the thunk name.
   // TODO: If we allocated a new vtable slot for the derived method, then
@@ -98,7 +102,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   SILGenFunction(*this, *thunk)
-    .emitVTableThunk(derived, basePattern,
+    .emitVTableThunk(derived, implFn, basePattern,
                      overrideInfo.LoweredInterfaceType,
                      derivedInfo.LoweredInterfaceType);
 
@@ -147,7 +151,7 @@ class SILGenVTable : public Lowering::ASTVisitor<SILGenVTable> {
 public:
   SILGenModule &SGM;
   ClassDecl *theClass;
-  std::vector<SILVTable::Pair> vtableEntries;
+  std::vector<SILVTable::Entry> vtableEntries;
 
   SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
     : SGM(SGM), theClass(theClass)
@@ -179,31 +183,35 @@ public:
   // Add an entry to the vtable.
   void addEntry(SILDeclRef member) {
     /// Get the function to reference from the vtable.
-    auto getVtableEntryFn = [&](SILDeclRef entry) -> SILFunction* {
+    auto getVtableEntry = [&](SILDeclRef entry) -> SILVTable::Entry {
       // If the member is dynamic, reference its dynamic dispatch thunk so that
       // it will be redispatched, funneling the method call through the runtime
       // hook point.
       // TODO: Dynamic thunks could conceivably require reabstraction too.
       if (member.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
-        return SGM.getDynamicThunk(member, SGM.Types.getConstantInfo(member));
+        return { entry,
+                 SGM.getDynamicThunk(member, SGM.Types.getConstantInfo(member)),
+                 SILLinkage::Public };
 
       // The derived method may require thunking to match up to the ABI of the
       // base method.
-      return SGM.emitVTableMethod(member, entry);
+      SILLinkage implLinkage;
+      SILFunction *implFn = SGM.emitVTableMethod(member, entry, implLinkage);
+      return { entry, implFn, stripExternalFromLinkage(implLinkage) };
     };
 
     // Try to find an overridden entry.
     // NB: Mutates vtableEntries in-place
     // FIXME: O(n^2)
     if (auto overridden = member.getNextOverriddenVTableEntry()) {
-      for (SILVTable::Pair &entry : vtableEntries) {
+      for (SILVTable::Entry &entry : vtableEntries) {
         SILDeclRef ref = overridden;
 
         do {
           // Replace the overridden member.
-          if (entry.first == ref) {
+          if (entry.Method == ref) {
             // The entry is keyed by the least derived method.
-            entry = {ref, getVtableEntryFn(ref)};
+            entry = getVtableEntry(ref);
             return;
           }
         } while ((ref = ref.getOverridden()));
@@ -222,7 +230,7 @@ public:
       return;
 
     // Otherwise, introduce a new vtable entry.
-    vtableEntries.emplace_back(member, getVtableEntryFn(member));
+    vtableEntries.push_back(getVtableEntry(member));
   }
 
   // Default for members that don't require vtable entries.

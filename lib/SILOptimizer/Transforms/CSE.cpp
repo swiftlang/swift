@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -645,7 +645,8 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   auto OldOpenedArchetype = getOpenedArchetypeOf(Inst);
   auto NewOpenedArchetype = getOpenedArchetypeOf(dyn_cast<SILInstruction>(V));
   SubstitutionMap TypeSubstMap;
-  TypeSubstMap.addSubstitution(CanType(OldOpenedArchetype), NewOpenedArchetype);
+  TypeSubstMap.addSubstitution(CanArchetypeType(OldOpenedArchetype),
+                               NewOpenedArchetype);
   // Collect all candidates that may contain opened archetypes
   // that need to be replaced.
   for (auto Use : Inst->getUses()) {

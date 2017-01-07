@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -232,13 +232,13 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// \brief Whether we've already performed early attribute validation.
     /// FIXME: This is ugly.
     unsigned EarlyAttrValidation : 1;
-    
+
     /// \brief Whether this declaration is currently being validated.
     unsigned BeingValidated : 1;
   };
   enum { NumDeclBits = 11 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
-  
+
   class PatternBindingDeclBitfields {
     friend class PatternBindingDecl;
     unsigned : NumDeclBits;
@@ -284,7 +284,7 @@ class alignas(1 << DeclAlignInBits) Decl {
   class VarDeclBitfields {
     friend class VarDecl;
     unsigned : NumAbstractStorageDeclBits;
-    
+
     /// \brief Whether this property is a type property (currently unfortunately
     /// called 'static').
     unsigned IsStatic : 1;
@@ -293,11 +293,14 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// once (either in its declaration, or once later), making it immutable.
     unsigned IsLet : 1;
 
+    /// \brief Whether this declaration was an element of a capture list.
+    unsigned IsCaptureList : 1;
+
     /// \brief Whether this vardecl has an initial value bound to it in a way
     /// that isn't represented in the AST with an initializer in the pattern
     /// binding.  This happens in cases like "for i in ...", switch cases, etc.
     unsigned HasNonPatternBindingInit : 1;
-    
+
     /// \brief Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
     unsigned IsDebuggerVar : 1;
@@ -306,9 +309,9 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// a.storage for lazy var a is a decl that cannot be accessed.
     unsigned IsUserAccessible : 1;
   };
-  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 5 };
+  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 6 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
-  
+
   class EnumElementDeclBitfields {
     friend class EnumElementDecl;
     unsigned : NumValueDeclBits;
@@ -578,6 +581,16 @@ class alignas(1 << DeclAlignInBits) Decl {
   enum { NumExtensionDeclBits = NumDeclBits + 6 };
   static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
 
+  class IfConfigDeclBitfields {
+    friend class IfConfigDecl;
+    unsigned : NumDeclBits;
+
+    /// Whether this decl is missing its closing '#endif'.
+    unsigned HadMissingEnd : 1;
+  };
+  enum { NumIfConfigDeclBits = NumDeclBits + 1 };
+  static_assert(NumIfConfigDeclBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     DeclBitfields DeclBits;
@@ -601,6 +614,7 @@ protected:
     PrecedenceGroupDeclBitfields PrecedenceGroupDeclBits;
     ImportDeclBitfields ImportDeclBits;
     ExtensionDeclBitfields ExtensionDeclBits;
+    IfConfigDeclBitfields IfConfigDeclBits;
     uint32_t OpaqueBits;
   };
 
@@ -1917,8 +1931,7 @@ struct IfConfigDeclClause {
 
   IfConfigDeclClause(SourceLoc Loc, Expr *Cond, ArrayRef<Decl*> Members,
                      bool isActive)
-    : Loc(Loc), Cond(Cond), Members(Members), isActive(isActive) {
-  }
+    : Loc(Loc), Cond(Cond), Members(Members), isActive(isActive) {}
 };
   
   
@@ -1931,14 +1944,14 @@ class IfConfigDecl : public Decl {
   /// The array is ASTContext allocated.
   ArrayRef<IfConfigDeclClause> Clauses;
   SourceLoc EndLoc;
-  bool HadMissingEnd;
-  bool HasBeenResolved = false;
 public:
   
   IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigDeclClause> Clauses,
                SourceLoc EndLoc, bool HadMissingEnd)
-    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses),
-      EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
+    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc)
+  {
+    IfConfigDeclBits.HadMissingEnd = HadMissingEnd;
+  }
 
   ArrayRef<IfConfigDeclClause> getClauses() const { return Clauses; }
 
@@ -1954,14 +1967,11 @@ public:
       return Clause->Members;
     return {};
   }
-
-  bool isResolved() const { return HasBeenResolved; }
-  void setResolved() { HasBeenResolved = true; }
   
   SourceLoc getEndLoc() const { return EndLoc; }
   SourceLoc getLoc() const { return Clauses[0].Loc; }
 
-  bool hadMissingEnd() const { return HadMissingEnd; }
+  bool hadMissingEnd() const { return IfConfigDeclBits.HadMissingEnd; }
   
   SourceRange getSourceRange() const;
   
@@ -2560,6 +2570,18 @@ enum PointerTypeKind : unsigned {
   PTK_UnsafePointer,
   PTK_AutoreleasingUnsafeMutablePointer,
 };
+
+static inline bool isRawPointerKind(PointerTypeKind PTK) {
+  switch (PTK) {
+  case PTK_UnsafeMutableRawPointer:
+  case PTK_UnsafeRawPointer:
+    return true;
+  case PTK_UnsafeMutablePointer:
+  case PTK_UnsafePointer:
+  case PTK_AutoreleasingUnsafeMutablePointer:
+    return false;
+  }
+}
 
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.
 class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
@@ -4074,13 +4096,14 @@ class VarDecl : public AbstractStorageDecl {
 protected:
   llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
-  VarDecl(DeclKind Kind, bool IsStatic, bool IsLet, SourceLoc NameLoc,
-          Identifier Name, Type Ty, DeclContext *DC)
-    : AbstractStorageDecl(Kind, DC, Name, NameLoc) 
+  VarDecl(DeclKind Kind, bool IsStatic, bool IsLet, bool IsCaptureList,
+          SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
+    : AbstractStorageDecl(Kind, DC, Name, NameLoc)
   {
     VarDeclBits.IsUserAccessible = true;
     VarDeclBits.IsStatic = IsStatic;
     VarDeclBits.IsLet = IsLet;
+    VarDeclBits.IsCaptureList = IsCaptureList;
     VarDeclBits.IsDebuggerVar = false;
     VarDeclBits.HasNonPatternBindingInit = false;
     setType(Ty);
@@ -4092,9 +4115,10 @@ protected:
   Type typeInContext;
 
 public:
-  VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
-          Type Ty, DeclContext *DC)
-    : VarDecl(DeclKind::Var, IsStatic, IsLet, NameLoc, Name, Ty, DC) { }
+  VarDecl(bool IsStatic, bool IsLet, bool IsCaptureList, SourceLoc NameLoc,
+          Identifier Name, Type Ty, DeclContext *DC)
+    : VarDecl(DeclKind::Var, IsStatic, IsLet, IsCaptureList, NameLoc, Name, Ty,
+              DC) {}
 
   SourceRange getSourceRange() const;
 
@@ -4105,7 +4129,7 @@ public:
   bool isUserAccessible() const {
     return VarDeclBits.IsUserAccessible;
   }
-  
+
   TypeLoc &getTypeLoc() { return typeLoc; }
   TypeLoc getTypeLoc() const { return typeLoc; }
 
@@ -4185,7 +4209,7 @@ public:
       return PBD->getPatternEntryForVarDecl(this).getInit();
     return nullptr;
   }
-  
+
   VarDecl *getOverriddenDecl() const {
     return cast_or_null<VarDecl>(AbstractStorageDecl::getOverriddenDecl());
   }
@@ -4203,6 +4227,9 @@ public:
   /// Is this an immutable 'let' property?
   bool isLet() const { return VarDeclBits.IsLet; }
   void setLet(bool IsLet) { VarDeclBits.IsLet = IsLet; }
+
+  /// Is this an element in a capture list?
+  bool isCaptureList() const { return VarDeclBits.IsCaptureList; }
 
   /// Return true if this vardecl has an initial value bound to it in a way
   /// that isn't represented in the AST with an initializer in the pattern

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -297,21 +297,21 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     for (SILVTable &vTable : Module->getVTableList()) {
       for (auto &entry : vTable.getEntries()) {
         // Destructors are alive because they are called from swift_release
-        if (entry.first.kind == SILDeclRef::Kind::Deallocator ||
-            entry.first.kind == SILDeclRef::Kind::IVarDestroyer) {
-          ensureAlive(entry.second);
+        if (entry.Method.kind == SILDeclRef::Kind::Deallocator ||
+            entry.Method.kind == SILDeclRef::Kind::IVarDestroyer) {
+          ensureAlive(entry.Implementation);
           continue;
         }
 
-        SILFunction *F = entry.second;
-        auto *fd = cast<AbstractFunctionDecl>(entry.first.getDecl());
+        SILFunction *F = entry.Implementation;
+        auto *fd = cast<AbstractFunctionDecl>(entry.Method.getDecl());
         fd = getBase(fd);
         MethodInfo *mi = getMethodInfo(fd);
         addImplementingFunction(mi, F, vTable.getClass());
 
         if (// A conservative approach: if any of the overridden functions is
             // visible externally, we mark the whole method as alive.
-            isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule())
+            isPossiblyUsedExternally(entry.Linkage, Module->isWholeModule())
             // We also have to check the method declaration's accessibility.
             // Needed if it's a public base method declared in another
             // compilation unit (for this we have no SILFunction).
@@ -364,10 +364,10 @@ class DeadFunctionElimination : FunctionLivenessComputation {
   /// Removes all dead methods from vtables and witness tables.
   void removeDeadEntriesFromTables() {
     for (SILVTable &vTable : Module->getVTableList()) {
-      vTable.removeEntries_if([this](SILVTable::Pair &entry) -> bool {
-        if (!isAlive(entry.second)) {
+      vTable.removeEntries_if([this](SILVTable::Entry &entry) -> bool {
+        if (!isAlive(entry.Implementation)) {
           DEBUG(llvm::dbgs() << "  erase dead vtable method " <<
-                entry.second->getName() << "\n");
+                entry.Implementation->getName() << "\n");
           return true;
         }
         return false;
@@ -467,7 +467,7 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
     // Check vtable methods.
     for (SILVTable &vTable : Module->getVTableList()) {
       for (auto &entry : vTable.getEntries()) {
-        SILFunction *F = entry.second;
+        SILFunction *F = entry.Implementation;
         if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
           ensureAlive(F);
       }

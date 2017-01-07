@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -172,7 +172,8 @@ public:
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.
   SILFunction *emitVTableMethod(SILDeclRef derived,
-                                SILDeclRef base);
+                                SILDeclRef base,
+                                SILLinkage &implLinkage);
 
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);

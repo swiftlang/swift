@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1261,6 +1261,20 @@ GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
   auto env = builder->getGenericEnvironment(sig);
   Impl.CanonicalGenericEnvironments[builder] = env;
   return env;
+}
+
+bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
+  // If this module has already been successfully imported, it is importable.
+  if (getLoadedModule(ModulePath) != nullptr)
+    return true;
+
+  // Otherwise, ask the module loaders.
+  for (auto &importer : Impl.ModuleLoaders) {
+    if (importer->canImportModule(ModulePath)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 Module *
@@ -3530,28 +3544,9 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
   return newSig;
 }
 
-GenericEnvironment *
-GenericEnvironment::get(GenericSignature *signature,
-                        TypeSubstitutionMap interfaceToArchetypeMap) {
-  unsigned numGenericParams = signature->getGenericParams().size();
-  assert(!interfaceToArchetypeMap.empty());
-  assert(interfaceToArchetypeMap.size() == numGenericParams
-         && "incorrect number of parameters");
-
-  ASTContext &ctx = signature->getASTContext();
-
-  // Allocate and construct the new environment.
-  size_t bytes = totalSizeToAlloc<Type, ArchetypeToInterfaceMapping>(
-                                           numGenericParams, numGenericParams);
-  void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  return new (mem) GenericEnvironment(signature, nullptr,
-                                      interfaceToArchetypeMap);
-}
-
 GenericEnvironment *GenericEnvironment::getIncomplete(
                                                   GenericSignature *signature,
                                                   ArchetypeBuilder *builder) {
-  TypeSubstitutionMap empty;
   auto &ctx = signature->getASTContext();
 
   // Allocate and construct the new environment.
@@ -3559,7 +3554,7 @@ GenericEnvironment *GenericEnvironment::getIncomplete(
   size_t bytes = totalSizeToAlloc<Type, ArchetypeToInterfaceMapping>(
                                            numGenericParams, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  return new (mem) GenericEnvironment(signature, builder, empty);
+  return new (mem) GenericEnvironment(signature, builder);
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,

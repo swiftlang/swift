@@ -55,7 +55,7 @@ Unfortunately, there are a few declarations that cannot be renamed without break
 - If the API is a generic parameter, the old name isn't available. FIXME: Uh oh?
 - If the API is an enumerator, the old name should be available as a deprecated alias (technically a static var, but we have special logic for pattern-matching that).
 - If the API is a struct or union field, the old name should be available as a deprecated alias.
-- If the API is an convenience initializer, the old name should be available as a deprecated convenience initializer as well. FIXME: inheritance?
+- If the API is a convenience initializer, the old name should be available as a deprecated convenience initializer as well. FIXME: inheritance?
 - If the API is a designated initializer...FIXME
 - If the API is a method or property, the old name should be available as well, though deprecated. Overrides of either name should work (more information below).
 

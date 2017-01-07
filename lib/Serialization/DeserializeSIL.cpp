@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -379,6 +379,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
+  GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
       inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
@@ -386,7 +387,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
                                 isThunk, isGlobal, inlineStrategy, effect,
                                 numSpecAttrs, hasQualifiedOwnership, funcTyID,
-                                clangNodeOwnerID, SemanticsIDs);
+                                genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -491,15 +492,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   }
 
   GenericEnvironment *genericEnv = nullptr;
-  if (!declarationOnly) {
-    auto signature = fn->getLoweredFunctionType()->getGenericSignature();
-    genericEnv = MF->readGenericSignatureOrEnvironment(
-                    SILCursor,
-                    /*wantEnvironment=*/true,
-                    signature ? signature->getRequirements()
-                              : ArrayRef<Requirement>())
-                  .get<GenericEnvironment *>();
-  }
+  if (!declarationOnly)
+    genericEnv = MF->getGenericEnvironment(genericEnvID);
 
   // If the next entry is the end of the block, then this function has
   // no contents.
@@ -2001,13 +1995,14 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   // linkage to avoid re-reading it from the bitcode each time?
   DeclID clangOwnerID;
   TypeID funcTyID;
+  GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
     inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
                                 isThunk, isGlobal, inlineStrategy, effect,
                                 numSpecAttrs, hasQualifiedOwnership, funcTyID,
-                                clangOwnerID, SemanticsIDs);
+                                genericEnvID, clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
@@ -2178,7 +2173,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     return nullptr;
   kind = SILCursor.readRecord(entry.ID, scratch);
 
-  std::vector<SILVTable::Pair> vtableEntries;
+  std::vector<SILVTable::Entry> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
   while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
          kind != SIL_DEFAULT_WITNESS_TABLE &&
@@ -2187,12 +2182,22 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
-    VTableEntryLayout::readRecord(scratch, NameID, ListOfValues);
+    unsigned RawLinkage;
+    VTableEntryLayout::readRecord(scratch, NameID, RawLinkage, ListOfValues);
+
+    Optional<SILLinkage> Linkage = fromStableSILLinkage(RawLinkage);
+    if (!Linkage) {
+      DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
+            << " for VTable Entry\n");
+      MF->error();
+      return nullptr;
+    }
+
     SILFunction *Func = getFuncForReference(MF->getIdentifier(NameID).str());
     if (Func) {
       unsigned NextValueIndex = 0;
-      vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues,
-                                               NextValueIndex), Func);
+      vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, NextValueIndex),
+                                 Func, Linkage.getValue());
     }
 
     // Fetch the next record.

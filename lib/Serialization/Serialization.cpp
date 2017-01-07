@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -556,8 +556,6 @@ void Serializer::writeBlockInfoBlock() {
                               decls_block::GENERIC_PARAM);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::GENERIC_REQUIREMENT);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::SIL_GENERIC_ENVIRONMENT);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -1011,24 +1009,31 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   return true;
 }
 
-void Serializer::writeGenericEnvironment(
-       const GenericEnvironment *env,
-       const std::array<unsigned, 256> &abbrCodes,
-       bool SILMode) {
+void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
   using namespace decls_block;
 
   // Record the offset of this generic environment.
-  if (!SILMode) {
-    auto id = GenericEnvironmentIDs[env];
-    assert(id != 0 && "generic environment not referenced properly");
-    (void)id;
+  auto id = GenericEnvironmentIDs[env];
+  assert(id != 0 && "generic environment not referenced properly");
+  (void)id;
 
-    assert((id - 1) == GenericEnvironmentOffsets.size());
-    GenericEnvironmentOffsets.push_back(Out.GetCurrentBitNo());
-  }
+  assert((id - 1) == GenericEnvironmentOffsets.size());
+  GenericEnvironmentOffsets.push_back(Out.GetCurrentBitNo());
 
   if (env == nullptr)
     return;
+
+  // Determine whether we must use SIL mode, because one of the generic
+  // parameters has a declaration with module context.
+  bool SILMode = false;
+  for (auto *paramTy : env->getGenericParams()) {
+    if (auto *decl = paramTy->getDecl()) {
+      if (decl->getDeclContext()->isModuleScopeContext()) {
+        SILMode = true;
+        break;
+      }
+    }
+  }
 
   // Record the generic parameters.
   SmallVector<uint64_t, 4> rawParamIDs;
@@ -1050,20 +1055,17 @@ void Serializer::writeGenericEnvironment(
   }
 
   if (SILMode) {
-    assert(&abbrCodes != &DeclTypeAbbrCodes);
-    auto envAbbrCode = abbrCodes[SILGenericEnvironmentLayout::Code];
+    auto envAbbrCode = DeclTypeAbbrCodes[SILGenericEnvironmentLayout::Code];
     SILGenericEnvironmentLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
                                             rawParamIDs);
-    return;
+  } else {
+    auto envAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
+    GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
+                                         rawParamIDs);
   }
 
-  assert(&abbrCodes == &DeclTypeAbbrCodes);
-  auto envAbbrCode = abbrCodes[GenericEnvironmentLayout::Code];
-  GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
-                                       rawParamIDs);
-
   writeGenericRequirements(env->getGenericSignature()->getRequirements(),
-                           abbrCodes);
+                           DeclTypeAbbrCodes);
 }
 
 void Serializer::writeSILLayout(SILLayout *layout) {
@@ -3072,21 +3074,25 @@ void Serializer::writeType(Type ty) {
       break;
     }
 
-    TypeID parentID = addTypeRef(archetypeTy->getParent());
-
     SmallVector<DeclID, 4> conformances;
     for (auto proto : archetypeTy->getConformsTo())
       conformances.push_back(addDeclRef(proto));
 
+    TypeID parentOrGenericEnv;
     DeclID assocTypeOrNameID;
-    if (archetypeTy->getParent())
+    if (archetypeTy->getParent()) {
+      parentOrGenericEnv = addTypeRef(archetypeTy->getParent());
       assocTypeOrNameID = addDeclRef(archetypeTy->getAssocType());
-    else
+    } else {
+      parentOrGenericEnv =
+        addGenericEnvironmentRef(archetypeTy->getGenericEnvironment());
       assocTypeOrNameID = addIdentifierRef(archetypeTy->getName());
+    }
 
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    parentID,
+                                    archetypeTy->isPrimary(),
+                                    parentOrGenericEnv,
                                     assocTypeOrNameID,
                                     addTypeRef(archetypeTy->getSuperclass()),
                                     conformances);
@@ -3437,6 +3443,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<GenericParamLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();
   registerDeclTypeAbbr<GenericEnvironmentLayout>();
+  registerDeclTypeAbbr<SILGenericEnvironmentLayout>();
 
   registerDeclTypeAbbr<ForeignErrorConventionLayout>();
   registerDeclTypeAbbr<DeclContextLayout>();
@@ -3498,7 +3505,7 @@ void Serializer::writeAllDeclsAndTypes() {
     while (!GenericEnvironmentsToWrite.empty()) {
       auto next = GenericEnvironmentsToWrite.front();
       GenericEnvironmentsToWrite.pop();
-      writeGenericEnvironment(next, DeclTypeAbbrCodes, /*SILMode=*/false);
+      writeGenericEnvironment(next);
     }
 
     while (!NormalConformancesToWrite.empty()) {

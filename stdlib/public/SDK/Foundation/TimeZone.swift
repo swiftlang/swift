@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -233,12 +233,13 @@ extension TimeZone : CustomStringConvertible, CustomDebugStringConvertible, Cust
     }
     
     public var customMirror : Mirror {
-        var c: [(label: String?, value: Any)] = []
-        c.append((label: "identifier", value: identifier))
-        c.append((label: "kind", value: _kindDescription))
-        c.append((label: "abbreviation", value: abbreviation()))
-        c.append((label: "secondsFromGMT", value: secondsFromGMT()))
-        c.append((label: "isDaylightSavingTime", value: isDaylightSavingTime()))
+        let c: [(label: String?, value: Any)] = [
+          ("identifier", identifier),
+          ("kind", _kindDescription),
+          ("abbreviation", abbreviation() as Any),
+          ("secondsFromGMT", secondsFromGMT()),
+          ("isDaylightSavingTime", isDaylightSavingTime()),
+        ]
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
     

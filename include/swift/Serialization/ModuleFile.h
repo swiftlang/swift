@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -740,20 +740,6 @@ public:
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
   Module *getModule(ArrayRef<Identifier> name);
-
-  /// Return the generic signature or environment at the current position in
-  /// the given cursor.
-  ///
-  /// \param cursor The cursor to read from.
-  /// \param wantEnvironment Whether we always want to receive a generic
-  /// environment vs. being able to handle the generic signature.
-  /// \param optRequirements If not \c None, use these generic requirements
-  /// rather than deserializing requirements.
-  llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-  readGenericSignatureOrEnvironment(
-                        llvm::BitstreamCursor &cursor,
-                        bool wantEnvironment,
-                        Optional<ArrayRef<Requirement>> optRequirements);
 
   /// Returns the generic signature or environment for the given ID,
   /// deserializing it if needed.

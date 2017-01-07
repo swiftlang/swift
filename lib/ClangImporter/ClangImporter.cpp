@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1020,6 +1020,23 @@ void ClangImporter::collectSubModuleNames(
 
 bool ClangImporter::isModuleImported(const clang::Module *M) {
   return M->NameVisibility == clang::Module::NameVisibilityKind::AllVisible;
+}
+
+bool ClangImporter::canImportModule(std::pair<Identifier, SourceLoc> moduleID) {
+  // Look up the top-level module to see if it exists.
+  // FIXME: This only works with top-level modules.
+  auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
+  clang::Module *clangModule =
+    clangHeaderSearch.lookupModule(moduleID.first.str());
+  if (!clangModule) {
+    return false;
+  }
+
+  clang::Module::Requirement r;
+  clang::Module::UnresolvedHeaderDirective mh;
+  clang::Module *m;
+  auto &ctx = Impl.getClangASTContext();
+  return clangModule->isAvailable(ctx.getLangOpts(), getTargetInfo(), r, mh, m);
 }
 
 Module *ClangImporter::loadModule(

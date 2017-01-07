@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -151,7 +151,9 @@ TEST(SourceLoc, StmtConditionElement) {
                         .addMemBufferCopy("if let x = Optional.some(1) { }");
   SourceLoc start = C.Ctx.SourceMgr.getLocForBufferStart(bufferID);
   
-  auto vardecl = new (C.Ctx) VarDecl( false, true, start.getAdvancedLoc(7)
+  auto vardecl = new (C.Ctx) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                     /*IsCaptureList*/false,
+                                     start.getAdvancedLoc(7)
                                     , C.Ctx.getIdentifier("x")
                                     , Type()
                                     , nullptr);

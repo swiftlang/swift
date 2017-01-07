@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -983,13 +983,14 @@ RequirementEnvironment::RequirementEnvironment(
   // type parameters of the conformance context and the parameters of the
   // requirement.
   Type concreteType = conformanceDC->getSelfInterfaceType();
-  auto selfType = proto->getSelfInterfaceType()->getCanonicalType();
+  auto selfType = cast<GenericTypeParamType>(
+                            proto->getSelfInterfaceType()->getCanonicalType());
+
+
   reqToSyntheticEnvMap.addSubstitution(selfType, concreteType);
 
   // 'Self' is always at depth 0, index 0. Anything else is invalid code.
-  auto selfGenericParam = selfType->castTo<GenericTypeParamType>();
-  if (selfGenericParam->getDepth() != 0 ||
-      selfGenericParam->getIndex() != 0) {
+  if (selfType->getDepth() != 0 || selfType->getIndex() != 0) {
     return;
   }
 
@@ -1058,8 +1059,9 @@ RequirementEnvironment::RequirementEnvironment(
 
     // Create a substitution from the requirement's generic parameter to the
     // generic parameter known to the builder.
-    reqToSyntheticEnvMap.addSubstitution(genericParam->getCanonicalType(),
-                                         substGenericParam);
+    reqToSyntheticEnvMap.addSubstitution(
+      cast<GenericTypeParamType>(genericParam->getCanonicalType()),
+      substGenericParam);
     if (auto archetypeType
           = reqEnv->mapTypeIntoContext(genericParam)->getAs<ArchetypeType>()) {
       // Add substitutions.

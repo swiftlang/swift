@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -124,19 +124,6 @@ ArchetypeType *swift::getOpenedArchetypeOf(const SILInstruction *I) {
   return nullptr;
 }
 
-
-bool hasAtMostOneOpenedArchetype(Type Ty) {
-  if (!Ty->hasOpenedExistential())
-    return true;
-
-  int NumOpenedArchetypes = 0;
-  Ty.visit([&](Type t) {
-    if (t->isOpenedExistential())
-      NumOpenedArchetypes++;
-  });
-
-  return NumOpenedArchetypes <= 1;
-}
 
 /// Find an opened archetype represented by this type.
 /// It is assumed by this method that the type contains

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -92,10 +92,6 @@ private:
     }
     if (!Parsed && ParserState.hasFunctionBodyState(AFD))
       TheParser.parseAbstractFunctionBodyDelayed(AFD);
-
-    SmallVector<Decl *, 2> scratch;
-    performDelayedConditionResolution(AFD, SF, scratch);
-    assert(scratch.empty());
 
     if (CodeCompletion)
       CodeCompletion->doneParsing();
@@ -808,6 +804,25 @@ const LangOptions &ParserUnit::getLangOptions() const {
 
 SourceFile &ParserUnit::getSourceFile() {
   return *Impl.SF;
+}
+
+ConditionalCompilationExprState
+swift::operator&&(ConditionalCompilationExprState lhs,
+                  ConditionalCompilationExprState rhs) {
+  return {lhs.isConditionActive() && rhs.isConditionActive(),
+    ConditionalCompilationExprKind::Binary};
+}
+
+ConditionalCompilationExprState
+swift::operator||(ConditionalCompilationExprState lhs,
+                  ConditionalCompilationExprState rhs) {
+  return {lhs.isConditionActive() || rhs.isConditionActive(),
+    ConditionalCompilationExprKind::Binary};
+}
+
+ConditionalCompilationExprState
+swift::operator!(ConditionalCompilationExprState state) {
+  return {!state.isConditionActive(), state.getKind()};
 }
 
 ParsedDeclName swift::parseDeclName(StringRef name) {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -139,7 +139,7 @@ SILVTable *SILLinkerVisitor::processClassDecl(const ClassDecl *C) {
   // Otherwise, add all the vtable functions in Vtbl to the function
   // processing list...
   for (auto &E : Vtbl->getEntries())
-    Worklist.push_back(E.second);
+    Worklist.push_back(E.Implementation);
 
   // And then transitively deserialize all SIL referenced by those functions.
   process();
@@ -162,9 +162,9 @@ bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // for processing.
   bool Result = false;
   for (auto P : Vtbl->getEntries()) {
-    if (P.second->isExternalDeclaration()) {
+    if (P.Implementation->isExternalDeclaration()) {
       Result = true;
-      addFunctionToWorklist(P.second);
+      addFunctionToWorklist(P.Implementation);
     }
   }
   return Result;

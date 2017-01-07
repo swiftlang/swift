@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -222,7 +222,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
       options.contains(NameLookupFlags::KnownPrivate),
       loc,
       /*OnlyTypes=*/true,
-      /*ProtocolMembers=*/false,
+      /*AllowProtocolMembers=*/false,
       options.contains(NameLookupFlags::IgnoreAccessibility));
   for (auto found : lookup.Results)
     decls.push_back(cast<TypeDecl>(found.getValueDecl()));
@@ -239,7 +239,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
         options.contains(NameLookupFlags::KnownPrivate),
         loc,
         /*OnlyTypes=*/true,
-        /*ProtocolMembers=*/true,
+        /*AllowProtocolMembers=*/true,
         options.contains(NameLookupFlags::IgnoreAccessibility));
 
     for (auto found : lookup.Results)

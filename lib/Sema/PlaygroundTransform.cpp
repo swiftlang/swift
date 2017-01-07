@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,6 +19,7 @@
 #include "swift/Subsystems.h"
 
 #include <random>
+#include <forward_list>
 
 using namespace swift;
 using namespace swift::instrumenter_support;
@@ -360,7 +361,7 @@ public:
     }
   }
 
-  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) {
+  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) override {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
     typedef SmallVector<swift::ASTNode, 3> ElementVector;
     ElementVector Elements(OriginalElements.begin(), OriginalElements.end());
@@ -737,9 +738,9 @@ public:
     }
 
     VarDecl *VD =
-        new (Context) VarDecl(false, // static
-                              true,  // let
-                              SourceLoc(), Context.getIdentifier(NameBuf),
+        new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                              /*IsCaptureList*/false, SourceLoc(),
+                              Context.getIdentifier(NameBuf),
                               MaybeLoadInitExpr->getType(), TypeCheckDC);
 
     VD->setInterfaceType(VD->getType());
