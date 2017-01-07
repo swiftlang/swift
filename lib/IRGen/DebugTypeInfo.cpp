@@ -75,9 +75,6 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DeclCtx,
   // the type hasn't been mucked with by an optimization pass.
   auto *Type = DeclSelfType->isEqual(RealType) ? DeclType.getPointer()
                                                : RealType.getPointer();
-  // FIXME: LLDB cannot deal with manglings that contain @owning annotations.
-  if (DeclType->getAs<FunctionType>())
-    Type = DeclType.getPointer();
   return getFromTypeInfo(DeclCtx, Type, Info);
 }
 
