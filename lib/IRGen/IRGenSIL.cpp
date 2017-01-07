@@ -3538,18 +3538,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 }
 
 void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
-  /*
-  LayoutConstraintInfo LayoutInfo =
-      i->getElementType().getSwiftRValueType().getLayoutConstraintInfo();
-  const TypeInfo &type = getTypeInfo(
-      (LayoutInfo > LayoutConstraintInfo::UnknownLayout &&
-       LayoutInfo < LayoutConstraintInfo::Trivial)
-          ? SILType::getBuiltinIntegerType((unsigned)LayoutInfo * 8,
-                                           i->getModule().getASTContext())
-          : i->getElementType());
-  */
   const TypeInfo &type = getTypeInfo(i->getElementType());
-
 
   // Derive name from SIL location.
   VarDecl *Decl = i->getDecl();
@@ -3567,7 +3556,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
       type.allocateStack(*this, i->getElementType(), isEntryBlock, dbgname);
 
   emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
-  
+
   setLoweredStackAddress(i, addr);
 }
 

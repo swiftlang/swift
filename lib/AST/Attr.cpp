@@ -466,9 +466,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     interleave(attr->getRequirements(),
                [&](Requirement req) {
                  auto FirstTy = GetInterfaceType(req.getFirstType());
-                 auto SecondTy = GetInterfaceType(req.getSecondType());
-                 Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-                 ReqWithDecls.print(Printer, Options);
+                 if (req.getKind() != RequirementKind::Layout) {
+                   auto SecondTy = GetInterfaceType(req.getSecondType());
+                   Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+                   ReqWithDecls.print(Printer, Options);
+                 } else {
+                   Requirement ReqWithDecls(req.getKind(), FirstTy,
+                                            req.getLayoutConstraint());
+                   ReqWithDecls.print(Printer, Options);
+                 }
                },
                [&] { Printer << ", "; });
 

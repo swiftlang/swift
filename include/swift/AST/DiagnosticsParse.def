@@ -691,6 +691,19 @@ ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
 
 //------------------------------------------------------------------------------
+// Layout constaints diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(layout_size_should_be_positive,none,
+      "expected non-negative size to be specified in layout constraint", ())
+ERROR(layout_alignment_should_be_positive,none,
+      "expected non-negative alignment to be specified in layout constraint", ())
+ERROR(expected_rparen_layout_constraint,none,
+      "expected ')' to complete layout constraint", ())
+ERROR(layout_constraints_only_inside_specialize_attr,none,
+      "layout constraints are only allowed inside @_specialize attributes", ())
+
+//------------------------------------------------------------------------------
 // Pattern parsing diagnostics
 //------------------------------------------------------------------------------
 

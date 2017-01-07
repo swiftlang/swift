@@ -673,8 +673,11 @@ ClassDecl *CanType::getClassBoundImpl(CanType type) {
   llvm_unreachable("class has no class bound!");
 }
 
-LayoutConstraintInfo CanType::getLayoutConstraintInfo() const {
-  return swift::getLayoutConstraintInfo(*this);
+LayoutConstraint CanType::getLayoutConstraint() const {
+  if (auto archetypeTy = dyn_cast<ArchetypeType>(*this)) {
+    return archetypeTy->getLayoutConstraint();
+  }
+  return LayoutConstraint();
 }
 
 bool TypeBase::isAnyObject() {
@@ -1594,6 +1597,13 @@ bool TypeBase::isSpelledLike(Type other) {
   llvm_unreachable("Unknown type kind");
 }
 
+LayoutConstraint TypeBase::getLayoutConstraint() {
+  auto CanTy = getCanonicalType();
+  if (!CanTy)
+    return LayoutConstraint();
+  return CanTy.getLayoutConstraint();
+}
+
 Type TypeBase::getSuperclass(LazyResolver *resolver) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
@@ -2498,7 +2508,7 @@ ArchetypeType::ArchetypeType(
   llvm::PointerUnion<ArchetypeType *, GenericEnvironment *> ParentOrGenericEnv,
   llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
   ArrayRef<ProtocolDecl *> ConformsTo,
-  Type Superclass)
+  Type Superclass, LayoutConstraint Layout)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties::HasArchetype),
       AssocTypeOrName(AssocTypeOrName) {
@@ -2513,11 +2523,16 @@ ArchetypeType::ArchetypeType(
   // Set up the bits we need for trailing objects to work.
   ArchetypeTypeBits.ExpandedNestedTypes = false;
   ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
+  ArchetypeTypeBits.HasLayoutConstraint = static_cast<bool>(Layout);
   ArchetypeTypeBits.NumProtocols = ConformsTo.size();
 
   // Record the superclass.
   if (Superclass)
     *getTrailingObjects<Type>() = Superclass;
+
+  // Record the layout constraint.
+  if (Layout)
+    *getTrailingObjects<LayoutConstraint>() = Layout;
 
   // Copy the protocols.
   std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
@@ -2526,7 +2541,8 @@ ArchetypeType::ArchetypeType(
 
 ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
                              ArrayRef<ProtocolDecl *> ConformsTo,
-                             Type Superclass, UUID uuid)
+                             Type Superclass, LayoutConstraint Layout,
+                             UUID uuid)
   : SubstitutableType(TypeKind::Archetype, &Ctx,
                       RecursiveTypeProperties(
                         RecursiveTypeProperties::HasArchetype |
@@ -2535,11 +2551,16 @@ ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
   // Set up the bits we need for trailing objects to work.
   ArchetypeTypeBits.ExpandedNestedTypes = false;
   ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
+  ArchetypeTypeBits.HasLayoutConstraint = static_cast<bool>(Layout);
   ArchetypeTypeBits.NumProtocols = ConformsTo.size();
 
   // Record the superclass.
   if (Superclass)
     *getTrailingObjects<Type>() = Superclass;
+
+  // Record the layout constraint.
+  if (Layout)
+    *getTrailingObjects<LayoutConstraint>() = Layout;
 
   // Copy the protocols.
   std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
@@ -2554,19 +2575,19 @@ CanArchetypeType ArchetypeType::getNew(
                                    ArchetypeType *Parent,
                                    AssociatedTypeDecl *AssocType,
                                    SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                                   Type Superclass) {
+                                   Type Superclass,
+                                   LayoutConstraint Layout) {
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
   void *mem = Ctx.Allocate(
-                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(ConformsTo.size(),
-                                                             Superclass ? 1 : 0,
-                                                             0),
-                alignof(ArchetypeType), arena);
+      totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
+          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0, 0),
+      alignof(ArchetypeType), arena);
 
-  return CanArchetypeType(new (mem) ArchetypeType(Ctx, Parent, AssocType,
-                                                  ConformsTo, Superclass));
+  return CanArchetypeType(new (mem) ArchetypeType(
+      Ctx, Parent, AssocType, ConformsTo, Superclass, Layout));
 }
 
 CanArchetypeType
@@ -2574,19 +2595,19 @@ ArchetypeType::getNew(const ASTContext &Ctx,
                       GenericEnvironment *genericEnvironment,
                       Identifier Name,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                      Type Superclass) {
+                      Type Superclass,
+                      LayoutConstraint Layout) {
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
   void *mem = Ctx.Allocate(
-                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(ConformsTo.size(),
-                                                             Superclass ? 1 : 0,
-                                                             0),
-                alignof(ArchetypeType), arena);
+      totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
+          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0, 0),
+      alignof(ArchetypeType), arena);
 
-  return CanArchetypeType(new (mem) ArchetypeType(Ctx, genericEnvironment, Name,
-                                                  ConformsTo, Superclass));
+  return CanArchetypeType(new (mem) ArchetypeType(
+      Ctx, genericEnvironment, Name, ConformsTo, Superclass, Layout));
 }
 
 bool ArchetypeType::requiresClass() const {
@@ -2947,6 +2968,8 @@ LookUpConformanceInSubstitutionMap::operator()(CanType dependentType,
   if (!conformingReplacementType)
     return None;
 
+  // TODO: Describe what this code is doing. It works around the issues
+  // in the conformance lookup, when a dependent type cannot be found...
   if (auto nominal =
           conformingReplacementType->getNominalOrBoundGenericNominal()) {
     auto proto = conformedProtocol->getDecl();

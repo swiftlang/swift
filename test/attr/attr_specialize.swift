@@ -27,7 +27,7 @@ class NonSub {}
 // CHECK: @_specialize(exported: false, kind: full, where T == S<Int>)
 @_specialize(where T == S<Int>)
 @_specialize(where T == Int, U == Int) // expected-error{{use of undeclared type 'U'}},
-@_specialize(where T == T1) // expected-error{{use of undeclared type 'T1'}} expected-error{{too few type parameters are specified in @_specialize attribute (got 0, but expected 1)}} expected-error{{Missing constraint for 'T' in @_specialize attribute}}
+@_specialize(where T == T1) // expected-error{{use of undeclared type 'T1'}}
 public func oneGenericParam<T>(_ t: T) -> T {
   return t
 }
@@ -92,7 +92,7 @@ func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 @_specialize(where T == NonSub) // expected-error{{'T' requires that 'NonSub' inherit from 'Base'}} expected-error{{'T' requires that 'NonSub' inherit from 'Base'}}
 func superTypeRequirement<T : Base>(_ t: T) {}
 
-@_specialize(where X:_Trivial8, Y == Int) // expected-error{{trailing 'where' clause in @_specialize attribute of non-generic function 'requirementOnNonGenericFunction'}}
+@_specialize(where X:_Trivial(8), Y == Int) // expected-error{{trailing 'where' clause in @_specialize attribute of non-generic function 'requirementOnNonGenericFunction'}}
 public func requirementOnNonGenericFunction(x: Int, y: Int) {
 }
 
@@ -106,16 +106,16 @@ public func funcWithEmptySpecializeAttr<X: P, Y>(x: X, y: Y) {
 }
 
 
-@_specialize(where X:_Trivial8, Y:_Trivial32, Z == Int) // expected-error{{use of undeclared type 'Z'}}
-@_specialize(where X:_Trivial8, Y:_Trivial32)
+@_specialize(where X:_Trivial(8), Y:_Trivial(32), Z == Int) // expected-error{{use of undeclared type 'Z'}}
+@_specialize(where X:_Trivial(8), Y:_Trivial(32, 4))
 @_specialize(where X == Int) // expected-error{{too few type parameters are specified in @_specialize attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'Y' in @_specialize attribute}}
-@_specialize(where Y:_Trivial32) // expected-error {{too few type parameters are specified in @_specialize attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'X' in @_specialize attribute}}
+@_specialize(where Y:_Trivial(32)) // expected-error {{too few type parameters are specified in @_specialize attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'X' in @_specialize attribute}}
 @_specialize(where Y: P) // expected-error{{Only same-type and layout requirements are supported by @_specialize attribute}} expected-error{{too few type parameters are specified in @_specialize attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'X' in @_specialize attribute}}
-@_specialize(where Y: MyClass) // expected-error{{use of undeclared type 'MyClass'}} expected-error{{too few type parameters are specified in @_specialize attribute (got 0, but expected 2)}} expected-error{{Missing constraint for 'X' in @_specialize attribute}} expected-error{{Missing constraint for 'Y' in @_specialize attribute}}
-@_specialize(where X:_Trivial8, Y == Int)
+@_specialize(where Y: MyClass) // expected-error{{use of undeclared type 'MyClass'}} expected-error{{too few type parameters are specified in @_specialize attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'X' in @_specialize attribute}}
+@_specialize(where X:_Trivial(8), Y == Int)
 @_specialize(where X == Int, Y == Int)
 @_specialize(where X == Int, X == Int) // expected-error{{too few type parameters are specified in @_specialize attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'Y' in @_specialize attribute}}
-@_specialize(where Y:_Trivial32, X == Float)
+@_specialize(where Y:_Trivial(32), X == Float)
 @_specialize(where X1 == Int, Y1 == Int) // expected-error{{use of undeclared type 'X1'}} expected-error{{use of undeclared type 'Y1'}} expected-error{{too few type parameters are specified in @_specialize attribute (got 0, but expected 2)}} expected-error{{Missing constraint for 'X' in @_specialize attribute}} expected-error{{Missing constraint for 'Y' in @_specialize attribute}}
 public func funcWithTwoGenericParameters<X, Y>(x: X, y: Y) {
 }
@@ -128,6 +128,7 @@ public func funcWithTwoGenericParameters<X, Y>(x: X, y: Y) {
 @_specialize(exported: , where X == Int, Y == Int) // expected-error{{expected a boolean true or false value in @_specialize attribute}}
 
 @_specialize(kind: partial, where X == Int, Y == Int)
+@_specialize(kind: partial, where X == Int)
 @_specialize(kind: full, where X == Int, Y == Int)
 @_specialize(kind: any, where X == Int, Y == Int) // expected-error{{expected 'partial' or 'full' as values of the 'kind' parameter in @_specialize attribute}}
 @_specialize(kind: false, where X == Int, Y == Int) // expected-error{{expected 'partial' or 'full' as values of the 'kind' parameter in @_specialize attribute}}
@@ -153,7 +154,7 @@ public func anotherFuncWithTwoGenericParameters<X: P, Y>(x: X, y: Y) {
 func funcWithForbiddenSpecializeRequirement<T>(_ t: T) {
 }
 
-@_specialize(where T: _Trivial32, T: _Trivial64, T: _Trivial, T: _RefCountedObject) // expected-error{{multiple layout constraints cannot be used at the same time: '_Trivial64' and '_Trivial32'}} expected-note{{previous layout constraint declaration '_Trivial32' was here}} expected-error{{multiple layout constraints cannot be used at the same time: '_Trivial' and '_Trivial32'}} expected-note{{previous layout constraint declaration '_Trivial32' was here}} expected-error{{multiple layout constraints cannot be used at the same time: '_RefCountedObject' and '_Trivial32'}} expected-note{{previous layout constraint declaration '_Trivial32' was here}}
+@_specialize(where T: _Trivial(32), T: _Trivial(64), T: _Trivial, T: _RefCountedObject) // expected-error{{multiple layout constraints cannot be used at the same time: '_Trivial(64)' and '_Trivial(32)'}} expected-note{{previous layout constraint declaration '_Trivial(32)' was here}} expected-error{{multiple layout constraints cannot be used at the same time: '_Trivial' and '_Trivial(32)'}} expected-note{{previous layout constraint declaration '_Trivial(32)' was here}} expected-error{{multiple layout constraints cannot be used at the same time: '_RefCountedObject' and '_Trivial(32)'}} expected-note{{previous layout constraint declaration '_Trivial(32)' was here}}
 @_specialize(where Array<T> == Int) // expected-error{{neither type in same-type refers to a generic parameter or associated type}} expected-error{{Only requirements on generic parameters are supported by @_specialize attribute}}
 @_specialize(where T.Element == Int) // expected-error{{Only requirements on generic parameters are supported by @_specialize attribute}}
 public func funcWithComplexSpecializeRequirements<T: ProtocolWithDep>(t: T) -> Int {
@@ -169,9 +170,9 @@ public func simpleGeneric<T>(t: T) -> T {
 }
 
 
-@_specialize(exported: true, where S: _Trivial64)
+@_specialize(exported: true, where S: _Trivial(64))
 // Check that any bitsize size is OK, not only powers of 8.
-// @_specialize(where S: _Trivial60)
+@_specialize(where S: _Trivial(60))
 @_specialize(exported: true, where S: _RefCountedObject)
 @inline(never)
 public func copyValue<S>(_ t: S, s: inout S) -> Int64 where S: P{
@@ -179,8 +180,8 @@ public func copyValue<S>(_ t: S, s: inout S) -> Int64 where S: P{
 }
 
 @_specialize(exported: true, where S: _Trivial)
-@_specialize(exported: true, where S: _Trivial64)
-@_specialize(exported: true, where S: _Trivial32)
+@_specialize(exported: true, where S: _Trivial(64))
+@_specialize(exported: true, where S: _Trivial(32))
 @_specialize(exported: true, where S: _RefCountedObject)
 @inline(never)
 public func copyValueAndReturn<S>(_ t: S, s: inout S) -> S where S: P{
@@ -200,9 +201,22 @@ struct OuterStruct<S> {
 }
 
 // Check _TrivialAtMostN constraints.
-@_specialize(exported: true, where S: _TrivialAtMost64)
+@_specialize(exported: true, where S: _TrivialAtMost(64))
 @inline(never)
 public func copy2<S>(_ t: S, s: inout S) -> S where S: P{
   return s
 }
 
+// Check missing alignment.
+@_specialize(where S: _Trivial(64, )) // expected-error{{expected non-negative alignment to be specified in layout constraint}}
+// Check non-numeric size.
+@_specialize(where S: _Trivial(Int)) // expected-error{{expected non-negative size to be specified in layout constraint}}
+// Check non-numeric alignment.
+@_specialize(where S: _Trivial(64, X)) // expected-error{{expected non-negative alignment to be specified in layout constraint}}
+@inline(never)
+public func copy3<S>(_ s: S) -> S {
+  return s
+}
+
+public func funcWithWhereClause<T>(t: T) where T:P, T: _Trivial(64) { // expected-error{{layout constraints are only allowed inside @_specialize attributes}}
+}

@@ -795,6 +795,9 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   return OS;
 }
 
+SILType doSubstDependentSILType(SILModule &M,
+                                std::function<CanType(CanType)> Subst,
+                                SILType t);
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//

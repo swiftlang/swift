@@ -324,19 +324,7 @@ void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
         continue;
       }
 
-      if (validateType(req.getLayoutConstraintLoc(), lookupDC, options,
-                       resolver)) {
-        req.setInvalid();
-        continue;
-      }
-
-      // FIXME: Feels too early to perform this check.
-      if (!req.getLayoutConstraint()->isExistentialType() &&
-          !req.getLayoutConstraint()->getClassOrBoundGenericClass()) {
-        diagnose(genericParams->getWhereLoc(),
-                 diag::requires_conformance_nonprotocol,
-                 req.getSubjectLoc(), req.getLayoutConstraintLoc());
-        req.getLayoutConstraintLoc().setInvalidType(Context);
+      if (req.getLayoutConstraintLoc().isNull()) {
         req.setInvalid();
         continue;
       }
@@ -813,7 +801,6 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
     }
     case RequirementReprKind::LayoutConstraint: {
       revertDependentTypeLoc(req.getSubjectLoc());
-      revertDependentTypeLoc(req.getLayoutConstraintLoc());
       break;
     }
     case RequirementReprKind::SameType:

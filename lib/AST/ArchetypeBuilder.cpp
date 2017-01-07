@@ -268,32 +268,6 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
   if (rep != this)
     return rep->addConformance(proto, updateExistingSource, source, builder);
 
-  // Perform some checks for layout constraints.
-  // Skip these checks if it is a protocol declaration and let the
-  // type checker report them.
-  // FIXME: Sometimes it reports the same error for function signatures twice,
-  // because the type checker peforms two passes.
-  if (//!RootProtocol &&
-      getLayoutConstraintInfo(proto->getDeclaredType()).isKnownLayout()) {
-    // There can be only one layout constraint.
-    for (auto &ExistingConformancePair : ConformsTo) {
-      if (getLayoutConstraintInfo(
-              ExistingConformancePair.first->getDeclaredType())
-              .isKnownLayout()) {
-        builder.Diags.diagnose(
-            source.getLoc(), diag::mutiple_layout_constraints,
-            proto->getDeclaredType(),
-            ExistingConformancePair.first->getDeclaredType());
-        builder.Diags.diagnose(
-            ExistingConformancePair.second.getLoc(),
-            diag::previous_layout_constraint,
-            ExistingConformancePair.first->getDeclaredType());
-        setInvalid();
-        return false;
-      }
-    }
-  }
-
   // Check whether we already know about this conformance.
   auto known = ConformsTo.find(proto);
   if (known != ConformsTo.end()) {
@@ -668,6 +642,8 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
       return result;
   }
 
+  LayoutConstraint layout = representative->getLayout();
+
   // Build a new archetype.
 
   // Collect the protocol conformances for the archetype.
@@ -704,14 +680,14 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
     // Create a nested archetype.
     arch = ArchetypeType::getNew(ctx, ParentArchetype, assocType, Protos,
-                                 superclass);
+                                 superclass, layout);
 
     // Register this archetype with its parent.
     ParentArchetype->registerNestedType(getName(), arch);
   } else {
     // Create a top-level archetype.
     arch = ArchetypeType::getNew(ctx, genericEnv, getName(), Protos,
-                                 superclass);
+                                 superclass, layout);
 
     // Register the archetype with the generic environment.
     genericEnv->addMapping(getGenericParamKey(), arch);
@@ -963,59 +939,30 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
 }
 
 bool ArchetypeBuilder::addLayoutRequirement(PotentialArchetype *PAT,
-                                            ProtocolDecl *Proto,
+                                            LayoutConstraint Layout,
                                             RequirementSource Source) {
-  llvm::SmallPtrSet<ProtocolDecl *, 8> Visited;
-  return addLayoutRequirement(PAT, Proto, Source, Visited);
-}
-
-bool ArchetypeBuilder::addLayoutRequirement(PotentialArchetype *PAT,
-                                            ProtocolDecl *Proto,
-                                            RequirementSource Source,
-                               llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
   // Add the requirement to the representative.
   auto T = PAT->getRepresentative();
 
-  // Add the requirement, if we haven't done so already.
-  if (!T->addConformance(Proto, /*updateExistingSource=*/true, Source, *this))
-    return false;
-
-  RequirementSource InnerSource(RequirementSource::Redundant, Source.getLoc());
-  
-  bool inserted = Visited.insert(Proto).second;
-  assert(inserted);
-  (void) inserted;
-
-  // Add all of the inherited protocol requirements, recursively.
-  if (auto resolver = getLazyResolver())
-    resolver->resolveInheritedProtocols(Proto);
-  for (auto InheritedProto : Proto->getInheritedProtocols(getLazyResolver())) {
-    if (Visited.count(InheritedProto))
-      continue;
-    if (addConformanceRequirement(T, InheritedProto, InnerSource, Visited))
-      return true;
-  }
-
-  // Add requirements for each of the associated types.
-  // FIXME: This should use the generic signature, not walk the members.
-  for (auto Member : Proto->getMembers()) {
-    if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
-      // Add requirements placed directly on this associated type.
-      auto AssocPA = T->getNestedType(AssocType->getName(), *this);
-      if (AssocPA != T) {
-        if (addAbstractTypeParamRequirements(AssocType, AssocPA,
-                                             RequirementSource::Protocol,
-                                             Visited))
-          return true;
-      }
-
-      continue;
+  if (T->Layout) {
+    if (T->Layout == Layout) {
+      // Update the source.
+      T->LayoutSource = Source;
+      return false;
     }
+    // There is an existing layout constraint for this archetype.
+    Diags.diagnose(Source.getLoc(), diag::mutiple_layout_constraints,
+                   Layout, T->Layout);
+    Diags.diagnose(T->LayoutSource->getLoc(),
+                   diag::previous_layout_constraint, T->Layout);
+    T->setInvalid();
 
-    // FIXME: Requirement declarations.
+    return true;
   }
-  
-  Visited.erase(Proto);
+
+  T->Layout = Layout;
+  T->LayoutSource = Source;
+
   return false;
 }
 
@@ -1557,27 +1504,12 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
       return true;
     }
 
-    // Check whether this is a supertype requirement.
     RequirementSource source(
         RequirementSource::Explicit,
         Req.getLayoutConstraintLoc().getSourceRange().Start);
-    if (Req.getLayoutConstraint()->getClassOrBoundGenericClass()) {
-      return addSuperclassRequirement(PA, Req.getLayoutConstraint(), source);
-    }
 
-    SmallVector<ProtocolDecl *, 4> ConformsTo;
-    if (!Req.getLayoutConstraint()->isExistentialType(ConformsTo)) {
-      // FIXME: Diagnose this failure here, rather than over in type-checking.
+    if (addLayoutRequirement(PA, Req.getLayoutConstraint(), source))
       return true;
-    }
-
-#if 1
-    // FIXME: Register the layout conformance somewhere.
-    // Add each of the protocols.
-    for (auto Proto : ConformsTo)
-      if (addLayoutRequirement(PA, Proto, source))
-        return true;
-#endif
 
     return false;
   }
@@ -1639,17 +1571,9 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     if (!pa) return;
 
-    SmallVector<ProtocolDecl *, 4> conformsTo;
-    bool existential = req.getSecondType()->isExistentialType(conformsTo);
-    assert(existential && "Re-introducing invalid requirement");
-    (void)existential;
-
-    // Add each of the protocols.
-    for (auto proto : conformsTo) {
-      bool invalid = addConformanceRequirement(pa, proto, source);
-      assert(!invalid && "Re-introducing invalid requirement");
-      (void)invalid;
-    }
+    bool invalid = addLayoutRequirement(pa, req.getLayoutConstraint(), source);
+    assert(!invalid && "Re-introducing invalid requirement");
+    (void)invalid;
 
     return;
   }
@@ -1783,9 +1707,8 @@ public:
             return Action::Stop;
           }
         } else if (req.getKind() == RequirementKind::Layout) {
-          auto proto = req.getSecondType()->castTo<ProtocolType>();
-          if (Builder.addLayoutRequirement(subjectPA, proto->getDecl(),
-                                                source)) {
+          if (Builder.addLayoutRequirement(subjectPA, req.getLayoutConstraint(),
+                                           source)) {
             return Action::Stop;
           }
         } else {
@@ -2011,7 +1934,7 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
 void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
                      void (RequirementKind kind,
                            PotentialArchetype *archetype,
-                           llvm::PointerUnion<Type, PotentialArchetype *> type,
+                           llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint> constraint,
                            RequirementSource source)> f) {
   // First, collect all archetypes, and sort them.
   SmallVector<PotentialArchetype *, 8> archetypes;
@@ -2059,6 +1982,12 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
         archetype->getSuperclassSource());
     }
 
+    // If we have a layout constraint, produce a layout requirement.
+    if (LayoutConstraint Layout = archetype->getLayout()) {
+      f(RequirementKind::Layout, archetype, Layout,
+        archetype->getLayoutSource());
+    }
+
     // Enumerate conformance requirements.
     SmallVector<ProtocolDecl *, 4> protocols;
     DenseMap<ProtocolDecl *, RequirementSource> protocolSources;
@@ -2076,12 +2005,6 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     // Enumerate the conformance requirements.
     for (auto proto : protocols) {
       assert(protocolSources.count(proto) == 1 && "Missing conformance?");
-      if (getLayoutConstraintInfo(proto->getDeclaredType()).isKnownLayout()) {
-        // Add layout protocols as layout constraints.
-        f(RequirementKind::Layout, archetype, proto->getDeclaredInterfaceType(),
-          protocolSources.find(proto)->second);
-        continue;
-      }
       f(RequirementKind::Conformance, archetype,
         proto->getDeclaredInterfaceType(),
         protocolSources.find(proto)->second);
@@ -2097,26 +2020,31 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "Requirements:";
   enumerateRequirements([&](RequirementKind kind,
                             PotentialArchetype *archetype,
-                            llvm::PointerUnion<Type, PotentialArchetype *> type,
+                            llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint> constraint,
                             RequirementSource source) {
     switch (kind) {
     case RequirementKind::Conformance:
-    case RequirementKind::Layout:
     case RequirementKind::Superclass:
       out << "\n  ";
       out << archetype->getDebugName() << " : " 
-          << type.get<Type>().getString() << " [";
+          << constraint.get<Type>().getString() << " [";
       source.dump(out, &Context.SourceMgr);
       out << "]";
       break;
-
+    case RequirementKind::Layout:
+      out << "\n  ";
+      out << archetype->getDebugName() << " : "
+          << constraint.get<LayoutConstraint>().getString() << " [";
+      source.dump(out, &Context.SourceMgr);
+      out << "]";
+      break;
     case RequirementKind::SameType:
       out << "\n  ";
       out << archetype->getDebugName() << " == " ;
-      if (auto secondType = type.dyn_cast<Type>()) {
+      if (auto secondType = constraint.dyn_cast<Type>()) {
         out << secondType.getString();
       } else {
-        out << type.get<PotentialArchetype *>()->getDebugName();
+        out << constraint.get<PotentialArchetype *>()->getDebugName();
       }
       out << " [";
       source.dump(out, &Context.SourceMgr);
@@ -2147,7 +2075,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
                                 SmallVectorImpl<Requirement> &requirements) {
   builder.enumerateRequirements([&](RequirementKind kind,
           ArchetypeBuilder::PotentialArchetype *archetype,
-          llvm::PointerUnion<Type, ArchetypeBuilder::PotentialArchetype *> type,
+          llvm::PointerUnion3<Type, ArchetypeBuilder::PotentialArchetype *, LayoutConstraint> type,
           RequirementSource source) {
     // Filter out redundant requirements.
     switch (source.getKind()) {
@@ -2184,6 +2112,9 @@ static void collectRequirements(ArchetypeBuilder &builder,
           })) {
         return;
       }
+    } else if (auto layoutConstraint = type.dyn_cast<LayoutConstraint>()) {
+      requirements.push_back(Requirement(kind, depTy, layoutConstraint));
+      return;
     } else {
       // ...or to a dependent type.
       repTy = type.get<ArchetypeBuilder::PotentialArchetype *>()

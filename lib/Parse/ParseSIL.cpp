@@ -816,7 +816,6 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       continue;
     }
     else if (SpecAttrs && SP.P.Tok.getText() == "_specialize") {
-      //SourceLoc AtLoc = SP.P.consumeToken(tok::identifier);
       SourceLoc AtLoc = SP.P.Tok.getLoc();
       SourceLoc Loc(AtLoc);
 

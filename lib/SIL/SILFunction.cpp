@@ -276,6 +276,15 @@ SILType doSubstDependentSILType(SILModule &M,
   
 } // end anonymous namespace
 
+SILType swift::doSubstDependentSILType(SILModule &M,
+                                       std::function<CanType(CanType)> Subst,
+                                       SILType t) {
+  CanType result = SubstDependentSILType<std::function<CanType(CanType)>>(
+                       M, std::move(Subst))
+                       .visit(t.getSwiftRValueType());
+  return SILType::getPrimitiveType(result, t.getCategory());
+}
+
 SILType SILFunction::mapTypeIntoContext(SILType type) const {
   return doSubstDependentSILType(getModule(),
     [&](CanType t) { return mapTypeIntoContext(t)->getCanonicalType(); },

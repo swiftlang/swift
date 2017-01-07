@@ -241,7 +241,8 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
 ParserStatus Parser::parseGenericWhereClause(
                SourceLoc &WhereLoc,
                SmallVectorImpl<RequirementRepr> &Requirements,
-               bool &FirstTypeInComplete) {
+               bool &FirstTypeInComplete,
+               bool AllowLayoutConstraints) {
   ParserStatus Status;
   // Parse the 'where'.
   WhereLoc = consumeToken(tok::kw_where);
@@ -262,29 +263,38 @@ ParserStatus Parser::parseGenericWhereClause(
       // A conformance-requirement.
       SourceLoc ColonLoc = consumeToken();
 
-      // Parse the protocol or composition.
-      ParserResult<TypeRepr> Protocol = parseTypeForInheritance(
-          diag::expected_identifier_for_type,
-          diag::expected_ident_type_in_inheritance);
-      
-      if (Protocol.isNull()) {
-        Status.setIsParseError();
-        if (Protocol.hasCodeCompletion())
-          Status.setHasCodeCompletion();
-        break;
-      }
-
-      // Check if it is a special pseudo-protocol used to express
-      // layout constraints
-      if (isLayoutConstraintType(Protocol.get())) {
-        // TODO: Check if layout constraints are allowed in the
-        // current context. They should be allowed only in @_specialized
-        // attributes for now.
-
-        // Add the layout requirement.
-        Requirements.push_back(RequirementRepr::getLayoutConstraint(
-            FirstType.get(), ColonLoc, Protocol.get()));
+      if (Tok.is(tok::identifier) && getLayoutConstraintInfo(Tok.getText())) {
+        // Parse a layout constraint.
+        auto LayoutName = Tok.getText();
+        auto LayoutLoc = consumeToken();
+        auto LayoutInfo = parseLayoutConstraint(LayoutName);
+        if (!LayoutInfo.isKnownLayout()) {
+          // There was a bug in the layout constraint.
+          Status.setIsParseError();
+        }
+        auto Layout = LayoutConstraint(Context.AllocateObjectCopy(LayoutInfo));
+        if (!AllowLayoutConstraints) {
+          diagnose(LayoutLoc,
+                   diag::layout_constraints_only_inside_specialize_attr);
+        } else {
+          // Add the layout requirement.
+          Requirements.push_back(RequirementRepr::getLayoutConstraint(
+              FirstType.get(), ColonLoc,
+              LayoutConstraintLoc(Layout, LayoutLoc)));
+        }
       } else {
+        // Parse the protocol or composition.
+        ParserResult<TypeRepr> Protocol =
+            parseTypeForInheritance(diag::expected_identifier_for_type,
+                                    diag::expected_ident_type_in_inheritance);
+
+        if (Protocol.isNull()) {
+          Status.setIsParseError();
+          if (Protocol.hasCodeCompletion())
+            Status.setHasCodeCompletion();
+          break;
+        }
+
         // Add the requirement.
         Requirements.push_back(RequirementRepr::getTypeConstraint(
             FirstType.get(), ColonLoc, Protocol.get()));
@@ -329,20 +339,20 @@ ParserStatus Parser::
 parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
                                     WhereClauseKind kind) {
   assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
-  
+
   // Push the generic arguments back into a local scope so that references will
   // find them.
   Scope S(this, ScopeKind::Generics);
-  
+
   if (genericParams)
     for (auto pd : genericParams->getParams())
       addToScope(pd);
-  
+
   SmallVector<RequirementRepr, 4> Requirements;
   if (genericParams)
     Requirements.append(genericParams->getRequirements().begin(),
                         genericParams->getRequirements().end());
-  
+
   SourceLoc WhereLoc;
   bool FirstTypeInComplete;
   auto result = parseGenericWhereClause(WhereLoc, Requirements,

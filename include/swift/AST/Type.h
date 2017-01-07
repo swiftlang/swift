@@ -404,8 +404,8 @@ public:
 
   /// Returns information about the layout constraint represented by
   /// this type. If this type does not represent a layout constraint,
-  /// it returns UnknownLayout.
-  LayoutConstraintInfo getLayoutConstraintInfo() const;
+  /// it returns an empty LayoutConstraint.
+  LayoutConstraint getLayoutConstraint() const;
 
   /// \brief Retrieve the most-specific class bound of this type,
   /// which is either a class, a bound-generic class, or a class-bounded

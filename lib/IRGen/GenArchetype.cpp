@@ -331,10 +331,10 @@ public:
 /// archetype.
 static const ArchetypeTypeInfoBase &
 getArchetypeInfo(IRGenFunction &IGF, CanArchetypeType t, const TypeInfo &ti) {
-  LayoutConstraintInfo LayoutInfo = getLayoutConstraintInfo(t);
-  if (t->requiresClass() || LayoutInfo.isRefCountedObject())
+  LayoutConstraint LayoutInfo = t->getLayoutConstraint();
+  if (t->requiresClass() || (LayoutInfo && LayoutInfo->isRefCountedObject()))
     return ti.as<ClassArchetypeTypeInfo>();
-  if (LayoutInfo.isFixedSizeTrivial())
+  if (LayoutInfo && LayoutInfo->isFixedSizeTrivial())
     return ti.as<FixedSizeArchetypeTypeInfo>();
   // TODO: Handle LayoutConstraintInfo::Trivial
   return ti.as<OpaqueArchetypeTypeInfo>();
@@ -423,12 +423,12 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
     protocols.push_back(ProtocolEntry(protocol, impl));
   }
 
-  LayoutConstraintInfo LayoutInfo = getLayoutConstraintInfo(Type(archetype));
+  LayoutConstraint LayoutInfo = archetype->getLayoutConstraint();
 
   // If the archetype is class-constrained, use a class pointer
   // representation.
   if (archetype->requiresClass() ||
-      LayoutInfo.isRefCountedObject()) {
+      (LayoutInfo && LayoutInfo->isRefCountedObject())) {
     ReferenceCounting refcount;
     llvm::PointerType *reprTy;
 
@@ -466,9 +466,9 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
 
   // If the archetype is trivial fixed-size layout-constrained, use a fixed size
   // representation.
-  if (LayoutInfo.isFixedSizeTrivial()) {
-    Size size(LayoutInfo.getTrivialSizeInBytes());
-    Alignment align(LayoutInfo.getTrivialSizeInBytes());
+  if (LayoutInfo && LayoutInfo->isFixedSizeTrivial()) {
+    Size size(LayoutInfo->getTrivialSizeInBytes());
+    Alignment align(LayoutInfo->getTrivialSizeInBytes());
     auto spareBits =
       SpareBitVector::getConstant(size.getValueInBits(), false);
     // Get an integer type of the required size.
@@ -482,7 +482,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // If the archetype is a trivial layout-constrained, use a POD
   // representation. This type is not loadable, but it is known
   // to be a POD.
-  if (LayoutInfo.isAddressOnlyTrivial()) {
+  if (LayoutInfo && LayoutInfo->isAddressOnlyTrivial()) {
     // TODO: Create NonFixedSizeArchetypeTypeInfo and return it.
   }
 

@@ -396,22 +396,16 @@ bool Parser::parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
     return false;
   };
 
-  // Parse a where clause.
-  // Parse the optional where-clause.
+  // Parse the where clause.
   TrailingWhereClause *trailingWhereClause = nullptr;
   if (Tok.is(tok::kw_where)) {
     SourceLoc whereLoc;
     SmallVector<RequirementRepr, 4> requirements;
     bool firstTypeInComplete;
-    auto whereStatus =
-        parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete);
-    (void)firstTypeInComplete;
-    if (whereStatus.isSuccess()) {
-      trailingWhereClause =
-          TrailingWhereClause::create(Context, whereLoc, requirements);
-    } else {
-      trailingWhereClause = TrailingWhereClause::create(Context, whereLoc, {});
-    }
+    parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete,
+                            /* AllowLayoutConstraints */ true);
+    trailingWhereClause =
+      TrailingWhereClause::create(Context, whereLoc, requirements);
   }
 
   // Parse the closing ')' or ']'.

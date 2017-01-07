@@ -593,6 +593,18 @@ void Mangler::mangleConstrainedType(CanType type) {
   mangleType(type, 0);
 }
 
+void Mangler::mangleLayoutConstraint(LayoutConstraint layout) {
+  // TODO: Do something more efficient here.
+  Buffer << layout->getName();
+  if (!layout->isKnownSizeTrivial())
+    return;
+  Buffer << layout->getTrivialSizeInBits();
+  if (layout->getAlignment()) {
+    Buffer << "d";
+    Buffer << layout->getAlignment();
+  }
+}
+
 bool Mangler::
 checkGenericParamsOrder(ArrayRef<swift::GenericTypeParamType *> params) {
   unsigned depth = 0;
@@ -674,13 +686,10 @@ mangle_requirements:
         Buffer << 'R';
         didMangleRequirement = true;
       }
-      // Layout constraints are the common case, so mangle them more
-      // efficiently.
       // TODO: We could golf this a little more by assuming the first type
       // is a dependent type.
       mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
-      mangleProtocolName(
-                      reqt.getSecondType()->castTo<ProtocolType>()->getDecl());
+      mangleLayoutConstraint(reqt.getLayoutConstraint());
       break;
 
     case RequirementKind::Superclass:

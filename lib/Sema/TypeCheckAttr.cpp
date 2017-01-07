@@ -1403,6 +1403,9 @@ AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
 /// Collect all used generic parameter types from a given type.
 static void collectUsedGenericParameters(
     Type Ty, SmallPtrSet<TypeBase *, 4> &ConstrainedGenericParams) {
+  if (!Ty)
+    return;
+
   if (!Ty->hasTypeParameter())
     return;
 
@@ -1416,12 +1419,12 @@ static void collectUsedGenericParameters(
 
 /// Perform some sanity checks for the requirements provided by
 /// the @_specialize attribute.
-static void
-checkSpecializeAttrRequirements(SpecializeAttr *attr,
-                                AbstractFunctionDecl *FD,
-                                ArrayRef<RequirementRepr> requirements,
-                                TypeChecker &TC) {
-  SmallPtrSet<TypeBase *, 4> constrainedGenericParams;
+static void checkSpecializeAttrRequirements(
+    SpecializeAttr *attr,
+    AbstractFunctionDecl *FD,
+    ArrayRef<RequirementRepr> requirements,
+    SmallPtrSet<TypeBase *, 4> constrainedGenericParams,
+    TypeChecker &TC) {
   auto genericSig = FD->getGenericSignature();
   bool isInvalidAttr = false;
 
@@ -1484,9 +1487,6 @@ checkSpecializeAttrRequirements(SpecializeAttr *attr,
     if (req.getKind() == RequirementReprKind::LayoutConstraint ||
         req.getKind() == RequirementReprKind::TypeConstraint) {
       auto subjectType = req.getSubject();
-      auto constraint = (req.getKind() == RequirementReprKind::TypeConstraint)
-                            ? req.getConstraint()
-                            : req.getLayoutConstraint();
 
       // Skip any unknown or error types.
       if (!subjectType || subjectType->is<ErrorType>() ||
@@ -1495,28 +1495,33 @@ checkSpecializeAttrRequirements(SpecializeAttr *attr,
         continue;
       }
 
-      if (!constraint || constraint->is<ErrorType>() ||
-          constraint->hasArchetype()) {
-        isInvalidAttr = true;
-        continue;
+      if (req.getKind() == RequirementReprKind::TypeConstraint) {
+        auto constraint = req.getConstraint();
+
+        if (!constraint || constraint->is<ErrorType>() ||
+            constraint->hasArchetype()) {
+          isInvalidAttr = true;
+          continue;
+        }
+
+        auto nominalTy = constraint->getNominalOrBoundGenericNominal();
+        if (!nominalTy) {
+          TC.diagnose(attr->getLocation(),
+                      diag::specialize_attr_non_nominal_type_constraint_req)
+              .highlight(req.getSourceRange());
+          continue;
+        }
+
+        auto proto = dyn_cast<ProtocolDecl>(nominalTy);
+        if (!proto) {
+          TC.diagnose(attr->getLocation(),
+                      diag::specialize_attr_non_protocol_type_constraint_req)
+              .highlight(req.getSourceRange());
+        }
+        // TODO: Check that it is one of the compiler known protocols used for
+        // pre-specializations.
       }
 
-      auto nominalTy = constraint->getNominalOrBoundGenericNominal();
-      if (!nominalTy) {
-        TC.diagnose(attr->getLocation(),
-                    diag::specialize_attr_non_nominal_type_constraint_req)
-            .highlight(req.getSourceRange());
-        continue;
-      }
-
-      auto proto = dyn_cast<ProtocolDecl>(nominalTy);
-      if (!proto) {
-        TC.diagnose(attr->getLocation(),
-                    diag::specialize_attr_non_protocol_type_constraint_req)
-            .highlight(req.getSourceRange());
-      }
-      // TODO: Check that it is one of the compiler known protocols used for
-      // pre-specializations.
       bool isSubjectNonConcrete = subjectType->hasTypeParameter();
 
       if (isSubjectNonConcrete) {
@@ -1612,10 +1617,30 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   // Add all requirements from the "where" clause to the old signature
   // to check if there are any inconsistencies.
   auto options = TypeResolutionOptions();
+
+  // Set of generic parameters being constrained. It is used to
+  // determine if a full specialization misses requirements for
+  // some of the generic parameters.
+  SmallPtrSet<TypeBase *, 4> constrainedGenericParams;
+
+  // Go over the set of requirements and resolve their types.
   for (auto &req : trailingWhereClause->getRequirements()) {
     if (req.getKind() == RequirementReprKind::SameType) {
       auto firstType = TC.resolveType(req.getFirstTypeRepr(), FD, options);
       auto secondType = TC.resolveType(req.getSecondTypeRepr(), FD, options);
+      Type interfaceFirstType;
+      Type interfaceSecondType;
+
+      // Map types to their interface types.
+      if (firstType)
+        interfaceFirstType = genericEnv->mapTypeOutOfContext(firstType);
+      if (secondType)
+        interfaceSecondType = genericEnv->mapTypeOutOfContext(secondType);
+
+      collectUsedGenericParameters(interfaceFirstType,
+                                   constrainedGenericParams);
+      collectUsedGenericParameters(interfaceSecondType,
+                                   constrainedGenericParams);
 
       // Skip any unknown or error types.
       if (!firstType || firstType->is<ErrorType>() || !secondType ||
@@ -1624,9 +1649,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
       RequirementSource source(RequirementSource::Kind::Explicit,
                                req.getEqualLoc());
-      // Map types to their interface types.
-      auto interfaceFirstType = genericEnv->mapTypeOutOfContext(firstType);
-      auto interfaceSecondType = genericEnv->mapTypeOutOfContext(secondType);
 
       Type genericType;
       Type concreteType;
@@ -1661,25 +1683,26 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
     if (req.getKind() == RequirementReprKind::LayoutConstraint) {
       auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, options);
-      auto layoutConstraint = TC.resolveType(
-          req.getLayoutConstraintLoc().getTypeRepr(), FD, options);
+      Type interfaceSubjectType;
+
+      // Map types to their interface types.
+      if (subjectType)
+        interfaceSubjectType = genericEnv->mapTypeOutOfContext(subjectType);
+
+      collectUsedGenericParameters(interfaceSubjectType,
+                                   constrainedGenericParams);
 
       // Skip any unknown or error types.
       if (!subjectType || subjectType->is<ErrorType>() ||
-          !layoutConstraint || layoutConstraint->is<ErrorType>())
+          !req.getLayoutConstraint() ||
+          !req.getLayoutConstraint()->isKnownLayout())
         continue;
-
-      // Map types to their interface types.
-      auto interfaceSubjectType = genericEnv->mapTypeOutOfContext(subjectType);
-
-      auto interfaceLayoutConstraint =
-          genericEnv->mapTypeOutOfContext(layoutConstraint);
 
       // Re-create a requirement using the resolved interface types.
       auto resolvedReq = RequirementRepr::getLayoutConstraint(
           TypeLoc(req.getSubjectRepr(), interfaceSubjectType),
           req.getColonLoc(),
-          TypeLoc(req.getLayoutConstraintRepr(), interfaceLayoutConstraint));
+          req.getLayoutConstraintLoc());
 
       // Add a resolved requirement.
       Builder.addRequirement(resolvedReq);
@@ -1690,7 +1713,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       Requirement convertedRequirement(
           RequirementKind::Layout,
           interfaceSubjectType->getCanonicalType(),
-          interfaceLayoutConstraint->getCanonicalType());
+          req.getLayoutConstraint());
       convertedRequirements.push_back(convertedRequirement);
       continue;
     }
@@ -1700,13 +1723,20 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       auto constraint = TC.resolveType(
           req.getConstraintLoc().getTypeRepr(), FD, options);
 
+      Type interfaceSubjectType;
+
+      // Map types to their interface types.
+      if (subjectType)
+        interfaceSubjectType = genericEnv->mapTypeOutOfContext(subjectType);
+
+      collectUsedGenericParameters(interfaceSubjectType,
+                                   constrainedGenericParams);
+
       // Skip any unknown or error types.
       if (!subjectType || subjectType->is<ErrorType>() ||
           !constraint || constraint->is<ErrorType>())
         continue;
 
-      // Map types to their interface types.
-      auto interfaceSubjectType = genericEnv->mapTypeOutOfContext(subjectType);
 
       auto interfaceLayoutConstraint =
           genericEnv->mapTypeOutOfContext(constraint);
@@ -1733,7 +1763,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   }
 
   // Check the validity of provided requirements.
-  checkSpecializeAttrRequirements(attr, FD, resolvedRequirements, TC);
+  checkSpecializeAttrRequirements(attr, FD, resolvedRequirements,
+                                  constrainedGenericParams, TC);
 
   // Store converted requirements in the attribute so that they are
   // serialized later.

@@ -1580,9 +1580,9 @@ ERROR(requires_generic_param_same_type_does_not_conform,none,
       (Type, Identifier))
 ERROR(mutiple_layout_constraints,none,
       "multiple layout constraints cannot be used at the same time: %0 and %1",
-      (Type, Type))
+      (LayoutConstraint, LayoutConstraint))
 NOTE(previous_layout_constraint, none,
-    "previous layout constraint declaration %0 was here", (Type))
+    "previous layout constraint declaration %0 was here", (LayoutConstraint))
 
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{"

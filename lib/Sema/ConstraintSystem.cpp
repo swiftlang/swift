@@ -963,21 +963,8 @@ void ConstraintSystem::openGeneric(
     }
 
     case RequirementKind::Layout: {
-      auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
-      auto proto = req.getSecondType()->castTo<ProtocolType>();
-      auto protoDecl = proto->getDecl();
-
-      // Determine whether this is the protocol 'Self' constraint we should
-      // skip.
-      if (skipProtocolSelfConstraint &&
-          protoDecl == outerDC &&
-          (protoDecl->getSelfInterfaceType()->getCanonicalType() ==
-           req.getFirstType()->getCanonicalType())) {
-        break;
-      }
-
-      addConstraint(ConstraintKind::Layout, subjectTy, proto,
-                    locatorPtr);
+      // Do not process layout constraints yet, until we allow their use
+      // outside of @_specialize attribute.
       break;
     }
 

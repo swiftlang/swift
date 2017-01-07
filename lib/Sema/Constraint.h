@@ -83,7 +83,7 @@ enum class ConstraintKind : char {
   /// protocol type).
   ConformsTo,
   /// \brief The first type must conform to the layout defined by the second
-  /// type(which is a protocol type).
+  /// component representing a layout constraint.
   Layout,
   /// \brief The first type describes a literal that conforms to the second
   /// type, which is one of the known expressible-by-literal protocols.

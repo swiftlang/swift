@@ -47,12 +47,22 @@ enum class RequirementKind : unsigned {
 /// types thereof) of a
 class Requirement {
   llvm::PointerIntPair<Type, 3, RequirementKind> FirstTypeAndKind;
-  Type SecondType;
+  union {
+    Type SecondType;
+    LayoutConstraint SecondLayout;
+  };
 
 public:
   /// Create a conformance or same-type requirement.
   Requirement(RequirementKind kind, Type first, Type second)
     : FirstTypeAndKind(first, kind), SecondType(second) {
+    assert(first);
+    assert(second);
+  }
+
+  /// Create a layout constraint requirement.
+  Requirement(RequirementKind kind, Type first, LayoutConstraint second)
+    : FirstTypeAndKind(first, kind), SecondLayout(second) {
     assert(first);
     assert(second);
   }
@@ -67,7 +77,14 @@ public:
 
   /// \brief Retrieve the second type.
   Type getSecondType() const {
+    assert(getKind() != RequirementKind::Layout);
     return SecondType;
+  }
+
+  /// \brief Retrieve the layout constraint.
+  LayoutConstraint getLayoutConstraint() const {
+    assert(getKind() == RequirementKind::Layout);
+    return SecondLayout;
   }
 
   void dump() const;

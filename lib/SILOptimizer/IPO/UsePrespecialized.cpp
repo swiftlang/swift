@@ -89,6 +89,8 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
       continue;
 
     // Bail if any generic type parameters are unbound.
+    // TODO: Remove this limitation once public partial specializations
+    // are supported and can be provided by other modules.
     if (hasUnboundGenericTypes(Subs))
       continue;
 

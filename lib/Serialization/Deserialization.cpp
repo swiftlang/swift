@@ -3762,6 +3762,8 @@ Type ModuleFile::getType(TypeID TID) {
 
     Type superclass;
     superclass = getType(superclassID);
+    // TODO: Read layout.
+    LayoutConstraint layout;
 
     SmallVector<ProtocolDecl *, 4> conformances;
     for (DeclID protoID : rawConformanceIDs)
@@ -3775,11 +3777,11 @@ Type ModuleFile::getType(TypeID TID) {
     if (parent) {
       auto assocTypeDecl = cast<AssociatedTypeDecl>(getDecl(assocTypeOrNameID));
       archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
-                                        conformances, superclass);
+                                        conformances, superclass, layout);
     } else {
       archetype = ArchetypeType::getNew(ctx, genericEnv,
                                         getIdentifier(assocTypeOrNameID),
-                                        conformances, superclass);
+                                        conformances, superclass, layout);
     }
 
     typeOrOffset = archetype;

@@ -91,14 +91,16 @@ public:
         SmallVector<ProtocolConformance *, 2> conformances;
         nominal->lookupConformance(Mod, proto, conformances);
         assert(conformances.size() == 1);
-        auto concreteSubs = replacement->gatherAllSubstitutions(
-            nominal->getModuleContext(), nullptr);
-        if (!concreteSubs.empty()) {
-          auto specialized = Mod->getASTContext().getSpecializedConformance(
-              replacement, conformances.front(), concreteSubs);
-          return ProtocolConformanceRef(specialized);
-        }
-        return ProtocolConformanceRef(conformances.front());
+        return ProtocolConformanceRef(conformances.front())
+            .subst(Mod, replacement);
+        // auto concreteSubs = replacement->gatherAllSubstitutions(
+        //     nominal->getModuleContext(), nullptr);
+        // if (!concreteSubs.empty()) {
+        //   auto specialized = Mod->getASTContext().getSpecializedConformance(
+        //       replacement, conformances.front(), concreteSubs);
+        //   return ProtocolConformanceRef(specialized);
+        // }
+        // return ProtocolConformanceRef(conformances.front());
       }
     }
     return ProtocolConformanceRef(protoType->getDecl());
@@ -124,13 +126,13 @@ static unsigned getBoundGenericDepth(Type t) {
 /// For a dependent type of a generic type returns its base
 /// generic type. For a generic type parameter type, returns this
 /// type.
-GenericTypeParamType *getBaseGenericTypeParamType(CanType Ty) {
+GenericTypeParamType *getBaseGenericTypeParamType(Type Ty) {
   auto BaseTy = Ty;
-  while (auto DepTy = dyn_cast<DependentMemberType>(BaseTy)) {
-    BaseTy = DepTy->getBase()->getCanonicalType();
+  while (auto DepTy = dyn_cast<DependentMemberType>(BaseTy.getPointer())) {
+    BaseTy = DepTy->getBase();
   };
-  assert(isa<GenericTypeParamType>(BaseTy));
-  return cast<GenericTypeParamType>(BaseTy);
+  assert(BaseTy->is<GenericTypeParamType>());
+  return BaseTy->getAs<GenericTypeParamType>();
 }
 
 // =============================================================================
@@ -207,18 +209,6 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
     return false;
   }
 
-#if 0
-  if (!HasConcreteGenericParams) {
-    // All substititions are unbound.
-    DEBUG(llvm::dbgs() <<
-          "    Cannot specialize with all unbound interface substitutions.\n");
-    DEBUG(for (auto Sub : ParamSubs) {
-            Sub.dump();
-          });
-    return false;
-  }
-#endif
-
   // Do not partially specialize any print.*unlock methods, because
   // they are very big and are not important for performance.
   // TODO: Could it be that they are important for string interpolation?
@@ -228,8 +218,8 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
     return false;
 
   // We need a generic environment for the partial specialization.
-  if (HasUnboundGenericParams && !Callee->getGenericEnvironment())
-    return false;
+  // if (HasUnboundGenericParams && !Callee->getGenericEnvironment())
+  //   return false;
 
   return true;
 }
@@ -241,14 +231,13 @@ static void copySubstitutionMapEntry(Type FromTy, SubstitutionMap &FromMap,
                                      Type Replacement = nullptr) {
   auto FromCanTy = FromTy->getCanonicalType();
   auto ToCanTy = ToTy->getCanonicalType();
-  if (isa<SubstitutableType>(FromCanTy)) {
-    auto FromSubTy = cast<SubstitutableType>(FromCanTy);
-    auto ToSubTy = cast<SubstitutableType>(ToCanTy);
-    if (!SkipSubstIfExists || !ToMap.getMap().lookup(ToSubTy)) {
-      auto FromSubstTy =
-          (Replacement) ? Replacement : FromMap.getMap().lookup(FromSubTy);
-      ToMap.addSubstitution(ToSubTy, FromSubstTy);
-    }
+  assert(isa<SubstitutableType>(FromCanTy));
+  auto FromSubTy = cast<SubstitutableType>(FromCanTy);
+  auto ToSubTy = cast<SubstitutableType>(ToCanTy);
+  if (!SkipSubstIfExists || !ToMap.getMap().lookup(ToSubTy)) {
+    auto FromSubstTy =
+        (Replacement) ? Replacement : FromMap.getMap().lookup(FromSubTy);
+    ToMap.addSubstitution(ToSubTy, FromSubstTy);
   }
 }
 
@@ -366,9 +355,6 @@ static void remapRequirements(
   for (auto &reqReq : GenSig->getRequirements()) {
     SubstitutableType *FirstTy =
         dyn_cast<SubstitutableType>(reqReq.getFirstType()->getCanonicalType());
-    //assert((!FirstTy || SubstMap.getMap().lookup(FirstTy)) &&
-    //       "Type should be mapped");
-
     // If this generic parameter is not mapped, no need to handle its requirements.
     if (FirstTy && !SubstMap.getMap().lookup(FirstTy)) {
       assert(!isa<SubstitutableType>(reqReq.getSecondType()->getCanonicalType()));
@@ -405,7 +391,7 @@ static void remapRequirements(
 
       auto Req = RequirementRepr::getLayoutConstraint(
           TypeLoc::withoutLoc(first), sourceLoc,
-          TypeLoc::withoutLoc(reqReq.getSecondType()));
+          LayoutConstraintLoc::withoutLoc(reqReq.getLayoutConstraint()));
       auto Failure = Builder.addRequirement(Req);
 
       assert(!Failure);
@@ -668,6 +654,9 @@ void ReabstractionInfo::SpecializeConcreteAndGenericSubstitutions(
     auto CallerGenericParam =
         CallerGenericEnv->mapTypeOutOfContext(CallerArchetype)
             ->getCanonicalType();
+    // No need to introduce new generic parameters for dependent types.
+    if (!CallerGenericParam->is<DependentMemberType>())
+      continue;
     assert(CallerGenericParam);
     assert(CallerGenericParam->is<GenericTypeParamType>());
 
@@ -1143,91 +1132,6 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   return NewFnTy;
 }
 
-namespace {
-template<typename SubstFn>
-struct SubstDependentSILType
-  : CanTypeVisitor<SubstDependentSILType<SubstFn>, CanType>
-{
-  SILModule &M;
-  SubstFn Subst;
-
-  SubstDependentSILType(SILModule &M, SubstFn Subst)
-    : M(M), Subst(std::move(Subst))
-  {}
-
-  using super = CanTypeVisitor<SubstDependentSILType<SubstFn>, CanType>;
-  using super::visit;
-
-  CanType visitDependentMemberType(CanDependentMemberType t) {
-    // If a dependent member type appears in lowered position, we need to lower
-    // its context substitution against the associated type's abstraction
-    // pattern.
-    CanType astTy = Subst(t);
-    auto origTy = swift::Lowering::AbstractionPattern::getOpaque();
-
-    return M.Types.getLoweredType(origTy, astTy)
-      .getSwiftRValueType();
-  }
-
-  CanType visitTupleType(CanTupleType t) {
-    // Dependent members can appear in lowered position inside tuples.
-
-    SmallVector<TupleTypeElt, 4> elements;
-
-    for (auto &elt : t->getElements())
-      elements.push_back(elt.getWithType(visit(CanType(elt.getType()))));
-
-    return TupleType::get(elements, t->getASTContext())
-      ->getCanonicalType();
-  }
-
-  CanType visitSILFunctionType(CanSILFunctionType t) {
-    // Dependent members can appear in lowered position inside SIL functions.
-
-    SmallVector<SILParameterInfo, 4> params;
-    for (auto &param : t->getParameters())
-      params.push_back(param.map([&](CanType pt) -> CanType {
-        return visit(pt);
-      }));
-
-    SmallVector<SILResultInfo, 4> results;
-    for (auto &result : t->getAllResults())
-      results.push_back(result.map([&](CanType pt) -> CanType {
-        return visit(pt);
-      }));
-
-    Optional<SILResultInfo> errorResult;
-    if (t->hasErrorResult()) {
-      errorResult = t->getErrorResult().map([&](CanType elt) -> CanType {
-          return visit(elt);
-      });
-    }
-
-    return SILFunctionType::get(t->getGenericSignature(),
-                                t->getExtInfo(),
-                                t->getCalleeConvention(),
-                                params, results, errorResult,
-                                t->getASTContext());
-  }
-
-  CanType visitType(CanType t) {
-    // Other types get substituted into context normally.
-    return Subst(t);
-  }
-};
-
-
-template<typename SubstFn>
-static SILType doSubstDependentSILType(SILModule &M,
-                                SubstFn Subst,
-                                SILType t) {
-  CanType result = SubstDependentSILType<SubstFn>(M, std::move(Subst))
-    .visit(t.getSwiftRValueType());
-  return SILType::getPrimitiveType(result, t.getCategory());
-}
-
-}
-
 Type ReabstractionInfo::mapTypeIntoContext(Type type) const {
   if (!type->hasTypeParameter())
     return type;
@@ -1339,14 +1243,6 @@ checkSpecializationRequirements(ArrayRef<RequirementRepr> Requirements) {
     }
 
     if (Req.getKind() == RequirementReprKind::LayoutConstraint) {
-      auto Nominal = Req.getLayoutConstraint()->getNominalOrBoundGenericNominal();
-      assert(Nominal && "Only conformances to nominal types are supported by "
-                        "generic specialization");
-      (void)Nominal;
-      auto Proto = dyn_cast<ProtocolDecl>(Nominal);
-      assert(Proto && "Only conformances to protocol types are supported by "
-                        "generic specialization");
-      (void)Proto;
       // TODO: Check that it is one of the compiler known protocols used for
       // pre-specializations.
       continue;
@@ -1380,7 +1276,7 @@ static void convertRequirements(ArrayRef<Requirement> From,
     if (Req.getKind() == RequirementKind::Layout) {
       To.push_back(RequirementRepr::getLayoutConstraint(
           TypeLoc::withoutLoc(Req.getFirstType()), SourceLoc(),
-          TypeLoc::withoutLoc(Req.getSecondType())));
+            LayoutConstraintLoc::withoutLoc(Req.getLayoutConstraint())));
       continue;
     }
 
@@ -1509,6 +1405,7 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
     Old = Mangler.finalize();
   }
 
+  // TODO: Clean-up once the new mangler is merged.
 #if 0
   NewMangling::GenericSpecializationMangler NewGenericMangler(
       GenericFunc, FnTy, Fragile, /*isReAbstracted*/ true);
@@ -1741,6 +1638,8 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
       OldGenericMangler.mangle();
       Old = Mangler.finalize();
     }
+
+    // TODO: Clean-up once the new mangler is merged.
 #if 0
     NewMangling::GenericSpecializationMangler NewMangler(
         OrigF, ReInfo.getSubstitutedType(), Fragile,
@@ -1880,7 +1779,10 @@ void swift::trySpecializeApplyOfGeneric(
   if (F->isFragile() && !RefF->hasValidLinkageForFragileInline())
       return;
 
-  if (RefF && RefF->hasSemanticsAttr("optimize.sil.call_specialized.never"))
+  // Do not specialize if the callee is explicitly excluded from
+  // generic specializations.
+  if (RefF &&
+      RefF->hasSemanticsAttr("optimize.sil.generic.specialization.never"))
     return;
 
   // If the caller and callee are both fragile, preserve the fragility when

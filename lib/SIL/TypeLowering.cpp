@@ -152,7 +152,10 @@ enum class LoweredTypeKind {
   AggWithReference,
 
   /// Non-trivial and not loadable.
-  AddressOnly
+  AddressOnly,
+
+  /// Trivial and not loadable.
+  TrivialAddressOnly
 };
 
 static LoweredTypeKind classifyType(CanType type, SILModule &M,
@@ -178,6 +181,7 @@ namespace {
     //   RetTy handleAddressOnly(CanType);
     //   RetTy handleReference(CanType);
     //   RetTy handleTrivial(CanType);
+    //   RetTy handleTrivialAddressOnly(CanType);
     // In addition, if it does not override visitTupleType
     // and visitAnyStructType, it should also implement:
     //   RetTy handleAggWithReference(CanType);
@@ -319,19 +323,19 @@ namespace {
         return asImpl().handleReference(type);
       }
 
-      auto LayoutInfo = getLayoutConstraintInfo(type);
-      if (LayoutInfo.isFixedSizeTrivial()) {
-        return asImpl().handleTrivial(type);
+      auto LayoutInfo = type->getLayoutConstraint();
+      if (LayoutInfo) {
+        if (LayoutInfo->isFixedSizeTrivial()) {
+          return asImpl().handleTrivial(type);
+        }
+
+        if (LayoutInfo->isAddressOnlyTrivial()) {
+          return asImpl().handleTrivialAddressOnly(type);
+        }
+
+        if (LayoutInfo->isRefCountedObject())
+          return asImpl().handleReference(type);
       }
-
-      if (LayoutInfo.isAddressOnlyTrivial()) {
-        return asImpl().handleTrivial(
-            type, TypeLowering::IsAddressOnly_t::IsAddressOnly);
-      }
-
-      if (LayoutInfo.isRefCountedObject())
-        return asImpl().handleReference(type);
-
       return asImpl().handleAddressOnly(type);
     }
 
@@ -382,6 +386,8 @@ namespace {
         switch (classifyType(eltType, M, Sig, Expansion)) {
         case LoweredTypeKind::Trivial:
           continue;
+        case LoweredTypeKind::TrivialAddressOnly:
+          return asImpl().handleTrivialAddressOnly(type);
         case LoweredTypeKind::AddressOnly:
           return asImpl().handleAddressOnly(type);
         case LoweredTypeKind::Reference:
@@ -426,11 +432,15 @@ namespace {
       return LoweredTypeKind::AggWithReference;
     }
     LoweredTypeKind
-    handleTrivial(CanType type,
-                  TypeLowering::IsAddressOnly_t addressOnly =
-                      TypeLowering::IsAddressOnly_t::IsNotAddressOnly) {
+    handleTrivial(CanType type) {
       return LoweredTypeKind::Trivial;
     }
+
+    LoweredTypeKind
+    handleTrivialAddressOnly(CanType type) {
+      return LoweredTypeKind::TrivialAddressOnly;
+    }
+
     LoweredTypeKind handleAddressOnly(CanType type) {
       return LoweredTypeKind::AddressOnly;
     }
@@ -1144,12 +1154,14 @@ namespace {
         TC(TC), Dependent(Dependent) {}
 
     const TypeLowering *
-    handleTrivial(CanType type,
-                  TypeLowering::IsAddressOnly_t addressOnly =
-                      TypeLowering::IsAddressOnly_t::IsNotAddressOnly) {
+    handleTrivial(CanType type) {
       auto silType = SILType::getPrimitiveObjectType(type);
-      if (addressOnly == TypeLowering::IsAddressOnly_t::IsNotAddressOnly)
-        return new (TC, Dependent) TrivialTypeLowering(silType);
+      return new (TC, Dependent) TrivialTypeLowering(silType);
+    }
+
+    const TypeLowering *
+    handleTrivialAddressOnly(CanType type) {
+      auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC, Dependent) AddressOnlyTrivialTypeLowering(silType);
     }
 
@@ -1205,6 +1217,7 @@ namespace {
           structType->getTypeOfMember(D->getModuleContext(), field, nullptr);
         switch (classifyType(substFieldType->getCanonicalType(),
                              M, Sig, Expansion)) {
+        case LoweredTypeKind::TrivialAddressOnly:
         case LoweredTypeKind::AddressOnly:
           return handleAddressOnly(structType);
         case LoweredTypeKind::AggWithReference:
@@ -1258,6 +1271,7 @@ namespace {
           ->getCanonicalType();
         
         switch (classifyType(substEltType, M, Sig, Expansion)) {
+        case LoweredTypeKind::TrivialAddressOnly:
         case LoweredTypeKind::AddressOnly:
           return handleAddressOnly(enumType);
         case LoweredTypeKind::AggWithReference:

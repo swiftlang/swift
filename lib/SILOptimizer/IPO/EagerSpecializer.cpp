@@ -132,7 +132,6 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
 
 /// Adds a CFG edge from the unterminated NewRetBB to a merged "return" block.
 static void addReturnValue(SILBasicBlock *NewRetBB, SILBasicBlock *OldRetBB, SILValue NewRetVal) {
-  //auto *RetBB = &*NewRetBB->getParent()->findReturnBB();
   auto *RetBB = OldRetBB;
   addReturnValueImpl(RetBB, NewRetBB, NewRetVal);
 }
@@ -274,15 +273,15 @@ protected:
 
   void emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
                                SubstitutableType *ParamTy, Type SubTy,
-                               LayoutConstraintInfo Layout);
+                               LayoutConstraint Layout);
 
   void emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
                           SubstitutableType *ParamTy, Type SubTy,
-                          LayoutConstraintInfo Layout);
+                          LayoutConstraint Layout);
 
   void emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
                                  SubstitutableType *ParamTy, Type SubTy,
-                                 LayoutConstraintInfo Layout);
+                                 LayoutConstraint Layout);
 
   void emitLayoutCheck(SILBasicBlock *FailedTypeCheckBB,
                        SubstitutableType *ParamTy, Type SubTy);
@@ -327,15 +326,15 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
       } else {
         // If Replacement has a layout constraint, then dispatch based
         // on its size and the fact that it is trivial.
-        auto LayoutInfo = getLayoutConstraintInfo(Replacement);
-        if (LayoutInfo.isTrivial()) {
+        auto LayoutInfo = Replacement->getLayoutConstraint();
+        if (LayoutInfo && LayoutInfo->isTrivial()) {
           // Emit a check that it is a trivial type of a certain size.
           emitTrivialAndSizeCheck(
               FailedTypeCheckBB, ParamTy,
               ReInfo.getSpecializedGenericEnvironment()->mapTypeIntoContext(
                   Builder.getModule().getSwiftModule(), Replacement),
               LayoutInfo);
-        } else if (LayoutInfo.isRefCountedObject()) {
+        } else if (LayoutInfo && LayoutInfo->isRefCountedObject()) {
           // Emit a check that it is an object of a reference counted type.
           emitRefCountedObjectCheck(
               FailedTypeCheckBB, ParamTy,
@@ -439,7 +438,7 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
 
 void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
                                        SubstitutableType *ParamTy, Type SubTy,
-                                       LayoutConstraintInfo Layout) {
+                                       LayoutConstraint Layout) {
   auto &Ctx = Builder.getASTContext();
   // Instantiate a thick metatype for T.Type
   auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
@@ -459,8 +458,8 @@ void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
 void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
                                             SubstitutableType *ParamTy,
                                             Type SubTy,
-                                            LayoutConstraintInfo Layout) {
-  if (Layout.isAddressOnlyTrivial()) {
+                                            LayoutConstraint Layout) {
+  if (Layout->isAddressOnlyTrivial()) {
     emitIsTrivialCheck(FailedTypeCheckBB, ParamTy, SubTy, Layout);
     return;
   }
@@ -476,8 +475,8 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
   auto ParamSize = Builder.createBuiltin(Loc, Ctx.getIdentifier("sizeof"),
                                          WordTy, Sub, { GenericMT });
   auto LayoutSize =
-      Builder.createIntegerLiteral(Loc, WordTy, Layout.getTrivialSizeInBytes());
-  const char *CmpOpName = Layout.isFixedSizeTrivial() ? "cmp_eq" : "cmp_le";
+      Builder.createIntegerLiteral(Loc, WordTy, Layout->getTrivialSizeInBytes());
+  const char *CmpOpName = Layout->isFixedSizeTrivial() ? "cmp_eq" : "cmp_le";
   auto Cmp =
     Builder.createBuiltinBinaryFunction(Loc, CmpOpName, WordTy,
                                         BoolTy,
@@ -498,7 +497,7 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
 void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
                                               SubstitutableType *ParamTy,
                                               Type SubTy,
-                                              LayoutConstraintInfo Layout) {
+                                              LayoutConstraint Layout) {
   auto &Ctx = Builder.getASTContext();
   // Instantiate a thick metatype for T.Type
   auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);

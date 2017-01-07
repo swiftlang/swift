@@ -211,7 +211,7 @@ public:
   void enumerateRequirements(llvm::function_ref<
                       void (RequirementKind kind,
                             PotentialArchetype *archetype,
-                            llvm::PointerUnion<Type, PotentialArchetype *> type,
+                            llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint> constraint,
                             RequirementSource source)> f);
   
 
@@ -244,12 +244,9 @@ public:
   /// re-inject requirements from outer contexts.
   void addRequirement(const Requirement &req, RequirementSource source);
 
-  bool addLayoutRequirement(PotentialArchetype *PAT, ProtocolDecl *Proto,
+  bool addLayoutRequirement(PotentialArchetype *PAT,
+                            LayoutConstraint Layout,
                             RequirementSource Source);
-
-  bool addLayoutRequirement(PotentialArchetype *PAT, ProtocolDecl *Proto,
-                            RequirementSource Source,
-                            llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
@@ -351,6 +348,12 @@ class ArchetypeBuilder::PotentialArchetype {
 
   /// \brief The list of protocols to which this archetype will conform.
   llvm::MapVector<ProtocolDecl *, RequirementSource> ConformsTo;
+
+  /// \brief The layout constraint of this archetype, if specified.
+  LayoutConstraint Layout;
+
+  /// The source of the layout constraint requirement.
+  Optional<RequirementSource> LayoutSource;
 
   /// \brief The set of nested types of this archetype.
   ///
@@ -527,6 +530,14 @@ public:
   const RequirementSource &getSuperclassSource() const {
     return *SuperclassSource;
   } 
+
+  /// Retrieve the layout constraint of this archetype.
+  LayoutConstraint getLayout() const { return Layout; }
+
+  /// Retrieve the requirement source for the layout constraint requirement.
+  const RequirementSource &getLayoutSource() const {
+    return *LayoutSource;
+  }
 
   /// Retrieve the set of nested types.
   const llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>> &
