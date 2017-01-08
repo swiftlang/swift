@@ -69,7 +69,7 @@ namespace swift {
   struct SILArgumentConvention;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
-  enum class ValueOwnershipKind : uint8_t;
+  struct ValueOwnershipKind;
 
   enum class TypeKind {
 #define TYPE(id, parent) id,
