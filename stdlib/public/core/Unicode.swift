@@ -280,7 +280,7 @@ public struct UTF8 : UnicodeCodec {
   static func _decodeOne(_ buffer: UInt32) -> (result: UInt32?, length: UInt8) {
     // Note the buffer is read least significant byte first: [ #3 #2 #1 #0 ].
 
-    if buffer & 0x80 == 0 { // 1-byte sequence (ASCII), buffer: [ … … … CU0 ].
+    if buffer & 0x80 == 0 { // 1-byte sequence (ASCII), buffer: [ ... ... ... CU0 ].
       let value = buffer & 0xff
       return (value, 1)
     }
@@ -304,7 +304,7 @@ public struct UTF8 : UnicodeCodec {
     let bit1 = (lut1 >> index) & 1
 
     switch (bit1, bit0) {
-    case (0, 0): // 2-byte sequence, buffer: [ … … CU1 CU0 ].
+    case (0, 0): // 2-byte sequence, buffer: [ ... ... CU1 CU0 ].
       // Require 10xx xxxx  110x xxxx.
       if _slowPath(buffer & 0xc0e0 != 0x80c0) { return (nil, 1) }
       // Disallow xxxx xxxx  xxx0 000x (<= 7 bits case).
@@ -314,7 +314,7 @@ public struct UTF8 : UnicodeCodec {
                 | (buffer & 0x001f) << 6
       return (value, 2)
 
-    case (0, 1): // 3-byte sequence, buffer: [ … CU2 CU1 CU0 ].
+    case (0, 1): // 3-byte sequence, buffer: [ ... CU2 CU1 CU0 ].
       // Disallow xxxx xxxx  xx0x xxxx  xxxx 0000 (<= 11 bits case).
       if _slowPath(buffer & 0x00200f == 0x000000) { return (nil, 1) }
       // Disallow xxxx xxxx  xx1x xxxx  xxxx 1101 (surrogate code points).

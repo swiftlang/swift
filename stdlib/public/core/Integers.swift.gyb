@@ -81,8 +81,8 @@ extension ExpressibleByIntegerLiteral
 //===--- Arithmetic -------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// Declares methods backing binary arithmetic operators—such as `+`, `-` and
-/// `*`—and their mutating counterparts.
+/// Declares methods backing binary arithmetic operators--such as `+`, `-` and
+/// `*`--and their mutating counterparts.
 ///
 /// It provides a suitable basis for arithmetic on scalars such as integers and
 /// floating point numbers.

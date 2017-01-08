@@ -76,7 +76,7 @@ Generics
 There is actually a straightforward programming model for generics.
 If you want to design a generic component where a type parameter ``T``
 binds to both ``class``\ es and non-``class`` types, you can view
-``T`` as a value type where—as with C pointers—the value is the
+``T`` as a value type where--as with C pointers--the value is the
 reference rather than the object being referred to.
 
 Of course, if ``T`` is only supposed to bind to ``class``\ es, a

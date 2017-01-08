@@ -327,8 +327,8 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   ```swift
   let a: Foo & Bar
   let b = value as? A & B & C
-  func foo<T : Foo & Bar>(x: T) { … }
-  func bar(x: Foo & Bar) { … }
+  func foo<T : Foo & Bar>(x: T) { ... }
+  func bar(x: Foo & Bar) { ... }
   typealias G = GenericStruct<Foo & Bar>
   ```
 
@@ -1106,7 +1106,7 @@ Swift 2.0
 * Public extensions of generic types are now permitted.
 
   ```swift
-  public extension Array { … }
+  public extension Array { ... }
   ```
 
   **(16974298)**
@@ -1266,8 +1266,8 @@ Swift 2.0
   For example:
 
   ```swift
-  func produceGizmoUsingTechnology() throws -> Gizmo { … }
-  func produceGizmoUsingMagic() throws -> Gizmo { … }
+  func produceGizmoUsingTechnology() throws -> Gizmo { ... }
+  func produceGizmoUsingMagic() throws -> Gizmo { ... }
 
   if let result = try? produceGizmoUsingTechnology() { return result }
   if let result = try? produceGizmoUsingMagic() { return result }
@@ -1440,7 +1440,7 @@ Swift 2.0
   function or initializer. For example:
 
   ```swift
-  func doSomethingToValues(values: Int... , options: MyOptions = [], fn: (Int) -&gt; Void) { … }
+  func doSomethingToValues(values: Int... , options: MyOptions = [], fn: (Int) -&gt; Void) { ... }
   ```
 
   **(20127197)**
@@ -1472,7 +1472,7 @@ Swift 2.0
   **(17227475)**
 
 * When delegating or chaining to a failable initializer (for example, with
-  `self.init(…)` or `super.init(…)`), one can now force-unwrap the result with
+  `self.init(...)` or `super.init(...)`), one can now force-unwrap the result with
   `!`. For example:
 
   ```swift
@@ -2179,7 +2179,7 @@ Swift 1.2
   }
 
   class MySomethingDelegate : SomethingDelegate {
-      @objc func didSomething() { … }
+      @objc func didSomething() { ... }
   }
   ```
 

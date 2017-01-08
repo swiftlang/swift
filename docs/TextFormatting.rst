@@ -90,14 +90,14 @@ Formatting Variants
 -------------------
 
 ``CustomStringConvertible`` types with parameterized textual representations
-(e.g. number types) *additionally* support a ``format(…)`` method
+(e.g. number types) *additionally* support a ``format(...)`` method
 parameterized according to that type's axes of variability::
 
   print(offset)
   print(offset.format()) // equivalent to previous line
   print(offset.format(radix: 16, width: 5, precision: 3))
 
-Although ``format(…)`` is intended to provide the most general
+Although ``format(...)`` is intended to provide the most general
 interface, specialized formatting interfaces are also possible::
 
   print(offset.hex())
@@ -256,7 +256,7 @@ Extended Formatting Example
 
 The following code is a scaled-down version of the formatting code
 used for ``Int``. It represents an example of how a relatively
-complicated ``format(…)`` might be written::
+complicated ``format(...)`` might be written::
 
   protocol CustomStringConvertibleInteger
     : ExpressibleByIntegerLiteral, Comparable, SignedNumber, CustomStringConvertible {
@@ -346,8 +346,8 @@ an underlying stream::
     var base: UnderlyingStream
   }
 
-However, upcasing is a trivial example: many such transformations—such
-as ``trim()`` or regex replacement—are stateful, which implies some
+However, upcasing is a trivial example: many such transformations--such
+as ``trim()`` or regex replacement--are stateful, which implies some
 way of indicating "end of input" so that buffered state can be
 processed and written to the underlying stream:
 
@@ -396,7 +396,7 @@ and, finally, we'd be able to write:
 
 The complexity of this back-and-forth adapter dance is daunting, and
 might well be better handled in the language once we have some formal
-model—such as coroutines—of inversion-of-control. We think it makes
+model--such as coroutines--of inversion-of-control. We think it makes
 more sense to build the important transformations directly into
 ``format()`` methods, allowing, e.g.:
 
@@ -450,7 +450,7 @@ to tip the balance in favor of the current design.
 
 --------
 
-.. [#format] Whether ``format(…)`` is to be a real protocol or merely
+.. [#format] Whether ``format(...)`` is to be a real protocol or merely
    an ad-hoc convention is TBD. So far, there's no obvious use for a
    generic ``format`` with arguments that depend on the type being
    formatted, so an ad-hoc convention would be just fine.

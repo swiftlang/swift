@@ -237,7 +237,7 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
   ManagedValue payload;
 
   // Take the payload from the optional.  Cheat a bit in the +0
-  // case—UncheckedTakeEnumData will never actually invalidate an Optional enum
+  // case--UncheckedTakeEnumData will never actually invalidate an Optional enum
   // value.
   SILValue payloadVal;
   if (!addrOrValue.getType().isAddress()) {
