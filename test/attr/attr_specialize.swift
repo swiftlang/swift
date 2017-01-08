@@ -89,7 +89,7 @@ struct FloatElement : HasElt {
 func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 
 @_specialize(where T == Sub)
-@_specialize(where T == NonSub) // expected-error{{'T' requires that 'NonSub' inherit from 'Base'}} expected-error{{'T' requires that 'NonSub' inherit from 'Base'}}
+@_specialize(where T == NonSub) // expected-error{{'T' requires that 'NonSub' inherit from 'Base'}}
 func superTypeRequirement<T : Base>(_ t: T) {}
 
 @_specialize(where X:_Trivial(8), Y == Int) // expected-error{{trailing 'where' clause in @_specialize attribute of non-generic function 'requirementOnNonGenericFunction'}}
