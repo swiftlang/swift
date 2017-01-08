@@ -156,11 +156,11 @@ To add a new multiple file test:
 1.  Add a new directory and files under the `multi-source` directory as
     specified below:
 
-        ├── multi-source
-        │   ├── YourTestName
-        │   │   ├── TestFile1.swift
-        │   │   ├── TestFile2.swift
-        │   │   ├── TestFile3.swift
+        +-- multi-source
+        |   +-- YourTestName
+        |   |   +-- TestFile1.swift
+        |   |   +-- TestFile2.swift
+        |   |   +-- TestFile3.swift
 
     At least one run function (specified in the template below) must
     exist in the files.

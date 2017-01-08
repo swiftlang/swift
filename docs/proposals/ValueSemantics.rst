@@ -282,7 +282,7 @@ The Role of Moves
 =================
 
 Further complicating matters is the fact that the big three operations
-can be—and often are—combined in ways that mask the value/reference
+can be--and often are--combined in ways that mask the value/reference
 distinction.  In fact both of the following must be present in order
 to observe a difference in behavior:
 

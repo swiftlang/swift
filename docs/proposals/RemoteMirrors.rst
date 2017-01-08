@@ -50,7 +50,7 @@ While this should have zero runtime overhead when not in use, it is OK if
 introspection requires some additional computation, especially if it can be
 front-loaded or memoized.
 
-It is OK if in rare cases the metadata is not precise — for some allocations,
+It is OK if in rare cases the metadata is not precise -- for some allocations,
 we might not be able to figure out the runtime type of the contained value.
 Also we will not attempt to verify the "roots" of the object graph by walking
 the stack for pointers.
@@ -107,7 +107,7 @@ Opaque value buffers
 
 These come up when a value is too large to fit inside of an existential's
 inline storage, for example. They do not have a header, so we will not attempt
-to introspect them at first — eventually, we could identify pointers to buffers
+to introspect them at first -- eventually, we could identify pointers to buffers
 where the existential is itself inside of a heap-allocated object.
 
 Existing metadata
@@ -134,8 +134,8 @@ several strategies depending on the type being referenced. For concrete
 non-generic types, a direct call to a lazy accessor can be generated. For bound
 generic types T<P1, ..., Pn>, we recursively emit metadata references for the
 generic parameters Pn, then call the getter for the bound type T. For
-archetypes — that is, generic type parameters which are free variables in the
-function body being compiled — the metadata is passed in as a value, so the
+archetypes -- that is, generic type parameters which are free variables in the
+function body being compiled -- the metadata is passed in as a value, so the
 compiler simply emits a copy of that.
 
 Generic type metadata tells us the size of each heap allocation, but does not
@@ -202,8 +202,8 @@ Similarly, we can think of the field type access function as an operation F(T,
 S) which returns the types of the fields of T, with T again fixed at compile
 time.
 
-What we really want here is to build an "interpreter" — or really, a parser for
-a simple serialized graph — which understands how to parse uninstantiated
+What we really want here is to build an "interpreter" -- or really, a parser for
+a simple serialized graph -- which understands how to parse uninstantiated
 generic metadata, keep track of substitutions, and calculate field offsets,
 sizes, and locations of references.
 
@@ -241,7 +241,7 @@ to identify heap references therein, and the full type for reflection. The
 former could be retained while the latter could be stripped out in certain
 builds.
 
-We already have a very similar encoding — parameter type mangling in SIL. It
+We already have a very similar encoding -- parameter type mangling in SIL. It
 would be good to re-use this encoding, but for completeness, the full format of
 a type reference is described below:
 
@@ -281,7 +281,7 @@ a type reference is described below:
 #. **A metatype.** This consists of:
 
    - (optional) a type reference to the instance type
-   - there's no required information — a metatype is always a single pointer to
+   - there's no required information -- a metatype is always a single pointer to
      a heap object which itself does not reference any other heap objects.
 
 #. **An existential metatype.** This consists of:
@@ -294,7 +294,7 @@ a type reference is described below:
    identifiable by an index here (and once we add nested generic types, a depth).
 
 You can visualize type references as if they are written in an S-expression
-format — but in reality, it would be serialized in a compact binary form:
+format -- but in reality, it would be serialized in a compact binary form:
 
 ::
 
@@ -373,7 +373,7 @@ tools.
     case Strong, Weak, Unowned
     // the field is an opaque binary blob, contents unknown.
     case Opaque
-    // the field is a value type — look inside recursively.
+    // the field is a value type -- look inside recursively.
     case ValueType(indirect field: FieldDescriptor)
   }
 
@@ -386,7 +386,7 @@ tools.
 
   func instantiateSymbolicType(_ ref: SymbolicTypeReference) -> [FieldTypeDescriptor]
 
-Field type metadata can have circular references — for example, consider two
+Field type metadata can have circular references -- for example, consider two
 classes which contain optionals of each other. In order to calculate field
 offsets correctly, we need to break cycles when we know something is a class
 type, and use a work-list algorithm instead of unbounded recursion to ensure

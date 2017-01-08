@@ -468,7 +468,7 @@ public struct Unsafe${Mutable}RawBufferPointer
       to: base + count - elementStride + 1, 
       by: elementStride
     ) {
-      // underflow is permitted – e.g. a sequence into
+      // underflow is permitted -- e.g. a sequence into
       // the spare capacity of an Array buffer
       guard let x = it.next() else { break }
       p.initializeMemory(as: S.Iterator.Element.self, to: x)

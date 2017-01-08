@@ -128,7 +128,7 @@ specifying the name of the client library along with the required version::
 
     // Client code
     @available(Magician 1.5)
-    class CrystalBallView : MagicView { /*…*/ }
+    class CrystalBallView : MagicView { /*...*/ }
 
 Library versions can also be checked dynamically using ``#available``, allowing
 for fallback behavior when the requested library version is not present::
@@ -393,7 +393,7 @@ example using methods::
 
     public struct Point2D {
       var x, y: Double
-      public init(x: Double, y: Double) { /*…*/ }
+      public init(x: Double, y: Double) { /*...*/ }
     }
 
     extension Point2D {
@@ -410,7 +410,7 @@ polar representation::
 
     public struct Point2D {
       var r, theta: Double
-      public init(x: Double, y: Double) { /*…*/ }
+      public init(x: Double, y: Double) { /*...*/ }
     }
 
 and the ``x`` and ``y`` properties have now disappeared. To avoid this, the
@@ -659,13 +659,13 @@ can enforce its safe use.
 We've considered two possible syntaxes for this::
 
     @available(1.1)
-    extension Wand : MagicType {/*…*/}
+    extension Wand : MagicType {/*...*/}
 
 and
 
 ::
 
-    extension Wand : @available(1.1) MagicType {/*…*/}
+    extension Wand : @available(1.1) MagicType {/*...*/}
 
 The former requires fewer changes to the language grammar, but the latter could
 also be used on the declaration of the type itself (i.e. the ``struct``
