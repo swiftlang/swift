@@ -2351,9 +2351,16 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
                  // Use GenericEnvironment to produce user-friendly
                  // names instead of something like t_0_0.
                  auto FirstTy = GenericEnv->getSugaredType(req.getFirstType());
-                 auto SecondTy = GenericEnv->getSugaredType(req.getSecondType());
-                 Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-                 ReqWithDecls.print(OS, SubPrinter);
+                 if (req.getKind() != RequirementKind::Layout) {
+                   auto SecondTy =
+                       GenericEnv->getSugaredType(req.getSecondType());
+                   Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+                   ReqWithDecls.print(OS, SubPrinter);
+                 } else {
+                   Requirement ReqWithDecls(req.getKind(), FirstTy,
+                                            req.getLayoutConstraint());
+                   ReqWithDecls.print(OS, SubPrinter);
+                 }
                },
                [&] { OS << ", "; });
   }
