@@ -162,6 +162,9 @@ struct ASTContext::Implementation {
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
+  /// func append(Element) -> void
+  FuncDecl *ArrayAppendElementDecl = nullptr;
+
   /// func _unimplementedInitializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
 
@@ -881,6 +884,55 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
     }
   }
   return nullptr;
+}
+
+FuncDecl *ASTContext::getArrayAppendElementDecl() const {
+  if (Impl.ArrayAppendElementDecl)
+    return Impl.ArrayAppendElementDecl;
+
+  auto AppendFunctions = getArrayDecl()->lookupDirect(getIdentifier("append"));
+
+  for (auto CandidateFn : AppendFunctions) {
+    auto FnDecl = dyn_cast<FuncDecl>(CandidateFn);
+    auto Attrs = FnDecl->getAttrs();
+    for (auto *A : Attrs.getAttributes<SemanticsAttr, false>()) {
+      if (A->Value != "array.append_element")
+        continue;
+
+#ifndef NDEBUG
+      auto ParamLists = FnDecl->getParameterLists();
+      assert(ParamLists.size() == 2 && "Should have two parameter lists");
+      assert(ParamLists[0]->size() == 1 &&
+             "First parameter list should have one parameter");
+      auto SelfInOutTy = ParamLists[0]->get(0)->getInterfaceType()->getAs<InOutType>();
+      assert(SelfInOutTy && "Self parameter should be an inout Type");
+      auto SelfGenericStructTy =
+          SelfInOutTy->getObjectType()->getAs<BoundGenericStructType>();
+      assert(SelfGenericStructTy &&
+             "Self parameter should be a BoundGenericStructType Type");
+      assert(SelfGenericStructTy->getDecl() == getArrayDecl() &&
+             "Self parameter should be an Array");
+
+      assert(ParamLists[1]->size() == 1 &&
+             "Second parameter list should have one parameter");
+      auto ElementType = ParamLists[1]
+                             ->get(0)
+                             ->getInterfaceType()
+                             ->getAs<GenericTypeParamType>();
+      assert(ElementType &&
+             "First parameter replacement should be a GenericTypeParamType");
+      assert(ElementType->getName() == getIdentifier("Element") &&
+             "The GenericTypeParamType's name should be \"Element\"");
+
+      assert(FnDecl->getResultInterfaceType()->isVoid() &&
+             "The return type should be void");
+#endif
+      Impl.ArrayAppendElementDecl = FnDecl;
+      return FnDecl;
+    }
+  }
+
+  return NULL;
 }
 
 FuncDecl *
