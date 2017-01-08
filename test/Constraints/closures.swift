@@ -399,3 +399,41 @@ let mismatchInClosureResultType : (String) -> ((Int) -> Void) = {
 // SR-3520: Generic function taking closure with inout parameter can result in a variety of compiler errors or EXC_BAD_ACCESS
 func sr3520_1<T>(_ g: (inout T) -> Int) {}
 sr3520_1 { $0 = 1 } // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+
+func sr3520_2<T>(_ item: T, _ update: (inout T) -> Void) {
+  var x = item
+  update(&x)
+}
+var sr3250_arg = 42
+sr3520_2(sr3250_arg) { $0 += 3 } // ok
+
+// This test makes sure that having closure with inout argument doesn't crash with member lookup
+struct S_3520 {
+  var number1: Int
+}
+func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {}
+sr3520_set_via_closure({ $0.number1 = $1 }) // expected-error {{type of expression is ambiguous without more context}}
+
+// SR-1976/SR-3073: Inference of inout
+func sr1976<T>(_ closure: (inout T) -> Void) {}
+sr1976({ $0 += 2 }) // ok
+
+// SR-3073: UnresolvedDotExpr in single expression closure
+
+struct SR3073Lense<Whole, Part> {
+  let set: (inout Whole, Part) -> ()
+}
+struct SR3073 {
+  var number1: Int
+  func lenses() {
+    let _: SR3073Lense<SR3073, Int> = SR3073Lense(
+      set: { $0.number1 = $1 } // ok
+    )
+  }
+}
+
+// SR-3479: Segmentation fault and other error for closure with inout parameter
+func sr3497_unfold<A, B>(_ a0: A, next: (inout A) -> B) {}
+func sr3497() {
+  let _ = sr3497_unfold((0, 0)) { s in 0 } // ok
+}
