@@ -299,7 +299,7 @@ private:
   unsigned VerifiedImportCounter = 0;
 
   /// \brief Clang compiler invocation.
-  llvm::IntrusiveRefCntPtr<clang::CompilerInvocation> Invocation;
+  std::shared_ptr<clang::CompilerInvocation> Invocation;
 
   /// \brief Clang compiler instance, which is used to actually load Clang
   /// modules.
