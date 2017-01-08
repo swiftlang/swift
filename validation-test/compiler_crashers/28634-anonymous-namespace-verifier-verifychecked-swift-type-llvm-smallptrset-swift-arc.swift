@@ -5,5 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+// REQUIRES: OS=linux-gnu
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 let E=_==#keyPath(n&_=b:{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
