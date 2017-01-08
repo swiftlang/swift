@@ -34,7 +34,7 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-static Module *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
   SmallVector<std::pair<Identifier, SourceLoc>, 4>
       AccessPath;
   while (!ModuleName.empty()) {
@@ -45,7 +45,7 @@ static Module *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
   return Ctx.getModule(AccessPath);
 }
 
-static Module *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
   return Ctx.getModule(std::make_pair(ModuleName, SourceLoc()));
 }
 

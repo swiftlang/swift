@@ -445,8 +445,8 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   for (auto *localDecl : SF.LocalTypeDecls)
     emitGlobalDecl(localDecl);
 
-  SF.forAllVisibleModules([&](swift::Module::ImportedModule import) {
-    swift::Module *next = import.second;
+  SF.forAllVisibleModules([&](swift::ModuleDecl::ImportedModule import) {
+    swift::ModuleDecl *next = import.second;
     if (next->getName() == SF.getParentModule()->getName())
       return;
 
@@ -949,7 +949,7 @@ void IRGenModule::emitTypeVerifier() {
   for (auto name : IRGen.Opts.VerifyTypeLayoutNames) {
     // Look up the name in the module.
     SmallVector<ValueDecl*, 1> lookup;
-    swift::Module *M = getSwiftModule();
+    swift::ModuleDecl *M = getSwiftModule();
     M->lookupMember(lookup, M, DeclName(Context.getIdentifier(name)),
                     Identifier());
     if (lookup.empty()) {

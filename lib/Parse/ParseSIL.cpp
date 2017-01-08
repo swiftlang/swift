@@ -784,7 +784,7 @@ bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
 }
 
 /// Find the top-level ValueDecl or Module given a name.
-static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
+static llvm::PointerUnion<ValueDecl*, ModuleDecl*> lookupTopDecl(Parser &P,
              Identifier Name) {
   // Use UnqualifiedLookup to look through all of the imports.
   // We have to lie and say we're done with parsing to make this happen.
@@ -946,13 +946,13 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
 
   // Look up ValueDecl from a dotted path.
   ValueDecl *VD;
-  llvm::PointerUnion<ValueDecl*, Module *> Res = lookupTopDecl(P, FullName[0]);
+  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res = lookupTopDecl(P, FullName[0]);
   // It is possible that the last member lookup can return multiple lookup
   // results. One example is the overloaded member functions.
-  if (Res.is<Module*>()) {
+  if (Res.is<ModuleDecl*>()) {
     assert(FullName.size() > 1 &&
            "A single module is not a full path to SILDeclRef");
-    auto Mod = Res.get<Module*>();
+    auto Mod = Res.get<ModuleDecl*>();
     values.clear();
     VD = lookupMember(P, ModuleType::get(Mod), FullName[1], Locs[1], values,
                       FullName.size() == 2/*ExpectMultipleResults*/);
@@ -3227,7 +3227,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     SmallVector<ValueDecl*, 4> CurModuleResults;
     // Perform a module level lookup on the first component of the
     // fully-qualified name.
-    P.SF.getParentModule()->lookupValue(Module::AccessPathTy(), ProtocolName,
+    P.SF.getParentModule()->lookupValue(ModuleDecl::AccessPathTy(), ProtocolName,
                                         NLKind::UnqualifiedLookup,
                                         CurModuleResults);
     assert(CurModuleResults.size() == 1);
@@ -4251,7 +4251,7 @@ bool Parser::parseSILVTable() {
     return true;
 
   // Find the class decl.
-  llvm::PointerUnion<ValueDecl*, Module *> Res = lookupTopDecl(*this, Name);
+  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res = lookupTopDecl(*this, Name);
   assert(Res.is<ValueDecl*>() && "Class look-up should return a Decl");
   ValueDecl *VD = Res.get<ValueDecl*>();
   if (!VD) {
@@ -4317,7 +4317,7 @@ static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
     return nullptr;
 
   // Find the protocol decl. The protocol can be imported.
-  llvm::PointerUnion<ValueDecl*, Module *> Res = lookupTopDecl(P, DeclName);
+  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res = lookupTopDecl(P, DeclName);
   assert(Res.is<ValueDecl*>() && "Protocol look-up should return a Decl");
   ValueDecl *VD = Res.get<ValueDecl*>();
   if (!VD) {

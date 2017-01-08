@@ -49,7 +49,7 @@ public:
   TypeConverter &Types;
   
   /// The Swift module we are visiting.
-  Module *SwiftModule;
+  ModuleDecl *SwiftModule;
   
   /// TopLevelSGF - The SILGenFunction used to visit top-level code, or null if
   /// the current source file is not a script source file.
@@ -135,7 +135,8 @@ public:
   Optional<ProtocolConformance *> NSErrorConformanceToError;
 
 public:
-  SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile);
+  SILGenModule(SILModule &M, ModuleDecl *SM, bool makeModuleFragile);
+
   ~SILGenModule();
   
   SILGenModule(SILGenModule const &) = delete;

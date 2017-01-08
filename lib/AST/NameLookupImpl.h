@@ -23,13 +23,13 @@ namespace namelookup {
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
 void
-lookupVisibleDeclsInModule(Module *M, Module::AccessPathTy accessPath,
+lookupVisibleDeclsInModule(ModuleDecl *M, ModuleDecl::AccessPathTy accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            NLKind lookupKind,
                            ResolutionKind resolutionKind,
                            LazyResolver *typeResolver,
                            const DeclContext *moduleScopeContext,
-                           ArrayRef<Module::ImportedModule> extraImports = {});
+                           ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
 
 /// Searches through statements and patterns for local variable declarations.
 class FindLocalVal : public StmtVisitor<FindLocalVal> {

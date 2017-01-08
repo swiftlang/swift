@@ -311,7 +311,7 @@ class CompilerInstance {
   DependencyTracker *DepTracker = nullptr;
   ReferencedNameTracker *NameTracker = nullptr;
 
-  Module *MainModule = nullptr;
+  ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
 
   /// Contains buffer IDs for input source code files.
@@ -387,7 +387,7 @@ public:
     return static_cast<bool>(TheSILModule);
   }
 
-  Module *getMainModule();
+  ModuleDecl *getMainModule();
 
   SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }
 

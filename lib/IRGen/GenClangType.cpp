@@ -49,7 +49,7 @@ public:
                                                CanStructType type);
 };
 
-static CanType getNamedSwiftType(Module *stdlib, StringRef name) {
+static CanType getNamedSwiftType(ModuleDecl *stdlib, StringRef name) {
   auto &ctx = stdlib->getASTContext();
   SmallVector<ValueDecl*, 1> results;
   stdlib->lookupValue({}, ctx.getIdentifier(name), NLKind::QualifiedLookup,

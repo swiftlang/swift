@@ -377,7 +377,7 @@ Decl *DeclContext::getInnermostDeclarationDeclContext() {
 
     case DeclContextKind::SubscriptDecl:
       return cast<SubscriptDecl>(DC);
-        
+
     case DeclContextKind::GenericTypeDecl:
       return cast<GenericTypeDecl>(DC);
 
@@ -391,11 +391,11 @@ Decl *DeclContext::getInnermostDeclarationDeclContext() {
   return nullptr;
 }
 
-Module *DeclContext::getParentModule() const {
+ModuleDecl *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())
     DC = DC->getParent();
-  return const_cast<Module *>(cast<Module>(DC));
+  return const_cast<ModuleDecl *>(cast<ModuleDecl>(DC));
 }
 
 SourceFile *DeclContext::getParentSourceFile() const {
@@ -589,7 +589,7 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {
   case DeclContextKind::Module:
-    return cast<Module>(this)->walk(Walker);
+    return cast<ModuleDecl>(this)->walk(Walker);
   case DeclContextKind::FileUnit:
     return cast<FileUnit>(this)->walk(Walker);
   case DeclContextKind::AbstractClosureExpr:
@@ -681,7 +681,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
 
   switch (getContextKind()) {
   case DeclContextKind::Module:
-    OS << " name=" << cast<Module>(this)->getName();
+    OS << " name=" << cast<ModuleDecl>(this)->getName();
     break;
   case DeclContextKind::FileUnit:
     switch (cast<FileUnit>(this)->getKind()) {

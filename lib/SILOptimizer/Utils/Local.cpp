@@ -1627,7 +1627,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
          "There should be exactly one implementation of _bridgeToObjectiveC");
   auto BridgeFuncDecl = Members.front();
   auto BridgeFuncDeclRef = SILDeclRef(BridgeFuncDecl);
-  Module *Mod = M.getASTContext().getLoadedModule(
+  ModuleDecl *Mod = M.getASTContext().getLoadedModule(
       M.getASTContext().Id_Foundation);
   if (!Mod)
     return nullptr;

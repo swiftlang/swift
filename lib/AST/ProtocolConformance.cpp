@@ -462,7 +462,7 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
   return true;
 }
 
-ProtocolConformance *ProtocolConformance::subst(Module *module,
+ProtocolConformance *ProtocolConformance::subst(ModuleDecl *module,
                                        Type substType,
                                        TypeSubstitutionFn subs,
                                        LookupConformanceFn conformances) const {
@@ -649,7 +649,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
 }
 
 bool NominalTypeDecl::lookupConformance(
-       Module *module, ProtocolDecl *protocol,
+       ModuleDecl *module, ProtocolDecl *protocol,
        SmallVectorImpl<ProtocolConformance *> &conformances) const {
   prepareConformanceTable();
   return ConformanceTable->lookupConformance(

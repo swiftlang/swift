@@ -874,7 +874,7 @@ public:
   }
 };
 
-std::shared_ptr<sma::Module> createSMAModel(Module *M) {
+std::shared_ptr<sma::Module> createSMAModel(ModuleDecl *M) {
   SmallVector<Decl *, 1> Decls;
   M->getDisplayDecls(Decls);
 
@@ -926,7 +926,7 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
 
   PrintOptions Options = PrintOptions::printEverything();
 
-  Module *M = CI.getMainModule();
+  ModuleDecl *M = CI.getMainModule();
   M->getMainSourceFile(Invocation->getSourceFileKind()).print(llvm::outs(),
                                                         Options);
 

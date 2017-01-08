@@ -3276,7 +3276,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   template <typename T>
   void printModuleContext(T *Ty) {
-    Module *Mod = Ty->getDecl()->getModuleContext();
+    ModuleDecl *Mod = Ty->getDecl()->getModuleContext();
     Printer.printModuleRef(Mod, Mod->getName());
     Printer << ".";
   }
@@ -3289,7 +3289,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   // FIXME: we should have a callback that would tell us
   // whether it's kosher to print a module name or not
-  bool isLLDBExpressionModule(Module *M) {
+  bool isLLDBExpressionModule(ModuleDecl *M) {
     if (!M)
       return false;
     return M->getName().str().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
@@ -3309,7 +3309,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     if (!D)
       return true;
 
-    Module *M = D->getDeclContext()->getParentModule();
+    ModuleDecl *M = D->getDeclContext()->getParentModule();
 
     if (Options.CurrentModule && M == Options.CurrentModule) {
       return false;

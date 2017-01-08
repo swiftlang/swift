@@ -984,7 +984,7 @@ static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
 void ASTMangler::appendContext(const DeclContext *ctx) {
   switch (ctx->getContextKind()) {
   case DeclContextKind::Module:
-    return appendModule(cast<Module>(ctx));
+    return appendModule(cast<ModuleDecl>(ctx));
 
   case DeclContextKind::FileUnit:
     assert(!isa<BuiltinUnit>(ctx) && "mangling member of builtin module!");
@@ -1102,7 +1102,7 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
   llvm_unreachable("bad decl context");
 }
 
-void ASTMangler::appendModule(const Module *module) {
+void ASTMangler::appendModule(const ModuleDecl *module) {
   assert(!module->getParent() && "cannot mangle nested modules!");
 
   // Try the special 'swift' substitution.

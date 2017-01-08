@@ -242,7 +242,7 @@ bool removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls);
 ///
 /// \returns true if any shadowed declarations were removed.
 bool removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                         const Module *curModule,
+                         const ModuleDecl *curModule,
                          LazyResolver *typeResolver);
 
 /// Finds decls visible in the given context and feeds them to the given
@@ -295,12 +295,12 @@ enum class ResolutionKind {
 ///        being performed, for checking accessibility. This must be either a
 ///        FileUnit or a Module.
 /// \param extraImports Private imports to include in this search.
-void lookupInModule(Module *module, Module::AccessPathTy accessPath,
+void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPath,
                     DeclName name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
                     LazyResolver *typeResolver,
                     const DeclContext *moduleScopeContext,
-                    ArrayRef<Module::ImportedModule> extraImports = {});
+                    ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
 
 } // end namespace namelookup
 } // end namespace swift

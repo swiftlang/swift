@@ -120,8 +120,8 @@ namespace {
           os << "with type " << getDataAs<Type>();
           break;
         case Kind::Extension:
-          if (getDataAs<Module *>())
-            os << "in an extension in module '" << getDataAs<Module *>()->getName()
+          if (getDataAs<ModuleDecl *>())
+            os << "in an extension in module '" << getDataAs<ModuleDecl *>()->getName()
                << "'";
           else
             os << "in an extension in any module";
@@ -184,11 +184,11 @@ namespace {
     };
 
   private:
-    Module &baseM;
+    ModuleDecl &baseM;
     SmallVector<PathPiece, 8> path;
 
   public:
-    PrettyXRefTrace(Module &M) : baseM(M) {}
+    PrettyXRefTrace(ModuleDecl &M) : baseM(M) {}
 
     void addValue(Identifier name) {
       path.push_back({ PathPiece::Kind::Value, name });
@@ -212,7 +212,7 @@ namespace {
                        static_cast<uintptr_t>(kind) });
     }
 
-    void addExtension(Module *M) {
+    void addExtension(ModuleDecl *M) {
       path.push_back({ PathPiece::Kind::Extension, M });
     }
 
@@ -1198,7 +1198,7 @@ getActualCtorInitializerKind(uint8_t raw) {
 /// Any of \p expectedTy, \p expectedModule, or \p expectedGenericSig can be
 /// omitted, in which case any type or module is accepted. Values imported
 /// from Clang can also appear in any module.
-static void filterValues(Type expectedTy, Module *expectedModule,
+static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
                          CanGenericSignature expectedGenericSig, bool isType,
                          bool inProtocolExt,
                          Optional<swift::CtorInitializerKind> ctorInit,
@@ -1256,7 +1256,7 @@ static void filterValues(Type expectedTy, Module *expectedModule,
   values.erase(newEnd, values.end());
 }
 
-Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
+Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
   using namespace decls_block;
   assert(M && "missing dependency");
   PrettyXRefTrace pathTrace(*M);
@@ -1787,7 +1787,7 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
   return declContextOrOffset;
 }
 
-Module *ModuleFile::getModule(ModuleID MID) {
+ModuleDecl *ModuleFile::getModule(ModuleID MID) {
   if (MID < NUM_SPECIAL_MODULES) {
     switch (static_cast<SpecialModuleID>(static_cast<uint8_t>(MID))) {
     case BUILTIN_MODULE_ID:
@@ -1806,7 +1806,7 @@ Module *ModuleFile::getModule(ModuleID MID) {
   return getModule(getIdentifier(MID));
 }
 
-Module *ModuleFile::getModule(ArrayRef<Identifier> name) {
+ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name) {
   if (name.empty() || name.front().empty())
     return getContext().TheBuiltinModule;
 

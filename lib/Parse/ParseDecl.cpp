@@ -133,7 +133,7 @@ namespace {
   
     DebuggerClient *getDebuggerClient()
     {
-      Module *PM = P.CurDeclContext->getParentModule();
+      ModuleDecl *PM = P.CurDeclContext->getParentModule();
       if (!PM)
           return nullptr;
       else

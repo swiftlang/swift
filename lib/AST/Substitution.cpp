@@ -42,13 +42,13 @@ Substitution::Substitution(Type Replacement,
          && "cannot substitute with a non-materializable type");
 }
 
-Substitution Substitution::subst(Module *module,
+Substitution Substitution::subst(ModuleDecl *module,
                                  const SubstitutionMap &subMap) const {
   return subst(module, QueryTypeSubstitutionMap{subMap.getMap()},
                LookUpConformanceInSubstitutionMap(subMap));
 }
 
-Substitution Substitution::subst(Module *module,
+Substitution Substitution::subst(ModuleDecl *module,
                                  TypeSubstitutionFn subs,
                                  LookupConformanceFn conformances) const {
   // Substitute the replacement.

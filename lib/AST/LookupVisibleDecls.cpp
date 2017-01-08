@@ -378,7 +378,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
   DynamicLookupConsumer ConsumerWrapper(Consumer, LS, CurrDC, TypeResolver);
 
   CurrDC->getParentSourceFile()->forAllVisibleModules(
-      [&](Module::ImportedModule Import) {
+      [&](ModuleDecl::ImportedModule Import) {
         Import.second->lookupClassMembers(Import.first, ConsumerWrapper);
       });
 }
@@ -518,7 +518,7 @@ static void lookupVisibleMemberDeclsImpl(
   if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
     AccessFilteringDeclConsumer FilteringConsumer(CurrDC, Consumer,
                                                   TypeResolver);
-    MT->getModule()->lookupVisibleDecls(Module::AccessPathTy(),
+    MT->getModule()->lookupVisibleDecls(ModuleDecl::AccessPathTy(),
                                         FilteringConsumer,
                                         NLKind::QualifiedLookup);
     return;
@@ -797,7 +797,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                                LazyResolver *TypeResolver,
                                bool IncludeTopLevel,
                                SourceLoc Loc) {
-  const Module &M = *DC->getParentModule();
+  const ModuleDecl &M = *DC->getParentModule();
   const SourceManager &SM = DC->getASTContext().SourceMgr;
   auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
 
@@ -869,12 +869,12 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     // Check any generic parameters for something with the given name.
     namelookup::FindLocalVal(SM, Loc, Consumer)
           .checkGenericParams(GenericParams);
-    
+
     DC = DC->getParent();
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;
   }
 
-  SmallVector<Module::ImportedModule, 8> extraImports;
+  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
   if (auto SF = dyn_cast<SourceFile>(DC)) {
     if (Loc.isValid()) {
       // Look for local variables in top-level code; normally, the parser
@@ -891,14 +891,14 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         return;
       }
 
-      SF->getImportedModules(extraImports, Module::ImportFilter::Private);
+      SF->getImportedModules(extraImports, ModuleDecl::ImportFilter::Private);
     }
   }
 
   if (IncludeTopLevel) {
     using namespace namelookup;
     SmallVector<ValueDecl *, 0> moduleResults;
-    auto &mutableM = const_cast<Module&>(M);
+    auto &mutableM = const_cast<ModuleDecl&>(M);
     lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
                                NLKind::UnqualifiedLookup,
                                ResolutionKind::Overloadable,

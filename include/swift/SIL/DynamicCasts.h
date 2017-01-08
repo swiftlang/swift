@@ -89,7 +89,7 @@ bool isObjectiveCBridgeable(ModuleDecl *M, CanType Ty);
 
 /// \brief Get the bridged NS class of a CF class if it exists. Returns
 /// an empty CanType if such class does not exist.
-CanType getNSBridgedClassOfCFClass(Module *M, CanType type);
+CanType getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type);
 
 /// \brief Does the type conform to Error.
 bool isError(ModuleDecl *M, CanType Ty);

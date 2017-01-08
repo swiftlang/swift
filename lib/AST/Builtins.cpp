@@ -145,7 +145,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
   Type ArgType = TupleType::get(tupleElts, Context);
   Type FnType = FunctionType::get(ArgType, ResType, Info);
 
-  Module *M = Context.TheBuiltinModule;
+  ModuleDecl *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
   SmallVector<ParamDecl*, 4> params;
@@ -202,7 +202,7 @@ getBuiltinGenericFunction(Identifier Id,
   Type InterfaceType = GenericFunctionType::get(Sig, ArgParamType, ResType,
                                                 AnyFunctionType::ExtInfo());
 
-  Module *M = Context.TheBuiltinModule;
+  ModuleDecl *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
   SmallVector<ParamDecl*, 4> params;
@@ -425,7 +425,7 @@ static const char * const GenericParamNames[] = {
 
 static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
-  Module *M = ctx.TheBuiltinModule;
+  ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
   SmallVector<ProtocolDecl *, 1> protos;
   auto genericParam =

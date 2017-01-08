@@ -221,7 +221,7 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
   llvm_unreachable("unknown literal constructor");
 }
 
-Module *TypeChecker::getStdlibModule(const DeclContext *dc) {
+ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   if (StdlibModule)
     return StdlibModule;
 
@@ -597,7 +597,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // extensions, so we'll need to be smarter here.
     // FIXME: The current source file needs to be handled specially, because of
     // private extensions.
-    SF.forAllVisibleModules([&](Module::ImportedModule import) {
+    SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
       // FIXME: Respect the access path?
       for (auto file : import.second->getFiles()) {
         auto SF = dyn_cast<SourceFile>(file);

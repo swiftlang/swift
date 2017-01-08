@@ -769,7 +769,7 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   }
 }
 
-ArchetypeBuilder::ArchetypeBuilder(Module &mod)
+ArchetypeBuilder::ArchetypeBuilder(ModuleDecl &mod)
   : Mod(mod), Context(mod.getASTContext()), Diags(Context.Diags),
     Impl(new Implementation)
 {

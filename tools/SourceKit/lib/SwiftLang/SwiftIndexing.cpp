@@ -137,7 +137,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
 
   ASTContext &Ctx = CI.getASTContext();
   std::unique_ptr<SerializedModuleLoader> Loader;
-  Module *Mod = nullptr;
+  ModuleDecl *Mod = nullptr;
   if (ModuleName == Ctx.StdlibModuleName.str()) {
     Mod = Ctx.getModule({ {Ctx.StdlibModuleName, SourceLoc()} });
   } else {
@@ -148,7 +148,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
 
     // FIXME: These APIs allocate memory on the ASTContext, meaning it may not
     // be freed for a long time.
-    Mod = Module::create(Ctx.getIdentifier(ModuleName), Ctx);
+    Mod = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
     // Indexing is not using documentation now, so don't open the module
     // documentation file.
     // FIXME: refactor the frontend to provide an easy way to figure out the

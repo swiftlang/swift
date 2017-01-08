@@ -100,7 +100,7 @@ namespace {
 /// The SIL verifier walks over a SIL function / basic block / instruction,
 /// checking and enforcing its invariants.
 class SILVerifier : public SILVerifierBase<SILVerifier> {
-  Module *M;
+  ModuleDecl *M;
   const SILFunction &F;
   Lowering::TypeConverter &TC;
   SILOpenedArchetypesTracker OpenedArchetypes;

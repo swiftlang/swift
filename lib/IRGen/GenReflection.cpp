@@ -205,7 +205,7 @@ protected:
 
   /// Add a 32-bit relative offset to a mangled typeref string
   /// in the typeref reflection section.
-  void addTypeRef(Module *ModuleContext, CanType type,
+  void addTypeRef(ModuleDecl *ModuleContext, CanType type,
                   CanGenericSignature Context = {}) {
     assert(type);
 

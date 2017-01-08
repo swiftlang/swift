@@ -473,7 +473,7 @@ bool SourceEntityWalker::walk(SourceFile &SrcFile) {
   return SrcFile.walk(Annotator);
 }
 
-bool SourceEntityWalker::walk(Module &Mod) {
+bool SourceEntityWalker::walk(ModuleDecl &Mod) {
   SemaAnnotator Annotator(*this);
   return Mod.walk(Annotator);
 }
