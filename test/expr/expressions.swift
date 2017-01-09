@@ -48,10 +48,10 @@ func basictest() {
   _ = x8 + 1
   _ = 0 + x8
   1.0 + x8 // expected-error{{binary operator '+' cannot be applied to operands of type 'Double' and 'Int8'}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
+  // expected-note @-1 {{expected an argument list of type '(Self, Self)'}}
 
 
-  var x9 : Int16 = x8 + 1 // expected-error {{cannot convert value of type 'Int8' to specified type 'Int16'}}
+  var x9 : Int16 = x8 + 1 // expected-error {{cannot convert value of type 'Int8' to expected argument type 'Int16'}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -763,7 +763,7 @@ func testParenExprInTheWay() {
   if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Self, Self)'}}
 
   if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
-  //expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
+  //expected-note @-1 {{expected an argument list of type '(Self, Self)'}}
 
   
   if x & x {} // expected-error {{'Int' is not convertible to 'Bool'}}
@@ -795,7 +795,7 @@ func inoutTests(_ arr: inout Int) {
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
-  &x += y  // expected-error {{cannot pass immutable value of type 'inout Int' as inout argument}}}
+  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}}
 
   // <rdar://problem/23249098>
   func takeAny(_ x: Any) {}

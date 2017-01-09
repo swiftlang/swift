@@ -8,9 +8,9 @@ var x: Int
 
 // Just check a small part, mainly to make sure we can print the interface of the stdlib.
 // CHECK-STDLIB-NOT: extension _SwiftNSOperatingSystemVersion
-// CHECK-STDLIB: struct Int : SignedInteger, Comparable, Equatable {
-// CHECK-STDLIB:   static var max: Int { get }
-// CHECK-STDLIB:   static var min: Int { get }
+// CHECK-STDLIB: struct Int : FixedWidthInteger, SignedInteger {
+// CHECK-STDLIB:   static var bitWidth: Int { get }
+// CHECK-STDLIB:   var popcount: Int { get }
 // CHECK-STDLIB: }
 
 // Check that extensions of nested decls are showing up.
@@ -38,7 +38,7 @@ var x: Int
 // CHECK1-NEXT: <Group>Math/Integers</Group>
 // CHECK1-NEXT: /<interface-gen>{{$}}
 // CHECK1-NEXT: SYSTEM
-// CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:Ps13SignedInteger">SignedInteger</Type>{{.*}}{{.*}}<Type usr="s:Ps10Comparable">Comparable</Type>{{.*}}<Type usr="s:Ps9Equatable">Equatable</Type>{{.*}}</Declaration>
+// CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:Ps17FixedWidthInteger">FixedWidthInteger</Type>{{.*}}{{.*}}<Type usr="s:Ps13SignedInteger">SignedInteger</Type>{{.*}}</Declaration>
 
 // RUN: %sourcekitd-test -req=module-groups -module Swift | %FileCheck -check-prefix=GROUP1 %s
 // GROUP1: <GROUPS>

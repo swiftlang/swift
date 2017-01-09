@@ -11,6 +11,18 @@ func test() {
 
 // Swift == 1
 // CHECK-LABEL:  key.name: "abs(:)",
+// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: Comparable & SignedArithmetic##Comparable & SignedArithmetic#>)",
+// CHECK-NEXT:   key.description: "abs(x: Comparable & SignedArithmetic)",
+// CHECK-NEXT:   key.typename: "Comparable & SignedArithmetic",
+// CHECK-NEXT:   key.doc.brief: "Returns the absolute value of the given number.",
+// CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
+// CHECK-NEXT:   key.moduleimportdepth: 1,
+// CHECK-NEXT:   key.num_bytes_to_erase: 0,
+// CHECK:        key.associated_usrs: "s:Fs3absuRxs10Comparablexs16SignedArithmeticrFxx",
+// CHECK-NEXT:   key.modulename: "Swift"
+// CHECK-NEXT: },
+
+// CHECK-LABEL:  key.name: "abs(:)",
 // CHECK-NEXT:   key.sourcetext: "abs(<#T##x: FloatingPoint##FloatingPoint#>)",
 // CHECK-NEXT:   key.description: "abs(x: FloatingPoint)",
 // CHECK-NEXT:   key.typename: "FloatingPoint",
@@ -18,7 +30,19 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:   key.associated_usrs: "s:Fs3absuRxs12SignedNumberrFxx",
+// CHECK:        key.associated_usrs: "s:Fs3absuRxs13FloatingPointxzwx9MagnituderFxx",
+// CHECK-NEXT:   key.modulename: "Swift"
+// CHECK-NEXT: },
+
+// CHECK-LABEL:  key.name: "abs(:)",
+// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: SignedArithmetic##SignedArithmetic#>)",
+// CHECK-NEXT:   key.description: "abs(x: SignedArithmetic)",
+// CHECK-NEXT:   key.typename: "SignedArithmetic",
+// CHECK-NEXT:   key.doc.brief: "Returns the absolute value of the given number.",
+// CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
+// CHECK-NEXT:   key.moduleimportdepth: 1,
+// CHECK-NEXT:   key.num_bytes_to_erase: 0,
+// CHECK:        key.associated_usrs: "s:Fs3absuRxs16SignedArithmeticxzwx9MagnituderFxx",
 // CHECK-NEXT:   key.modulename: "Swift"
 // CHECK-NEXT: },
 

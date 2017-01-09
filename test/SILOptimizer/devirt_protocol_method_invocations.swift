@@ -6,7 +6,7 @@ public protocol Foo {
 
 public extension Foo {
   func boo(_ x:Int) -> Int32 {
-    return 2222 + x
+    return 2222 + Int32(x)
   }
 
   func getSelf() -> Self {
