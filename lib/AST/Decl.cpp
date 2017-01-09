@@ -1255,6 +1255,8 @@ bool AbstractStorageDecl::hasFixedLayout() const {
   case ResilienceStrategy::Default:
     return true;
   }
+
+  llvm_unreachable("Unhandled ResilienceStrategy in switch.");
 }
 
 bool AbstractStorageDecl::hasFixedLayout(ModuleDecl *M,
@@ -1962,6 +1964,8 @@ bool NominalTypeDecl::hasFixedLayout() const {
   case ResilienceStrategy::Default:
     return true;
   }
+
+  llvm_unreachable("Unhandled ResilienceStrategy in switch.");
 }
 
 bool NominalTypeDecl::hasFixedLayout(ModuleDecl *M,
@@ -2086,6 +2090,8 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       return BoundGenericType::get(decl, Ty, args);
     }
     }
+
+    llvm_unreachable("Unhandled DeclTypeKind in switch.");
   } else {
     return NominalType::get(decl, Ty, ctx);
   }
@@ -3035,6 +3041,8 @@ bool AbstractStorageDecl::isGetterMutating() const {
     assert(getAddressor());
     return getAddressor()->isMutating();
   }
+
+  llvm_unreachable("Unhandled AbstractStorageDecl in switch.");
 }
 
 /// \brief Return true if the 'setter' is nonmutating, i.e. that it can be

@@ -523,6 +523,8 @@ static DiagnosticKind toDiagnosticKind(DiagnosticState::Behavior behavior) {
   case DiagnosticState::Behavior::Warning:
     return DiagnosticKind::Warning;
   }
+
+  llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
 DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
@@ -584,6 +586,8 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
   case DiagnosticKind::Warning:
     return set(Behavior::Warning);
   }
+
+  llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
 void DiagnosticEngine::flushActiveDiagnostic() {

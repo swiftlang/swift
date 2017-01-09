@@ -36,11 +36,11 @@
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
-using namespace NewMangling;
+using namespace swift::NewMangling;
 
 std::string NewMangling::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   if (useNewMangling()) {
-    ASTMangler::ASTMangler NewMangler(/* DWARF */ true);
+    ASTMangler NewMangler(/* DWARF */ true);
     return NewMangler.mangleTypeForDebugger(Ty, DC);
   }
   Mangle::Mangler OldMangler(/* DWARF */ true);
@@ -50,7 +50,7 @@ std::string NewMangling::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
 
 std::string NewMangling::mangleTypeAsUSR(Type Ty) {
   if (useNewMangling()) {
-    ASTMangler::ASTMangler NewMangler;
+    ASTMangler NewMangler;
     return NewMangler.mangleTypeAsUSR(Ty);
   }
   Mangle::Mangler OldMangler;
@@ -369,7 +369,7 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     assert(!discriminator.empty());
     assert(!isNonAscii(discriminator.str()) &&
            "discriminator contains non-ASCII characters");
-    (void)isNonAscii;
+    (void)&isNonAscii;
     assert(!clang::isDigit(discriminator.str().front()) &&
            "not a valid identifier");
 
@@ -387,6 +387,8 @@ static const char *getMetatypeRepresentationOp(MetatypeRepresentation Rep) {
     case MetatypeRepresentation::ObjC:
       return "o";
   }
+
+  llvm_unreachable("Unhandled MetatypeRepresentation in switch.");
 }
 
 static bool isStdlibType(const NominalTypeDecl *decl) {

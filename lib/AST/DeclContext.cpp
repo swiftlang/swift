@@ -73,6 +73,8 @@ DeclContext::getAsTypeOrTypeExtensionContext() const {
   case DeclContextKind::GenericTypeDecl:
     return const_cast<GenericTypeDecl*>(cast<GenericTypeDecl>(this));
   }
+
+  llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
 /// If this DeclContext is a NominalType declaration or an
@@ -152,6 +154,8 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
     // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
     return type->getAnyNominal()->getDeclaredInterfaceType();
   }
+
+  llvm_unreachable("Unhandled DeclTypeKind in switch.");
 }
 
 Type DeclContext::getDeclaredTypeOfContext() const {
@@ -634,6 +638,8 @@ bool DeclContext::classof(const Decl *D) {
 #define CONTEXT_VALUE_DECL(ID, PARENT) case DeclKind::ID: return true;
 #include "swift/AST/DeclNodes.def"
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 DeclContext *DeclContext::castDeclToDeclContext(const Decl *D) {
@@ -647,6 +653,8 @@ DeclContext *DeclContext::castDeclToDeclContext(const Decl *D) {
 #define CONTEXT_VALUE_DECL(ID, PARENT) CONTEXT_DECL(ID, PARENT)
 #include "swift/AST/DeclNodes.def"
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
@@ -786,6 +794,8 @@ ASTContext &IterableDeclContext::getASTContext() const {
   case IterableDeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(this)->getASTContext();
   }
+
+  llvm_unreachable("Unhandled IterableDeclContextKind in switch.");
 }
 
 DeclRange IterableDeclContext::getMembers() const {
@@ -891,6 +901,8 @@ bool IterableDeclContext::classof(const Decl *D) {
 #define EXTENSION_DECL(ID, PARENT)    case DeclKind::ID: return true;
 #include "swift/AST/DeclNodes.def"
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 IterableDeclContext *
@@ -908,6 +920,8 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
         static_cast<const IterableDeclContext*>(cast<ID##Decl>(D)));
 #include "swift/AST/DeclNodes.def"
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)

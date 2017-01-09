@@ -36,6 +36,8 @@ DeclContext *ConformanceLookupTable::ConformanceSource::getDeclContext() const {
   case ConformanceEntryKind::Synthesized:
     return getSynthesizedDecl();
   }
+
+  llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
 }
 
 ProtocolDecl *ConformanceLookupTable::ConformanceEntry::getProtocol() const {
@@ -551,6 +553,8 @@ static bool isReplaceable(ConformanceEntryKind kind) {
   case ConformanceEntryKind::Inherited:
     return false;
   }
+
+  llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
 }
 
 ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(

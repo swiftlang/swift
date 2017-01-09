@@ -152,6 +152,8 @@ class ConformanceLookupTable {
                  ? ConformanceEntryKind::Synthesized
                  : ConformanceEntryKind::Implied;
       }
+
+      llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
     }
 
     /// For an inherited conformance, retrieve the class declaration
@@ -229,6 +231,8 @@ class ConformanceLookupTable {
       case ConformanceEntryKind::Inherited:
         return true;
       }
+
+      llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
     }
 
     /// Whether this protocol conformance was superseded by another

@@ -710,6 +710,8 @@ bool AvailableAttr::isUnconditionallyUnavailable() const {
   case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
     return true;
   }
+
+  llvm_unreachable("Unhandled PlatformAgnosticAvailabilityKind in switch.");
 }
 
 bool AvailableAttr::isUnconditionallyDeprecated() const {
@@ -723,6 +725,8 @@ bool AvailableAttr::isUnconditionallyDeprecated() const {
   case PlatformAgnosticAvailabilityKind::Deprecated:
     return true;
   }
+
+  llvm_unreachable("Unhandled PlatformAgnosticAvailabilityKind in switch.");
 }
 
 AvailableVersionComparison AvailableAttr::getVersionAvailability(

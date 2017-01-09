@@ -41,6 +41,8 @@ StringRef swift::getFunctionRefKindStr(FunctionRefKind refKind) {
   case FunctionRefKind::Compound:
     return "compound";
   }
+
+  llvm_unreachable("Unhandled FunctionRefKind in switch.");
 }
 
 //===----------------------------------------------------------------------===//
@@ -777,6 +779,8 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::EditorPlaceholder:
     return false;
   }
+
+  llvm_unreachable("Unhandled ExprKind in switch.");
 }
 
 llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {

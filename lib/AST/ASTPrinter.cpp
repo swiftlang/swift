@@ -477,7 +477,7 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
   Builder.reserve(Text.size());
   const UTF8* Data = reinterpret_cast<const UTF8*>(Text.begin());
   const UTF8* End = reinterpret_cast<const UTF8*>(Text.end());
-  StringRef Replacement = "\ufffd";
+  StringRef Replacement = u8"\ufffd";
   while (Data < End) {
     auto Step = getNumBytesForUTF8(*Data);
     if (Data + Step > End) {
@@ -612,6 +612,8 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   case PrintNameContext::TupleElement:
     return !canBeArgumentLabel(keyword);
   }
+
+  llvm_unreachable("Unhandled PrintNameContext in switch.");
 }
 
 void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {

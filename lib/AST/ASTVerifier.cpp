@@ -1709,6 +1709,8 @@ struct ASTNodeBase {};
       case DeclContextKind::SubscriptDecl:
         return hasEnclosingFunctionContext(dc->getParent());
       }
+
+      llvm_unreachable("Unhandled DeclContextKind in switch.");
     }
 
     void verifyChecked(ValueDecl *VD) {
