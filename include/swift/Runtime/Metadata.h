@@ -1968,7 +1968,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   TargetValueMetadata(MetadataKind Kind,
     ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
                       description,
-    ConstTargetMetadataPointer<Runtime, TargetMetadata> parent)
+    ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> parent)
     : TargetMetadata<Runtime>(Kind),
       Description(description),
       Parent(parent)
@@ -1990,7 +1990,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   }
   
   /// Retrieve the generic arguments of this type.
-  ConstTargetMetadataPointer<Runtime, TargetMetadata> const *
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *
   getGenericArgs() const {
     if (!Description->GenericParams.hasGenericRequirements())
       return nullptr;
@@ -2094,7 +2094,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   TargetFunctionTypeFlags<StoredSize> Flags;
 
   /// The type metadata for the result type.
-  ConstTargetMetadataPointer<Runtime, TargetMetadata> ResultType;
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> ResultType;
 
   TargetPointer<Runtime, Argument> getArguments() {
     return reinterpret_cast<TargetPointer<Runtime, Argument>>(this + 1);
@@ -2124,7 +2124,7 @@ using FunctionTypeMetadata = TargetFunctionTypeMetadata<InProcess>;
 template <typename Runtime>
 struct TargetMetatypeMetadata : public TargetMetadata<Runtime> {
   /// The type metadata for the element.
-  ConstTargetMetadataPointer<Runtime, TargetMetadata> InstanceType;
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> InstanceType;
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Metatype;
@@ -2152,7 +2152,7 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
 
   struct Element {
     /// The type of the element.
-    ConstTargetMetadataPointer<Runtime, TargetMetadata> Type;
+    ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Type;
 
     /// The offset of the tuple element within the tuple.
     StoredSize Offset;
@@ -2467,7 +2467,7 @@ template <typename Runtime>
 struct TargetExistentialMetatypeMetadata
   : public TargetMetadata<Runtime> {
   /// The type metadata for the element.
-  ConstTargetMetadataPointer<Runtime, TargetMetadata> InstanceType;
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> InstanceType;
 
   /// The number of witness tables and class-constrained-ness of the
   /// underlying type.
@@ -2568,11 +2568,11 @@ struct TargetGenericBoxHeapMetadata : public TargetBoxHeapMetadata<Runtime> {
   using super::Offset;
 
   /// The type inside the box.
-  ConstTargetMetadataPointer<Runtime, TargetMetadata> BoxedType;
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> BoxedType;
 
   constexpr
   TargetGenericBoxHeapMetadata(MetadataKind kind, unsigned offset,
-    ConstTargetMetadataPointer<Runtime, TargetMetadata> boxedType)
+    ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> boxedType)
   : TargetBoxHeapMetadata<Runtime>(kind, offset), BoxedType(boxedType)
   {}
 
