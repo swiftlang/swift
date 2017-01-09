@@ -2955,6 +2955,18 @@ namespace {
       if (decl->isVariadic()) {
         Impl.markUnavailable(result, "Variadic function is unavailable");
       }
+
+      if (decl->hasAttr<clang::ReturnsTwiceAttr>()) {
+        // The Clang 'returns_twice' attribute is used for functions like
+        // 'vfork' or 'setjmp'. Because these functions may return control flow
+        // of a Swift program to an arbitrary point, Swift's guarantees of
+        // definitive initialization of variables cannot be upheld. As a result,
+        // functions like these cannot be used in Swift.
+        Impl.markUnavailable(
+          result,
+          "Functions that may return more than one time (annotated with the "
+          "'returns_twice' attribute) are unavailable in Swift");
+      }
     }
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
