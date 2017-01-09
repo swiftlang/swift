@@ -329,7 +329,8 @@ static void emitRecordID(unsigned ID, const char *Name,
 }
 
 /// \brief Emit bitcode for abbreviation for source locations.
-static void addSourceLocationAbbrev(std::shared_ptr<llvm::BitCodeAbbrev> Abbrev) {
+static void
+addSourceLocationAbbrev(std::shared_ptr<llvm::BitCodeAbbrev> Abbrev) {
   using namespace llvm;
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 10)); // File ID.
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 32)); // Line.
@@ -338,7 +339,8 @@ static void addSourceLocationAbbrev(std::shared_ptr<llvm::BitCodeAbbrev> Abbrev)
 }
 
 /// \brief Emit bitcode for abbreviation for source ranges.
-static void addRangeLocationAbbrev(std::shared_ptr<llvm::BitCodeAbbrev> Abbrev) {
+static void
+addRangeLocationAbbrev(std::shared_ptr<llvm::BitCodeAbbrev> Abbrev) {
   addSourceLocationAbbrev(Abbrev);
   addSourceLocationAbbrev(Abbrev);
 }
