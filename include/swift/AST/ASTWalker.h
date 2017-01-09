@@ -190,8 +190,8 @@ public:
   virtual bool walkToTypeReprPost(TypeRepr *T) { return true; }
 
   /// This method configures whether the walker should explore into the generic
-  /// params in an AbstractFunctionDecl.
-  virtual bool shouldWalkIntoFunctionGenericParams() { return false; }
+  /// params in AbstractFunctionDecl and NominalTypeDecl.
+  virtual bool shouldWalkIntoGenericParams() { return false; }
 
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.  If it returns false,
