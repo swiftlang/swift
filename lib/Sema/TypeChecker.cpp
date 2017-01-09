@@ -407,6 +407,77 @@ void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
 }
 
+static void validateDeclForLayout(TypeChecker &TC, NominalTypeDecl *nominal) {
+  Optional<bool> lazyVarsAlreadyHaveImplementation;
+
+  for (auto *D : nominal->getMembers()) {
+    auto VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
+      continue;
+
+    // For enums, we only need to validate enum elements to know
+    // the layout.
+    if (isa<EnumDecl>(nominal) &&
+        !isa<EnumElementDecl>(VD))
+      continue;
+
+    // For structs, we only need to validate stored properties to
+    // know the layout.
+    if (isa<StructDecl>(nominal) &&
+        !isa<VarDecl>(VD))
+      continue;
+
+    // For classes, we need to validate properties and functions,
+    // but skipping nested types is OK.
+    if (isa<ClassDecl>(nominal) &&
+        isa<TypeDecl>(VD))
+      continue;
+
+    // For protocols, skip nested typealiases and nominal types.
+    if (isa<ProtocolDecl>(nominal) &&
+        isa<GenericTypeDecl>(VD))
+      continue;
+
+    TC.validateDecl(VD);
+
+    // The only thing left to do is synthesize storage for lazy variables.
+    // We only have to do that if it's a type from another file, though.
+    // In NDEBUG builds, bail out as soon as we can.
+#ifdef NDEBUG
+    if (lazyVarsAlreadyHaveImplementation.hasValue() &&
+        lazyVarsAlreadyHaveImplementation.getValue())
+      continue;
+#endif
+    auto *prop = dyn_cast<VarDecl>(D);
+    if (!prop)
+      continue;
+
+    if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic()
+                                                  && prop->getGetter()) {
+      bool hasImplementation = prop->getGetter()->hasBody();
+
+      if (lazyVarsAlreadyHaveImplementation.hasValue()) {
+        assert(lazyVarsAlreadyHaveImplementation.getValue() ==
+                 hasImplementation &&
+               "only some lazy vars already have implementations");
+      } else {
+        lazyVarsAlreadyHaveImplementation = hasImplementation;
+      }
+
+      if (!hasImplementation)
+        TC.completeLazyVarImplementation(prop);
+    }
+  }
+
+  // FIXME: We need to add implicit initializers and dtors when a decl is
+  // touched, because it affects vtable layout.  If you're not defining the
+  // class, you shouldn't have to know what the vtable layout is.
+  if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
+    TC.addImplicitConstructors(CD);
+    TC.addImplicitDestructor(CD);
+  }
+}
+
 static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
@@ -462,50 +533,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       if (nominal->isInvalid() || TC.Context.hadError())
         continue;
 
-      Optional<bool> lazyVarsAlreadyHaveImplementation;
-
-      for (auto *D : nominal->getMembers()) {
-        auto VD = dyn_cast<ValueDecl>(D);
-        if (!VD)
-          continue;
-        TC.validateDecl(VD);
-
-        // The only thing left to do is synthesize storage for lazy variables.
-        // We only have to do that if it's a type from another file, though.
-        // In NDEBUG builds, bail out as soon as we can.
-#ifdef NDEBUG
-        if (lazyVarsAlreadyHaveImplementation.hasValue() &&
-            lazyVarsAlreadyHaveImplementation.getValue())
-          continue;
-#endif
-        auto *prop = dyn_cast<VarDecl>(D);
-        if (!prop)
-          continue;
-
-        if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic()
-                                                      && prop->getGetter()) {
-          bool hasImplementation = prop->getGetter()->hasBody();
-
-          if (lazyVarsAlreadyHaveImplementation.hasValue()) {
-            assert(lazyVarsAlreadyHaveImplementation.getValue() ==
-                     hasImplementation &&
-                   "only some lazy vars already have implementations");
-          } else {
-            lazyVarsAlreadyHaveImplementation = hasImplementation;
-          }
-
-          if (!hasImplementation)
-            TC.completeLazyVarImplementation(prop);
-        }
-      }
-
-      // FIXME: We need to add implicit initializers and dtors when a decl is
-      // touched, because it affects vtable layout.  If you're not defining the
-      // class, you shouldn't have to know what the vtable layout is.
-      if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
-        TC.addImplicitConstructors(CD);
-        TC.addImplicitDestructor(CD);
-      }
+      validateDeclForLayout(TC, nominal);
     }
 
     // Complete any conformances that we used.
