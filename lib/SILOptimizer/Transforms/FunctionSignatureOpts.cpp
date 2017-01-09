@@ -849,6 +849,7 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     for (auto Node : LeafNodes) {
       LeafValues.push_back(
           BB->insertFunctionArgument(ArgOffset++, Node->getType(),
+                                     ValueOwnershipKind::Any,
                                      BB->getArgument(OldArgIndex)->getDecl()));
       AIM[TotalArgIndex - 1] = AD.Index;
       TotalArgIndex ++;
