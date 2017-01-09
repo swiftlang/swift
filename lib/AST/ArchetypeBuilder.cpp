@@ -374,21 +374,12 @@ bool ArchetypeBuilder::PotentialArchetype::isBetterArchetypeAnchor(
 auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
        -> PotentialArchetype * {
 
-  // Find the best archetype within this equivalence class.
-  PotentialArchetype *rep = getRepresentative();
-  auto best = rep;
-  for (auto pa : rep->getEquivalenceClass()) {
+  // Default to the representative, unless we find something better.
+  PotentialArchetype *best = getRepresentative();
+  for (auto pa : best->getEquivalenceClass()) {
     if (pa->isBetterArchetypeAnchor(best))
       best = pa;
   }
-
-#ifndef NDEBUG
-  // Make sure that we did, in fact, get one that is better than all others.
-  for (auto pa : rep->getEquivalenceClass()) {
-    assert(!pa->isBetterArchetypeAnchor(best) &&
-           "archetype anchor isn't a total order");
-  }
-#endif
 
   return best;
 }
@@ -1058,10 +1049,18 @@ static int compareDependentTypes(ArchetypeBuilder::PotentialArchetype * const* p
       if (int compareProtocols
             = ProtocolType::compareProtocols(&protoa, &protob))
         return compareProtocols;
-    } else {
-      // A resolved archetype is always ordered before an unresolved one.
-      return -1;
+
+      // - if one is the representative, put it first.
+      if ((a->getRepresentative() == a) !=
+          (b->getRepresentative() == b))
+        return a->getRepresentative() ? -1 : 1;
+
+      // FIXME: Would be nice if this was a total order.
+      return 0;
     }
+
+    // A resolved archetype is always ordered before an unresolved one.
+    return -1;
   }
 
   // A resolved archetype is always ordered before an unresolved one.
