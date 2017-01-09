@@ -137,21 +137,17 @@ ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index);
 /// if possible.
 void replaceDeadApply(ApplySite Old, ValueBase *New);
 
-/// \brief Return true if the substitution map contains a
-/// substitution that is an unbound generic type.
-bool hasUnboundGenericTypes(const TypeSubstitutionMap &SubsMap);
+/// \brief Return true if the substitution map contains replacement types
+/// that are dependent on the type parameters of the caller.
+bool hasTypeParameterTypes(SubstitutionMap &SubsMap);
 
-/// Return true if the substitution list contains a substitution
-/// that is an unbound generic.
-bool hasUnboundGenericTypes(ArrayRef<Substitution> Subs);
+/// \brief Return true if the substitution list contains replacement types
+/// that are dependent on the type parameters of the caller.
+bool hasArchetypes(ArrayRef<Substitution> Subs);
 
 /// \brief Return true if the substitution map contains a
 /// substitution that refers to the dynamic Self type.
-bool hasDynamicSelfTypes(const TypeSubstitutionMap &SubsMap);
-
-/// \brief Return true if the substitution list contains a
-/// substitution that refers to the dynamic Self type.
-bool hasDynamicSelfTypes(ArrayRef<Substitution> Subs);
+bool hasDynamicSelfTypes(const SubstitutionMap &SubsMap);
 
 /// \brief Return true if any call inside the given function may bind dynamic
 /// 'Self' to a generic argument of the callee.

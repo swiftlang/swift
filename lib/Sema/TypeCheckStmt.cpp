@@ -254,7 +254,7 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
   MemberRefExpr *BME = dyn_cast<MemberRefExpr>(ME->getBase());
   if (!BME)
     return;
-  if (BME->getType()->getCanonicalType() != ResultType->getCanonicalType())
+  if (!BME->getType()->isEqual(ResultType))
     return;
 
   Ctx.Diags.diagnose(E->getLoc(), diag::unnecessary_cast_over_optionset,
@@ -709,7 +709,7 @@ public:
                        TC.Context.Id_next, {}, diag::iterator_protocol_broken);
     if (!iteratorNext) return nullptr;
     // Check that next() produces an Optional<T> value.
-    if (iteratorNext->getType()->getCanonicalType()->getAnyNominal()
+    if (iteratorNext->getType()->getAnyNominal()
           != TC.Context.getOptionalDecl()) {
       TC.diagnose(S->getForLoc(), diag::iterator_protocol_broken);
       return nullptr;

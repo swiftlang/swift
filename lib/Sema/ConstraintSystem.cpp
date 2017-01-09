@@ -954,10 +954,8 @@ void ConstraintSystem::openGeneric(
       // skip.
       if (skipProtocolSelfConstraint &&
           protoDecl == outerDC &&
-          (protoDecl->getSelfInterfaceType()->getCanonicalType() ==
-           req.getFirstType()->getCanonicalType())) {
+          protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
         break;
-      }
 
       addConstraint(ConstraintKind::ConformsTo, subjectTy, proto,
                     locatorPtr);

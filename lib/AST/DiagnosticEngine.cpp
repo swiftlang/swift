@@ -391,7 +391,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
       showAKA = false;
 
     // Don't show generic type parameters.
-    if (showAKA && type->getCanonicalType()->hasTypeParameter())
+    if (showAKA && type->hasTypeParameter())
       showAKA = false;
 
     if (showAKA)

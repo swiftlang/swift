@@ -3708,7 +3708,6 @@ public:
         // We can only say .foo where foo is a static member of the contextual
         // type and has the same type (or if the member is a function, then the
         // same result type) as the contextual type.
-        auto contextCanT = T->getCanonicalType();
         FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD, DeclVisibilityKind reason) {
           if (!VD->hasInterfaceType()) {
             TypeResolver->resolveDeclSignature(VD);
@@ -3716,10 +3715,10 @@ public:
               return false;
           }
 
-          auto T = VD->getInterfaceType();
-          while (auto FT = T->getAs<AnyFunctionType>())
-            T = FT->getResult();
-          return T->getCanonicalType() == contextCanT;
+          auto declTy = VD->getInterfaceType();
+          while (auto FT = declTy->getAs<AnyFunctionType>())
+            declTy = FT->getResult();
+          return declTy->isEqual(T);
         });
 
         auto baseType = MetatypeType::get(T);

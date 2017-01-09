@@ -188,7 +188,7 @@ public:
   AvailabilityInferenceTypeWalker(ASTContext &AC) : AC(AC) {}
 
   Action walkToTypePre(Type ty) override {
-    if (auto *nominalDecl = ty->getCanonicalType()->getAnyNominal()) {
+    if (auto *nominalDecl = ty->getAnyNominal()) {
       AvailabilityInfo.intersectWith(
           AvailabilityInference::availableRange(nominalDecl, AC));
     }

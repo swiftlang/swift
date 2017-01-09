@@ -2547,8 +2547,8 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
       // If we are in a protocol extension of 'Proto' and we see
       // 'Proto.static', suggest 'Self.static'
       if (auto extensionContext = parent->getAsProtocolExtensionContext()) {
-        if (extensionContext->getDeclaredType()->getCanonicalType()
-            == metatypeTy->getInstanceType()->getCanonicalType()) {
+        if (extensionContext->getDeclaredType()->isEqual(
+                metatypeTy->getInstanceType())) {
           Diag->fixItReplace(baseRange, "Self");
         }
       }
@@ -3562,8 +3562,7 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
     // in.  Reset them to UnresolvedTypes for safe measures.
     for (auto param : *CE->getParameters()) {
       auto VD = param;
-      if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
-          VD->getType()->getCanonicalType()->hasError()) {
+      if (VD->getType()->hasTypeVariable() || VD->getType()->hasError()) {
         VD->setType(CS->getASTContext().TheUnresolvedType);
         VD->setInterfaceType(VD->getType());
       }
@@ -4962,8 +4961,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     CallArgParam &arg = args[0];
     auto resTy = candidate.getResultType()->lookThroughAllAnyOptionalTypes();
     auto rawTy = isRawRepresentable(resTy, CCI.CS);
-    if (rawTy && arg.Ty &&
-        resTy->getCanonicalType() == arg.Ty->getCanonicalType()) {
+    if (rawTy && arg.Ty && resTy->isEqual(arg.Ty)) {
       auto getInnerExpr = [](Expr *E) -> Expr* {
         ParenExpr *parenE = dyn_cast<ParenExpr>(E);
         if (!parenE)
@@ -6408,8 +6406,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     //
     // Handle this by rewriting the arguments to UnresolvedType().
     for (auto VD : *CE->getParameters()) {
-      if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
-          VD->getType()->getCanonicalType()->hasError()) {
+      if (VD->getType()->hasTypeVariable() || VD->getType()->hasError()) {
         VD->setType(CS->getASTContext().TheUnresolvedType);
         VD->setInterfaceType(VD->getType());
       }
