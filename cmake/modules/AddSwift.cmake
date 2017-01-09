@@ -721,6 +721,7 @@ function(_add_swift_library_single target name)
       swift_object_dependency_target
       swift_module_dependency_target
       swift_sib_dependency_target
+      swift_sibopt_dependency_target
       swift_sibgen_dependency_target
       SWIFTLIB_SINGLE_SOURCES
       SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
@@ -753,6 +754,11 @@ function(_add_swift_library_single target name)
   if (swift_sib_dependency_target)
     add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sib
       ${swift_sib_dependency_target})
+  endif()
+
+  if (swift_sibopt_dependency_target)
+    add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibopt
+      ${swift_sibopt_dependency_target})
   endif()
 
   if (swift_sibgen_dependency_target)
@@ -1852,6 +1858,7 @@ function(_add_swift_executable_single name)
       dependency_target
       unused_module_dependency_target
       unused_sib_dependency_target
+      unusged_sibopt_dependency_target
       unused_sibgen_dependency_target
       SWIFTEXE_SINGLE_SOURCES SWIFTEXE_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS
