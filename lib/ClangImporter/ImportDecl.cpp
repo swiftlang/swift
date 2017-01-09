@@ -598,6 +598,122 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   return setterDecl;
 }
 
+/// Build the indirect field getter and setter.
+///
+/// \code
+/// struct SomeImportedIndirectField {
+///   struct __Unnamed_struct___Anonymous_field_1 {
+///     var myField : Int
+///   }
+///   var __Anonymous_field_1 : __Unnamed_struct___Anonymous_field_1
+///   var myField : Int {
+///     get {
+///       __Anonymous_field_1.myField
+///     }
+///     set(newValue) {
+///       __Anonymous_field_1.myField = newValue
+///     }
+///   }
+/// }
+/// \endcode
+///
+/// \returns a pair of getter and setter function decls.
+static std::pair<FuncDecl *, FuncDecl *>
+makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
+                           const clang::IndirectFieldDecl *indirectField,
+                           ArrayRef<VarDecl *> members,
+                           StructDecl *importedStructDecl,
+                           VarDecl *importedFieldDecl) {
+  auto &C = Impl.SwiftContext;
+
+  auto getterDecl = makeFieldGetterDecl(Impl,
+                                        importedStructDecl,
+                                        importedFieldDecl);
+
+  auto setterDecl = makeFieldSetterDecl(Impl,
+                                        importedStructDecl,
+                                        importedFieldDecl);
+
+  importedFieldDecl->makeComputed(SourceLoc(), getterDecl, setterDecl, nullptr,
+                                  SourceLoc());
+
+  auto containingField = indirectField->chain().front();
+  VarDecl *anonymousFieldDecl = nullptr;
+
+  // Reverse scan of the members because indirect field are generated just
+  // after the corresponding anonymous type, so a reverse scan allows
+  // swiftching from O(n) to O(1) here.
+  for (auto decl : reverse(members)) {
+    if (decl->getClangDecl() == containingField) {
+      anonymousFieldDecl = cast<VarDecl>(decl);
+      break;
+    }
+  }
+  assert (anonymousFieldDecl && "anonymous field not generated");
+
+  auto anonymousFieldType = anonymousFieldDecl->getInterfaceType();
+  auto anonymousFieldTypeDecl = anonymousFieldType->getStructOrBoundGenericStruct();
+
+  VarDecl *anonymousInnerFieldDecl = nullptr;
+  for (auto decl : anonymousFieldTypeDecl->lookupDirect(importedFieldDecl->getName())) {
+    if (isa<VarDecl>(decl)) {
+      anonymousInnerFieldDecl = cast<VarDecl>(decl);
+      break;
+    }
+  }
+  assert (anonymousInnerFieldDecl && "cannot find field in anonymous generated structure");
+
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return { getterDecl, setterDecl };
+
+  // Synthesize the getter body
+  {
+    auto selfDecl = getterDecl->getImplicitSelfDecl();
+    Expr *expr = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                     /*implicit*/true);
+    expr = new (C) MemberRefExpr(expr, SourceLoc(), anonymousFieldDecl,
+                                 DeclNameLoc(), /*implicit*/true);
+
+    expr = new (C) MemberRefExpr(expr, SourceLoc(), anonymousInnerFieldDecl,
+                                 DeclNameLoc(), /*implicit*/true);
+
+    auto ret = new (C) ReturnStmt(SourceLoc(), expr);
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                  /*implicit*/ true);
+    getterDecl->setBody(body);
+    getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
+    C.addExternalDecl(getterDecl);
+  }
+
+  // Synthesize the setter body
+  {
+    auto selfDecl = setterDecl->getImplicitSelfDecl();
+    Expr *lhs = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                     /*implicit*/true);
+    lhs = new (C) MemberRefExpr(lhs, SourceLoc(), anonymousFieldDecl,
+                                 DeclNameLoc(), /*implicit*/true);
+
+    lhs = new (C) MemberRefExpr(lhs, SourceLoc(), anonymousInnerFieldDecl,
+                                DeclNameLoc(), /*implicit*/true);
+
+    auto newValueDecl = setterDecl->getParameterList(1)->get(0);
+
+    auto rhs = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
+                                   /*implicit*/ true);
+
+    auto assign = new (C) AssignExpr(lhs, SourceLoc(), rhs, /*implicit*/true);
+
+    auto body = BraceStmt::create(C, SourceLoc(), { assign }, SourceLoc(),
+                                  /*implicit*/ true);
+    setterDecl->setBody(body);
+    setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
+    C.addExternalDecl(setterDecl);
+  }
+
+  return { getterDecl, setterDecl };
+}
+
 /// Build the union field getter and setter.
 ///
 /// \code
@@ -971,6 +1087,11 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
   for (auto var : members) {
+    // TODO create value constructor with indirect fields instead of the
+    // generated __Anonymous_field.
+    if (var->hasClangNode() && isa<clang::IndirectFieldDecl>(var->getClangDecl()))
+      continue;
+
     Identifier argName = wantCtorParamNames ? var->getName() : Identifier();
     auto param = new (context)
         ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(), argName,
@@ -1014,6 +1135,10 @@ createValueConstructor(ClangImporter::Implementation &Impl,
     for (unsigned pass = 0; pass < 2; pass++) {
       for (unsigned i = 0, e = members.size(); i < e; i++) {
         auto var = members[i];
+
+        if (var->hasClangNode() && isa<clang::IndirectFieldDecl>(var->getClangDecl()))
+          continue;
+
         if (var->hasStorage() == (pass != 0))
           continue;
 
@@ -1751,10 +1876,6 @@ namespace {
                               decl->getLexicalDeclContext())) {
         for (auto field : recordDecl->fields()) {
           if (field->getType()->getAsTagDecl() == decl) {
-            // We found the field. The field should not be anonymous, since we are
-            // using its name to derive the generated declaration name.
-            assert(!field->isAnonymousStructOrUnion());
-
             // Create a name for the declaration from the field name.
             std::string Id;
             llvm::raw_string_ostream IdStream(Id);
@@ -1767,8 +1888,12 @@ namespace {
             else
               llvm_unreachable("unknown decl kind");
 
-            IdStream << "__Unnamed_" << kind
-            << "_" << field->getName();
+            IdStream << "__Unnamed_" << kind << "_";
+            if (field->isAnonymousStructOrUnion()) {
+              IdStream << "__Anonymous_field" << field->getFieldIndex();
+            } else {
+              IdStream << field->getName();
+            }
             ImportedName Result;
             Result.setDeclName(Impl.SwiftContext.getIdentifier(IdStream.str()));
             Result.setEffectiveContext(decl->getDeclContext());
@@ -2433,11 +2558,6 @@ namespace {
       if (decl->isInterface())
         return nullptr;
 
-      // The types of anonymous structs or unions are never imported; their
-      // fields are dumped directly into the enclosing class.
-      if (decl->isAnonymousStructOrUnion())
-        return nullptr;
-
       // FIXME: Figure out how to deal with incomplete types, since that
       // notion doesn't exist in Swift.
       decl = decl->getDefinition();
@@ -2494,11 +2614,6 @@ namespace {
         }
 
         if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
-          // Skip anonymous structs or unions; they'll be dealt with via the
-          // IndirectFieldDecls.
-          if (field->isAnonymousStructOrUnion())
-            continue;
-
           // Non-nullable pointers can't be zero-initialized.
           if (auto nullability = field->getType()
                 ->getNullability(Impl.getClangASTContext())) {
@@ -2547,6 +2662,15 @@ namespace {
 
         auto VD = cast<VarDecl>(member);
 
+        if (isa<clang::IndirectFieldDecl>(nd) || decl->isUnion()) {
+          // Don't import unavailable fields that have no associated storage.
+          if (VD->getAttrs().isUnavailable(Impl.SwiftContext)) {
+            continue;
+          }
+        }
+
+        members.push_back(VD);
+
         // Bitfields are imported as computed properties with Clang-generated
         // accessors.
         if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
@@ -2563,19 +2687,16 @@ namespace {
           }
         }
 
-        if (decl->isUnion()) {
+        if (auto ind = dyn_cast<clang::IndirectFieldDecl>(nd)) {
+          // Indirect fields are created as computed property accessible the
+          // fields on the anonymous field from which they are injected.
+          makeIndirectFieldAccessors(Impl, ind, members, result, VD);
+        } else if (decl->isUnion()) {
           // Union fields should only be available indirectly via a computed
           // property. Since the union is made of all of the fields at once,
           // this is a trivial accessor that casts self to the correct
           // field type.
-
-          // FIXME: Allow indirect field access of anonymous structs.
-          if (isa<clang::IndirectFieldDecl>(nd))
-            continue;
-
-          Decl *getter, *setter;
-          std::tie(getter, setter) = makeUnionFieldAccessors(Impl, result, VD);
-          members.push_back(VD);
+          makeUnionFieldAccessors(Impl, result, VD);
 
           // Create labeled initializers for unions that take one of the
           // fields, which only initializes the data for that field.
@@ -2584,8 +2705,6 @@ namespace {
                                      /*want param names*/true,
                                      /*wantBody=*/!Impl.hasFinishedTypeChecking());
           ctors.push_back(valueCtor);
-        } else {
-          members.push_back(VD);
         }
       }
 
@@ -2761,16 +2880,6 @@ namespace {
     }
 
     Decl *VisitIndirectFieldDecl(const clang::IndirectFieldDecl *decl) {
-      // Check whether the context of any of the fields in the chain is a
-      // union. If so, don't import this field.
-      for (auto f = decl->chain_begin(), fEnd = decl->chain_end(); f != fEnd;
-           ++f) {
-        if (auto record = dyn_cast<clang::RecordDecl>((*f)->getDeclContext())) {
-          if (record->isUnion())
-            return nullptr;
-        }
-      }
-
       Optional<ImportedName> correctSwiftName;
       auto importedName = importFullName(decl, correctSwiftName);
       if (!importedName) return nullptr;
@@ -2977,8 +3086,24 @@ namespace {
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
       // Fields are imported as variables.
       Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
-      if (!importedName) return nullptr;
+      ImportedName importedName;
+
+      if (!decl->isAnonymousStructOrUnion()) {
+        importedName = importFullName(decl, correctSwiftName);
+        if (!importedName) {
+          return nullptr;
+        }
+      } else {
+        // Generate a field name for anonymous fields, this will be used in
+        // order to be able to expose the indirect fields injected from there
+        // as computed properties forwarding the access to the subfield.
+        std::string Id;
+        llvm::raw_string_ostream IdStream(Id);
+
+        IdStream << "__Anonymous_field" << decl->getFieldIndex();
+        importedName.setDeclName(Impl.SwiftContext.getIdentifier(IdStream.str()));
+        importedName.setEffectiveContext(decl->getDeclContext());
+      }
 
       auto name = importedName.getDeclName().getBaseName();
 
