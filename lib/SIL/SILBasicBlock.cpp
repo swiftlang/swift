@@ -124,7 +124,11 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
 SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,
                                                            const ValueDecl *D) {
   assert(isEntry() && "Function Arguments can only be in the entry block");
-  auto OwnershipKind = ValueOwnershipKind::Any;
+  SILFunction *Parent = getParent();
+  auto OwnershipKind = ValueOwnershipKind(
+      Parent->getModule(), Ty,
+      Parent->getLoweredFunctionType()->getSILArgumentConvention(
+          getNumArguments()));
   return new (getModule()) SILFunctionArgument(this, Ty, OwnershipKind, D);
 }
 
