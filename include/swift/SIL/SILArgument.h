@@ -44,6 +44,7 @@ class SILArgument : public ValueBase {
 
 public:
   ValueOwnershipKind getOwnershipKind() const { return OwnershipKind; }
+  void setOwnershipKind(ValueOwnershipKind NewKind) { OwnershipKind = NewKind; }
 
   SILBasicBlock *getParent() { return ParentBB; }
   const SILBasicBlock *getParent() const { return ParentBB; }
