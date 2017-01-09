@@ -1178,6 +1178,9 @@ ERROR(pattern_binds_no_variables,none,
 ERROR(unsupported_type_nested_in_generic_function,none,
       "type %0 cannot be nested in generic function %1",
       (Identifier, Identifier))
+ERROR(unsupported_type_nested_in_generic_closure,none,
+      "type %0 cannot be nested in closure in generic context",
+      (Identifier))
 ERROR(unsupported_type_nested_in_protocol,none,
       "type %0 cannot be nested in protocol %1",
       (Identifier, Identifier))
