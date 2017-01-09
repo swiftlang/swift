@@ -65,6 +65,8 @@ extension Array where Element == String {
 
 This is a highly-requested feature that fits into the existing syntax and semantics. Note that one could imagine introducing new syntax, e.g., extending `Array<String>`, which gets into new-feature territory: see the section on "Parameterized extensions".
 
+This feature is tracked by [SR-1009](https://bugs.swift.org/browse/SR-1009) and work has been completed. This feature is planned for release with Swift 3.1.
+
 
 ## Parameterizing other declarations
 
