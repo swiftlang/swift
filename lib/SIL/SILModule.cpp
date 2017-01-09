@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -30,11 +30,11 @@ using namespace swift;
 using namespace Lowering;
 
 class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
-  void didDeserialize(Module *M, SILFunction *fn) override {
+  void didDeserialize(ModuleDecl *M, SILFunction *fn) override {
     updateLinkage(fn);
   }
 
-  void didDeserialize(Module *M, SILGlobalVariable *var) override {
+  void didDeserialize(ModuleDecl *M, SILGlobalVariable *var) override {
     updateLinkage(var);
     
     // For globals we currently do not support available_externally.
@@ -43,12 +43,12 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
     var->setDeclaration(true);
   }
 
-  void didDeserialize(Module *M, SILVTable *vtable) override {
+  void didDeserialize(ModuleDecl *M, SILVTable *vtable) override {
     // TODO: should vtables get linkage?
     //updateLinkage(vtable);
   }
 
-  void didDeserialize(Module *M, SILWitnessTable *wt) override {
+  void didDeserialize(ModuleDecl *M, SILWitnessTable *wt) override {
     updateLinkage(wt);
   }
 
@@ -75,7 +75,7 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
   }
 };
 
-SILModule::SILModule(Module *SwiftModule, SILOptions &Options,
+SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
                      const DeclContext *associatedDC,
                      bool wholeModule)
   : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),

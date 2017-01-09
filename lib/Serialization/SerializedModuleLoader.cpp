@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -156,7 +156,7 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
 }
 
 FileUnit *SerializedModuleLoader::loadAST(
-    Module &M, Optional<SourceLoc> diagLoc,
+    ModuleDecl &M, Optional<SourceLoc> diagLoc,
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     bool isFramework) {
@@ -380,8 +380,8 @@ SerializedModuleLoader::canImportModule(std::pair<Identifier, SourceLoc> mID) {
   return findModule(Ctx, mID, nullptr, nullptr, isFramework);
 }
 
-Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
-                                           Module::AccessPathTy path) {
+ModuleDecl *SerializedModuleLoader::loadModule(SourceLoc importLoc,
+                                               ModuleDecl::AccessPathTy path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -415,7 +415,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   assert(moduleInputBuffer);
 
-  auto M = Module::create(moduleID.first, Ctx);
+  auto M = ModuleDecl::create(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first] = M;
 
   if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
@@ -461,22 +461,22 @@ void SerializedModuleLoader::verifyAllModules() {
 //-----------------------------------------------------------------------------
 
 void SerializedASTFile::getImportedModules(
-    SmallVectorImpl<Module::ImportedModule> &imports,
-    Module::ImportFilter filter) const {
+    SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+    ModuleDecl::ImportFilter filter) const {
   File.getImportedModules(imports, filter);
 }
 
 void SerializedASTFile::collectLinkLibrariesFromImports(
-    Module::LinkLibraryCallback callback) const {
-  llvm::SmallVector<Module::ImportedModule, 8> Imports;
-  File.getImportedModules(Imports, Module::ImportFilter::All);
+    ModuleDecl::LinkLibraryCallback callback) const {
+  llvm::SmallVector<ModuleDecl::ImportedModule, 8> Imports;
+  File.getImportedModules(Imports, ModuleDecl::ImportFilter::All);
 
   for (auto Import : Imports)
     Import.second->collectLinkLibraries(callback);
 }
 
 void SerializedASTFile::collectLinkLibraries(
-    Module::LinkLibraryCallback callback) const {
+    ModuleDecl::LinkLibraryCallback callback) const {
   if (isSIB()) {
     collectLinkLibrariesFromImports(callback);
   } else {
@@ -495,10 +495,10 @@ bool SerializedASTFile::isSystemModule() const {
   return false;
 }
 
-void SerializedASTFile::lookupValue(Module::AccessPathTy accessPath,
+void SerializedASTFile::lookupValue(ModuleDecl::AccessPathTy accessPath,
                                     DeclName name, NLKind lookupKind,
                                     SmallVectorImpl<ValueDecl*> &results) const{
-  if (!Module::matchesAccessPath(accessPath, name))
+  if (!ModuleDecl::matchesAccessPath(accessPath, name))
     return;
   
   File.lookupValue(name, results);
@@ -518,19 +518,19 @@ SerializedASTFile::lookupPrecedenceGroup(Identifier name) const {
   return File.lookupPrecedenceGroup(name);
 }
 
-void SerializedASTFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
+void SerializedASTFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                            VisibleDeclConsumer &consumer,
                                            NLKind lookupKind) const {
   File.lookupVisibleDecls(accessPath, consumer, lookupKind);
 }
 
-void SerializedASTFile::lookupClassMembers(Module::AccessPathTy accessPath,
+void SerializedASTFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
                                            VisibleDeclConsumer &consumer) const{
   File.lookupClassMembers(accessPath, consumer);
 }
 
 void
-SerializedASTFile::lookupClassMember(Module::AccessPathTy accessPath,
+SerializedASTFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
                                      DeclName name,
                                      SmallVectorImpl<ValueDecl*> &decls) const {
   File.lookupClassMember(accessPath, name, decls);

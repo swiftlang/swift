@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -462,7 +462,7 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
   return true;
 }
 
-ProtocolConformance *ProtocolConformance::subst(Module *module,
+ProtocolConformance *ProtocolConformance::subst(ModuleDecl *module,
                                        Type substType,
                                        TypeSubstitutionFn subs,
                                        LookupConformanceFn conformances) const {
@@ -649,7 +649,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
 }
 
 bool NominalTypeDecl::lookupConformance(
-       Module *module, ProtocolDecl *protocol,
+       ModuleDecl *module, ProtocolDecl *protocol,
        SmallVectorImpl<ProtocolConformance *> &conformances) const {
   prepareConformanceTable();
   return ConformanceTable->lookupConformance(

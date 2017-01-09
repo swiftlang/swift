@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -819,7 +819,7 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
       superclassTy = superclassTy->getSuperclass(resolver);
 
     // Look up the inherited conformance.
-    Module *module = entry->getDeclContext()->getParentModule();
+    ModuleDecl *module = entry->getDeclContext()->getParentModule();
     auto inheritedConformance = module->lookupConformance(superclassTy,
                                                           protocol,
                                                           resolver)
@@ -892,7 +892,7 @@ void ConformanceLookupTable::registerProtocolConformance(
 }
 
 bool ConformanceLookupTable::lookupConformance(
-       Module *module, 
+       ModuleDecl *module, 
        NominalTypeDecl *nominal,
        ProtocolDecl *protocol, 
        LazyResolver *resolver,

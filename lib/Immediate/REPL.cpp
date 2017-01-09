@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -739,7 +739,7 @@ public:
 
 private:
   ProcessCmdLine CmdLine;
-  llvm::SmallPtrSet<swift::Module *, 8> ImportedModules;
+  llvm::SmallPtrSet<swift::ModuleDecl *, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
   bool RanGlobalInitializers;
   llvm::LLVMContext &LLVMContext;
@@ -994,7 +994,7 @@ public:
           "***  Type ':help' for assistance.              ***\n";
   }
   
-  swift::Module *getMainModule() const {
+  swift::ModuleDecl *getMainModule() const {
     return REPLInputFile.getParentModule();
   }
   StringRef getDumpSource() const { return DumpSource; }

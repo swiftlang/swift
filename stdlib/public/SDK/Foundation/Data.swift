@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1425,7 +1425,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 // In the future, if we keep the malloced pointer and count inside this struct/ref instead of deferring to NSData, we may be able to do this more efficiently.
                 self.count = resultCount
             }
-            
+
             let shift = resultCount - currentCount
             let start = subrange.lowerBound
             
@@ -1437,7 +1437,11 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 }
                 
                 if replacementCount != 0 {
-                    newElements._copyContents(initializing: bytes + start)
+                    let buf = UnsafeMutableBufferPointer(start: bytes + start, 
+                                                         count: replacementCount)
+                    var (it,idx) = newElements._copyContents(initializing: buf)
+                    precondition(it.next() == nil && idx == buf.endIndex,
+                      "newElements iterator returned different count to newElements.count")
                 }
             }
     }

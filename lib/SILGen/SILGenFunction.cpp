@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -91,7 +91,7 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
   if (auto fu = dyn_cast<FileUnit>(dc)) {
     return fu->getParentModule()->getName();
   }
-  if (auto m = dyn_cast<Module>(dc)) {
+  if (auto m = dyn_cast<ModuleDecl>(dc)) {
     return m->getName();
   }
   if (auto e = dyn_cast<ExtensionDecl>(dc)) {

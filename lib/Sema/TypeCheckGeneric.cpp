@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -678,7 +678,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     genericParams->getOuterParameters() && !parentSig;
 
   // Create the archetype builder.
-  Module *module = dc->getParentModule();
+  ModuleDecl *module = dc->getParentModule();
   ArchetypeBuilder builder = createArchetypeBuilder(module);
 
   // Type check the generic parameters, treating all generic type
@@ -887,7 +887,7 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                                    const TypeSubstitutionMap &substitutions,
                                    UnsatisfiedDependency *unsatisfiedDependency) {
   // Check each of the requirements.
-  Module *module = dc->getParentModule();
+  ModuleDecl *module = dc->getParentModule();
   for (const auto &req : genericSig->getRequirements()) {
     Type firstType = req.getFirstType().subst(module, substitutions);
     if (firstType.isNull()) {

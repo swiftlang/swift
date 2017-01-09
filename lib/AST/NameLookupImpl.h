@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,13 +23,13 @@ namespace namelookup {
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
 void
-lookupVisibleDeclsInModule(Module *M, Module::AccessPathTy accessPath,
+lookupVisibleDeclsInModule(ModuleDecl *M, ModuleDecl::AccessPathTy accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            NLKind lookupKind,
                            ResolutionKind resolutionKind,
                            LazyResolver *typeResolver,
                            const DeclContext *moduleScopeContext,
-                           ArrayRef<Module::ImportedModule> extraImports = {});
+                           ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
 
 /// Searches through statements and patterns for local variable declarations.
 class FindLocalVal : public StmtVisitor<FindLocalVal> {

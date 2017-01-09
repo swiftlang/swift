@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -66,7 +66,7 @@ struct ASTNodeBase {};
 #include "swift/AST/PatternNodes.def"
 
   class Verifier : public ASTWalker {
-    PointerUnion<Module *, SourceFile *> M;
+    PointerUnion<ModuleDecl *, SourceFile *> M;
     ASTContext &Ctx;
     llvm::raw_ostream &Out;
     const bool HadError;
@@ -101,9 +101,9 @@ struct ASTNodeBase {};
                    llvm::SmallBitVector> ClosureDiscriminators;
     DeclContext *CanonicalTopLevelContext = nullptr;
 
-    Verifier(PointerUnion<Module *, SourceFile *> M, DeclContext *DC)
+    Verifier(PointerUnion<ModuleDecl *, SourceFile *> M, DeclContext *DC)
       : M(M),
-        Ctx(M.is<Module *>() ? M.get<Module *>()->getASTContext()
+        Ctx(M.is<ModuleDecl *>() ? M.get<ModuleDecl *>()->getASTContext()
                              : M.get<SourceFile *>()->getASTContext()),
         Out(llvm::errs()),
         HadError(Ctx.hadError())
@@ -113,8 +113,8 @@ struct ASTNodeBase {};
     }
 
   public:
-    Verifier(Module *M, DeclContext *DC)
-      : Verifier(PointerUnion<Module *, SourceFile *>(M), DC) { }
+    Verifier(ModuleDecl *M, DeclContext *DC)
+      : Verifier(PointerUnion<ModuleDecl *, SourceFile *>(M), DC) { }
     Verifier(SourceFile &SF, DeclContext *DC)
       : Verifier(&SF, DC) { }
 

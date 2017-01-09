@@ -79,4 +79,7 @@ public protocol P4 {}
 
 extension C1 : P4 {
   public func C1foo() {}
+  public struct C1S1{
+    public func C1S1foo(a : P4) {}
+  }
 }

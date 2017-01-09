@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1349,7 +1349,7 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 // AST printing
 //===----------------------------------------------------------------------===//
 
-static Module *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
   SmallVector<std::pair<Identifier, SourceLoc>, 4>
       AccessPath;
   while (!ModuleName.empty()) {
@@ -1361,7 +1361,7 @@ static Module *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
   return Context.getModule(AccessPath);
 }
 
-static Module *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
   return Context.getModule(std::make_pair(ModuleName, SourceLoc()));
 }
 
@@ -1397,7 +1397,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     CI.performSema();
 
   if (MangledNameToFind.empty()) {
-    Module *M = CI.getMainModule();
+    ModuleDecl *M = CI.getMainModule();
     M->getMainSourceFile(Invocation.getSourceFileKind()).print(llvm::outs(),
                                                                Options);
     return EXIT_SUCCESS;
@@ -1474,7 +1474,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     }
   } while (node->getKind() != NodeKind::Module);
 
-  Module *M = getModuleByFullName(ctx, node->getText());
+  ModuleDecl *M = getModuleByFullName(ctx, node->getText());
   SmallVector<ValueDecl *, 4> results;
   M->lookupMember(results, M, identifiers.back().first,
                   identifiers.back().second);
@@ -2367,22 +2367,22 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       continue;
     }
 
-    auto isClangModule = [](const Module *M) -> bool {
+    auto isClangModule = [](const ModuleDecl *M) -> bool {
       if (!M->getFiles().empty())
         if (M->getFiles().front()->getKind() == FileUnitKind::ClangModule)
           return true;
       return false;
     };
 
-    SmallVector<Module::ImportedModule, 16> scratch;
-    M->forAllVisibleModules({}, [&](const Module::ImportedModule &next) {
+    SmallVector<ModuleDecl::ImportedModule, 16> scratch;
+    M->forAllVisibleModules({}, [&](const ModuleDecl::ImportedModule &next) {
       llvm::outs() << next.second->getName();
       if (isClangModule(next.second))
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
 
       scratch.clear();
-      next.second->getImportedModules(scratch, Module::ImportFilter::Public);
+      next.second->getImportedModules(scratch, ModuleDecl::ImportFilter::Public);
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.second->getName();
         for (auto accessPathPiece : import.first) {

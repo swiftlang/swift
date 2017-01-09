@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1189,6 +1189,48 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
   return false;
 }
 
+static Optional<ConversionRestrictionKind>
+selectOptionalConversionRestriction(Type type1, Type type2,
+                                    ConstraintKind kind) {
+  OptionalTypeKind optionalKind1 = OTK_None;
+  if (auto boundGeneric1 = type1->getAs<BoundGenericType>())
+    optionalKind1 = boundGeneric1->getDecl()->classifyAsOptionalType();
+
+  OptionalTypeKind optionalKind2 = OTK_None;
+  if (auto boundGeneric2 = type2->getAs<BoundGenericType>())
+    optionalKind2 = boundGeneric2->getDecl()->classifyAsOptionalType();
+
+  if (optionalKind2 == OTK_None) {
+    if (optionalKind1 == OTK_ImplicitlyUnwrappedOptional &&
+        kind >= ConstraintKind::Conversion)
+      return ConversionRestrictionKind::ForceUnchecked;
+
+    return llvm::None;
+  }
+
+  if (optionalKind1 == optionalKind2)
+    return ConversionRestrictionKind::OptionalToOptional;
+
+  if (optionalKind1 == OTK_None)
+    return ConversionRestrictionKind::ValueToOptional;
+
+  if (optionalKind1 == OTK_Optional) {
+    if (kind >= ConstraintKind::Conversion)
+      return ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional;
+
+    assert(optionalKind2 == OTK_ImplicitlyUnwrappedOptional &&
+           "Result has unexpected optional kind!");
+
+    return llvm::None;
+  }
+
+  assert(optionalKind1 == OTK_ImplicitlyUnwrappedOptional &&
+         "Source has unexpected optional kind!");
+
+  return ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional;
+}
+
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
@@ -1933,57 +1975,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
   }
 
-  // A value of type T can be converted to type U? if T is convertible to U.
-  // A value of type T? can be converted to type U? if T is convertible to U.
-  // The above conversions also apply to implicitly unwrapped optional types,
-  // except that there is no implicit conversion from T? to T!.
-  {
-    BoundGenericType *boundGenericType2;
-    
-    if (concrete && kind >= ConstraintKind::Subtype &&
-        (boundGenericType2 = type2->getAs<BoundGenericType>())) {
-      auto decl2 = boundGenericType2->getDecl();
-      if (auto optionalKind2 = decl2->classifyAsOptionalType()) {
-        assert(boundGenericType2->getGenericArgs().size() == 1);
-        
-        BoundGenericType *boundGenericType1 = type1->getAs<BoundGenericType>();
-        if (boundGenericType1) {
-          auto decl1 = boundGenericType1->getDecl();
-          if (decl1 == decl2) {
-            assert(boundGenericType1->getGenericArgs().size() == 1);
-            conversionsOrFixes.push_back(
-                                ConversionRestrictionKind::OptionalToOptional);
-          } else if (optionalKind2 == OTK_Optional &&
-                     decl1 == TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
-            assert(boundGenericType1->getGenericArgs().size() == 1);
-            conversionsOrFixes.push_back(
-                       ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional);
-          } else if (optionalKind2 == OTK_ImplicitlyUnwrappedOptional &&
-                     kind >= ConstraintKind::Conversion &&
-                     decl1 == TC.Context.getOptionalDecl()) {
-            assert(boundGenericType1->getGenericArgs().size() == 1);
-            conversionsOrFixes.push_back(
-                       ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional);
-          }
-        }
-        
-        conversionsOrFixes.push_back(
-            ConversionRestrictionKind::ValueToOptional);
-      }
-    }
-  }
+  // A value of type T! can be converted to type U if T is convertible
+  // to U by force-unwrapping the source value.
+  // A value of type T, T?, or T! can be converted to type U? or U! if
+  // T is convertible to U.
+  if (concrete && kind >= ConstraintKind::Subtype)
+    if (auto restriction =
+        selectOptionalConversionRestriction(type1, type2, kind))
+      conversionsOrFixes.push_back(restriction.getValue());
 
-  // A value of type T! can be (unsafely) forced to U if T
-  // is convertible to U.
-  {
-    Type objectType1;
-    if (concrete && kind >= ConstraintKind::Conversion &&
-        (objectType1 = lookThroughImplicitlyUnwrappedOptionalType(type1))) {
-      conversionsOrFixes.push_back(
-                          ConversionRestrictionKind::ForceUnchecked);
-    }
-  }
-  
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
   // literals.
   if (auto elt = locator.last()) {
@@ -2991,7 +2991,7 @@ retry_after_fail:
   // a lookup into that Objective-C type.
   if (bridgedType) {
     LookupResult &bridgedLookup = lookupMember(bridgedClass, memberName);
-    Module *foundationModule = nullptr;
+    ModuleDecl *foundationModule = nullptr;
     for (auto result : bridgedLookup) {
       // Ignore results from the Objective-C "Foundation"
       // module. Those core APIs are explicitly provided by the

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -205,8 +205,8 @@ extension NSDictionary {
   /// Initializes a newly allocated dictionary and adds to it objects from
   /// another given dictionary.
   ///
-  /// - Returns: An initialized dictionary—which might be different
-  ///   than the original receiver—containing the keys and values
+  /// - Returns: An initialized dictionary--which might be different
+  ///   than the original receiver--containing the keys and values
   ///   found in `otherDictionary`.
   @objc(_swiftInitWithDictionary_NSDictionary:)
   public convenience init(dictionary otherDictionary: NSDictionary) {

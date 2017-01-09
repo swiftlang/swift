@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -150,8 +150,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     return;
   switch (Context->getContextKind()) {
   case DeclContextKind::Module:
-    if (Context == cast<Module>(Context)->getASTContext().TheBuiltinModule)
-      Buffer << cast<Module>(Context)->getName() << ".";
+    if (Context == cast<ModuleDecl>(Context)->getASTContext().TheBuiltinModule)
+      Buffer << cast<ModuleDecl>(Context)->getName() << ".";
     return;
 
   case DeclContextKind::FileUnit:
@@ -2075,7 +2075,7 @@ printSILCoverageMaps(SILPrintContext &Ctx,
 }
 
 /// Pretty-print the SILModule to the designated stream.
-void SILModule::print(SILPrintContext &PrintCtx, Module *M,
+void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
                       bool PrintASTDecls) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
   OS << "sil_stage ";
@@ -2141,9 +2141,14 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_vtable " << getClass()->getName() << " {\n";
   for (auto &entry : getEntries()) {
     OS << "  ";
-    entry.first.print(OS);
-    OS << ": " << entry.second->getName()
-       << "\t// " << demangleSymbol(entry.second->getName()) << "\n";
+    entry.Method.print(OS);
+    OS << ": ";
+    if (entry.Linkage !=
+        stripExternalFromLinkage(entry.Implementation->getLinkage())) {
+      OS << getLinkageString(entry.Linkage);
+    }
+    OS << entry.Implementation->getName()
+       << "\t// " << demangleSymbol(entry.Implementation->getName()) << "\n";
   }
   OS << "}\n\n";
 }

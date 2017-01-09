@@ -194,7 +194,7 @@ Strings are **Mutable**
 
    The ability to change a string's value might not be worth noting
    except that *some languages make all strings immutable*, as a way
-   of working around problems that Swift has defined away—by making
+   of working around problems that Swift has defined away--by making
    strings pure values (see below).
 
 .. parsed-literal::
@@ -231,13 +231,13 @@ passes you a string *you own it*.  Nobody can change a string value
   |swift| var c = Cave()
   `// c: Cave = <Cave instance>`
   |swift| s = "Hey"
-  |swift| var t = :look1:`c.say(s)`\ :aside:`this call can't change s…`
+  |swift| var t = :look1:`c.say(s)`\ :aside:`this call can't change s...`
   `// t: String = "HeyHey"`
   |swift| s
-  `// s: String =` :look:`"Hey"`\ :aside:`…and it doesn't.`
-  |swift| :look1:`t.addEcho()`\ :aside:`this call can't change c.lastSound…`
+  `// s: String =` :look:`"Hey"`\ :aside:`...and it doesn't.`
+  |swift| :look1:`t.addEcho()`\ :aside:`this call can't change c.lastSound...`
   |swift| [s, c.lastSound, t]
-  `// r0: [String] = ["Hey",` :look:`"HeyHey"`\ :aside:`…and it doesn't.`\ `, "HeyHeyHeyHey"]`
+  `// r0: [String] = ["Hey",` :look:`"HeyHey"`\ :aside:`...and it doesn't.`\ `, "HeyHeyHeyHey"]`
 
 Strings are **Unicode-Aware**
 -----------------------------
@@ -320,7 +320,7 @@ Strings are **Containers**
    |swift| var s = "Strings are awesome"
    `// s : String = "Strings are awesome"`
    |swift| var r = s.find("awe")
-   `// r : Range<StringIndex> = <"…are a̲w̲e̲some">`
+   `// r : Range<StringIndex> = <"...are a̲w̲e̲some">`
    |swift| s[r.start]
    `// r0 : Character =` :look:`Character("a")`\ :aside:`String elements have type Character (see below)`
 
@@ -516,8 +516,8 @@ Why a Built-In String Type?
    "value semantics" in place of "C++ semantics". I know that is what
    you meant, but we need to tread carefully in the final document.
 
-``NSString`` and ``NSMutableString``\ —the string types provided by
-Cocoa—are full-featured classes with high-level functionality for
+``NSString`` and ``NSMutableString``\ --the string types provided by
+Cocoa--are full-featured classes with high-level functionality for
 writing fully-localized applications.  They have served Apple
 programmers well; so, why does Swift have its own string type?
 
@@ -887,7 +887,7 @@ all contexts.
 
   :``NSAnchoredSearch``: Not applicable to whole-string comparisons
   :``NSNumericSearch``: While it's legitimate to defer this
-                        functionality to Cocoa, it's (probably—see
+                        functionality to Cocoa, it's (probably--see
                         <rdar://problem/14724804>) locale-independent and
                         easy enough to implement in Swift.  TBD_
   :``NSDiacriticInsensitiveSearch``: Ditto; TBD_
@@ -916,7 +916,7 @@ Searching
 
 .. Sidebar:: Rationale
 
-   Modern languages (Java, C#, Python, Ruby…) have standardized on
+   Modern languages (Java, C#, Python, Ruby...) have standardized on
    variants of ``startsWith``/\ ``endsWith``.  There's no reason Swift
    should deviate from de-facto industry standards here.
 
@@ -1012,7 +1012,7 @@ Dynamic Formatting
   .. parsed-literal::
      \- (NSString \*)\ **stringByAppendingFormat:**\ (NSString \*)format, ... NS_FORMAT_FUNCTION(1,2);
 
-:Swift: *Not directly provided*\ —see the *Swift formatting proposal*
+:Swift: *Not directly provided*\ --see the *Swift formatting proposal*
 
 Extracting Numeric Values
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1026,7 +1026,7 @@ Extracting Numeric Values
      \- (long long)longLongValue;
      \- (BOOL)boolValue;
 
-:Swift: Not in ``String``\ —It is up to other types to provide their
+:Swift: Not in ``String``\ --It is up to other types to provide their
    conversions to and from String.  See also this `rationale`__
 
    __ extending_

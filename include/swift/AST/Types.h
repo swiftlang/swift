@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -69,7 +69,7 @@ namespace swift {
   struct SILArgumentConvention;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
-  enum class ValueOwnershipKind : uint8_t;
+  struct ValueOwnershipKind;
 
   enum class TypeKind {
 #define TYPE(id, parent) id,
@@ -652,7 +652,7 @@ public:
   /// name lookup, which is the case for nominal types, protocol compositions
   /// and archetypes.
   ///
-  /// Generally, the static vs instanec and mutating vs nonmutating distinction
+  /// Generally, the static vs instance and mutating vs nonmutating distinction
   /// is handled elsewhere, so metatypes, lvalue types and inout types are not
   /// allowed here.
   ///
@@ -3875,7 +3875,7 @@ public:
 
   /// Retrieve the generic environment in which this archetype resides.
   ///
-  /// FIXME: Not all archetypes have generic environments, yet.
+  /// Note: opened archetypes currently don't have generic environments.
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the associated type to which this archetype (if it is a nested

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -170,7 +170,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   ClangImporterOptions ClangImporterOpts;
   ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ClangImporterOpts),
                          true);
-  Module *M = Module::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
+  ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   SILOptions SILOpts;
   std::unique_ptr<SILModule> SM = SILModule::createEmptyModule(M, SILOpts);
   createSwiftModuleObjectFile(*SM, (*ErrOrBuf)->getBuffer(),

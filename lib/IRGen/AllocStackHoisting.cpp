@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -85,7 +85,7 @@ public:
   /// non-overlapping.
   void assignStackLocation(SmallVectorImpl<SILInstruction *> &FunctionExits);
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 /// Erases all dealloc_stack users of an alloc_stack
 static void eraseDeallocStacks(AllocStackInst *AllocStack) {
@@ -213,7 +213,7 @@ public:
     return false;
   }
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 namespace {
 /// Merge alloc_stack instructions.
@@ -237,7 +237,7 @@ public:
   /// block.
   void mergeSlots();
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 MergeStackSlots::MergeStackSlots(SmallVectorImpl<AllocStackInst *> &AllocStacks,
                                  SmallVectorImpl<SILInstruction *> &FuncExits)
@@ -339,7 +339,7 @@ private:
   /// Move the hoistable alloc_stack instructions to the entry block.
   void hoist();
 };
-}
+} // end anonymous namespace
 
 /// Collect generic alloc_stack instructions in the current function can be
 /// hoisted.

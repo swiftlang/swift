@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -42,13 +42,13 @@ Substitution::Substitution(Type Replacement,
          && "cannot substitute with a non-materializable type");
 }
 
-Substitution Substitution::subst(Module *module,
+Substitution Substitution::subst(ModuleDecl *module,
                                  const SubstitutionMap &subMap) const {
   return subst(module, QueryTypeSubstitutionMap{subMap.getMap()},
                LookUpConformanceInSubstitutionMap(subMap));
 }
 
-Substitution Substitution::subst(Module *module,
+Substitution Substitution::subst(ModuleDecl *module,
                                  TypeSubstitutionFn subs,
                                  LookupConformanceFn conformances) const {
   // Substitute the replacement.

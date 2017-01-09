@@ -68,9 +68,10 @@ ErrorBridgingTests.test("NSCopying") {
   }
 }
 
-func archiveAndUnarchiveObject<T: NSCoding where T: NSObject>(
+func archiveAndUnarchiveObject<T: NSCoding>(
   _ object: T
-) -> T? {
+) -> T?
+where T: NSObject {
   let unarchiver = NSKeyedUnarchiver(forReadingWith:
     NSKeyedArchiver.archivedData(withRootObject: object)
   )

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -657,7 +657,7 @@ private:
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
 
-  Module *StdlibModule = nullptr;
+  ModuleDecl *StdlibModule = nullptr;
 
   /// The index of the next response metavariable to bind to a REPL result.
   unsigned NextResponseVariableIndex = 0;
@@ -886,7 +886,7 @@ public:
   /// \param member The member whose type projection is being computed.
   /// \param baseTy The base type that will be substituted for the 'Self' of the
   /// member.
-  Type substMemberTypeWithBase(Module *module, TypeDecl *member, Type baseTy);
+  Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member, Type baseTy);
 
   /// \brief Retrieve the superclass type of the given type, or a null type if
   /// the type has no supertype.
@@ -1854,7 +1854,7 @@ public:
   ///
   /// This is "Swift", if that module is imported, or the current module if
   /// we're parsing the standard library.
-  Module *getStdlibModule(const DeclContext *dc);
+  ModuleDecl *getStdlibModule(const DeclContext *dc);
 
   /// \name AST Mutation Listener Implementation
   /// @{
@@ -1886,7 +1886,7 @@ public:
 
   void fillObjCRepresentableTypeCache(const DeclContext *DC);
 
-  ArchetypeBuilder createArchetypeBuilder(Module *mod);
+  ArchetypeBuilder createArchetypeBuilder(ModuleDecl *mod);
 
   /// \name Availability checking
   ///

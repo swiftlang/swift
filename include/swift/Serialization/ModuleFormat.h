@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 302; // Last change: SIL box type substitutions
+const uint16_t VERSION_MINOR = 305; // Last change: linkage in SILVTable::Entry
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -630,7 +630,8 @@ namespace decls_block {
 
   using ArchetypeTypeLayout = BCRecordLayout<
     ARCHETYPE_TYPE,
-    TypeIDField,         // parent if non-primary
+    BCFixed<1>,          // whether this is a primary archetype or not
+    TypeIDField,         // parent if non-primary, generic env if primary
     DeclIDField,         // associated type decl if non-primary, name if primary
     TypeIDField,         // superclass
     BCArray<DeclIDField> // conformances

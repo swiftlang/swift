@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -859,10 +859,15 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
       // Get the innermost nominal type context.
       DeclContext *DC;
-      if (isa<NominalTypeDecl>(Current) || isa<ExtensionDecl>(Current))
+      if (isa<NominalTypeDecl>(Current))
         DC = Current->getInnermostDeclContext();
+      else if (isa<ExtensionDecl>(Current))
+        DC = Current->getInnermostDeclContext()->
+          getAsNominalTypeOrNominalTypeExtensionContext();
       else
         DC = Current->getDeclContext();
+
+      assert(DC->isTypeContext());
 
       // Get the substitutions from our base type.
       auto subMap = CurrentType->getContextSubstitutions(DC);
@@ -3271,7 +3276,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   template <typename T>
   void printModuleContext(T *Ty) {
-    Module *Mod = Ty->getDecl()->getModuleContext();
+    ModuleDecl *Mod = Ty->getDecl()->getModuleContext();
     Printer.printModuleRef(Mod, Mod->getName());
     Printer << ".";
   }
@@ -3284,7 +3289,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   // FIXME: we should have a callback that would tell us
   // whether it's kosher to print a module name or not
-  bool isLLDBExpressionModule(Module *M) {
+  bool isLLDBExpressionModule(ModuleDecl *M) {
     if (!M)
       return false;
     return M->getName().str().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
@@ -3304,7 +3309,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     if (!D)
       return true;
 
-    Module *M = D->getDeclContext()->getParentModule();
+    ModuleDecl *M = D->getDeclContext()->getParentModule();
 
     if (Options.CurrentModule && M == Options.CurrentModule) {
       return false;

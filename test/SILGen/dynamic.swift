@@ -468,6 +468,6 @@ public class Sub : Base {
 
 // Vtable uses a dynamic thunk for dynamic overrides
 // CHECK-LABEL: sil_vtable Subclass {
-// CHECK-LABEL:   #Foo.overriddenByDynamic!1: _TTDFC7dynamic8Subclass19overriddenByDynamic
+// CHECK-LABEL:   #Foo.overriddenByDynamic!1: public _TTDFC7dynamic8Subclass19overriddenByDynamic
 
 

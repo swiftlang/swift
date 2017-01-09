@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -327,7 +327,7 @@ public:
     return D;
   }
 
-  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) {
+  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) override {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
     SmallVector<swift::ASTNode, 3> Elements(OriginalElements.begin(),
                                             OriginalElements.end());
@@ -472,9 +472,9 @@ public:
     }
 
     VarDecl *VD =
-        new (Context) VarDecl(false, // static
-                              true,  // let
-                              SourceLoc(), Context.getIdentifier(NameBuf),
+        new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                              /*IsCaptureList*/false, SourceLoc(),
+                              Context.getIdentifier(NameBuf),
                               MaybeLoadInitExpr->getType(), TypeCheckDC);
 
     VD->setImplicit();
@@ -676,7 +676,7 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
   public:
     ExpressionFinder(TopLevelContext &TLC) : TLC(TLC) {}
 
-    virtual bool walkToDeclPre(Decl *D) {
+    bool walkToDeclPre(Decl *D) override {
       if (AbstractFunctionDecl *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (FD->getBody()) {

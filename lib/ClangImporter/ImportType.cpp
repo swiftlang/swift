@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -328,7 +328,7 @@ namespace {
         if (pointee && !pointee->getDecl()->isCompleteDefinition() &&
             pointee->getDecl()->getName() == "_NSZone") {
           Identifier Id_ObjectiveC = Impl.SwiftContext.Id_ObjectiveC;
-          Module *objCModule = Impl.SwiftContext.getLoadedModule(Id_ObjectiveC);
+          ModuleDecl *objCModule = Impl.SwiftContext.getLoadedModule(Id_ObjectiveC);
           Type wrapperTy = Impl.getNamedSwiftType(
                              objCModule,
                              Impl.SwiftContext.getSwiftName(
@@ -1210,7 +1210,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
           impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSError))
       return Type();
 
-    Module *foundationModule = impl.tryLoadFoundationModule();
+    ModuleDecl *foundationModule = impl.tryLoadFoundationModule();
     if (!foundationModule ||
         foundationModule->getName()
           != elementClass->getModuleContext()->getName())
@@ -2214,25 +2214,25 @@ Type ClangImporter::Implementation::importAccessorMethodType(
 }
 
 
-Module *ClangImporter::Implementation::getStdlibModule() {
+ModuleDecl *ClangImporter::Implementation::getStdlibModule() {
   return SwiftContext.getStdlibModule(true);
 }
 
-Module *ClangImporter::Implementation::getNamedModule(StringRef name) {
+ModuleDecl *ClangImporter::Implementation::getNamedModule(StringRef name) {
   return SwiftContext.getLoadedModule(SwiftContext.getIdentifier(name));
 }
 
-static Module *tryLoadModule(ASTContext &C,
+static ModuleDecl *tryLoadModule(ASTContext &C,
                              Identifier moduleName,
                              bool importForwardDeclarations,
-                             llvm::DenseMap<Identifier, Module *>
+                             llvm::DenseMap<Identifier, ModuleDecl *>
                                &checkedModules) {
   // If we've already done this check, return the cached result.
   auto known = checkedModules.find(moduleName);
   if (known != checkedModules.end())
     return known->second;
 
-  Module *module;
+  ModuleDecl *module;
 
   // If we're synthesizing forward declarations, we don't want to pull in
   // the module too eagerly.
@@ -2245,17 +2245,17 @@ static Module *tryLoadModule(ASTContext &C,
   return module;
 }
 
-Module *ClangImporter::Implementation::tryLoadFoundationModule() {
+ModuleDecl *ClangImporter::Implementation::tryLoadFoundationModule() {
   return tryLoadModule(SwiftContext, SwiftContext.Id_Foundation,
                        ImportForwardDeclarations, checkedModules);
 }
 
-Module *ClangImporter::Implementation::tryLoadSIMDModule() {
+ModuleDecl *ClangImporter::Implementation::tryLoadSIMDModule() {
   return tryLoadModule(SwiftContext, SwiftContext.Id_simd,
                        ImportForwardDeclarations, checkedModules);
 }
 
-Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
+Type ClangImporter::Implementation::getNamedSwiftType(ModuleDecl *module,
                                                       StringRef name) {
   if (!module)
     return Type();
@@ -2309,7 +2309,7 @@ Type ClangImporter::Implementation::getNamedSwiftType(StringRef moduleName,
 
 Type
 ClangImporter::Implementation::
-getNamedSwiftTypeSpecialization(Module *module, StringRef name,
+getNamedSwiftTypeSpecialization(ModuleDecl *module, StringRef name,
                                 ArrayRef<Type> args) {
   if (!module)
     return Type();

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -214,7 +214,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   for (auto &VD : DeclaredDecls) {
     OS << "<Declared>" << VD.VD->getNameStr() << "</Declared>";
     OS << "<OutscopeReference>";
-    if (VD.ReferedAfterRange)
+    if (VD.ReferredAfterRange)
       OS << "true";
     else
       OS << "false";
@@ -469,7 +469,7 @@ public:
       auto It = std::find(Impl->DeclaredDecls.begin(),
                           Impl->DeclaredDecls.end(), D);
       if (It != Impl->DeclaredDecls.end()) {
-        It->ReferedAfterRange = true;
+        It->ReferredAfterRange = true;
       }
       return true;
     }

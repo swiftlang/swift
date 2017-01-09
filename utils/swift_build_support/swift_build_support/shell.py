@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -175,21 +175,26 @@ def copytree(src, dest, dry_run=None, echo=True):
     shutil.copytree(src, dest)
 
 
+# Initialized later
+lock = None
+
+
 def run(*args, **kwargs):
     repo_path = os.getcwd()
     echo_output = kwargs.pop('echo', False)
     dry_run = kwargs.pop('dry_run', False)
     env = kwargs.pop('env', None)
-    allow_non_zero_exit = kwargs.pop('allow_non_zero_exit', False)
     if dry_run:
         _echo_command(dry_run, *args, env=env)
         return(None, 0, args)
 
-    my_pipe = subprocess.Popen(*args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+    my_pipe = subprocess.Popen(
+        *args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
     (stdout, stderr) = my_pipe.communicate()
     ret = my_pipe.wait()
 
-    lock.acquire()
+    if lock:
+        lock.acquire()
     if echo_output:
         print(repo_path)
         _echo_command(dry_run, *args, env=env)
@@ -198,7 +203,8 @@ def run(*args, **kwargs):
         if stderr:
             print(stderr, end="")
         print()
-    lock.release()
+    if lock:
+        lock.release()
 
     if ret != 0:
         eout = Exception()
@@ -219,7 +225,8 @@ def run_parallel(fn, pool_args, n_processes=0):
         n_processes = cpu_count() * 2
 
     l = Lock()
-    print("Running ``%s`` with up to %d processes." % (fn.__name__, n_processes))
+    print("Running ``%s`` with up to %d processes." %
+          (fn.__name__, n_processes))
     pool = Pool(processes=n_processes, initializer=init, initargs=(l,))
     results = pool.map_async(func=fn, iterable=pool_args).get(9999999)
     pool.close()

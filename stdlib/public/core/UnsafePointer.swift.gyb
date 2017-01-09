@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -477,7 +477,7 @@ public struct ${Self}<Pointee>
   /// Initializes this pointer's memory with the specified number of
   /// consecutive copies of the given value.
   ///
-  /// The destination memory must be uninititalized or the pointer's `Pointee`
+  /// The destination memory must be uninitialized or the pointer's `Pointee`
   /// must be a trivial type. After a call to `initialize(to:count:)`, the
   /// memory referenced by this pointer is initialized.
   ///
@@ -628,9 +628,15 @@ public struct ${Self}<Pointee>
   ///
   /// - Parameter source: A collection of elements of the pointer's `Pointee`
   ///   type.
+  // This is fundamentally unsafe since collections can underreport their count.
+  @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
   public func initialize<C : Collection>(from source: C)
     where C.Iterator.Element == Pointee {
-    source._copyContents(initializing: self)
+    let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
+    var (remainders,writtenUpTo) = source._copyContents(initializing: buf)
+    // ensure that exactly rhs.count elements were written
+    _precondition(remainders.next() == nil, "rhs underreported its count")
+    _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
   }
 
   /// Replaces the memory referenced by this pointer with the values

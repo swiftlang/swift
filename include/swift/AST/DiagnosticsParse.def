@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1339,7 +1339,7 @@ ERROR(unsupported_conditional_compilation_unary_expression,none,
       "expected unary '!' expression", ())
 ERROR(unsupported_platform_condition_expression,none,
       "unexpected platform condition "
-      "(expected 'canImport', 'os', 'arch', or 'swift')",
+      "(expected 'os', 'arch', or 'swift')",
       ())
 ERROR(platform_condition_expected_one_argument,none,
       "expected only one argument to platform condition",

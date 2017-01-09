@@ -35,7 +35,7 @@ func testE(e: E) {
 
   guard
     case .C() = e, // Ok. SILGen assert this, but no-assert Swift3 GM build didn't assert.
-    case .D(let payload) = e // FIXME: Should be rejeceted. Swift3 IRGen verifier did catch this.
+    case .D(let payload) = e // FIXME: Should be rejected. Swift3 IRGen verifier did catch this.
   else { return }
   print(payload)
 }

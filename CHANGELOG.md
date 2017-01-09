@@ -20,6 +20,33 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* The `withoutActuallyEscaping` function from [SE-0103][] has been implemented.
+  To pass off a non-escaping closure to an API that formally takes an
+  `@escaping` closure, but which is used in a way that will not in fact 
+  escape it in practice, use `withoutActuallyEscaping` to get an escapable
+  copy of the closure and delimit its expected lifetime. For example:
+
+  ```swift
+  func doSimultaneously(_ f: () -> (), and g: () -> (), on q: DispatchQueue) {
+    // DispatchQueue.async normally has to be able to escape its closure
+    // since it may be called at any point after the operation is queued.
+    // By using a barrier, we ensure it does not in practice escape.
+    withoutActuallyEscaping(f) { escapableF in
+      withoutActuallyEscaping(g) { escapableG in
+        q.async(escapableF)
+        q.async(escapableG)
+        q.sync(flags: .barrier) {}
+      }
+    }
+    // `escapableF` and `escapableG` must be dequeued by the point
+    // `withoutActuallyEscaping` returns.
+  }
+  ```
+
+  The old workaround of using `unsafeBitCast` to cast to an `@escaping` type
+  is not guaranteed to work in future versions of Swift, and will
+  now raise a warning.
+
 * [SR-1446](https://bugs.swift.org/browse/SR-1446)
 
   Nested types may now appear inside generic types, and nested types may have their own generic parameters:
@@ -300,8 +327,8 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   ```swift
   let a: Foo & Bar
   let b = value as? A & B & C
-  func foo<T : Foo & Bar>(x: T) { … }
-  func bar(x: Foo & Bar) { … }
+  func foo<T : Foo & Bar>(x: T) { ... }
+  func bar(x: Foo & Bar) { ... }
   typealias G = GenericStruct<Foo & Bar>
   ```
 
@@ -1079,7 +1106,7 @@ Swift 2.0
 * Public extensions of generic types are now permitted.
 
   ```swift
-  public extension Array { … }
+  public extension Array { ... }
   ```
 
   **(16974298)**
@@ -1239,8 +1266,8 @@ Swift 2.0
   For example:
 
   ```swift
-  func produceGizmoUsingTechnology() throws -> Gizmo { … }
-  func produceGizmoUsingMagic() throws -> Gizmo { … }
+  func produceGizmoUsingTechnology() throws -> Gizmo { ... }
+  func produceGizmoUsingMagic() throws -> Gizmo { ... }
 
   if let result = try? produceGizmoUsingTechnology() { return result }
   if let result = try? produceGizmoUsingMagic() { return result }
@@ -1413,7 +1440,7 @@ Swift 2.0
   function or initializer. For example:
 
   ```swift
-  func doSomethingToValues(values: Int... , options: MyOptions = [], fn: (Int) -&gt; Void) { … }
+  func doSomethingToValues(values: Int... , options: MyOptions = [], fn: (Int) -&gt; Void) { ... }
   ```
 
   **(20127197)**
@@ -1445,7 +1472,7 @@ Swift 2.0
   **(17227475)**
 
 * When delegating or chaining to a failable initializer (for example, with
-  `self.init(…)` or `super.init(…)`), one can now force-unwrap the result with
+  `self.init(...)` or `super.init(...)`), one can now force-unwrap the result with
   `!`. For example:
 
   ```swift
@@ -2152,7 +2179,7 @@ Swift 1.2
   }
 
   class MySomethingDelegate : SomethingDelegate {
-      @objc func didSomething() { … }
+      @objc func didSomething() { ... }
   }
   ```
 

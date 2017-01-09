@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -427,9 +427,10 @@ extension URLQueryItem : CustomStringConvertible, CustomDebugStringConvertible, 
     }
 
     public var customMirror: Mirror {
-        var c: [(label: String?, value: Any)] = []
-        c.append((label: "name", value: name))
-        c.append((label: "value", value: value))
+        let c: [(label: String?, value: Any)] = [
+          ("name", name),
+          ("value", value as Any),
+        ]
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
 }

@@ -170,9 +170,9 @@ We propose to allow method pairs of the form:
 .. parsed-literal::
 
   extension **X** {
-    func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **X**
+    func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, ...p\ *n*: T\ *n*) -> **X**
 
-    func **=**\ *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
+    func **=**\ *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, ...p\ *n*: T\ *n*) -> **Void**
   }
 
 The second ``=f`` method is known as an **assignment method** [#getset]_.
@@ -257,7 +257,7 @@ Given an ordinary method of a type ``X``:
 .. parsed-literal::
 
   extension **X** {
-    func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **X**
+    func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, ...p\ *n*: T\ *n*) -> **X**
   }
 
 if there is no corresponding *assignment method* in ``X`` with the signature
@@ -265,20 +265,20 @@ if there is no corresponding *assignment method* in ``X`` with the signature
 .. parsed-literal::
 
   extension **X** {
-    func *=f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
+    func *=f*\ (p₀: T₀, p₁: T₁, p₂: T₂, ...p\ *n*: T\ *n*) -> **Void**
   }
 
 we can compile the statement
 
 .. parsed-literal::
 
-  x\ **.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
+  x\ **.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, ...p\ *n*: a\ *n*)
 
 as though it were written:
 
 .. parsed-literal::
 
-  x **= x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
+  x **= x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, ...p\ *n*: a\ *n*)
 
 Generating the Non-Mutating Form
 --------------------------------
@@ -288,7 +288,7 @@ Given an *assignment method* of a value type ``X``:
 .. parsed-literal::
 
   extension **X** {
-    func *=f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
+    func *=f*\ (p₀: T₀, p₁: T₁, p₂: T₂, ...p\ *n*: T\ *n*) -> **Void**
   }
 
 if there is no method in ``X`` with the signature
@@ -296,14 +296,14 @@ if there is no method in ``X`` with the signature
 .. parsed-literal::
 
   extension **X** {
-    func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **X**
+    func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, ...p\ *n*: T\ *n*) -> **X**
   }
 
 we can compile the expression
 
 .. parsed-literal::
 
-  **x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
+  **x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, ...p\ *n*: a\ *n*)
 
 as though it were written:
 
@@ -311,7 +311,7 @@ as though it were written:
 
   {
     (var y: X) -> X in
-    y\ **.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
+    y\ **.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, ...p\ *n*: a\ *n*)
     return y
   }(x)
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -515,9 +515,6 @@ public:
                      unsigned Alignment = alignof(ModuleDecl));
 };
 
-/// FIXME: Helper for the Module -> ModuleDecl migration.
-typedef ModuleDecl Module;
-
 /// A container for module-scope declarations that itself provides a scope; the
 /// smallest unit of code organization.
 ///
@@ -656,7 +653,7 @@ public:
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const {}
 
-  /// \see Module::getImportedModulesForLookup
+  /// \see ModuleDecl::getImportedModulesForLookup
   virtual void getImportedModulesForLookup(
       SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
     return getImportedModules(imports, ModuleDecl::ImportFilter::Public);
@@ -681,7 +678,7 @@ public:
 
   bool
   forAllVisibleModules(llvm::function_ref<void(ModuleDecl::ImportedModule)> fn) {
-    return forAllVisibleModules([=](Module::ImportedModule import) -> bool {
+    return forAllVisibleModules([=](ModuleDecl::ImportedModule import) -> bool {
       fn(import);
       return true;
     });

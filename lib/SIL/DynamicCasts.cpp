@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,13 +29,13 @@ static unsigned getAnyMetatypeDepth(CanType type) {
 }
 
 static bool
-mayBridgeToObjectiveC(Module *M, CanType T) {
+mayBridgeToObjectiveC(ModuleDecl *M, CanType T) {
   // FIXME: Disable when we don't support Objective-C interoperability?
   return true;
 }
 
 static bool
-mustBridgeToSwiftValueBox(Module *M, CanType T) {
+mustBridgeToSwiftValueBox(ModuleDecl *M, CanType T) {
   // If the target type is either an unknown dynamic type, or statically
   // known to bridge, the cast may succeed.
   if (T->hasArchetype())
@@ -188,7 +188,7 @@ classifyDynamicCastFromProtocol(ModuleDecl *M, CanType source, CanType target,
 
 /// Returns the existential type associated with the Hashable
 /// protocol, if it can be found.
-static CanType getHashableExistentialType(Module *M) {
+static CanType getHashableExistentialType(ModuleDecl *M) {
   auto hashable =
     M->getASTContext().getProtocol(KnownProtocolKind::Hashable);
   if (!hashable) return CanType();
@@ -196,7 +196,7 @@ static CanType getHashableExistentialType(Module *M) {
 }
 
 /// Check if a given type conforms to _BridgedToObjectiveC protocol.
-bool swift::isObjectiveCBridgeable(Module *M, CanType Ty) {
+bool swift::isObjectiveCBridgeable(ModuleDecl *M, CanType Ty) {
   // Retrieve the _BridgedToObjectiveC protocol.
   auto bridgedProto =
       M->getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
@@ -211,7 +211,7 @@ bool swift::isObjectiveCBridgeable(Module *M, CanType Ty) {
 }
 
 /// Check if a given type conforms to _Error protocol.
-bool swift::isError(Module *M, CanType Ty) {
+bool swift::isError(ModuleDecl *M, CanType Ty) {
   // Retrieve the Error protocol.
   auto errorTypeProto =
       M->getASTContext().getProtocol(KnownProtocolKind::Error);
@@ -262,7 +262,7 @@ classifyClassHierarchyCast(CanType source, CanType target) {
   return DynamicCastFeasibility::WillFail;
 }
 
-CanType swift::getNSBridgedClassOfCFClass(Module *M, CanType type) {
+CanType swift::getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
     if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       if (auto bridgedAttr =
@@ -278,7 +278,7 @@ CanType swift::getNSBridgedClassOfCFClass(Module *M, CanType type) {
   return CanType();
 }
 
-static bool isCFBridgingConversion(Module *M, SILType sourceType,
+static bool isCFBridgingConversion(ModuleDecl *M, SILType sourceType,
                                    SILType targetType) {
   return (sourceType.getSwiftRValueType() ==
             getNSBridgedClassOfCFClass(M, targetType.getSwiftRValueType()) ||
@@ -288,7 +288,7 @@ static bool isCFBridgingConversion(Module *M, SILType sourceType,
 
 /// Try to classify the dynamic-cast relationship between two types.
 DynamicCastFeasibility
-swift::classifyDynamicCast(Module *M,
+swift::classifyDynamicCast(ModuleDecl *M,
                            CanType source,
                            CanType target,
                            bool isSourceTypeExact,
@@ -758,9 +758,9 @@ namespace {
     SILModule &M;
     ASTContext &Ctx;
     SILLocation Loc;
-    Module *SwiftModule;
+    ModuleDecl *SwiftModule;
   public:
-    CastEmitter(SILBuilder &B, Module *swiftModule, SILLocation loc)
+    CastEmitter(SILBuilder &B, ModuleDecl *swiftModule, SILLocation loc)
       : B(B), M(B.getModule()), Ctx(M.getASTContext()), Loc(loc),
         SwiftModule(swiftModule) {}
 
@@ -1028,7 +1028,7 @@ namespace {
 
 /// Emit an unconditional scalar cast that's known to succeed.
 SILValue
-swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, Module *M,
+swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, ModuleDecl *M,
                                              SILLocation loc, SILValue value,
                                              SILType loweredTargetType,
                                              CanType sourceType,
@@ -1060,7 +1060,7 @@ swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, Module *M,
   return result.Value;
 }
 
-bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
+bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, ModuleDecl *M,
                                                     SILLocation loc,
                                                CastConsumptionKind consumption,
                                                     SILValue src,
@@ -1178,7 +1178,7 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
 /// Carry out the operations required for an indirect conditional cast
 /// using a scalar cast operation.
 void swift::
-emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
+emitIndirectConditionalCastWithScalar(SILBuilder &B, ModuleDecl *M,
                                       SILLocation loc,
                                       CastConsumptionKind consumption,
                                       SILValue src, CanType sourceType,

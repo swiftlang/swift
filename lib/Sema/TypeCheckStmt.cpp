@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -227,7 +227,7 @@ void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
 static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
                                                     Expr *E,
                                                     Type ResultType,
-                                                    Module *module) {
+                                                    ModuleDecl *module) {
   auto *NTD = ResultType->getAnyNominal();
   if (!NTD)
     return;
@@ -656,18 +656,18 @@ public:
                          TC.Context.Id_makeIterator,
                          {}, diag::sequence_protocol_broken);
       if (!getIterator) return nullptr;
-      
+
       // Create a local variable to capture the generator.
       std::string name;
       if (auto np = dyn_cast_or_null<NamedPattern>(S->getPattern()))
         name = "$"+np->getBoundName().str().str();
       name += "$generator";
       generator = new (TC.Context)
-        VarDecl(/*static*/ false, /*IsLet*/ false, S->getInLoc(),
-                TC.Context.getIdentifier(name), generatorTy, DC);
+        VarDecl(/*IsStatic*/false, /*IsLet*/false, /*IsCaptureList*/false,
+                S->getInLoc(), TC.Context.getIdentifier(name), generatorTy, DC);
       generator->setInterfaceType(DC->mapTypeOutOfContext(generatorTy));
       generator->setImplicit();
-      
+
       // Create a pattern binding to initialize the generator.
       auto genPat = new (TC.Context) NamedPattern(generator);
       genPat->setImplicit();
@@ -678,11 +678,11 @@ public:
       genBinding->setImplicit();
       S->setIterator(genBinding);
     }
-    
+
     // Working with generators requires Optional.
     if (TC.requireOptionalIntrinsics(S->getForLoc()))
       return nullptr;
-    
+
     // Gather the witnesses from the Iterator protocol conformance, which
     // we'll use to drive the loop.
     // FIXME: Would like to customize the diagnostic emitted in

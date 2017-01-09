@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -50,7 +50,7 @@ class ModuleFile : public LazyMemberLoader {
   FileUnit *FileContext = nullptr;
 
   /// The module shadowed by this module, if any.
-  Module *ShadowedModule = nullptr;
+  ModuleDecl *ShadowedModule = nullptr;
 
   /// The module file data.
   std::unique_ptr<llvm::MemoryBuffer> ModuleInputBuffer;
@@ -114,7 +114,7 @@ public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {
   public:
-    Module::ImportedModule Import = {};
+    ModuleDecl::ImportedModule Import = {};
     const StringRef RawPath;
 
   private:
@@ -413,7 +413,7 @@ public:
     return FileContext->getParentModule()->getASTContext();
   }
 
-  Module *getAssociatedModule() const {
+  ModuleDecl *getAssociatedModule() const {
     assert(FileContext && "no associated context yet");
     return FileContext->getParentModule();
   }
@@ -509,7 +509,7 @@ private:
   /// because it reads from the cursor, it is not possible to reset the cursor
   /// after reading. Nothing should ever follow an XREF record except
   /// XREF_PATH_PIECE records.
-  Decl *resolveCrossReference(Module *M, uint32_t pathLen);
+  Decl *resolveCrossReference(ModuleDecl *M, uint32_t pathLen);
 
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
@@ -570,7 +570,7 @@ public:
   }
 
   /// The module shadowed by this module, if any.
-  Module *getShadowedModule() const { return ShadowedModule; }
+  ModuleDecl *getShadowedModule() const { return ShadowedModule; }
 
   /// Searches the module's top-level decls for the given identifier.
   void lookupValue(DeclName name, SmallVectorImpl<ValueDecl*> &results);
@@ -590,13 +590,13 @@ public:
   PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name);
 
   /// Adds any imported modules to the given vector.
-  void getImportedModules(SmallVectorImpl<Module::ImportedModule> &results,
-                          Module::ImportFilter filter);
+  void getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &results,
+                          ModuleDecl::ImportFilter filter);
 
   void getImportDecls(SmallVectorImpl<Decl *> &Results);
 
   /// Reports all visible top-level members in this module.
-  void lookupVisibleDecls(Module::AccessPathTy accessPath,
+  void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                           VisibleDeclConsumer &consumer,
                           NLKind lookupKind);
 
@@ -627,13 +627,13 @@ public:
   /// Reports all class members in the module to the given consumer.
   ///
   /// This is intended for use with id-style lookup and code completion.
-  void lookupClassMembers(Module::AccessPathTy accessPath,
+  void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
                           VisibleDeclConsumer &consumer);
 
   /// Adds class members in the module with the given name to the given vector.
   ///
   /// This is intended for use with id-style lookup.
-  void lookupClassMember(Module::AccessPathTy accessPath,
+  void lookupClassMember(ModuleDecl::AccessPathTy accessPath,
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results);
 
@@ -643,7 +643,7 @@ public:
          SmallVectorImpl<AbstractFunctionDecl *> &results);
 
   /// Reports all link-time dependencies.
-  void collectLinkLibraries(Module::LinkLibraryCallback callback) const;
+  void collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const;
 
   /// Adds all top-level decls to the given vector.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results);
@@ -727,27 +727,13 @@ public:
   DeclContext *getLocalDeclContext(serialization::DeclContextID DID);
 
   /// Returns the appropriate module for the given ID.
-  Module *getModule(serialization::ModuleID MID);
+  ModuleDecl *getModule(serialization::ModuleID MID);
 
   /// Returns the appropriate module for the given name.
   ///
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
-  Module *getModule(ArrayRef<Identifier> name);
-
-  /// Return the generic signature or environment at the current position in
-  /// the given cursor.
-  ///
-  /// \param cursor The cursor to read from.
-  /// \param wantEnvironment Whether we always want to receive a generic
-  /// environment vs. being able to handle the generic signature.
-  /// \param optRequirements If not \c None, use these generic requirements
-  /// rather than deserializing requirements.
-  llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-  readGenericSignatureOrEnvironment(
-                        llvm::BitstreamCursor &cursor,
-                        bool wantEnvironment,
-                        Optional<ArrayRef<Requirement>> optRequirements);
+  ModuleDecl *getModule(ArrayRef<Identifier> name);
 
   /// Returns the generic signature or environment for the given ID,
   /// deserializing it if needed.

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -338,6 +338,9 @@ private:
   /// Writes the given type.
   void writeType(Type ty);
 
+  /// Writes a generic environment.
+  void writeGenericEnvironment(const GenericEnvironment *env);
+
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
   void registerDeclTypeAbbr() {
@@ -471,11 +474,6 @@ public:
   void writeConformance(ProtocolConformance *conformance,
                         const std::array<unsigned, 256> &abbrCodes,
                         GenericEnvironment *genericEnv = nullptr);
-
-  /// Writes a generic environment.
-  void writeGenericEnvironment(const GenericEnvironment *env,
-                               const std::array<unsigned, 256> &abbrCodes,
-                               bool SILMode);
 };
 } // end namespace serialization
 } // end namespace swift

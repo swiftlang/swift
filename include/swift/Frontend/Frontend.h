@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -311,7 +311,7 @@ class CompilerInstance {
   DependencyTracker *DepTracker = nullptr;
   ReferencedNameTracker *NameTracker = nullptr;
 
-  Module *MainModule = nullptr;
+  ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
 
   /// Contains buffer IDs for input source code files.
@@ -387,7 +387,7 @@ public:
     return static_cast<bool>(TheSILModule);
   }
 
-  Module *getMainModule();
+  ModuleDecl *getMainModule();
 
   SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }
 

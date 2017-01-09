@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -503,7 +503,7 @@ public:
     if (!TC.Context.isSwiftVersion3()) {
       // swift(>=4) mode.
       // Specialized call are not allowed anyway.
-      // Let it be diagnosed as a expression.
+      // Let it be diagnosed as an expression.
       // For Swift3 mode, we emit warnings just before constructing the
       // enum-element-pattern below.
       if (isa<UnresolvedSpecializeExpr>(ce->getFn()))
@@ -968,7 +968,8 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
   }
 
   // Create a new match variable $match.
-  auto *matchVar = new (tc.Context) VarDecl(/*static*/ false, /*IsLet*/true,
+  auto *matchVar = new (tc.Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                            /*IsCaptureList*/false,
                                             pattern->getLoc(),
                                             tc.Context.getIdentifier("$match"),
                                             type, dc);

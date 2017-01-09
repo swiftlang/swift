@@ -12,6 +12,9 @@ Protocol IndexableBase has been removed (deprecated)
 Protocol MutableIndexable has been removed (deprecated)
 Protocol RandomAccessIndexable has been removed (deprecated)
 Protocol RangeReplaceableIndexable has been removed (deprecated)
+Func Array.append(contentsOf:) has been removed
+Func ArraySlice.append(contentsOf:) has been removed
+Func ContiguousArray.append(contentsOf:) has been removed
 
 /* FIXME: Bogus */
 Var Dictionary.endIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
@@ -31,6 +34,10 @@ Constructor RangeReplaceableBidirectionalSlice.init(base:bounds:) has 2nd parame
 Constructor RangeReplaceableRandomAccessSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<RangeReplaceableRandomAccessSlice.Index>
 Constructor RangeReplaceableSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<RangeReplaceableSlice.Index>
 Constructor Slice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<Slice.Index>
+Func AnyBidirectionalCollection.makeIterator() has return type change from AnyIterator<Element> to AnyBidirectionalCollection.Iterator
+Func AnyCollection.makeIterator() has return type change from AnyIterator<Element> to AnyCollection.Iterator
+Func AnyRandomAccessCollection.makeIterator() has return type change from AnyIterator<Element> to AnyRandomAccessCollection.Iterator
+Func AnySequence.makeIterator() has return type change from AnyIterator<Element> to AnySequence.Iterator
 Func BidirectionalSlice.distance(from:to:) has return type change from Base.IndexDistance to BidirectionalSlice.IndexDistance
 Func BidirectionalSlice.index(_:offsetBy:) has return type change from Base.Index to BidirectionalSlice.Index
 Func BidirectionalSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to BidirectionalSlice.Index?

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -63,12 +63,13 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   Type enumType = enumVarDecl->getType();
   Type intType = C.getIntDecl()->getDeclaredType();
 
-  auto indexVar = new (C) VarDecl(/*static*/false, /*let*/false,
-                                  SourceLoc(), C.getIdentifier(indexName),
-                                  intType, funcDecl);
+  auto indexVar = new (C) VarDecl(/*IsStatic*/false, /*IsLet*/false,
+                                  /*IsCaptureList*/false, SourceLoc(),
+                                  C.getIdentifier(indexName), intType,
+                                  funcDecl);
   indexVar->setInterfaceType(intType);
   indexVar->setImplicit();
-  
+
   // generate: var indexVar
   Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
   indexPat->setType(intType);
@@ -87,15 +88,15 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                           SourceLoc(), SourceLoc(),
                                           Identifier(), elt, nullptr);
     pat->setImplicit();
-    
+
     auto labelItem = CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(),
                                    nullptr);
-    
+
     // generate: indexVar = <index>
     llvm::SmallString<8> indexVal;
     APInt(32, index++).toString(indexVal, 10, /*signed*/ false);
     auto indexStr = C.AllocateCopy(indexVal);
-    
+
     auto indexExpr = new (C) IntegerLiteralExpr(StringRef(indexStr.data(),
                                                 indexStr.size()), SourceLoc(),
                                                 /*implicit*/ true);
@@ -422,12 +423,11 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   // normally.
   if (enumDecl->hasClangNode())
     tc.Context.addExternalDecl(getterDecl);
-  
+
   // Create the property.
-  VarDecl *hashValueDecl = new (C) VarDecl(/*static*/ false,
-                                           /*let*/ false,
-                                           SourceLoc(), C.Id_hashValue,
-                                           intType, parentDC);
+  VarDecl *hashValueDecl = new (C) VarDecl(/*IsStatic*/false, /*IsLet*/false,
+                                           /*IsCaptureList*/false, SourceLoc(),
+                                           C.Id_hashValue, intType, parentDC);
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->makeComputed(SourceLoc(), getterDecl,
@@ -440,13 +440,13 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     = new (C) TypedPattern(hashValuePat, TypeLoc::withoutLoc(intType),
                            /*implicit*/ true);
   hashValuePat->setType(intType);
-  
+
   auto patDecl = PatternBindingDecl::create(C, SourceLoc(),
                                             StaticSpellingKind::None,
                                             SourceLoc(), hashValuePat, nullptr,
                                             parentDC);
   patDecl->setImplicit();
-  
+
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
   dc->addMember(hashValueDecl);

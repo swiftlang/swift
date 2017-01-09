@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -117,29 +117,6 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
     createPHIArgument(PHIArg->getType(), PHIArg->getOwnershipKind(),
                       PHIArg->getDecl());
   }
-}
-
-/// Replace the ith BB argument with a new one with type Ty (and optional
-/// ValueDecl D).
-SILFunctionArgument *
-SILBasicBlock::replaceFunctionArgument(unsigned i, SILType Ty,
-                                       const ValueDecl *D) {
-  assert(isEntry() && "Function Arguments can only be in the entry block");
-  SILModule &M = getParent()->getModule();
-
-  assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
-
-  // Notify the delete handlers that this argument is being deleted.
-  M.notifyDeleteHandlers(ArgumentList[i]);
-
-  SILFunctionArgument *NewArg = new (M) SILFunctionArgument(Ty, D);
-  NewArg->setParent(this);
-
-  // TODO: When we switch to malloc/free allocation we'll be leaking memory
-  // here.
-  ArgumentList[i] = NewArg;
-
-  return NewArg;
 }
 
 SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,

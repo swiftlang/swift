@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -167,7 +167,7 @@ static StringRef getFilenameFromDC(const DeclContext *DC) {
     return LF->getFilename();
   if (auto SF = dyn_cast<SourceFile>(DC))
     return SF->getFilename();
-  else if (auto M = dyn_cast<Module>(DC))
+  else if (auto M = dyn_cast<ModuleDecl>(DC))
     return M->getModuleFilename();
   else
     return StringRef();
@@ -535,7 +535,7 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     return getOrCreateContext(DC->getParent());
 
   case DeclContextKind::Module:
-    return getOrCreateModule({Module::AccessPathTy(), cast<ModuleDecl>(DC)});
+    return getOrCreateModule({ModuleDecl::AccessPathTy(), cast<ModuleDecl>(DC)});
   case DeclContextKind::FileUnit:
     // A module may contain multiple files.
     return getOrCreateContext(DC->getParent());
@@ -739,7 +739,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
-  swift::Module *M = IGM.Context.getModule(D->getModulePath());
+  swift::ModuleDecl *M = IGM.Context.getModule(D->getModulePath());
   if (!M &&
       D->getModulePath()[0].first == IGM.Context.TheBuiltinModule->getName())
     M = IGM.Context.TheBuiltinModule;

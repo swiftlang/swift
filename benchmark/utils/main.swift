@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -225,7 +225,7 @@ precommitTests = [
   "RangeAssignment": run_RangeAssignment,
   "RecursiveOwnedParameter": run_RecursiveOwnedParameter,
   "ReversedArray": run_ReversedArray,
-  "ReversedBidirectonal": run_ReversedBidirectonal,
+  "ReversedBidirectional": run_ReversedBidirectional,
   "ReversedDictionary": run_ReversedDictionary,
   "SetExclusiveOr": run_SetExclusiveOr,
   "SetExclusiveOr_OfObjects": run_SetExclusiveOr_OfObjects,

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -53,7 +53,7 @@ llvm::cl::opt<bool> PrintMessageInsteadOfAssert(
 
 static bool compatibleOwnershipKinds(ValueOwnershipKind K1,
                                      ValueOwnershipKind K2) {
-  return ValueOwnershipKindMerge(K1, K2).hasValue();
+  return K1.merge(K2).hasValue();
 }
 
 static bool isValueAddressOrTrivial(SILValue V, SILModule &M) {
@@ -316,11 +316,12 @@ OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitForwardingInst(SILInstruction *I) {
   assert(I->getNumOperands() && "Expected to have non-zero operands");
   ArrayRef<Operand> Ops = I->getAllOperands();
-  llvm::Optional<ValueOwnershipKind> Base = getOwnershipKind();
+  ValueOwnershipKind Base = getOwnershipKind();
   for (const Operand &Op : Ops) {
-    Base = ValueOwnershipKindMerge(Base, Op.get().getOwnershipKind());
-    if (!Base.hasValue())
+    auto MergedValue = Base.merge(Op.get().getOwnershipKind());
+    if (!MergedValue.hasValue())
       return {false, true};
+    Base = MergedValue.getValue();
   }
   return {true, !isAddressOrTrivialType()};
 }
@@ -374,10 +375,10 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
   for (const SILResultInfo &ResultInfo : Results.slice(Index + 1)) {
     auto RKind = ResultInfo.getOwnershipKind(M);
     // Ignore trivial types.
-    if (ValueOwnershipKindMerge(RKind, ValueOwnershipKind::Trivial))
+    if (RKind.merge(ValueOwnershipKind::Trivial))
       continue;
 
-    auto MergedValue = ValueOwnershipKindMerge(Base, RKind);
+    auto MergedValue = Base.merge(RKind);
     // If we fail to merge all types in, bail. We can not come up with a proper
     // result type.
     if (!MergedValue.hasValue()) {

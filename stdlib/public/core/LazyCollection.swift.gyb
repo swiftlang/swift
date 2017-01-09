@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -75,11 +75,13 @@ public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
 /// Forward implementations to the base collection, to pick up any
 /// optimizations it might implement.
 extension ${Self} : Sequence {
+  
+  public typealias Iterator = Base.Iterator
 
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func makeIterator() -> Base.Iterator {
+  public func makeIterator() -> Iterator {
     return _base.makeIterator()
   }
 
@@ -94,11 +96,10 @@ extension ${Self} : Sequence {
     return _base._copyToContiguousArray()
   }
 
-  @discardableResult
   public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
-  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
-    return _base._copyContents(initializing: ptr)
+    initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    return _base._copyContents(initializing: buf)
   }
 
   public func _customContainsEquatableElement(

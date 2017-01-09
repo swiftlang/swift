@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -64,42 +64,42 @@ static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
 namespace {
 // Adapter providing a common interface for a SourceFile/Module.
 class SourceFileOrModule {
-  llvm::PointerUnion<SourceFile *, Module *> SFOrMod;
+  llvm::PointerUnion<SourceFile *, ModuleDecl *> SFOrMod;
 
 public:
   SourceFileOrModule(SourceFile &SF) : SFOrMod(&SF) {}
-  SourceFileOrModule(Module &Mod) : SFOrMod(&Mod) {}
+  SourceFileOrModule(ModuleDecl &Mod) : SFOrMod(&Mod) {}
 
   SourceFile *getAsSourceFile() const {
     return SFOrMod.dyn_cast<SourceFile *>();
   }
 
-  Module *getAsModule() const { return SFOrMod.dyn_cast<Module *>(); }
+  ModuleDecl *getAsModule() const { return SFOrMod.dyn_cast<ModuleDecl *>(); }
 
-  Module &getModule() const {
+  ModuleDecl &getModule() const {
     if (auto SF = SFOrMod.dyn_cast<SourceFile *>())
       return *SF->getParentModule();
-    return *SFOrMod.get<Module *>();
+    return *SFOrMod.get<ModuleDecl *>();
   }
 
   ArrayRef<FileUnit *> getFiles() const {
     return SFOrMod.is<SourceFile *>() ? *SFOrMod.getAddrOfPtr1()
-                                      : SFOrMod.get<Module *>()->getFiles();
+                                      : SFOrMod.get<ModuleDecl *>()->getFiles();
   }
 
   StringRef getFilename() const {
     if (SourceFile *SF = SFOrMod.dyn_cast<SourceFile *>())
       return SF->getFilename();
-    return SFOrMod.get<Module *>()->getModuleFilename();
+    return SFOrMod.get<ModuleDecl *>()->getModuleFilename();
   }
 
   void
-  getImportedModules(SmallVectorImpl<Module::ImportedModule> &Modules) const {
+  getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &Modules) const {
     if (SourceFile *SF = SFOrMod.dyn_cast<SourceFile *>()) {
-      SF->getImportedModules(Modules, Module::ImportFilter::All);
+      SF->getImportedModules(Modules, ModuleDecl::ImportFilter::All);
     } else {
-      SFOrMod.get<Module *>()->getImportedModules(Modules,
-                                                  Module::ImportFilter::All);
+      SFOrMod.get<ModuleDecl *>()->getImportedModules(Modules,
+                                                  ModuleDecl::ImportFilter::All);
     }
   }
 };
@@ -176,11 +176,11 @@ public:
         enableWarnings(IdxConsumer.enableWarnings()) {}
   ~IndexSwiftASTWalker() override { assert(Cancelled || EntitiesStack.empty()); }
 
-  void visitModule(Module &Mod, StringRef Hash);
+  void visitModule(ModuleDecl &Mod, StringRef Hash);
 
 private:
   bool visitImports(SourceFileOrModule Mod,
-                    llvm::SmallPtrSet<Module *, 16> &Visited);
+                    llvm::SmallPtrSet<ModuleDecl *, 16> &Visited);
 
   bool handleSourceOrModuleFile(SourceFileOrModule SFOrMod, StringRef KnownHash,
                                 bool &HashIsKnown);
@@ -342,10 +342,10 @@ private:
   llvm::hash_code hashModule(llvm::hash_code code, SourceFileOrModule SFOrMod);
   llvm::hash_code hashFileReference(llvm::hash_code code,
                                     SourceFileOrModule SFOrMod);
-  void getRecursiveModuleImports(Module &Mod,
-                                 SmallVectorImpl<Module *> &Imports);
-  void collectRecursiveModuleImports(Module &Mod,
-                                     llvm::SmallPtrSet<Module *, 16> &Visited);
+  void getRecursiveModuleImports(ModuleDecl &Mod,
+                                 SmallVectorImpl<ModuleDecl *> &Imports);
+  void collectRecursiveModuleImports(ModuleDecl &Mod,
+                                     llvm::SmallPtrSet<ModuleDecl *, 16> &Visited);
 
   template <typename F>
   void warn(F log) {
@@ -358,11 +358,11 @@ private:
   }
 
   // This maps a module to all its imports, recursively.
-  llvm::DenseMap<Module *, llvm::SmallVector<Module *, 4>> ImportsMap;
+  llvm::DenseMap<ModuleDecl *, llvm::SmallVector<ModuleDecl *, 4>> ImportsMap;
 };
 } // anonymous namespace
 
-void IndexSwiftASTWalker::visitModule(Module &Mod, StringRef KnownHash) {
+void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod, StringRef KnownHash) {
   SourceFile *SrcFile = nullptr;
   for (auto File : Mod.getFiles()) {
     if (auto SF = dyn_cast<SourceFile>(File)) {
@@ -409,12 +409,12 @@ bool IndexSwiftASTWalker::handleSourceOrModuleFile(SourceFileOrModule SFOrMod,
   }
 
   // We always report the dependencies, even if the hash is known.
-  llvm::SmallPtrSet<Module *, 16> Visited;
+  llvm::SmallPtrSet<ModuleDecl *, 16> Visited;
   return visitImports(SFOrMod, Visited);
 }
 
 bool IndexSwiftASTWalker::visitImports(
-    SourceFileOrModule TopMod, llvm::SmallPtrSet<Module *, 16> &Visited) {
+    SourceFileOrModule TopMod, llvm::SmallPtrSet<ModuleDecl *, 16> &Visited) {
   // Dependencies of the stdlib module (like SwiftShims module) are
   // implementation details.
   if (TopMod.getModule().isStdlibModule())
@@ -424,12 +424,12 @@ bool IndexSwiftASTWalker::visitImports(
   if (!IsNew)
     return true;
 
-  SmallVector<Module::ImportedModule, 8> Imports;
+  SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   TopMod.getImportedModules(Imports);
 
-  llvm::SmallPtrSet<Module *, 8> Reported;
+  llvm::SmallPtrSet<ModuleDecl *, 8> Reported;
   for (auto Import : Imports) {
-    Module *Mod = Import.second;
+    ModuleDecl *Mod = Import.second;
     bool NewReport = Reported.insert(Mod).second;
     if (!NewReport)
       continue;
@@ -984,7 +984,7 @@ llvm::hash_code IndexSwiftASTWalker::hashModule(llvm::hash_code code,
                                                 SourceFileOrModule SFOrMod) {
   code = hashFileReference(code, SFOrMod);
 
-  SmallVector<Module *, 16> Imports;
+  SmallVector<ModuleDecl *, 16> Imports;
   getRecursiveModuleImports(SFOrMod.getModule(), Imports);
   for (auto Import : Imports)
     code = hashFileReference(code, *Import);
@@ -993,21 +993,21 @@ llvm::hash_code IndexSwiftASTWalker::hashModule(llvm::hash_code code,
 }
 
 void IndexSwiftASTWalker::getRecursiveModuleImports(
-    Module &Mod, SmallVectorImpl<Module *> &Imports) {
+    ModuleDecl &Mod, SmallVectorImpl<ModuleDecl *> &Imports) {
   auto It = ImportsMap.find(&Mod);
   if (It != ImportsMap.end()) {
     Imports.append(It->second.begin(), It->second.end());
     return;
   }
 
-  llvm::SmallPtrSet<Module *, 16> Visited;
+  llvm::SmallPtrSet<ModuleDecl *, 16> Visited;
   collectRecursiveModuleImports(Mod, Visited);
   Visited.erase(&Mod);
 
   warn([&Imports](llvm::raw_ostream &OS) {
-    std::for_each(Imports.begin(), Imports.end(), [&OS](Module *M) {
+    std::for_each(Imports.begin(), Imports.end(), [&OS](ModuleDecl *M) {
       if (M->getModuleFilename().empty()) {
-        std::string Info = "swift::Module with empty file name!! \nDetails: \n";
+        std::string Info = "swift::ModuleDecl with empty file name!! \nDetails: \n";
         Info += "  name: ";
         Info += M->getName().get();
         Info += "\n";
@@ -1042,13 +1042,13 @@ void IndexSwiftASTWalker::getRecursiveModuleImports(
           Info += "\n";
         });
 
-        OS << "swift::Module with empty file name! " << Info << "\n";
+        OS << "swift::ModuleDecl with empty file name! " << Info << "\n";
       }
     });
   });
 
   Imports.append(Visited.begin(), Visited.end());
-  std::sort(Imports.begin(), Imports.end(), [](Module *LHS, Module *RHS) {
+  std::sort(Imports.begin(), Imports.end(), [](ModuleDecl *LHS, ModuleDecl *RHS) {
     return LHS->getModuleFilename() < RHS->getModuleFilename();
   });
 
@@ -1057,7 +1057,7 @@ void IndexSwiftASTWalker::getRecursiveModuleImports(
 }
 
 void IndexSwiftASTWalker::collectRecursiveModuleImports(
-    Module &TopMod, llvm::SmallPtrSet<Module *, 16> &Visited) {
+    ModuleDecl &TopMod, llvm::SmallPtrSet<ModuleDecl *, 16> &Visited) {
 
   bool IsNew = Visited.insert(&TopMod).second;
   if (!IsNew)
@@ -1079,8 +1079,8 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
     return;
   }
 
-  SmallVector<Module::ImportedModule, 8> Imports;
-  TopMod.getImportedModules(Imports, Module::ImportFilter::All);
+  SmallVector<ModuleDecl::ImportedModule, 8> Imports;
+  TopMod.getImportedModules(Imports, ModuleDecl::ImportFilter::All);
 
   for (auto Import : Imports) {
     collectRecursiveModuleImports(*Import.second, Visited);

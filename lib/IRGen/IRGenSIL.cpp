@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1018,8 +1018,22 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    SILFunction *f)
   : IRGenFunction(IGM, IGM.getAddrOfSILFunction(f, ForDefinition),
                   f->getDebugScope(), f->getLocation()),
-    CurSILFn(f)
-{}
+    CurSILFn(f) {
+  // Apply sanitizer attributes to the function.
+  // TODO: Check if the function is ASan black listed either in the external
+  // file or via annotations.
+  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Address)
+    CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
+  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread) {
+    if (dyn_cast_or_null<DestructorDecl>(f->getDeclContext()))
+      // Do not report races in deinit and anything called from it
+      // because TSan does not observe synchronization between retain
+      // count dropping to '0' and the object deinitialization.
+      CurFn->addFnAttr("sanitize_thread_no_checking_at_run_time");
+    else
+      CurFn->addFnAttr(llvm::Attribute::SanitizeThread);
+  }
+}
 
 IRGenSILFunction::~IRGenSILFunction() {
   assert(Builder.hasPostTerminatorIP() && "did not terminate BB?!");

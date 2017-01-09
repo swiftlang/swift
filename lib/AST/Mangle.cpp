@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -211,7 +211,7 @@ static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
 void Mangler::mangleContext(const DeclContext *ctx) {
   switch (ctx->getContextKind()) {
   case DeclContextKind::Module:
-    return mangleModule(cast<Module>(ctx));
+    return mangleModule(cast<ModuleDecl>(ctx));
 
   case DeclContextKind::FileUnit:
     assert(!isa<BuiltinUnit>(ctx) && "mangling member of builtin module!");
@@ -335,7 +335,7 @@ void Mangler::mangleContext(const DeclContext *ctx) {
   llvm_unreachable("bad decl context");
 }
 
-void Mangler::mangleModule(const Module *module) {
+void Mangler::mangleModule(const ModuleDecl *module) {
   assert(!module->getParent() && "cannot mangle nested modules!");
 
   // Try the special 'swift' substitution.

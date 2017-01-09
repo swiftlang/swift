@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -54,7 +54,7 @@ public:
   /// scope.
   void addToScope(ValueDecl *D, Parser &TheParser);
 
-  bool isStaticallyInactiveConfigBlock() const;
+  bool isInactiveConfigBlock() const;
   
   SavedScope saveCurrentScope();
 };
@@ -91,7 +91,7 @@ class SavedScope {
   ScopeInfo::ScopedHTDetachedScopeTy HTDetachedScope;
   unsigned Depth;
   ScopeKind Kind;
-  bool IsStaticallyInactiveConfigBlock;
+  bool IsInactiveConfigBlock;
 
   SavedScope() = delete;
   SavedScope(const SavedScope &) = delete;
@@ -103,9 +103,9 @@ public:
   ~SavedScope() = default;
 
   SavedScope(ScopeInfo::ScopedHTDetachedScopeTy &&HTDetachedScope,
-             unsigned Depth, ScopeKind Kind, bool IsStaticallyInactiveConfigBlock)
+             unsigned Depth, ScopeKind Kind, bool isInactiveConfigBlock)
     : HTDetachedScope(std::move(HTDetachedScope)), Depth(Depth), Kind(Kind),
-      IsStaticallyInactiveConfigBlock(IsStaticallyInactiveConfigBlock) {}
+      IsInactiveConfigBlock(isInactiveConfigBlock) {}
 };
 
 /// Scope - This class represents lexical scopes.  These objects are created
@@ -125,13 +125,12 @@ class Scope {
   unsigned PrevResolvableDepth;
   unsigned Depth;
   ScopeKind Kind;
-  bool IsStaticallyInactiveConfigBlock;
+  bool IsInactiveConfigBlock;
 
   /// \brief Save this scope so that it can be re-entered later.  Transfers the
   /// ownership of the scope frame to returned object.
   SavedScope saveScope() {
-    return SavedScope(HTScope.detach(), Depth, Kind,
-                      IsStaticallyInactiveConfigBlock);
+    return SavedScope(HTScope.detach(), Depth, Kind, IsInactiveConfigBlock);
   }
 
   unsigned getDepth() const {
@@ -142,7 +141,7 @@ class Scope {
 
 public:
   /// \brief Create a lexical scope of the specified kind.
-  Scope(Parser *P, ScopeKind SC, bool IsStaticallyInactiveConfigBlock = false);
+  Scope(Parser *P, ScopeKind SC, bool isInactiveConfigBlock = false);
 
   /// \brief Re-enter the specified scope, transferring the ownership of the
   /// scope frame to the new object.
@@ -175,15 +174,10 @@ inline ValueDecl *ScopeInfo::lookupValueName(DeclName Name) {
   return Res.second;
 }
 
-inline bool ScopeInfo::isStaticallyInactiveConfigBlock() const {
-  auto scope = CurScope;
-  while (scope) {
-    if (scope->IsStaticallyInactiveConfigBlock) {
-      return true;
-    }
-    scope = scope->PrevScope;
-  }
-  return false;
+inline bool ScopeInfo::isInactiveConfigBlock() const {
+  if (!CurScope)
+    return false;
+  return CurScope->IsInactiveConfigBlock;
 }
 
 inline SavedScope ScopeInfo::saveCurrentScope() {

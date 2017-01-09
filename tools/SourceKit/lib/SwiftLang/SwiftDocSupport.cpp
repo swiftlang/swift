@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -34,7 +34,7 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-static Module *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
   SmallVector<std::pair<Identifier, SourceLoc>, 4>
       AccessPath;
   while (!ModuleName.empty()) {
@@ -45,7 +45,7 @@ static Module *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
   return Ctx.getModule(AccessPath);
 }
 
-static Module *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
   return Ctx.getModule(std::make_pair(ModuleName, SourceLoc()));
 }
 
@@ -97,7 +97,9 @@ struct TextReference {
 };
 
 class AnnotatingPrinter : public StreamPrinter {
-  const NominalTypeDecl *SynthesizeTarget = nullptr;
+
+  std::pair<const ExtensionDecl *, const NominalTypeDecl *>
+    SynthesizedExtensionInfo = {nullptr, nullptr};
 
   typedef llvm::SmallDenseMap<ValueDecl*, ValueDecl*> DefaultImplementMap;
   llvm::SmallDenseMap<ProtocolDecl*, DefaultImplementMap> AllDefaultMaps;
@@ -170,19 +172,20 @@ public:
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     const NominalTypeDecl *NTD,
                                     Optional<BracketOptions> Bracket) override {
-    assert(!SynthesizeTarget);
-    SynthesizeTarget = NTD;
+    assert(!SynthesizedExtensionInfo.first);
+    SynthesizedExtensionInfo = {ED, NTD};
     if (!shouldContinuePre(ED, Bracket))
       return;
     unsigned StartOffset = OS.tell();
-    EntitiesStack.emplace_back(ED, SynthesizeTarget, nullptr, StartOffset, true);
+    EntitiesStack.emplace_back(ED, SynthesizedExtensionInfo.second, nullptr,
+                               StartOffset, true);
   }
 
   void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                      const NominalTypeDecl *NTD,
                                      Optional<BracketOptions> Bracket) override {
-    assert(SynthesizeTarget);
-    SynthesizeTarget = nullptr;
+    assert(SynthesizedExtensionInfo.first);
+    SynthesizedExtensionInfo = {nullptr, nullptr};
     if (!shouldContinuePost(ED, Bracket))
       return;
     TextEntity Entity = std::move(EntitiesStack.back());
@@ -199,8 +202,12 @@ public:
       return;
     unsigned StartOffset = OS.tell();
     initDefaultMapToUse(D);
-    EntitiesStack.emplace_back(D, SynthesizeTarget, getDefaultImplementation(D),
-                               StartOffset, false);
+    const NominalTypeDecl *SynthesizedTarget = nullptr;
+    // If D is declared in the extension, then the synthesized target is valid.
+    if (D->getDeclContext() == SynthesizedExtensionInfo.first)
+      SynthesizedTarget = SynthesizedExtensionInfo.second;
+    EntitiesStack.emplace_back(D, SynthesizedTarget,
+                               getDefaultImplementation(D), StartOffset, false);
   }
 
   void printDeclLoc(const Decl *D) override {

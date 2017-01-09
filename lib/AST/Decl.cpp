@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -86,7 +86,7 @@ void *Decl::operator new(size_t Bytes, const ASTContext &C,
 }
 
 // Only allow allocation of Modules using the allocator in ASTContext.
-void *Module::operator new(size_t Bytes, const ASTContext &C,
+void *ModuleDecl::operator new(size_t Bytes, const ASTContext &C,
                            unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
@@ -317,7 +317,7 @@ bool Decl::canHaveComment() const {
          (!isa<AbstractTypeParamDecl>(this) || isa<AssociatedTypeDecl>(this));
 }
 
-Module *Decl::getModuleContext() const {
+ModuleDecl *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }
 
@@ -451,7 +451,7 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   return false;
 }
 
-bool Decl::isWeakImported(Module *fromModule) const {
+bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   // For a Clang declaration, trust Clang.
   if (auto clangDecl = getClangDecl()) {
     return clangDecl->isWeakImported();
@@ -3727,7 +3727,10 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
 
   // Besides self, don't suggest mutability for explicit function parameters.
   if (isa<ParamDecl>(this)) return;
-  
+
+  // Don't suggest any fixes for capture list elements.
+  if (isCaptureList()) return;
+
   // If this is a normal variable definition, then we can change 'let' to 'var'.
   // We even are willing to suggest this for multi-variable binding, like
   //   "let (a,b) = "
@@ -3748,8 +3751,8 @@ ParamDecl::ParamDecl(bool isLet,
                      SourceLoc letVarInOutLoc, SourceLoc argumentNameLoc,
                      Identifier argumentName, SourceLoc parameterNameLoc,
                      Identifier parameterName, Type ty, DeclContext *dc)
-  : VarDecl(DeclKind::Param, /*IsStatic=*/false, isLet, parameterNameLoc,
-            parameterName, ty, dc),
+  : VarDecl(DeclKind::Param, /*IsStatic*/false, /*IsLet*/isLet,
+            /*IsCaptureList*/false, parameterNameLoc, parameterName, ty, dc),
   ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc),
   LetVarInOutLoc(letVarInOutLoc) {
 }
@@ -3757,9 +3760,9 @@ ParamDecl::ParamDecl(bool isLet,
 /// Clone constructor, allocates a new ParamDecl identical to the first.
 /// Intentionally not defined as a copy constructor to avoid accidental copies.
 ParamDecl::ParamDecl(ParamDecl *PD)
-  : VarDecl(DeclKind::Param, /*IsStatic=*/false, PD->isLet(), PD->getNameLoc(),
-            PD->getName(), PD->hasType() ? PD->getType() : Type(),
-            PD->getDeclContext()),
+  : VarDecl(DeclKind::Param, /*IsStatic*/false, /*IsLet*/PD->isLet(),
+            /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
+            PD->hasType() ? PD->getType() : Type(), PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     LetVarInOutLoc(PD->getLetVarInOutLoc()),
