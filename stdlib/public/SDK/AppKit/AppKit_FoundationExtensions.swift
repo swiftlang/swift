@@ -75,8 +75,8 @@ public extension URLResourceValues {
     
     /// Returns a dictionary of NSImage objects keyed by size.
     @available(OSX 10.10, *)
-    public var thumbnailDictionary : [URLThumbnailSizeKey : NSImage]? {
-        return allValues[URLResourceKey.thumbnailDictionaryKey] as? [URLThumbnailSizeKey : NSImage]
+    public var thumbnailDictionary : [URLThumbnailDictionaryItem : NSImage]? {
+        return allValues[URLResourceKey.thumbnailDictionaryKey] as? [URLThumbnailDictionaryItem : NSImage]
     }
 
 }

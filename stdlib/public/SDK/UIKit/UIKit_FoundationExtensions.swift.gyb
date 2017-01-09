@@ -80,8 +80,8 @@ public extension URLResourceValues {
 
     /// Returns a dictionary of UIImage objects keyed by size.
     @available(iOS 8.0, *)
-    public var thumbnailDictionary : [URLThumbnailSizeKey : UIImage]? {
-        return allValues[URLResourceKey.thumbnailDictionaryKey] as? [URLThumbnailSizeKey : UIImage]
+    public var thumbnailDictionary : [URLThumbnailDictionaryItem : UIImage]? {
+        return allValues[URLResourceKey.thumbnailDictionaryKey] as? [URLThumbnailDictionaryItem : UIImage]
     }
 }
 
