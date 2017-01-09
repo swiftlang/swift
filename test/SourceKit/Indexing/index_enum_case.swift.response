@@ -104,14 +104,12 @@
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.accessor.getter,
-          key.name: "getter:e",
           key.usr: "s:F15index_enum_caseg1eOS_1E",
           key.line: 21,
           key.column: 5
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
-          key.name: "setter:e",
           key.usr: "s:F15index_enum_cases1eOS_1E",
           key.line: 21,
           key.column: 5

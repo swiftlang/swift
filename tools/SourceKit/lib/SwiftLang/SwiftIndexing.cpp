@@ -114,9 +114,11 @@ private:
   bool withEntityInfo(const IndexSymbol &symbol, F func) {
     EntityInfo info;
     bool isRef = symbol.roles & (unsigned)SymbolRole::Reference;
+    bool isImplicit = symbol.roles & (unsigned)SymbolRole::Implicit;
+
     info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.kind, symbol.subKinds,
                                                   isRef);
-    info.Name = symbol.name;
+    info.Name = isImplicit? "" : symbol.name;
     info.USR = symbol.USR;
     info.Group = symbol.group;
     info.Line = symbol.line;
