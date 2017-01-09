@@ -260,8 +260,12 @@ function(_add_variant_swift_compile_flags
     sdk arch build_type enable_assertions result_var_name)
   set(result ${${result_var_name}})
 
+  # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH, so don't include it.
+  if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_PATH}")
+  endif()
+
   list(APPEND result
-      "-sdk" "${SWIFT_SDK_${sdk}_PATH}"
       "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
       "-resource-dir" "${SWIFTLIB_DIR}")
 
