@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/RawComment.h"

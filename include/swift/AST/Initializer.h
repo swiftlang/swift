@@ -21,6 +21,7 @@
 #define SWIFT_INITIALIZER_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Decl.h"
 
 namespace swift {
 class PatternBindingDecl;

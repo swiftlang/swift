@@ -15,6 +15,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/DenseMap.h"
