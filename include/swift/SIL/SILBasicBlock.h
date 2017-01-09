@@ -180,10 +180,11 @@ public:
                                               const ValueDecl *D = nullptr);
 
   SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
+                                              ValueOwnershipKind OwnershipKind = ValueOwnershipKind::Any,
                                               const ValueDecl *D = nullptr) {
     arg_iterator Pos = ArgumentList.begin();
     std::advance(Pos, Index);
-    return insertFunctionArgument(Pos, Ty, D);
+    return insertFunctionArgument(Pos, Ty, OwnershipKind, D);
   }
 
   /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
@@ -345,6 +346,7 @@ private:
   /// Insert a new SILFunctionArgument with type \p Ty and \p Decl at position
   /// \p Pos.
   SILFunctionArgument *insertFunctionArgument(arg_iterator Pos, SILType Ty,
+                                              ValueOwnershipKind OwnershipKind,
                                               const ValueDecl *D = nullptr);
 };
 
