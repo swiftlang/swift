@@ -245,11 +245,11 @@ bool ReabstractionInfo::canBeSpecialized() const {
 }
 
 bool ReabstractionInfo::isFullSpecialization() const {
-  return !hasUnboundGenericTypes(getOriginalParamSubstitutions());
+  return !hasArchetypes(getOriginalParamSubstitutions());
 }
 
 bool ReabstractionInfo::isPartialSpecialization() const {
-  return hasUnboundGenericTypes(getOriginalParamSubstitutions());
+  return hasArchetypes(getOriginalParamSubstitutions());
 }
 
 void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
@@ -340,7 +340,7 @@ static void remapRequirements(
     SubstitutionMap &SubstMap,
     bool ResolveArchetypes,
     ArchetypeBuilder &Builder,
-    Module *SM) {
+    ModuleDecl *SM) {
   if (!GenSig)
     return;
 
@@ -564,7 +564,7 @@ bool ReabstractionInfo::SpecializeConcreteAndGenericSubstitutions(
     ApplySite Apply, SILFunction *Callee, ArrayRef<Substitution> ParamSubs) {
 
   SILModule &M = Callee->getModule();
-  Module *SM = M.getSwiftModule();
+  ModuleDecl *SM = M.getSwiftModule();
   auto &Ctx = M.getASTContext();
 
   // Caller is the SILFunction containing the apply instruction.
@@ -856,7 +856,7 @@ bool ReabstractionInfo::SpecializeConcreteSubstitutions(
     ApplySite Apply, SILFunction *Callee, ArrayRef<Substitution> ParamSubs) {
 
   SILModule &M = Callee->getModule();
-  Module *SM = M.getSwiftModule();
+  ModuleDecl *SM = M.getSwiftModule();
   auto &Ctx = M.getASTContext();
 
   SubstitutionMap InterfaceSubs;
@@ -1310,7 +1310,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
 
   OriginalF = OrigF;
   SILModule &M = OrigF->getModule();
-  Module *SM = M.getSwiftModule();
+  ModuleDecl *SM = M.getSwiftModule();
   auto &Ctx = M.getASTContext();
 
   auto OrigGenericSig = OrigF->getLoweredFunctionType()->getGenericSignature();

@@ -91,7 +91,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     // Bail if any generic type parameters are unbound.
     // TODO: Remove this limitation once public partial specializations
     // are supported and can be provided by other modules.
-    if (hasUnboundGenericTypes(Subs))
+    if (hasArchetypes(Subs))
       continue;
 
     ReabstractionInfo ReInfo(AI, ReferencedF, Subs);
