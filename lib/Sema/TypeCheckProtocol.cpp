@@ -1709,6 +1709,9 @@ namespace {
     /// Record that the given optional requirement has no witness.
     void recordOptionalWitness(ValueDecl *requirement);
 
+    /// Record that the given requirement has no valid witness.
+    void recordInvalidWitness(ValueDecl *requirement);
+
     /// Record a type witness.
     ///
     /// \param assocType The associated type whose witness is being recorded.
@@ -2175,6 +2178,20 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
 }
 
 void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
+  // If we already recorded this witness, don't do so again.
+  if (Conformance->hasWitness(requirement)) {
+    assert(!Conformance->getWitness(requirement, nullptr).getDecl() &&
+           "Already have a non-optional witness?");
+    return;
+  }
+
+  // Record that there is no witness.
+  Conformance->setWitness(requirement, Witness());
+}
+
+void ConformanceChecker::recordInvalidWitness(ValueDecl *requirement) {
+  assert(Conformance->isInvalid());
+
   // If we already recorded this witness, don't do so again.
   if (Conformance->hasWitness(requirement)) {
     assert(!Conformance->getWitness(requirement, nullptr).getDecl() &&
@@ -4019,6 +4036,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   
   case ResolveWitnessResult::ExplicitFailed:
     Conformance->setInvalid();
+    recordInvalidWitness(requirement);
     return;
 
   case ResolveWitnessResult::Missing:
@@ -4033,6 +4051,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 
   case ResolveWitnessResult::ExplicitFailed:
     Conformance->setInvalid();
+    recordInvalidWitness(requirement);
     return;
 
   case ResolveWitnessResult::Missing:
@@ -4047,6 +4066,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 
   case ResolveWitnessResult::ExplicitFailed:
     Conformance->setInvalid();
+    recordInvalidWitness(requirement);
     return;
 
   case ResolveWitnessResult::Missing:
