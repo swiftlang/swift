@@ -206,3 +206,7 @@ func forcedDowncastToOptional(_ b: B) {
 
 _ = b1 as Int    // expected-error {{cannot convert value of type 'Bool' to type 'Int' in coercion}}
 _ = seven as Int // expected-error {{cannot convert value of type 'Double' to type 'Int' in coercion}}
+
+func rdar29894174(v: B?) {
+  let _ = [v].flatMap { $0 as? D }
+}
