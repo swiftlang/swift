@@ -3205,7 +3205,8 @@ bool TypeChecker::isRepresentableInObjC(
       // Global computed properties may however @_cdecl their accessors.
       auto storage = FD->getAccessorStorageDecl();
       validateDecl(storage);
-      if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl) {
+      if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl &&
+          Reason != ObjCReason::WitnessToObjC) {
         if (Diagnose) {
           auto error = FD->isGetter()
                     ? (isa<VarDecl>(storage) 
@@ -3220,25 +3221,27 @@ bool TypeChecker::isRepresentableInObjC(
         }
         return false;
       }
-    } else {
-      unsigned ExpectedParamPatterns = 1;
-      if (FD->getImplicitSelfDecl())
-        ExpectedParamPatterns++;
-      if (FD->getParameterLists().size() != ExpectedParamPatterns) {
+
+      // willSet/didSet implementations are never exposed to objc, they are
+      // always directly dispatched from the synthesized setter.
+      if (FD->isObservingAccessor()) {
         if (Diagnose) {
-          diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried,
-                   getObjCDiagnosticAttrKind(Reason));
+          diagnose(AFD->getLoc(), diag::objc_observing_accessor);
           describeObjCReason(*this, AFD, Reason);
         }
         return false;
       }
+      assert(FD->isGetterOrSetter() && "missing diags for other accessors");
+      return true;
     }
 
-    // willSet/didSet implementations are never exposed to objc, they are always
-    // directly dispatched from the synthesized setter.
-    if (FD->isObservingAccessor()) {
+    unsigned ExpectedParamPatterns = 1;
+    if (FD->getImplicitSelfDecl())
+      ExpectedParamPatterns++;
+    if (FD->getParameterLists().size() != ExpectedParamPatterns) {
       if (Diagnose) {
-        diagnose(AFD->getLoc(), diag::objc_observing_accessor);
+        diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried,
+                 getObjCDiagnosticAttrKind(Reason));
         describeObjCReason(*this, AFD, Reason);
       }
       return false;
