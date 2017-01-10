@@ -88,11 +88,11 @@
 % end
 ///
 /// When you only need to temporarily access a pointer's memory as a different
-/// type, use the `withMemoryRebound(to:)` method. For example, you can use
-/// this method to call an API that expects a pointer to a different type that
-/// is layout compatible with your pointer's `Pointee`. The following code
-/// temporarily rebinds the memory that `uint8Pointer` references from `UInt8`
-/// to `Int8` to call the imported C `strlen` function.
+/// type, use the `withMemoryRebound(to:capacity:)` method. For example, you
+/// can use this method to call an API that expects a pointer to a different
+/// type that is layout compatible with your pointer's `Pointee`. The following
+/// code temporarily rebinds the memory that `uint8Pointer` references from
+/// `UInt8` to `Int8` to call the imported C `strlen` function.
 ///
 ///     // Imported from C
 ///     func strlen(_ __s: UnsafePointer<Int8>!) -> UInt
@@ -729,7 +729,7 @@ public struct ${Self}<Pointee>
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, it is used as the return
-  ///     value for the `withMemoryRebound(to:count:_:)` method.
+  ///     value for the `withMemoryRebound(to:capacity:_:)` method.
   /// - Returns: The return value of the `body` closure parameter, if any.
   public func withMemoryRebound<T, Result>(to type: T.Type, capacity count: Int,
     _ body: (${Self}<T>) throws -> Result
