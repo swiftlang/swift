@@ -200,10 +200,6 @@ macro(add_sourcekit_library name)
     endif()
   endif()
 
-  if(SWIFT_BUILD_SOURCEKIT AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    add_dependencies(${name} needs-libdispatch)
-  endif()
-
   if("${SOURCEKITLIB_INSTALL_IN_COMPONENT}" STREQUAL "")
     if(SOURCEKITLIB_SHARED)
       set(SOURCEKITLIB_INSTALL_IN_COMPONENT tools)
@@ -512,24 +508,6 @@ include_directories(BEFORE
 )
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-  if(SWIFT_BUILD_SOURCEKIT)
-    add_custom_command(
-      OUTPUT "${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/.libs/libdispatch.so"
-      COMMAND /bin/sh ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/autogen.sh
-      COMMAND /bin/sh ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/configure
-      COMMAND /usr/bin/make
-      COMMAND /bin/mkdir -p ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/.libs/
-      COMMAND /bin/cp ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/.libs/libdispatch.so ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/.libs/libdispatch.so
-      COMMAND /usr/bin/make distclean
-      WORKING_DIRECTORY ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}
-      COMMENT "Generating libdispatch.so"
-      USES_TERMINAL
-    )
-    add_custom_target(needs-libdispatch
-      DEPENDS "${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/.libs/libdispatch.so"
-    )
-  endif()
-
   include_directories(AFTER ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
 
   add_library(dispatch SHARED IMPORTED)
