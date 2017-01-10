@@ -25,5 +25,10 @@ _swift_os_log_default(void) {
   return OS_LOG_DEFAULT;
 }
 
+static inline os_log_t _Nonnull
+_swift_os_log_disabled(void) {
+  return OS_LOG_DISABLED;
+}
+
 #endif // SWIFT_STDLIB_SHIMS_OS_OVERLAY_H
 
