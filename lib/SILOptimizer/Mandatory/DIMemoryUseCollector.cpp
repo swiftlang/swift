@@ -408,6 +408,15 @@ namespace {
     /// top level of a 'self' variable in a non-delegating init method.
     bool IsSelfOfNonDelegatingInitializer;
 
+    /// How should address_to_pointer be handled?
+    ///
+    /// In DefinitInitialization it is considered as an inout parameter to get
+    /// diagnostics about passing a let variable to an inout mutable-pointer
+    /// argument.
+    /// In PredictableMemOpt it is considered as an escape point to be
+    /// conservative.
+    bool TreatAddressToPointerAsInout;
+
     /// When walking the use list, if we index into a struct element, keep track
     /// of this, so that any indexes into tuple subelements don't affect the
     /// element we attribute an access to.
@@ -421,11 +430,13 @@ namespace {
                         SmallVectorImpl<DIMemoryUse> &Uses,
                         SmallVectorImpl<TermInst*> &FailableInits,
                         SmallVectorImpl<SILInstruction*> &Releases,
-                        bool isDefiniteInitFinished)
+                        bool isDefiniteInitFinished,
+                        bool TreatAddressToPointerAsInout)
       : Module(TheMemory.MemoryInst->getModule()),
         TheMemory(TheMemory), Uses(Uses),
         FailableInits(FailableInits), Releases(Releases),
-        isDefiniteInitFinished(isDefiniteInitFinished) {
+        isDefiniteInitFinished(isDefiniteInitFinished),
+        TreatAddressToPointerAsInout(TreatAddressToPointerAsInout) {
     }
 
     /// This is the main entry point for the use walker.  It collects uses from
@@ -765,7 +776,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       llvm_unreachable("bad parameter convention");
     }
     
-    if (isa<AddressToPointerInst>(User)) {
+    if (isa<AddressToPointerInst>(User) && TreatAddressToPointerAsInout) {
       // address_to_pointer is a mutable escape, which we model as an inout use.
       addElementUses(BaseEltNo, PointeeType, User, DIUseKind::InOutUse);
       continue;
@@ -1496,7 +1507,9 @@ void swift::collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                                      SmallVectorImpl<DIMemoryUse> &Uses,
                                      SmallVectorImpl<TermInst*> &FailableInits,
                                      SmallVectorImpl<SILInstruction*> &Releases,
-                                     bool isDIFinished) {
-  ElementUseCollector(MemoryInfo, Uses, FailableInits, Releases, isDIFinished)
+                                     bool isDIFinished,
+                                     bool TreatAddressToPointerAsInout) {
+  ElementUseCollector(MemoryInfo, Uses, FailableInits, Releases, isDIFinished,
+                      TreatAddressToPointerAsInout)
       .collectFrom();
 }

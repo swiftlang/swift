@@ -982,7 +982,8 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
       SmallVector<SILInstruction*, 4> Releases;
       
       // Walk the use list of the pointer, collecting them.
-      collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, true);
+      collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, true,
+                               /*TreatAddressToPointerAsInout*/ false);
       
       Changed |= AllocOptimize(Inst, Uses, Releases).doIt();
       

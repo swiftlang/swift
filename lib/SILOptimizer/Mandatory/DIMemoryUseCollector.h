@@ -288,7 +288,8 @@ void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                               SmallVectorImpl<DIMemoryUse> &Uses,
                               SmallVectorImpl<TermInst*> &FailableInits,
                               SmallVectorImpl<SILInstruction*> &Releases,
-                              bool isDefiniteInitFinished);
+                              bool isDefiniteInitFinished,
+                              bool TreatAddressToPointerAsInout);
 
 } // end namespace swift
 
