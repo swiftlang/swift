@@ -41,6 +41,7 @@ public:
 
 /// Utility function, useful to be called from the debugger.
 void dumpNode(const NodePointer &Root);
+void dumpNode(const Node *Root);
 
 NodePointer
 demangleSymbolAsNode(StringRef MangledName,
