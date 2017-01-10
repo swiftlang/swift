@@ -16,6 +16,7 @@
 /// keeping the object alive.
 @_fixed_layout
 public struct Unmanaged<Instance : AnyObject> {
+  @_versioned
   internal unowned(unsafe) var _value: Instance
 
   @_versioned

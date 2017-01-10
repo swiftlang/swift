@@ -1178,6 +1178,9 @@ ERROR(pattern_binds_no_variables,none,
 ERROR(unsupported_type_nested_in_generic_function,none,
       "type %0 cannot be nested in generic function %1",
       (Identifier, Identifier))
+ERROR(unsupported_type_nested_in_generic_closure,none,
+      "type %0 cannot be nested in closure in generic context",
+      (Identifier))
 ERROR(unsupported_type_nested_in_protocol,none,
       "type %0 cannot be nested in protocol %1",
       (Identifier, Identifier))
@@ -3293,6 +3296,35 @@ NOTE(availability_conformance_introduced_here, none,
      "conformance introduced here", ())
 
 //------------------------------------------------------------------------------
+// Resilience diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(versioned_attr_with_explicit_accessibility,
+      none, "'@_versioned' attribute can only be applied to internal "
+      "declarations, but %0 is %select{private|fileprivate|%error|public}1",
+      (Identifier, Accessibility))
+
+#define FRAGILE_FUNC_KIND \
+  "%select{a '@_transparent' function|" \
+  "an '@inline(__always)' function|" \
+  "an '@_inlineable' function|" \
+  "a default argument value}"
+
+ERROR(local_type_in_inlineable_function,
+      none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",
+      (DeclName, unsigned))
+
+ERROR(resilience_decl_unavailable,
+      none, "%0 %1 is %select{private|fileprivate|internal|%error}2 and "
+      "cannot be referenced from " FRAGILE_FUNC_KIND "3",
+      (DescriptiveDeclKind, DeclName, Accessibility, unsigned))
+
+NOTE(resilience_decl_declared_here,
+     none, "%0 %1 is not '@_versioned' or public", (DescriptiveDeclKind, DeclName))
+
+#undef FRAGILE_FUNC_KIND
+
+//------------------------------------------------------------------------------
 // Variable usage diagnostics
 //------------------------------------------------------------------------------
 
@@ -3334,7 +3366,7 @@ ERROR(circular_reference, none,
       "circular reference", ())
 
 ERROR(redundant_type_alias_define, none,
-"redundant type alias declaration", ())
+      "redundant type alias declaration", ())
 
 NOTE(circular_reference_through, none,
      "through reference here", ())

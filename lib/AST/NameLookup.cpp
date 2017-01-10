@@ -21,6 +21,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"

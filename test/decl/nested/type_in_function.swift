@@ -21,6 +21,14 @@ func outerGenericFunction<T>(_ t: T) {
     func nonGenericMethod(_ t: T, u: U) {}
     func genericMethod<V>(_ t: T, u: U) -> V where V : Racoon, V.Stripes == T {}
   }
+
+  _ = {
+    struct ConcreteInClosure { // expected-error{{type 'ConcreteInClosure' cannot be nested in closure in generic context}}
+    }
+
+    struct GenericInClosure<U> { // expected-error{{type 'GenericInClosure' cannot be nested in closure in generic context}}
+    }
+  }
 }
 
 class OuterNonGenericClass {

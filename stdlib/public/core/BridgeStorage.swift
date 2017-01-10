@@ -150,5 +150,6 @@ struct _BridgeStorage<
 
   // rawValue is passed inout to _isUnique.  Although its value
   // is unchanged, it must appear mutable to the optimizer.
+  @_versioned
   internal var rawValue: Builtin.BridgeObject
 }
