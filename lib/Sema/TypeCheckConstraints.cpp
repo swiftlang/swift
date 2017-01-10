@@ -452,7 +452,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
     // Note all the correction candidates.
     for (auto &result : Lookup) {
-      noteTypoCorrection(Name, nameLoc, result);
+      noteTypoCorrection(Name, nameLoc, result, UDRE->getFunctionRefKind());
     }
 
     // TODO: consider recovering from here.  We may want some way to suppress
