@@ -13,6 +13,9 @@
 
 // REQUIRES: CODEGENERATOR=X86
 
+// FIXME: SR-3591 test is failing after being unintentionally disabled for a while
+// REQUIRES: SR3591
+
 // CHECK: define hidden %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque* noalias nocapture, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(_ x: T) -> T.Type {
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* {{.*}}, %swift.type* [[TYPE]])
