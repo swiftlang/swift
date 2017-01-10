@@ -95,7 +95,7 @@ class SILToolInvoker(object):
 
     def __init__(self, config, extra_args=None):
         self.config = config
-        self.extra_args = extra_args
+        self.extra_args = extra_args or []
 
     def base_args(self, emit_sib):
         x = [self.tool]
