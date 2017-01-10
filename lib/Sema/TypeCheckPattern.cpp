@@ -1303,7 +1303,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     case CheckedCastKind::Unresolved:
       return true;
     case CheckedCastKind::Coercion:
-    case CheckedCastKind::BridgingCast:
+    case CheckedCastKind::BridgingCoercion:
       // If this is an 'as' pattern coercing between two different types, then
       // it is "useful" because it is providing a different type to the
       // sub-pattern.  If this is an 'is' pattern or an 'as' pattern where the
@@ -1325,6 +1325,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                subOptions|TR_FromNonInferredPattern);
 
     case CheckedCastKind::ValueCast:
+    case CheckedCastKind::Swift3BridgingDowncast:
       IP->setCastKind(castKind);
       break;
     }

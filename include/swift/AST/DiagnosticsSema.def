@@ -812,6 +812,10 @@ ERROR(missing_unwrap_optional_try,none,
 ERROR(missing_forced_downcast,none,
       "%0 is not convertible to %1; "
       "did you mean to use 'as!' to force downcast?", (Type, Type))
+WARNING(missing_forced_downcast_swift3_compat_warning,none,
+        "bridging %0 to %1 may fail at runtime and will become a checked "
+        "cast in Swift 4; did you mean to use 'as!' to force downcast?",
+        (Type, Type))
 ERROR(missing_explicit_conversion,none,
       "%0 is not implicitly convertible to %1; "
       "did you mean to use 'as' to explicitly convert?", (Type, Type))
