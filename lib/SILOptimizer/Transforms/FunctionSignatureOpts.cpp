@@ -545,11 +545,13 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     // We need a try_apply to call a function with an error result.
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
-    ReturnValue = NormalBlock->createPHIArgument(ResultType);
+    ReturnValue =
+        NormalBlock->createPHIArgument(ResultType, ValueOwnershipKind::Owned);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createPHIArgument(Error);
+    auto *ErrorArg =
+        ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 

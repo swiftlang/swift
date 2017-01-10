@@ -1781,7 +1781,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
           eltValue = eltTL->emitLoad(SGF.B, loc, eltValue,
                                      LoadOwnershipQualifier::Take);
       } else {
-        eltValue = caseBB->createPHIArgument(eltTy);
+        eltValue = caseBB->createPHIArgument(eltTy, ValueOwnershipKind::Owned);
       }
 
       origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);
@@ -1973,7 +1973,7 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
         if (!V->hasName())
           return;
         block->createPHIArgument(SGF.VarLocs[V].value->getType(),
-                                 ValueOwnershipKind::Any, V);
+                                 ValueOwnershipKind::Owned, V);
       });
     }
   }

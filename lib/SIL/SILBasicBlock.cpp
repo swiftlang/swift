@@ -147,6 +147,8 @@ SILPHIArgument *SILBasicBlock::replacePHIArgument(unsigned i, SILType Ty,
                                                   const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
   SILModule &M = getParent()->getModule();
+  if (Ty.isTrivial(M))
+    Kind = ValueOwnershipKind::Trivial;
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
 
@@ -167,6 +169,10 @@ SILPHIArgument *SILBasicBlock::createPHIArgument(SILType Ty,
                                                  ValueOwnershipKind Kind,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
+  assert(!getParent()->hasQualifiedOwnership() ||
+         Kind != ValueOwnershipKind::Any);
+  if (Ty.isTrivial(getModule()))
+    Kind = ValueOwnershipKind::Trivial;
   return new (getModule()) SILPHIArgument(this, Ty, Kind, D);
 }
 
@@ -174,6 +180,10 @@ SILPHIArgument *SILBasicBlock::insertPHIArgument(arg_iterator Iter, SILType Ty,
                                                  ValueOwnershipKind Kind,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
+  assert(!getParent()->hasQualifiedOwnership() ||
+         Kind != ValueOwnershipKind::Any);
+  if (Ty.isTrivial(getModule()))
+    Kind = ValueOwnershipKind::Trivial;
   return new (getModule()) SILPHIArgument(this, Iter, Ty, Kind, D);
 }
 

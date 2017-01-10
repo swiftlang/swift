@@ -261,8 +261,11 @@ public:
       arg = parent->createFunctionArgument(gen.getLoweredType(t),
                                            loc.getAsASTNode<ValueDecl>());
     } else {
-      arg = parent->createPHIArgument(gen.getLoweredType(t),
-                                      ValueOwnershipKind::Any,
+      SILType lty = gen.getLoweredType(t);
+      ValueOwnershipKind ownershipkind = lty.isAddress()
+                                             ? ValueOwnershipKind::Trivial
+                                             : ValueOwnershipKind::Owned;
+      arg = parent->createPHIArgument(lty, ownershipkind,
                                       loc.getAsASTNode<ValueDecl>());
     }
     ManagedValue mv = isa<InOutType>(t)

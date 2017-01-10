@@ -180,7 +180,7 @@ public:
                                               const ValueDecl *D = nullptr);
 
   SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
-                                              ValueOwnershipKind OwnershipKind = ValueOwnershipKind::Any,
+                                              ValueOwnershipKind OwnershipKind,
                                               const ValueDecl *D = nullptr) {
     arg_iterator Pos = ArgumentList.begin();
     std::advance(Pos, Index);
@@ -190,29 +190,24 @@ public:
   /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
   /// ValueDecl
   /// \p D.
-  SILPHIArgument *
-  replacePHIArgument(unsigned i, SILType Ty,
-                     ValueOwnershipKind Kind = ValueOwnershipKind::Any,
-                     const ValueDecl *D = nullptr);
+  SILPHIArgument *replacePHIArgument(unsigned i, SILType Ty,
+                                     ValueOwnershipKind Kind,
+                                     const ValueDecl *D = nullptr);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
-  SILPHIArgument *
-  createPHIArgument(SILType Ty,
-                    ValueOwnershipKind Kind = ValueOwnershipKind::Any,
-                    const ValueDecl *D = nullptr);
+  SILPHIArgument *createPHIArgument(SILType Ty, ValueOwnershipKind Kind,
+                                    const ValueDecl *D = nullptr);
 
   /// Insert a new SILPHIArgument with type \p Ty and \p Decl at position \p
   /// Pos.
-  SILPHIArgument *
-  insertPHIArgument(arg_iterator Pos, SILType Ty,
-                    ValueOwnershipKind Kind = ValueOwnershipKind::Any,
-                    const ValueDecl *D = nullptr);
+  SILPHIArgument *insertPHIArgument(arg_iterator Pos, SILType Ty,
+                                    ValueOwnershipKind Kind,
+                                    const ValueDecl *D = nullptr);
 
-  SILPHIArgument *
-  insertPHIArgument(unsigned Index, SILType Ty,
-                    ValueOwnershipKind Kind = ValueOwnershipKind::Any,
-                    const ValueDecl *D = nullptr) {
+  SILPHIArgument *insertPHIArgument(unsigned Index, SILType Ty,
+                                    ValueOwnershipKind Kind,
+                                    const ValueDecl *D = nullptr) {
     arg_iterator Pos = ArgumentList.begin();
     std::advance(Pos, Index);
     return insertPHIArgument(Pos, Ty, Kind, D);

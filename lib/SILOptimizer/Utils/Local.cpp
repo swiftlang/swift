@@ -574,7 +574,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     auto *CurBB = B->getInsertionPoint()->getParent();
 
     auto *ContBB = CurBB->split(B->getInsertionPoint());
-    ContBB->createPHIArgument(DestTy);
+    ContBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned);
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
     CaseBBs.push_back(std::make_pair(SomeDecl, SomeBB));
@@ -1437,7 +1437,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
       // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
       if (isConditional) {
         SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-        CastSuccessBB->createPHIArgument(SILBridgedTy);
+        CastSuccessBB->createPHIArgument(SILBridgedTy,
+                                         ValueOwnershipKind::Owned);
         Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
         Builder.setInsertionPoint(CastSuccessBB);
         SrcOp = CastSuccessBB->getArgument(0);
@@ -1446,7 +1447,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
       }
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-      CastSuccessBB->createPHIArgument(SILBridgedTy);
+      CastSuccessBB->createPHIArgument(SILBridgedTy, ValueOwnershipKind::Owned);
       NewI = Builder.createCheckedCastBranch(Loc, false, Load, SILBridgedTy,
                                              CastSuccessBB, ConvFailBB);
       Builder.setInsertionPoint(CastSuccessBB);
@@ -2149,7 +2150,8 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, MI,
               Dest->getType().getObjectType(), SuccessBB, FailureBB);
-          SuccessBB->createPHIArgument(Dest->getType().getObjectType());
+          SuccessBB->createPHIArgument(Dest->getType().getObjectType(),
+                                       ValueOwnershipKind::Owned);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result
           B.createStore(Loc, SuccessBB->getArgument(0), Dest,
