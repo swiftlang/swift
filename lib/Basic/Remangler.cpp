@@ -1092,6 +1092,7 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
 
 void Remangler::mangleImplFunctionType(Node *node) {
   const char *PseudoGeneric = "";
+  Node *GenSig = nullptr;
   for (NodePointer Child : *node) {
     switch (Child->getKind()) {
       case Node::Kind::ImplParameter:
@@ -1103,12 +1104,15 @@ void Remangler::mangleImplFunctionType(Node *node) {
         PseudoGeneric = "P";
         SWIFT_FALLTHROUGH;
       case Node::Kind::DependentGenericSignature:
-        mangle(Child.get());
+        GenSig = Child.get();
         break;
       default:
         break;
     }
   }
+  if (GenSig)
+    mangle(GenSig);
+
   Buffer << 'I' << PseudoGeneric;
   for (NodePointer Child : *node) {
     switch (Child->getKind()) {
