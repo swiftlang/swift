@@ -8,30 +8,30 @@ let x = 2
 var y = x + 1
 // CHECK: [[@LINE-1]]:5 | variable/Swift | y | s:v14swift_ide_test1ySi | Def | rel: 0
 // CHECK: [[@LINE-2]]:9 | variable/Swift | x | s:v14swift_ide_test1xSi | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:11 | infix-operator/Swift | +(_:_:) | s:Fsoi1pFTSiSi_Si | Ref,Call | rel: 0
+// CHECK: [[@LINE-3]]:11 | function/infix-operator/Swift | +(_:_:) | s:Fsoi1pFTSiSi_Si | Ref,Call | rel: 0
 
 // Read of x + Write of y
 y = x + 1
 // CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:v14swift_ide_test1ySi | Ref,Writ | rel: 0
 // CHECK: [[@LINE-2]]:5 | variable/Swift | x | s:v14swift_ide_test1xSi | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:7 | infix-operator/Swift | +(_:_:) | s:Fsoi1pFTSiSi_Si | Ref,Call | rel: 0
+// CHECK: [[@LINE-3]]:7 | function/infix-operator/Swift | +(_:_:) | s:Fsoi1pFTSiSi_Si | Ref,Call | rel: 0
 
 // Read of y + Write of y
 y += x
 // CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:v14swift_ide_test1ySi | Ref,Read,Writ | rel: 0
-// CHECK: [[@LINE-2]]:3 | infix-operator/Swift | +=(_:_:) | s:Fsoi2peFTRSiSi_T_ | Ref,Call | rel: 0
+// CHECK: [[@LINE-2]]:3 | function/infix-operator/Swift | +=(_:_:) | s:Fsoi2peFTRSiSi_T_ | Ref,Call | rel: 0
 // CHECK: [[@LINE-3]]:6 | variable/Swift | x | s:v14swift_ide_test1xSi | Ref,Read | rel: 0
 
 var z: Int {
 // CHECK: [[@LINE-1]]:5 | variable/Swift | z | s:v14swift_ide_test1zSi | Def | rel: 0
   get {
-    // CHECK: [[@LINE-1]]:3 | accessor(get)/Swift | getter:z | s:F14swift_ide_testg1zSi | Def,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:3 | function/acc-get/Swift | getter:z | s:F14swift_ide_testg1zSi | Def,RelChild,RelAcc | rel: 1
 
     return y
     // CHECK: [[@LINE-1]]:12 | variable/Swift | y | s:v14swift_ide_test1ySi | Ref,Read | rel: 0
   }
   set {
-    // CHECK: [[@LINE-1]]:3 | accessor(set)/Swift | setter:z | s:F14swift_ide_tests1zSi | Def,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:3 | function/acc-set/Swift | setter:z | s:F14swift_ide_tests1zSi | Def,RelChild,RelAcc | rel: 1
 
     y = newValue
     // CHECK: [[@LINE-1]]:5 | variable/Swift | y | s:v14swift_ide_test1ySi | Ref,Writ | rel: 0
@@ -40,10 +40,10 @@ var z: Int {
 // Write + Read of z
 z = z + 1
 // CHECK: [[@LINE-1]]:1 | variable/Swift | z | s:v14swift_ide_test1zSi | Ref,Writ | rel: 0
-// CHECK: [[@LINE-2]]:1 | accessor(set)/Swift | setter:z | s:F14swift_ide_tests1zSi | Ref,Call,Impl,RelCall | rel: 1
+// CHECK: [[@LINE-2]]:1 | function/acc-set/Swift | setter:z | s:F14swift_ide_tests1zSi | Ref,Call,Impl,RelCall | rel: 1
 // CHECK-NEXT: RelCall | z | s:v14swift_ide_test1zSi
 // CHECK: [[@LINE-4]]:5 | variable/Swift | z | s:v14swift_ide_test1zSi | Ref,Read | rel: 0
-// CHECK-NEXT: [[@LINE-5]]:5 | accessor(get)/Swift | getter:z | s:F14swift_ide_testg1zSi | Ref,Call,Impl,RelCall | rel: 1
+// CHECK-NEXT: [[@LINE-5]]:5 | function/acc-get/Swift | getter:z | s:F14swift_ide_testg1zSi | Ref,Call,Impl,RelCall | rel: 1
 
 // Call
 func aCalledFunction() {}
@@ -72,29 +72,29 @@ struct AStruct {
 
     x += 1
     // CHECK: [[@LINE-1]]:5 | instance-property/Swift | x | s:vV14swift_ide_test7AStruct1xSi | Ref,Read,Writ | rel: 0
-    // CHECK: [[@LINE-2]]:5 | accessor(get)/Swift | getter:x | s:FV14swift_ide_test7AStructg1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
+    // CHECK: [[@LINE-2]]:5 | function/acc-get/Swift | getter:x | s:FV14swift_ide_test7AStructg1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
     // CHECK-NEXT: RelCall | x | s:vV14swift_ide_test7AStruct1xSi
     // CHECK-NEXT: RelRec | AStruct | s:V14swift_ide_test7AStruct
-    // CHECK: [[@LINE-5]]:5 | accessor(set)/Swift | setter:x | s:FV14swift_ide_test7AStructs1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
+    // CHECK: [[@LINE-5]]:5 | function/acc-set/Swift | setter:x | s:FV14swift_ide_test7AStructs1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
     // CHECK-NEXT: RelCall | x | s:vV14swift_ide_test7AStruct1xSi
     // CHECK-NEXT: RelRec | AStruct | s:V14swift_ide_test7AStruct
-    // CHECK: [[@LINE-8]]:7 | infix-operator/Swift | +=(_:_:) | s:Fsoi2peFTRSiSi_T_ | Ref,Call,RelCall | rel: 1
+    // CHECK: [[@LINE-8]]:7 | function/infix-operator/Swift | +=(_:_:) | s:Fsoi2peFTRSiSi_T_ | Ref,Call,RelCall | rel: 1
     // CHECK-NEXT: RelCall | aMethod() | s:FV14swift_ide_test7AStruct7aMethodFT_T_
   }
 
   // RelationChildOf, RelationAccessorOf
   subscript(index: Int) -> Int {
-    // CHECK: [[@LINE-1]]:3 | subscript/Swift | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi | Def,RelChild | rel: 1
+    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi | Def,RelChild | rel: 1
     // CHECK-NEXT: RelChild | AStruct | s:V14swift_ide_test7AStruct
 
     get {
-      // CHECK: [[@LINE-1]]:5 | accessor(get)/Swift | getter:subscript(_:) | s:FV14swift_ide_test7AStructg9subscriptFSiSi | Def,RelChild,RelAcc | rel: 1
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:subscript(_:) | s:FV14swift_ide_test7AStructg9subscriptFSiSi | Def,RelChild,RelAcc | rel: 1
       // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi
 
       return x
     }
     set {
-      // CHECK: [[@LINE-1]]:5 | accessor(set)/Swift | setter:subscript(_:) | s:FV14swift_ide_test7AStructs9subscriptFSiSi | Def,RelChild,RelAcc | rel: 1
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:subscript(_:) | s:FV14swift_ide_test7AStructs9subscriptFSiSi | Def,RelChild,RelAcc | rel: 1
       // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi
 
       x = newValue
@@ -151,7 +151,7 @@ class ASubClass : AClass, AProtocol {
 // RelationExtendedBy
 // FIXME give extensions their own USR like ObjC?
 extension AClass {
-  // CHECK: [[@LINE-1]]:11 | extension(extClass)/Swift | AClass | s:C14swift_ide_test6AClass | Def | rel: 0
+  // CHECK: [[@LINE-1]]:11 | extension/ext-class/Swift | AClass | s:C14swift_ide_test6AClass | Def | rel: 0
   // CHECK: [[@LINE-2]]:11 | class/Swift | AClass | s:C14swift_ide_test6AClass | Ref,RelExt | rel: 1
   // CHECK-NEXT: RelExt | AClass | s:C14swift_ide_test6AClass
 
@@ -189,11 +189,11 @@ let otherInstance = AStruct(x: 1)
 
 let _ = otherInstance[0]
 // CHECK: [[@LINE-1]]:9 | variable/Swift | otherInstance | s:v14swift_ide_test13otherInstanceVS_7AStruct | Ref,Read | rel: 0
-// CHECK: [[@LINE-2]]:22 | subscript/Swift | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:22 | instance-property/subscript/Swift | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi | Ref,Read | rel: 0
 
 let _ = anInstance[0]
 // CHECK: [[@LINE-1]]:9 | variable/Swift | anInstance | s:v14swift_ide_test10anInstanceCS_6AClass | Ref,Read | rel: 0
-// CHECK: [[@LINE-2]]:19 | subscript/Swift | subscript(_:) | s:iC14swift_ide_test6AClass9subscriptFSiSi | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:19 | instance-property/subscript/Swift | subscript(_:) | s:iC14swift_ide_test6AClass9subscriptFSiSi | Ref,Read | rel: 0
 
 let aSubInstance: AClass = ASubClass(x: 1)
 // CHECK: [[@LINE-1]]:5 | variable/Swift | aSubInstance | s:v14swift_ide_test12aSubInstanceCS_6AClass | Def | rel: 0
