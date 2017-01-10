@@ -2730,9 +2730,9 @@ public struct ${Self}
       Builtin.${truncOrExt}OrBitCast_Int${word_bits}_Int${bits}(bits._value))
   }
 
-% if signed:
-  public typealias Magnitude = U${Self}
+  public typealias Magnitude = ${U}${Self}
 
+% if signed:
   @_transparent
   public var magnitude: U${Self} {
     let base = U${Self}(_value)
