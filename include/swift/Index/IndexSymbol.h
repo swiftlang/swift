@@ -92,24 +92,47 @@ inline SymbolSubKindSet &operator|=(SymbolSubKindSet &SKSet, SymbolSubKind SK) {
 using SymbolRole = clang::index::SymbolRole;
 using SymbolRoleSet = clang::index::SymbolRoleSet;
 
-struct IndexSymbol {
+struct IndexRelation {
   const ValueDecl *decl;
   SymbolKind kind;
   SymbolSubKindSet subKinds = SymbolSubKindSet(0);
   SymbolRoleSet roles = SymbolRoleSet(0);
+
   // The following strings are guaranteed to live at least as long as the
   // current indexing action.
   StringRef name;
   StringRef USR; // USR may be safely compared by pointer.
   StringRef group;
-  StringRef receiverUSR;
+
+  IndexRelation(SymbolRoleSet Roles, const ValueDecl *Sym, SymbolKind Kind, SymbolSubKindSet SubKinds, StringRef Name, StringRef USR)
+  : decl(Sym), kind(Kind), subKinds(SubKinds), roles(Roles), name(Name), USR(USR) {}
+
+  IndexRelation() = default;
+};
+
+struct IndexSymbol : IndexRelation {
+  SmallVector<IndexRelation, 3> Relations;
   unsigned line = 0;
   unsigned column = 0;
 
   IndexSymbol() = default;
+
+  StringRef getReceiverUSR() const {
+    for(auto Relation: Relations) {
+      if (Relation.roles & (SymbolRoleSet) SymbolRole::RelationReceivedBy)
+        return Relation.USR;
+    }
+    return StringRef();
+  }
 };
 
 SymbolKind getSymbolKindForDecl(const Decl *D);
+
+StringRef getSymbolKindString(SymbolKind K);
+
+void applyForEachSymbolSubKind(SymbolSubKindSet SubKinds,
+                               llvm::function_ref<void(SymbolSubKind)> Fn);
+void printSymbolSubKinds(SymbolSubKindSet SubKinds, raw_ostream &OS);
 
 } // end namespace index
 } // end namespace swift

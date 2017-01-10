@@ -15,6 +15,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/DenseMap.h"
@@ -73,6 +74,8 @@ DeclContext::getAsTypeOrTypeExtensionContext() const {
   case DeclContextKind::GenericTypeDecl:
     return const_cast<GenericTypeDecl*>(cast<GenericTypeDecl>(this));
   }
+
+  llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
 /// If this DeclContext is a NominalType declaration or an
@@ -152,6 +155,8 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
     // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
     return type->getAnyNominal()->getDeclaredInterfaceType();
   }
+
+  llvm_unreachable("Unhandled DeclTypeKind in switch.");
 }
 
 Type DeclContext::getDeclaredTypeOfContext() const {
@@ -464,13 +469,20 @@ bool DeclContext::isGenericContext() const {
 /// are used.
 ResilienceExpansion DeclContext::getResilienceExpansion() const {
   for (const auto *dc = this; dc->isLocalContext(); dc = dc->getParent()) {
+    // Default argument initializer contexts have their resilience expansion
+    // set when they're type checked.
+    if (auto *DAI = dyn_cast<DefaultArgumentInitializer>(dc))
+      return DAI->getResilienceExpansion();
+
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
       // If the function is a nested function, we will serialize its body if
       // we serialize the parent's body.
       if (AFD->getDeclContext()->isLocalContext())
         continue;
 
-      if (AFD->isInvalid())
+      // FIXME: Make sure this method is never called on decls that have not
+      // been fully validated.
+      if (!AFD->hasAccessibility())
         break;
 
       // If the function is not externally visible, we will not be serializing
@@ -490,8 +502,8 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
         if (attr->getKind() == InlineKind::Always)
           return ResilienceExpansion::Minimal;
 
-      // If a property or subscript is @_fragile, the accessors are
-      // @_fragile also.
+      // If a property or subscript is @_inlineable, the accessors are
+      // @_inlineable also.
       if (auto FD = dyn_cast<FuncDecl>(AFD))
         if (auto *ASD = FD->getAccessorStorageDecl())
           if (ASD->getAttrs().getAttribute<InlineableAttr>())
@@ -500,7 +512,6 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
   }
 
   return ResilienceExpansion::Maximal;
-
 }
 
 /// Determine whether the innermost context is generic.
@@ -634,6 +645,8 @@ bool DeclContext::classof(const Decl *D) {
 #define CONTEXT_VALUE_DECL(ID, PARENT) case DeclKind::ID: return true;
 #include "swift/AST/DeclNodes.def"
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 DeclContext *DeclContext::castDeclToDeclContext(const Decl *D) {
@@ -647,6 +660,8 @@ DeclContext *DeclContext::castDeclToDeclContext(const Decl *D) {
 #define CONTEXT_VALUE_DECL(ID, PARENT) CONTEXT_DECL(ID, PARENT)
 #include "swift/AST/DeclNodes.def"
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
@@ -786,6 +801,8 @@ ASTContext &IterableDeclContext::getASTContext() const {
   case IterableDeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(this)->getASTContext();
   }
+
+  llvm_unreachable("Unhandled IterableDeclContextKind in switch.");
 }
 
 DeclRange IterableDeclContext::getMembers() const {
@@ -891,6 +908,8 @@ bool IterableDeclContext::classof(const Decl *D) {
 #define EXTENSION_DECL(ID, PARENT)    case DeclKind::ID: return true;
 #include "swift/AST/DeclNodes.def"
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 IterableDeclContext *
@@ -908,6 +927,8 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
         static_cast<const IterableDeclContext*>(cast<ID##Decl>(D)));
 #include "swift/AST/DeclNodes.def"
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)

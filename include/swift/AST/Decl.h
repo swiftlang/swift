@@ -863,7 +863,11 @@ public:
 
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
+
+  // Work around MSVC error: attempting to reference a deleted function.
+#if !defined(_MSC_VER) || defined(__clang__)
   void operator delete(void *Data) = delete;
+#endif
 
   // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.

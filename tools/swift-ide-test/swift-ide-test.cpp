@@ -39,6 +39,7 @@
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
+#include "swift/Index/Index.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Config.h"
@@ -63,6 +64,7 @@
 
 using namespace swift;
 using namespace ide;
+using namespace index;
 
 namespace {
 
@@ -91,6 +93,7 @@ enum class ActionType {
   PrintUSRs,
   PrintLocalTypes,
   PrintTypeInterface,
+  PrintIndexedSymbols,
   TestCreateCompilerInvocation,
   CompilerInvocationFromModule,
   GenerateModuleAPIDescription,
@@ -212,7 +215,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "Print group names in a module"),
            clEnumValN(ActionType::Range,
                       "range",
-                      "Print information about a given range")));
+                      "Print information about a given range"),
+           clEnumValN(ActionType::PrintIndexedSymbols,
+                      "print-indexed-symbols",
+                      "Print indexed symbol information")));
 
 static llvm::cl::opt<std::string>
 SourceFilename("source-filename", llvm::cl::desc("Name of the source file"));
@@ -2517,7 +2523,7 @@ private:
     }
   }
 
-  bool shouldWalkIntoFunctionGenericParams() override {
+  bool shouldWalkIntoGenericParams() override {
     return false;
   }
 };
@@ -2666,6 +2672,104 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   Result.print(llvm::outs());
   return 0;
 }
+
+namespace {
+  class PrintIndexDataConsumer : public IndexDataConsumer {
+    raw_ostream &OS;
+    bool firstSourceEntity = true;
+
+    void anchor() {}
+
+    void printSymbolKind(SymbolKind kind, SymbolSubKindSet subKinds) {
+      OS << getSymbolKindString(kind);
+      if (subKinds) {
+        OS << '(';
+        printSymbolSubKinds(subKinds, OS);
+        OS << ')';
+      }
+      // FIXME: add and use language enum
+      OS << '/' << "Swift";
+    }
+
+  public:
+    PrintIndexDataConsumer(raw_ostream &OS) : OS(OS) {}
+
+    void failed(StringRef error) {}
+
+    bool recordHash(StringRef hash, bool isKnown) { return true; }
+    bool startDependency(SymbolKind kind, StringRef name, StringRef path,
+                         bool isSystem, StringRef hash) {
+      OS << getSymbolKindString(kind) << " | ";
+      OS << (isSystem ? "system" : "user") << " | ";
+      OS << name << " | " << path << "-" << hash << "\n";
+      return true;
+    }
+    bool finishDependency(SymbolKind kind) {
+      return true;
+    }
+
+    Action startSourceEntity(const IndexSymbol &symbol) {
+      if (firstSourceEntity) {
+        firstSourceEntity = false;
+        OS << "------------\n";
+      }
+      OS << symbol.line << ':' << symbol.column << " | ";
+      printSymbolKind(symbol.kind, symbol.subKinds);
+      OS << " | " << symbol.name << " | " << symbol.USR << " | ";
+      clang::index::printSymbolRoles(symbol.roles, OS);
+      OS << " | rel: " << symbol.Relations.size() << "\n";
+
+      for (auto Relation : symbol.Relations) {
+        OS << "  ";
+        clang::index::printSymbolRoles(Relation.roles, OS);
+        OS << " | " << Relation.name << " | " << Relation.USR << "\n";
+      }
+      return Continue;
+    }
+    bool finishSourceEntity(SymbolKind kind, SymbolSubKindSet subKinds,
+                                    SymbolRoleSet roles) {
+      return true;
+    }
+
+    void finish() {}
+  };
+
+} // anonymous namespace
+
+static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
+                                StringRef SourceFileName) {
+
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(SourceFileName);
+  Invocation.getLangOptions().DisableAvailabilityChecking = false;
+  Invocation.getLangOptions().DisableTypoCorrection = true;
+
+  CompilerInstance CI;
+
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+  SourceFile *SF = nullptr;
+  for (auto Unit : CI.getMainModule()->getFiles()) {
+    SF = dyn_cast<SourceFile>(Unit);
+    if (SF)
+      break;
+  }
+  assert(SF && "no source file?");
+  assert(SF->getBufferID().hasValue() && "no buffer id?");
+
+  llvm::outs() << llvm::sys::path::filename(SF->getFilename()) << '\n';
+  llvm::outs() << "------------\n";
+  PrintIndexDataConsumer consumer(llvm::outs());
+  indexSourceFile(SF, StringRef(), consumer);
+
+  return 0;
+}
+
 
 static int doPrintUSRs(const CompilerInvocation &InitInvok,
                        StringRef SourceFilename) {
@@ -3083,6 +3187,8 @@ int main(int argc, char *argv[]) {
                                 options::LineColumnPair,
                                 options::EndLineColumnPair);
     break;
+  case ActionType::PrintIndexedSymbols:
+      ExitCode = doPrintIndexedSymbols(InitInvok, options::SourceFilename);
   }
 
   if (options::PrintStats)

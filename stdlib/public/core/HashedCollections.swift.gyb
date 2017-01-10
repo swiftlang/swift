@@ -451,6 +451,7 @@ public struct Set<Element : Hashable> :
   internal typealias _VariantBuffer = _VariantSetBuffer<Element>
   internal typealias _NativeBuffer = _NativeSetBuffer<Element>
 
+  @_versioned
   internal var _variantBuffer: _VariantBuffer
 
   /// Creates a new, empty set with at least the specified number of elements'
@@ -1645,6 +1646,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// key-value pair.
   public typealias Element = (key: Key, value: Value)
 
+  @_versioned
   internal var _variantBuffer: _VariantBuffer
 
   /// Creates an empty dictionary.

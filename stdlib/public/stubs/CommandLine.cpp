@@ -57,7 +57,7 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   *outArgLen = *_NSGetArgc();
   return *_NSGetArgv();
 }
-#elif defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__)
+#elif defined(__linux__) || defined(__CYGWIN__)
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
@@ -103,6 +103,57 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
   *outArgLen = __argc;
   return __argv;
+}
+#elif defined(__FreeBSD__)
+#include <errno.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/sysctl.h>
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+  assert(outArgLen != nullptr);
+
+  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
+    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
+    return _swift_stdlib_ProcessOverrideUnsafeArgv;
+  }
+
+  char *argPtr = NULL; // or use ARG_MAX? 8192 is used in LLDB though..
+  int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ARGS, getpid() };
+  size_t argPtrSize = 0;
+  for (int i = 0; i < 3 && !argPtr; i++) { // give up after 3 tries
+    if (sysctl(mib, 4, NULL, &argPtrSize, NULL, 0) != -1) {
+      argPtr = (char *)malloc(argPtrSize);
+      if (sysctl(mib, 4, argPtr, &argPtrSize, NULL, 0) == -1) {
+        free(argPtr);
+        argPtr = NULL;
+        if (errno != ENOMEM)
+          break;
+      }
+    } else {
+      break;
+    }
+  }
+  if (!argPtr)
+    swift::fatalError(0, "fatal error: could not retrieve commandline "
+                         "arguments: sysctl: %s.\n", strerror(errno));
+
+  char *curPtr = argPtr;
+  char *endPtr = argPtr + argPtrSize;
+
+  std::vector<char *> argvec;
+  for (; curPtr < endPtr; curPtr += strlen(curPtr) + 1)
+    argvec.push_back(strdup(curPtr));
+  *outArgLen = argvec.size();
+  char **outBuf = (char **)calloc(argvec.size() + 1, sizeof(char *));
+  std::copy(argvec.begin(), argvec.end(), outBuf);
+  outBuf[argvec.size()] = nullptr;
+
+  free(argPtr);
+    
+  return outBuf;
 }
 #else // __ANDROID__; Add your favorite arch's command line arg grabber here.
 SWIFT_RUNTIME_STDLIB_INTERFACE

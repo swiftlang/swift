@@ -350,7 +350,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // If we have a body, we might have a generic environment.
   GenericEnvironmentID genericEnvID = 0;
-  if (!F.isExternalDeclaration())
+  if (!NoBody)
     genericEnvID = S.addGenericEnvironmentRef(F.getGenericEnvironment());
 
   DeclID clangNodeOwnerID;

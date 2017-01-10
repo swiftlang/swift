@@ -466,7 +466,7 @@ Type GenericSignature::getRepresentative(Type type, ModuleDecl &mod) {
   if (rep->isConcreteType()) return rep->getConcreteType();
   if (pa == rep) {
     assert(rep->getDependentType(getGenericParams(), /*allowUnresolved*/ false)
-              ->getCanonicalType() == type->getCanonicalType());
+              ->isEqual(type));
     return type;
   }
   return rep->getDependentType(getGenericParams(), /*allowUnresolved*/ false);

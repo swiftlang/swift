@@ -107,6 +107,8 @@ public:
     case ForeignRepresentableKind::StaticBridged:
       llvm_unreachable("unexpected kind in ForeignRepresentableCacheEntry");
     }
+
+    llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
   }
 
   /// Returns true if the optional version of this type is also representable.
@@ -136,6 +138,8 @@ public:
     case ForeignRepresentableKind::StaticBridged:
       llvm_unreachable("unexpected kind in ForeignRepresentableCacheEntry");
     }
+
+    llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
   }
 };
 

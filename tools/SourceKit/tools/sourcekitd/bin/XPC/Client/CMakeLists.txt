@@ -20,8 +20,11 @@ add_definitions(-DSOURCEKIT_XPCSERVICE_IDENTIFIER="com.apple.SourceKitService.${
 
 if (SOURCEKIT_BUILT_STANDALONE)
   # Create the symlink necessary to find the swift stdlib.
-  add_custom_command(TARGET sourcekitd POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E create_symlink ${SWIFTLIB_DIR} ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}/swift)
+  swift_create_post_build_symlink(sourcekitd
+    IS_DIRECTORY
+    SOURCE "${SWIFTLIB_DIR}"
+    DESTINATION "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}/swift"
+    COMMENT "Creating symlink necessary to find the swift stdlib.")
 endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")

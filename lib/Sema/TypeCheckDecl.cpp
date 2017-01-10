@@ -3517,6 +3517,32 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
   }
 }
 
+static void validateAbstractStorageDecl(AbstractStorageDecl *ASD,
+                                        TypeChecker &TC) {
+  if (ASD->hasAccessorFunctions())
+    maybeAddMaterializeForSet(ASD, TC);
+
+  if (ASD->isFinal()) {
+    makeFinal(TC.Context, ASD->getGetter());
+    makeFinal(TC.Context, ASD->getSetter());
+    makeFinal(TC.Context, ASD->getMaterializeForSetFunc());
+  }
+
+  if (auto getter = ASD->getGetter())
+    TC.validateDecl(getter);
+  if (auto setter = ASD->getSetter())
+    TC.validateDecl(setter);
+  if (auto materializeForSet = ASD->getMaterializeForSetFunc())
+    TC.validateDecl(materializeForSet);
+  if (ASD->hasAddressors()) {
+    if (auto addressor = ASD->getAddressor())
+      TC.validateDecl(addressor);
+    if (auto addressor = ASD->getMutableAddressor())
+      TC.validateDecl(addressor);
+  }
+
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -3885,25 +3911,7 @@ public:
       inferDynamic(TC.Context, SD);
     }
 
-    if (SD->hasAccessorFunctions())
-      maybeAddMaterializeForSet(SD, TC);
-
-    // If this subscript is marked final and has a getter or setter, mark the
-    // getter and setter as final as well.
-    if (SD->isFinal()) {
-      makeFinal(TC.Context, SD->getGetter());
-      makeFinal(TC.Context, SD->getSetter());
-      makeFinal(TC.Context, SD->getMaterializeForSetFunc());
-    }
-
-    // Make sure the getter and setter have valid types, since they will be
-    // used by SILGen for any accesses to this subscript.
-    if (auto getter = SD->getGetter())
-      TC.validateDecl(getter);
-    if (auto setter = SD->getSetter())
-      TC.validateDecl(setter);
-    if (auto materializeForSet = SD->getMaterializeForSetFunc())
-      TC.validateDecl(materializeForSet);
+    validateAbstractStorageDecl(SD, TC);
 
     // If this is a get+mutableAddress property, synthesize the setter body.
     if (SD->getStorageKind() == SubscriptDecl::ComputedWithMutableAddress &&
@@ -3932,7 +3940,9 @@ public:
       TC.validateDecl(assocType);
   }
 
-  void checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
+  void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
+    TC.diagnoseInlineableLocalType(NTD);
+
     // We don't support protocols outside the top level of a file.
     if (isa<ProtocolDecl>(NTD) &&
         !NTD->getParent()->isModuleScopeContext()) {
@@ -3966,6 +3976,10 @@ public:
                       diag::unsupported_type_nested_in_generic_function,
                       NTD->getName(),
                       AFD->getName());
+        } else {
+          TC.diagnose(NTD->getLoc(),
+                      diag::unsupported_type_nested_in_generic_closure,
+                      NTD->getName());
         }
       }
     }
@@ -3976,7 +3990,7 @@ public:
     TC.computeAccessibility(ED);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(ED);
+      checkUnsupportedNestedType(ED);
 
       TC.validateDecl(ED);
 
@@ -4033,7 +4047,7 @@ public:
     TC.computeAccessibility(SD);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(SD);
+      checkUnsupportedNestedType(SD);
 
       TC.validateDecl(SD);
       TC.ValidatedTypes.remove(SD);
@@ -4162,7 +4176,7 @@ public:
     TC.computeAccessibility(CD);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(CD);
+      checkUnsupportedNestedType(CD);
 
       TC.validateDecl(CD);
       if (!CD->hasValidSignature())
@@ -4275,7 +4289,7 @@ public:
     TC.computeAccessibility(PD);
 
     if (!IsSecondPass)
-      checkUnsupportedNestedGeneric(PD);
+      checkUnsupportedNestedType(PD);
 
     if (IsSecondPass) {
       checkAccessibility(TC, PD);
@@ -7113,25 +7127,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // Synthesize accessors as necessary.
       maybeAddAccessorsToVariable(VD, *this);
 
-      if (VD->hasAccessorFunctions())
-        maybeAddMaterializeForSet(VD, *this);
-
       // Make sure the getter and setter have valid types, since they will be
       // used by SILGen for any accesses to this variable.
-      if (auto getter = VD->getGetter())
-        validateDecl(getter);
-      if (auto setter = VD->getSetter())
-        validateDecl(setter);
-      if (auto materializeForSet = VD->getMaterializeForSetFunc())
-        validateDecl(materializeForSet);
+      validateAbstractStorageDecl(VD, *this);
 
-      // If this variable is marked final and has a getter or setter, mark the
-      // getter and setter as final as well.
-      if (VD->isFinal()) {
-        makeFinal(Context, VD->getGetter());
-        makeFinal(Context, VD->getSetter());
-        makeFinal(Context, VD->getMaterializeForSetFunc());
-      } else if (VD->isDynamic()) {
+      if (VD->isDynamic()) {
         makeDynamic(Context, VD->getGetter());
         makeDynamic(Context, VD->getSetter());
         // Skip materializeForSet -- it won't be used with a dynamic property.

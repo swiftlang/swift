@@ -14,6 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(__FreeBSD__)
+#define _WITH_GETLINE
+#endif
+
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/ManglingMacros.h"
 #include "llvm/ADT/SmallString.h"

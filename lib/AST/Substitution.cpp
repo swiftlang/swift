@@ -29,7 +29,7 @@ bool Substitution::operator==(const Substitution &other) const {
   // The archetypes may be missing, but we can compare them directly
   // because archetypes are always canonical.
   return
-    Replacement->getCanonicalType() == other.Replacement->getCanonicalType() &&
+    Replacement->isEqual(other.Replacement) &&
     Conformance.equals(other.Conformance);
 }
 

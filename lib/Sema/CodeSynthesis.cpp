@@ -776,7 +776,7 @@ static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
     if (isDynamic)
       setter->getAttrs().add(new (TC.Context) DynamicAttr(IsImplicit));
 
-    // Synthesize and type-check the body of the setter.
+    // Synthesize the body of the setter.
     synthesizeTrivialSetter(setter, storage, setterValueParam, TC);
   }
 
@@ -800,7 +800,7 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
   assert(storage->getStorageKind() ==
            AbstractStorageDecl::ComputedWithMutableAddress);
 
-  // Synthesize and type-check the body of the setter.
+  // Synthesize the body of the setter.
   VarDecl *valueParamDecl = getFirstParamDecl(setter);
   synthesizeTrivialSetter(setter, storage, valueParamDecl, TC);
 }

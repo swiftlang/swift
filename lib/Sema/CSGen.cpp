@@ -2855,9 +2855,7 @@ namespace {
 
           // If the function type has an error in it, we don't want to solve the
           // system.
-          if (closureTy &&
-              (closureTy->hasError() ||
-               closureTy->getCanonicalType()->hasError()))
+          if (closureTy && closureTy->hasError())
             return nullptr;
 
           CS.setType(closure, closureTy);

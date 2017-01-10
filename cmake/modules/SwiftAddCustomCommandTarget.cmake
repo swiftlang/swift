@@ -123,6 +123,7 @@ function(add_custom_command_target dependency_out_var_name)
     # CMake doesn't allow '/' characters in filenames, so replace them with '-'
     list(GET ACCT_OUTPUT 0 output_filename)
     string(REPLACE "${CMAKE_BINARY_DIR}/" "" target_name "${output_filename}")
+    string(REPLACE "${CMAKE_SOURCE_DIR}/" "" target_name "${target_name}")
     string(REPLACE "${CMAKE_CFG_INTDIR}/" "" target_name "${target_name}")
     string(REPLACE "/" "-" target_name "${target_name}")
   else()

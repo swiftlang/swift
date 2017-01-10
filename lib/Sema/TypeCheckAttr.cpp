@@ -727,9 +727,6 @@ public:
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
     IGNORED_ATTR(DiscardableResult)
-
-    // FIXME: We actually do have things to enforce for versioned API.
-    IGNORED_ATTR(Versioned)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -764,6 +761,8 @@ public:
   void visitPrefixAttr(PrefixAttr *attr) { checkOperatorAttribute(attr); }
 
   void visitSpecializeAttr(SpecializeAttr *attr);
+
+  void visitVersionedAttr(VersionedAttr *attr);
 };
 } // end anonymous namespace
 
@@ -1306,7 +1305,9 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   auto fn = cast<AbstractFunctionDecl>(D);
   for (auto paramList : fn->getParameterLists()) {
     for (auto param : *paramList)
-      if (hasThrowingFunctionParameter(param->getType()->lookThroughAllAnyOptionalTypes()->getCanonicalType()))
+      if (hasThrowingFunctionParameter(param->getType()
+              ->lookThroughAllAnyOptionalTypes()
+              ->getCanonicalType()))
         return;
   }
 
@@ -1430,7 +1431,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       return;
     }
 
-    if (ty->getCanonicalType()->hasArchetype()) {
+    if (ty->hasArchetype()) {
       TC.diagnose(attr->getLocation(),
                   diag::cannot_partially_specialize_generic_function);
       attr->setInvalid();
@@ -1518,6 +1519,19 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   // Package the Substitution list in the SpecializeAttr's ConcreteDeclRef.
   attr->setConcreteDecl(
     ConcreteDeclRef(DC->getASTContext(), FD, substitutions));
+}
+
+void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
+  auto *VD = cast<ValueDecl>(D);
+
+  if (VD->getFormalAccess() != Accessibility::Internal) {
+    TC.diagnose(attr->getLocation(),
+                diag::versioned_attr_with_explicit_accessibility,
+                VD->getName(),
+                VD->getFormalAccess())
+        .fixItRemove(attr->getRangeWithAt());
+    attr->setInvalid();
+  }
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

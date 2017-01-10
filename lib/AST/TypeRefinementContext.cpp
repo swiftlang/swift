@@ -190,6 +190,8 @@ SourceLoc TypeRefinementContext::getIntroductionLoc() const {
   case Reason::Root:
     return SourceLoc();
   }
+
+  llvm_unreachable("Unhandled Reason in switch.");
 }
 
 void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
@@ -253,4 +255,6 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
   case Reason::WhileStmtBody:
     return "while_body";
   }
+
+  llvm_unreachable("Unhandled Reason in switch.");
 }

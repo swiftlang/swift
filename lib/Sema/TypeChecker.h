@@ -1888,6 +1888,13 @@ public:
 
   ArchetypeBuilder createArchetypeBuilder(ModuleDecl *mod);
 
+  /// \name Resilience diagnostics
+
+  void diagnoseInlineableLocalType(const NominalTypeDecl *NTD);
+
+  bool diagnoseInlineableDeclRef(SourceLoc loc, const ValueDecl *D,
+                                 const DeclContext *DC);
+
   /// \name Availability checking
   ///
   /// Routines that perform API availability checking and type checking of

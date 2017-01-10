@@ -63,7 +63,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
       ->getSubstitutionMap(ParamSubs);
 
   // We do not support partial specialization.
-  if (hasUnboundGenericTypes(InterfaceSubs.getMap())) {
+  if (hasTypeParameterTypes(InterfaceSubs)) {
     DEBUG(llvm::dbgs() <<
           "    Cannot specialize with unbound interface substitutions.\n");
     DEBUG(for (auto Sub : ParamSubs) {
@@ -71,7 +71,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
           });
     return;
   }
-  if (hasDynamicSelfTypes(InterfaceSubs.getMap())) {
+  if (hasDynamicSelfTypes(InterfaceSubs)) {
     DEBUG(llvm::dbgs() << "    Cannot specialize with dynamic self.\n");
     return;
   }

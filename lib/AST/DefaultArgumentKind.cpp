@@ -34,6 +34,8 @@ StringRef swift::getDefaultArgumentSpelling(DefaultArgumentKind kind) {
   case DefaultArgumentKind::EmptyArray: return "[]";
   case DefaultArgumentKind::EmptyDictionary: return "[:]";
   }
+
+  llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
 
 DefaultArgumentKind swift::inferDefaultArgumentKind(Expr *expr) {
