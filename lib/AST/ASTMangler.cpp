@@ -1239,17 +1239,19 @@ void ASTMangler::appendGenericSignature(const GenericSignature *sig) {
 void ASTMangler::appendRequirement(const Requirement &reqt) {
 
   Type FirstTy = reqt.getFirstType()->getCanonicalType();
-  Type SecondTy = reqt.getSecondType();
 
   switch (reqt.getKind()) {
-    case RequirementKind::Conformance:
-    case RequirementKind::Layout:
-      appendProtocolName(SecondTy->castTo<ProtocolType>()->getDecl());
-      break;
-    case RequirementKind::Superclass:
-    case RequirementKind::SameType:
-      appendType(SecondTy->getCanonicalType());
-      break;
+  case RequirementKind::Layout: {
+  } break;
+  case RequirementKind::Conformance: {
+    Type SecondTy = reqt.getSecondType();
+    appendProtocolName(SecondTy->castTo<ProtocolType>()->getDecl());
+  } break;
+  case RequirementKind::Superclass:
+  case RequirementKind::SameType: {
+    Type SecondTy = reqt.getSecondType();
+    appendType(SecondTy->getCanonicalType());
+  } break;
   }
 
   if (auto *DT = FirstTy->getAs<DependentMemberType>()) {
@@ -1259,7 +1261,9 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
         case RequirementKind::Conformance:
           return appendOperator("RQ");
         case RequirementKind::Layout:
-          return appendOperator("RL");
+          appendOperator("RL");
+          appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
+          return;
         case RequirementKind::Superclass:
           return appendOperator("RB");
         case RequirementKind::SameType:
@@ -1275,8 +1279,9 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
         return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RP" : "Rp",
                                              gpBase);
       case RequirementKind::Layout:
-        return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RM" : "Rm",
-                                             gpBase);
+        appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RM" : "Rm", gpBase);
+        appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
+        return;
       case RequirementKind::Superclass:
         return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RC" : "Rc",
                                              gpBase);
@@ -1291,7 +1296,9 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
     case RequirementKind::Conformance:
       return appendOpWithGenericParamIndex("R", gpBase);
     case RequirementKind::Layout:
-      return appendOpWithGenericParamIndex("Rl", gpBase);
+      appendOpWithGenericParamIndex("Rl", gpBase);
+      appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
+      return;
     case RequirementKind::Superclass:
       return appendOpWithGenericParamIndex("Rb", gpBase);
     case RequirementKind::SameType:
@@ -1730,5 +1737,37 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
   }
   if (GenericSignature *Sig = conformance->getGenericSignature()) {
     appendGenericSignature(Sig);
+  }
+}
+
+void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {
+  assert(layout);
+  switch (layout->getKind()) {
+  case LayoutConstraintKind::UnknownLayout:
+    appendOperatorParam("U");
+    break;
+  case LayoutConstraintKind::RefCountedObject:
+    appendOperatorParam("R");
+    break;
+  case LayoutConstraintKind::NativeRefCountedObject:
+    appendOperatorParam("N");
+    break;
+  case LayoutConstraintKind::Trivial:
+    appendOperatorParam("T");
+    break;
+  case LayoutConstraintKind::TrivialOfExactSize:
+    if (!layout->getAlignment())
+      appendOperatorParam("E", Index(layout->getTrivialSizeInBits()));
+    else
+      appendOperatorParam("E", Index(layout->getTrivialSizeInBits()),
+                     Index(layout->getAlignment()));
+    break;
+  case LayoutConstraintKind::TrivialOfAtMostSize:
+    if (!layout->getAlignment())
+      appendOperatorParam("M", Index(layout->getTrivialSizeInBits()));
+    else
+      appendOperatorParam("M", Index(layout->getTrivialSizeInBits()),
+                     Index(layout->getAlignment()));
+    break;
   }
 }

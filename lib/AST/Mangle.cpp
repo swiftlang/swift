@@ -594,14 +594,35 @@ void Mangler::mangleConstrainedType(CanType type) {
 }
 
 void Mangler::mangleLayoutConstraint(LayoutConstraint layout) {
-  // TODO: Do something more efficient here.
-  Buffer << layout->getName();
-  if (!layout->isKnownSizeTrivial())
-    return;
-  Buffer << layout->getTrivialSizeInBits();
-  if (layout->getAlignment()) {
-    Buffer << "d";
-    Buffer << layout->getAlignment();
+  switch (layout->getKind()) {
+  case LayoutConstraintKind::UnknownLayout:
+    Buffer << "U";
+    break;
+  case LayoutConstraintKind::RefCountedObject:
+    Buffer << "R";
+    break;
+  case LayoutConstraintKind::NativeRefCountedObject:
+    Buffer << "N";
+    break;
+  case LayoutConstraintKind::Trivial:
+    Buffer << "T";
+    break;
+  case LayoutConstraintKind::TrivialOfExactSize:
+    Buffer << "E";
+    Buffer << layout->getTrivialSizeInBits();
+    if (layout->getAlignment()) {
+      Buffer << "_";
+      Buffer << layout->getAlignment();
+    }
+    break;
+  case LayoutConstraintKind::TrivialOfAtMostSize:
+    Buffer << "M";
+    Buffer << layout->getTrivialSizeInBits();
+    if (layout->getAlignment()) {
+      Buffer << "_";
+      Buffer << layout->getAlignment();
+    }
+    break;
   }
 }
 
@@ -689,6 +710,7 @@ mangle_requirements:
       // TODO: We could golf this a little more by assuming the first type
       // is a dependent type.
       mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
+      Buffer << 'l';
       mangleLayoutConstraint(reqt.getLayoutConstraint());
       break;
 

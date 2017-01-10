@@ -462,11 +462,25 @@ void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
 }
 
 void Remangler::mangleGenericPartialSpecialization(Node *node) {
-  unreachable("todo");
+  Out << "TSp";
+  mangleChildNodes(node); // GenericSpecializationParams
+
+  // Specializations are just prepended to already-mangled names.
+  resetSubstitutions();
+
+  // Start another mangled name.
+  Out << "__T";
 }
 
 void Remangler::mangleGenericPartialSpecializationNotReAbstracted(Node *node) {
-  unreachable("todo");
+  Out << "TSP";
+  mangleChildNodes(node); // GenericSpecializationParams
+
+  // Specializations are just prepended to already-mangled names.
+  resetSubstitutions();
+
+  // Start another mangled name.
+  Out << "__T";
 }
 
 void Remangler::mangleGenericSpecializationParam(Node *node) {
@@ -1337,6 +1351,12 @@ void Remangler::mangleDependentGenericConformanceRequirement(Node *node) {
 void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
   mangleConstrainedType(node->getChild(0).get());
   Out << 'z';
+  mangle(node->getChild(1).get());
+}
+
+void Remangler::mangleDependentGenericLayoutRequirement(Node *node) {
+  mangleConstrainedType(node->getChild(0).get());
+  Out << 'l';
   mangle(node->getChild(1).get());
 }
 

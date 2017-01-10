@@ -215,6 +215,7 @@ private:
   NodePointer popProtocolConformance();
   NodePointer demangleThunkOrSpecialization();
   NodePointer demangleGenericSpecialization(Node::Kind SpecKind);
+  NodePointer demangleGenericPartialSpecialization(Node::Kind SpecKind);
   NodePointer demangleFunctionSpecialization();
   NodePointer demangleFuncSpecParam(Node::IndexType ParamIdx);
   NodePointer addFuncSpecParamIdentifier(NodePointer Param,

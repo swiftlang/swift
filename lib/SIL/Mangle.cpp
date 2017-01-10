@@ -89,7 +89,6 @@ void PartialSpecializationMangler::mangleSpecialization() {
 
   // This is a partial specialization.
   M.mangleType(SpecializedFnTy, 0);
-  M.append("_");
 }
 
 //===----------------------------------------------------------------------===//

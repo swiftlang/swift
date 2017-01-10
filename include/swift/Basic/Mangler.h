@@ -162,6 +162,21 @@ protected:
       isFirstListItem = false;
     }
   }
+  void appendOperatorParam(StringRef op) {
+    Buffer << op;
+  }
+  void appendOperatorParam(StringRef op, int natural) {
+    Buffer << op << natural << '_';
+  }
+  void appendOperatorParam(StringRef op, Index index) {
+    Buffer << op << index;
+  }
+  void appendOperatorParam(StringRef op, Index index1, Index index2) {
+    Buffer << op << index1 << index2;
+  }
+  void appendOperatorParam(StringRef op, StringRef arg) {
+    Buffer << op << arg;
+  }
 };
 
 } // end namespace Mangle
