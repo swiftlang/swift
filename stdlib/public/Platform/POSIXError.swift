@@ -13,6 +13,7 @@
 // FIXME: Only defining POSIXErrorCode for Darwin and Linux at the moment.
 
 #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
+
 /// Enumeration describing POSIX error codes.
 @objc public enum POSIXErrorCode : Int32 {
   /// Operation not permitted.
@@ -91,7 +92,7 @@
   /// Resource temporarily unavailable.
   case EAGAIN          = 35
   /// Operation would block.
-    public static var EWOULDBLOCK: POSIXErrorCode { return EAGAIN }
+  public static var EWOULDBLOCK: POSIXErrorCode { return EAGAIN }
   /// Operation now in progress.
   case EINPROGRESS     = 36
   /// Operation already in progress.
@@ -205,8 +206,9 @@
     
   /// Value too large to be stored in data type.
   case EOVERFLOW       = 84
-    
-  /// Program loading errors.
+
+  // MARK: Program loading errors.
+
   /// Bad executable.
   case EBADEXEC        = 85
   /// Bad CPU type in executable.
@@ -330,8 +332,7 @@ public enum POSIXErrorCode : Int32 {
   case EMLINK          = 31
   /// Broken pipe.
   case EPIPE           = 32
-    
-  /// math software.
+
   /// Numerical argument out of domain.
   case EDOM            = 33
   /// Result too large.
@@ -356,8 +357,8 @@ public enum POSIXErrorCode : Int32 {
   case ELOOP            = 40
     
   /// Operation would block.
-    public static var EWOULDBLOCK: POSIXErrorCode { return .EAGAIN }
-    
+  public static var EWOULDBLOCK: POSIXErrorCode { return .EAGAIN }
+
   /// No message of desired type.
   case ENOMSG          = 42
     
@@ -387,91 +388,169 @@ public enum POSIXErrorCode : Int32 {
     
   /// Level 2 halted.
   case EL2HLT          = 51
-  case EBADE           = 52  /* Invalid exchange */
-  case EBADR           = 53  /* Invalid request descriptor */
-  case EXFULL          = 54  /* Exchange full */
-  case ENOANO          = 55  /* No anode */
-  case EBADRQC         = 56  /* Invalid request code */
-  case EBADSLT         = 57  /* Invalid slot */
-    
-    public static var EDEADLOCK: POSIXErrorCode { return .EDEADLK }
-    
-  case EBFONT          = 59  /* Bad font file format */
-  case ENOSTR          = 60  /* Device not a stream */
-  case ENODATA         = 61  /* No data available */
-  case ETIME           = 62  /* Timer expired */
-  case ENOSR           = 63  /* Out of streams resources */
-  case ENONET          = 64  /* Machine is not on the network */
-  case ENOPKG          = 65  /* Package not installed */
-  case EREMOTE         = 66  /* Object is remote */
-  case ENOLINK         = 67  /* Link has been severed */
-  case EADV            = 68  /* Advertise error */
-  case ESRMNT          = 69  /* Srmount error */
-  case ECOMM           = 70  /* Communication error on send */
-  case EPROTO          = 71  /* Protocol error */
-  case EMULTIHOP       = 72  /* Multihop attempted */
-  case EDOTDOT         = 73  /* RFS specific error */
-  case EBADMSG         = 74  /* Not a data message */
-  case EOVERFLOW       = 75  /* Value too large for defined data type */
-  case ENOTUNIQ        = 76  /* Name not unique on network */
-  case EBADFD          = 77  /* File descriptor in bad state */
-  case EREMCHG         = 78  /* Remote address changed */
-  case ELIBACC         = 79  /* Can not access a needed shared library */
-  case ELIBBAD         = 80  /* Accessing a corrupted shared library */
-  case ELIBSCN         = 81  /* .lib section in a.out corrupted */
-  case ELIBMAX         = 82  /* Attempting to link in too many shared libraries */
-  case ELIBEXEC        = 83  /* Cannot exec a shared library directly */
-  case EILSEQ          = 84  /* Illegal byte sequence */
-  case ERESTART        = 85  /* Interrupted system call should be restarted */
-  case ESTRPIPE        = 86  /* Streams pipe error */
-  case EUSERS          = 87  /* Too many users */
-  case ENOTSOCK        = 88  /* Socket operation on non-socket */
-  case EDESTADDRREQ    = 89  /* Destination address required */
-  case EMSGSIZE        = 90  /* Message too long */
-  case EPROTOTYPE      = 91  /* Protocol wrong type for socket */
-  case ENOPROTOOPT     = 92  /* Protocol not available */
-  case EPROTONOSUPPORT = 93  /* Protocol not supported */
-  case ESOCKTNOSUPPORT = 94  /* Socket type not supported */
-  case EOPNOTSUPP      = 95  /* Operation not supported on transport endpoint */
-  case EPFNOSUPPORT    = 96  /* Protocol family not supported */
-  case EAFNOSUPPORT    = 97  /* Address family not supported by protocol */
-  case EADDRINUSE      = 98  /* Address already in use */
-  case EADDRNOTAVAIL   = 99  /* Cannot assign requested address */
-  case ENETDOWN        = 100 /* Network is down */
-  case ENETUNREACH     = 101 /* Network is unreachable */
-  case ENETRESET       = 102 /* Network dropped connection because of reset */
-  case ECONNABORTED    = 103 /* Software caused connection abort */
-  case ECONNRESET      = 104 /* Connection reset by peer */
-  case ENOBUFS         = 105 /* No buffer space available */
-  case EISCONN         = 106 /* Transport endpoint is already connected */
-  case ENOTCONN        = 107 /* Transport endpoint is not connected */
-  case ESHUTDOWN       = 108 /* Cannot send after transport endpoint shutdown */
-  case ETOOMANYREFS    = 109 /* Too many references: cannot splice */
-  case ETIMEDOUT       = 110 /* Connection timed out */
-  case ECONNREFUSED    = 111 /* Connection refused */
-  case EHOSTDOWN       = 112 /* Host is down */
-  case EHOSTUNREACH    = 113 /* No route to host */
-  case EALREADY        = 114 /* Operation already in progress */
-  case EINPROGRESS     = 115 /* Operation now in progress */
-  case ESTALE          = 116 /* Stale NFS file handle */
-  case EUCLEAN         = 117 /* Structure needs cleaning */
-  case ENOTNAM         = 118 /* Not a XENIX named type file */
-  case ENAVAIL         = 119 /* No XENIX semaphores available */
-  case EISNAM          = 120 /* Is a named type file */
-  case EREMOTEIO       = 121 /* Remote I/O error */
-  case EDQUOT          = 122 /* Quota exceeded */
-    
-  case ENOMEDIUM       = 123 /* No medium found */
-  case EMEDIUMTYPE     = 124 /* Wrong medium type */
-  case ECANCELED       = 125 /* Operation Canceled */
-  case ENOKEY          = 126 /* Required key not available */
-  case EKEYEXPIRED     = 127 /* Key has expired */
-  case EKEYREVOKED     = 128 /* Key has been revoked */
-  case EKEYREJECTED    = 129 /* Key was rejected by service */
-    
-    /* for robust mutexes */
-  case EOWNERDEAD      = 130 /* Owner died */
-  case ENOTRECOVERABLE = 131 /* State not recoverable */
+  /// Invalid exchange
+  case EBADE           = 52
+  /// Invalid request descriptor
+  case EBADR           = 53
+  /// Exchange full
+  case EXFULL          = 54
+  /// No anode
+  case ENOANO          = 55
+  /// Invalid request code
+  case EBADRQC         = 56
+  /// Invalid slot
+  case EBADSLT         = 57
+
+  public static var EDEADLOCK: POSIXErrorCode { return .EDEADLK }
+
+  /// Bad font file format
+  case EBFONT          = 59
+  /// Device not a stream
+  case ENOSTR          = 60
+  /// No data available
+  case ENODATA         = 61
+  /// Timer expired
+  case ETIME           = 62
+  /// Out of streams resources
+  case ENOSR           = 63
+  /// Machine is not on the network
+  case ENONET          = 64
+  /// Package not installed
+  case ENOPKG          = 65
+  /// Object is remote
+  case EREMOTE         = 66
+  /// Link has been severed
+  case ENOLINK         = 67
+  /// Advertise error
+  case EADV            = 68
+  /// Srmount error
+  case ESRMNT          = 69
+  /// Communication error on send
+  case ECOMM           = 70
+  /// Protocol error
+  case EPROTO          = 71
+  /// Multihop attempted
+  case EMULTIHOP       = 72
+  /// RFS specific error
+  case EDOTDOT         = 73
+  /// Not a data message
+  case EBADMSG         = 74
+  /// Value too large for defined data type
+  case EOVERFLOW       = 75
+  /// Name not unique on network
+  case ENOTUNIQ        = 76
+  /// File descriptor in bad state
+  case EBADFD          = 77
+  /// Remote address changed
+  case EREMCHG         = 78
+  /// Can not access a needed shared library
+  case ELIBACC         = 79
+  /// Accessing a corrupted shared library
+  case ELIBBAD         = 80
+  /// .lib section in a.out corrupted
+  case ELIBSCN         = 81
+  /// Attempting to link in too many shared libraries
+  case ELIBMAX         = 82
+  /// Cannot exec a shared library directly
+  case ELIBEXEC        = 83
+  /// Illegal byte sequence
+  case EILSEQ          = 84
+  /// Interrupted system call should be restarted
+  case ERESTART        = 85
+  /// Streams pipe error
+  case ESTRPIPE        = 86
+  /// Too many users
+  case EUSERS          = 87
+  /// Socket operation on non-socket
+  case ENOTSOCK        = 88
+  /// Destination address required
+  case EDESTADDRREQ    = 89
+  /// Message too long
+  case EMSGSIZE        = 90
+  /// Protocol wrong type for socket
+  case EPROTOTYPE      = 91
+  /// Protocol not available
+  case ENOPROTOOPT     = 92
+  /// Protocol not supported
+  case EPROTONOSUPPORT = 93
+  /// Socket type not supported
+  case ESOCKTNOSUPPORT = 94
+  /// Operation not supported on transport endpoint
+  case EOPNOTSUPP      = 95
+  /// Protocol family not supported
+  case EPFNOSUPPORT    = 96
+  /// Address family not supported by protocol
+  case EAFNOSUPPORT    = 97
+  /// Address already in use
+  case EADDRINUSE      = 98
+  /// Cannot assign requested address
+  case EADDRNOTAVAIL   = 99
+  /// Network is down
+  case ENETDOWN        = 100
+  /// Network is unreachable
+  case ENETUNREACH     = 101
+  /// Network dropped connection because of reset
+  case ENETRESET       = 102
+  /// Software caused connection abort
+  case ECONNABORTED    = 103
+  /// Connection reset by peer
+  case ECONNRESET      = 104
+  /// No buffer space available
+  case ENOBUFS         = 105
+  /// Transport endpoint is already connected
+  case EISCONN         = 106
+  /// Transport endpoint is not connected
+  case ENOTCONN        = 107
+  /// Cannot send after transport endpoint shutdown
+  case ESHUTDOWN       = 108
+  /// Too many references: cannot splice
+  case ETOOMANYREFS    = 109
+  /// Connection timed out
+  case ETIMEDOUT       = 110
+  /// Connection refused
+  case ECONNREFUSED    = 111
+  /// Host is down
+  case EHOSTDOWN       = 112
+  /// No route to host
+  case EHOSTUNREACH    = 113
+  /// Operation already in progress
+  case EALREADY        = 114
+  /// Operation now in progress
+  case EINPROGRESS     = 115
+  /// Stale NFS file handle
+  case ESTALE          = 116
+  /// Structure needs cleaning
+  case EUCLEAN         = 117
+  /// Not a XENIX named type file
+  case ENOTNAM         = 118
+  /// No XENIX semaphores available
+  case ENAVAIL         = 119
+  /// Is a named type file
+  case EISNAM          = 120
+  /// Remote I/O error
+  case EREMOTEIO       = 121
+  /// Quota exceeded
+  case EDQUOT          = 122
+
+  /// No medium found
+  case ENOMEDIUM       = 123
+  /// Wrong medium type
+  case EMEDIUMTYPE     = 124
+  /// Operation Canceled
+  case ECANCELED       = 125
+  /// Required key not available
+  case ENOKEY          = 126
+  /// Key has expired
+  case EKEYEXPIRED     = 127
+  /// Key has been revoked
+  case EKEYREVOKED     = 128
+  /// Key was rejected by service
+  case EKEYREJECTED    = 129
+  
+  /// Owner died
+  case EOWNERDEAD      = 130
+  /// State not recoverable
+  case ENOTRECOVERABLE = 131
 }
 
 #endif
