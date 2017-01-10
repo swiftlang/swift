@@ -561,7 +561,7 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
     // of the function.
     if (var->isSelfParameter())
       return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
-                         decl->getName().str());
+                         decl->getFullName());
   }
 
   if (!decl->getLoc().isValid() && decl->getDeclContext()->isTypeContext()) {
@@ -579,7 +579,7 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
     }
   }
 
-  return tc.diagnose(decl, diag::note_typo_candidate, decl->getName().str());
+  return tc.diagnose(decl, diag::note_typo_candidate, decl->getFullName());
 }
 
 void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,
