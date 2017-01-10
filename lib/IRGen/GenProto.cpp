@@ -351,7 +351,6 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Deallocating:
       // Classes are sources of metadata.
       if (type->getClassOrBoundGenericClass()) {
         considerNewTypeSource(MetadataSource::Kind::ClassPointer,

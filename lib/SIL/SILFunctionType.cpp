@@ -1837,7 +1837,6 @@ namespace {
       case ParameterConvention::Direct_Guaranteed:
         if (isTrivial) return ParameterConvention::Direct_Unowned;
         SWIFT_FALLTHROUGH;
-      case ParameterConvention::Direct_Deallocating:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:

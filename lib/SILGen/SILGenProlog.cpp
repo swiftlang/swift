@@ -88,11 +88,6 @@ public:
   ManagedValue getManagedValue(SILValue arg, CanType t,
                                  SILParameterInfo parameterInfo) const {
     switch (parameterInfo.getConvention()) {
-    case ParameterConvention::Direct_Deallocating:
-      // If we have a deallocating parameter, it is passed in at +0 and will not
-      // be deallocated since we do not allow for resurrection.
-      return ManagedValue::forUnmanaged(arg);
-
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Indirect_In_Guaranteed:
       // If we have a guaranteed parameter, it is passed in at +0, and its

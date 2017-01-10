@@ -1737,8 +1737,6 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     case ParameterConvention::Indirect_InoutAliasable:
       // TODO handle remaining indirect argument types
       return nullptr;
-    case ParameterConvention::Direct_Deallocating:
-      llvm_unreachable("unsupported convention for bridging conversion");
   }
 
   if (needRetainBeforeCall)

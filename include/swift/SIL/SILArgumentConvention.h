@@ -72,9 +72,6 @@ struct SILArgumentConvention {
     case ParameterConvention::Direct_Owned:
       Value = SILArgumentConvention::Direct_Owned;
       return;
-    case ParameterConvention::Direct_Deallocating:
-      Value = SILArgumentConvention::Direct_Deallocating;
-      return;
     }
     llvm_unreachable("covered switch isn't covered?!");
   }
