@@ -5357,9 +5357,17 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
   if (isa<TypeDecl>(witness)) return result;
 
   auto dc = witness->getDeclContext();
-  auto name = witness->getFullName();
   auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!nominal) return result;
+
+  DeclName name = witness->getFullName();
+  auto accessorKind = AccessorKind::NotAccessor;
+  if (auto *fn = dyn_cast<FuncDecl>(witness)) {
+    accessorKind = fn->getAccessorKind();
+    if (accessorKind != AccessorKind::NotAccessor) {
+      name = fn->getAccessorStorageDecl()->getFullName();
+    }
+  }
 
   for (auto proto : nominal->getAllProtocols()) {
     // We only care about Objective-C protocols.
@@ -5385,35 +5393,67 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
       }
       if (!*conformance) continue;
 
-      // Determine whether the witness for this conformance is in fact
-      // our witness.
-      if ((*conformance)->getWitness(req, this).getDecl() == witness) {
-        result.push_back(req);
-        if (anySingleRequirement) return result;
+      const Decl *found = (*conformance)->getWitness(req, this).getDecl();
+
+      if (!found) {
+        // If we have an optional requirement in an inherited conformance,
+        // check whether the potential witness matches the requirement.
+        // FIXME: for now, don't even try this with generics involved. We
+        // should be tracking how subclasses implement optional requirements,
+        // in which case the getWitness() check above would suffice.
+        if (!req->getAttrs().hasAttribute<OptionalAttr>() ||
+            !isa<InheritedProtocolConformance>(*conformance)) {
+          continue;
+        }
+
+        auto normal = (*conformance)->getRootNormalConformance();
+        auto dc = (*conformance)->getDeclContext();
+        if (dc->getGenericSignatureOfContext() ||
+            normal->getDeclContext()->getGenericSignatureOfContext()) {
+          continue;
+        }
+
+        const ValueDecl *witnessToMatch = witness;
+        if (accessorKind != AccessorKind::NotAccessor)
+          witnessToMatch = cast<FuncDecl>(witness)->getAccessorStorageDecl();
+
+        RequirementEnvironment reqEnvironment(*this, dc, req, *conformance);
+        if (matchWitness(*this, proto, *conformance,
+                         witnessToMatch->getDeclContext(), req,
+                         const_cast<ValueDecl *>(witnessToMatch),
+                         reqEnvironment).Kind == MatchKind::ExactMatch) {
+          if (accessorKind != AccessorKind::NotAccessor) {
+            auto *storageReq = dyn_cast<AbstractStorageDecl>(req);
+            if (!storageReq)
+              continue;
+            req = storageReq->getAccessorFunction(accessorKind);
+          }
+          result.push_back(req);
+          if (anySingleRequirement) return result;
+          continue;
+        }
+
         continue;
       }
 
-      // If we have an inherited conformance, check whether the potential
-      // witness matches the requirement.
-      // FIXME: for now, don't even try this with generics involved. We
-      // should be tracking how subclasses implement optional requirements,
-      // in which case the getWitness() check above would suffice.
-      if (req->getAttrs().hasAttribute<OptionalAttr>() &&
-          isa<InheritedProtocolConformance>(*conformance)) {
-        auto normal = (*conformance)->getRootNormalConformance();
-        if (!(*conformance)->getDeclContext()->getGenericSignatureOfContext() &&
-            !normal->getDeclContext()->getGenericSignatureOfContext()) {
-          auto dc = (*conformance)->getDeclContext();
-          RequirementEnvironment reqEnvironment(*this, dc, req, *conformance);
-          if (matchWitness(*this, proto, *conformance, witness->getDeclContext(),
-                           req, const_cast<ValueDecl *>(witness),
-                           reqEnvironment)
-                .Kind == MatchKind::ExactMatch) {
-            result.push_back(req);
-            if (anySingleRequirement) return result;
-            continue;
-          }
-        }
+      // Dig out the appropriate accessor, if necessary.
+      if (accessorKind != AccessorKind::NotAccessor) {
+        auto *storageReq = dyn_cast<AbstractStorageDecl>(req);
+        auto *storageFound = dyn_cast_or_null<AbstractStorageDecl>(found);
+        if (!storageReq || !storageFound)
+          continue;
+        req = storageReq->getAccessorFunction(accessorKind);
+        if (!req)
+          continue;
+        found = storageFound->getAccessorFunction(accessorKind);
+      }
+
+      // Determine whether the witness for this conformance is in fact
+      // our witness.
+      if (found == witness) {
+        result.push_back(req);
+        if (anySingleRequirement) return result;
+        continue;
       }
     }
   }
