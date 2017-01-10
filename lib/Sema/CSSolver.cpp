@@ -837,19 +837,11 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // Relational constraints: break out to look for types above/below.
       break;
 
-    case ConstraintKind::CheckedCast:
-      // FIXME: Relational constraints for which we could perhaps do better
-      // than the default.
-      break;
-
     case ConstraintKind::BridgingConversion:
-      // Nothing to infer from bridging conversions.
-      continue;
-
+    case ConstraintKind::CheckedCast:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
       // Constraints from which we can't do anything.
-      // FIXME: Record this somehow?
       continue;
 
     case ConstraintKind::Defaultable:

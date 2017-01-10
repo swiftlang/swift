@@ -88,8 +88,8 @@ Double(1) as Double as String // expected-error{{cannot convert value of type 'D
 (1.0, 1, "asd") as (String, Int, Float) // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}}
 (1, 1.0, "a", [1, 23]) as (Int, Double, String, [String]) // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 
-[1] as! [String] // expected-error{{'[Int]' is not convertible to '[String]'}}
-[(1, (1, 1))] as! [(Int, (String, Int))] // expected-error{{'[(Int, (Int, Int))]' is not convertible to '[(Int, (String, Int))]'}}
+_ = [1] as! [String] // expected-warning{{cast from '[Int]' to unrelated type '[String]' always fails}}
+_ = [(1, (1, 1))] as! [(Int, (String, Int))] // expected-warning{{cast from '[(Int, (Int, Int))]' to unrelated type '[(Int, (String, Int))]' always fails}}
 
 // <rdar://problem/19495253> Incorrect diagnostic for explicitly casting to the same type
 _ = "hello" as! String // expected-warning{{forced cast of 'String' to same type has no effect}} {{13-24=}}
