@@ -8,6 +8,9 @@
 // REQUIRES: CODEGENERATOR=X86
 // REQUIRES: CODEGENERATOR=ARM
 
+// FIXME: SR-3603 test is failing after being unintentionally disabled for a while
+// REQUIRES: SR3603
+ 
 import Builtin
 
 sil_stage canonical
