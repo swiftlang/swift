@@ -6,7 +6,7 @@ enum AnEnumeration {
 
   // EnumElement
   case Element
-  // CHECK: [[@LINE-1]]:8 | enum-element/Swift | Element | s:FO14swift_ide_test13AnEnumeration7ElementFMS0_S0_ | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:8 | enumerator/Swift | Element | s:FO14swift_ide_test13AnEnumeration7ElementFMS0_S0_ | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | AnEnumeration | s:O14swift_ide_test13AnEnumeration
 }
 
@@ -18,12 +18,12 @@ struct AStruct {
 
   // Subscript
   subscript(index: Int) -> Int {
-    // CHECK: [[@LINE-1]]:3 | subscript/Swift | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi | Def,RelChild | rel: 1
+    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi | Def,RelChild | rel: 1
     // CHECK-NEXT: RelChild | AStruct | s:V14swift_ide_test7AStruct
 
     // Accessor + AccessorAddressor
     unsafeAddress {
-      // CHECK: [[@LINE-1]]:5 | accessor(addr)/Swift |  | s:FV14swift_ide_test7AStructlu9subscriptFSiSi | Def,RelChild,RelAcc | rel: 1
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-addr/Swift |  | s:FV14swift_ide_test7AStructlu9subscriptFSiSi | Def,RelChild,RelAcc | rel: 1
       // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi
 
       return UnsafePointer(base)
@@ -31,7 +31,7 @@ struct AStruct {
 
     // Accessor + AccessorMutableAddressor
     unsafeMutableAddress {
-      // CHECK: [[@LINE-1]]:5 | accessor(mutAddr)/Swift |  | s:FV14swift_ide_test7AStructau9subscriptFSiSi | Def,RelChild,RelAcc | rel: 1
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-mutaddr/Swift |  | s:FV14swift_ide_test7AStructau9subscriptFSiSi | Def,RelChild,RelAcc | rel: 1
       // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:iV14swift_ide_test7AStruct9subscriptFSiSi
 
       return base
@@ -65,7 +65,7 @@ class AClass {
 
     // Accessor + AccessorGetter
     get {
-      // CHECK: [[@LINE-1]]:5 | accessor(get)/Swift | getter:instanceProperty | s:FC14swift_ide_test6AClassg16instancePropertySi | Def,RelChild,RelAcc | rel: 1
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:instanceProperty | s:FC14swift_ide_test6AClassg16instancePropertySi | Def,RelChild,RelAcc | rel: 1
       // CHECK-NEXT: RelChild,RelAcc | instanceProperty | s:vC14swift_ide_test6AClass16instancePropertySi
 
       return 1
@@ -73,7 +73,7 @@ class AClass {
 
     // Accessor + AccessorSetter
     set {}
-    // CHECK: [[@LINE-1]]:5 | accessor(set)/Swift | setter:instanceProperty | s:FC14swift_ide_test6AClasss16instancePropertySi | Def,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:instanceProperty | s:FC14swift_ide_test6AClasss16instancePropertySi | Def,RelChild,RelAcc | rel: 1
     // CHECK-NEXT: RelChild,RelAcc | instanceProperty | s:vC14swift_ide_test6AClass16instancePropertySi
   }
 
@@ -81,12 +81,12 @@ class AClass {
 
     // Accessor + AccessorWillSet
     willSet {}
-    // CHECK: [[@LINE-1]]:5 | accessor(willSet)/Swift | willSet:observed | s:FC14swift_ide_test6AClassw8observedSi | Def,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:5 | instance-method/acc-willset/Swift | willSet:observed | s:FC14swift_ide_test6AClassw8observedSi | Def,RelChild,RelAcc | rel: 1
     // CHECK-NEXT: RelChild,RelAcc | observed | s:vC14swift_ide_test6AClass8observedSi
 
     // Accessor + AccessorDidSet
     didSet {}
-    // CHECK: [[@LINE-1]]:5 | accessor(didSet)/Swift | didSet:observed | s:FC14swift_ide_test6AClassW8observedSi | Def,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:5 | instance-method/acc-didset/Swift | didSet:observed | s:FC14swift_ide_test6AClassW8observedSi | Def,RelChild,RelAcc | rel: 1
     // CHECK-NEXT: RelChild,RelAcc | observed | s:vC14swift_ide_test6AClass8observedSi
   }
 
@@ -117,28 +117,28 @@ protocol AProtocol {
 
   // AssociatedType
   associatedtype T
-  // CHECK: [[@LINE-1]]:18 | associated-type/Swift | T | s:P14swift_ide_test9AProtocol1T | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:18 | type-alias/associated-type/Swift | T | s:P14swift_ide_test9AProtocol1T | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | AProtocol | s:P14swift_ide_test9AProtocol
 }
 
 // Extension
 extension AnEnumeration {}
-// CHECK: [[@LINE-1]]:11 | extension(extEnum)/Swift | AnEnumeration | s:O14swift_ide_test13AnEnumeration | Def | rel: 0
+// CHECK: [[@LINE-1]]:11 | extension/ext-enum/Swift | AnEnumeration | s:O14swift_ide_test13AnEnumeration | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | enum/Swift | AnEnumeration | s:O14swift_ide_test13AnEnumeration | Ref,RelExt | rel: 1
 // CHECK-NEXT: RelExt | AnEnumeration | s:O14swift_ide_test13AnEnumeration
 
 extension AStruct {}
-// CHECK: [[@LINE-1]]:11 | extension(extStruct)/Swift | AStruct | s:V14swift_ide_test7AStruct | Def | rel: 0
+// CHECK: [[@LINE-1]]:11 | extension/ext-struct/Swift | AStruct | s:V14swift_ide_test7AStruct | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | struct/Swift | AStruct | s:V14swift_ide_test7AStruct | Ref,RelExt | rel: 1
 // CHECK-NEXT: RelExt | AStruct | s:V14swift_ide_test7AStruct
 
 extension AClass {}
-// CHECK: [[@LINE-1]]:11 | extension(extClass)/Swift | AClass | s:C14swift_ide_test6AClass | Def | rel: 0
+// CHECK: [[@LINE-1]]:11 | extension/ext-class/Swift | AClass | s:C14swift_ide_test6AClass | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | class/Swift | AClass | s:C14swift_ide_test6AClass | Ref,RelExt | rel: 1
 // CHECK-NEXT: RelExt | AClass | s:C14swift_ide_test6AClass
 
 extension AProtocol {}
-// CHECK: [[@LINE-1]]:11 | extension(extProt)/Swift | AProtocol | s:P14swift_ide_test9AProtocol | Def | rel: 0
+// CHECK: [[@LINE-1]]:11 | extension/ext-protocol/Swift | AProtocol | s:P14swift_ide_test9AProtocol | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | protocol/Swift | AProtocol | s:P14swift_ide_test9AProtocol | Ref,RelExt | rel: 1
 // CHECK-NEXT: RelExt | AProtocol | s:P14swift_ide_test9AProtocol
 
@@ -149,11 +149,11 @@ typealias SomeAlias = AStruct
 
 // GenericTypeParam
 struct GenericStruct<ATypeParam> {}
-// CHECK: [[@LINE-1]]:22 | generic-type-param/Swift | ATypeParam | s:tV14swift_ide_test13GenericStruct10ATypeParamMx | Def,RelChild | rel: 1
+// CHECK: [[@LINE-1]]:22 | type-alias/generic-type-param/Swift | ATypeParam | s:tV14swift_ide_test13GenericStruct10ATypeParamMx | Def,RelChild | rel: 1
 // CHECK-NEXT: RelChild | GenericStruct | s:V14swift_ide_test13GenericStruct
 
 func GenericFunc<ATypeParam>(_: ATypeParam) {}
-// CHECK-NOT: [[@LINE-1]]:18 | generic-type-param/Swift | ATypeParam | {{.*}} | Def,RelChild | rel: 1
+// CHECK-NOT: [[@LINE-1]]:18 | type-alias/generic-type-param/Swift | ATypeParam | {{.*}} | Def,RelChild | rel: 1
 
 // Function
 func EmptyFunction() {}
@@ -165,15 +165,15 @@ var foo = 1
 
 // PrefixOperator
 prefix func -(a: AStruct) -> AStruct { return a }
-// CHECK: [[@LINE-1]]:13 | prefix-operator/Swift | -(_:) | s:F14swift_ide_testop1sFVS_7AStructS0_ | Def | rel: 0
+// CHECK: [[@LINE-1]]:13 | function/prefix-operator/Swift | -(_:) | s:F14swift_ide_testop1sFVS_7AStructS0_ | Def | rel: 0
 
 // PostfixOperator
 postfix func ++(a: AStruct) -> AStruct { return a }
-// CHECK: [[@LINE-1]]:14 | postfix-operator/Swift | ++(_:) | s:F14swift_ide_testoP2ppFVS_7AStructS0_ | Def | rel: 0
+// CHECK: [[@LINE-1]]:14 | function/postfix-operator/Swift | ++(_:) | s:F14swift_ide_testoP2ppFVS_7AStructS0_ | Def | rel: 0
 
 // InfixOperator
 func +(a: AStruct, b: AStruct) -> AStruct { return a }
-// CHECK: [[@LINE-1]]:6 | infix-operator/Swift | +(_:_:) | s:F14swift_ide_testoi1pFTVS_7AStructS0__S0_ | Def | rel: 0
+// CHECK: [[@LINE-1]]:6 | function/infix-operator/Swift | +(_:_:) | s:F14swift_ide_testoi1pFTVS_7AStructS0__S0_ | Def | rel: 0
 
 
 // TODO: UnitTest
