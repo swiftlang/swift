@@ -17,10 +17,11 @@
 #ifndef SWIFT_LAYOUT_CONSTRAINT_H
 #define SWIFT_LAYOUT_CONSTRAINT_H
 
-#include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "swift/AST/PrintOptions.h"
 
 namespace swift {
 

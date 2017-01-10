@@ -42,7 +42,7 @@ LayoutConstraintInfo getLayoutConstraintInfo(StringRef ID) {
 StringRef LayoutConstraintInfo::getName() const {
   switch (getKind()) {
   case LayoutConstraintKind::UnknownLayout:
-    return "_UnknwonLayout";
+    return "_UnknownLayout";
   case LayoutConstraintKind::RefCountedObject:
     return "_RefCountedObject";
   case LayoutConstraintKind::NativeRefCountedObject:

@@ -461,6 +461,18 @@ Type GenericSignature::getConcreteType(Type type, ModuleDecl &mod) {
   return pa->getConcreteType();
 }
 
+LayoutConstraint GenericSignature::getLayoutConstraint(Type type,
+                                                       ModuleDecl &mod) {
+  if (!type->isTypeParameter()) return LayoutConstraint();
+
+  auto &builder = *getArchetypeBuilder(mod);
+  auto pa = builder.resolveArchetype(type);
+  if (!pa) return LayoutConstraint();
+
+  pa = pa->getRepresentative();
+  return pa->getLayout();
+}
+
 Type GenericSignature::getRepresentative(Type type, ModuleDecl &mod) {
   assert(type->isTypeParameter());
   auto &builder = *getArchetypeBuilder(mod);

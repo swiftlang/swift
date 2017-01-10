@@ -199,6 +199,11 @@ public:
   /// constraint.
   Type getConcreteType(Type type, ModuleDecl &mod);
 
+  /// Return the layout constraint that the given dependent type is constrained
+  /// to, or the null LayoutConstraint if it is not the subject of layout
+  /// constraint.
+  LayoutConstraint getLayoutConstraint(Type type, ModuleDecl &mod);
+
   /// Return the preferred representative of the given type parameter within
   /// this generic signature.  This may yield a concrete type or a
   /// different type parameter.

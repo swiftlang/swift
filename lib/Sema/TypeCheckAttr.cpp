@@ -1428,7 +1428,7 @@ static void checkSpecializeAttrRequirements(
   auto genericSig = FD->getGenericSignature();
   bool isInvalidAttr = false;
 
-  // TODO: Check that requirements are defined only on
+  // Check that requirements are defined only on
   // generic parameter types and not on their associated or dependent types or
   // other generic types using these parameters.
   for (auto &req : requirements) {
@@ -1498,7 +1498,7 @@ static void checkSpecializeAttrRequirements(
       if (req.getKind() == RequirementReprKind::TypeConstraint) {
         auto constraint = req.getConstraint();
 
-        if (!constraint || constraint->is<ErrorType>() ||
+        if (!constraint || constraint->hasError() ||
             constraint->hasArchetype()) {
           isInvalidAttr = true;
           continue;
@@ -1518,8 +1518,6 @@ static void checkSpecializeAttrRequirements(
                       diag::specialize_attr_non_protocol_type_constraint_req)
               .highlight(req.getSourceRange());
         }
-        // TODO: Check that it is one of the compiler known protocols used for
-        // pre-specializations.
       }
 
       bool isSubjectNonConcrete = subjectType->hasTypeParameter();
@@ -1669,7 +1667,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
             TypeLoc(req.getFirstTypeRepr(), concreteType), req.getEqualLoc(),
             TypeLoc(req.getSecondTypeRepr(), genericType)));
       }
-      // Builder.addSameTypeRequirementToConcrete(pa, concreteType, source);
       Builder.addRequirement(resolvedRequirements.back());
 
       // Convert the requirement into a form which uses canonical interface
@@ -1733,8 +1730,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
                                    constrainedGenericParams);
 
       // Skip any unknown or error types.
-      if (!subjectType || subjectType->is<ErrorType>() ||
-          !constraint || constraint->is<ErrorType>())
+      if (!subjectType || subjectType->hasError() ||
+          !constraint || constraint->hasError())
         continue;
 
 

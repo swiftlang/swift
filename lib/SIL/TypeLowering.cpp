@@ -247,6 +247,10 @@ namespace {
         } else if (genericSig->isConcreteType(type, mod)) {
           return asImpl().visit(genericSig->getConcreteType(type, mod)
                                     ->getCanonicalType());
+        // } else if (genericSig->getLayoutConstraint(type, mod) &&
+        //            genericSig->getLayoutConstraint(type, mod)
+        //                ->isKnownSizeTrivial()) {
+        //   return asImpl().handleTrivial(type);
         } else {
           return asImpl().handleAddressOnly(type);
         }

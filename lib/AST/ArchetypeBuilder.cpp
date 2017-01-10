@@ -1934,7 +1934,7 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
 void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
                      void (RequirementKind kind,
                            PotentialArchetype *archetype,
-                           llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint> constraint,
+                           ArchetypeBuilder::RequirementRHS constraint,
                            RequirementSource source)> f) {
   // First, collect all archetypes, and sort them.
   SmallVector<PotentialArchetype *, 8> archetypes;
@@ -2020,7 +2020,7 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "Requirements:";
   enumerateRequirements([&](RequirementKind kind,
                             PotentialArchetype *archetype,
-                            llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint> constraint,
+                            ArchetypeBuilder::RequirementRHS constraint,
                             RequirementSource source) {
     switch (kind) {
     case RequirementKind::Conformance:
@@ -2075,7 +2075,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
                                 SmallVectorImpl<Requirement> &requirements) {
   builder.enumerateRequirements([&](RequirementKind kind,
           ArchetypeBuilder::PotentialArchetype *archetype,
-          llvm::PointerUnion3<Type, ArchetypeBuilder::PotentialArchetype *, LayoutConstraint> type,
+          ArchetypeBuilder::RequirementRHS type,
           RequirementSource source) {
     // Filter out redundant requirements.
     switch (source.getKind()) {

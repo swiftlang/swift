@@ -131,7 +131,8 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
 }
 
 /// Adds a CFG edge from the unterminated NewRetBB to a merged "return" block.
-static void addReturnValue(SILBasicBlock *NewRetBB, SILBasicBlock *OldRetBB, SILValue NewRetVal) {
+static void addReturnValue(SILBasicBlock *NewRetBB, SILBasicBlock *OldRetBB,
+                           SILValue NewRetVal) {
   auto *RetBB = OldRetBB;
   addReturnValueImpl(RetBB, NewRetBB, NewRetVal);
 }
@@ -567,10 +568,18 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
 
 /// Cast a generic argument to its specialized type.
 SILValue EagerDispatch::emitArgumentCast(CanSILFunctionType CalleeSubstFnTy,
-                                         SILFunctionArgument *OrigArg, unsigned Idx) {
-
+                                         SILFunctionArgument *OrigArg,
+                                         unsigned Idx) {
   auto CastTy = CalleeSubstFnTy->getSILArgumentType(Idx);
 
+  // TODO: What if the original arg is generic and we don't know its size statically
+  // in the caller, but the specialized function has a layout constraint on it?
+  // Do we need to load this parameter first in this case, before we call a
+  // specialized function? How can we express loading of this parameter in SIL?
+  // In the caller's its not loadable! But in the specialized function's context
+  // it is loadable, because it is layout constrained there.
+  // May be we should stack_alloc a placeholder for the new value of the sized
+  // described by the layout constraint and then simply memcopy the value there?
   assert(CastTy.isAddress() ==
          (OrigArg->isIndirectResult()
           || OrigArg->getKnownParameterInfo().isIndirect()) && "bad arg type");
@@ -593,6 +602,7 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
   auto OrigArgs = GenericFunc->begin()->getFunctionArguments();
   // Create a substituted callee type.
   auto SubstitutedType = ReInfo.getSubstitutedType();
+  auto SpecializedType = ReInfo.getSpecializedType();
   auto CanSILFuncTy = SubstitutedType;
   auto CalleeSubstFnTy = CanSILFuncTy;
   if (CanSILFuncTy->isPolymorphic()) {
@@ -604,20 +614,24 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
            "Substituted callee type should not have type parameters");
 
     SubstitutedType = CalleeSubstFnTy;
+    SpecializedType =
+        ReInfo.createSpecializedType(SubstitutedType, Builder.getModule());
   }
 
   assert(OrigArgs.size() == ReInfo.getNumArguments() && "signature mismatch");
-  
+
   CallArgs.reserve(OrigArgs.size());
   SILValue StoreResultTo;
   for (auto *OrigArg : OrigArgs) {
     unsigned Idx = OrigArg->getIndex();
 
+    //auto CastArg = emitArgumentCast(SpecializedType, OrigArg, Idx);
     auto CastArg = emitArgumentCast(SubstitutedType, OrigArg, Idx);
     DEBUG(dbgs() << "  Cast generic arg: "; CastArg->print(dbgs()));
 
     if (ReInfo.isArgConverted(OrigArg->getIndex()) &&
-        !isa<ArchetypeType>(CastArg->getType().getSwiftRValueType()->getCanonicalType())) {
+        !isa<ArchetypeType>(
+            CastArg->getType().getSwiftRValueType()->getCanonicalType())) {
       if (ReInfo.isResultIndex(Idx)) {
         // The result is converted from indirect to direct. We need to insert
         // a store later.

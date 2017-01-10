@@ -1599,8 +1599,6 @@ bool TypeBase::isSpelledLike(Type other) {
 
 LayoutConstraint TypeBase::getLayoutConstraint() {
   auto CanTy = getCanonicalType();
-  if (!CanTy)
-    return LayoutConstraint();
   return CanTy.getLayoutConstraint();
 }
 

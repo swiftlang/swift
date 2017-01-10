@@ -117,6 +117,9 @@ public:
   /// type or some type derived from it.
   class PotentialArchetype;
 
+  using RequirementRHS =
+      llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+
 private:
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
@@ -211,9 +214,8 @@ public:
   void enumerateRequirements(llvm::function_ref<
                       void (RequirementKind kind,
                             PotentialArchetype *archetype,
-                            llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint> constraint,
+                            RequirementRHS constraint,
                             RequirementSource source)> f);
-  
 
 private:
   PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,

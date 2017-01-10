@@ -78,7 +78,7 @@ LayoutConstraintInfo Parser::parseLayoutConstraint(StringRef LayoutConstraintID)
   int alignment = 0;
 
   auto ParseTrivialLayoutConstraintBody = [&] () -> bool {
-    // Parse the size and alginment.
+    // Parse the size and alignment.
     if (Tok.is(tok::integer_literal)) {
       if (Tok.getText().getAsInteger(10, size)) {
         diagnose(Tok.getLoc(), diag::layout_size_should_be_positive);
@@ -130,7 +130,7 @@ LayoutConstraintInfo Parser::parseLayoutConstraint(StringRef LayoutConstraintID)
   }
 
   // Otherwise it is a trivial layout constraint with
-  // provided size and alginment.
+  // provided size and alignment.
   return LayoutConstraintInfo(layoutConstraint.getKind(), size, alignment);
 }
 
