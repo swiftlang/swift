@@ -133,7 +133,7 @@ namespace {
   
     DebuggerClient *getDebuggerClient()
     {
-      Module *PM = P.CurDeclContext->getParentModule();
+      ModuleDecl *PM = P.CurDeclContext->getParentModule();
       if (!PM)
           return nullptr;
       else
@@ -1850,8 +1850,9 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   if (!CurLocalContext || !D->getDeclContext()->isLocalContext())
     return;
 
-  if (getScopeInfo().isStaticallyInactiveConfigBlock())
-    return;
+  if (auto TD = dyn_cast<TypeDecl>(D))
+    if (!getScopeInfo().isInactiveConfigBlock())
+      SF.LocalTypeDecls.insert(TD);
 
   Identifier name = D->getName();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
@@ -1901,10 +1902,8 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       // The IfConfigDecl is ahead of its members in source order.
       Handler(ICD);
       // Copy the active members into the entries list.
-      if (ICD->isResolved()) {
-        for (auto activeMember : ICD->getActiveMembers()) {
-          Handler(activeMember);
-        }
+      for (auto activeMember : ICD->getActiveMembers()) {
+        Handler(activeMember);
       }
     }
     return IfConfigResult;
@@ -2219,6 +2218,15 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     break;
   }
 
+  if (auto SF = CurDeclContext->getParentSourceFile()) {
+    if (!getScopeInfo().isInactiveConfigBlock()) {
+      for (auto Attr : Attributes) {
+        if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
+          SF->AttrsRequiringFoundation.insert(Attr);
+      }
+    }
+  }
+
   if (FoundCCTokenInAttr) {
     if (CodeCompletion) {
       CodeCompletion->completeDeclAttrKeyword(DeclResult.getPtrOrNull(),
@@ -2290,11 +2298,7 @@ void Parser::parseDeclDelayed() {
   Scope S(this, DelayedState->takeScope());
   ContextChange CC(*this, DelayedState->ParentContext);
 
-  parseDecl(ParseDeclOptions(DelayedState->Flags), [&](Decl *D) {
-    SmallVector<Decl *, 2> scratch;
-    performDelayedConditionResolution(D, SF, scratch);
-    assert(scratch.empty());
-  });
+  parseDecl(ParseDeclOptions(DelayedState->Flags), [](Decl *D) { });
 }
 
 /// \brief Parse an 'import' declaration, doing no token skipping on error.
@@ -2814,28 +2818,36 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 
   SmallVector<IfConfigDeclClause, 4> Clauses;
 
-  bool canStaticallyFindActive = true;
-  bool foundActiveClause = false;
+  bool foundActive = false;
+  ConditionalCompilationExprState ConfigState;
   while (1) {
     bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
-    
-    if (!isElse) {
+
+    if (isElse) {
+      ConfigState.setConditionActive(!foundActive);
+    } else {
       if (Tok.isAtStartOfLine()) {
         diagnose(ClauseLoc, diag::expected_conditional_compilation_expression,
                  !Clauses.empty());
       }
-      
-      // Parse the condition.
+
+      // Evaluate the condition.
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                     /*isBasic*/true,
                                                     /*isForDirective*/true);
       if (Result.isNull())
         return makeParserError();
-      
+
       Condition = Result.get();
+
+      // Evaluate the condition, to validate it.
+      ConfigState = classifyConditionalCompilationExpr(Condition, Context,
+                                                       Diags);
     }
+
+    foundActive |= ConfigState.isConditionActive();
 
     if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
       diagnose(Tok.getLoc(),
@@ -2843,49 +2855,35 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     }
 
     Optional<Scope> scope;
-    scope.emplace(this, getScopeInfo().getCurrentScope()->getKind());
-    
-    SmallVector<Decl*, 8> Decls;
-    auto condValue = classifyConditionalCompilationExpr(Condition, Context,
-                                                        Diags);
+    if (!ConfigState.isConditionActive())
+      scope.emplace(this, getScopeInfo().getCurrentScope()->getKind(),
+                    /*inactiveConfigBlock=*/true);
 
-    // If we see a block conditionalizing compilation on language or
-    // compiler version we must take care not to emit diagnostics.
-    if (!condValue.getValueOr(true)
-        || (isElse && canStaticallyFindActive && foundActiveClause)) {
-      DiagnosticTransaction DT(Diags);
-      skipUntilConditionalBlockClose();
-      DT.abort();
-    } else {
-      if (!(isElse || condValue.hasValue())) {
-        canStaticallyFindActive = false;
-      } else if (condValue.getValueOr(false)) {
-        foundActiveClause = true;
-      }
+    SmallVector<Decl*, 8> Decls;
+    if (ConfigState.shouldParse()) {
       ParserStatus Status;
       while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
              Tok.isNot(tok::pound_elseif)) {
-        Status = parseDecl(Flags, [&](Decl *D) { Decls.push_back(D); });
+        Status = parseDecl(Flags, [&](Decl *D) {Decls.push_back(D);});
         if (Status.isError()) {
           diagnose(Tok, diag::expected_close_to_if_directive);
           skipUntilConditionalBlockClose();
           break;
         }
       }
-    }
-
-    // If we can statically determine the condition of a '#else' clause, do so.
-    if (canStaticallyFindActive && isElse) {
-      condValue.emplace(!foundActiveClause);
+    } else {
+      DiagnosticTransaction DT(Diags);
+      skipUntilConditionalBlockClose();
+      DT.abort();
     }
 
     Clauses.push_back(IfConfigDeclClause(ClauseLoc, Condition,
                                          Context.AllocateCopy(Decls),
-                                         condValue.getValueOr(false)));
+                                         ConfigState.isConditionActive()));
 
     if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
       break;
-    
+
     if (isElse)
       diagnose(Tok, diag::expected_close_after_else_directive);
   }
@@ -2896,11 +2894,6 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
                                                  Context.AllocateCopy(Clauses),
                                                  EndLoc, HadMissingEnd);
-  // If we were able to resolve this condition statically, mark it as such.
-  if (canStaticallyFindActive) {
-    ICD->setResolved();
-  }
-
   return makeParserResult(ICD);
 }
 

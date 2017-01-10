@@ -205,8 +205,8 @@ extension NSDictionary {
   /// Initializes a newly allocated dictionary and adds to it objects from
   /// another given dictionary.
   ///
-  /// - Returns: An initialized dictionary—which might be different
-  ///   than the original receiver—containing the keys and values
+  /// - Returns: An initialized dictionary--which might be different
+  ///   than the original receiver--containing the keys and values
   ///   found in `otherDictionary`.
   @objc(_swiftInitWithDictionary_NSDictionary:)
   public convenience init(dictionary otherDictionary: NSDictionary) {

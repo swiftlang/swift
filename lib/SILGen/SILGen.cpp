@@ -36,7 +36,7 @@ using namespace Lowering;
 // SILGenModule Class implementation
 //===----------------------------------------------------------------------===//
 
-SILGenModule::SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile)
+SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM, bool makeModuleFragile)
   : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
     Profiler(nullptr), makeModuleFragile(makeModuleFragile) {
 }
@@ -73,7 +73,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
 
   if (!cacheSlot) {
     ASTContext &ctx = SGM.M.getASTContext();
-    Module *mod = ctx.getLoadedModule(moduleName);
+    ModuleDecl *mod = ctx.getLoadedModule(moduleName);
     if (!mod) {
       SGM.diagnose(SourceLoc(), diag::bridging_module_missing,
                    moduleName.str(), functionName);
@@ -1421,7 +1421,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,
+SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
                         Optional<unsigned> startElem, bool makeModuleFragile,
                         bool isWholeModule) {
   SharedTimer timer("SILGen");
@@ -1494,7 +1494,7 @@ SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(Module *mod,
+swift::performSILGeneration(ModuleDecl *mod,
                             SILOptions &options,
                             bool makeModuleFragile,
                             bool wholeModuleCompilation) {

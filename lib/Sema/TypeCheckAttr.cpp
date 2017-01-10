@@ -1306,7 +1306,9 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   auto fn = cast<AbstractFunctionDecl>(D);
   for (auto paramList : fn->getParameterLists()) {
     for (auto param : *paramList)
-      if (hasThrowingFunctionParameter(param->getType()->lookThroughAllAnyOptionalTypes()->getCanonicalType()))
+      if (hasThrowingFunctionParameter(param->getType()
+              ->lookThroughAllAnyOptionalTypes()
+              ->getCanonicalType()))
         return;
   }
 
@@ -1430,7 +1432,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       return;
     }
 
-    if (ty->getCanonicalType()->hasArchetype()) {
+    if (ty->hasArchetype()) {
       TC.diagnose(attr->getLocation(),
                   diag::cannot_partially_specialize_generic_function);
       attr->setInvalid();

@@ -86,7 +86,7 @@ void *Decl::operator new(size_t Bytes, const ASTContext &C,
 }
 
 // Only allow allocation of Modules using the allocator in ASTContext.
-void *Module::operator new(size_t Bytes, const ASTContext &C,
+void *ModuleDecl::operator new(size_t Bytes, const ASTContext &C,
                            unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
@@ -317,7 +317,7 @@ bool Decl::canHaveComment() const {
          (!isa<AbstractTypeParamDecl>(this) || isa<AssociatedTypeDecl>(this));
 }
 
-Module *Decl::getModuleContext() const {
+ModuleDecl *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }
 
@@ -451,7 +451,7 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   return false;
 }
 
-bool Decl::isWeakImported(Module *fromModule) const {
+bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   // For a Clang declaration, trust Clang.
   if (auto clangDecl = getClangDecl()) {
     return clangDecl->isWeakImported();
@@ -1255,6 +1255,8 @@ bool AbstractStorageDecl::hasFixedLayout() const {
   case ResilienceStrategy::Default:
     return true;
   }
+
+  llvm_unreachable("Unhandled ResilienceStrategy in switch.");
 }
 
 bool AbstractStorageDecl::hasFixedLayout(ModuleDecl *M,
@@ -1962,6 +1964,8 @@ bool NominalTypeDecl::hasFixedLayout() const {
   case ResilienceStrategy::Default:
     return true;
   }
+
+  llvm_unreachable("Unhandled ResilienceStrategy in switch.");
 }
 
 bool NominalTypeDecl::hasFixedLayout(ModuleDecl *M,
@@ -2086,6 +2090,8 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       return BoundGenericType::get(decl, Ty, args);
     }
     }
+
+    llvm_unreachable("Unhandled DeclTypeKind in switch.");
   } else {
     return NominalType::get(decl, Ty, ctx);
   }
@@ -3035,6 +3041,8 @@ bool AbstractStorageDecl::isGetterMutating() const {
     assert(getAddressor());
     return getAddressor()->isMutating();
   }
+
+  llvm_unreachable("Unhandled AbstractStorageDecl in switch.");
 }
 
 /// \brief Return true if the 'setter' is nonmutating, i.e. that it can be

@@ -202,7 +202,7 @@ ERROR(enum_case_dot_prefix,none,
 
 // Variable getters/setters
 ERROR(static_var_decl_global_scope,none,
-      "%select{ERROR|static properties|class properties}0 may only be declared on a type",
+      "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
 ERROR(computed_property_no_accessors, none,
       "computed property must have accessors specified", ())
@@ -222,7 +222,7 @@ ERROR(conflicting_property_addressor,none,
       "%select{variable|subscript}0 already has a "
       "%select{addressor|mutable addressor}1", (unsigned, unsigned))
 ERROR(expected_accessor_name,none,
-      "expected %select{GETTER|setter|willSet|didSet}0 parameter name",
+      "expected %select{%error|setter|willSet|didSet}0 parameter name",
       (unsigned))
 ERROR(expected_rparen_set_name,none,
       "expected ')' after setter parameter name",())
@@ -292,7 +292,7 @@ ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
 ERROR(func_decl_without_paren,PointsToFirstBadToken,
       "expected '(' in argument list of function declaration", ())
 ERROR(static_func_decl_global_scope,none,
-      "%select{ERROR|static methods|class methods}0 may only be declared on a type",
+      "%select{%error|static methods|class methods}0 may only be declared on a type",
       (StaticSpellingKind))
 ERROR(func_decl_expected_arrow,none,
       "expected '->' after function parameter tuple", ())
@@ -1339,7 +1339,7 @@ ERROR(unsupported_conditional_compilation_unary_expression,none,
       "expected unary '!' expression", ())
 ERROR(unsupported_platform_condition_expression,none,
       "unexpected platform condition "
-      "(expected 'canImport', 'os', 'arch', or 'swift')",
+      "(expected 'os', 'arch', or 'swift')",
       ())
 ERROR(platform_condition_expected_one_argument,none,
       "expected only one argument to platform condition",

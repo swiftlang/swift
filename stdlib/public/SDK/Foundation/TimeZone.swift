@@ -87,7 +87,7 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
     
     /// Returns a time zone identified by a given abbreviation.
     ///
-    /// In general, you are discouraged from using abbreviations except for unique instances such as "GMT". Time Zone abbreviations are not standardized and so a given abbreviation may have multiple meanings—for example, "EST" refers to Eastern Time in both the United States and Australia
+    /// In general, you are discouraged from using abbreviations except for unique instances such as "GMT". Time Zone abbreviations are not standardized and so a given abbreviation may have multiple meanings--for example, "EST" refers to Eastern Time in both the United States and Australia
     ///
     /// - parameter abbreviation: The abbreviation for the time zone.
     /// - returns: A time zone identified by abbreviation determined by resolving the abbreviation to an identifier using the abbreviation dictionary and then returning the time zone for that identifier. Returns `nil` if there is no match for abbreviation.
@@ -233,12 +233,13 @@ extension TimeZone : CustomStringConvertible, CustomDebugStringConvertible, Cust
     }
     
     public var customMirror : Mirror {
-        var c: [(label: String?, value: Any)] = []
-        c.append((label: "identifier", value: identifier))
-        c.append((label: "kind", value: _kindDescription))
-        c.append((label: "abbreviation", value: abbreviation()))
-        c.append((label: "secondsFromGMT", value: secondsFromGMT()))
-        c.append((label: "isDaylightSavingTime", value: isDaylightSavingTime()))
+        let c: [(label: String?, value: Any)] = [
+          ("identifier", identifier),
+          ("kind", _kindDescription),
+          ("abbreviation", abbreviation() as Any),
+          ("secondsFromGMT", secondsFromGMT()),
+          ("isDaylightSavingTime", isDaylightSavingTime()),
+        ]
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
     

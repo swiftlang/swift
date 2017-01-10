@@ -737,7 +737,7 @@ public:
 
 private:
   ProcessCmdLine CmdLine;
-  llvm::SmallPtrSet<swift::Module *, 8> ImportedModules;
+  llvm::SmallPtrSet<swift::ModuleDecl *, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
   bool RanGlobalInitializers;
   llvm::LLVMContext &LLVMContext;
@@ -992,7 +992,7 @@ public:
           "***  Type ':help' for assistance.              ***\n";
   }
   
-  swift::Module *getMainModule() const {
+  swift::ModuleDecl *getMainModule() const {
     return REPLInputFile.getParentModule();
   }
   StringRef getDumpSource() const { return DumpSource; }

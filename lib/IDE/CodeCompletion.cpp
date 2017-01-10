@@ -1066,7 +1066,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         } else {
           ModuleName = copyString(
               *Sink.Allocator,
-              CurrentModule.get<const swift::Module *>()->getName().str());
+              CurrentModule.get<const swift::ModuleDecl *>()->getName().str());
         }
         Sink.LastModule.first = CurrentModule.getOpaqueValue();
         Sink.LastModule.second = ModuleName;
@@ -1671,11 +1671,11 @@ private:
 
 public:
   struct RequestedResultsTy {
-    const Module *TheModule;
+    const ModuleDecl *TheModule;
     bool OnlyTypes;
     bool NeedLeadingDot;
 
-    static RequestedResultsTy fromModule(const Module *TheModule) {
+    static RequestedResultsTy fromModule(const ModuleDecl *TheModule) {
       return { TheModule, false, false };
     }
 
@@ -1792,17 +1792,17 @@ public:
   }
 
   void collectImportedModules(llvm::StringSet<> &ImportedModules) {
-    SmallVector<Module::ImportedModule, 16> Imported;
-    SmallVector<Module::ImportedModule, 16> FurtherImported;
+    SmallVector<ModuleDecl::ImportedModule, 16> Imported;
+    SmallVector<ModuleDecl::ImportedModule, 16> FurtherImported;
     CurrDeclContext->getParentSourceFile()->getImportedModules(Imported,
-      Module::ImportFilter::All);
+      ModuleDecl::ImportFilter::All);
     while (!Imported.empty()) {
       ModuleDecl *MD = Imported.back().second;
       Imported.pop_back();
       if (!ImportedModules.insert(MD->getNameStr()).second)
         continue;
       FurtherImported.clear();
-      MD->getImportedModules(FurtherImported, Module::ImportFilter::Public);
+      MD->getImportedModules(FurtherImported, ModuleDecl::ImportFilter::Public);
       Imported.append(FurtherImported.begin(), FurtherImported.end());
       for (auto SubMod : FurtherImported) {
         Imported.push_back(SubMod);
@@ -3123,7 +3123,7 @@ public:
     if (tryFunctionCallCompletions(ExprType, VD))
       Done = true;
     if (auto MT = ExprType->getAs<ModuleType>()) {
-      Module *M = MT->getModule();
+      ModuleDecl *M = MT->getModule();
       if (CurrDeclContext->getParentModule() != M) {
         // Only use the cache if it is not the current module.
         RequestedCachedResults = RequestedResultsTy::fromModule(M)
@@ -3177,7 +3177,7 @@ public:
     std::vector<OperatorDecl *> results;
     assert(CurrDeclContext);
     CurrDeclContext->getParentSourceFile()->forAllVisibleModules(
-    [&](Module::ImportedModule import) {
+    [&](ModuleDecl::ImportedModule import) {
       for (auto fileUnit : import.second->getFiles()) {
         switch (fileUnit->getKind()) {
         case FileUnitKind::Builtin:
@@ -3708,7 +3708,6 @@ public:
         // We can only say .foo where foo is a static member of the contextual
         // type and has the same type (or if the member is a function, then the
         // same result type) as the contextual type.
-        auto contextCanT = T->getCanonicalType();
         FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD, DeclVisibilityKind reason) {
           if (!VD->hasInterfaceType()) {
             TypeResolver->resolveDeclSignature(VD);
@@ -3716,10 +3715,10 @@ public:
               return false;
           }
 
-          auto T = VD->getInterfaceType();
-          while (auto FT = T->getAs<AnyFunctionType>())
-            T = FT->getResult();
-          return T->getCanonicalType() == contextCanT;
+          auto declTy = VD->getInterfaceType();
+          while (auto FT = declTy->getAs<AnyFunctionType>())
+            declTy = FT->getResult();
+          return declTy->isEqual(T);
         });
 
         auto baseType = MetatypeType::get(T);
@@ -4024,13 +4023,13 @@ public:
     Kind = OnlyTypes ? LookupKind::TypeInDeclContext
                      : LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
-    Module *M = CurrDeclContext->getParentModule();
+    ModuleDecl *M = CurrDeclContext->getParentModule();
     AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this,
                                                   TypeResolver.get());
     M->lookupVisibleDecls({}, FilteringConsumer, NLKind::UnqualifiedLookup);
   }
 
-  void getVisibleDeclsOfModule(const Module *TheModule,
+  void getVisibleDeclsOfModule(const ModuleDecl *TheModule,
                                ArrayRef<std::string> AccessPath,
                                bool ResultsHaveLeadingDot) {
     Kind = LookupKind::ImportFromModule;
@@ -4641,7 +4640,7 @@ static bool isDynamicLookup(Type T) {
   return false;
 }
 
-static bool isClangSubModule(Module *TheModule) {
+static bool isClangSubModule(ModuleDecl *TheModule) {
   if (auto ClangMod = TheModule->findUnderlyingClangModule())
     return ClangMod->isSubModule();
   return false;
@@ -5327,9 +5326,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     auto &Request = Lookup.RequestedCachedResults.getValue();
 
     llvm::DenseSet<CodeCompletionCache::Key> ImportsSeen;
-    auto handleImport = [&](Module::ImportedModule Import) {
-      Module *TheModule = Import.second;
-      Module::AccessPathTy Path = Import.first;
+    auto handleImport = [&](ModuleDecl::ImportedModule Import) {
+      ModuleDecl *TheModule = Import.second;
+      ModuleDecl::AccessPathTy Path = Import.first;
       if (TheModule->getFiles().empty())
         return;
 
@@ -5370,7 +5369,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.discardTypeResolver();
 
       // FIXME: actually check imports.
-      const_cast<Module*>(Request.TheModule)
+      const_cast<ModuleDecl*>(Request.TheModule)
           ->forAllVisibleModules({}, handleImport);
     } else {
       // Add results from current module.
@@ -5378,13 +5377,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.discardTypeResolver();
 
       // Add results for all imported modules.
-      SmallVector<Module::ImportedModule, 4> Imports;
+      SmallVector<ModuleDecl::ImportedModule, 4> Imports;
       auto *SF = CurDeclContext->getParentSourceFile();
-      SF->getImportedModules(Imports, Module::ImportFilter::All);
+      SF->getImportedModules(Imports, ModuleDecl::ImportFilter::All);
 
       for (auto Imported : Imports) {
-        Module *TheModule = Imported.second;
-        Module::AccessPathTy AccessPath = Imported.first;
+        ModuleDecl *TheModule = Imported.second;
+        ModuleDecl::AccessPathTy AccessPath = Imported.first;
         TheModule->forAllVisibleModules(AccessPath, handleImport);
       }
     }
@@ -5460,7 +5459,7 @@ swift::ide::makeCodeCompletionCallbacksFactory(
 }
 
 void swift::ide::lookupCodeCompletionResultsFromModule(
-    CodeCompletionResultSink &targetSink, const Module *module,
+    CodeCompletionResultSink &targetSink, const ModuleDecl *module,
     ArrayRef<std::string> accessPath, bool needLeadingDot,
     const DeclContext *currDeclContext) {
   CompletionLookup Lookup(targetSink, module->getASTContext(), currDeclContext);

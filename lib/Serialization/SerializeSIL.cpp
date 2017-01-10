@@ -350,7 +350,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // If we have a body, we might have a generic environment.
   GenericEnvironmentID genericEnvID = 0;
-  if (!F.isExternalDeclaration())
+  if (!NoBody)
     genericEnvID = S.addGenericEnvironmentRef(F.getGenericEnvironment());
 
   DeclID clangNodeOwnerID;
@@ -1746,13 +1746,14 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 
   for (auto &entry : vt.getEntries()) {
     SmallVector<ValueID, 4> ListOfValues;
-    handleSILDeclRef(S, entry.first, ListOfValues);
-    addReferencedSILFunction(entry.second, true);
+    handleSILDeclRef(S, entry.Method, ListOfValues);
+    addReferencedSILFunction(entry.Implementation, true);
     // Each entry is a pair of SILDeclRef and SILFunction.
     VTableEntryLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[VTableEntryLayout::Code],
         // SILFunction name
-        S.addIdentifierRef(Ctx.getIdentifier(entry.second->getName())),
+        S.addIdentifierRef(Ctx.getIdentifier(entry.Implementation->getName())),
+        toStableSILLinkage(entry.Linkage),
         ListOfValues);
   }
 }

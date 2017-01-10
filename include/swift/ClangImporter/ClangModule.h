@@ -34,7 +34,7 @@ class ClangModuleUnit final : public LoadedFile {
   ClangImporter &owner;
   const clang::Module *clangModule;
   llvm::PointerIntPair<ModuleDecl *, 1, bool> adapterModule;
-  mutable ArrayRef<Module::ImportedModule> importedModulesForLookup;
+  mutable ArrayRef<ModuleDecl::ImportedModule> importedModulesForLookup;
 
   ~ClangModuleUnit() = default;
 

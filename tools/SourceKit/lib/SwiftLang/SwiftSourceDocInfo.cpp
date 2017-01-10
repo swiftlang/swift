@@ -606,7 +606,7 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
 
 /// Returns true for failure to resolve.
 static bool passCursorInfoForDecl(const ValueDecl *VD,
-                                  const Module *MainModule,
+                                  const ModuleDecl *MainModule,
                                   const Type Ty,
                                   const Type ContainerTy,
                                   bool IsRef,
@@ -952,7 +952,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
-      Module *MainModule = CompIns.getMainModule();
+      ModuleDecl *MainModule = CompIns.getMainModule();
 
       unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
       SourceLoc Loc =
@@ -1227,7 +1227,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
-      Module *MainModule = CompIns.getMainModule();
+      ModuleDecl *MainModule = CompIns.getMainModule();
 
       unsigned BufferID =
           AstUnit->getPrimarySourceFile().getBufferID().getValue();

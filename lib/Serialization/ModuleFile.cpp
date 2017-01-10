@@ -1087,7 +1087,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
         if (hadError)
           return error(Status::FailedToLoadBridgingHeader);
       }
-      Module *importedHeaderModule = clangImporter->getImportedHeaderModule();
+      ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
       dependency.Import = { {}, importedHeaderModule };
       continue;
     }
@@ -1242,13 +1242,13 @@ PrecedenceGroupDecl *ModuleFile::lookupPrecedenceGroup(Identifier name) {
 }
 
 void ModuleFile::getImportedModules(
-    SmallVectorImpl<Module::ImportedModule> &results,
-    Module::ImportFilter filter) {
+    SmallVectorImpl<ModuleDecl::ImportedModule> &results,
+    ModuleDecl::ImportFilter filter) {
   PrettyModuleFileDeserialization stackEntry(*this);
 
   for (auto &dep : Dependencies) {
-    if (filter != Module::ImportFilter::All &&
-        (filter == Module::ImportFilter::Public) ^ dep.isExported())
+    if (filter != ModuleDecl::ImportFilter::All &&
+        (filter == ModuleDecl::ImportFilter::Public) ^ dep.isExported())
       continue;
     assert(dep.isLoaded());
     results.push_back(dep.Import);
@@ -1279,7 +1279,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (AccessPath.size() == 1 && AccessPath[0].first == Ctx.StdlibModuleName)
         continue;
 
-      Module *M = Ctx.getModule(AccessPath);
+      ModuleDecl *M = Ctx.getModule(AccessPath);
 
       auto Kind = ImportKind::Module;
       if (!ScopePath.empty()) {
@@ -1293,7 +1293,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           Kind = ImportKind::Func;
         } else {
           // Lookup the decl in the top-level module.
-          Module *TopLevelModule = M;
+          ModuleDecl *TopLevelModule = M;
           if (AccessPath.size() > 1)
             TopLevelModule = Ctx.getLoadedModule(AccessPath.front().first);
 
@@ -1323,7 +1323,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
   Results.append(ImportDecls.begin(), ImportDecls.end());
 }
 
-void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
+void ModuleFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                     VisibleDeclConsumer &consumer,
                                     NLKind lookupKind) {
   PrettyModuleFileDeserialization stackEntry(*this);
@@ -1399,7 +1399,7 @@ void ModuleFile::loadObjCMethods(
   }
 }
 
-void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
+void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) {
   PrettyModuleFileDeserialization stackEntry(*this);
@@ -1449,7 +1449,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
   }
 }
 
-void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
+void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
                                     VisibleDeclConsumer &consumer) {
   PrettyModuleFileDeserialization stackEntry(*this);
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
@@ -1499,7 +1499,7 @@ void ModuleFile::lookupObjCMethods(
 }
 
 void
-ModuleFile::collectLinkLibraries(Module::LinkLibraryCallback callback) const {
+ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
   for (auto &lib : LinkLibraries)
     callback(lib);
   if (Bits.IsFramework)

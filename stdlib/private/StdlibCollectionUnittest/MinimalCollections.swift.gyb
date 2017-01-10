@@ -1063,11 +1063,11 @@ public struct Defaulted${Traversal}RangeReplaceableSlice<Element>
   }
 
   public mutating func replaceSubrange<
-    C : Collection where C.Iterator.Element == Element
+    C : Collection
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) {
+  ) where C.Iterator.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position

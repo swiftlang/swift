@@ -1019,8 +1019,8 @@ int ProtocolType::compareProtocols(ProtocolDecl * const* PP1,
                                    ProtocolDecl * const* PP2) {
   auto *P1 = *PP1;
   auto *P2 = *PP2;
-  Module *M1 = P1->getParentModule();
-  Module *M2 = P2->getParentModule();
+  ModuleDecl *M1 = P1->getParentModule();
+  ModuleDecl *M2 = P2->getParentModule();
 
   // Try ordering based on module name, first.
   if (int result = M1->getName().str().compare(M2->getName().str()))
@@ -1619,7 +1619,7 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
 
   // Gather substitutions from the self type, and apply them to the original
   // superclass type to form the substituted superclass type.
-  Module *module = classDecl->getModuleContext();
+  ModuleDecl *module = classDecl->getModuleContext();
   auto *sig = classDecl->getGenericSignatureOfContext();
   auto subs = sig->getSubstitutionMap(gatherAllSubstitutions(module, resolver));
 
@@ -2085,6 +2085,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
         anyStaticBridged = true;
         return false;
       }
+
+      llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
     };
 
     // Check the representation of the function type.
@@ -2299,6 +2301,8 @@ bool TypeBase::isRepresentableIn(ForeignLanguage language,
   case ForeignRepresentableKind::StaticBridged:
     return true;
   }
+
+  llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
 bool TypeBase::isTriviallyRepresentableIn(ForeignLanguage language,
@@ -2314,6 +2318,8 @@ bool TypeBase::isTriviallyRepresentableIn(ForeignLanguage language,
   case ForeignRepresentableKind::Object:
     return true;
   }
+
+  llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
 /// Is t1 not just a subtype of t2, but one such that its values are
@@ -3052,7 +3058,7 @@ static Type substType(Type derivedType,
   });
 }
 
-Type Type::subst(Module *module,
+Type Type::subst(ModuleDecl *module,
                  const TypeSubstitutionMap &substitutions,
                  SubstOptions options) const {
   return substType(*this,
@@ -3208,7 +3214,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
   return substitutions;
 }
 
-Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
+Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
                                LazyResolver *resolver, Type memberType) {
   // If no member type was provided, use the member's type.
   if (!memberType)

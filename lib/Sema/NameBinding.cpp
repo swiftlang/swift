@@ -36,7 +36,7 @@ using namespace swift;
 // NameBinder
 //===----------------------------------------------------------------------===//
 
-using ImportedModule = Module::ImportedModule;
+using ImportedModule = ModuleDecl::ImportedModule;
 using ImportOptions = SourceFile::ImportOptions;
 
 namespace {  
@@ -59,11 +59,11 @@ namespace {
     /// Load a module referenced by an import statement.
     ///
     /// Returns null if no module can be loaded.
-    Module *getModule(ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
+    ModuleDecl *getModule(ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
   };
 } // end anonymous namespace
 
-Module *
+ModuleDecl *
 NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
@@ -167,7 +167,7 @@ void NameBinder::addImport(
     return;
   }
 
-  Module *M = getModule(ID->getModulePath());
+  ModuleDecl *M = getModule(ID->getModulePath());
   if (!M) {
     SmallString<64> modulePathStr;
     interleave(ID->getModulePath(),
@@ -191,7 +191,7 @@ void NameBinder::addImport(
 
   ID->setModule(M);
 
-  Module *topLevelModule;
+  ModuleDecl *topLevelModule;
   if (ID->getModulePath().size() == 1) {
     topLevelModule = M;
   } else {

@@ -139,7 +139,7 @@ SILVTable *SILLinkerVisitor::processClassDecl(const ClassDecl *C) {
   // Otherwise, add all the vtable functions in Vtbl to the function
   // processing list...
   for (auto &E : Vtbl->getEntries())
-    Worklist.push_back(E.second);
+    Worklist.push_back(E.Implementation);
 
   // And then transitively deserialize all SIL referenced by those functions.
   process();
@@ -162,9 +162,9 @@ bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // for processing.
   bool Result = false;
   for (auto P : Vtbl->getEntries()) {
-    if (P.second->isExternalDeclaration()) {
+    if (P.Implementation->isExternalDeclaration()) {
       Result = true;
-      addFunctionToWorklist(P.second);
+      addFunctionToWorklist(P.Implementation);
     }
   }
   return Result;

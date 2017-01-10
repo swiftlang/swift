@@ -595,11 +595,9 @@ public:
   }
 
   void visitCode(const Code *C) {
-    print("\\code");
-    printNewline();
+    print("<code>");
     print(C->getLiteralContent());
-    printNewline();
-    print("\\endcode");
+    print("</code>");
   }
 
   void visitHTML(const HTML *H) {

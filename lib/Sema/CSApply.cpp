@@ -213,8 +213,8 @@ static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
 #endif
 
   // Ctor or dtor are for immediate class, not a derived class.
-  if (AFD->getParent()->getDeclaredTypeOfContext()->getCanonicalType() !=
-      member->getDeclContext()->getDeclaredTypeOfContext()->getCanonicalType())
+  if (!AFD->getParent()->getDeclaredInterfaceType()->isEqual(
+       member->getDeclContext()->getDeclaredInterfaceType()))
     return false;
 
   return true;
@@ -247,8 +247,8 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
         isa<ConstructorDecl>(AFD_DC) &&
         
         // Ctor is for immediate class, not a derived class.
-        AFD_DC->getParent()->getDeclaredTypeOfContext()->getCanonicalType() ==
-          member->getDeclContext()->getDeclaredTypeOfContext()->getCanonicalType() &&
+        AFD_DC->getParent()->getDeclaredInterfaceType()->isEqual(
+          member->getDeclContext()->getDeclaredInterfaceType()) &&
         
         // Is a "self.property" reference.
         isa<DeclRefExpr>(base) &&
@@ -4704,21 +4704,18 @@ static unsigned getOptionalBindDepth(const BoundGenericType *bgt) {
     
     unsigned innerDepth = 0;
     
-    if (auto wrappedBGT = dyn_cast<BoundGenericType>(tyarg->
-                                                     getCanonicalType())) {
+    if (auto wrappedBGT = tyarg->getAs<BoundGenericType>())
       innerDepth = getOptionalBindDepth(wrappedBGT);
-    }
-    
+
     return 1 + innerDepth;
   }
   
   return 0;
 }
 
-static Type getOptionalBaseType(const Type &type) {
+static Type getOptionalBaseType(Type type) {
   
-  if (auto bgt = dyn_cast<BoundGenericType>(type->
-                                            getCanonicalType())) {
+  if (auto bgt = type->getAs<BoundGenericType>()) {
     if (bgt->getDecl()->classifyAsOptionalType()) {
       return getOptionalBaseType(bgt->getGenericArgs()[0]);
     }
@@ -6102,7 +6099,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
       return nullptr;
 
     // If the argument type is in error, we're done.
-    if (argType->hasError() || argType->getCanonicalType()->hasError())
+    if (argType->hasError())
       return nullptr;
 
     // Convert the literal to the non-builtin argument type via the

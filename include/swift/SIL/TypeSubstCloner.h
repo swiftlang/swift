@@ -285,7 +285,7 @@ protected:
   }
 
   /// The Swift module that the cloned function belongs to.
-  Module *SwiftMod;
+  ModuleDecl *SwiftMod;
   /// The substitutions list for the specialization.
   SubstitutionMap SubsMap;
   /// The original function to specialize.

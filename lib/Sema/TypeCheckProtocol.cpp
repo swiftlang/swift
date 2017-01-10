@@ -1460,7 +1460,7 @@ checkWitnessAccessibility(AccessScope &requiredAccessScope,
     // allow us to see it anywhere, because any other client could also add
     // their own `@testable import`.
     if (auto parentFile = dyn_cast<SourceFile>(DC->getModuleScopeContext())) {
-      const Module *witnessModule = witness->getModuleContext();
+      const ModuleDecl *witnessModule = witness->getModuleContext();
       if (parentFile->getParentModule() != witnessModule &&
           parentFile->hasTestableImport(witnessModule) &&
           witness->isAccessibleFrom(parentFile)) {
@@ -1815,7 +1815,7 @@ static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
 }
 
 /// Clean up the given declaration type for display purposes.
-static Type getTypeForDisplay(Module *module, ValueDecl *decl) {
+static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
   // If we're not in a type context, just grab the interface type.
   Type type = decl->getInterfaceType();
   if (!decl->getDeclContext()->isTypeContext() ||
@@ -1845,7 +1845,7 @@ static Type getTypeForDisplay(Module *module, ValueDecl *decl) {
 }
 
 /// Clean up the given requirement type for display purposes.
-static Type getRequirementTypeForDisplay(Module *module,
+static Type getRequirementTypeForDisplay(ModuleDecl *module,
                                          NormalProtocolConformance *conformance,
                                          ValueDecl *req) {
   auto type = getTypeForDisplay(module, req);
@@ -1993,7 +1993,7 @@ void RequirementMatch::addOptionalityFixIts(
 
 /// \brief Diagnose a requirement match, describing what went wrong (or not).
 static void
-diagnoseMatch(Module *module, NormalProtocolConformance *conformance,
+diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
               ValueDecl *req, const RequirementMatch &match){
   // Form a string describing the associated type deductions.
   // FIXME: Determine which associated types matter, and only print those.
@@ -3072,7 +3072,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
                              genericFn->getExtInfo());
   }
 
-  Module *module = conformance->getDeclContext()->getParentModule();
+  ModuleDecl *module = conformance->getDeclContext()->getParentModule();
   auto resultType = type.subst(module, substitutions, SubstFlags::UseErrorType);
   if (!resultType->hasError()) return resultType;
 
@@ -4317,7 +4317,7 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
                                        ProtocolDecl *Proto,
                                        DeclContext *DC,
                                        SourceLoc ComplainLoc) {
-  if (T->hasError() || T->getCanonicalType()->hasError())
+  if (T->hasError())
     return;
 
   // If we're checking conformance of an existential type to a protocol,
@@ -4580,7 +4580,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
   };
 
   // Look up conformance in the module.
-  Module *M = DC->getParentModule();
+  ModuleDecl *M = DC->getParentModule();
   auto lookupResult = M->lookupConformance(T, Proto, this);
   if (!lookupResult) {
     if (ComplainLoc.isValid())

@@ -66,7 +66,7 @@ struct ASTNodeBase {};
 #include "swift/AST/PatternNodes.def"
 
   class Verifier : public ASTWalker {
-    PointerUnion<Module *, SourceFile *> M;
+    PointerUnion<ModuleDecl *, SourceFile *> M;
     ASTContext &Ctx;
     llvm::raw_ostream &Out;
     const bool HadError;
@@ -101,9 +101,9 @@ struct ASTNodeBase {};
                    llvm::SmallBitVector> ClosureDiscriminators;
     DeclContext *CanonicalTopLevelContext = nullptr;
 
-    Verifier(PointerUnion<Module *, SourceFile *> M, DeclContext *DC)
+    Verifier(PointerUnion<ModuleDecl *, SourceFile *> M, DeclContext *DC)
       : M(M),
-        Ctx(M.is<Module *>() ? M.get<Module *>()->getASTContext()
+        Ctx(M.is<ModuleDecl *>() ? M.get<ModuleDecl *>()->getASTContext()
                              : M.get<SourceFile *>()->getASTContext()),
         Out(llvm::errs()),
         HadError(Ctx.hadError())
@@ -113,8 +113,8 @@ struct ASTNodeBase {};
     }
 
   public:
-    Verifier(Module *M, DeclContext *DC)
-      : Verifier(PointerUnion<Module *, SourceFile *>(M), DC) { }
+    Verifier(ModuleDecl *M, DeclContext *DC)
+      : Verifier(PointerUnion<ModuleDecl *, SourceFile *>(M), DC) { }
     Verifier(SourceFile &SF, DeclContext *DC)
       : Verifier(&SF, DC) { }
 
@@ -1249,9 +1249,9 @@ struct ASTNodeBase {};
         Out << "\n";
         abort();
       }
-      CanType InputExprTy = E->getArg()->getType()->getCanonicalType();
-      CanType ResultExprTy = E->getType()->getCanonicalType();
-      if (ResultExprTy != FT->getResult()->getCanonicalType()) {
+      Type InputExprTy = E->getArg()->getType();
+      Type ResultExprTy = E->getType();
+      if (!ResultExprTy->isEqual(FT->getResult())) {
         Out << "result of ApplyExpr does not match result type of callee:";
         E->getType().print(Out);
         Out << " vs. ";
@@ -1259,7 +1259,7 @@ struct ASTNodeBase {};
         Out << "\n";
         abort();
       }
-      if (InputExprTy != FT->getInput()->getCanonicalType()) {
+      if (!InputExprTy->isEqual(FT->getInput())) {
         TupleType *TT = FT->getInput()->getAs<TupleType>();
         if (isa<SelfApplyExpr>(E)) {
           Type InputExprObjectTy;
@@ -1274,8 +1274,7 @@ struct ASTNodeBase {};
           checkSameOrSubType(InputExprObjectTy, FunctionInputObjectTy,
                              "object argument and 'self' parameter");
         } else if (!TT || TT->getNumElements() != 1 ||
-                   TT->getElement(0).getType()->getCanonicalType()
-                     != InputExprTy) {
+                   !TT->getElement(0).getType()->isEqual(InputExprTy)) {
           Out << "Argument type does not match parameter type in ApplyExpr:"
                  "\nArgument type: ";
           E->getArg()->getType().print(Out);
@@ -1710,6 +1709,8 @@ struct ASTNodeBase {};
       case DeclContextKind::SubscriptDecl:
         return hasEnclosingFunctionContext(dc->getParent());
       }
+
+      llvm_unreachable("Unhandled DeclContextKind in switch.");
     }
 
     void verifyChecked(ValueDecl *VD) {
@@ -1892,8 +1893,7 @@ struct ASTNodeBase {};
         return;
       }
 
-      if (type->getCanonicalType() !=
-            conformance.getConcrete()->getType()->getCanonicalType()) {
+      if (!type->isEqual(conformance.getConcrete()->getType())) {
         Out << "conforming type does not match conformance\n";
         Out << "conforming type:\n";
         type.dump(Out, 2);
@@ -2518,7 +2518,7 @@ struct ASTNodeBase {};
     }
 
     void checkSameType(Type T0, Type T1, const char *what) {
-      if (T0->getCanonicalType() == T1->getCanonicalType())
+      if (T0->isEqual(T1))
         return;
 
       Out << "different types for " << what << ": ";
@@ -2568,7 +2568,7 @@ struct ASTNodeBase {};
     }
 
     void checkSameOrSubType(Type T0, Type T1, const char *what) {
-      if (T0->getCanonicalType() == T1->getCanonicalType())
+      if (T0->isEqual(T1))
         return;
 
       // Protocol subtyping.

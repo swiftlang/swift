@@ -27,7 +27,7 @@ behavior of our implementations would work against these goals.
 Almost all languages provide some amount of abstraction of implementation. For
 example, functions are usually opaque data types which fully abstract away the
 exact sequence of operations performed.  Similarly, adding a new field to a C
-struct does not break programs which refer to a different field — those programs
+struct does not break programs which refer to a different field -- those programs
 may need to be recompiled, but once recompiled, they should continue to
 work. (This would not necessarily be true if, say, fields were accessed by index
 rather than by name.)
@@ -517,7 +517,7 @@ of this: [born_unchanging] for things that are universally non-resilient,
 
 Global functions always export a maximally-resilient entrypoint. If there exist
 any [fragile] arguments, and there do not exist any resilient arguments, they
-also export a [fragile] copy. Callers do… something? Have to know what they're
+also export a [fragile] copy. Callers do... something? Have to know what they're
 deploying against, I guess.
 
 Want some concrete representation for [ref] arguments.
@@ -611,7 +611,7 @@ Break it down by types of declarations.
 
 * typealias has no resilience
 
-* struct — the set/order of fields can change — means size/alignment, layout,
+* struct -- the set/order of fields can change -- means size/alignment, layout,
   copy/destruction semantics, etc. can all change
 
 * fields - direct access vs. getter/setter
@@ -620,27 +620,27 @@ Break it down by types of declarations.
 
 * types - as if top level
 
-* class — same as a structs, plus
+* class -- same as a structs, plus
 
-* base classes — can't completely remove a base class (breaks interface), but
+* base classes -- can't completely remove a base class (breaks interface), but
   can introduce a new intermediate base
 
-* virtual dispatch — table vs. dictionary, devirtualization (to which
+* virtual dispatch -- table vs. dictionary, devirtualization (to which
   decl?). Some amount of table lookup can be done as static vs. dynamic offsets
 
-* funcs — inlineability
+* funcs -- inlineability
 
-* vars — direct access vs. getter/setter. Direct accesses for types that aren't
+* vars -- direct access vs. getter/setter. Direct accesses for types that aren't
   inherently fragile need to be indirected because they may need to be
   dynamically allocated. In general, might be actor-local, this is for when the
   model does say "global variable".
 
-* extensions of classes — like class. Fields are always side-allocated if we're
+* extensions of classes -- like class. Fields are always side-allocated if we're
   extending a class not defined in this component (w/i domain?). Making a class
   fragile is also a promise not to add more fields in extensions in this
   component; probably need a way to force a side-table.
 
-* protocols — can't remove/change existing methods, but can add defaulted
+* protocols -- can't remove/change existing methods, but can add defaulted
   methods. Doing this resiliently requires load-time checking.  vtable for
   non-defaulted methods, ? for rest?
 

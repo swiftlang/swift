@@ -174,20 +174,9 @@ public:
   /// Erase a specific argument from the arg list.
   void eraseArgument(int Index);
 
-  /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
-  /// ValueDecl
-  /// \p D.
-  SILFunctionArgument *replaceFunctionArgument(unsigned i, SILType Ty,
-                                               const ValueDecl *D = nullptr);
-
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
   SILFunctionArgument *createFunctionArgument(SILType Ty,
-                                              const ValueDecl *D = nullptr);
-
-  /// Insert a new SILFunctionArgument with type \p Ty and \p Decl at position
-  /// \p Pos.
-  SILFunctionArgument *insertFunctionArgument(arg_iterator Pos, SILType Ty,
                                               const ValueDecl *D = nullptr);
 
   SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
@@ -352,6 +341,11 @@ private:
   void insertArgument(arg_iterator Iter, SILArgument *Arg) {
     ArgumentList.insert(Iter, Arg);
   }
+
+  /// Insert a new SILFunctionArgument with type \p Ty and \p Decl at position
+  /// \p Pos.
+  SILFunctionArgument *insertFunctionArgument(arg_iterator Pos, SILType Ty,
+                                              const ValueDecl *D = nullptr);
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

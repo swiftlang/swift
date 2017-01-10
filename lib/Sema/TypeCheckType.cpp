@@ -17,7 +17,7 @@
 
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
-#include "MiscDiagnostics.h"
+#include "TypeCheckAvailability.h"
 
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
@@ -84,7 +84,7 @@ Type TypeChecker::getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type element
 static Type getStdlibType(TypeChecker &TC, Type &cached, DeclContext *dc,
                           StringRef name) {
   if (cached.isNull()) {
-    Module *stdlib = TC.Context.getStdlibModule();
+    ModuleDecl *stdlib = TC.Context.getStdlibModule();
     LookupTypeResult lookup = TC.lookupMemberType(dc, ModuleType::get(stdlib),
                                                   TC.Context.getIdentifier(
                                                     name));
@@ -128,7 +128,7 @@ static Type getObjectiveCNominalType(TypeChecker &TC,
   auto &Context = TC.Context;
 
   // FIXME: Does not respect visibility of the module.
-  Module *module = Context.getLoadedModule(ModuleName);
+  ModuleDecl *module = Context.getLoadedModule(ModuleName);
   if (!module)
     return nullptr;
 
@@ -2877,7 +2877,7 @@ Type TypeResolver::buildProtocolType(
   return MetatypeType::get(instanceType, storedRepr);
 }
 
-Type TypeChecker::substMemberTypeWithBase(Module *module,
+Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
                                           TypeDecl *member,
                                           Type baseTy) {
   // For type members of a base class, make sure we use the right
@@ -2929,7 +2929,7 @@ Type TypeChecker::getSuperClassOf(Type type) {
 }
 
 static void lookupAndAddLibraryTypes(TypeChecker &TC,
-                                     Module *Stdlib,
+                                     ModuleDecl *Stdlib,
                                      ArrayRef<Identifier> TypeNames,
                                      llvm::DenseSet<CanType> &Types) {
   SmallVector<ValueDecl *, 4> Results;
@@ -3683,7 +3683,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
     return;
 
   SmallVector<Identifier, 32> StdlibTypeNames;
-  Module *Stdlib = getStdlibModule(DC);
+  ModuleDecl *Stdlib = getStdlibModule(DC);
 #define MAP_BUILTIN_TYPE(_, __)
 #define MAP_BUILTIN_INTEGER_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
   StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));

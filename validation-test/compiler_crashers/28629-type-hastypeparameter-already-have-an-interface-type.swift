@@ -5,7 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: rdar://problem/29564984
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-{{return 0 &+ 1 + 2){}}t
+&{$0=Array(.f

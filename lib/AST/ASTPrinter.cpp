@@ -477,7 +477,7 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
   Builder.reserve(Text.size());
   const UTF8* Data = reinterpret_cast<const UTF8*>(Text.begin());
   const UTF8* End = reinterpret_cast<const UTF8*>(Text.end());
-  StringRef Replacement = "\ufffd";
+  StringRef Replacement = u8"\ufffd";
   while (Data < End) {
     auto Step = getNumBytesForUTF8(*Data);
     if (Data + Step > End) {
@@ -612,6 +612,8 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   case PrintNameContext::TupleElement:
     return !canBeArgumentLabel(keyword);
   }
+
+  llvm_unreachable("Unhandled PrintNameContext in switch.");
 }
 
 void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
@@ -859,10 +861,15 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
       // Get the innermost nominal type context.
       DeclContext *DC;
-      if (isa<NominalTypeDecl>(Current) || isa<ExtensionDecl>(Current))
+      if (isa<NominalTypeDecl>(Current))
         DC = Current->getInnermostDeclContext();
+      else if (isa<ExtensionDecl>(Current))
+        DC = Current->getInnermostDeclContext()->
+          getAsNominalTypeOrNominalTypeExtensionContext();
       else
         DC = Current->getDeclContext();
+
+      assert(DC->isTypeContext());
 
       // Get the substitutions from our base type.
       auto subMap = CurrentType->getContextSubstitutions(DC);
@@ -3271,7 +3278,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   template <typename T>
   void printModuleContext(T *Ty) {
-    Module *Mod = Ty->getDecl()->getModuleContext();
+    ModuleDecl *Mod = Ty->getDecl()->getModuleContext();
     Printer.printModuleRef(Mod, Mod->getName());
     Printer << ".";
   }
@@ -3284,7 +3291,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   // FIXME: we should have a callback that would tell us
   // whether it's kosher to print a module name or not
-  bool isLLDBExpressionModule(Module *M) {
+  bool isLLDBExpressionModule(ModuleDecl *M) {
     if (!M)
       return false;
     return M->getName().str().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
@@ -3304,7 +3311,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     if (!D)
       return true;
 
-    Module *M = D->getDeclContext()->getParentModule();
+    ModuleDecl *M = D->getDeclContext()->getParentModule();
 
     if (Options.CurrentModule && M == Options.CurrentModule) {
       return false;

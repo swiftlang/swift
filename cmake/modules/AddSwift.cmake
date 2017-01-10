@@ -260,8 +260,12 @@ function(_add_variant_swift_compile_flags
     sdk arch build_type enable_assertions result_var_name)
   set(result ${${result_var_name}})
 
+  # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH, so don't include it.
+  if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_PATH}")
+  endif()
+
   list(APPEND result
-      "-sdk" "${SWIFT_SDK_${sdk}_PATH}"
       "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
       "-resource-dir" "${SWIFTLIB_DIR}")
 
@@ -293,7 +297,7 @@ endfunction()
 function(_add_variant_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
   DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
-  RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LIBRARY_SEARCH_DIRECTORIES)
+  RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME)
   cmake_parse_arguments(LFLAGS
     ""
     "${oneValueArgs}"
@@ -309,7 +313,7 @@ function(_add_variant_link_flags)
   endif()
 
   set(result ${${LFLAGS_RESULT_VAR_NAME}})
-  set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES}})
+  set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
 
   _add_variant_c_compile_link_flags(
     SDK "${LFLAGS_SDK}"
@@ -363,7 +367,7 @@ function(_add_variant_link_flags)
   endif()
 
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
-  set("${LFLAGS_LIBRARY_SEARCH_DIRECTORIES}" "${library_search_directories}" PARENT_SCOPE)
+  set("${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}" "${library_search_directories}" PARENT_SCOPE)
 endfunction()
 
 # Look up extra flags for a module that matches a regexp.
@@ -463,7 +467,7 @@ endfunction()
 function(swift_target_link_search_directories target directories)
   set(STLD_FLAGS "")
   foreach(directory ${directories})
-    set(STLD_FLAGS " ${CMAKE_LIBRARY_PATH_FLAG}${directory}")
+    set(STLD_FLAGS "${STLD_FLAGS} ${CMAKE_LIBRARY_PATH_FLAG}${directory}")
   endforeach()
   set_property(TARGET ${target} APPEND_STRING PROPERTY LINK_FLAGS ${STLD_FLAGS})
 endfunction()
@@ -949,10 +953,17 @@ function(_add_swift_library_single target name)
   set(prefixed_link_libraries)
   foreach(dep ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
     if("${dep}" MATCHES "^clang")
-      set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-    endif()
-    if("${dep}" STREQUAL "cmark")
-      set(dep "${CMARK_LIBRARY_DIR}/lib${dep}.a")
+      if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+        set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/${dep}.lib")
+      else()
+        set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
+      endif()
+    elseif("${dep}" STREQUAL "cmark")
+      if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+        set(dep "${CMARK_LIBRARY_DIR}/${dep}.lib")
+      else()
+        set(dep "${CMARK_LIBRARY_DIR}/lib${dep}.a")
+      endif()
     endif()
     list(APPEND prefixed_link_libraries "${dep}")
   endforeach()
@@ -1053,7 +1064,7 @@ function(_add_swift_library_single target name)
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
     RESULT_VAR_NAME link_flags
-    LIBRARY_SEARCH_DIRECTORIES library_search_directories
+    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
       )
 
   if(SWIFT_ENABLE_GOLD_LINKER AND
@@ -1107,7 +1118,7 @@ function(_add_swift_library_single target name)
       COMPILE_FLAGS " ${c_compile_flags}")
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
-  swift_target_link_search_directories(${target} ${library_search_directories})
+  swift_target_link_search_directories("${target}" "${library_search_directories}")
 
   # Adjust the linked libraries for windows targets.  On Windows, the link is
   # performed against the import library, and the runtime uses the dll.  Not
@@ -1163,8 +1174,7 @@ function(_add_swift_library_single target name)
         "${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
-    swift_target_link_search_directories(${target_static}
-      ${library_search_directories})
+    swift_target_link_search_directories("${target_static}" "${library_search_directories}")
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
@@ -1784,6 +1794,10 @@ function(_add_swift_executable_single name)
   set(c_compile_flags)
   set(link_flags)
 
+  # Prepare linker search directories.
+  set(library_search_directories
+        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+
   # Add variant-specific flags.
   _add_variant_c_compile_flags(
     SDK "${SWIFTEXE_SINGLE_SDK}"
@@ -1801,7 +1815,8 @@ function(_add_swift_executable_single name)
     ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     LTO_OBJECT_NAME "${name}-${SWIFTEXE_SINGLE_SDK}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
-    RESULT_VAR_NAME link_flags)
+    RESULT_VAR_NAME link_flags
+    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
 
   if(SWIFTEXE_SINGLE_DISABLE_ASLR)
     list(APPEND link_flags "-Wl,-no_pie")
@@ -1868,8 +1883,7 @@ function(_add_swift_executable_single name)
 
   set_property(TARGET ${name} APPEND_STRING PROPERTY
       COMPILE_FLAGS " ${c_compile_flags}")
-  swift_target_link_search_directories(${name}
-      "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+  swift_target_link_search_directories("${name}" "${library_search_directories}")
   set_property(TARGET ${name} APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
   if (SWIFT_PARALLEL_LINK_JOBS)

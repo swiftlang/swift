@@ -322,36 +322,27 @@ void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
   recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
 }
 
-bool swift::hasUnboundGenericTypes(const TypeSubstitutionMap &SubsMap) {
+bool swift::hasTypeParameterTypes(SubstitutionMap &SubsMap) {
   // Check whether any of the substitutions are dependent.
-  for (auto &entry : SubsMap)
-    if (entry.second->getCanonicalType()->hasArchetype())
+  for (auto &entry : SubsMap.getMap())
+    if (entry.second->hasArchetype())
       return true;
 
   return false;
 }
 
-bool swift::hasUnboundGenericTypes(ArrayRef<Substitution> Subs) {
+bool swift::hasArchetypes(ArrayRef<Substitution> Subs) {
   // Check whether any of the substitutions are dependent.
   for (auto &sub : Subs)
-    if (sub.getReplacement()->getCanonicalType()->hasArchetype())
+    if (sub.getReplacement()->hasArchetype())
       return true;
   return false;
 }
 
-bool swift::hasDynamicSelfTypes(const TypeSubstitutionMap &SubsMap) {
+bool swift::hasDynamicSelfTypes(const SubstitutionMap &SubsMap) {
   // Check whether any of the substitutions are refer to dynamic self.
-  for (auto &entry : SubsMap)
-    if (entry.second->getCanonicalType()->hasDynamicSelfType())
-      return true;
-
-  return false;
-}
-
-bool swift::hasDynamicSelfTypes(ArrayRef<Substitution> Subs) {
-  // Check whether any of the substitutions are refer to dynamic self.
-  for (auto &sub : Subs)
-    if (sub.getReplacement()->getCanonicalType()->hasDynamicSelfType())
+  for (auto &entry : SubsMap.getMap())
+    if (entry.second->hasDynamicSelfType())
       return true;
 
   return false;
@@ -1627,7 +1618,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
          "There should be exactly one implementation of _bridgeToObjectiveC");
   auto BridgeFuncDecl = Members.front();
   auto BridgeFuncDeclRef = SILDeclRef(BridgeFuncDecl);
-  Module *Mod = M.getASTContext().getLoadedModule(
+  ModuleDecl *Mod = M.getASTContext().getLoadedModule(
       M.getASTContext().Id_Foundation);
   if (!Mod)
     return nullptr;

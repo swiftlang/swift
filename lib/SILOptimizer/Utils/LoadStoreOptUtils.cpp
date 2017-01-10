@@ -58,7 +58,10 @@ LSValue::reduceInner(LSLocation &Base, SILModule *M, LSLocationValueMap &Values,
 
   // This is NOT a leaf node, we need to construct a value for it.
   auto Iter = NextLevel.begin();
-  LSValue &FirstVal = Values[*Iter];
+
+  // Don't make this a reference! It may be invalidated as soon as the Values
+  // map is modified, e.g. later at Values[Base] = ...
+  LSValue FirstVal = Values[*Iter];
 
   // There is only 1 children node and its value's projection path is not
   // empty, keep stripping it.

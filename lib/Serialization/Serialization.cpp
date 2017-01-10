@@ -165,8 +165,8 @@ namespace llvm {
   };
 } // namespace llvm
 
-static Module *getModule(ModuleOrSourceFile DC) {
-  if (auto M = DC.dyn_cast<Module *>())
+static ModuleDecl *getModule(ModuleOrSourceFile DC) {
+  if (auto M = DC.dyn_cast<ModuleDecl *>())
     return M;
   return DC.get<SourceFile *>()->getParentModule();
 }
@@ -378,7 +378,7 @@ IdentifierID Serializer::addIdentifierRef(Identifier ident) {
   return id;
 }
 
-IdentifierID Serializer::addModuleRef(const Module *M) {
+IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
   if (M == this->M)
     return CURRENT_MODULE_ID;
   if (M == this->M->getASTContext().TheBuiltinModule)
@@ -664,10 +664,10 @@ void Serializer::writeDocHeader() {
 }
 
 static void
-removeDuplicateImports(SmallVectorImpl<Module::ImportedModule> &imports) {
+removeDuplicateImports(SmallVectorImpl<ModuleDecl::ImportedModule> &imports) {
   std::sort(imports.begin(), imports.end(),
-            [](const Module::ImportedModule &lhs,
-               const Module::ImportedModule &rhs) -> bool {
+            [](const ModuleDecl::ImportedModule &lhs,
+               const ModuleDecl::ImportedModule &rhs) -> bool {
     // Arbitrarily sort by name to get a deterministic order.
     // FIXME: Submodules don't get sorted properly here.
     if (lhs.second != rhs.second)
@@ -681,17 +681,17 @@ removeDuplicateImports(SmallVectorImpl<Module::ImportedModule> &imports) {
     });
   });
   auto last = std::unique(imports.begin(), imports.end(),
-                          [](const Module::ImportedModule &lhs,
-                             const Module::ImportedModule &rhs) -> bool {
+                          [](const ModuleDecl::ImportedModule &lhs,
+                             const ModuleDecl::ImportedModule &rhs) -> bool {
     if (lhs.second != rhs.second)
       return false;
-    return Module::isSameAccessPath(lhs.first, rhs.first);
+    return ModuleDecl::isSameAccessPath(lhs.first, rhs.first);
   });
   imports.erase(last, imports.end());
 }
 
 using ImportPathBlob = llvm::SmallString<64>;
-static void flattenImportPath(const Module::ImportedModule &import,
+static void flattenImportPath(const ModuleDecl::ImportedModule &import,
                               ImportPathBlob &out) {
   ArrayRef<FileUnit *> files = import.second->getFiles();
   if (auto clangModule = dyn_cast<ClangModuleUnit>(files.front())) {
@@ -740,22 +740,22 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
 
   // FIXME: Having to deal with private imports as a superset of public imports
   // is inefficient.
-  SmallVector<Module::ImportedModule, 8> publicImports;
-  SmallVector<Module::ImportedModule, 8> allImports;
+  SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
+  SmallVector<ModuleDecl::ImportedModule, 8> allImports;
   for (auto file : M->getFiles()) {
-    file->getImportedModules(publicImports, Module::ImportFilter::Public);
-    file->getImportedModules(allImports, Module::ImportFilter::All);
+    file->getImportedModules(publicImports, ModuleDecl::ImportFilter::Public);
+    file->getImportedModules(allImports, ModuleDecl::ImportFilter::All);
   }
 
-  llvm::SmallSet<Module::ImportedModule, 8, Module::OrderImportedModules>
+  llvm::SmallSet<ModuleDecl::ImportedModule, 8, ModuleDecl::OrderImportedModules>
     publicImportSet;
   publicImportSet.insert(publicImports.begin(), publicImports.end());
 
   removeDuplicateImports(allImports);
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
-  Module *importedHeaderModule = clangImporter->getImportedHeaderModule();
-  Module *theBuiltinModule = M->getASTContext().TheBuiltinModule;
+  ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
+  ModuleDecl *theBuiltinModule = M->getASTContext().TheBuiltinModule;
   for (auto import : allImports) {
     if (import.second == theBuiltinModule)
       continue;
@@ -1527,7 +1527,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::Module:
     abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
     XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                           addModuleRef(cast<Module>(DC)), pathLen);
+                           addModuleRef(cast<ModuleDecl>(DC)), pathLen);
     break;
 
   case DeclContextKind::GenericTypeDecl: {
@@ -2933,7 +2933,7 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx,
   StringRef TypeName = FullName.substr(8);
 
   SmallVector<ValueDecl*, 4> CurModuleResults;
-  Ctx.TheBuiltinModule->lookupValue(Module::AccessPathTy(),
+  Ctx.TheBuiltinModule->lookupValue(ModuleDecl::AccessPathTy(),
                                     Ctx.getIdentifier(TypeName),
                                     NLKind::QualifiedLookup,
                                     CurModuleResults);
@@ -3854,7 +3854,7 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
 
 static void writeDeclCommentTable(
     const comment_block::DeclCommentListLayout &DeclCommentList,
-    const SourceFile *SF, const Module *M,
+    const SourceFile *SF, const ModuleDecl *M,
     DeclGroupNameContext &GroupContext) {
 
   struct DeclCommentTableWriter : public ASTWalker {

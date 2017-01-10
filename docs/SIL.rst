@@ -1028,7 +1028,7 @@ VTables
   decl ::= sil-vtable
   sil-vtable ::= 'sil_vtable' identifier '{' sil-vtable-entry* '}'
 
-  sil-vtable-entry ::= sil-decl-ref ':' sil-function-name
+  sil-vtable-entry ::= sil-decl-ref ':' sil-linkage? sil-function-name
 
 SIL represents dynamic dispatch for class methods using the `class_method`_,
 `super_method`_, and `dynamic_method`_ instructions. The potential destinations
@@ -1083,6 +1083,9 @@ visible through that class (in the example above, ``B``'s vtable references
 ``C.bas``). The Swift AST maintains override relationships between declarations
 that can be used to look up overridden methods in the SIL vtable for a derived
 class (such as ``C.bas`` in ``C``'s vtable).
+
+In case the SIL function is a thunk, the function name is preceded with the
+linkage of the original implementing function.
 
 Witness Tables
 ~~~~~~~~~~~~~~

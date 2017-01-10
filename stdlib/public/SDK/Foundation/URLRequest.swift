@@ -241,11 +241,7 @@ public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
 extension URLRequest : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
 
     public var description: String {
-        if let u = url {
-            return u.description
-        } else {
-            return "url: nil"
-        }
+      return url?.description ?? "url: nil"
     }
     
     public var debugDescription: String {
@@ -253,19 +249,20 @@ extension URLRequest : CustomStringConvertible, CustomDebugStringConvertible, Cu
     }
     
     public var customMirror: Mirror {
-        var c: [(label: String?, value: Any)] = []
-        c.append((label: "url", value: url))
-        c.append((label: "cachePolicy", value: cachePolicy.rawValue))
-        c.append((label: "timeoutInterval", value: timeoutInterval))
-        c.append((label: "mainDocumentURL", value: mainDocumentURL))
-        c.append((label: "networkServiceType", value: networkServiceType))
-        c.append((label: "allowsCellularAccess", value: allowsCellularAccess))
-        c.append((label: "httpMethod", value: httpMethod))
-        c.append((label: "allHTTPHeaderFields", value: allHTTPHeaderFields))
-        c.append((label: "httpBody", value: httpBody))
-        c.append((label: "httpBodyStream", value: httpBodyStream))
-        c.append((label: "httpShouldHandleCookies", value: httpShouldHandleCookies))
-        c.append((label: "httpShouldUsePipelining", value: httpShouldUsePipelining))
+        let c: [(label: String?, value: Any)] = [
+          ("url", url as Any),
+          ("cachePolicy", cachePolicy.rawValue),
+          ("timeoutInterval", timeoutInterval),
+          ("mainDocumentURL", mainDocumentURL as Any),
+          ("networkServiceType", networkServiceType),
+          ("allowsCellularAccess", allowsCellularAccess),
+          ("httpMethod", httpMethod as Any),
+          ("allHTTPHeaderFields", allHTTPHeaderFields as Any),
+          ("httpBody", httpBody as Any),
+          ("httpBodyStream", httpBodyStream as Any),
+          ("httpShouldHandleCookies", httpShouldHandleCookies),
+          ("httpShouldUsePipelining", httpShouldUsePipelining),
+        ]
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
 }

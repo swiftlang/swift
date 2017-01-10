@@ -667,19 +667,19 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
   return false;
 }
 
-static void collectModuleDependencies(Module *TopMod,
-    llvm::SmallPtrSetImpl<Module *> &Visited,
+static void collectModuleDependencies(ModuleDecl *TopMod,
+    llvm::SmallPtrSetImpl<ModuleDecl *> &Visited,
     SmallVectorImpl<std::string> &Filenames) {
 
   if (!TopMod)
     return;
 
   auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
-  SmallVector<Module::ImportedModule, 8> Imports;
-  TopMod->getImportedModules(Imports, Module::ImportFilter::All);
+  SmallVector<ModuleDecl::ImportedModule, 8> Imports;
+  TopMod->getImportedModules(Imports, ModuleDecl::ImportFilter::All);
 
   for (auto Import : Imports) {
-    Module *Mod = Import.second;
+    ModuleDecl *Mod = Import.second;
     if (Mod->isSystemModule())
       continue;
     // FIXME: Setup dependencies on the included headers.
@@ -799,7 +799,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   Consumer.setInputBufferIDs(ASTRef->getCompilerInstance().getInputBufferIDs());
   CompIns.performSema();
 
-  llvm::SmallPtrSet<Module *, 16> Visited;
+  llvm::SmallPtrSet<ModuleDecl *, 16> Visited;
   SmallVector<std::string, 8> Filenames;
   collectModuleDependencies(CompIns.getMainModule(), Visited, Filenames);
   // FIXME: There exists a small window where the module file may have been

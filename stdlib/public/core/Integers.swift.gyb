@@ -913,8 +913,8 @@ def operatorComment(operator):
 //===--- Arithmetic -------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// A type that supports binary arithmetic operators, such as `+`, `-`, and
-/// `*`, and their mutating counterparts.
+/// Declares methods backing binary arithmetic operators--such as `+`, `-` and
+/// `*`--and their mutating counterparts.
 ///
 /// The `Arithmetic` protocol provides a suitable basis for arithmetic on
 /// scalar values, such as integers and floating-point numbers. You can write

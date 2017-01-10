@@ -11,16 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "mandatory-inlining"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/ImmutableSet.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -417,6 +418,27 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
                          << " into @" << InnerAI.getFunction()->getName()
                          << "\n");
+
+      // If we intend to inline a thick function, then we need to balance the
+      // reference counts for correctness.
+      if (IsThick && I != ApplyBlock->begin()) {
+        // We need to find an appropriate location for our fix up code
+        // We used to do this after inlining Without any modifications
+        // This caused us to add a release in a wrong place:
+        // It would release a value *before* retaining it!
+        // It is really problematic to do this after inlining -
+        // Finding a valid insertion point is tricky:
+        // Inlining might add new basic blocks and/or remove the apply
+        // We want to add the fix up *just before* where the current apply is!
+        // Unfortunately, we *can't* add the fix up code here:
+        // Inlining might fail for any reason -
+        // If that occurred we'd need to undo our fix up code.
+        // Instead, we split the current basic block -
+        // Making sure we have a basic block that starts with our apply.
+        SILBuilderWithScope B(I);
+        ApplyBlock = splitBasicBlockAndBranch(B, &*I, nullptr, nullptr);
+        I = ApplyBlock->begin();
+      }
 
       // Decrement our iterator (carefully, to avoid going off the front) so it
       // is valid after inlining is done.  Inlining deletes the apply, and can

@@ -86,8 +86,9 @@ bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
   return true;
 }
 
-Module *SourceLoader::loadModule(SourceLoc importLoc,
-                             ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
+                                     ArrayRef<std::pair<Identifier,
+                                     SourceLoc>> path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -121,7 +122,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
-  auto *importMod = Module::create(moduleID.first, Ctx);
+  auto *importMod = ModuleDecl::create(moduleID.first, Ctx);
   if (EnableResilience)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.LoadedModules[moduleID.first] = importMod;
@@ -141,8 +142,6 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
                       SkipBodies ? &delayCallbacks : nullptr);
   assert(done && "Parser returned early?");
   (void)done;
-
-  performConditionResolution(*importFile);
 
   if (SkipBodies)
     performDelayedParsing(importMod, persistentState, nullptr);

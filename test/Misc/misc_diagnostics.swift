@@ -100,11 +100,11 @@ func test17875634() {
   var col = 2
   var coord = (row, col)
 
-  match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}} expected-note {{overloads for '+=' exist}}
+  match += (1, 2) // expected-error{{argument type '(Int, Int)' does not conform to expected type 'Sequence'}}
 
-  match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}} expected-note {{overloads for '+=' exist}}
+  match += (row, col) // expected-error{{argument type '(@lvalue Int, @lvalue Int)' does not conform to expected type 'Sequence'}}
 
-  match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}} expected-note {{overloads for '+=' exist}}
+  match += coord // expected-error{{argument type '@lvalue (Int, Int)' does not conform to expected type 'Sequence'}}
 
   match.append(row, col) // expected-error{{extra argument in call}}
 

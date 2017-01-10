@@ -327,7 +327,7 @@ public:
     return D;
   }
 
-  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) {
+  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) override {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
     SmallVector<swift::ASTNode, 3> Elements(OriginalElements.begin(),
                                             OriginalElements.end());
@@ -676,7 +676,7 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
   public:
     ExpressionFinder(TopLevelContext &TLC) : TLC(TLC) {}
 
-    virtual bool walkToDeclPre(Decl *D) {
+    bool walkToDeclPre(Decl *D) override {
       if (AbstractFunctionDecl *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (FD->getBody()) {

@@ -506,7 +506,11 @@ public:
 private:
   // Make placement new and vanilla new/delete illegal for Modules.
   void *operator new(size_t Bytes) throw() = delete;
+
+  // Work around MSVC error: attempting to reference a deleted function.
+#if !defined(_MSC_VER) && !defined(__clang__)
   void operator delete(void *Data) throw() = delete;
+#endif
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 public:
   // Only allow allocation of Modules using the allocator in ASTContext
@@ -515,8 +519,7 @@ public:
                      unsigned Alignment = alignof(ModuleDecl));
 };
 
-/// FIXME: Helper for the Module -> ModuleDecl migration.
-typedef ModuleDecl Module;
+static inline unsigned alignOfFileUnit();
 
 /// A container for module-scope declarations that itself provides a scope; the
 /// smallest unit of code organization.
@@ -656,7 +659,7 @@ public:
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const {}
 
-  /// \see Module::getImportedModulesForLookup
+  /// \see ModuleDecl::getImportedModulesForLookup
   virtual void getImportedModulesForLookup(
       SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
     return getImportedModules(imports, ModuleDecl::ImportFilter::Public);
@@ -681,7 +684,7 @@ public:
 
   bool
   forAllVisibleModules(llvm::function_ref<void(ModuleDecl::ImportedModule)> fn) {
-    return forAllVisibleModules([=](Module::ImportedModule import) -> bool {
+    return forAllVisibleModules([=](ModuleDecl::ImportedModule import) -> bool {
       fn(import);
       return true;
     });
@@ -744,8 +747,12 @@ public:
   // Only allow allocation of FileUnits using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(FileUnit));
+                     unsigned Alignment = alignOfFileUnit());
 };
+
+static inline unsigned alignOfFileUnit() {
+  return alignof(FileUnit&);
+}
   
 /// A file containing Swift source code.
 ///

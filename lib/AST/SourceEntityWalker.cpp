@@ -40,8 +40,8 @@ public:
   bool isDone() const { return Cancelled; }
 
 private:
-  bool shouldWalkIntoFunctionGenericParams() override {
-    return SEWalker.shouldWalkIntoFunctionGenericParams();
+  bool shouldWalkIntoGenericParams() override {
+    return SEWalker.shouldWalkIntoGenericParams();
   }
   bool walkToDeclPre(Decl *D) override;
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
@@ -473,7 +473,7 @@ bool SourceEntityWalker::walk(SourceFile &SrcFile) {
   return SrcFile.walk(Annotator);
 }
 
-bool SourceEntityWalker::walk(Module &Mod) {
+bool SourceEntityWalker::walk(ModuleDecl &Mod) {
   SemaAnnotator Annotator(*this);
   return Mod.walk(Annotator);
 }

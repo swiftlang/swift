@@ -69,6 +69,8 @@ class TypeMatcher {
                         cast<CLASS##Type>(secondType.getPointer()));
 #include "swift/AST/TypeNodes.def"
       }
+
+      llvm_unreachable("Unhandled TypeKind in switch.");
     }
 
     /// Honeypot to catch cases where we should redispatch the second type, but

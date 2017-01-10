@@ -5,10 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-let a{class d:e
-class B:d class a{}{a
-return $0
-== {
+&(_=nil?=nil

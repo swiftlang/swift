@@ -25,6 +25,7 @@ add_swift_library(swiftSema STATIC
   PlaygroundTransform.cpp
   SourceLoader.cpp
   TypeCheckAttr.cpp
+  TypeCheckAvailability.cpp
   TypeCheckCaptures.cpp
   TypeCheckConstraints.cpp
   TypeCheckDecl.cpp

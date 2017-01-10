@@ -30,7 +30,7 @@ class and its superclasses.
 There are three kinds of delegation:
 
 * **super**: runs an initializer belonging to a superclass (in ObjC,
-  ``[super init…]``; in Swift, ``super.init(...)``).
+  ``[super init...]``; in Swift, ``super.init(...)``).
 
 * **peer**:  runs an initializer belonging to the current class (ObjC
   does not have syntax for this, although it is supported by the
@@ -38,7 +38,7 @@ There are three kinds of delegation:
 
 * **dispatched**: given a signature, runs the initializer with that
   signature that is either defined or inherited by the most-derived
-  class (in ObjC, ``[self init…]``; not currently supported by Swift)
+  class (in ObjC, ``[self init...]``; not currently supported by Swift)
 
 We can also distinguish two ways to originally invoke an initializer:
 

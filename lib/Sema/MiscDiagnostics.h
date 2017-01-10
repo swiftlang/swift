@@ -23,7 +23,6 @@
 namespace swift {
   class AbstractFunctionDecl;
   class ApplyExpr;
-  class AvailableAttr;
   class CallExpr;
   class DeclContext;
   class Expr;
@@ -61,16 +60,6 @@ bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
                                 bool isSubscript,
                                 InFlightDiagnostic *existingDiag = nullptr);
 
-/// Emit fix-its to rename the base name at \p referenceRange based on the
-/// "renamed" argument in \p attr. If \p call is provided, the argument labels
-/// will also be updated.
-void fixItAvailableAttrRename(TypeChecker &TC,
-                              InFlightDiagnostic &diag,
-                              SourceRange referenceRange,
-                              const ValueDecl *renamedDecl,
-                              const AvailableAttr *attr,
-                              const ApplyExpr *call);
-
 /// Attempt to fix the type of \p decl so that it's a valid override for
 /// \p base...but only if we're highly confident that we know what the user
 /// should have written.
@@ -85,16 +74,6 @@ void fixItEncloseTrailingClosure(TypeChecker &TC,
                                  InFlightDiagnostic &diag,
                                  const CallExpr *call,
                                  Identifier closureLabel);
-
-/// Run the Availability-diagnostics algorithm otherwise used in an expr
-/// context, but for non-expr contexts such as TypeDecls referenced from
-/// TypeReprs.
-bool diagnoseDeclAvailability(const ValueDecl *Decl,
-                              TypeChecker &TC,
-                              DeclContext *DC,
-                              SourceRange R,
-                              bool AllowPotentiallyUnavailableProtocol,
-                              bool SignalOnPotentialUnavailability);
 
 } // namespace swift
 

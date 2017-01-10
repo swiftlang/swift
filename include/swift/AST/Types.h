@@ -69,7 +69,7 @@ namespace swift {
   struct SILArgumentConvention;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
-  enum class ValueOwnershipKind : uint8_t;
+  struct ValueOwnershipKind;
 
   enum class TypeKind {
 #define TYPE(id, parent) id,
@@ -1381,7 +1381,7 @@ class ParameterTypeFlags {
     NumBits = 3
   };
   OptionSet<ParameterFlags> value;
-  static_assert(NumBits < 8*sizeof(value), "overflowed");
+  static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
 
   ParameterTypeFlags(OptionSet<ParameterFlags, uint8_t> val) : value(val) {}
 
@@ -2255,6 +2255,8 @@ inline bool canBeCalledIndirectly(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::WitnessMethod:
     return true;
   }
+
+  llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
 /// Map a SIL function representation to the base language calling convention
@@ -2273,6 +2275,8 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::Closure:
     return SILFunctionLanguage::Swift;
   }
+
+  llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
 /// AnyFunctionType - A function type has a single input and result, but
@@ -2357,6 +2361,8 @@ public:
       case SILFunctionTypeRepresentation::WitnessMethod:
         return true;
       }
+
+      llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
     }
 
     /// True if the function representation carries context.
@@ -2373,6 +2379,8 @@ public:
       case SILFunctionTypeRepresentation::Closure:
         return false;
       }
+
+      llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
     }
     
     // Note that we don't have setters. That is by design, use
@@ -3043,6 +3051,8 @@ public:
       case Representation::WitnessMethod:
         return true;
       }
+
+      llvm_unreachable("Unhandled Representation in switch.");
     }
 
     bool hasGuaranteedSelfParam() const {
@@ -3058,6 +3068,8 @@ public:
       case Representation::WitnessMethod:
         return true;
       }
+
+      llvm_unreachable("Unhandled Representation in switch.");
     }
 
     /// True if the function representation carries context.
@@ -3074,6 +3086,8 @@ public:
       case Representation::Closure:
         return false;
       }
+
+      llvm_unreachable("Unhandled Representation in switch.");
     }
     
     // Note that we don't have setters. That is by design, use

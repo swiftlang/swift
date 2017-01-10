@@ -49,7 +49,7 @@ public:
   TypeConverter &Types;
   
   /// The Swift module we are visiting.
-  Module *SwiftModule;
+  ModuleDecl *SwiftModule;
   
   /// TopLevelSGF - The SILGenFunction used to visit top-level code, or null if
   /// the current source file is not a script source file.
@@ -135,7 +135,8 @@ public:
   Optional<ProtocolConformance *> NSErrorConformanceToError;
 
 public:
-  SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile);
+  SILGenModule(SILModule &M, ModuleDecl *SM, bool makeModuleFragile);
+
   ~SILGenModule();
   
   SILGenModule(SILGenModule const &) = delete;
@@ -172,7 +173,8 @@ public:
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.
   SILFunction *emitVTableMethod(SILDeclRef derived,
-                                SILDeclRef base);
+                                SILDeclRef base,
+                                SILLinkage &implLinkage);
 
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);

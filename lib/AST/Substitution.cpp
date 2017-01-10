@@ -29,7 +29,7 @@ bool Substitution::operator==(const Substitution &other) const {
   // The archetypes may be missing, but we can compare them directly
   // because archetypes are always canonical.
   return
-    Replacement->getCanonicalType() == other.Replacement->getCanonicalType() &&
+    Replacement->isEqual(other.Replacement) &&
     Conformance.equals(other.Conformance);
 }
 
@@ -42,13 +42,13 @@ Substitution::Substitution(Type Replacement,
          && "cannot substitute with a non-materializable type");
 }
 
-Substitution Substitution::subst(Module *module,
+Substitution Substitution::subst(ModuleDecl *module,
                                  const SubstitutionMap &subMap) const {
   return subst(module, QueryTypeSubstitutionMap{subMap.getMap()},
                LookUpConformanceInSubstitutionMap(subMap));
 }
 
-Substitution Substitution::subst(Module *module,
+Substitution Substitution::subst(ModuleDecl *module,
                                  TypeSubstitutionFn subs,
                                  LookupConformanceFn conformances) const {
   // Substitute the replacement.

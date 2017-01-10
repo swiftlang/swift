@@ -19,6 +19,7 @@
 #include "swift/Subsystems.h"
 
 #include <random>
+#include <forward_list>
 
 using namespace swift;
 using namespace swift::instrumenter_support;
@@ -360,7 +361,7 @@ public:
     }
   }
 
-  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) {
+  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) override {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
     typedef SmallVector<swift::ASTNode, 3> ElementVector;
     ElementVector Elements(OriginalElements.begin(), OriginalElements.end());
@@ -451,7 +452,7 @@ public:
             }
           }
           if (!Handled &&
-              AE->getType()->getCanonicalType() == Context.TheEmptyTupleType) {
+              AE->getType()->isEqual(Context.TheEmptyTupleType)) {
             if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(AE->getFn())) {
               Expr *TargetExpr = DSCE->getArg();
               Added<Expr *> Target_RE;

@@ -36,6 +36,8 @@ DeclContext *ConformanceLookupTable::ConformanceSource::getDeclContext() const {
   case ConformanceEntryKind::Synthesized:
     return getSynthesizedDecl();
   }
+
+  llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
 }
 
 ProtocolDecl *ConformanceLookupTable::ConformanceEntry::getProtocol() const {
@@ -551,6 +553,8 @@ static bool isReplaceable(ConformanceEntryKind kind) {
   case ConformanceEntryKind::Inherited:
     return false;
   }
+
+  llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
 }
 
 ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
@@ -819,7 +823,7 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
       superclassTy = superclassTy->getSuperclass(resolver);
 
     // Look up the inherited conformance.
-    Module *module = entry->getDeclContext()->getParentModule();
+    ModuleDecl *module = entry->getDeclContext()->getParentModule();
     auto inheritedConformance = module->lookupConformance(superclassTy,
                                                           protocol,
                                                           resolver)
@@ -892,7 +896,7 @@ void ConformanceLookupTable::registerProtocolConformance(
 }
 
 bool ConformanceLookupTable::lookupConformance(
-       Module *module, 
+       ModuleDecl *module, 
        NominalTypeDecl *nominal,
        ProtocolDecl *protocol, 
        LazyResolver *resolver,

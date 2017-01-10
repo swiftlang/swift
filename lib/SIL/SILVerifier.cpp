@@ -100,7 +100,7 @@ namespace {
 /// The SIL verifier walks over a SIL function / basic block / instruction,
 /// checking and enforcing its invariants.
 class SILVerifier : public SILVerifierBase<SILVerifier> {
-  Module *M;
+  ModuleDecl *M;
   const SILFunction &F;
   Lowering::TypeConverter &TC;
   SILOpenedArchetypesTracker OpenedArchetypes;
@@ -3592,9 +3592,9 @@ void SILVTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
   for (auto &entry : getEntries()) {
     // All vtable entries must be decls in a class context.
-    assert(entry.first.hasDecl() && "vtable entry is not a decl");
-    auto baseInfo = M.Types.getConstantInfo(entry.first);
-    ValueDecl *decl = entry.first.getDecl();
+    assert(entry.Method.hasDecl() && "vtable entry is not a decl");
+    auto baseInfo = M.Types.getConstantInfo(entry.Method);
+    ValueDecl *decl = entry.Method.getDecl();
     
     assert((!isa<FuncDecl>(decl)
             || !cast<FuncDecl>(decl)->isObservingAccessor())
@@ -3602,7 +3602,7 @@ void SILVTable::verify(const SILModule &M) const {
 
     // For ivar destroyers, the decl is the class itself.
     ClassDecl *theClass;
-    if (entry.first.kind == SILDeclRef::Kind::IVarDestroyer)
+    if (entry.Method.kind == SILDeclRef::Kind::IVarDestroyer)
       theClass = dyn_cast<ClassDecl>(decl);
     else
       theClass = dyn_cast<ClassDecl>(decl->getDeclContext());
@@ -3622,22 +3622,22 @@ void SILVTable::verify(const SILModule &M) const {
     assert(c && "vtable entry must refer to a member of the vtable's class");
 
     // All function vtable entries must be at their natural uncurry level.
-    assert(!entry.first.isCurried && "vtable entry must not be curried");
+    assert(!entry.Method.isCurried && "vtable entry must not be curried");
 
     // Foreign entry points shouldn't appear in vtables.
-    assert(!entry.first.isForeign && "vtable entry must not be foreign");
+    assert(!entry.Method.isForeign && "vtable entry must not be foreign");
     
     // The vtable entry must be ABI-compatible with the overridden vtable slot.
     SmallString<32> baseName;
     {
       llvm::raw_svector_ostream os(baseName);
-      entry.first.print(os);
+      entry.Method.print(os);
     }
     
-    SILVerifier(*entry.second)
+    SILVerifier(*entry.Implementation)
       .requireABICompatibleFunctionTypes(
                     baseInfo.getSILType().castTo<SILFunctionType>(),
-                    entry.second->getLoweredFunctionType(),
+                    entry.Implementation->getLoweredFunctionType(),
                     "vtable entry for " + baseName + " must be ABI-compatible");
   }
 #endif
@@ -3747,9 +3747,9 @@ void SILModule::verify() const {
     vt.verify(*this);
     // Check if there is a cache entry for each vtable entry
     for (auto entry : vt.getEntries()) {
-      if (VTableEntryCache.find({&vt, entry.first}) == VTableEntryCache.end()) {
-        llvm::errs() << "Vtable entry for function: " << entry.second->getName()
-                     << "not in cache!\n";
+      if (VTableEntryCache.find({&vt, entry.Method}) == VTableEntryCache.end()) {
+        llvm::errs() << "Vtable entry for function: "
+                     << entry.Implementation->getName() << "not in cache!\n";
         assert(false && "triggering standard assertion failure routine");
       }
       EntriesSZ++;

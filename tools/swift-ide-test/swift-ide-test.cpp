@@ -39,6 +39,7 @@
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
+#include "swift/Index/Index.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Config.h"
@@ -63,6 +64,7 @@
 
 using namespace swift;
 using namespace ide;
+using namespace index;
 
 namespace {
 
@@ -91,6 +93,7 @@ enum class ActionType {
   PrintUSRs,
   PrintLocalTypes,
   PrintTypeInterface,
+  PrintIndexedSymbols,
   TestCreateCompilerInvocation,
   CompilerInvocationFromModule,
   GenerateModuleAPIDescription,
@@ -213,6 +216,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            clEnumValN(ActionType::Range,
                       "range",
                       "Print information about a given range"),
+           clEnumValN(ActionType::PrintIndexedSymbols,
+                      "print-indexed-symbols",
+                      "Print indexed symbol information"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -1351,7 +1357,7 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 // AST printing
 //===----------------------------------------------------------------------===//
 
-static Module *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
   SmallVector<std::pair<Identifier, SourceLoc>, 4>
       AccessPath;
   while (!ModuleName.empty()) {
@@ -1363,7 +1369,7 @@ static Module *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
   return Context.getModule(AccessPath);
 }
 
-static Module *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
   return Context.getModule(std::make_pair(ModuleName, SourceLoc()));
 }
 
@@ -1399,7 +1405,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     CI.performSema();
 
   if (MangledNameToFind.empty()) {
-    Module *M = CI.getMainModule();
+    ModuleDecl *M = CI.getMainModule();
     M->getMainSourceFile(Invocation.getSourceFileKind()).print(llvm::outs(),
                                                                Options);
     return EXIT_SUCCESS;
@@ -1476,7 +1482,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     }
   } while (node->getKind() != NodeKind::Module);
 
-  Module *M = getModuleByFullName(ctx, node->getText());
+  ModuleDecl *M = getModuleByFullName(ctx, node->getText());
   SmallVector<ValueDecl *, 4> results;
   M->lookupMember(results, M, identifiers.back().first,
                   identifiers.back().second);
@@ -2369,22 +2375,22 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       continue;
     }
 
-    auto isClangModule = [](const Module *M) -> bool {
+    auto isClangModule = [](const ModuleDecl *M) -> bool {
       if (!M->getFiles().empty())
         if (M->getFiles().front()->getKind() == FileUnitKind::ClangModule)
           return true;
       return false;
     };
 
-    SmallVector<Module::ImportedModule, 16> scratch;
-    M->forAllVisibleModules({}, [&](const Module::ImportedModule &next) {
+    SmallVector<ModuleDecl::ImportedModule, 16> scratch;
+    M->forAllVisibleModules({}, [&](const ModuleDecl::ImportedModule &next) {
       llvm::outs() << next.second->getName();
       if (isClangModule(next.second))
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
 
       scratch.clear();
-      next.second->getImportedModules(scratch, Module::ImportFilter::Public);
+      next.second->getImportedModules(scratch, ModuleDecl::ImportFilter::Public);
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.second->getName();
         for (auto accessPathPiece : import.first) {
@@ -2519,7 +2525,7 @@ private:
     }
   }
 
-  bool shouldWalkIntoFunctionGenericParams() override {
+  bool shouldWalkIntoGenericParams() override {
     return false;
   }
 };
@@ -2668,6 +2674,104 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   Result.print(llvm::outs());
   return 0;
 }
+
+namespace {
+  class PrintIndexDataConsumer : public IndexDataConsumer {
+    raw_ostream &OS;
+    bool firstSourceEntity = true;
+
+    void anchor() {}
+
+    void printSymbolKind(SymbolKind kind, SymbolSubKindSet subKinds) {
+      OS << getSymbolKindString(kind);
+      if (subKinds) {
+        OS << '(';
+        printSymbolSubKinds(subKinds, OS);
+        OS << ')';
+      }
+      // FIXME: add and use language enum
+      OS << '/' << "Swift";
+    }
+
+  public:
+    PrintIndexDataConsumer(raw_ostream &OS) : OS(OS) {}
+
+    void failed(StringRef error) {}
+
+    bool recordHash(StringRef hash, bool isKnown) { return true; }
+    bool startDependency(SymbolKind kind, StringRef name, StringRef path,
+                         bool isSystem, StringRef hash) {
+      OS << getSymbolKindString(kind) << " | ";
+      OS << (isSystem ? "system" : "user") << " | ";
+      OS << name << " | " << path << "-" << hash << "\n";
+      return true;
+    }
+    bool finishDependency(SymbolKind kind) {
+      return true;
+    }
+
+    Action startSourceEntity(const IndexSymbol &symbol) {
+      if (firstSourceEntity) {
+        firstSourceEntity = false;
+        OS << "------------\n";
+      }
+      OS << symbol.line << ':' << symbol.column << " | ";
+      printSymbolKind(symbol.kind, symbol.subKinds);
+      OS << " | " << symbol.name << " | " << symbol.USR << " | ";
+      clang::index::printSymbolRoles(symbol.roles, OS);
+      OS << " | rel: " << symbol.Relations.size() << "\n";
+
+      for (auto Relation : symbol.Relations) {
+        OS << "  ";
+        clang::index::printSymbolRoles(Relation.roles, OS);
+        OS << " | " << Relation.name << " | " << Relation.USR << "\n";
+      }
+      return Continue;
+    }
+    bool finishSourceEntity(SymbolKind kind, SymbolSubKindSet subKinds,
+                                    SymbolRoleSet roles) {
+      return true;
+    }
+
+    void finish() {}
+  };
+
+} // anonymous namespace
+
+static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
+                                StringRef SourceFileName) {
+
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(SourceFileName);
+  Invocation.getLangOptions().DisableAvailabilityChecking = false;
+  Invocation.getLangOptions().DisableTypoCorrection = true;
+
+  CompilerInstance CI;
+
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+  SourceFile *SF = nullptr;
+  for (auto Unit : CI.getMainModule()->getFiles()) {
+    SF = dyn_cast<SourceFile>(Unit);
+    if (SF)
+      break;
+  }
+  assert(SF && "no source file?");
+  assert(SF->getBufferID().hasValue() && "no buffer id?");
+
+  llvm::outs() << llvm::sys::path::filename(SF->getFilename()) << '\n';
+  llvm::outs() << "------------\n";
+  PrintIndexDataConsumer consumer(llvm::outs());
+  indexSourceFile(SF, StringRef(), consumer);
+
+  return 0;
+}
+
 
 static int doPrintUSRs(const CompilerInvocation &InitInvok,
                        StringRef SourceFilename) {
@@ -3085,6 +3189,8 @@ int main(int argc, char *argv[]) {
                                 options::LineColumnPair,
                                 options::EndLineColumnPair);
     break;
+  case ActionType::PrintIndexedSymbols:
+      ExitCode = doPrintIndexedSymbols(InitInvok, options::SourceFilename);
   }
 
   if (options::PrintStats)
