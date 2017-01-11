@@ -753,9 +753,8 @@ void SILParser::convertRequirements(SILFunction *F,
 
     if (Req.getKind() == RequirementReprKind::LayoutConstraint) {
       auto Subject = ResolveToInterfaceType(Req.getSubjectLoc());
-      auto Constraint = ResolveToInterfaceType(Req.getConstraintLoc());
       Requirement ConvertedRequirement(RequirementKind::Layout, Subject,
-                                       Constraint);
+                                       Req.getLayoutConstraint());
       To.push_back(ConvertedRequirement);
       continue;
     }

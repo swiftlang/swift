@@ -603,7 +603,7 @@ bool ReabstractionInfo::SpecializeConcreteAndGenericSubstitutions(
   // because both define the capabilities of the requirement.
 
   // This is a builder for a new specialized generic signature.
-  ArchetypeBuilder Builder(*SM);
+  ArchetypeBuilder Builder(Ctx, LookUpConformanceInModule(SM));
 
   // Set of newly created generic type parameters.
   SmallVector<GenericTypeParamType*, 4> AllGenericParams;
@@ -895,7 +895,7 @@ bool ReabstractionInfo::SpecializeConcreteSubstitutions(
     SpecializedGenericSig = CalleeGenericSig;
 
     // Form a new generic signature based on the old one.
-    ArchetypeBuilder Builder(*SM);
+    ArchetypeBuilder Builder(Ctx, LookUpConformanceInModule(SM));
 
     // First, add the old generic signature.
     Builder.addGenericSignature(CalleeGenericSig);
@@ -1217,7 +1217,8 @@ getSignatureWithRequirements(GenericSignature *OrigGenSig,
                              ArrayRef<RequirementRepr> Requirements,
                              SILModule &M) {
   // Form a new generic signature based on the old one.
-  ArchetypeBuilder Builder(*M.getSwiftModule());
+  ArchetypeBuilder Builder(M.getASTContext(),
+                           LookUpConformanceInModule(M.getSwiftModule()));
 
   // First, add the old generic signature.
   Builder.addGenericSignature(OrigGenSig);
@@ -1757,7 +1758,7 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
     Builder.createTryApply(Loc, FRI, FnTy,
                            Subs, Arguments, NormalBB, ErrorBB);
     auto *ErrorVal = ErrorBB->createPHIArgument(
-        SpecType->getErrorResult().getSILType(), VallueOwnershipKInd::Owned);
+        SpecType->getErrorResult().getSILType(), ValueOwnershipKind::Owned);
     Builder.setInsertionPoint(ErrorBB);
     Builder.createThrow(Loc, ErrorVal);
     ReturnValue = NormalBB->createPHIArgument(SpecType->getSILResult(),

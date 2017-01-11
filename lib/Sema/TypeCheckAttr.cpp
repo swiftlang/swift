@@ -1604,7 +1604,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   }
 
   // Form a new generic signature based on the old one.
-  ArchetypeBuilder Builder(*DC->getParentModule());
+  ArchetypeBuilder Builder(D->getASTContext(),
+                           LookUpConformanceInModule(DC->getParentModule()));
 
   // First, add the old generic signature.
   Builder.addGenericSignature(genericSig);

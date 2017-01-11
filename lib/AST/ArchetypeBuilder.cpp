@@ -1567,7 +1567,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
     return;
   }
 
-  case RequirementKind::Conformance: {
+  case RequirementKind::Layout: {
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     if (!pa) return;
 
@@ -1578,7 +1578,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
     return;
   }
 
-  case RequirementKind::Layout: {
+  case RequirementKind::Conformance: {
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     if (!pa) return;
 
@@ -2135,7 +2135,7 @@ ArchetypeBuilder::getGenericSignatureAndEnvironment() {
   // Re-importing and then generating again a generic signature produces
   // a real minimized signature.
   GenericSignature *sig = getGenericSignature();
-  ArchetypeBuilder Builder(Mod);
+  ArchetypeBuilder Builder(getASTContext(), getLookupConformanceFn());
   Builder.addGenericSignature(sig);
   sig = Builder.getGenericSignature();
   auto env = Builder.getGenericEnvironment(sig);
