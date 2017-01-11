@@ -84,3 +84,9 @@ _ = [Any]().withUnsafeBufferPointer { (buf) -> [Any] in
   guard let base = buf.baseAddress else { return [] }
   return (base ..< base + buf.count).m // expected-error {{value of type 'CountableRange<_>' has no member 'm'}}
 }
+
+
+// SR-3254: Test for correct diagnostics for compound references
+foo(x: Int) {} // expected-note {{did you mean 'foo(x:)'?}}
+let f = foo(_:) // expected-error {{use of unresolved identifier 'foo'}}
+

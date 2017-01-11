@@ -555,13 +555,11 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
 }
 
 static InFlightDiagnostic
-diagnoseTypoCorrection(TypeChecker &tc,
-                       DeclNameLoc loc, 
-                       ValueDecl *decl, 
+diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
                        FunctionRefKind refKind) {
   
-  auto name = refKind == FunctionRefKind::Compound ? decl->getFullName() :
-                                                     decl->getName();
+  auto name = refKind == FunctionRefKind::Compound ? decl->getFullName()
+                                                   : decl->getName();
   
   if (auto var = dyn_cast<VarDecl>(decl)) {
     // Suggest 'self' at the use point instead of pointing at the start
