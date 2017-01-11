@@ -826,59 +826,6 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
   }
 }
 
-/// Create a text string that describes the bindings of generic parameters that
-/// are relevant to the given set of types, e.g., "[with T = Bar, U = Wibble]".
-///
-/// \param types The types that will be scanned for generic type parameters,
-/// which will be used in the resulting type.
-///
-/// \param genericSig The actual generic parameters, whose names will be used
-/// in the resulting text.
-///
-/// \param substitutions The generic parameter -> generic argument substitutions
-/// that will have been applied to these types. These are used to produce the
-/// "parameter = argument" bindings in the test.
-static std::string gatherGenericParamBindingsText(
-                     ArrayRef<Type> types,
-                     GenericSignature *genericSig,
-                     const TypeSubstitutionMap &substitutions) {
-  llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
-  for (auto type : types) {
-    type.visit([&](Type type) {
-      if (auto gp = type->getAs<GenericTypeParamType>()) {
-        knownGenericParams.insert(gp->getCanonicalType()
-                                    ->castTo<GenericTypeParamType>());
-      }
-    });
-  }
-
-  if (knownGenericParams.empty())
-    return "";
-
-  SmallString<128> result;
-  for (auto gp : genericSig->getGenericParams()) {
-    auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
-    if (!knownGenericParams.count(canonGP))
-      continue;
-
-    if (result.empty())
-      result += " [with ";
-    else
-      result += ", ";
-    result += gp->getName().str();
-    result += " = ";
-
-    auto found = substitutions.find(canonGP);
-    if (found == substitutions.end())
-      return "";
-
-    result += found->second.getString();
-  }
-
-  result += "]";
-  return result.str().str();
-}
-
 std::pair<bool, bool>
 TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                                    SourceLoc noteLoc,
@@ -937,9 +884,8 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
 
         diagnose(noteLoc, diag::type_does_not_inherit_requirement,
                  req.getFirstType(), req.getSecondType(),
-                 gatherGenericParamBindingsText(
-                   {req.getFirstType(), req.getSecondType()},
-                   genericSig, substitutions));
+                 genericSig->gatherGenericParamBindingsText(
+                     {req.getFirstType(), req.getSecondType()}, substitutions));
         return std::make_pair(false, false);
       }
       continue;
@@ -949,11 +895,10 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
         // FIXME: Better location info for both diagnostics.
         diagnose(loc, diag::types_not_equal, owner, firstType, secondType);
 
-        diagnose(noteLoc, diag::types_not_equal_requirement,
-                 req.getFirstType(), req.getSecondType(),
-                 gatherGenericParamBindingsText(
-                   {req.getFirstType(), req.getSecondType()},
-                   genericSig, substitutions));
+        diagnose(noteLoc, diag::types_not_equal_requirement, req.getFirstType(),
+                 req.getSecondType(),
+                 genericSig->gatherGenericParamBindingsText(
+                     {req.getFirstType(), req.getSecondType()}, substitutions));
         return std::make_pair(false, false);
       }
       continue;
