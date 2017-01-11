@@ -179,6 +179,9 @@ public:
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
 
+  /// If set, dumps wall time taken to check each expression.
+  bool DebugTimeExpressionTypeChecking = false;
+
   /// If set, prints the time taken in each major compilation phase to 
   /// llvm::errs().
   ///

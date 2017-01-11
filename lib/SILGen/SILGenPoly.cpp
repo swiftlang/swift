@@ -730,9 +730,6 @@ static ManagedValue manageParam(SILGenFunction &gen,
                                 SILParameterInfo info,
                                 bool allowPlusZero) {
   switch (info.getConvention()) {
-  // A deallocating parameter can always be accessed directly.
-  case ParameterConvention::Direct_Deallocating:
-    return ManagedValue::forUnmanaged(paramValue);
   case ParameterConvention::Direct_Guaranteed:
     if (allowPlusZero)
       return ManagedValue::forUnmanaged(paramValue);
@@ -1235,7 +1232,6 @@ namespace {
       // Direct translation is relatively easy.
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
-      case ParameterConvention::Direct_Deallocating:
       case ParameterConvention::Direct_Guaranteed: {
         auto output = translatePrimitive(inputOrigType, inputSubstType,
                                          outputOrigType, outputSubstType,
@@ -2432,7 +2428,7 @@ buildThunkSignature(SILGenFunction &gen,
     return genericSig;
   }
 
-  ArchetypeBuilder builder(*mod);
+  ArchetypeBuilder builder(ctx, LookUpConformanceInModule(mod));
 
   // Add the existing generic signature.
   int depth = 0;

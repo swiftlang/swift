@@ -18,6 +18,7 @@
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Defer.h"
@@ -5745,8 +5746,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // candidates later on.
     CalleeListener listener(CS->getContextualType());
 
-    if (auto OSR = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
-      assert(!OSR->getReferencedDecl() && "unexpected declaration reference");
+    if (isa<OverloadSetRefExpr>(fnExpr)) {
+      assert(!cast<OverloadSetRefExpr>(fnExpr)->getReferencedDecl() &&
+             "unexpected declaration reference");
 
       ConcreteDeclRef decl = nullptr;
       Optional<Type> type = CS->TC.getTypeOfExpressionWithoutApplying(

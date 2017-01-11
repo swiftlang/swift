@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/RawComment.h"
@@ -2902,7 +2903,6 @@ static uint8_t getRawStableParameterConvention(swift::ParameterConvention pc) {
   SIMPLE_CASE(ParameterConvention, Direct_Owned)
   SIMPLE_CASE(ParameterConvention, Direct_Unowned)
   SIMPLE_CASE(ParameterConvention, Direct_Guaranteed)
-  SIMPLE_CASE(ParameterConvention, Direct_Deallocating)
   }
   llvm_unreachable("bad parameter convention kind");
 }

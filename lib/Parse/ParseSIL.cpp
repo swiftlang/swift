@@ -3963,7 +3963,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         if (IsEntry)
           Arg = BB->createFunctionArgument(Ty);
         else
-          Arg = BB->createPHIArgument(Ty);
+          Arg = BB->createPHIArgument(Ty, ValueOwnershipKind::Any);
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));
       

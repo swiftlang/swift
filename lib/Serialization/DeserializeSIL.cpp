@@ -27,6 +27,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
+#include <type_traits>
+
 using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
@@ -607,14 +609,31 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   return fn;
 }
 
+// We put these static asserts here to formalize our assumption that both
+// SILValueCategory and ValueOwnershipKind have uint8_t as their underlying
+// pointer values.
+static_assert(
+    std::is_same<std::underlying_type<SILValueCategory>::type, uint8_t>::value,
+    "Expected an underlying uint8_t type");
+// We put these static asserts here to formalize our assumption that both
+// SILValueCategory and ValueOwnershipKind have uint8_t as their underlying
+// pointer values.
+static_assert(
+    std::is_same<std::underlying_type<ValueOwnershipKind::innerty>::type,
+                 uint8_t>::value,
+    "Expected an underlying uint8_t type");
 SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
                                                   SILBasicBlock *Prev,
                                     SmallVectorImpl<uint64_t> &scratch) {
   ArrayRef<uint64_t> Args;
   SILBasicBlockLayout::readRecord(scratch, Args);
 
-  // Args should be a list of pairs, the first number is a TypeID, the
-  // second number is a ValueID.
+  // Args should be a list of triples of the following form:
+  //
+  // 1. A TypeID.
+  // 2. A flag of metadata. This currently includes the SILValueCategory and
+  //    ValueOwnershipKind. We enforce size constraints of these types above.
+  // 3. A ValueID.
   SILBasicBlock *CurrentBB = getBBForDefinition(Fn, Prev, BasicBlockID++);
   bool IsEntry = CurrentBB->isEntry();
   for (unsigned I = 0, E = Args.size(); I < E; I += 3) {
@@ -625,11 +644,13 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
 
     auto ArgTy = MF->getType(TyID);
     SILArgument *Arg;
-    SILType SILArgTy = getSILType(ArgTy, (SILValueCategory)Args[I + 1]);
+    auto ValueCategory = SILValueCategory(Args[I + 1] & 0xF);
+    SILType SILArgTy = getSILType(ArgTy, ValueCategory);
     if (IsEntry) {
       Arg = CurrentBB->createFunctionArgument(SILArgTy);
     } else {
-      Arg = CurrentBB->createPHIArgument(SILArgTy);
+      auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
+      Arg = CurrentBB->createPHIArgument(SILArgTy, OwnershipKind);
     }
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);

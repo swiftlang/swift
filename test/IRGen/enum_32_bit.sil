@@ -1,8 +1,8 @@
 // RUN: %swift -target i386-apple-ios7 %s -gnone -emit-ir | %FileCheck %s
 // RUN: %swift -target armv7-apple-ios7 %s -gnone -emit-ir | %FileCheck %s
 
-// REQUIRES: X86
-// REQUIRES: ARM
+// REQUIRES: CODEGENERATOR=X86
+// REQUIRES: CODEGENERATOR=ARM
 
 // Check that we correctly lay out single-payload enums with a class reference
 // payload as nullable pointers. <rdar://problem/16093103>

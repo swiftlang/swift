@@ -19,7 +19,7 @@ import subprocess
 import unittest
 
 
-import bug_reducer.bug_reducer_utils as bug_reducer_utils
+import bug_reducer.swift_tools as swift_tools
 
 
 @unittest.skipUnless(platform.system() == 'Darwin',
@@ -44,7 +44,7 @@ class FuncBugReducerTestCase(unittest.TestCase):
         self.sdk = subprocess.check_output(['xcrun', '--sdk', 'macosx',
                                             '--toolchain', 'Default',
                                             '--show-sdk-path']).strip("\n")
-        self.tools = bug_reducer_utils.SwiftTools(self.build_dir)
+        self.tools = swift_tools.SwiftTools(self.build_dir)
         self.passes = ['--pass=-bug-reducer-tester']
 
         if os.access(self.tmp_dir, os.F_OK):

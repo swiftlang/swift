@@ -17,6 +17,7 @@
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Parser.h"
@@ -3477,7 +3478,6 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   CASE(Direct_Owned)
   CASE(Direct_Unowned)
   CASE(Direct_Guaranteed)
-  CASE(Direct_Deallocating)
 #undef CASE
   }
   return None;
@@ -4305,7 +4305,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
       // Create an archetype builder, which will help us create the
       // synthetic environment.
-      ArchetypeBuilder builder(*getAssociatedModule());
+      ArchetypeBuilder builder(
+                         getContext(),
+                         LookUpConformanceInModule(getAssociatedModule()));
       builder.addGenericSignature(syntheticSig);
       builder.finalize(SourceLoc());
       syntheticEnv = builder.getGenericEnvironment(syntheticSig);

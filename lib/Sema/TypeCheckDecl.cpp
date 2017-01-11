@@ -697,7 +697,7 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
 
 /// Create a fresh archetype builder.
 ArchetypeBuilder TypeChecker::createArchetypeBuilder(ModuleDecl *mod) {
-  return ArchetypeBuilder(*mod);
+  return ArchetypeBuilder(Context, LookUpConformanceInModule(mod));
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
@@ -3940,7 +3940,9 @@ public:
       TC.validateDecl(assocType);
   }
 
-  void checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
+  void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
+    TC.diagnoseInlineableLocalType(NTD);
+
     // We don't support protocols outside the top level of a file.
     if (isa<ProtocolDecl>(NTD) &&
         !NTD->getParent()->isModuleScopeContext()) {
@@ -3974,6 +3976,10 @@ public:
                       diag::unsupported_type_nested_in_generic_function,
                       NTD->getName(),
                       AFD->getName());
+        } else {
+          TC.diagnose(NTD->getLoc(),
+                      diag::unsupported_type_nested_in_generic_closure,
+                      NTD->getName());
         }
       }
     }
@@ -3984,7 +3990,7 @@ public:
     TC.computeAccessibility(ED);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(ED);
+      checkUnsupportedNestedType(ED);
 
       TC.validateDecl(ED);
 
@@ -4041,7 +4047,7 @@ public:
     TC.computeAccessibility(SD);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(SD);
+      checkUnsupportedNestedType(SD);
 
       TC.validateDecl(SD);
       TC.ValidatedTypes.remove(SD);
@@ -4170,7 +4176,7 @@ public:
     TC.computeAccessibility(CD);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(CD);
+      checkUnsupportedNestedType(CD);
 
       TC.validateDecl(CD);
       if (!CD->hasValidSignature())
@@ -4283,7 +4289,7 @@ public:
     TC.computeAccessibility(PD);
 
     if (!IsSecondPass)
-      checkUnsupportedNestedGeneric(PD);
+      checkUnsupportedNestedType(PD);
 
     if (IsSecondPass) {
       checkAccessibility(TC, PD);

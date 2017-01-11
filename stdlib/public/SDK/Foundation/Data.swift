@@ -1010,6 +1010,17 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             return _DataStorage(bytes: $0.baseAddress, length: $0.count)
         }
     }
+
+    /// Initialze a `Data` with a repeating byte pattern
+    ///
+    /// - parameter repeatedValue: A byte to initialze the pattern
+    /// - parameter count: The number of bytes the data initially contains initialzed to the repeatedValue
+    public init(repeating repeatedValue: UInt8, count: Int) {
+        self.init(count: count)
+        withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt8>) -> Void in
+            memset(bytes, Int32(repeatedValue), count)
+        }
+    }
     
     /// Initialize a `Data` with the specified size.
     ///
@@ -1330,9 +1341,12 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
         count += estimatedCount
         for byte in newElements {
+            let newIndex = idx + 1
+            if newIndex > count {
+                count = newIndex
+            }
             self[idx] = byte
-            idx += 1
-            count = idx
+            idx = newIndex
         }
     }
     

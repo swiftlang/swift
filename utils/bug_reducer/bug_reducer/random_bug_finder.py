@@ -4,7 +4,7 @@ import random
 import subprocess
 import sys
 
-import bug_reducer_utils
+import swift_tools
 
 import opt_bug_reducer
 
@@ -12,8 +12,8 @@ import opt_bug_reducer
 def random_bug_finder(args):
     """Given a path to a sib file with canonical sil, attempt to find a perturbed
 list of passes that the perf pipeline"""
-    tools = bug_reducer_utils.SwiftTools(args.swift_build_dir)
-    config = bug_reducer_utils.SILToolInvokerConfig(args)
+    tools = swift_tools.SwiftTools(args.swift_build_dir)
+    config = swift_tools.SILToolInvokerConfig(args)
 
     json_data = json.loads(subprocess.check_output(
         [tools.sil_passpipeline_dumper, '-Performance']))
@@ -23,9 +23,9 @@ list of passes that the perf pipeline"""
     extra_args = []
     if args.extra_args is not None:
         extra_args.extend(args.extra_args)
-    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(config, tools,
-                                                      args.input_file,
-                                                      extra_args)
+    sil_opt_invoker = swift_tools.SILOptInvoker(config, tools,
+                                                args.input_file,
+                                                extra_args)
 
     # Make sure that the base case /does/ crash.
     max_count = args.max_count
@@ -34,7 +34,7 @@ list of passes that the perf pipeline"""
         random.shuffle(passes)
         filename = sil_opt_invoker.get_suffixed_filename(str(count))
         result = sil_opt_invoker.invoke_with_passlist(passes, filename)
-        if result == 0:
+        if result['exit_code'] == 0:
             print("*** Success with PassList: %s" % (' '.join(passes)))
             continue
 

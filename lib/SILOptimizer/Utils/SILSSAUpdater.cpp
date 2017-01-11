@@ -209,7 +209,8 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   }
 
   // Create a new phi node.
-  SILPHIArgument *PHI = BB->createPHIArgument(ValType);
+  SILPHIArgument *PHI =
+      BB->createPHIArgument(ValType, ValueOwnershipKind::Owned);
   for (auto &EV : PredVals)
     addNewEdgeValueToBranch(EV.first->getTerminator(), BB, EV.second);
 
@@ -314,7 +315,8 @@ public:
   static SILValue CreateEmptyPHI(SILBasicBlock *BB, unsigned NumPreds,
                                  SILSSAUpdater *Updater) {
     // Add the argument to the block.
-    SILValue PHI(BB->createPHIArgument(Updater->ValType));
+    SILValue PHI(
+        BB->createPHIArgument(Updater->ValType, ValueOwnershipKind::Owned));
 
     // Mark all predecessor blocks with the sentinel undef value.
     SmallVector<SILBasicBlock*, 4> Preds(BB->pred_begin(), BB->pred_end());

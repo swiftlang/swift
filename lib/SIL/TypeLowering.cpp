@@ -1448,12 +1448,7 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
     }
     
     CanType instanceType = substMeta.getInstanceType();
-    // If this is a DynamicSelf metatype, turn it into a metatype of the
-    // underlying self type.
-    if (auto dynamicSelf = dyn_cast<DynamicSelfType>(instanceType)) {
-      instanceType = dynamicSelf.getSelfType();
-    }
-    
+
     // Regardless of thinness, metatypes are always trivial.
     return CanMetatypeType::get(instanceType, repr);
   }
@@ -2100,11 +2095,12 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
 
         case VarDecl::Stored: {
           // We can always capture the storage in these cases.
-          Type captureType;
-          if (auto *selfType = capturedVar->getType()->getAs<DynamicSelfType>()) {
+          Type captureType = capturedVar->getType();
+          if (auto *metatypeType = captureType->getAs<MetatypeType>())
+            captureType = metatypeType->getInstanceType();
+
+          if (auto *selfType = captureType->getAs<DynamicSelfType>()) {
             captureType = selfType->getSelfType();
-            if (auto *metatypeType = captureType->getAs<MetatypeType>())
-              captureType = metatypeType->getInstanceType();
 
             // We're capturing a 'self' value with dynamic 'Self' type;
             // handle it specially.

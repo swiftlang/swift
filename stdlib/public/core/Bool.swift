@@ -61,6 +61,7 @@
 /// have a consistent type interface.
 @_fixed_layout
 public struct Bool {
+  @_versioned
   internal var _value: Builtin.Int1
 
   /// Creates an instance initialized to `false`.

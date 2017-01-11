@@ -2615,7 +2615,8 @@ static bool processMemoryObject(SILInstruction *I) {
   SmallVector<SILInstruction*, 4> Releases;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, false);
+  collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, false,
+                           /*TreatAddressToPointerAsInout*/ true);
 
   LifetimeChecker(MemInfo, Uses, FailableInits, Releases).doIt();
   return true;

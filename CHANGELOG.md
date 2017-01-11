@@ -20,6 +20,39 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* Indirect fields from C structures and unions are now always imported, while
+  they previously weren't imported if they belonged to an union. This is done by
+  naming anonymous fields. For example:
+
+  ```c
+  typedef struct foo_t {
+    union {
+      int a;
+      double b;
+    };
+  } foo_t;
+  ```
+
+  Get imported as:
+
+  ```swift
+  struct foo_t {
+    struct __Unnamed_union___Anonymous_field0 {
+      var a : Int { get set }
+      var b : Double { get set }
+    }
+    var __Anonymous_field0 : foo_t.__Unnamed_union___Anonymous_field0
+
+    // a and b are computed properties accessing the content of __Anonymous_field0
+    var a : Int { get set }
+    var b : Double { get set }
+  }
+  ```
+
+  Since new symbols are exposed from imported structure/unions, this may conflict
+  with existing code that extended C types in order to provide their own accessors
+  to the indirect fields.
+
 * The `withoutActuallyEscaping` function from [SE-0103][] has been implemented.
   To pass off a non-escaping closure to an API that formally takes an
   `@escaping` closure, but which is used in a way that will not in fact 
@@ -6320,3 +6353,10 @@ Swift 1.0
 [SE-0138]: <https://github.com/apple/swift-evolution/blob/master/proposals/0138-unsaferawbufferpointer.md>
 [SE-0139]: <https://github.com/apple/swift-evolution/blob/master/proposals/0139-bridge-nsnumber-and-nsvalue.md>
 [SE-0140]: <https://github.com/apple/swift-evolution/blob/master/proposals/0140-bridge-optional-to-nsnull.md>
+[SE-0141]: <https://github.com/apple/swift-evolution/blob/master/proposals/0141-available-by-swift-version.md>
+[SE-0142]: <https://github.com/apple/swift-evolution/blob/master/proposals/0142-associated-types-constraints.md>
+[SE-0143]: <https://github.com/apple/swift-evolution/blob/master/proposals/0143-conditional-conformances.md>
+[SE-0144]: <https://github.com/apple/swift-evolution/blob/master/proposals/0144-allow-single-dollar-sign-as-valid-identifier.md>
+[SE-0145]: <https://github.com/apple/swift-evolution/blob/master/proposals/0145-package-manager-version-pinning.md>
+[SE-0146]: <https://github.com/apple/swift-evolution/blob/master/proposals/0146-package-manager-product-definitions.md>
+[SE-0147]: <https://github.com/apple/swift-evolution/blob/master/proposals/0147-move-unsafe-initialize-from.md>

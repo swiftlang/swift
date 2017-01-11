@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"

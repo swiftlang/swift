@@ -31,12 +31,11 @@ public:
   virtual bool enableWarnings() { return false; }
 
   virtual bool recordHash(StringRef hash, bool isKnown) = 0;
-  virtual bool startDependency(SymbolKind kind, StringRef name, StringRef path,
+  virtual bool startDependency(StringRef name, StringRef path, bool isClangModule,
                                bool isSystem, StringRef hash) = 0;
-  virtual bool finishDependency(SymbolKind kind) = 0;
+  virtual bool finishDependency(bool isClangModule) = 0;
   virtual Action startSourceEntity(const IndexSymbol &symbol) = 0;
-  virtual bool finishSourceEntity(SymbolKind kind, SymbolSubKindSet subKinds,
-                                  SymbolRoleSet roles) = 0;
+  virtual bool finishSourceEntity(SymbolInfo symInfo, SymbolRoleSet roles) = 0;
 
   virtual void finish() {}
 };

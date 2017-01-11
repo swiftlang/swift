@@ -818,7 +818,6 @@ static char getParamConvention(ParameterConvention conv) {
     case ParameterConvention::Direct_Owned: return 'x';
     case ParameterConvention::Direct_Unowned: return 'y';
     case ParameterConvention::Direct_Guaranteed: return 'g';
-    case ParameterConvention::Direct_Deallocating: return 'e';
   }
   llvm_unreachable("bad parameter convention");
 };

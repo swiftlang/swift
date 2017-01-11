@@ -554,7 +554,6 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
     switch (paramTy.getConvention()) {
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Direct_Unowned:
-    case ParameterConvention::Direct_Deallocating:
       // OK.
       break;
 

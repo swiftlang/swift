@@ -20,6 +20,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Range.h"
@@ -1205,9 +1206,16 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 }
 
 /// Check the default arguments that occur within this pattern.
-static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
-                                  unsigned &nextArgIndex, DeclContext *dc) {
-  assert(dc->isLocalContext());
+static void checkDefaultArguments(TypeChecker &tc,
+                                  ParameterList *params,
+                                  unsigned &nextArgIndex,
+                                  AbstractFunctionDecl *func) {
+  // In Swift 4 mode, default argument bodies are inlined into the
+  // caller.
+  auto expansion = func->getResilienceExpansion();
+  if (!tc.Context.isSwiftVersion3() &&
+      func->getEffectiveAccess() == Accessibility::Public)
+    expansion = ResilienceExpansion::Minimal;
 
   for (auto &param : *params) {
     ++nextArgIndex;
@@ -1217,6 +1225,9 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
     
     Expr *e = param->getDefaultValue();
     auto initContext = param->getDefaultArgumentInitContext();
+
+    cast<DefaultArgumentInitializer>(initContext)
+        ->changeResilienceExpansion(expansion);
 
     // Type-check the initializer, then flag that we did so.
     if (!tc.typeCheckExpression(e, initContext,

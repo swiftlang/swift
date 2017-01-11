@@ -24,6 +24,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ParameterList.h"
@@ -3723,9 +3724,13 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     // If the problematic decl is 'self', then we might be trying to mutate
     // a property in a non-mutating method.
     auto FD = dyn_cast_or_null<FuncDecl>(UseDC->getInnermostMethodContext());
+
     if (FD && !FD->isMutating() && !FD->isImplicit() && FD->isInstanceMember()&&
         !FD->getDeclContext()->getDeclaredInterfaceType()
                  ->hasReferenceSemantics()) {
+      // Do not suggest the fix it in implicit getters
+      if (FD->isGetter() && !FD->getAccessorKeywordLoc().isValid()) return;
+                   
       auto &d = getASTContext().Diags;
       d.diagnose(FD->getFuncLoc(), diag::change_to_mutating, FD->isAccessor())
        .fixItInsert(FD->getFuncLoc(), "mutating ");

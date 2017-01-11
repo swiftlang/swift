@@ -907,6 +907,20 @@ class TestData : TestDataSuper {
         }
         expectEqual(len, 1)
     }
+
+    func test_repeatingValueInitialization() {
+        var d = Data(repeating: 0x01, count: 3)
+        let elements = repeatElement(UInt8(0x02), count: 3) // ensure we fall into the sequence case
+        d.append(contentsOf: elements)
+
+        expectEqual(d[0], 0x01)
+        expectEqual(d[1], 0x01)
+        expectEqual(d[2], 0x01)
+
+        expectEqual(d[3], 0x02)
+        expectEqual(d[4], 0x02)
+        expectEqual(d[5], 0x02)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -951,6 +965,7 @@ DataTests.test("test_AnyHashableContainingData") { TestData().test_AnyHashableCo
 DataTests.test("test_AnyHashableCreatedFromNSData") { TestData().test_AnyHashableCreatedFromNSData() }
 DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
 DataTests.test("test_doubleDeallocation") { TestData().test_doubleDeallocation() }
+DataTests.test("test_repeatingValueInitialization") { TestData().test_repeatingValueInitialization() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

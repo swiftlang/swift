@@ -258,7 +258,6 @@ struct ${Self} {
   }
 
   // FIXME(ABI)#65 (UnsafeRawBufferPointer): Use UnsafeRawBufferPointer.
-  @_versioned
   @inline(__always)
   public // @testable
   static func _hash_alwaysInline(

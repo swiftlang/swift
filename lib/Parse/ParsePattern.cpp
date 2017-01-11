@@ -17,6 +17,7 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Initializer.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"

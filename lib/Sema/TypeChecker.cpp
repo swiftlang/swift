@@ -22,6 +22,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -614,6 +615,9 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     TC.setWarnLongFunctionBodies(WarnLongFunctionBodies);
     if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
       TC.enableDebugTimeFunctionBodies();
+
+    if (Options.contains(TypeCheckingFlags::DebugTimeExpressions))
+      TC.enableDebugTimeExpressions();
 
     if (Options.contains(TypeCheckingFlags::ForImmediateMode))
       TC.setInImmediateMode(true);
