@@ -107,8 +107,10 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
   assert(Other->isEntry() == isEntry() &&
          "Expected to both blocks to be entries or not");
   if (isEntry()) {
+    assert(args_empty() && "Expected to have no arguments");
     for (auto *FuncArg : Other->getFunctionArguments()) {
-      createFunctionArgument(FuncArg->getType(), FuncArg->getDecl());
+      createFunctionArgument(FuncArg->getType(),
+                             FuncArg->getDecl());
     }
     return;
   }
@@ -122,14 +124,20 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
 SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,
                                                            const ValueDecl *D) {
   assert(isEntry() && "Function Arguments can only be in the entry block");
-  return new (getModule()) SILFunctionArgument(this, Ty, D);
+  SILFunction *Parent = getParent();
+  auto OwnershipKind = ValueOwnershipKind(
+      Parent->getModule(), Ty,
+      Parent->getLoweredFunctionType()->getSILArgumentConvention(
+          getNumArguments()));
+  return new (getModule()) SILFunctionArgument(this, Ty, OwnershipKind, D);
 }
 
 SILFunctionArgument *SILBasicBlock::insertFunctionArgument(arg_iterator Iter,
                                                            SILType Ty,
+                                                           ValueOwnershipKind OwnershipKind,
                                                            const ValueDecl *D) {
   assert(isEntry() && "Function Arguments can only be in the entry block");
-  return new (getModule()) SILFunctionArgument(this, Iter, Ty, D);
+  return new (getModule()) SILFunctionArgument(this, Iter, Ty, OwnershipKind, D);
 }
 
 /// Replace the ith BB argument with a new one with type Ty (and optional

@@ -125,6 +125,16 @@ struct ArgumentDescriptor {
     size_t explosionSize = ProjTree.liveLeafCount();
     return explosionSize >= 1 && explosionSize <= 3;
   }
+
+  llvm::Optional<ValueOwnershipKind> getTransformedOwnershipKind(SILType SubTy) {
+    if (IsEntirelyDead)
+      return None;
+    if (SubTy.isTrivial(Arg->getModule()))
+      return Optional<ValueOwnershipKind>(ValueOwnershipKind::Trivial);
+    if (OwnedToGuaranteed)
+      return Optional<ValueOwnershipKind>(ValueOwnershipKind::Guaranteed);
+    return Arg->getOwnershipKind();
+  }
 };
 
 /// A structure that maintains all of the information about a specific
