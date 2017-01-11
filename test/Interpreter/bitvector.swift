@@ -14,7 +14,7 @@ struct BitVector64 {
       return false
     }
     set {
-      var mask = 1 << Int64(bit)
+      var mask: Int64 = 1 << bit
       if newValue {
         bits = bits | mask
       } else {

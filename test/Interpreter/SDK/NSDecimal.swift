@@ -110,12 +110,12 @@ print(one.pow10(-2)) // CHECK: 0.01
 
 var twenty = Decimal(20)
 var ten = Decimal(10)
-twenty.multiply(by: ten)
+twenty *= ten
 print(twenty) // CHECK: 200
 
 twenty = Decimal(20)
 ten = Decimal(10)
-twenty.divide(by: ten)
+twenty /= ten
 print(twenty) // CHECK: 2
 
 twenty = NSDecimalNumber(mantissa: 2, exponent: 1, isNegative: false) as Decimal
