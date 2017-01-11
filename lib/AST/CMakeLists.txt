@@ -26,6 +26,7 @@ add_swift_library(swiftAST STATIC
   GenericEnvironment.cpp
   GenericSignature.cpp
   Identifier.cpp
+  LayoutConstraint.cpp
   LookupVisibleDecls.cpp
   Mangle.cpp
   Module.cpp
