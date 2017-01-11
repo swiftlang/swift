@@ -697,7 +697,7 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
 
 /// Create a fresh archetype builder.
 ArchetypeBuilder TypeChecker::createArchetypeBuilder(ModuleDecl *mod) {
-  return ArchetypeBuilder(*mod);
+  return ArchetypeBuilder(Context, LookUpConformanceInModule(mod));
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.

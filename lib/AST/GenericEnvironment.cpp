@@ -284,14 +284,21 @@ Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
   return Type();
 }
 
-Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
+Type GenericEnvironment::mapTypeIntoContext(
+                                Type type,
+                                LookupConformanceFn lookupConformance) const {
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
-                           LookUpConformanceInModule(M),
+                           lookupConformance,
                            (SubstFlags::AllowLoweredTypes|
                             SubstFlags::UseErrorType));
   assert((!result->hasTypeParameter() || result->hasError()) &&
          "not fully substituted");
   return result;
+
+}
+
+Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
+  return mapTypeIntoContext(type, LookUpConformanceInModule(M));
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
