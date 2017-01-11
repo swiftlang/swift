@@ -211,7 +211,7 @@ internal func sendBytes() {
   let count = Int(readUInt())
   debugLog("Parent requested \(count) bytes from \(address)")
   var totalBytesWritten = 0
-  var pointer = UnsafeMutableRawPointer(bitPattern: address)!
+  var pointer = UnsafeMutableRawPointer(bitPattern: address)
   while totalBytesWritten < count {
     let bytesWritten = Int(fwrite(pointer, 1, Int(count), stdout))
     fflush(stdout)
@@ -219,7 +219,7 @@ internal func sendBytes() {
       printErrnoAndExit()
     }
     totalBytesWritten += bytesWritten
-    pointer = pointer.advanced(by: bytesWritten)
+    pointer = pointer?.advanced(by: bytesWritten)
   }
 }
 
