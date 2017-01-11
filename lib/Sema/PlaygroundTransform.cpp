@@ -741,7 +741,8 @@ public:
                               true,  // let
                               SourceLoc(), Context.getIdentifier(NameBuf),
                               MaybeLoadInitExpr->getType(), TypeCheckDC);
-    VD->setInterfaceType(TypeCheckDC->mapTypeOutOfContext(VD->getType()));
+
+    VD->setInterfaceType(VD->getType());
     VD->setImplicit();
 
     NamedPattern *NP = new (Context) NamedPattern(VD, /*implicit*/ true);
