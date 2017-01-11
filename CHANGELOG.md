@@ -20,6 +20,23 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* [SR-2394](https://bugs.swift.org/browse/SR-2394)
+
+  C functions that "return twice" are no longer imported into Swift. Instead,
+  they are explicitly made unavailable, so attempting to reference them will
+  result in a compilation error.
+
+  Examples of functions that "return twice" include `vfork` and `setjmp`.
+  These functions change the control flow of a program in ways that that Swift
+  has never supported. For example, definitive initialization of variables,
+  a core Swift language feature, could not be guaranteed when these functions
+  were used.
+
+  Swift code that references these functions will no longer compile. Although
+  this could be considered a source-breaking change, it's important to note that
+  any use of these functions would have most likely crashed at runtime. Now,
+  the compiler will prevent them from being used in the first place.
+
 * The `withoutActuallyEscaping` function from [SE-0103][] has been implemented.
   To pass off a non-escaping closure to an API that formally takes an
   `@escaping` closure, but which is used in a way that will not in fact 
