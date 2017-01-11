@@ -317,6 +317,21 @@ void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
       break;
     }
 
+    case RequirementReprKind::LayoutConstraint: {
+      // Validate the types.
+      if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
+        req.setInvalid();
+        continue;
+      }
+
+      if (req.getLayoutConstraintLoc().isNull()) {
+        req.setInvalid();
+        continue;
+      }
+
+      break;
+    }
+
     case RequirementReprKind::SameType:
       if (validateType(req.getFirstTypeLoc(), lookupDC, options,
                        resolver)) {
@@ -784,7 +799,10 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
       revertDependentTypeLoc(req.getConstraintLoc());
       break;
     }
-
+    case RequirementReprKind::LayoutConstraint: {
+      revertDependentTypeLoc(req.getSubjectLoc());
+      break;
+    }
     case RequirementReprKind::SameType:
       revertDependentTypeLoc(req.getFirstTypeLoc());
       revertDependentTypeLoc(req.getSecondTypeLoc());
@@ -895,7 +913,9 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
       continue;
     }
 
-    Type secondType = req.getSecondType();
+    Type secondType;
+    if (req.getKind() != RequirementKind::Layout)
+      secondType = req.getSecondType();
     if (secondType) {
       secondType = secondType.subst(module, substitutions);
       if (secondType.isNull()) {
@@ -925,6 +945,13 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
       if (!result.second)
         return std::make_pair(false, false);
 
+      continue;
+    }
+
+    case RequirementKind::Layout: {
+      // TODO: Statically check if a the first type
+      // conforms to the layout constraint, once we
+      // support such static checks.
       continue;
     }
 

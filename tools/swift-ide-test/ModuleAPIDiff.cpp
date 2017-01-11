@@ -754,6 +754,7 @@ public:
       switch (Req.getKind()) {
       case RequirementKind::Superclass:
       case RequirementKind::Conformance:
+      case RequirementKind::Layout:
         ResultGS.ConformanceRequirements.emplace_back(
             sma::ConformanceRequirement{
                 convertToTypeName(Req.getFirstType()),
