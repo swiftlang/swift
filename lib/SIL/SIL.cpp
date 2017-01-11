@@ -68,6 +68,8 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
     // access these symbols.
     return FormalLinkage::HiddenUnique;
   }
+
+  llvm_unreachable("Unhandled Accessibility in switch.");
 }
 
 FormalLinkage swift::getTypeLinkage(CanType type) {
