@@ -2083,7 +2083,8 @@ public:
                              unsigned maxResults = 4);
 
   void noteTypoCorrection(DeclName name, DeclNameLoc nameLoc,
-                          const LookupResult::Result &suggestion, FunctionRefKind refKind = FunctionRefKind::Unapplied);
+                          const LookupResult::Result &suggestion,
+                          FunctionRefKind refKind = FunctionRefKind::Unapplied);
   
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
