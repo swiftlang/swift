@@ -810,7 +810,7 @@ function(_add_swift_library_single target name)
     endif()
   endif()
 
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
     if("${libkind}" STREQUAL "SHARED")
       # Each dll has an associated .lib (import library); since we may be
       # building on a non-DLL platform (not windows), create an imported target
@@ -1141,7 +1141,7 @@ function(_add_swift_library_single target name)
         # libraries are only associated with shared libraries, so add an
         # additional check for that as well.
         set(import_library ${library})
-        if(TARGET ${library})
+        if(TARGET ${library} AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
           get_target_property(type ${library} TYPE)
           if(${type} STREQUAL "SHARED_LIBRARY")
             set(import_library ${library}_IMPLIB)
