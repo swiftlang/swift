@@ -968,6 +968,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
   CASE(Conformance)
   CASE(Superclass)
   CASE(SameType)
+  CASE(Layout)
   }
 #undef CASE
 
@@ -983,11 +984,14 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
 
   auto reqAbbrCode = abbrCodes[GenericRequirementLayout::Code];
   for (const auto &req : requirements) {
-    GenericRequirementLayout::emitRecord(
-      Out, ScratchRecord, reqAbbrCode,
-      getRawStableRequirementKind(req.getKind()),
-      addTypeRef(req.getFirstType()),
-      addTypeRef(req.getSecondType()));
+    if (req.getKind() != RequirementKind::Layout)
+      GenericRequirementLayout::emitRecord(
+          Out, ScratchRecord, reqAbbrCode,
+          getRawStableRequirementKind(req.getKind()),
+          addTypeRef(req.getFirstType()), addTypeRef(req.getSecondType()));
+    else {
+      // TODO: write layout requirement here.
+    }
   }
 }
 
