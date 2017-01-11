@@ -2975,19 +2975,19 @@ static Type substType(Type derivedType,
       !derivedType->is<GenericFunctionType>())
     return derivedType;
 
-  return derivedType.transform([&](Type type) -> Type {
+  return derivedType.transformRec([&](TypeBase *type) -> Optional<Type> {
     // FIXME: Add SIL versions of mapTypeIntoContext() and
     // mapTypeOutOfContext() and use them appropriately
     assert((options.contains(SubstFlags::AllowLoweredTypes) ||
-            !isa<SILFunctionType>(type.getPointer())) &&
+            !isa<SILFunctionType>(type)) &&
            "should not be doing AST type-substitution on a lowered SIL type;"
            "use SILType::subst");
 
     // Special-case handle SILBoxTypes; we want to structurally substitute the
     // substitutions.
-    if (auto boxTy = dyn_cast<SILBoxType>(type.getPointer())) {
+    if (auto boxTy = dyn_cast<SILBoxType>(type)) {
       if (boxTy->getGenericArgs().empty())
-        return boxTy;
+        return Type(boxTy);
       
       SmallVector<Substitution, 4> substArgs;
       for (auto &arg : boxTy->getGenericArgs()) {
@@ -3007,7 +3007,7 @@ static Type substType(Type derivedType,
     
     // For dependent member types, we may need to look up the member if the
     // base is resolved to a non-dependent type.
-    if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
+    if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
       auto newBase = substType(depMemTy->getBase(),
                                substitutions, lookupConformances, options);
       if (!newBase)
@@ -3019,29 +3019,29 @@ static Type substType(Type derivedType,
                                   depMemTy->getName(), options);
     }
     
-    auto substOrig = dyn_cast<SubstitutableType>(type.getPointer());
+    auto substOrig = dyn_cast<SubstitutableType>(type);
     if (!substOrig)
-      return type;
+      return None;
 
     // If we have a substitution for this type, use it.
     if (auto known = substitutions(substOrig))
       return known;
 
     // If we failed to substitute a generic type parameter, give up.
-    if (substOrig->is<GenericTypeParamType>()) {
+    if (isa<GenericTypeParamType>(substOrig)) {
       if (options.contains(SubstFlags::UseErrorType))
         return ErrorType::get(type);
-      return type;
+      return Type(type);
     }
 
-    auto archetype = substOrig->castTo<ArchetypeType>();
+    auto archetype = cast<ArchetypeType>(substOrig);
 
     // For archetypes, we can substitute the parent (if present).
     auto parent = archetype->getParent();
     if (!parent) {
       if (options.contains(SubstFlags::UseErrorType))
         return ErrorType::get(type);
-      return type;
+      return Type(type);
     }
 
     // Substitute into the parent type.
@@ -3050,7 +3050,7 @@ static Type substType(Type derivedType,
 
     // If the parent didn't change, we won't change.
     if (substParent.getPointer() == parent)
-      return type;
+      return Type(type);
 
     // Get the associated type reference from a child archetype.
     AssociatedTypeDecl *assocType = archetype->getAssocType();
