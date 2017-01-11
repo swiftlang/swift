@@ -3296,6 +3296,14 @@ NOTE(availability_conformance_introduced_here, none,
      "conformance introduced here", ())
 
 //------------------------------------------------------------------------------
+// @discardableResult
+//------------------------------------------------------------------------------
+
+WARNING(discardable_result_on_void_never_function, none,
+        "@discardableResult declared on a function returning %select{Never|Void}0 is unnecessary",
+        (bool))
+
+//------------------------------------------------------------------------------
 // Resilience diagnostics
 //------------------------------------------------------------------------------
 

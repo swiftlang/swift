@@ -726,7 +726,6 @@ public:
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
-    IGNORED_ATTR(DiscardableResult)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -763,6 +762,8 @@ public:
   void visitSpecializeAttr(SpecializeAttr *attr);
 
   void visitVersionedAttr(VersionedAttr *attr);
+  
+  void visitDiscardableResultAttr(DiscardableResultAttr *attr);
 };
 } // end anonymous namespace
 
@@ -1531,6 +1532,20 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
                 VD->getFormalAccess())
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
+  }
+}
+
+void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
+  if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    if (auto result = FD->getResultInterfaceType()) {
+      auto resultIsVoid = result->isVoid();
+      if (resultIsVoid || result->isUninhabited()) {
+        auto warn = diag::discardable_result_on_void_never_function;
+        auto diagnostic = TC.diagnose(D->getStartLoc(), warn, resultIsVoid);
+        diagnostic.fixItRemove(attr->getRangeWithAt());
+        attr->setInvalid();
+      }
+    }
   }
 }
 
