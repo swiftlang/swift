@@ -672,6 +672,10 @@ private:
   /// to llvm::errs().
   bool DebugTimeFunctionBodies = false;
 
+  /// If true, the time it takes to type-check each expression will be
+  /// dumped to llvm::errs().
+  bool DebugTimeExpressions = false;
+
   /// Indicate that the type checker is checking code that will be
   /// immediately executed. This will suppress certain warnings
   /// when executing scripts.
@@ -692,6 +696,11 @@ public:
   /// Dump the time it takes to type-check each function to llvm::errs().
   void enableDebugTimeFunctionBodies() {
     DebugTimeFunctionBodies = true;
+  }
+
+  /// Dump the time it takes to type-check each function to llvm::errs().
+  void enableDebugTimeExpressions() {
+    DebugTimeExpressions = true;
   }
 
   /// If \p timeInMS is non-zero, warn when a function body takes longer than
