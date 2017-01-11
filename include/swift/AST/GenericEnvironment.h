@@ -208,6 +208,10 @@ public:
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(ModuleDecl *M, Type type) const;
 
+  /// Map an interface type to a contextual type.
+  Type mapTypeIntoContext(Type type,
+                          LookupConformanceFn lookupConformance) const;
+
   /// Map a generic parameter type to a contextual type.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;
 

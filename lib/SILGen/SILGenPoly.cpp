@@ -2432,7 +2432,7 @@ buildThunkSignature(SILGenFunction &gen,
     return genericSig;
   }
 
-  ArchetypeBuilder builder(*mod);
+  ArchetypeBuilder builder(ctx, LookUpConformanceInModule(mod));
 
   // Add the existing generic signature.
   int depth = 0;

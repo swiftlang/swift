@@ -121,7 +121,6 @@ private:
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
 
-  ModuleDecl &Mod;
   ASTContext &Context;
   DiagnosticEngine &Diags;
   struct Implementation;
@@ -187,8 +186,10 @@ private:
 public:
   /// Construct a new archetype builder.
   ///
-  /// \param mod The module in which the builder will create archetypes.
-  explicit ArchetypeBuilder(ModuleDecl &mod);
+  /// \param lookupConformance Conformance-lookup routine that will be used
+  /// to satisfy conformance requirements for concrete types.
+  explicit ArchetypeBuilder(ASTContext &ctx,
+                            std::function<GenericFunction> lookupConformance);
 
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
@@ -196,8 +197,8 @@ public:
   /// Retrieve the AST context.
   ASTContext &getASTContext() const { return Context; }
 
-  /// Retrieve the module.
-  ModuleDecl &getModule() const { return Mod; }
+  /// Retrieve the conformance-lookup function used by this archetype builder.
+  std::function<GenericFunction> getLookupConformanceFn() const;
 
   /// Retrieve the lazy resolver, if there is one.
   LazyResolver *getLazyResolver() const;

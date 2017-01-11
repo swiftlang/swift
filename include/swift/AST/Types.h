@@ -4130,6 +4130,11 @@ public:
                      Type base,
                      LazyResolver *resolver = nullptr);
 
+  /// Substitute the base type, looking up our associated type in it if it is
+  /// non-dependent. Returns null if the member could not be found in the new
+  /// base.
+  Type substBaseType(Type base, LookupConformanceFn lookupConformance);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::DependentMember;

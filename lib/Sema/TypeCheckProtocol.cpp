@@ -1019,7 +1019,9 @@ RequirementEnvironment::RequirementEnvironment(
   // Construct an archetype builder by collecting the constraints from the
   // requirement and the context of the conformance together, because both
   // define the capabilities of the requirement.
-  ArchetypeBuilder builder(*conformanceDC->getParentModule());
+  ArchetypeBuilder builder(
+           ctx,
+           LookUpConformanceInModule(conformanceDC->getParentModule()));
   SmallVector<GenericTypeParamType*, 4> allGenericParams;
 
   // Add the generic signature of the context of the conformance. This includes

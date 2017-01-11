@@ -2951,14 +2951,17 @@ MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
 Type DependentMemberType::substBaseType(ModuleDecl *module,
                                         Type substBase,
                                         LazyResolver *resolver) {
+  return substBaseType(substBase, LookUpConformanceInModule(module));
+}
+
+Type DependentMemberType::substBaseType(Type substBase,
+                                        LookupConformanceFn lookupConformance) {
   if (substBase.getPointer() == getBase().getPointer() &&
       substBase->hasTypeParameter())
     return this;
 
-  return getMemberForBaseType(LookUpConformanceInModule(module),
-                              Type(), substBase,
-                              getAssocType(), getName(),
-                              None);
+  return getMemberForBaseType(lookupConformance, Type(), substBase,
+                              getAssocType(), getName(), None);
 }
 
 static Type substType(Type derivedType,
