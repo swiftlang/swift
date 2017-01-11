@@ -1643,6 +1643,69 @@ private:
       return reqt;
     }
 
+    if (Mangled.nextIf('l')) {
+      StringRef name;
+      Node::Kind kind;
+      Node::IndexType size = SIZE_MAX;
+      Node::IndexType alignment = SIZE_MAX;
+      if (Mangled.nextIf('U')) {
+        kind = Node::Kind::Identifier;
+        name = "U";
+      } else if (Mangled.nextIf('R')) {
+        kind = Node::Kind::Identifier;
+        name = "R";
+      } else if (Mangled.nextIf('N')) {
+        kind = Node::Kind::Identifier;
+        name = "N";
+      } else if (Mangled.nextIf('T')) {
+        kind = Node::Kind::Identifier;
+        name = "T";
+      } else if (Mangled.nextIf('E')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        if (!Mangled.nextIf('_'))
+          return nullptr;
+        if (!demangleNatural(alignment))
+          return nullptr;
+        name = "E";
+      } else if (Mangled.nextIf('e')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        name = "e";
+      } else if (Mangled.nextIf('M')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        if (!Mangled.nextIf('_'))
+          return nullptr;
+        if (!demangleNatural(alignment))
+          return nullptr;
+        name = "M";
+      } else if (Mangled.nextIf('m')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        name = "m";
+      } else {
+        unreachable("Unknown layout constraint");
+      }
+
+      NodePointer second = NodeFactory::create(kind, name);
+      if (!second) return nullptr;
+      auto reqt = NodeFactory::create(
+        Node::Kind::DependentGenericLayoutRequirement);
+      reqt->addChild(constrainedType);
+      reqt->addChild(second);
+      if (size != SIZE_MAX) {
+        reqt->addChild(NodeFactory::create(Node::Kind::Number, size));
+        if (alignment != SIZE_MAX)
+          reqt->addChild(NodeFactory::create(Node::Kind::Number, alignment));
+      }
+      return reqt;
+    }
+
     // Base class constraints are introduced by a class type mangling, which
     // will begin with either 'C' or 'S'.
     if (!Mangled)
@@ -2438,6 +2501,7 @@ private:
     case Node::Kind::DependentGenericSignature:
     case Node::Kind::DependentGenericParamCount:
     case Node::Kind::DependentGenericConformanceRequirement:
+    case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericSameTypeRequirement:
     case Node::Kind::DependentPseudogenericSignature:
     case Node::Kind::Destructor:
@@ -3710,6 +3774,40 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     print(type);
     Printer << ": ";
     print(reqt);
+    return;
+  }
+  case Node::Kind::DependentGenericLayoutRequirement: {
+    NodePointer type = pointer->getChild(0);
+    NodePointer layout = pointer->getChild(1);
+    print(type);
+    Printer << ": ";
+    assert(layout->getKind() == Node::Kind::Identifier);
+    assert(layout->getText().size() == 1);
+    char c = layout->getText()[0];
+    StringRef name;
+    if (c == 'U') {
+      name = "_UnknownLayout";
+    } else if (c == 'R') {
+      name = "_RefCountedObject";
+    } else if (c == 'N') {
+      name = "_NativeRefCountedObject";
+    } else if (c == 'T') {
+      name = "_Trivial";
+    } else if (c == 'E' || c == 'e') {
+      name = "_Trivial";
+    } else if (c == 'M' || c == 'm') {
+      name = "_TrivialAtMost";
+    }
+    Printer << name;
+    if (pointer->getNumChildren() > 2) {
+      Printer << "(";
+      print(pointer->getChild(2));
+      if (pointer->getNumChildren() > 3) {
+        Printer << ", ";
+        print(pointer->getChild(3));
+      }
+      Printer << ")";
+    }
     return;
   }
   case Node::Kind::DependentGenericSameTypeRequirement: {
