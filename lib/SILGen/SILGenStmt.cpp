@@ -166,7 +166,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   SILBasicBlock *ContBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
-    ContBB->createPHIArgument(argTy);
+    ContBB->createPHIArgument(argTy, ValueOwnershipKind::Owned);
   }
   
   SILBasicBlock *FalseBB, *FalseDestBB;
@@ -619,8 +619,8 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // Create the throw destination at the end of the function.
   JumpDest throwDest = createJumpDest(S->getBody(),
                                       FunctionSection::Postmatter);
-  SILArgument *exnArg =
-      throwDest.getBlock()->createPHIArgument(exnTL.getLoweredType());
+  SILArgument *exnArg = throwDest.getBlock()->createPHIArgument(
+      exnTL.getLoweredType(), ValueOwnershipKind::Owned);
 
   // We always need a continuation block because we might fall out of
   // a catch block.  But we don't need a loop block unless the 'do'
@@ -906,7 +906,8 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // For now, don't try to re-use destination blocks for multiple
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
-  SILValue exn = destBB->createPHIArgument(exnResult.getSILType());
+  SILValue exn = destBB->createPHIArgument(exnResult.getSILType(),
+                                           ValueOwnershipKind::Owned);
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);

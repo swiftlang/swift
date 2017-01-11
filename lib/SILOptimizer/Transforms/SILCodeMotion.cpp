@@ -482,7 +482,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     BB->getArgument(ArgNum)->replaceAllUsesWith(FSI);
 
     const auto &ArgType = FSI->getOperand(*DifferentOperandIndex)->getType();
-    BB->replacePHIArgument(ArgNum, ArgType);
+    BB->replacePHIArgument(ArgNum, ArgType, ValueOwnershipKind::Owned);
 
     // Update all branch instructions in the predecessors to pass the new
     // argument to this BB.

@@ -158,8 +158,8 @@ namespace {
           result = finishFromResultBuffer(hasAbstraction, resultBuffer,
                                           abstraction, origTargetTL, ctx);
         } else {
-          SILValue argument =
-              trueBB->createPHIArgument(origTargetTL.getLoweredType());
+          SILValue argument = trueBB->createPHIArgument(
+              origTargetTL.getLoweredType(), ValueOwnershipKind::Owned);
           result = finishFromResultScalar(hasAbstraction, argument, consumption,
                                           abstraction, origTargetTL, ctx);
         }
@@ -497,7 +497,8 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
   if (resultObjectTemp) {
     result = SGF.manageBufferForExprResult(resultBuffer, resultTL, C);
   } else {
-    auto argument = contBB->createPHIArgument(resultTL.getLoweredType());
+    auto argument = contBB->createPHIArgument(resultTL.getLoweredType(),
+                                              ValueOwnershipKind::Owned);
     result = SGF.emitManagedRValueWithCleanup(argument, resultTL);
   }
 
@@ -546,7 +547,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
     });
 
   auto contBB = scope.exit();
-  auto isa = contBB->createPHIArgument(i1Ty);
+  auto isa = contBB->createPHIArgument(i1Ty, ValueOwnershipKind::Trivial);
   return isa;
 }
 

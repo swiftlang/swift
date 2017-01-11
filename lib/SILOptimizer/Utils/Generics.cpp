@@ -298,7 +298,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
       fixUsedVoidType(ResultBB->getArgument(0), Loc, Builder);
 
       SILArgument *Arg = ResultBB->replacePHIArgument(
-          0, StoreResultTo->getType().getObjectType());
+          0, StoreResultTo->getType().getObjectType(),
+          ValueOwnershipKind::Owned);
       // Store the direct result to the original result address.
       Builder.createStore(Loc, Arg, StoreResultTo,
                           StoreOwnershipQualifier::Unqualified);
@@ -434,11 +435,12 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
     SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
     Builder.createTryApply(Loc, FRI, SpecializedFunc->getLoweredType(),
                            {}, Arguments, NormalBB, ErrorBB);
-    auto *ErrorVal =
-        ErrorBB->createPHIArgument(SpecType->getErrorResult().getSILType());
+    auto *ErrorVal = ErrorBB->createPHIArgument(
+        SpecType->getErrorResult().getSILType(), ValueOwnershipKind::Owned);
     Builder.setInsertionPoint(ErrorBB);
     Builder.createThrow(Loc, ErrorVal);
-    ReturnValue = NormalBB->createPHIArgument(SpecType->getSILResult());
+    ReturnValue = NormalBB->createPHIArgument(SpecType->getSILResult(),
+                                              ValueOwnershipKind::Owned);
     Builder.setInsertionPoint(NormalBB);
   } else {
     ReturnValue = Builder.createApply(Loc, FRI, SpecializedFunc->getLoweredType(),

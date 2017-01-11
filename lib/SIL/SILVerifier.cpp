@@ -3270,14 +3270,26 @@ public:
 
     bool matched = true;
     auto argI = entry->args_begin();
+    SILModule &M = F.getModule();
+    CanSILFunctionType FTy = F.getLoweredFunctionType();
 
     auto check = [&](const char *what, SILType ty) {
       auto mappedTy = F.mapTypeIntoContext(ty);
-      SILArgument *bbarg = *argI++;
+      SILArgument *bbarg = *argI;
+      ++argI;
+      auto ownershipkind = ValueOwnershipKind(
+          M, mappedTy, FTy->getSILArgumentConvention(bbarg->getIndex()));
       if (bbarg->getType() != mappedTy) {
         llvm::errs() << what << " type mismatch!\n";
         llvm::errs() << "  argument: "; bbarg->dump();
         llvm::errs() << "  expected: "; mappedTy.dump();
+        matched = false;
+      }
+
+      if (bbarg->getOwnershipKind() != ownershipkind) {
+        llvm::errs() << what << " ownership kind mismatch!\n";
+        llvm::errs() << "  argument: " << bbarg->getOwnershipKind() << '\n';
+        llvm::errs() << "  expected: " << ownershipkind << '\n';
         matched = false;
       }
     };

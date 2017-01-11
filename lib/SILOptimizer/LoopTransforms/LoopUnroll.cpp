@@ -83,8 +83,8 @@ void LoopCloner::cloneLoop() {
 
   // Clone the arguments.
   for (auto *Arg : Header->getArguments()) {
-    SILValue MappedArg =
-        ClonedHeader->createPHIArgument(getOpType(Arg->getType()));
+    SILValue MappedArg = ClonedHeader->createPHIArgument(
+        getOpType(Arg->getType()), ValueOwnershipKind::Owned);
     ValueMap.insert(std::make_pair(Arg, MappedArg));
   }
 

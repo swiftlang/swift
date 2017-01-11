@@ -929,8 +929,9 @@ namespace {
           objectSource = Source(sourceAddr, sourceObjectType,
                                 CastConsumptionKind::TakeAlways);
         } else {
-          SILValue sourceObjectValue =
-              someBB->createPHIArgument(loweredSourceObjectType);
+          // switch enum always start as @owned.
+          SILValue sourceObjectValue = someBB->createPHIArgument(
+              loweredSourceObjectType, ValueOwnershipKind::Owned);
           objectSource = Source(sourceObjectValue, sourceObjectType,
                                 source.Consumption);
         }
@@ -968,7 +969,8 @@ namespace {
       if (target.isAddress()) {
         return target.asAddressSource();
       } else {
-        SILValue result = contBB->createPHIArgument(target.LoweredType);
+        SILValue result = contBB->createPHIArgument(target.LoweredType,
+                                                    ValueOwnershipKind::Owned);
         return target.asScalarSource(result);
       }
     }
@@ -1214,7 +1216,8 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, ModuleDecl *M,
   // Emit the success block.
   B.setInsertionPoint(scalarSuccBB); {
     auto &targetTL = B.getModule().Types.getTypeLowering(targetValueType);
-    SILValue succValue = scalarSuccBB->createPHIArgument(targetValueType);
+    SILValue succValue = scalarSuccBB->createPHIArgument(
+        targetValueType, ValueOwnershipKind::Owned);
     if (!shouldTakeOnSuccess(consumption))
       targetTL.emitCopyValue(B, loc, succValue);
     targetTL.emitStoreOfCopy(B, loc, succValue, dest, IsInitialization);

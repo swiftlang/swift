@@ -67,7 +67,7 @@ enum class ExistentialRepresentation {
 };
 
 /// The value category.
-enum class SILValueCategory {
+enum class SILValueCategory : uint8_t {
   /// An object is a value of the type.
   Object,
 

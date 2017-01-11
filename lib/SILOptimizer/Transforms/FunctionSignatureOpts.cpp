@@ -545,11 +545,13 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     // We need a try_apply to call a function with an error result.
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
-    ReturnValue = NormalBlock->createPHIArgument(ResultType);
+    ReturnValue =
+        NormalBlock->createPHIArgument(ResultType, ValueOwnershipKind::Owned);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createPHIArgument(Error);
+    auto *ErrorArg =
+        ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
@@ -706,6 +708,10 @@ void FunctionSignatureTransform::OwnedToGuaranteedTransformFunctionParameters() 
     for (auto &X : AD.CalleeReleaseInThrowBlock) { 
       X->eraseFromParent();
     }
+
+    // Now we need to replace the FunctionArgument so that we have the correct
+    // ValueOwnershipKind.
+    AD.Arg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
   }
 }
 
@@ -846,10 +852,12 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     // order of leaf values matches the order of leaf types.
     llvm::SmallVector<const ProjectionTreeNode*, 8> LeafNodes;
     AD.ProjTree.getLeafNodes(LeafNodes);
-    for (auto Node : LeafNodes) {
-      LeafValues.push_back(
-          BB->insertFunctionArgument(ArgOffset++, Node->getType(),
-                                     BB->getArgument(OldArgIndex)->getDecl()));
+
+    for (auto *Node : LeafNodes) {
+      auto OwnershipKind = *AD.getTransformedOwnershipKind(Node->getType());
+      LeafValues.push_back(BB->insertFunctionArgument(
+          ArgOffset++, Node->getType(), OwnershipKind,
+          BB->getArgument(OldArgIndex)->getDecl()));
       AIM[TotalArgIndex - 1] = AD.Index;
       TotalArgIndex ++;
     }
