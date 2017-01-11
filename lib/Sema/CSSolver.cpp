@@ -1243,14 +1243,9 @@ static bool tryTypeVariableBindings(
   auto &tc = cs.getTypeChecker();
   ++cs.solverState->NumTypeVariablesBound;
   
-  // If the solver has allocated an excessive amount of memory when solving for
-  // this expression, short-circuit the binding operation and mark the parent
-  // expression as "too complex".
-  if (cs.TC.Context.getSolverMemory() >
-        cs.TC.Context.LangOpts.SolverMemoryThreshold) {
-    cs.setExpressionTooComplex(true);
+  // If we've already explored a lot of potential solutions, bail.
+  if (cs.getExpressionTooComplex())
     return true;
-  }
 
   for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
     // Try each of the bindings in turn.
@@ -1903,7 +1898,16 @@ ConstraintSystem::solve(Expr *&expr,
 
   // If there are no solutions let's mark system as unsolved,
   // and solved otherwise even if there are multiple solutions still present.
-  return solutions.empty() ? SolutionKind::Unsolved : SolutionKind::Solved;
+
+  // There was a Swift 3 bug that allowed us to return Solved if we
+  // had found at least one solution before deciding an expression was
+  // "too complex". Maintain that behavior, but for Swift > 3 return
+  // Unsolved in these cases.
+  auto tooComplex = getExpressionTooComplex() &&
+    !getASTContext().isSwiftVersion3();
+  auto unsolved = tooComplex || solutions.empty();
+
+  return unsolved ? SolutionKind::Unsolved : SolutionKind::Solved;
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
@@ -2440,5 +2444,12 @@ bool ConstraintSystem::solveSimplified(
   InactiveConstraints.insert(afterDisjunction, disjunction);
   CG.addConstraint(disjunction);
 
-  return !firstSolvedConstraint;
+  // If we are exiting due to an expression that is too complex, do
+  // not allow our caller to continue as if we have been successful.
+  // Maintain the broken behavior under Swift 3 mode though, to avoid
+  // breaking code.
+  auto tooComplex = getExpressionTooComplex() &&
+    !getASTContext().isSwiftVersion3();
+
+  return tooComplex || !firstSolvedConstraint;
 }

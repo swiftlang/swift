@@ -134,6 +134,8 @@ namespace swift {
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 33554432; /* 32 * 1024 * 1024 */
 
+    unsigned SolverBindingThreshold = 1024 * 1024;
+
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
