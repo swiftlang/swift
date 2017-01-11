@@ -343,7 +343,7 @@ class SHA1 : Hash {
 
     // Append the original message length as 64bit big endian:
     let len_in_bits = Int64(messageLength)*8
-    for i in 0..<8 {
+    for i in 0..<(8 as Int64) {
       let val = (len_in_bits >> ((7-i)*8)) & 0xFF
       data[dataLength] = UInt8(val)
       dataLength += 1
@@ -481,7 +481,7 @@ class SHA256 :  Hash {
 
     // Append the original message length as 64bit big endian:
     let len_in_bits = Int64(messageLength)*8
-    for i in 0..<8 {
+    for i in 0..<(8 as Int64) {
       let val = (len_in_bits >> ((7-i)*8)) & 0xFF
       data[dataLength] = UInt8(val)
       dataLength += 1
