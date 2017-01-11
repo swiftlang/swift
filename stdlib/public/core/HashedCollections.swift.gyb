@@ -243,7 +243,6 @@ internal protocol _HashBuffer {
   @discardableResult
   mutating func removeValue(forKey key: Key) -> Value?
 
-  @discardableResult
   mutating func removeAll(keepingCapacity keepCapacity: Bool)
 
   var count: Int { get }
