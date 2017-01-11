@@ -112,8 +112,8 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // Wait() returning a return code of -2 indicates the process received
       // a signal during execution.
       if (Signalled) {
-        TaskFinishedResponse Response = Signalled(PI.Pid, ErrMsg, StringRef(),
-                                                  T->Context);
+        TaskFinishedResponse Response =
+            Signalled(PI.Pid, ErrMsg, StringRef(), StringRef(), T->Context);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else {
         // If we don't have a Signalled callback, unconditionally stop.
@@ -124,7 +124,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // finished.
       if (Finished) {
         TaskFinishedResponse Response = Finished(PI.Pid, PI.ReturnCode,
-        StringRef(), T->Context);
+        StringRef(), StringRef(), T->Context);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else if (PI.ReturnCode != 0) {
         ContinueExecution = false;
