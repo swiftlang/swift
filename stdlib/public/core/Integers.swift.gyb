@@ -54,11 +54,11 @@ binaryBitwise = [
 maskingShifts = [
     struct(
       operator='&>>', nonMaskingOperator='>>', description='right shift',
-      helper='nonMaskingRightShift',
+      helper='_nonMaskingRightShift',
       llvmName=lambda s:['lshr','ashr'][s]),
     struct(
       operator='&<<', nonMaskingOperator='<<', description='left shift',
-      helper='nonMaskingLeftShift',
+      helper='_nonMaskingLeftShift',
       llvmName=lambda _: 'shl'),
 ]
 
@@ -2125,7 +2125,7 @@ ${operatorComment(x.nonMaskingOperator)}
 %   reversedOperator = x.operator.translate(maketrans('<>', '><'))
 %   isRightShift = '>' in x.operator
   @_transparent
-  internal static func ${x.helper}(_ lhs: Self, _ rhs: Int) -> Self {
+  public static func ${x.helper}(_ lhs: Self, _ rhs: Int) -> Self {
     let overshiftR = Self.isSigned ? lhs &>> (Self.bitWidth - 1) : 0
     let overshiftL: Self = 0
     if _fastPath(rhs >= 0) {
