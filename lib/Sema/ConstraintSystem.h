@@ -871,10 +871,14 @@ private:
 
   /// \brief Counter for type variables introduced.
   unsigned TypeCounter = 0;
-  
-  /// \brief The expression being solved has exceeded the solver's memory
-  /// threshold.
-  bool expressionExceededThreshold = false;
+
+  /// \brief The number of scopes created so far during the solution
+  /// of this constriant system.
+  ///
+  /// This is a measure of complexity of the solution space. A new
+  /// scope is created every time we attempt a type variable binding
+  /// or explore an option in a disjuction.
+  unsigned CountScopes = 0;
 
   /// \brief Cached member lookups.
   llvm::DenseMap<std::pair<Type, DeclName>, Optional<LookupResult>>
@@ -1041,6 +1045,7 @@ private:
     ///
     /// \param scope The scope to associate with current solver state.
     void registerScope(SolverScope *scope) {
+      CS.incrementScopeCounter();
       scopes.insert({ scope, std::make_pair(retiredConstraints.begin(),
                                             generatedConstraints.size()) });
     }
@@ -1277,6 +1282,10 @@ public:
 private:
   unsigned assignTypeVariableID() {
     return TypeCounter++;
+  }
+
+  void incrementScopeCounter() {
+    CountScopes++;
   }
 
 public:
@@ -2455,21 +2464,36 @@ public:
   Expr *applySolutionShallow(const Solution &solution, Expr *expr,
                              bool suppressDiagnostics);
   
-  /// \brief Set whether or not the expression being solved is too complex and
-  /// has exceeded the solver's memory threshold.
-  void setExpressionTooComplex(bool tc) {
-    expressionExceededThreshold = tc;
-  }
-  
   /// \brief Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
   void optimizeConstraints(Expr *e);
   
-  /// \brief Determine if the expression being solved has exceeded the solver's
-  /// memory threshold.
+  /// \brief Determine if we've already explored too many paths in an
+  /// attempt to solve this expression.
   bool getExpressionTooComplex() {
-    return expressionExceededThreshold;
+    if (!getASTContext().isSwiftVersion3()) {
+      if (CountScopes < TypeCounter)
+        return false;
+
+      // If we haven't explored a relatively large number of possibilities
+      // yet, continue.
+      if (CountScopes <= 16 * 1024)
+        return false;
+
+      // Clearly exponential
+      if (TypeCounter < 32 && CountScopes > (1 << TypeCounter))
+        return true;
+
+      // Bail out once we've looked at a really large number of
+      // choices, even if we haven't used a huge amount of memory.
+      if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold)
+        return true;
+    }
+
+    auto used = TC.Context.getSolverMemory();
+    auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
+    return used > threshold;
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(

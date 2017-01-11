@@ -1251,14 +1251,9 @@ static bool tryTypeVariableBindings(
   auto &tc = cs.getTypeChecker();
   ++cs.solverState->NumTypeVariablesBound;
   
-  // If the solver has allocated an excessive amount of memory when solving for
-  // this expression, short-circuit the binding operation and mark the parent
-  // expression as "too complex".
-  if (cs.TC.Context.getSolverMemory() >
-        cs.TC.Context.LangOpts.SolverMemoryThreshold) {
-    cs.setExpressionTooComplex(true);
+  // If we've already explored a lot of potential solutions, bail.
+  if (cs.getExpressionTooComplex())
     return true;
-  }
 
   for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
     // Try each of the bindings in turn.
