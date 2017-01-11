@@ -269,8 +269,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
       case ParameterConvention::Direct_Owned:
         gen.emitManagedRValueWithCleanup(v);
         break;
-        
-      case ParameterConvention::Direct_Deallocating:
+
       case ParameterConvention::Direct_Guaranteed:
       case ParameterConvention::Direct_Unowned:
         break;
@@ -295,12 +294,6 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
       case ParameterConvention::Direct_Unowned:
         // We need to independently retain the value.
         mv = gen.emitManagedRetain(loc, v);
-        break;
-
-      case ParameterConvention::Direct_Deallocating:
-        // We do not need to retain the value since the value is already being
-        // deallocated.
-        mv = ManagedValue::forUnmanaged(v);
         break;
 
       case ParameterConvention::Indirect_In_Guaranteed:
@@ -935,14 +928,6 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
       continue;
     }
 
-    // If this parameter is deallocating, emit an unmanaged rvalue and
-    // continue. The object has the deallocating bit set so retain, release is
-    // irrelevant.
-    if (inputs[i].isDeallocating()) {
-      bridgedArgs.push_back(ManagedValue::forUnmanaged(arg));
-      continue;
-    }
-
     // If the argument is a block, copy it.
     if (argTy.isBlockPointerCompatible()) {
       auto copy = gen.B.createCopyBlock(loc, arg);
@@ -1259,9 +1244,6 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         case ParameterConvention::Direct_Guaranteed:
         case ParameterConvention::Direct_Unowned:
           param = emitManagedRetain(fd, paramValue);
-          break;
-        case ParameterConvention::Direct_Deallocating:
-          param = ManagedValue::forUnmanaged(paramValue);
           break;
         case ParameterConvention::Indirect_Inout:
         case ParameterConvention::Indirect_InoutAliasable:

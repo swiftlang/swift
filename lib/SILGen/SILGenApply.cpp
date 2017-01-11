@@ -2361,11 +2361,6 @@ RValue SILGenFunction::emitApply(
       }
       break;
 
-    // If self is already deallocating, self does not need to be retained or
-    // released since the deallocating bit has been set.
-    case ParameterConvention::Direct_Deallocating:
-      break;
-
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
@@ -5051,7 +5046,6 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Guaranteed:
-      case ParameterConvention::Direct_Deallocating:
         return true;
       }
       llvm_unreachable("bad convention");

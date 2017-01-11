@@ -2701,11 +2701,6 @@ enum class ParameterConvention {
   /// validity is guaranteed only at the instant the call begins.
   Direct_Unowned,
 
-  /// This argument is passed directly. Its type is non-trivial, and the callee
-  /// guarantees that the caller can treat the argument as being instantaneously
-  /// deallocated when the callee returns.
-  Direct_Deallocating,
-
   /// This argument is passed directly.  Its type is non-trivial, and the caller
   /// guarantees its validity for the entirety of the call.
   Direct_Guaranteed,
@@ -2722,7 +2717,6 @@ inline bool isIndirectParameter(ParameterConvention conv) {
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Owned:
-  case ParameterConvention::Direct_Deallocating:
     return false;
   }
   llvm_unreachable("covered switch isn't covered?!");
@@ -2738,7 +2732,6 @@ inline bool isConsumedParameter(ParameterConvention conv) {
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Indirect_In_Guaranteed:
-  case ParameterConvention::Direct_Deallocating:
     return false;
   }
   llvm_unreachable("bad convention kind");
@@ -2758,27 +2751,9 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Owned:
-  case ParameterConvention::Direct_Deallocating:
     return false;
   }
   llvm_unreachable("bad convention kind");
-}
-
-inline bool isDeallocatingParameter(ParameterConvention conv) {
-  switch (conv) {
-  case ParameterConvention::Direct_Deallocating:
-    return true;
-
-  case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_Inout:
-  case ParameterConvention::Indirect_InoutAliasable:
-  case ParameterConvention::Indirect_In_Guaranteed:
-  case ParameterConvention::Direct_Unowned:
-  case ParameterConvention::Direct_Guaranteed:
-  case ParameterConvention::Direct_Owned:
-    return false;
-  }
-  llvm_unreachable("covered switch isn't covered?!");
 }
 
 /// A parameter type and the rules for passing it.
@@ -2824,13 +2799,6 @@ public:
   /// directly.
   bool isGuaranteed() const {
     return isGuaranteedParameter(getConvention());
-  }
-
-  /// Returns true if this parameter is deallocating. This means that the
-  /// deallocating bit has been set on the parameter. This means that retains,
-  /// releases are inert for the duration of the lifetime of the function.
-  bool isDeallocating() const {
-    return isDeallocatingParameter(getConvention());
   }
 
   SILType getSILType() const; // in SILType.h
