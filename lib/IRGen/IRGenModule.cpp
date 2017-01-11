@@ -984,7 +984,7 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
   // image info.
   // Using "Objective-C Garbage Collection" as the key here is a hack,
   // but LLVM's object-file emission isn't general enough to collect
-  // arbitrary keys to put in the
+  // arbitrary keys to put in the image info.
 
   const char *ObjectiveCGarbageCollection = "Objective-C Garbage Collection";
   if (Module.getModuleFlag(ObjectiveCGarbageCollection)) {
