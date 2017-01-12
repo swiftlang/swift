@@ -133,8 +133,14 @@ public:
     return StringRef(Unresolved.Data, UnresolvedLength);
   }
 };
+
+#if __SIZEOF_POINTER__ == 4
+static_assert(sizeof(EffectiveClangContext) <= 4 * sizeof(void *),
+              "should fit in four pointers");
+#else
 static_assert(sizeof(EffectiveClangContext) <= 2 * sizeof(void *),
               "should fit in a couple pointers");
+#endif
 
 class SwiftLookupTableReader;
 class SwiftLookupTableWriter;
