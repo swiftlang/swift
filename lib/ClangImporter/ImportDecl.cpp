@@ -7570,7 +7570,7 @@ ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *dec
 
 Identifier
 ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
-  return Impl.importFullName(enumConstant, ImportNameVersion::Swift3)
+  return Impl.importFullName(enumConstant, Impl.CurrentVersion)
       .getDeclName()
       .getBaseName();
 }
