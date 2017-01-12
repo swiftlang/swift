@@ -22,7 +22,7 @@ func typoAssoc1<T : P1>(x: T.assoc) { }
 func typoAssoc2<T : P1, U : P1>() where T.assoc == U.assoc {}
 
 // CHECK-GENERIC-LABEL: .typoAssoc2
-// CHECK-GENERIC: Generic signature: <T, U where T : P1, U : P1, T.Assoc == U.Assoc>
+// CHECK-GENERIC: Generic signature: <T, U where T : P1, U : P1, U.Assoc == T.Assoc>
 
 // expected-error@+3{{'U.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}
 // expected-error@+3{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{42-47=Assoc}}

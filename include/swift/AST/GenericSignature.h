@@ -233,6 +233,11 @@ public:
   CanType getCanonicalTypeInContext(Type type, ModuleDecl &mod);
   bool isCanonicalTypeInContext(Type type, ModuleDecl &mod);
 
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
+  bool isCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
+
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);
