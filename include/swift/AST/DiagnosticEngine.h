@@ -77,6 +77,7 @@ namespace swift {
     DescriptiveDeclKind,
     DeclAttribute,
     VersionTuple,
+    LayoutConstraint,
   };
 
   namespace diag {
@@ -102,6 +103,7 @@ namespace swift {
       DescriptiveDeclKind DescriptiveDeclKindVal;
       const DeclAttribute *DeclAttributeVal;
       clang::VersionTuple VersionVal;
+      LayoutConstraint LayoutConstraintVal;
     };
     
   public:
@@ -166,6 +168,9 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::VersionTuple),
         VersionVal(version) { }
 
+    DiagnosticArgument(LayoutConstraint L)
+      : Kind(DiagnosticArgumentKind::LayoutConstraint), LayoutConstraintVal(L) {
+    }
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
     template<
@@ -235,6 +240,11 @@ namespace swift {
     clang::VersionTuple getAsVersionTuple() const {
       assert(Kind == DiagnosticArgumentKind::VersionTuple);
       return VersionVal;
+    }
+
+    LayoutConstraint getAsLayoutConstraint() const {
+      assert(Kind == DiagnosticArgumentKind::LayoutConstraint);
+      return LayoutConstraintVal;
     }
   };
   

@@ -446,6 +446,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
            "Improper modifier for VersionTuple argument");
     Out << Arg.getAsVersionTuple().getAsString();
     break;
+  case DiagnosticArgumentKind::LayoutConstraint:
+    assert(Modifier.empty() && "Improper modifier for LayoutConstraint argument");
+    Out << '\'' << Arg.getAsLayoutConstraint() << '\'';
+    break;
   }
 }
 

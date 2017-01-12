@@ -223,6 +223,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
             if (doIt(Req.getSubjectLoc()) || doIt(Req.getConstraintLoc()))
               return true;
             break;
+          case RequirementReprKind::LayoutConstraint:
+            if (doIt(Req.getFirstTypeLoc()))
+              return true;
+            break;
         }
       }
     }
@@ -277,6 +281,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
           break;
         case RequirementReprKind::TypeConstraint:
           if (doIt(Req.getSubjectLoc()) || doIt(Req.getConstraintLoc()))
+            return true;
+          break;
+        case RequirementReprKind::LayoutConstraint:
+          if (doIt(Req.getSubjectLoc()))
             return true;
           break;
         }
