@@ -2595,6 +2595,8 @@ WARNING(expression_unused_optional_try,none,
         "result of 'try?' is unused", ())
 WARNING(expression_unused_selector_result, none,
         "result of '#selector' is unused", ())
+WARNING(expression_unused_literal,none,
+        "%0 literal is unused", (StringRef))
 
 ERROR(assignment_lhs_not_lvalue,none,
       "cannot assign to immutable expression of type %0", (Type))

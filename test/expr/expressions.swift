@@ -40,7 +40,7 @@ func basictest() {
 
   //var x6 : Float = 4+5
 
-  var x7 = 4; 5 // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
+  var x7 = 4; 5 // expected-warning {{integer literal is unused}}
 
   // Test implicit conversion of integer literal to non-Int64 type.
   var x8 : Int8 = 4
@@ -77,6 +77,31 @@ func basictest() {
 
   // Cannot call an integer.
   bind_test2() // expected-error {{cannot call value of non-function type 'Int'}}{{13-15=}}
+}
+
+// <https://bugs.swift.org/browse/SR-3522>
+func testUnusedLiterals_SR3522() {
+  42 // expected-warning {{integer literal is unused}}
+  2.71828 // expected-warning {{floating-point literal is unused}}
+  true // expected-warning {{boolean literal is unused}}
+  false // expected-warning {{boolean literal is unused}}
+  "Hello" // expected-warning {{string literal is unused}}
+  "Hello \(42)" // expected-warning {{string literal is unused}}
+  #file // expected-warning {{#file literal is unused}}
+  (#line) // expected-warning {{#line literal is unused}}
+  #column // expected-warning {{#column literal is unused}}
+  #function // expected-warning {{#function literal is unused}}
+  #dsohandle // expected-warning {{#dsohandle literal is unused}}
+  __FILE__ // expected-error {{__FILE__ has been replaced with #file in Swift 3}} expected-warning {{#file literal is unused}}
+  __LINE__ // expected-error {{__LINE__ has been replaced with #line in Swift 3}} expected-warning {{#line literal is unused}}
+  __COLUMN__ // expected-error {{__COLUMN__ has been replaced with #column in Swift 3}} expected-warning {{#column literal is unused}}
+  __FUNCTION__ // expected-error {{__FUNCTION__ has been replaced with #function in Swift 3}} expected-warning {{#function literal is unused}}
+  __DSO_HANDLE__ // expected-error {{__DSO_HANDLE__ has been replaced with #dsohandle in Swift 3}} expected-warning {{#dsohandle literal is unused}}
+
+  nil // expected-error {{'nil' requires a contextual type}}
+  #fileLiteral(resourceName: "what.txt") // expected-error {{could not infer type of file reference literal}} expected-note * {{}}
+  #imageLiteral(resourceName: "hello.png") // expected-error {{could not infer type of image literal}} expected-note * {{}}
+  #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1) // expected-error {{could not infer type of color literal}} expected-note * {{}}
 }
 
 // Infix operators and attribute lists.
@@ -431,7 +456,7 @@ func stringliterals(_ d: [String: Int]) {
 
   // rdar://11385385
   let x = 4
-  "Hello \(x+1) world"  // expected-warning {{expression of type 'String' is unused}}
+  "Hello \(x+1) world"  // expected-warning {{string literal is unused}}
   
   "Error: \(x+1"; // expected-error {{unterminated string literal}}
   
