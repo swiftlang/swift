@@ -1161,23 +1161,9 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
     return false;
 
   // Decide which potential archetype is to be considered the representative.
-  // We necessarily prefer potential archetypes rooted at parameters that come
-  // from outer generic parameter lists, since those generic parameters will
-  // have archetypes bound in the outer context.
-  //
-  // FIXME: The above comment is mostly obsolete, so why can't we just use
-  // compareDependentTypes() here?
-  auto T1Param = T1->getRootGenericParamKey();
-  auto T2Param = T2->getRootGenericParamKey();
-  unsigned T1Depth = T1->getNestingDepth();
-  unsigned T2Depth = T2->getNestingDepth();
-  auto T1Key = std::make_tuple(T1->wasRenamed(), +T1Param.Depth,
-                               +T1Param.Index, T1Depth);
-  auto T2Key = std::make_tuple(T2->wasRenamed(), +T2Param.Depth,
-                               +T2Param.Index, T2Depth);
-  if (T2Key < T1Key ||
-      (T2Key == T1Key &&
-       compareDependentTypes(&T2, &T1) < 0))
+  // It doesn't specifically matter which we use, but it's a minor optimization
+  // to prefer the canonical type.
+  if (compareDependentTypes(&T2, &T1) < 0)
     std::swap(T1, T2);
 
   // Merge any concrete constraints.
