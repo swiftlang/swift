@@ -104,39 +104,6 @@ extension Decimal {
     public var nextDown: Decimal {
         return self - Decimal(_exponent: _exponent, _length: 1, _isNegative: 0, _isCompact: 1, _reserved: 0, _mantissa: (0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000))
     }
-
-    public static func +(lhs: Decimal, rhs: Decimal) -> Decimal {
-        var res = Decimal()
-        var leftOp = lhs
-        var rightOp = rhs
-        NSDecimalAdd(&res, &leftOp, &rightOp, .plain)
-        return res
-    }
-
-    public static func -(lhs: Decimal, rhs: Decimal) -> Decimal {
-        var res = Decimal()
-        var leftOp = lhs
-        var rightOp = rhs
-        NSDecimalSubtract(&res, &leftOp, &rightOp, .plain)
-        return res
-    }
-
-    public static func /(lhs: Decimal, rhs: Decimal) -> Decimal {
-        var res = Decimal()
-        var leftOp = lhs
-        var rightOp = rhs
-        NSDecimalDivide(&res, &leftOp, &rightOp, .plain)
-        return res
-    }
-
-    public static func *(lhs: Decimal, rhs: Decimal) -> Decimal {
-        var res = Decimal()
-        var leftOp = lhs
-        var rightOp = rhs
-        NSDecimalMultiply(&res, &leftOp, &rightOp, .plain)
-        return res
-    }
-
 }
 
 public func pow(_ x: Decimal, _ y: Int) -> Decimal {
