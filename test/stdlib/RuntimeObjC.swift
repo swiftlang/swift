@@ -812,11 +812,21 @@ var KVOHandle = 0
 
 Reflection.test("Name of metatype of artificial subclass") {
   let obj = TestArtificialSubclass()
+
+  expectEqual("\(type(of: obj))", "TestArtificialSubclass")
+  expectEqual(String(describing: type(of: obj)), "TestArtificialSubclass")
+  expectEqual(String(reflecting: type(of: obj)), "a.TestArtificialSubclass")
+
   // Trigger the creation of a KVO subclass for TestArtificialSubclass.
   obj.addObserver(obj, forKeyPath: "foo", options: [.new], context: &KVOHandle)
+  expectEqual("\(type(of: obj))", "TestArtificialSubclass")
+  expectEqual(String(describing: type(of: obj)), "TestArtificialSubclass")
+  expectEqual(String(reflecting: type(of: obj)), "a.TestArtificialSubclass")
   obj.removeObserver(obj, forKeyPath: "foo")
 
   expectEqual("\(type(of: obj))", "TestArtificialSubclass")
+  expectEqual(String(describing: type(of: obj)), "TestArtificialSubclass")
+  expectEqual(String(reflecting: type(of: obj)), "a.TestArtificialSubclass")
 }
 
 @objc class StringConvertibleInDebugAndOtherwise : NSObject {
