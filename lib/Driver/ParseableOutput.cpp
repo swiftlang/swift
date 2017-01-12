@@ -201,10 +201,10 @@ public:
 
 class SignalledMessage : public TaskOutputMessage {
   std::string ErrorMsg;
-  int Signal;
+  Optional<int> Signal;
 public:
   SignalledMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
-                   StringRef ErrorMsg, int Signal) : TaskOutputMessage("signalled", Cmd,
+                   StringRef ErrorMsg, Optional<int> Signal) : TaskOutputMessage("signalled", Cmd,
                                                            Pid, Output),
                                          ErrorMsg(ErrorMsg), Signal(Signal) {}
 
@@ -262,7 +262,7 @@ void parseable_output::emitFinishedMessage(raw_ostream &os,
 void parseable_output::emitSignalledMessage(raw_ostream &os,
                                             const Job &Cmd, ProcessId Pid,
                                             StringRef ErrorMsg,
-                                            StringRef Output, int Signal) {
+                                            StringRef Output, Optional<int> Signal) {
   SignalledMessage msg(Cmd, Pid, Output, ErrorMsg, Signal);
   emitMessage(os, msg);
 }
