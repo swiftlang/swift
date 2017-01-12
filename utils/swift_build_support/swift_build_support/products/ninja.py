@@ -47,6 +47,10 @@ class Ninja(product.Product):
                     "-mmacosx-version-min={osx_version}"
                 ).format(osx_version=osx_version_min),
             }
+        elif self.toolchain.cxx:
+            env = {
+                "CXX": self.toolchain.cxx,
+            }
 
         # Ninja can only be built in-tree.  Copy the source tree to the build
         # directory.
