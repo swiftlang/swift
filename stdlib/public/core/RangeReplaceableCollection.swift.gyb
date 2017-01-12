@@ -242,6 +242,10 @@ public protocol RangeReplaceableIndexable : Indexable {
 public protocol RangeReplaceableCollection
   : RangeReplaceableIndexable, Collection
 {
+  // FIXME(ABI): should require `RangeReplaceableCollection`.
+  associatedtype SubSequence : _RangeReplaceableIndexable /*: RangeReplaceableCollection*/
+    = RangeReplaceableSlice<Self>
+
   //===--- Fundamental Requirements ---------------------------------------===//
 
   /// Creates a new, empty collection.
@@ -536,6 +540,9 @@ public protocol RangeReplaceableCollection
 //===----------------------------------------------------------------------===//
 
 extension RangeReplaceableCollection {
+  public subscript(bounds: Range<Index>) -> RangeReplaceableSlice<Self> {
+    return RangeReplaceableSlice(base: self, bounds: bounds)
+  }
 
   /// Creates a new collection containing the specified number of a single,
   /// repeated value.
