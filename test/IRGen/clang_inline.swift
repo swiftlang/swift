@@ -9,6 +9,7 @@
 
 // REQUIRES: CPU=i386_or_x86_64
 // XFAIL: linux
+// REQUIRES: rdar29976210
 
 #if IMPORT_EMPTY
 import Empty
