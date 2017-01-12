@@ -2,6 +2,8 @@ void jumpToLocation(double x, double y, double z);
 
 void acceptDoublePointer(double* _Nonnull ptr) __attribute__((swift_name("accept(_:)")));
 
+void oldAcceptDoublePointer(double* _Nonnull ptr) __attribute__((availability(swift, unavailable, replacement="acceptDoublePointer")));
+
 #ifdef __OBJC__
 
 __attribute__((objc_root_class))
