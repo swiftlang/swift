@@ -61,6 +61,8 @@ inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
   case SubSeqRelation_t::RHSStrictSubSeqOfLHS:
     return true;
   }
+
+  llvm_unreachable("Unhandled SubSeqRelation_t in switch.");
 }
 
 /// Extract an integer index from a SILValue.
@@ -306,6 +308,8 @@ public:
       // Index types do not change the underlying type.
       return BaseType;
     }
+
+    llvm_unreachable("Unhandled ProjectionKind in switch.");
   }
 
   VarDecl *getVarDecl(SILType BaseType) const {
@@ -431,6 +435,8 @@ public:
     case ProjectionKind::Box:
       return false;
     }
+
+    llvm_unreachable("Unhandled ProjectionKind in switch.");
   }
 
   bool isNominalKind() const {
@@ -448,6 +454,8 @@ public:
     case ProjectionKind::TailElems:
       return false;
     }
+
+    llvm_unreachable("Unhandled ProjectionKind in switch.");
   }
 
   /// Form an aggregate of type BaseType using the SILValue Values. Returns the

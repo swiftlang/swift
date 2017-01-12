@@ -79,11 +79,17 @@ else() # NOT SWIFT_BUILT_STANDALONE
   set(clang_headers_location "${LLVM_LIBRARY_DIR}/clang/${CLANG_VERSION}")
 endif()
 
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+  set(cmake_symlink_option "copy_directory")
+else()
+  set(cmake_symlink_option "create_symlink")
+endif()
+
 add_custom_command_target(unused_var
     COMMAND
       "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTLIB_DIR}"
     COMMAND
-      "${CMAKE_COMMAND}" "-E" "create_symlink"
+      "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
       "${clang_headers_location}"
       "${SWIFTLIB_DIR}/clang"
 

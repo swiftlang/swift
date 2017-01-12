@@ -2,6 +2,8 @@
 import os
 import subprocess
 
+import subprocess_utils
+
 DRY_RUN = False
 SQUELCH_STDERR = True
 ECHO_CALLS = False
@@ -11,13 +13,8 @@ def br_call(args, dry_run=DRY_RUN, echo=ECHO_CALLS):
     if dry_run or echo:
         print('BRCALL: ' + ' '.join(args))
     if dry_run:
-        return 0
-    if SQUELCH_STDERR:
-        return subprocess.call(args, stdout=open('/dev/null'),
-                               stderr=open('/dev/null'))
-    else:
-        # Useful for debugging.
-        return subprocess.call(args, stdout=open('/dev/null'))
+        return {'exit_code': 0, 'fingerprint': ''}
+    return subprocess_utils.call_fingerprint(args, echo_stderr=not SQUELCH_STDERR)
 
 
 # We use this since our squelching of stderr can hide missing file errors.
@@ -95,7 +92,7 @@ class SILToolInvoker(object):
 
     def __init__(self, config, extra_args=None):
         self.config = config
-        self.extra_args = extra_args
+        self.extra_args = extra_args or []
 
     def base_args(self, emit_sib):
         x = [self.tool]

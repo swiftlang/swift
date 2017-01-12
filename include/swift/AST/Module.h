@@ -506,7 +506,11 @@ public:
 private:
   // Make placement new and vanilla new/delete illegal for Modules.
   void *operator new(size_t Bytes) throw() = delete;
+
+  // Work around MSVC error: attempting to reference a deleted function.
+#if !defined(_MSC_VER) && !defined(__clang__)
   void operator delete(void *Data) throw() = delete;
+#endif
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 public:
   // Only allow allocation of Modules using the allocator in ASTContext
@@ -514,6 +518,8 @@ public:
   void *operator new(size_t Bytes, const ASTContext &C,
                      unsigned Alignment = alignof(ModuleDecl));
 };
+
+static inline unsigned alignOfFileUnit();
 
 /// A container for module-scope declarations that itself provides a scope; the
 /// smallest unit of code organization.
@@ -741,8 +747,12 @@ public:
   // Only allow allocation of FileUnits using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(FileUnit));
+                     unsigned Alignment = alignOfFileUnit());
 };
+
+static inline unsigned alignOfFileUnit() {
+  return alignof(FileUnit&);
+}
   
 /// A file containing Swift source code.
 ///

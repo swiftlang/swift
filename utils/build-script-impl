@@ -416,6 +416,7 @@ function set_build_options_for_host() {
             SWIFT_HOST_VARIANT="freebsd"
             SWIFT_HOST_VARIANT_SDK="FREEBSD"
             SWIFT_HOST_VARIANT_ARCH="x86_64"
+            USE_GOLD_LINKER=1
             ;;
         cygwin-x86_64)
             SWIFT_HOST_VARIANT="windows"

@@ -338,6 +338,8 @@ namespace {
       case ExistentialRepresentation::Metatype:
         return asImpl().handleTrivial(type);
       }
+
+      llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
     }
     RetTy visitProtocolType(CanProtocolType type) {
       return visitExistentialType(type);
@@ -1210,8 +1212,8 @@ TypeConverter::~TypeConverter() {
 void *TypeLowering::operator new(size_t size, TypeConverter &tc,
                                  IsDependent_t dependent) {
   return dependent
-    ? tc.DependentBPA.Allocate(size, alignof(TypeLowering))
-    : tc.IndependentBPA.Allocate(size, alignof(TypeLowering));
+    ? tc.DependentBPA.Allocate(size, alignof(TypeLowering&))
+    : tc.IndependentBPA.Allocate(size, alignof(TypeLowering&));
 }
 
 const TypeLowering *TypeConverter::find(TypeKey k) {
@@ -1448,12 +1450,7 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
     }
     
     CanType instanceType = substMeta.getInstanceType();
-    // If this is a DynamicSelf metatype, turn it into a metatype of the
-    // underlying self type.
-    if (auto dynamicSelf = dyn_cast<DynamicSelfType>(instanceType)) {
-      instanceType = dynamicSelf.getSelfType();
-    }
-    
+
     // Regardless of thinness, metatypes are always trivial.
     return CanMetatypeType::get(instanceType, repr);
   }
@@ -1812,6 +1809,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, Context, true);
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 /// Get the generic environment for an entity.
@@ -1858,6 +1857,8 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
     // Use the generic environment of the containing type.
     return c.getDecl()->getDeclContext()->getGenericEnvironmentOfContext();
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 SILType TypeConverter::getSubstitutedStorageType(AbstractStorageDecl *value,
@@ -2100,11 +2101,12 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
 
         case VarDecl::Stored: {
           // We can always capture the storage in these cases.
-          Type captureType;
-          if (auto *selfType = capturedVar->getType()->getAs<DynamicSelfType>()) {
+          Type captureType = capturedVar->getType();
+          if (auto *metatypeType = captureType->getAs<MetatypeType>())
+            captureType = metatypeType->getInstanceType();
+
+          if (auto *selfType = captureType->getAs<DynamicSelfType>()) {
             captureType = selfType->getSelfType();
-            if (auto *metatypeType = captureType->getAs<MetatypeType>())
-              captureType = metatypeType->getInstanceType();
 
             // We're capturing a 'self' value with dynamic 'Self' type;
             // handle it specially.

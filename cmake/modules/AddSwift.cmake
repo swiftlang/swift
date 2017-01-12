@@ -260,8 +260,12 @@ function(_add_variant_swift_compile_flags
     sdk arch build_type enable_assertions result_var_name)
   set(result ${${result_var_name}})
 
+  # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH, so don't include it.
+  if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_PATH}")
+  endif()
+
   list(APPEND result
-      "-sdk" "${SWIFT_SDK_${sdk}_PATH}"
       "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
       "-resource-dir" "${SWIFTLIB_DIR}")
 
@@ -717,6 +721,7 @@ function(_add_swift_library_single target name)
       swift_object_dependency_target
       swift_module_dependency_target
       swift_sib_dependency_target
+      swift_sibopt_dependency_target
       swift_sibgen_dependency_target
       SWIFTLIB_SINGLE_SOURCES
       SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
@@ -749,6 +754,11 @@ function(_add_swift_library_single target name)
   if (swift_sib_dependency_target)
     add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sib
       ${swift_sib_dependency_target})
+  endif()
+
+  if (swift_sibopt_dependency_target)
+    add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibopt
+      ${swift_sibopt_dependency_target})
   endif()
 
   if (swift_sibgen_dependency_target)
@@ -800,7 +810,7 @@ function(_add_swift_library_single target name)
     endif()
   endif()
 
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
     if("${libkind}" STREQUAL "SHARED")
       # Each dll has an associated .lib (import library); since we may be
       # building on a non-DLL platform (not windows), create an imported target
@@ -949,10 +959,17 @@ function(_add_swift_library_single target name)
   set(prefixed_link_libraries)
   foreach(dep ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
     if("${dep}" MATCHES "^clang")
-      set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-    endif()
-    if("${dep}" STREQUAL "cmark")
-      set(dep "${CMARK_LIBRARY_DIR}/lib${dep}.a")
+      if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+        set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/${dep}.lib")
+      else()
+        set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
+      endif()
+    elseif("${dep}" STREQUAL "cmark")
+      if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+        set(dep "${CMARK_LIBRARY_DIR}/${dep}.lib")
+      else()
+        set(dep "${CMARK_LIBRARY_DIR}/lib${dep}.a")
+      endif()
     endif()
     list(APPEND prefixed_link_libraries "${dep}")
   endforeach()
@@ -1124,7 +1141,7 @@ function(_add_swift_library_single target name)
         # libraries are only associated with shared libraries, so add an
         # additional check for that as well.
         set(import_library ${library})
-        if(TARGET ${library})
+        if(TARGET ${library} AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
           get_target_property(type ${library} TYPE)
           if(${type} STREQUAL "SHARED_LIBRARY")
             set(import_library ${library}_IMPLIB)
@@ -1841,6 +1858,7 @@ function(_add_swift_executable_single name)
       dependency_target
       unused_module_dependency_target
       unused_sib_dependency_target
+      unusged_sibopt_dependency_target
       unused_sibgen_dependency_target
       SWIFTEXE_SINGLE_SOURCES SWIFTEXE_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS

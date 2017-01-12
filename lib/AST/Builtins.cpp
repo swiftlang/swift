@@ -472,7 +472,8 @@ namespace {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
                                              GenericTypeParams);
 
-      ArchetypeBuilder Builder(*ctx.TheBuiltinModule);
+      ArchetypeBuilder Builder(ctx,
+                               LookUpConformanceInModule(ctx.TheBuiltinModule));
       for (auto gp : GenericTypeParams)
         Builder.addGenericParameter(gp);
 
@@ -1316,6 +1317,8 @@ static bool isUnknownOrUnordered(llvm::AtomicOrdering ordering) {
   case AtomicOrdering::SequentiallyConsistent:
     return false;
   }
+
+  llvm_unreachable("Unhandled AtomicOrdering in switch.");
 }
 
 static bool isValidCmpXChgOrdering(StringRef SuccessString, 

@@ -471,6 +471,9 @@ void CompilerInstance::performSema() {
   if (options.actionIsImmediate()) {
     TypeCheckOptions |= TypeCheckingFlags::ForImmediateMode;
   }
+  if (options.DebugTimeExpressionTypeChecking) {
+    TypeCheckOptions |= TypeCheckingFlags::DebugTimeExpressions;
+  }
 
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {

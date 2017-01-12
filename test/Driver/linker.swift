@@ -58,7 +58,7 @@
 
 // There are more RUN lines further down in the file.
 
-// REQUIRES: X86
+// REQUIRES: CODEGENERATOR=X86
 
 // FIXME: Need to set up a sysroot for osx so the DEBUG checks work on linux/freebsd
 // rdar://problem/19692770

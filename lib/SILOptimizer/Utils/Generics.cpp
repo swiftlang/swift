@@ -63,7 +63,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
       ->getSubstitutionMap(ParamSubs);
 
   // We do not support partial specialization.
-  if (hasUnboundGenericTypes(InterfaceSubs.getMap())) {
+  if (hasTypeParameterTypes(InterfaceSubs)) {
     DEBUG(llvm::dbgs() <<
           "    Cannot specialize with unbound interface substitutions.\n");
     DEBUG(for (auto Sub : ParamSubs) {
@@ -71,7 +71,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
           });
     return;
   }
-  if (hasDynamicSelfTypes(InterfaceSubs.getMap())) {
+  if (hasDynamicSelfTypes(InterfaceSubs)) {
     DEBUG(llvm::dbgs() << "    Cannot specialize with dynamic self.\n");
     return;
   }
@@ -298,7 +298,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
       fixUsedVoidType(ResultBB->getArgument(0), Loc, Builder);
 
       SILArgument *Arg = ResultBB->replacePHIArgument(
-          0, StoreResultTo->getType().getObjectType());
+          0, StoreResultTo->getType().getObjectType(),
+          ValueOwnershipKind::Owned);
       // Store the direct result to the original result address.
       Builder.createStore(Loc, Arg, StoreResultTo,
                           StoreOwnershipQualifier::Unqualified);
@@ -434,11 +435,12 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
     SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
     Builder.createTryApply(Loc, FRI, SpecializedFunc->getLoweredType(),
                            {}, Arguments, NormalBB, ErrorBB);
-    auto *ErrorVal =
-        ErrorBB->createPHIArgument(SpecType->getErrorResult().getSILType());
+    auto *ErrorVal = ErrorBB->createPHIArgument(
+        SpecType->getErrorResult().getSILType(), ValueOwnershipKind::Owned);
     Builder.setInsertionPoint(ErrorBB);
     Builder.createThrow(Loc, ErrorVal);
-    ReturnValue = NormalBB->createPHIArgument(SpecType->getSILResult());
+    ReturnValue = NormalBB->createPHIArgument(SpecType->getSILResult(),
+                                              ValueOwnershipKind::Owned);
     Builder.setInsertionPoint(NormalBB);
   } else {
     ReturnValue = Builder.createApply(Loc, FRI, SpecializedFunc->getLoweredType(),

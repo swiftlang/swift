@@ -390,7 +390,7 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   // If all substitutions are concrete, then there is no need to perform the
   // generic inlining. Let the generic specializer create a specialized
   // function and then decide if it is beneficial to inline it.
-  if (!hasUnboundGenericTypes(AI.getSubstitutions()))
+  if (!hasArchetypes(AI.getSubstitutions()))
     return false;
 
   SILFunction *Callee = AI.getReferencedFunction();

@@ -716,7 +716,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   // is not address-only.
   SILValue eltValue;
   if (!value.getType().isAddress())
-    eltValue = contBB->createPHIArgument(eltTy);
+    eltValue = contBB->createPHIArgument(eltTy, ValueOwnershipKind::Owned);
 
   if (subInit == nullptr) {
     // If there is no subinitialization, then we are done matching.  Don't

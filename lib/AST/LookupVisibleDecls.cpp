@@ -16,8 +16,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "NameLookupImpl.h"
-#include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/NameLookup.h"
+#include "swift/AST/Initializer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Sema/IDETypeChecking.h"

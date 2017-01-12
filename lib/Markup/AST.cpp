@@ -241,6 +241,8 @@ ArrayRef<MarkupASTNode *> MarkupASTNode::getChildren() {
 #define MARKUP_AST_NODE_RANGE(Id, FirstId, LastId)
 #include "swift/Markup/ASTNodes.def"
   }
+
+  llvm_unreachable("Unhandled ASTNodeKind in switch.");
 }
 
 ArrayRef<const MarkupASTNode *> MarkupASTNode::getChildren() const {
@@ -252,6 +254,8 @@ return cast<Id>(this)->getChildren();
 #define MARKUP_AST_NODE_RANGE(Id, FirstId, LastId)
 #include "swift/Markup/ASTNodes.def"
   }
+
+  llvm_unreachable("Unhandled ASTNodeKind in switch.");
 }
 
 void swift::markup::printInlinesUnder(const MarkupASTNode *Node,

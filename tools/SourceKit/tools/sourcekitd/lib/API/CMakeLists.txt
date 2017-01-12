@@ -23,10 +23,10 @@ set(sourcekitdAPI_NonDarwin_InProc_sources
   sourcekitdAPI-InProc.cpp)
 set(LLVM_OPTIONAL_SOURCES ${sourcekitdAPI_Darwin_sources} ${sourcekitdAPI_NonDarwin_InProc_sources})
 
-if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
-  list(APPEND sourcekitdAPI_sources ${sourcekitdAPI_NonDarwin_InProc_sources})
-elseif(APPLE)
+if(APPLE AND HAVE_XPC_H)
   list(APPEND sourcekitdAPI_sources ${sourcekitdAPI_Darwin_sources})
+elseif(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
+  list(APPEND sourcekitdAPI_sources ${sourcekitdAPI_NonDarwin_InProc_sources})
 endif()
 
 add_sourcekit_library(sourcekitdAPI

@@ -23,10 +23,15 @@
 #include <mutex>
 #include <assert.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdocumentation"
+
 #include <unicode/ustring.h>
 #include <unicode/ucol.h>
 #include <unicode/ucoleitr.h>
 #include <unicode/uiter.h>
+
+#pragma clang diagnostic pop
 
 #include "../SwiftShims/UnicodeShims.h"
 

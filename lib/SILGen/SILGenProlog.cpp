@@ -88,11 +88,6 @@ public:
   ManagedValue getManagedValue(SILValue arg, CanType t,
                                  SILParameterInfo parameterInfo) const {
     switch (parameterInfo.getConvention()) {
-    case ParameterConvention::Direct_Deallocating:
-      // If we have a deallocating parameter, it is passed in at +0 and will not
-      // be deallocated since we do not allow for resurrection.
-      return ManagedValue::forUnmanaged(arg);
-
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Indirect_In_Guaranteed:
       // If we have a guaranteed parameter, it is passed in at +0, and its
@@ -278,18 +273,20 @@ struct ArgumentInitHelper {
   }
 
   void emitParam(ParamDecl *PD) {
+    // The contextual type of a ParamDecl has DynamicSelfType. We don't want
+    // that here.
+    auto type = PD->getType()->eraseDynamicSelfType();
+
     ++ArgNo;
     if (PD->hasName()) {
-      makeArgumentIntoBinding(PD->getType(), &*f.begin(), PD);
+      makeArgumentIntoBinding(type, &*f.begin(), PD);
       return;
     }
 
-    emitAnonymousParam(PD->getType(), PD, PD);
+    emitAnonymousParam(type, PD, PD);
   }
 
   void emitAnonymousParam(Type type, SILLocation paramLoc, ParamDecl *PD) {
-    assert(!PD || PD->getType()->isEqual(type));
-
     // Allow non-materializable tuples to be bound to anonymous parameters.
     if (!type->isMaterializable()) {
       if (auto tupleType = type->getAs<TupleType>()) {
@@ -341,7 +338,7 @@ void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
                                      SmallVectorImpl<SILValue> &parameters) {
   for (auto param : *params) {
     Type type = (param->hasType()
-                 ? param->getType()
+                 ? param->getType()->eraseDynamicSelfType()
                  : F.mapTypeIntoContext(param->getInterfaceType()));
     makeArgument(type, param, parameters, *this);
   }

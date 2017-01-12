@@ -275,8 +275,16 @@ struct ASTContext::Implementation {
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
         conformance.~SpecializedProtocolConformance();
+      // Work around MSVC warning: local variable is initialized but
+      // not referenced.
+#if defined(_MSC_VER)
+#pragma warning (disable: 4189)
+#endif
       for (auto &conformance : InheritedConformances)
         conformance.~InheritedProtocolConformance();
+#if defined(_MSC_VER)
+#pragma warning (default: 4189)
+#endif
 
       // Call the normal conformance destructors last since they could be
       // referenced by the other conformance types.
@@ -536,6 +544,8 @@ EnumDecl *ASTContext::getOptionalDecl(OptionalTypeKind kind) const {
   case OTK_Optional:
     return getOptionalDecl();
   }
+
+  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
 }
 
 static EnumElementDecl *findEnumElement(EnumDecl *e, Identifier name) {
@@ -1241,7 +1251,7 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
     return known->second.get();
 
   // Create a new archetype builder with the given signature.
-  auto builder = new ArchetypeBuilder(*mod);
+  auto builder = new ArchetypeBuilder(*this, LookUpConformanceInModule(mod));
   builder->addGenericSignature(sig);
 
   // Store this archetype builder (no generic environment yet).
@@ -1714,6 +1724,8 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
     // Normal method.
     return { 4, func->getFullName() };
   }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }
 
 bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
@@ -3760,6 +3772,8 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   case ForeignLanguage::ObjectiveC:
     return entry;
   }
+
+  llvm_unreachable("Unhandled ForeignLanguage in switch.");
 }
 
 bool ASTContext::isTypeBridgedInExternalModule(

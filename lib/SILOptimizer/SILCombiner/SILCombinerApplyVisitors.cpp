@@ -521,7 +521,6 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
         case ParameterConvention::Indirect_Inout:
         case ParameterConvention::Indirect_InoutAliasable:
         case ParameterConvention::Direct_Unowned:
-        case ParameterConvention::Direct_Deallocating:
         case ParameterConvention::Direct_Guaranteed:
           break;
       }

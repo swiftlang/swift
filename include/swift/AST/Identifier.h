@@ -510,6 +510,20 @@ public:
 } // end namespace swift
 
 namespace llvm {
+  // A DeclName is "pointer like".
+  template<typename T> class PointerLikeTypeTraits;
+  template<>
+  class PointerLikeTypeTraits<swift::DeclName> {
+  public:
+    static inline void *getAsVoidPointer(swift::DeclName name) {
+      return name.getOpaqueValue();
+    }
+    static inline swift::DeclName getFromVoidPointer(void *ptr) {
+      return swift::DeclName::getFromOpaqueValue(ptr);
+    }
+    enum { NumLowBitsAvailable = 0 };
+  };
+
   // DeclNames hash just like pointers.
   template<> struct DenseMapInfo<swift::DeclName> {
     static swift::DeclName getEmptyKey() {
@@ -524,7 +538,21 @@ namespace llvm {
     static bool isEqual(swift::DeclName LHS, swift::DeclName RHS) {
       return LHS.getOpaqueValue() == RHS.getOpaqueValue();
     }
-  };  
+  };
+
+  // An ObjCSelector is "pointer like".
+  template<typename T> class PointerLikeTypeTraits;
+  template<>
+  class PointerLikeTypeTraits<swift::ObjCSelector> {
+  public:
+    static inline void *getAsVoidPointer(swift::ObjCSelector name) {
+      return name.getOpaqueValue();
+    }
+    static inline swift::ObjCSelector getFromVoidPointer(void *ptr) {
+      return swift::ObjCSelector::getFromOpaqueValue(ptr);
+    }
+    enum { NumLowBitsAvailable = 0 };
+  };
 
   // ObjCSelectors hash just like pointers.
   template<> struct DenseMapInfo<swift::ObjCSelector> {

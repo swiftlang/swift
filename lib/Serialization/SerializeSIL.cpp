@@ -31,6 +31,8 @@
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
+#include <type_traits>
+
 using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
@@ -350,7 +352,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // If we have a body, we might have a generic environment.
   GenericEnvironmentID genericEnvID = 0;
-  if (!F.isExternalDeclaration())
+  if (!NoBody)
     genericEnvID = S.addGenericEnvironmentRef(F.getGenericEnvironment());
 
   DeclID clangNodeOwnerID;
@@ -418,7 +420,27 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
     DeclID tId = S.addTypeRef(SA->getType().getSwiftRValueType());
     DeclID vId = addValueRef(static_cast<const ValueBase*>(SA));
     Args.push_back(tId);
-    Args.push_back((unsigned)SA->getType().getCategory());
+
+    // We put these static asserts here to formalize our assumption that both
+    // SILValueCategory and ValueOwnershipKind have uint8_t as their underlying
+    // pointer values.
+    static_assert(
+        std::is_same<
+            std::underlying_type<decltype(SA->getType().getCategory())>::type,
+            uint8_t>::value,
+        "Expected an underlying uint8_t type");
+    // We put these static asserts here to formalize our assumption that both
+    // SILValueCategory and ValueOwnershipKind have uint8_t as their underlying
+    // pointer values.
+    static_assert(std::is_same<std::underlying_type<decltype(
+                                   SA->getOwnershipKind())::innerty>::type,
+                               uint8_t>::value,
+                  "Expected an underlying uint8_t type");
+    unsigned packedMetadata = 0;
+    packedMetadata |= unsigned(SA->getType().getCategory());
+    packedMetadata |= unsigned(SA->getOwnershipKind()) << 8;
+    Args.push_back(packedMetadata);
+
     Args.push_back(vId);
   }
 

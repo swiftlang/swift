@@ -207,18 +207,37 @@ class Z {
 
 }
 
-// Make sure we erase dynamic Self in a metatype instance type when
-// performing SIL type substitution.
+// Unbound reference to a method returning Self.
 
-func makeInstance<T: FactoryBase>(_ cls: T.Type) -> T {
-    return cls.init()
+class Factory {
+  func newInstance() -> Self {}
+  class func classNewInstance() -> Self {}
+  static func staticNewInstance() -> Self {}
 }
 
-class FactoryBase {
-    required init() { }
-    func before() -> Self {
-        return makeInstance(type(of: self))
-    }
+// CHECK-LABEL: sil hidden @_TF12dynamic_self22partialApplySelfReturnFT1cCS_7Factory1tMS0__T_ : $@convention(thin) (@owned Factory, @thick Factory.Type) -> ()
+func partialApplySelfReturn(c: Factory, t: Factory.Type) {
+  // CHECK: function_ref @_TFC12dynamic_self7Factory11newInstanceFT_DS0_ : $@convention(thin) (@owned Factory) -> @owned @callee_owned () -> @owned Factory
+  _ = c.newInstance
+  // CHECK: function_ref @_TFC12dynamic_self7Factory11newInstanceFT_DS0_ : $@convention(thin) (@owned Factory) -> @owned @callee_owned () -> @owned Factory
+  _ = Factory.newInstance
+  // CHECK: function_ref @_TFC12dynamic_self7Factory11newInstanceFT_DS0_ : $@convention(thin) (@owned Factory) -> @owned @callee_owned () -> @owned Factory
+  _ = t.newInstance
+  _ = type(of: c).newInstance
+
+  // CHECK: function_ref @_TZFC12dynamic_self7Factory16classNewInstanceFT_DS0_ : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  _ = t.classNewInstance
+  // CHECK: function_ref @_TZFC12dynamic_self7Factory16classNewInstanceFT_DS0_ : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  _ = type(of: c).classNewInstance
+  // CHECK: function_ref @_TZFC12dynamic_self7Factory16classNewInstanceFT_DS0_ : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  _ = Factory.classNewInstance
+
+  // CHECK: function_ref @_TZFC12dynamic_self7Factory17staticNewInstanceFT_DS0_ : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  _ = t.staticNewInstance
+  // CHECK: function_ref @_TZFC12dynamic_self7Factory17staticNewInstanceFT_DS0_ : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  _ = type(of: c).staticNewInstance
+  // CHECK: function_ref @_TZFC12dynamic_self7Factory17staticNewInstanceFT_DS0_ : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  _ = Factory.staticNewInstance
 }
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {

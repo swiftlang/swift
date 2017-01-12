@@ -58,8 +58,11 @@ Func DefaultRandomAccessIndices.index(after:) has return type change from Elemen
 Func DefaultRandomAccessIndices.index(before:) has return type change from Elements.Index to DefaultRandomAccessIndices.Index
 Func Dictionary.index(after:) has return type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
 Func Dictionary.index(forKey:) has return type change from DictionaryIndex<Key, Value>? to Dictionary<Key, Value>.Index?
+Func Dictionary.makeIterator() has return type change from DictionaryIterator<Key, Value> to DictionaryIterator<Dictionary.Key, Dictionary.Value>
 Func Dictionary.popFirst() has return type change from (key: Key, value: Value)? to Dictionary.Element?
 Func Dictionary.remove(at:) has return type change from (key: Key, value: Value) to Dictionary.Element
+Func Dictionary.removeValue(forKey:) has return type change from Value? to Dictionary.Value?
+Func Dictionary.updateValue(_:forKey:) has return type change from Value? to Dictionary.Value?
 Func EnumeratedIterator.next() has return type change from (offset: Int, element: Base.Element)? to EnumeratedIterator.Element?
 Func FlattenBidirectionalCollection.index(after:) has return type change from FlattenBidirectionalCollectionIndex<Base> to FlattenBidirectionalCollection.Index
 Func FlattenBidirectionalCollection.index(before:) has return type change from FlattenBidirectionalCollectionIndex<Base> to FlattenBidirectionalCollection.Index
@@ -182,10 +185,22 @@ Func ReversedRandomAccessCollection.index(_:offsetBy:) has return type change fr
 Func ReversedRandomAccessCollection.index(_:offsetBy:limitedBy:) has return type change from ReversedRandomAccessIndex<Base>? to ReversedRandomAccessCollection.Index?
 Func ReversedRandomAccessCollection.index(after:) has return type change from ReversedRandomAccessIndex<Base> to ReversedRandomAccessCollection.Index
 Func ReversedRandomAccessCollection.index(before:) has return type change from ReversedRandomAccessIndex<Base> to ReversedRandomAccessCollection.Index
+Func Set.formSymmetricDifference(_:) has 1st parameter type change from Set<Element> to Set<Set.Element>
 Func Set.index(after:) has return type change from SetIndex<Element> to Set<Element>.Index
 Func Set.index(of:) has return type change from SetIndex<Element>? to Set<Element>.Index?
+Func Set.intersection(_:) has return type change from Set<Element> to Set<Set.Element>
+Func Set.isDisjoint(with:) has 1st parameter type change from Set<Element> to Set<Set.Element>
+Func Set.isStrictSubset(of:) has 1st parameter type change from Set<Element> to Set<Set.Element>
+Func Set.isStrictSuperset(of:) has 1st parameter type change from Set<Element> to Set<Set.Element>
+Func Set.isSubset(of:) has 1st parameter type change from Set<Element> to Set<Set.Element>
+Func Set.isSuperset(of:) has 1st parameter type change from Set<Element> to Set<Set.Element>
 Func Set.popFirst() has return type change from Element? to Set.Element?
 Func Set.remove(at:) has 1st parameter type change from SetIndex<Element> to Set<Element>.Index
+Func Set.removeFirst() has return type change from Element to Set.Element
+Func Set.subtract(_:) has 1st parameter type change from Set<Element> to Set<Set.Element>
+Func Set.subtracting(_:) has return type change from Set<Element> to Set<Set.Element>
+Func Set.symmetricDifference(_:) has return type change from Set<Element> to Set<Set.Element>
+Func Set.union(_:) has return type change from Set<Element> to Set<Set.Element>
 Func Slice.distance(from:to:) has return type change from Base.IndexDistance to Slice.IndexDistance
 Func Slice.index(_:offsetBy:) has return type change from Base.Index to Slice.Index
 Func Slice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to Slice.Index?

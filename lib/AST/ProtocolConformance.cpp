@@ -221,6 +221,8 @@ GenericEnvironment *ProtocolConformance::getGenericEnvironment() const {
     // FIXME: We could return a meaningful GenericEnvironment here
     return nullptr;
   }
+
+  llvm_unreachable("Unhandled ProtocolConformanceKind in switch.");
 }
 
 GenericSignature *ProtocolConformance::getGenericSignature() const {
@@ -237,6 +239,8 @@ GenericSignature *ProtocolConformance::getGenericSignature() const {
     // type variables.
     return nullptr;
   }
+
+  llvm_unreachable("Unhandled ProtocolConformanceKind in switch.");
 }
 
 bool ProtocolConformance::isBehaviorConformance() const {
@@ -414,8 +418,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
     assert((conforms ||
             specializedType->isTypeVariableOrMember() ||
             specializedType->isTypeParameter() ||
-            specializedType->hasError() ||
-            specializedType->getCanonicalType()->hasError()) &&
+            specializedType->hasError()) &&
            "Improperly checked substitution");
     conformances.push_back(conforms ? *conforms 
                                     : ProtocolConformanceRef(proto));

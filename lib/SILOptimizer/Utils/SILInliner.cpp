@@ -137,8 +137,8 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
                            SILFunction::iterator(ReturnToBB));
 
     // Create an argument on the return-to BB representing the returned value.
-    auto *RetArg =
-        ReturnToBB->createPHIArgument(AI.getInstruction()->getType());
+    auto *RetArg = ReturnToBB->createPHIArgument(AI.getInstruction()->getType(),
+                                                 ValueOwnershipKind::Owned);
     // Replace all uses of the ApplyInst with the new argument.
     AI.getInstruction()->replaceAllUsesWith(RetArg);
   }

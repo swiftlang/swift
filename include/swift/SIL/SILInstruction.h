@@ -80,7 +80,11 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
 
   SILInstruction() = delete;
   void operator=(const SILInstruction &) = delete;
+
+  // Work around MSVC error: attempting to reference a deleted function.
+#if !defined(_MSC_VER) || defined(__clang__)
   void operator delete(void *Ptr, size_t) = delete;
+#endif
 
   /// Check any special state of instructions that are not represented in the
   /// instructions operands/type.
@@ -459,8 +463,15 @@ public:
     }
   }
 
+  // Work around MSVC bug: can't infer llvm::trailing_objects_internal,
+  // even though we granted friend access to it.
   size_t numTrailingObjects(
+#if defined(_MSC_VER) && !defined(__clang__)
+      llvm::trailing_objects_internal::TrailingObjectsBase::OverloadToken<
+      Operand>) const {
+#else
       typename TrailingBase::template OverloadToken<Operand>) const {
+#endif
     return NumOperands;
   }
 
@@ -2302,8 +2313,16 @@ public:
   SILType getBoundType() const { return BoundType ; }
 
   // Implement llvm::TrailingObjects.
+
+  // Work around MSVC bug: can't infer llvm::trailing_objects_internal,
+  // even though we granted friend access to it.
   size_t numTrailingObjects(
+#if defined(_MSC_VER) && !defined(__clang__)
+      llvm::trailing_objects_internal::TrailingObjectsBase::OverloadToken<
+      Operand>) const {
+#else
       typename TrailingBase::template OverloadToken<Operand>) const {
+#endif
     return NumOperands;
   }
 

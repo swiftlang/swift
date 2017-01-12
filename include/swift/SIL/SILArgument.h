@@ -36,12 +36,20 @@ SILFunctionType::getSILArgumentConvention(unsigned index) const {
 
 class SILArgument : public ValueBase {
   void operator=(const SILArgument &) = delete;
+
+  // Work around MSVC error: attempting to reference a deleted function.
+#if !defined(_MSC_VER) || defined(__clang__)
   void operator delete(void *Ptr, size_t) = delete;
+#endif
 
   SILBasicBlock *ParentBB;
   const ValueDecl *Decl;
+  ValueOwnershipKind OwnershipKind;
 
 public:
+  ValueOwnershipKind getOwnershipKind() const { return OwnershipKind; }
+  void setOwnershipKind(ValueOwnershipKind NewKind) { OwnershipKind = NewKind; }
+
   SILBasicBlock *getParent() { return ParentBB; }
   const SILBasicBlock *getParent() const { return ParentBB; }
 
@@ -103,28 +111,26 @@ public:
 
 protected:
   SILArgument(ValueKind SubClassKind, SILBasicBlock *ParentBB, SILType Ty,
+              ValueOwnershipKind OwnershipKind,
               const ValueDecl *D = nullptr);
   SILArgument(ValueKind SubClassKind, SILBasicBlock *ParentBB,
               SILBasicBlock::arg_iterator Pos, SILType Ty,
+              ValueOwnershipKind OwnershipKind,
               const ValueDecl *D = nullptr);
 
   // A special constructor, only intended for use in
-  // SILBasicBlock::replaceBBArg.
+  // SILBasicBlock::replacePHIArg.
   explicit SILArgument(ValueKind SubClassKind, SILType Ty,
+                       ValueOwnershipKind OwnershipKind,
                        const ValueDecl *D = nullptr)
-      : ValueBase(SubClassKind, Ty), ParentBB(nullptr), Decl(D) {}
+      : ValueBase(SubClassKind, Ty), ParentBB(nullptr), Decl(D), OwnershipKind(OwnershipKind) {}
   void setParent(SILBasicBlock *P) { ParentBB = P; }
 
   friend SILBasicBlock;
 };
 
 class SILPHIArgument : public SILArgument {
-  ValueOwnershipKind Kind;
-
 public:
-  /// Return the static ownership kind associated with this SILPHIArgument.
-  ValueOwnershipKind getOwnershipKind() const { return Kind; }
-
   /// Returns the incoming SILValue from the \p BBIndex predecessor of this
   /// argument's parent BB. If the routine fails, it returns an empty SILValue.
   /// Note that for some predecessor terminators the incoming value is not
@@ -167,20 +173,19 @@ public:
 
 private:
   friend SILBasicBlock;
-  SILPHIArgument(SILBasicBlock *ParentBB, SILType Ty, ValueOwnershipKind Kind,
+  SILPHIArgument(SILBasicBlock *ParentBB, SILType Ty, ValueOwnershipKind OwnershipKind,
                  const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILPHIArgument, ParentBB, Ty, D), Kind(Kind) {}
+      : SILArgument(ValueKind::SILPHIArgument, ParentBB, Ty, OwnershipKind, D) {}
   SILPHIArgument(SILBasicBlock *ParentBB, SILBasicBlock::arg_iterator Pos,
-                 SILType Ty, ValueOwnershipKind Kind,
+                 SILType Ty, ValueOwnershipKind OwnershipKind,
                  const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILPHIArgument, ParentBB, Pos, Ty, D),
-        Kind(Kind) {}
+      : SILArgument(ValueKind::SILPHIArgument, ParentBB, Pos, Ty, OwnershipKind, D) {}
 
   // A special constructor, only intended for use in
-  // SILBasicBlock::replaceBBArg.
-  explicit SILPHIArgument(SILType Ty, ValueOwnershipKind Kind,
+  // SILBasicBlock::replacePHIArg.
+  explicit SILPHIArgument(SILType Ty, ValueOwnershipKind OwnershipKind,
                           const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILPHIArgument, Ty, D), Kind(Kind) {}
+      : SILArgument(ValueKind::SILPHIArgument, Ty, OwnershipKind, D) {}
 };
 
 class SILFunctionArgument : public SILArgument {
@@ -226,16 +231,12 @@ public:
 private:
   friend SILBasicBlock;
 
-  SILFunctionArgument(SILBasicBlock *ParentBB, SILType Ty,
+  SILFunctionArgument(SILBasicBlock *ParentBB, SILType Ty, ValueOwnershipKind OwnershipKind,
                       const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILFunctionArgument, ParentBB, Ty, D) {}
+      : SILArgument(ValueKind::SILFunctionArgument, ParentBB, Ty, OwnershipKind, D) {}
   SILFunctionArgument(SILBasicBlock *ParentBB, SILBasicBlock::arg_iterator Pos,
-                      SILType Ty, const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILFunctionArgument, ParentBB, Pos, Ty, D) {}
-
-  // A special constructor, only intended for use in SILBasicBlock::replaceBBArg.
-  explicit SILFunctionArgument(SILType Ty, const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILFunctionArgument, Ty, D) {}
+                      SILType Ty, ValueOwnershipKind OwnershipKind, const ValueDecl *D = nullptr)
+      : SILArgument(ValueKind::SILFunctionArgument, ParentBB, Pos, Ty, OwnershipKind, D) {}
 };
 
 //===----------------------------------------------------------------------===//

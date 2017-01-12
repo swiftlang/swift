@@ -1028,6 +1028,8 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
     }
   }
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
@@ -1488,6 +1490,8 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return SelectorFamily::None;
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 namespace {
@@ -1684,6 +1688,8 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::IVarDestroyer:
       return SILFunctionTypeRepresentation::Method;
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
@@ -1837,7 +1843,6 @@ namespace {
       case ParameterConvention::Direct_Guaranteed:
         if (isTrivial) return ParameterConvention::Direct_Unowned;
         SWIFT_FALLTHROUGH;
-      case ParameterConvention::Direct_Deallocating:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
@@ -2207,28 +2212,6 @@ namespace {
       CanType substObjectType = visit(origObjectType);
       return CanType(BoundGenericType::get(origType->getDecl(), Type(),
                                            substObjectType));
-    }
-
-    /// Metatypes get DynamicSelfType stripped off the instance type.
-    CanType visitMetatypeType(CanMetatypeType origType) {
-      CanType origInstanceType = origType.getInstanceType();
-      CanType substInstanceType = origInstanceType.subst(
-            Subst, Conformances, None)->getCanonicalType();
-
-      // If the substitution didn't change anything, we know that the
-      // original type was a lowered type, so we're good.
-      if (origInstanceType == substInstanceType) {
-        return origType;
-      }
-
-      // If this is a DynamicSelf metatype, turn it into a metatype of the
-      // underlying self type.
-      if (auto dynamicSelf = dyn_cast<DynamicSelfType>(substInstanceType)) {
-        substInstanceType = dynamicSelf.getSelfType();
-      }
-
-      return CanMetatypeType::get(substInstanceType,
-                                  origType->getRepresentation());
     }
 
     /// Any other type is would be a valid type in the AST.  Just

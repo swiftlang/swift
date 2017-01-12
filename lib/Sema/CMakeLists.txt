@@ -23,6 +23,7 @@ add_swift_library(swiftSema STATIC
   NameBinding.cpp
   PCMacro.cpp
   PlaygroundTransform.cpp
+  ResilienceDiagnostics.cpp
   SourceLoader.cpp
   TypeCheckAttr.cpp
   TypeCheckAvailability.cpp

@@ -183,7 +183,9 @@ public:
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
+#if !defined(_MSC_VER) || defined(__clang__)
   void operator delete(void *Data) = delete;
+#endif
 
   /// Only allow placement new.
   void *operator new(size_t Bytes, void *Mem) {
@@ -205,6 +207,10 @@ public:
 
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(ModuleDecl *M, Type type) const;
+
+  /// Map an interface type to a contextual type.
+  Type mapTypeIntoContext(Type type,
+                          LookupConformanceFn lookupConformance) const;
 
   /// Map a generic parameter type to a contextual type.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;

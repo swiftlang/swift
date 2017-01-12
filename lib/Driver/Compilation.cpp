@@ -481,8 +481,9 @@ int Compilation::performJobsImpl() {
   // continue (if execution should stop, this callback should return true), and
   // it should also schedule any additional commands which we now know need
   // to run.
-  auto taskFinished = [&] (ProcessId Pid, int ReturnCode, StringRef Output,
-                           void *Context) -> TaskFinishedResponse {
+  auto taskFinished = [&](ProcessId Pid, int ReturnCode, StringRef Output,
+                          StringRef Errors,
+                          void *Context) -> TaskFinishedResponse {
     const Job *FinishedCmd = (const Job *)Context;
 
     if (ShowDriverTimeCompilation) {
@@ -612,8 +613,9 @@ int Compilation::performJobsImpl() {
     return TaskFinishedResponse::ContinueExecution;
   };
 
-  auto taskSignalled = [&] (ProcessId Pid, StringRef ErrorMsg, StringRef Output,
-                            void *Context) -> TaskFinishedResponse {
+  auto taskSignalled = [&](ProcessId Pid, StringRef ErrorMsg, StringRef Output,
+                           StringRef Errors,
+                           void *Context) -> TaskFinishedResponse {
     const Job *SignalledCmd = (const Job *)Context;
 
     if (ShowDriverTimeCompilation) {

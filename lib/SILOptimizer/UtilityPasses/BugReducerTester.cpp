@@ -58,6 +58,12 @@ static llvm::cl::opt<FailureKind> TargetFailureKind(
         clEnumValEnd),
     llvm::cl::init(FailureKind::None));
 
+
+LLVM_ATTRIBUTE_NOINLINE
+void THIS_TEST_IS_EXPECTED_TO_CRASH_HERE() {
+  llvm_unreachable("Found the target!");
+}
+
 namespace {
 
 class BugReducerTester : public SILFunctionTransform {
@@ -117,7 +123,7 @@ class BugReducerTester : public SILFunctionTransform {
         // Ok, we found the Apply that we want! If we are asked to crash, crash
         // here.
         if (TargetFailureKind == FailureKind::OptimizerCrasher)
-          llvm_unreachable("Found the target!");
+          THIS_TEST_IS_EXPECTED_TO_CRASH_HERE();
 
         // Otherwise, if we are asked to perform a runtime time miscompile,
         // delete the apply target.

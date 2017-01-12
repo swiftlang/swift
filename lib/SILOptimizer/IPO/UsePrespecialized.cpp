@@ -94,14 +94,9 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (!SpecType)
       continue;
 
-    // Bail if any generic types parameters of the concrete type
-    // are unbound.
-    if (SpecType->hasArchetype())
-      continue;
-
-    // Bail if any generic types parameters of the concrete type
-    // are unbound.
-    if (hasUnboundGenericTypes(Subs))
+    // Bail any callee generic type parameters are dependent on the generic
+    // parameters of the caller.
+    if (SpecType->hasArchetype() || hasArchetypes(Subs))
       continue;
 
     // Create a name of the specialization.

@@ -317,6 +317,8 @@ SourceRange StmtConditionElement::getSourceRange() const {
       return SourceRange();
     }
   }
+
+  llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
 SourceLoc StmtConditionElement::getStartLoc() const {
@@ -328,6 +330,8 @@ SourceLoc StmtConditionElement::getStartLoc() const {
   case StmtConditionElement::CK_PatternBinding:
     return getSourceRange().Start;
   }
+
+  llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
 SourceLoc StmtConditionElement::getEndLoc() const {
@@ -339,6 +343,8 @@ SourceLoc StmtConditionElement::getEndLoc() const {
   case StmtConditionElement::CK_PatternBinding:
     return getSourceRange().End;
   }
+
+  llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
 static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
