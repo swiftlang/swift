@@ -1949,35 +1949,31 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     if (archetype->isInvalid())
       continue;
 
-    // If this type is not the representative, or if it was made concrete,
-    // we emit a same-type constraint.
-    if (archetype->getRepresentative() != archetype ||
-        archetype->isConcreteType()) {
-      auto *first = archetype;
-      auto *second = archetype->getRepresentative();
+    // If this type is equivalent to a concrete type, emit the same-type
+    // constraint.
+    auto rep = archetype->getRepresentative();
+    if (auto concreteType = rep->getConcreteType()) {
+      f(RequirementKind::SameType, archetype, concreteType,
+        (archetype->SameTypeSource ? archetype->getSameTypeSource()
+                                   : rep->getSameTypeSource()));
+      continue;
+    }
 
-      if (second->isConcreteType()) {
-        Type concreteType = second->getConcreteType();
-        f(RequirementKind::SameType, first, concreteType,
-          first->getSameTypeSource());
-        continue;
-      }
+    // If this type is not the anchor, we emit a same-type constraint to the
+    // anchor.
+    if (archetype->getArchetypeAnchor() != archetype) {
+      auto *anchor = archetype->getArchetypeAnchor();
 
-      assert(!first->isConcreteType());
-
-      // Neither one is concrete. Put the shorter type first.
-      if (compareDependentTypes(&first, &second) > 0)
-        std::swap(first, second);
-
-      f(RequirementKind::SameType, first, second,
-        archetype->getSameTypeSource());
+      f(RequirementKind::SameType, archetype, anchor,
+        (archetype->SameTypeSource ? archetype->getSameTypeSource()
+                                   : anchor->getSameTypeSource()));
       continue;
     }
 
     // If we have a superclass, produce a superclass requirement
-    if (Type superclass = archetype->getSuperclass()) {
+    if (Type superclass = rep->getSuperclass()) {
       f(RequirementKind::Superclass, archetype, superclass,
-        archetype->getSuperclassSource());
+        rep->getSuperclassSource());
     }
 
     // If we have a layout constraint, produce a layout requirement.
@@ -1989,7 +1985,7 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     // Enumerate conformance requirements.
     SmallVector<ProtocolDecl *, 4> protocols;
     DenseMap<ProtocolDecl *, RequirementSource> protocolSources;
-    for (const auto &conforms : archetype->getConformsTo()) {
+    for (const auto &conforms : rep->getConformsTo()) {
       protocols.push_back(conforms.first);
       assert(protocolSources.count(conforms.first) == 0 && 
              "redundant protocol requirement?");

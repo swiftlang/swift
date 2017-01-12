@@ -368,6 +368,9 @@ void GenericSignature::
 getSubstitutions(TypeSubstitutionFn subs,
                  GenericSignature::LookupConformanceFn lookupConformance,
                  SmallVectorImpl<Substitution> &result) const {
+
+  ArchetypeBuilder builder(getASTContext(), lookupConformance);
+
   // Enumerate all of the requirements that require substitution.
   enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement> reqs) {
     auto &ctx = getASTContext();
@@ -376,6 +379,10 @@ getSubstitutions(TypeSubstitutionFn subs,
     Type currentReplacement = depTy.subst(subs, lookupConformance);
     if (!currentReplacement)
       currentReplacement = ErrorType::get(depTy);
+
+    // Canonicalize the current replacement in context.
+    currentReplacement = const_cast<GenericSignature *>(this)
+        ->getCanonicalTypeInContext(currentReplacement, builder);
 
     // Collect the conformances.
     SmallVector<ProtocolConformanceRef, 4> currentConformances;
@@ -561,6 +568,20 @@ bool GenericSignature::isCanonicalTypeInContext(Type type, ModuleDecl &mod) {
     return true;
 
   auto &builder = *getArchetypeBuilder(mod);
+  return isCanonicalTypeInContext(type, builder);
+}
+
+bool GenericSignature::isCanonicalTypeInContext(Type type,
+                                                ArchetypeBuilder &builder) {
+  // If the type isn't independently canonical, it's certainly not canonical
+  // in this context.
+  if (!type->isCanonical())
+    return false;
+
+  // All the contextual canonicality rules apply to type parameters, so if the
+  // type doesn't involve any type parameters, it's already canonical.
+  if (!type->hasTypeParameter())
+    return true;
 
   // Look for non-canonical type parameters.
   return !type.findIf([&](Type component) -> bool {
@@ -574,15 +595,14 @@ bool GenericSignature::isCanonicalTypeInContext(Type type, ModuleDecl &mod) {
   });
 }
 
-CanType GenericSignature::getCanonicalTypeInContext(Type type, ModuleDecl &mod) {
+CanType GenericSignature::getCanonicalTypeInContext(Type type,
+                                                    ArchetypeBuilder &builder) {
   type = type->getCanonicalType();
 
   // All the contextual canonicality rules apply to type parameters, so if the
   // type doesn't involve any type parameters, it's already canonical.
   if (!type->hasTypeParameter())
     return CanType(type);
-
-  auto &builder = *getArchetypeBuilder(mod);
 
   // Replace non-canonical type parameters.
   type = type.transform([&](Type component) -> Type {
@@ -595,16 +615,29 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type, ModuleDecl &mod) 
 
     auto rep = pa->getArchetypeAnchor();
     if (rep->isConcreteType()) {
-      return getCanonicalTypeInContext(rep->getConcreteType(), mod);
+      return getCanonicalTypeInContext(rep->getConcreteType(), builder);
     } else {
       return rep->getDependentType(getGenericParams(),
                                    /*allowUnresolved*/ false);
     }
   });
-
+  
   auto result = type->getCanonicalType();
-  assert(isCanonicalTypeInContext(result, mod));
+  assert(isCanonicalTypeInContext(result, builder));
   return result;
+}
+
+CanType GenericSignature::getCanonicalTypeInContext(Type type,
+                                                    ModuleDecl &mod) {
+  type = type->getCanonicalType();
+
+  // All the contextual canonicality rules apply to type parameters, so if the
+  // type doesn't involve any type parameters, it's already canonical.
+  if (!type->hasTypeParameter())
+    return CanType(type);
+
+  auto &builder = *getArchetypeBuilder(mod);
+  return getCanonicalTypeInContext(type, builder);
 }
 
 GenericEnvironment *CanGenericSignature::getGenericEnvironment(
