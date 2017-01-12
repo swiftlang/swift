@@ -18,12 +18,12 @@ import APINotesFrameworkTest
 func testRenamedTopLevel() {
   var value = 0.0
 
-  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]
+  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
   accept(&value)
   // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:3: error: 'accept' has been renamed to 'acceptPointer(_:)'
   // CHECK-DIAGS-3: note: 'accept' was introduced in Swift 4
 
-  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]
+  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
   acceptPointer(&value)
   // CHECK-DIAGS-4: versioned.swift:[[@LINE-1]]:3: error: 'acceptPointer' has been renamed to 'accept(_:)'
   // CHECK-DIAGS-4: note: 'acceptPointer' was obsoleted in Swift 4

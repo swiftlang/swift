@@ -1,3 +1,4 @@
+#ifdef __OBJC__
 #pragma clang assume_nonnull begin
 
 __attribute__((objc_root_class))
@@ -33,3 +34,4 @@ __attribute__((objc_root_class))
 @end
 
 #pragma clang assume_nonnull end
+#endif // __OBJC__

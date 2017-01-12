@@ -13,5 +13,7 @@ __attribute__((objc_root_class))
 -(nonnull id)methodWithA:(nonnull id)a;
 @end
 
+#endif // __OBJC__
+
 #import <APINotesFrameworkTest/Properties.h>
-#endif
+#import <APINotesFrameworkTest/Protocols.h>
