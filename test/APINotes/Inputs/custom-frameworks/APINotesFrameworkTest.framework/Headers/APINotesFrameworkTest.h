@@ -4,6 +4,9 @@ void acceptDoublePointer(double* _Nonnull ptr) __attribute__((swift_name("accept
 
 void oldAcceptDoublePointer(double* _Nonnull ptr) __attribute__((availability(swift, unavailable, replacement="acceptDoublePointer")));
 
+
+#import <APINotesFrameworkTest/Types.h>
+
 #ifdef __OBJC__
 
 __attribute__((objc_root_class))
@@ -18,4 +21,4 @@ __attribute__((objc_root_class))
 #import <APINotesFrameworkTest/Properties.h>
 #import <APINotesFrameworkTest/Protocols.h>
 
-#endif
+#endif // __OBJC__
