@@ -838,7 +838,10 @@ public:
             site.getSubstCalleeType()->getRepresentation(),
             "calling convention difference between types");
 
-    require(!site.getSubstCalleeType()->isPolymorphic(),
+    require(!site.getSubstCalleeType()->isPolymorphic() ||
+                site.getSubstCalleeType()
+                    ->getGenericSignature()
+                    ->areAllParamsConcrete(),
             "substituted callee type should not be generic");
 
     requireSameType(SILType::getPrimitiveObjectType(substTy),

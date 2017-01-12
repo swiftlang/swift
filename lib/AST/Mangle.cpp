@@ -531,6 +531,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
       for (auto &reqt : sig->getRequirements()) {
         switch (reqt.getKind()) {
         case RequirementKind::Conformance:
+        case RequirementKind::Layout:
         case RequirementKind::Superclass:
           // We don't need the requirement if the constrained type is above the
           // method depth.
@@ -590,6 +591,39 @@ void Mangler::mangleConstrainedType(CanType type) {
     return;
   }
   mangleType(type, 0);
+}
+
+void Mangler::mangleLayoutConstraint(LayoutConstraint layout) {
+  switch (layout->getKind()) {
+  case LayoutConstraintKind::UnknownLayout:
+    Buffer << "U";
+    break;
+  case LayoutConstraintKind::RefCountedObject:
+    Buffer << "R";
+    break;
+  case LayoutConstraintKind::NativeRefCountedObject:
+    Buffer << "N";
+    break;
+  case LayoutConstraintKind::Trivial:
+    Buffer << "T";
+    break;
+  case LayoutConstraintKind::TrivialOfExactSize:
+    Buffer << "E";
+    Buffer << layout->getTrivialSizeInBits();
+    if (layout->getAlignment()) {
+      Buffer << "_";
+      Buffer << layout->getAlignment();
+    }
+    break;
+  case LayoutConstraintKind::TrivialOfAtMostSize:
+    Buffer << "M";
+    Buffer << layout->getTrivialSizeInBits();
+    if (layout->getAlignment()) {
+      Buffer << "_";
+      Buffer << layout->getAlignment();
+    }
+    break;
+  }
 }
 
 bool Mangler::
@@ -666,6 +700,18 @@ mangle_requirements:
       mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
       mangleProtocolName(
                       reqt.getSecondType()->castTo<ProtocolType>()->getDecl());
+      break;
+
+    case RequirementKind::Layout:
+      if (!didMangleRequirement) {
+        Buffer << 'R';
+        didMangleRequirement = true;
+      }
+      // TODO: We could golf this a little more by assuming the first type
+      // is a dependent type.
+      mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
+      Buffer << 'l';
+      mangleLayoutConstraint(reqt.getLayoutConstraint());
       break;
 
     case RequirementKind::Superclass:

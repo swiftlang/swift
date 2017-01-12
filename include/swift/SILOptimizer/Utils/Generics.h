@@ -52,20 +52,78 @@ class ReabstractionInfo {
   /// The first NumResults bits in Conversions refer to indirect out-parameters.
   unsigned NumResults;
 
-  /// The function type after applying the substitutions of the original
-  /// apply site.
+  /// The function type after applying the substitutions used to call the
+  /// specialized function.
   CanSILFunctionType SubstitutedType;
 
   /// The function type after applying the re-abstractions on the
   /// SubstitutedType.
   CanSILFunctionType SpecializedType;
 
+  /// The generic environment to be used by the specialization.
+  GenericEnvironment *SpecializedGenericEnv;
+
+  /// The generic signature of the specialization.
+  /// It is nullptr if the specialization is not polymorphic.
+  GenericSignature *SpecializedGenericSig;
+
+  // Set of the substitutions used by the caller's apply instruction before
+  // any transformations performed by the generic specializer.
+  // It uses archetypes.
+  ArrayRef<Substitution> OriginalParamSubs;
+
+  // Set of substitutions to be used by the caller's apply when it calls a
+  // specialized function.
+  // It uses archetypes.
+  ArrayRef<Substitution> CallerParamSubs;
+
+  // Set of substitutions to be used by the cloner during cloning.
+  // It maps to concrete types for any types which were replaced by
+  // concrete types in the caller's apply substitution list. All other
+  // types are replaced by their respective archetypes.
+  ArrayRef<Substitution> ClonerParamSubs;
+
+  // Reference to the original generic non-specialized function.
+  SILFunction *OriginalF;
+
+  // The apply site which invokes the generic function.
+  ApplySite Apply;
+
+  // Set if a specialized function has unbound generic parameters.
+  bool HasUnboundGenericParams;
+
+  // Substitutions to be used for creating a new function type
+  // for the specialized function.
+  // It uses interface types.
+  SubstitutionMap CallerInterfaceSubs;
+
+  // Create a new substituted type with the updated signature.
+  CanSILFunctionType createSubstitutedType(SILFunction *OrigF,
+                                           const SubstitutionMap &SubstMap,
+                                           bool HasUnboundGenericParams);
+
+  void createSubstitutedAndSpecializedTypes();
+  bool prepareAndCheck(ApplySite Apply, SILFunction *Callee,
+                       ArrayRef<Substitution> ParamSubs);
+  bool SpecializeConcreteAndGenericSubstitutions(
+      ApplySite Apply, SILFunction *Callee, ArrayRef<Substitution> ParamSubs);
+  bool SpecializeConcreteSubstitutions(ApplySite Apply, SILFunction *Callee,
+                                       ArrayRef<Substitution> ParamSubs);
+
 public:
   /// Constructs the ReabstractionInfo for generic function \p Orig with
   /// substitutions \p ParamSubs.
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
-  ReabstractionInfo(SILFunction *Orig, ArrayRef<Substitution> ParamSubs);
+  ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
+                    ArrayRef<Substitution> ParamSubs);
+  void ReabstractionInfo1(ApplySite Apply, SILFunction *Callee,
+                          ArrayRef<Substitution> ParamSubs);
+
+  /// Constructs the ReabstractionInfo for generic function \p Orig with
+  /// additional requirements. Requirements may contain new layout,
+  /// conformances or same concrete type requirements.
+  ReabstractionInfo(SILFunction *Orig, ArrayRef<Requirement> Requirements);
 
   /// Does the \p ArgIdx refer to an indirect out-parameter?
   bool isResultIndex(unsigned ArgIdx) const {
@@ -89,13 +147,15 @@ public:
   /// Gets the total number of original function arguments.
   unsigned getNumArguments() const { return Conversions.size(); }
 
-  /// Returns true if the \p ArgIdx'th argument is converted from an indirect
+  /// Returns true if the \p ArgIdx'th argument is converted from an
+  /// indirect
   /// result or parameter to a direct result or parameter.
   bool isArgConverted(unsigned ArgIdx) const {
     return Conversions.test(ArgIdx);
   }
 
-  /// Returns true if there are any conversions from indirect to direct values.
+  /// Returns true if there are any conversions from indirect to direct
+  /// values.
   bool hasConversions() const { return Conversions.any(); }
 
   /// Remove the arguments of a partial apply, leaving the arguments for the
@@ -109,8 +169,8 @@ public:
   /// > 0 in case of a partial_apply.
   unsigned getIndexOfFirstArg(ApplySite Apply) const {
     unsigned numArgs = Apply.getNumArguments();
-    assert(numArgs == Conversions.size() || (numArgs < Conversions.size() &&
-                                             isa<PartialApplyInst>(Apply)));
+    assert(numArgs == Conversions.size() ||
+           (numArgs < Conversions.size() && isa<PartialApplyInst>(Apply)));
     return Conversions.size() - numArgs;
   }
 
@@ -123,10 +183,45 @@ public:
   /// possible.
   CanSILFunctionType getSpecializedType() const { return SpecializedType; }
 
+  GenericEnvironment *getSpecializedGenericEnvironment() const {
+    return SpecializedGenericEnv;
+  }
+
+  ArrayRef<Substitution> getCallerParamSubstitutions() const {
+    return CallerParamSubs;
+  }
+
+  ArrayRef<Substitution> getClonerParamSubstitutions() const {
+    return ClonerParamSubs;
+  }
+
+  ArrayRef<Substitution> getOriginalParamSubstitutions() const {
+    return OriginalParamSubs;
+  }
+
   /// Create a specialized function type for a specific substituted type \p
   /// SubstFTy by applying the re-abstractions.
   CanSILFunctionType createSpecializedType(CanSILFunctionType SubstFTy,
                                            SILModule &M) const;
+
+  SILFunction *getNonSpecializedFunction() const { return OriginalF; }
+
+  /// Map type into a context of the specialized function.
+  Type mapTypeIntoContext(Type type) const;
+
+  /// Map SIL type into a context of the specialized function.
+  SILType mapTypeIntoContext(SILType type) const;
+
+  SILModule &getModule() const { return OriginalF->getModule(); }
+
+  /// Returns true if generic specialization is possible.
+  bool canBeSpecialized() const;
+
+  /// Returns true if it is a full generic specialization.
+  bool isFullSpecialization() const;
+
+  /// Returns true if it is a partial generic specialization.
+  bool isPartialSpecialization() const;
 };
 
 /// Helper class for specializing a generic function given a list of
@@ -140,10 +235,10 @@ class GenericFuncSpecializer {
 
   SubstitutionMap ContextSubs;
   std::string ClonedName;
+
 public:
   GenericFuncSpecializer(SILFunction *GenericFunc,
-                         ArrayRef<Substitution> ParamSubs,
-                         IsFragile_t Fragile,
+                         ArrayRef<Substitution> ParamSubs, IsFragile_t Fragile,
                          const ReabstractionInfo &ReInfo);
 
   /// If we already have this specialization, reuse it.
@@ -163,6 +258,10 @@ public:
       SpecializedF = tryCreateSpecialization();
 
     return SpecializedF;
+  }
+
+  StringRef getClonedName() {
+    return ClonedName;
   }
 };
 

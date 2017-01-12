@@ -3556,7 +3556,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
       type.allocateStack(*this, i->getElementType(), isEntryBlock, dbgname);
 
   emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
-  
+
   setLoweredStackAddress(i, addr);
 }
 
@@ -3611,6 +3611,13 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
 
 void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   auto allocatedType = i->getOperand()->getType();
+/*
+  LayoutConstraintInfo LayoutInfo =
+      allocatedType.getSwiftRValueType().getLayoutConstraintInfo();
+  if (LayoutInfo > LayoutConstraintInfo::UnknownLayout &&
+      LayoutInfo < LayoutConstraintInfo::Trivial)
+    return;
+*/
   const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
   StackAddress stackAddr = getLoweredStackAddress(i->getOperand());
 
@@ -4588,6 +4595,7 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   Address src = getLoweredAddress(i->getSrc());
   // See whether we have a deferred fixed-size buffer initialization.
   auto &loweredDest = getLoweredValue(i->getDest());
+
   if (loweredDest.isUnallocatedAddressInBuffer()) {
     assert(i->isInitializationOfDest()
            && "need to initialize an unallocated buffer");

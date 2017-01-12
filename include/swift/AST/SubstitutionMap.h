@@ -94,6 +94,7 @@ public:
                            GenericSignature *derivedSig,
                            Optional<SubstitutionMap> derivedSubs,
                            LazyResolver *resolver);
+  void dump() const LLVM_ATTRIBUTE_USED;
 };
 
 } // end namespace swift

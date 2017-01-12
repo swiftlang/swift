@@ -35,6 +35,9 @@ enum class RequirementKind : unsigned {
   /// A same-type requirement T == U, where T and U are types that shall be
   /// equivalent.
   SameType,
+  /// A layout bound T : L, where T is a type that depends on a generic
+  /// parameter and L is some layout specification that should bound T.
+  Layout,
 
   // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
   // when adding enumerators.
@@ -43,13 +46,23 @@ enum class RequirementKind : unsigned {
 /// \brief A single requirement placed on the type parameters (or associated
 /// types thereof) of a
 class Requirement {
-  llvm::PointerIntPair<Type, 2, RequirementKind> FirstTypeAndKind;
-  Type SecondType;
+  llvm::PointerIntPair<Type, 3, RequirementKind> FirstTypeAndKind;
+  union {
+    Type SecondType;
+    LayoutConstraint SecondLayout;
+  };
 
 public:
   /// Create a conformance or same-type requirement.
   Requirement(RequirementKind kind, Type first, Type second)
     : FirstTypeAndKind(first, kind), SecondType(second) {
+    assert(first);
+    assert(second);
+  }
+
+  /// Create a layout constraint requirement.
+  Requirement(RequirementKind kind, Type first, LayoutConstraint second)
+    : FirstTypeAndKind(first, kind), SecondLayout(second) {
     assert(first);
     assert(second);
   }
@@ -64,11 +77,19 @@ public:
 
   /// \brief Retrieve the second type.
   Type getSecondType() const {
+    assert(getKind() != RequirementKind::Layout);
     return SecondType;
+  }
+
+  /// \brief Retrieve the layout constraint.
+  LayoutConstraint getLayoutConstraint() const {
+    assert(getKind() == RequirementKind::Layout);
+    return SecondLayout;
   }
 
   void dump() const;
   void print(raw_ostream &os, const PrintOptions &opts) const;
+  void print(ASTPrinter &printer, const PrintOptions &opts) const;
 };
 
 } // end namespace swift

@@ -1095,6 +1095,17 @@ RequirementEnvironment::RequirementEnvironment(
       break;
     }
 
+    case RequirementKind::Layout: {
+      // Substitute the constrained types.
+      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
+      if (!first->isTypeParameter()) break;
+
+      builder.addRequirement(Requirement(RequirementKind::Layout,
+                                         first, reqReq.getSecondType()),
+                             source);
+      break;
+    }
+
     case RequirementKind::Superclass: {
       // Substitute the constrained types.
       auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,

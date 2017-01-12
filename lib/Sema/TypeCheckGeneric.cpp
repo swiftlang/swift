@@ -317,6 +317,21 @@ void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
       break;
     }
 
+    case RequirementReprKind::LayoutConstraint: {
+      // Validate the types.
+      if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
+        req.setInvalid();
+        continue;
+      }
+
+      if (req.getLayoutConstraintLoc().isNull()) {
+        req.setInvalid();
+        continue;
+      }
+
+      break;
+    }
+
     case RequirementReprKind::SameType:
       if (validateType(req.getFirstTypeLoc(), lookupDC, options,
                        resolver)) {
@@ -784,7 +799,10 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
       revertDependentTypeLoc(req.getConstraintLoc());
       break;
     }
-
+    case RequirementReprKind::LayoutConstraint: {
+      revertDependentTypeLoc(req.getSubjectLoc());
+      break;
+    }
     case RequirementReprKind::SameType:
       revertDependentTypeLoc(req.getFirstTypeLoc());
       revertDependentTypeLoc(req.getSecondTypeLoc());
@@ -853,6 +871,29 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
 
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
+      // Protocol conformance requirements.
+      auto proto = secondType->castTo<ProtocolType>();
+      // FIXME: This should track whether this should result in a private
+      // or non-private dependency.
+      // FIXME: Do we really need "used" at this point?
+      // FIXME: Poor location information. How much better can we do here?
+      auto result = conformsToProtocol(
+          firstType, proto->getDecl(), dc,
+          ConformanceCheckFlags::Used, loc,
+          unsatisfiedDependency);
+
+      // Unsatisfied dependency case.
+      if (result.first)
+        return std::make_pair(true, false);
+
+      // Conformance check failure case.
+      if (!result.second)
+        return std::make_pair(false, false);
+
+      continue;
+    }
+
+    case RequirementKind::Layout: {
       // Protocol conformance requirements.
       auto proto = secondType->castTo<ProtocolType>();
       // FIXME: This should track whether this should result in a private

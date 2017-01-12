@@ -679,6 +679,24 @@ void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
   mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
 }
 
+void Remangler::mangleDependentGenericLayoutRequirement(Node *node) {
+  auto NumMembersAndParamIdx = mangleConstrainedType(node->getChild(0).get());
+  switch (NumMembersAndParamIdx.first) {
+    case -1: Buffer << "RL"; return; // substitution
+    case 0: Buffer << "Rl"; break;
+    case 1: Buffer << "Rm"; break;
+    default: Buffer << "RM"; break;
+  }
+  mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
+  assert(node->getChild(1)->getKind() == Node::Kind::Identifier);
+  assert(node->getChild(1)->getText().size() == 1);
+  Buffer << node->getChild(1)->getText()[0];
+  if (node->getNumChildren() >=3)
+    mangleChildNode(node, 2);
+  if (node->getNumChildren() >=4)
+    mangleChildNode(node, 3);
+}
+
 void Remangler::mangleDependentGenericSignature(Node *node) {
   size_t ParamCountEnd = 0;
   for (size_t Idx = 0, Num = node->getNumChildren(); Idx < Num; Idx++) {
@@ -961,17 +979,22 @@ void Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(Node *nod
 }
 
 void Remangler::mangleGenericPartialSpecialization(Node *node) {
-  for (NodePointer Child : *node) {
-    if (Child->getKind() == Node::Kind::GenericSpecializationParam) {
-      mangleChildNode(Child.get(), 0);
+  // Mangle the type before the operator.
+  for (size_t Idx = 0, Num = node->getNumChildren(); Idx < Num; ++Idx) {
+    if (node->getChild(Idx)->getKind() == Node::Kind::Type) {
+      mangleChildNode(node, Idx);
       break;
     }
   }
+
   Buffer << (node->getKind() ==
         Node::Kind::GenericPartialSpecializationNotReAbstracted ? "TP" : "Tp");
-  for (NodePointer Child : *node) {
-    if (Child->getKind() != Node::Kind::GenericSpecializationParam)
-      mangle(Child.get());
+
+  // Mangle everything else after the operator.
+  for (size_t Idx = 0, Num = node->getNumChildren(); Idx < Num; ++Idx) {
+    if (node->getChild(Idx)->getKind() != Node::Kind::Type) {
+      mangleChildNode(node, Idx);
+    }
   }
 }
 

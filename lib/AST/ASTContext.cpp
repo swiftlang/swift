@@ -3441,13 +3441,13 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
 
   auto arena = AllocationArena::Permanent;
   void *mem = ctx.Allocate(
-                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(conformsTo.size(),
-                                                             superclass ? 1 : 0,
-                                                             1),
-                alignof(ArchetypeType), arena);
+      totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
+        conformsTo.size(), superclass ? 1 : 0, 0, 1),
+      alignof(ArchetypeType), arena);
 
-  auto result = ::new (mem) ArchetypeType(ctx, existential, conformsTo,
-                                          superclass, *knownID);
+  auto result =
+      ::new (mem) ArchetypeType(ctx, existential, conformsTo, superclass,
+                                existential->getLayoutConstraint(), *knownID);
   openedExistentialArchetypes[*knownID] = result;
 
   return CanArchetypeType(result);
@@ -3517,7 +3517,10 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
 
   for (auto &reqt : requirements) {
     ID.AddPointer(reqt.getFirstType().getPointer());
-    ID.AddPointer(reqt.getSecondType().getPointer());
+    if (reqt.getKind() != RequirementKind::Layout)
+      ID.AddPointer(reqt.getSecondType().getPointer());
+    else
+      ID.AddPointer(reqt.getLayoutConstraint().getPointer());
     ID.AddInteger(unsigned(reqt.getKind()));
   }
 }

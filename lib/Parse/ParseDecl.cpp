@@ -294,6 +294,149 @@ getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
                                                  Segments.front().Length));
 }
 
+bool Parser::parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
+                                      SourceLoc Loc, SpecializeAttr *&Attr) {
+  assert(ClosingBrace == tok::r_paren || ClosingBrace == tok::r_square);
+  SourceLoc lParenLoc = consumeToken();
+  bool DiscardAttribute = false;
+  StringRef AttrName = "_specialize";
+
+  Optional<bool> exported;
+  Optional<SpecializeAttr::SpecializationKind> kind;
+
+  // Parse optional "exported" and "kind" labeled parameters.
+  while (!Tok.is(tok::kw_where)) {
+    if (Tok.is(tok::identifier)) {
+      auto ParamLabel = Tok.getText();
+      if (ParamLabel != "exported" && ParamLabel != "kind") {
+        diagnose(Tok.getLoc(), diag::attr_specialize_unknown_parameter_name,
+                 ParamLabel);
+      }
+      consumeToken();
+      if (!consumeIf(tok::colon)) {
+        diagnose(Tok.getLoc(), diag::attr_specialize_missing_colon, ParamLabel);
+        skipUntil(tok::comma, tok::kw_where);
+        if (Tok.is(ClosingBrace))
+          break;
+        if (Tok.is(tok::kw_where)) {
+          continue;
+        }
+        if (Tok.is(tok::comma)) {
+          consumeToken();
+          continue;
+        }
+        DiscardAttribute = true;
+        return false;
+      }
+      if ((ParamLabel == "exported" && exported.hasValue()) ||
+          (ParamLabel == "kind" && kind.hasValue())) {
+        diagnose(Tok.getLoc(), diag::attr_specialize_parameter_already_defined,
+                 ParamLabel);
+      }
+      if (ParamLabel == "exported") {
+        bool isTrue = consumeIf(tok::kw_true);
+        bool isFalse = consumeIf(tok::kw_false);
+        if (!isTrue && !isFalse) {
+          diagnose(Tok.getLoc(), diag::attr_specialize_expected_bool_value);
+          skipUntil(tok::comma, tok::kw_where);
+          if (Tok.is(ClosingBrace))
+            break;
+          if (Tok.is(tok::kw_where)) {
+            continue;
+          }
+          if (Tok.is(tok::comma)) {
+            consumeToken();
+            continue;
+          }
+          DiscardAttribute = true;
+          return false;
+        }
+        if (ParamLabel == "exported") {
+          exported = isTrue ? true : false;
+        }
+      }
+      if (ParamLabel == "kind") {
+        SourceLoc paramValueLoc;
+        if (Tok.is(tok::identifier)) {
+          if (Tok.getText() == "partial") {
+            kind = SpecializeAttr::SpecializationKind::Partial;
+          } else if (Tok.getText() == "full") {
+            kind = SpecializeAttr::SpecializationKind::Full;
+          } else {
+            diagnose(Tok.getLoc(),
+                     diag::attr_specialize_expected_partial_or_full);
+          }
+          consumeToken();
+        } else if (consumeIf(tok::kw_true, paramValueLoc) ||
+                   consumeIf(tok::kw_false, paramValueLoc)) {
+          diagnose(paramValueLoc,
+                   diag::attr_specialize_expected_partial_or_full);
+        }
+      }
+      if (!consumeIf(tok::comma)) {
+        diagnose(Tok.getLoc(), diag::attr_specialize_missing_comma);
+        skipUntil(tok::comma, tok::kw_where);
+        if (Tok.is(ClosingBrace))
+          break;
+        if (Tok.is(tok::kw_where)) {
+          continue;
+        }
+        if (Tok.is(tok::comma)) {
+          consumeToken();
+          continue;
+        }
+        DiscardAttribute = true;
+        return false;
+      }
+      continue;
+    }
+    diagnose(Tok.getLoc(),
+             diag::attr_specialize_missing_parameter_label_or_where_clause);
+    DiscardAttribute = true;
+    return false;
+  };
+
+  // Parse the where clause.
+  TrailingWhereClause *trailingWhereClause = nullptr;
+  if (Tok.is(tok::kw_where)) {
+    SourceLoc whereLoc;
+    SmallVector<RequirementRepr, 4> requirements;
+    bool firstTypeInComplete;
+    parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete,
+                            /* AllowLayoutConstraints */ true);
+    trailingWhereClause =
+      TrailingWhereClause::create(Context, whereLoc, requirements);
+  }
+
+  // Parse the closing ')' or ']'.
+  SourceLoc rParenLoc;
+  if (!consumeIf(ClosingBrace, rParenLoc)) {
+    if (ClosingBrace == tok::r_paren)
+      diagnose(lParenLoc, diag::attr_expected_rparen, AttrName,
+             /*DeclModifier=*/false);
+    else if (ClosingBrace == tok::r_square)
+      diagnose(lParenLoc, diag::attr_expected_rparen, AttrName,
+             /*DeclModifier=*/false);
+    return false;
+  }
+  // Not exported by default.
+  if (!exported.hasValue())
+    exported = false;
+  // Full specialization by default.
+  if (!kind.hasValue())
+    kind = SpecializeAttr::SpecializationKind::Full;
+
+  if (DiscardAttribute) {
+    Attr = nullptr;
+    return false;
+  }
+  // Store the attribute.
+  Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
+                                trailingWhereClause, exported.getValue(),
+                                kind.getValue());
+  return true;
+}
+
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                    DeclAttrKind DK) {
   // Ok, it is a valid attribute, eat it, and then process it.
@@ -1099,34 +1242,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                DeclAttribute::isDeclModifier(DK));
       return false;
     }
-
-    SourceLoc lParenLoc = consumeToken();
-
-    SmallVector<TypeLoc, 8> TypeList;
-    do {
-      // Parse the concrete nominal type.
-      ParserResult<TypeRepr> Ty = parseTypeIdentifier();
-      if (Ty.isNull()) {
-        skipUntil(tok::r_paren);
-        return false;
-      }  
-
-      // Record the type.
-      TypeList.push_back(Ty.get());
-  
-      // Check for a ',', which indicates that there are more protocols coming.
-    } while (consumeIf(tok::comma));
-
-    // Parse the closing ')'.
-    SourceLoc rParenLoc;
-    if (!consumeIf(tok::r_paren, rParenLoc)) {
-      diagnose(lParenLoc, diag::attr_expected_rparen, AttrName,
-               /*DeclModifier=*/false);
+    SpecializeAttr *Attr;
+    if (!parseSpecializeAttribute(tok::r_paren, AtLoc, Loc, Attr))
       return false;
-    }
-    Attributes.add(
-      SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
-                             TypeList));
+
+    Attributes.add(Attr);
     break;
     }
   }

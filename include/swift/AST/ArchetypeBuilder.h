@@ -117,6 +117,9 @@ public:
   /// type or some type derived from it.
   class PotentialArchetype;
 
+  using RequirementRHS =
+      llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+
 private:
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
@@ -128,12 +131,6 @@ private:
 
   ArchetypeBuilder(const ArchetypeBuilder &) = delete;
   ArchetypeBuilder &operator=(const ArchetypeBuilder &) = delete;
-
-  /// \brief Add a new conformance requirement specifying that the given
-  /// potential archetype conforms to the given protocol.
-  bool addConformanceRequirement(PotentialArchetype *T,
-                                 ProtocolDecl *Proto,
-                                 RequirementSource Source);
 
   bool addConformanceRequirement(PotentialArchetype *T,
                                  ProtocolDecl *Proto,
@@ -153,16 +150,22 @@ public:
                                         Type Concrete,
                                         RequirementSource Source);
 
+  /// \brief Add a new same-type requirement specifying that the given potential
+  /// archetypes should map to the equivalent archetype.
+  bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source);
+
+  /// \brief Add a new conformance requirement specifying that the given
+  /// potential archetype conforms to the given protocol.
+  bool addConformanceRequirement(PotentialArchetype *T,
+                                 ProtocolDecl *Proto,
+                                 RequirementSource Source);
+
 private:
   /// \brief Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
   bool addSuperclassRequirement(PotentialArchetype *T, 
                                 Type Superclass,
                                 RequirementSource Source);
-
-  /// \brief Add a new same-type requirement specifying that the given potential
-  /// archetypes should map to the equivalent archetype.
-  bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source);
 
   /// Add the requirements placed on the given abstract type parameter
   /// to the given potential archetype.
@@ -211,9 +214,8 @@ public:
   void enumerateRequirements(llvm::function_ref<
                       void (RequirementKind kind,
                             PotentialArchetype *archetype,
-                            llvm::PointerUnion<Type, PotentialArchetype *> type,
+                            RequirementRHS constraint,
                             RequirementSource source)> f);
-  
 
 private:
   PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,
@@ -243,12 +245,19 @@ public:
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
   void addRequirement(const Requirement &req, RequirementSource source);
-  
+
+  bool addLayoutRequirement(PotentialArchetype *PAT,
+                            LayoutConstraint Layout,
+                            RequirementSource Source);
+
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
 
   /// \brief Build the generic signature.
   GenericSignature *getGenericSignature();
+  
+  /// \bried Build the generic signature and environment
+  std::pair<GenericSignature *, GenericEnvironment *> getGenericSignatureAndEnvironment();
 
   /// \brief Build the generic environment.
   GenericEnvironment *getGenericEnvironment(GenericSignature *signature);
@@ -341,6 +350,12 @@ class ArchetypeBuilder::PotentialArchetype {
 
   /// \brief The list of protocols to which this archetype will conform.
   llvm::MapVector<ProtocolDecl *, RequirementSource> ConformsTo;
+
+  /// \brief The layout constraint of this archetype, if specified.
+  LayoutConstraint Layout;
+
+  /// The source of the layout constraint requirement.
+  Optional<RequirementSource> LayoutSource;
 
   /// \brief The set of nested types of this archetype.
   ///
@@ -517,6 +532,14 @@ public:
   const RequirementSource &getSuperclassSource() const {
     return *SuperclassSource;
   } 
+
+  /// Retrieve the layout constraint of this archetype.
+  LayoutConstraint getLayout() const { return Layout; }
+
+  /// Retrieve the requirement source for the layout constraint requirement.
+  const RequirementSource &getLayoutSource() const {
+    return *LayoutSource;
+  }
 
   /// Retrieve the set of nested types.
   const llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>> &

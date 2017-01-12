@@ -376,8 +376,12 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     for (auto *A :
            Attrs.getAttributes<SpecializeAttr, false /*AllowInvalid*/>()) {
       auto *SA = cast<SpecializeAttr>(A);
-      auto subs = SA->getConcreteDecl().getSubstitutions();
-      F->addSpecializeAttr(SILSpecializeAttr::create(*this, subs));
+      auto kind = SA->getSpecializationKind() ==
+                          SpecializeAttr::SpecializationKind::Full
+                      ? SILSpecializeAttr::SpecializationKind::Full
+                      : SILSpecializeAttr::SpecializationKind::Partial;
+      F->addSpecializeAttr(SILSpecializeAttr::create(
+          *this, SA->getRequirements(), SA->isExported(), kind));
     }
   }
 

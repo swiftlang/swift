@@ -59,6 +59,10 @@ void swift::demangle_wrappers::dumpNode(const NodePointer &Root) {
   NodeDumper(Root).dump();
 }
 
+void swift::demangle_wrappers::dumpNode(const Node *Root) {
+  printNode(llvm::errs(), Root, 0);
+}
+
 namespace {
 /// A pretty-stack-trace node for demangling trees.
 class PrettyStackTraceNode : public llvm::PrettyStackTraceEntry {

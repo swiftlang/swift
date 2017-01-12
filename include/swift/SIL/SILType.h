@@ -132,6 +132,12 @@ public:
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics);
 
+  static CanSILFunctionType substFuncType(SILModule &silModule,
+                                          TypeSubstitutionFn subs,
+                                          LookupConformanceFn conformances,
+                                          CanSILFunctionType SrcTy,
+                                          bool dropGenerics);
+
   bool isNull() const { return value.getPointer() == nullptr; }
   explicit operator bool() const { return bool(value.getPointer()); }
 

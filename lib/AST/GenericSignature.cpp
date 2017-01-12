@@ -137,11 +137,15 @@ CanGenericSignature GenericSignature::getCanonical(
   SmallVector<Requirement, 8> canonicalRequirements;
   canonicalRequirements.reserve(requirements.size());
   for (auto &reqt : requirements) {
-    auto secondTy = reqt.getSecondType();
-    canonicalRequirements.push_back(Requirement(reqt.getKind(),
-                              reqt.getFirstType()->getCanonicalType(),
-                              secondTy ? secondTy->getCanonicalType()
-                                       : CanType()));
+    if (reqt.getKind() != RequirementKind::Layout) {
+      auto secondTy = reqt.getSecondType();
+      canonicalRequirements.push_back(
+          Requirement(reqt.getKind(), reqt.getFirstType()->getCanonicalType(),
+                      secondTy ? secondTy->getCanonicalType() : CanType()));
+    } else
+      canonicalRequirements.push_back(
+          Requirement(reqt.getKind(), reqt.getFirstType()->getCanonicalType(),
+                      reqt.getLayoutConstraint()));
   }
   auto canSig = get(canonicalParams, canonicalRequirements,
                     /*isKnownCanonical=*/true);
@@ -302,7 +306,7 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> subs,
                                      SubstitutionMap &result) const {
   // An empty parameter list gives an empty map.
   if (subs.empty())
-    assert(getGenericParams().empty());
+    assert(getGenericParams().empty() || areAllParamsConcrete());
 
   for (auto depTy : getAllDependentTypes()) {
     auto sub = subs.front();
@@ -494,6 +498,18 @@ Type GenericSignature::getConcreteType(Type type, ModuleDecl &mod) {
   if (!pa->isConcreteType()) return Type();
 
   return pa->getConcreteType();
+}
+
+LayoutConstraint GenericSignature::getLayoutConstraint(Type type,
+                                                       ModuleDecl &mod) {
+  if (!type->isTypeParameter()) return LayoutConstraint();
+
+  auto &builder = *getArchetypeBuilder(mod);
+  auto pa = builder.resolveArchetype(type);
+  if (!pa) return LayoutConstraint();
+
+  pa = pa->getRepresentative();
+  return pa->getLayout();
 }
 
 Type GenericSignature::getRepresentative(Type type, ModuleDecl &mod) {
