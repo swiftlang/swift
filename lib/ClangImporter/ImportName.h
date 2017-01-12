@@ -25,9 +25,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "clang/Sema/Sema.h"
 
-// TODO: remove when we drop import name options
-#include "clang/AST/Decl.h"
-
 namespace swift {
 namespace importer {
 struct PlatformAvailability;
@@ -55,17 +52,35 @@ enum class ImportNameVersion : unsigned {
 
   /// Names as they appeared in Swift 4 family
   Swift4,
+
+  /// A placeholder for the latest version, to be used in loops and such.
+  LAST_VERSION = Swift4
 };
-enum { NumImportNameVersions = 4 };
 
 static inline void
 forEachImportNameVersion(llvm::function_ref<void(ImportNameVersion)> action) {
-  for (unsigned raw = 0; raw < NumImportNameVersions; ++raw)
+  auto limit = static_cast<unsigned>(ImportNameVersion::LAST_VERSION);
+  for (unsigned raw = 0; raw <= limit; ++raw)
     action(static_cast<ImportNameVersion>(raw));
 }
 
-/// Map a language version into an import name version
+static inline ImportNameVersion &operator++(ImportNameVersion &value) {
+  assert(value != ImportNameVersion::LAST_VERSION);
+  value = static_cast<ImportNameVersion>(static_cast<unsigned>(value) + 1);
+  return value;
+}
+
+static inline ImportNameVersion &operator--(ImportNameVersion &value) {
+  assert(value != ImportNameVersion::Raw);
+  value = static_cast<ImportNameVersion>(static_cast<unsigned>(value) - 1);
+  return value;
+}
+
+/// Map a language version into an import name version.
 ImportNameVersion nameVersionFromOptions(const LangOptions &langOpts);
+
+/// Map an import name version into a language version.
+unsigned majorVersionNumberForNameVersion(ImportNameVersion version);
 
 /// Describes a name that was imported from Clang.
 class ImportedName {

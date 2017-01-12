@@ -84,7 +84,7 @@ func testNonInstanceTypeFactoryMethod(_ s: String) {
 }
 
 func testUseOfFactoryMethod(_ queen: Bee) {
-  _ = Hive.hiveWithQueen(queen) // expected-error{{'hiveWithQueen' is unavailable: use object construction 'Hive(queen:)'}}
+  _ = Hive.hiveWithQueen(queen) // expected-error{{'hiveWithQueen' has been replaced by 'init(queen:)'}} {{11-25=}} {{26-26=queen: }}
 }
 
 func testNonsplittableFactoryMethod() {
@@ -97,18 +97,18 @@ func testFactoryMethodBlacklist() {
 
 func test17261609() {
   _ = NSDecimalNumber(mantissa:1, exponent:1, isNegative:true)
-  _ = NSDecimalNumber.decimalNumberWithMantissa(1, exponent:1, isNegative:true) // expected-error{{'decimalNumberWithMantissa(_:exponent:isNegative:)' is unavailable: use object construction 'NSDecimalNumber(mantissa:exponent:isNegative:)'}}
+  _ = NSDecimalNumber.decimalNumberWithMantissa(1, exponent:1, isNegative:true) // expected-error{{'decimalNumberWithMantissa(_:exponent:isNegative:)' has been replaced by 'init(mantissa:exponent:isNegative:)'}} {{22-48=}} {{49-49=mantissa: }}
 }
 
 func testURL() {
   let url = NSURL(string: "http://www.llvm.org")!
-  _ = NSURL.URLWithString("http://www.llvm.org") // expected-error{{'URLWithString' is unavailable: use object construction 'NSURL(string:)'}}
+  _ = NSURL.URLWithString("http://www.llvm.org") // expected-error{{'URLWithString' has been replaced by 'init(string:)'}} {{12-26=}} {{27-27=string: }}
 
   NSURLRequest(string: "http://www.llvm.org") // expected-warning{{unused}}
   NSURLRequest(url: url as URL) // expected-warning{{unused}}
 
-  _ = NSURLRequest.requestWithString("http://www.llvm.org") // expected-error{{'requestWithString' is unavailable: use object construction 'NSURLRequest(string:)'}}
-  _ = NSURLRequest.URLRequestWithURL(url as URL) // expected-error{{'URLRequestWithURL' is unavailable: use object construction 'NSURLRequest(url:)'}}
+  _ = NSURLRequest.requestWithString("http://www.llvm.org") // expected-error{{'requestWithString' has been replaced by 'init(string:)'}}
+  _ = NSURLRequest.URLRequestWithURL(url as URL) // expected-error{{'URLRequestWithURL' has been replaced by 'init(url:)'}}
 }
 
 // FIXME: Remove -verify-ignore-unknown.

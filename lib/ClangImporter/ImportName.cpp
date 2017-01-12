@@ -68,6 +68,20 @@ importer::nameVersionFromOptions(const LangOptions &langOpts) {
   }
 }
 
+unsigned importer::majorVersionNumberForNameVersion(ImportNameVersion version) {
+  switch (version) {
+  case ImportNameVersion::Raw:
+    return 0;
+  case ImportNameVersion::Swift2:
+    return 2;
+  case ImportNameVersion::Swift3:
+    return 3;
+  case ImportNameVersion::Swift4:
+    return 4;
+  }
+}
+
+
 /// Determine whether the given Clang selector matches the given
 /// selector pieces.
 static bool isNonNullarySelector(clang::Selector selector,
@@ -560,16 +574,47 @@ determineCtorInitializerKind(const clang::ObjCMethodDecl *method) {
   return None;
 }
 
+template <typename A>
+static bool matchesVersion(A *versionedAttr, ImportNameVersion version) {
+  clang::VersionTuple attrVersion = versionedAttr->getVersion();
+  if (attrVersion.empty())
+    return version == ImportNameVersion::LAST_VERSION;
+  return attrVersion.getMajor() == majorVersionNumberForNameVersion(version);
+}
+
 const clang::SwiftNameAttr *
 importer::findSwiftNameAttr(const clang::Decl *decl,
                             ImportNameVersion version) {
-  // Find the attribute.
+  if (version == ImportNameVersion::Raw)
+    return nullptr;
+
+  // Handle versioned API notes for Swift 3 and later. This is the common case.
+  if (version != ImportNameVersion::Swift2) {
+    for (auto *attr : decl->attrs()) {
+      if (auto *versionedAttr = dyn_cast<clang::SwiftVersionedAttr>(attr)) {
+        if (!matchesVersion(versionedAttr, version))
+          continue;
+        if (auto *added =
+              dyn_cast<clang::SwiftNameAttr>(versionedAttr->getAttrToAdd())) {
+          return added;
+        }
+      }
+
+      if (auto *removeAttr = dyn_cast<clang::SwiftVersionedRemovalAttr>(attr)) {
+        if (!matchesVersion(removeAttr, version))
+          continue;
+        if (removeAttr->getAttrKindToRemove() == clang::attr::SwiftName)
+          return nullptr;
+      }
+    }
+
+    return decl->getAttr<clang::SwiftNameAttr>();
+  }
+
+  // The remainder of this function emulates the limited form of swift_name
+  // supported in Swift 2.
   auto attr = decl->getAttr<clang::SwiftNameAttr>();
   if (!attr) return nullptr;
-
-  // If we're not emulating the Swift 2 behavior, return what we got.
-  if (version != ImportNameVersion::Swift2)
-    return attr;
 
   // API notes produce implicit attributes; ignore them because they weren't
   // used for naming in Swift 2.

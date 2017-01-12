@@ -1541,9 +1541,8 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   }
 
   // If we have a name to import as, add this entry to the table.
-  // FIXME: It doesn't actually matter which version we use here, but it should
-  // probably follow the ASTContext anyway.
-  ImportNameVersion currentVersion = ImportNameVersion::Swift3;
+  ImportNameVersion currentVersion =
+      nameVersionFromOptions(nameImporter.getLangOpts());
   if (auto importedName = nameImporter.importName(named, currentVersion)) {
     SmallPtrSet<DeclName, 8> distinctNames;
     distinctNames.insert(importedName.getDeclName());
