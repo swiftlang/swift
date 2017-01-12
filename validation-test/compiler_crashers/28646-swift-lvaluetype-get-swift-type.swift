@@ -7,5 +7,7 @@
 
 // REQUIRES: deterministic-behavior
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-_&[i
--{$0
+#keyPath(a
+print(Int
+print(_=#keyPath(a
+print(

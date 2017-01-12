@@ -1028,6 +1028,8 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
     }
   }
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
@@ -1488,6 +1490,8 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return SelectorFamily::None;
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 namespace {
@@ -1684,6 +1688,8 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::IVarDestroyer:
       return SILFunctionTypeRepresentation::Method;
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {

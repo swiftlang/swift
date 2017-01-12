@@ -130,8 +130,8 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
 SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
   switch (AK) {
     case AccessorKind::NotAccessor: return SymbolSubKind::None;
-    case AccessorKind::IsGetter:    return SymbolSubKind::SwiftAccessorGetter;
-    case AccessorKind::IsSetter:    return SymbolSubKind::SwiftAccessorSetter;
+    case AccessorKind::IsGetter:    return SymbolSubKind::AccessorGetter;
+    case AccessorKind::IsSetter:    return SymbolSubKind::AccessorSetter;
     case AccessorKind::IsWillSet:   return SymbolSubKind::SwiftAccessorWillSet;
     case AccessorKind::IsDidSet:    return SymbolSubKind::SwiftAccessorDidSet;
     case AccessorKind::IsAddressor: return SymbolSubKind::SwiftAccessorAddressor;

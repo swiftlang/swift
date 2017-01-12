@@ -1509,6 +1509,9 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       }
       break;
     }
+    case RequirementKind::Layout: {
+      llvm_unreachable("Layout constraints not supported yet");
+    }
     }
   }
   if (currentType) flushConformances();

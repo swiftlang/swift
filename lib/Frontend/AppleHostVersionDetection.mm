@@ -21,20 +21,16 @@
 
 using namespace swift;
 
-// Note that these conditions must come in this order. TARGET_OS_MAC is set on
-// nearly all Apple platforms; it's in contrast to things like TARGET_OS_WIN32.
-#if TARGET_OS_IPHONE
-# define REQUIRED_CF_VERSION kCFCoreFoundationVersionNumber_iOS_8_0
-#elif TARGET_OS_MAC
-# define REQUIRED_CF_VERSION kCFCoreFoundationVersionNumber10_10
-#else
-# error "Unknown Apple platform"
-#endif
-
 #define DLSYM(LIBRARY, SYMBOL) \
   reinterpret_cast<decltype(SYMBOL) *>(dlsym(LIBRARY, #SYMBOL))
 
+
 clang::VersionTuple swift::inferAppleHostOSVersion() {
+#if !TARGET_OS_OSX
+  // For now, only support this on macOS. It wouldn't take too much work to
+  // port it to other Apple platforms, but no one is using that right now.
+  return {};
+#else
   // Simulate [[NSProcessInfo processInfo] operatingSystemVersion].
   // DYLD_PRINT_STATISTICS shows that the cost of linking Foundation when we
   // don't need to is a non-trivial percentage of our pre-main startup time.
@@ -50,7 +46,7 @@ clang::VersionTuple swift::inferAppleHostOSVersion() {
     return {};
 
   auto *cfVersionPtr = DLSYM(foundation, kCFCoreFoundationVersionNumber);
-  if (!cfVersionPtr || *cfVersionPtr < REQUIRED_CF_VERSION)
+  if (!cfVersionPtr || *cfVersionPtr < kCFCoreFoundationVersionNumber10_10)
     return {};
 
   auto objcGetClass = DLSYM(foundation, objc_getClass);
@@ -78,4 +74,5 @@ clang::VersionTuple swift::inferAppleHostOSVersion() {
   return clang::VersionTuple(static_cast<unsigned>(version.majorVersion),
                              static_cast<unsigned>(version.minorVersion),
                              static_cast<unsigned>(version.patchVersion));
+#endif
 }

@@ -138,7 +138,18 @@ void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
     }
   };
 
+  auto printLayoutConstraint =
+      [&](const LayoutConstraintLoc &LayoutConstraintLoc) {
+        LayoutConstraintLoc.getLayoutConstraint()->print(out);
+      };
+
   switch (getKind()) {
+  case RequirementReprKind::LayoutConstraint:
+    printTy(getSubjectLoc());
+    out << " : ";
+    printLayoutConstraint(getLayoutConstraintLoc());
+    break;
+
   case RequirementReprKind::TypeConstraint:
     printTy(getSubjectLoc());
     out << " : ";

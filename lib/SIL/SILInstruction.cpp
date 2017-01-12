@@ -1045,6 +1045,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
     case SILInstruction::MemoryBehavior::MayHaveSideEffects:
       return OS << "MayHaveSideEffects";
   }
+
+  llvm_unreachable("Unhandled MemoryBehavior in switch.");
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
@@ -1055,4 +1057,6 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   case SILInstruction::ReleasingBehavior::MayRelease:
     return OS << "MayRelease";
   }
+
+  llvm_unreachable("Unhandled ReleasingBehavior in switch.");
 }

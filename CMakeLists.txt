@@ -810,6 +810,13 @@ message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEA
 message(STATUS "")
 
 #
+# Find required dependencies.
+#
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND "${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
+  find_package(ICU REQUIRED COMPONENTS uc i18n)
+endif()
+
+#
 # Find optional dependencies.
 #
 
