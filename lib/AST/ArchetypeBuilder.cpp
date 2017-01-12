@@ -1951,25 +1951,20 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
 
     // If this type is not the representative, or if it was made concrete,
     // we emit a same-type constraint.
-    if (archetype->getRepresentative() != archetype ||
+    if (archetype->getArchetypeAnchor() != archetype ||
         archetype->isConcreteType()) {
-      auto *first = archetype;
-      auto *second = archetype->getRepresentative();
+      auto *anchor = archetype->getArchetypeAnchor();
 
-      if (second->isConcreteType()) {
-        Type concreteType = second->getConcreteType();
-        f(RequirementKind::SameType, first, concreteType,
-          first->getSameTypeSource());
+      if (archetype->isConcreteType()) {
+        Type concreteType = archetype->getConcreteType();
+        f(RequirementKind::SameType, anchor, concreteType,
+          anchor->getSameTypeSource());
         continue;
       }
 
-      assert(!first->isConcreteType());
+      assert(!anchor->isConcreteType());
 
-      // Neither one is concrete. Put the shorter type first.
-      if (compareDependentTypes(&first, &second) > 0)
-        std::swap(first, second);
-
-      f(RequirementKind::SameType, first, second,
+      f(RequirementKind::SameType, anchor, archetype,
         archetype->getSameTypeSource());
       continue;
     }
