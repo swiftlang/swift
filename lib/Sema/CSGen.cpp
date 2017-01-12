@@ -2753,6 +2753,32 @@ namespace {
   public:
     SanitizeExpr(TypeChecker &tc) : TC(tc) { }
 
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // Let's check if condition of the IfExpr looks properly
+      // type-checked, and roll it back to the original state,
+      // because otherwise, since condition is implicitly Int1,
+      // we'll have to handle multiple ways of type-checking
+      // IfExprs in both ConstraintGenerator and ExprRewriter,
+      // so it's less error prone to do it once here.
+      if (auto IE = dyn_cast<IfExpr>(expr)) {
+        auto condition = IE->getCondExpr();
+        if (!condition)
+          return {true, expr};
+
+        if (auto call = dyn_cast<CallExpr>(condition)) {
+          if (!call->isImplicit())
+            return {true, expr};
+
+          if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(call->getFn())) {
+            if (DSCE->isImplicit())
+              IE->setCondExpr(DSCE->getBase());
+          }
+        }
+      }
+
+      return {true, expr};
+    }
+
     Expr *walkToExprPost(Expr *expr) override {
       if (auto implicit = dyn_cast<ImplicitConversionExpr>(expr)) {
         // Skip implicit conversions completely.
