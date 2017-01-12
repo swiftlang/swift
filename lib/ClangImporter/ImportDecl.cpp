@@ -4072,8 +4072,8 @@ namespace {
       //
       // FIXME: Remove this once SILGen gets proper support for factory
       // initializers.
-      if (result->getName() ==
-          result->getASTContext().getIdentifier("OS_object")) {
+      if (decl->getName() == "OS_object" ||
+          decl->getName() == "OS_os_log") {
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
       }
 
