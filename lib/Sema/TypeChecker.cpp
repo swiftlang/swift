@@ -560,12 +560,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
-  // Resolve condition clauses so name binding can accurately track imports.
-  {
-    SharedTimer timer("Condition resolution");
-    performConditionResolution(SF);
-  }
-
   // Make sure that name binding has been completed before doing any type
   // checking.
   {

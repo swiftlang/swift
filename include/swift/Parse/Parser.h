@@ -59,11 +59,10 @@ namespace swift {
     TopLevelCode,
     /// The top-level of a file, when in parse-as-library mode.
     TopLevelLibrary,
-    /// The body of the clause of an #if/#else/#endif block
-    ConditionalBlock,
-    /// The body of the clause of an #if/#else/#endif block that was statically
-    /// determined to be inactive.
-    StaticallyInactiveConditionalBlock,
+    /// The body of the inactive clause of an #if/#else/#endif block
+    InactiveConditionalBlock,
+    /// The body of the active clause of an #if/#else/#endif block
+    ActiveConditionalBlock,
   };
 
   
@@ -619,10 +618,6 @@ public:
                                BraceItemListKind ConditionalBlockKind =
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
-  
-  void parseIfConfigClauseElements(bool isInactive,
-                                   BraceItemListKind Kind,
-                                   SmallVectorImpl<ASTNode> &Elements);
   
   void parseTopLevelCodeDeclDelayed();
 
@@ -1231,13 +1226,13 @@ public:
   ParserResult<CaseStmt> parseStmtCase();
 
   /// Classify the condition of an #if directive according to whether it can
-  /// be evaluated statically.  If evaluation is not possible, the result is
-  /// 'None'.
-  static Optional<bool>
+  /// be evaluated statically.  The first member of the pair indicates whether
+  /// parsing of the condition body should occur, the second contains the result
+  /// of evaluating the conditional expression.
+  static ConditionalCompilationExprState
   classifyConditionalCompilationExpr(Expr *condition,
                                      ASTContext &context,
-                                     DiagnosticEngine &diags,
-                                     bool fullCheck = false);
+                                     DiagnosticEngine &diags);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

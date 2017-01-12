@@ -142,8 +142,6 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   assert(done && "Parser returned early?");
   (void)done;
 
-  performConditionResolution(*importFile);
-
   if (SkipBodies)
     performDelayedParsing(importMod, persistentState, nullptr);
 

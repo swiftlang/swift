@@ -685,7 +685,6 @@ class IfConfigStmt : public Stmt {
   ArrayRef<IfConfigStmtClause> Clauses;
   SourceLoc EndLoc;
   bool HadMissingEnd;
-  bool HasBeenResolved = false;
 
 public:
   IfConfigStmt(ArrayRef<IfConfigStmtClause> Clauses, SourceLoc EndLoc,
@@ -699,9 +698,6 @@ public:
   SourceLoc getEndLoc() const { return EndLoc; }
 
   bool hadMissingEnd() const { return HadMissingEnd; }
-
-  bool isResolved() { return HasBeenResolved; }
-  void setResolved() { HasBeenResolved = true; }
   
   const ArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
 
