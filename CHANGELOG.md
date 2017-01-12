@@ -20,6 +20,56 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* [SR-2394](https://bugs.swift.org/browse/SR-2394)
+
+  C functions that "return twice" are no longer imported into Swift. Instead,
+  they are explicitly made unavailable, so attempting to reference them will
+  result in a compilation error.
+
+  Examples of functions that "return twice" include `vfork` and `setjmp`.
+  These functions change the control flow of a program in ways that that Swift
+  has never supported. For example, definitive initialization of variables,
+  a core Swift language feature, could not be guaranteed when these functions
+  were used.
+
+  Swift code that references these functions will no longer compile. Although
+  this could be considered a source-breaking change, it's important to note that
+  any use of these functions would have most likely crashed at runtime. Now,
+  the compiler will prevent them from being used in the first place.
+
+* Indirect fields from C structures and unions are now always imported, while
+  they previously weren't imported if they belonged to an union. This is done by
+  naming anonymous fields. For example:
+
+  ```c
+  typedef struct foo_t {
+    union {
+      int a;
+      double b;
+    };
+  } foo_t;
+  ```
+
+  Get imported as:
+
+  ```swift
+  struct foo_t {
+    struct __Unnamed_union___Anonymous_field0 {
+      var a : Int { get set }
+      var b : Double { get set }
+    }
+    var __Anonymous_field0 : foo_t.__Unnamed_union___Anonymous_field0
+
+    // a and b are computed properties accessing the content of __Anonymous_field0
+    var a : Int { get set }
+    var b : Double { get set }
+  }
+  ```
+
+  Since new symbols are exposed from imported structure/unions, this may conflict
+  with existing code that extended C types in order to provide their own accessors
+  to the indirect fields.
+
 * The `withoutActuallyEscaping` function from [SE-0103][] has been implemented.
   To pass off a non-escaping closure to an API that formally takes an
   `@escaping` closure, but which is used in a way that will not in fact 

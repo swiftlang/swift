@@ -7,6 +7,6 @@
 
 // This test is disabled because it fails to crash on the Ubuntu 14.04 host.
 // REQUIRES: deterministic-behavior
-// REQUIRES: OS=linux-gnu
+// REQUIRES: deterministic-behavior
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 let E=_==#keyPath(n&_=b:{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{

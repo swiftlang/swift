@@ -42,9 +42,10 @@ DummyTaskQueue::DummyTaskQueue(unsigned NumberOfParallelTasks)
 DummyTaskQueue::~DummyTaskQueue() = default;
 
 void DummyTaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
-                             ArrayRef<const char *> Env, void *Context) {
-  QueuedTasks.emplace(
-    std::unique_ptr<DummyTask>(new DummyTask(ExecPath, Args, Env, Context)));
+                             ArrayRef<const char *> Env, void *Context,
+                             bool SeparateErrors) {
+  QueuedTasks.emplace(std::unique_ptr<DummyTask>(
+      new DummyTask(ExecPath, Args, Env, Context, SeparateErrors)));
 }
 
 bool DummyTaskQueue::execute(TaskQueue::TaskBeganCallback Began,
@@ -80,9 +81,11 @@ bool DummyTaskQueue::execute(TaskQueue::TaskBeganCallback Began,
 
     if (Finished) {
       std::string Output = "Output placeholder\n";
-        if (Finished(P.first, 0, Output, P.second->Context) ==
-            TaskFinishedResponse::StopExecution)
-          SubtaskFailed = true;
+      std::string Errors =
+          P.second->SeparateErrors ? "Error placeholder\n" : "";
+      if (Finished(P.first, 0, Output, Errors, P.second->Context) ==
+          TaskFinishedResponse::StopExecution)
+        SubtaskFailed = true;
     }
   }
 

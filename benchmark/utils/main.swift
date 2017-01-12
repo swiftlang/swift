@@ -121,6 +121,8 @@ precommitTests = [
   "ArrayAppendStrings": run_ArrayAppendStrings,
   "ArrayAppendToFromGeneric": run_ArrayAppendToFromGeneric,
   "ArrayAppendToGeneric": run_ArrayAppendToGeneric,
+  "ArrayPlusEqualSingleElementCollection": run_ArrayPlusEqualSingleElementCollection,
+  "ArrayPlusEqualFiveElementCollection": run_ArrayPlusEqualFiveElementCollection,
   "ArrayInClass": run_ArrayInClass,
   "ArrayLiteral": run_ArrayLiteral,
   "ArrayOfGenericPOD": run_ArrayOfGenericPOD,

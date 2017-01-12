@@ -1566,16 +1566,20 @@ public:
     if (!genericSig)
       return Action::Stop;
 
-    auto params = genericSig->getInnermostGenericParams();
+    /// Retrieves the type substitution.
     auto args = boundGeneric->getGenericArgs();
+    auto genericSigDepth =
+      genericSig->getInnermostGenericParams().front()->getDepth();
+    auto getTypeSubstitution = [&](SubstitutableType *dependentType) -> Type {
+      if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
+        if (gp->getDepth() == genericSigDepth)
+          return args[gp->getIndex()];
 
-    // Produce substitutions from the generic parameters to the actual
-    // arguments.
-    TypeSubstitutionMap substitutions;
-    for (unsigned i = 0, n = params.size(); i != n; ++i) {
-      substitutions[params[i]->getCanonicalType()->castTo<SubstitutableType>()]
-        = args[i];
-    }
+        return gp;
+      }
+
+      return dependentType;
+    };
 
     // Handle the requirements.
     RequirementSource source(RequirementSource::Inferred, Loc);
@@ -1583,7 +1587,7 @@ public:
       switch (req.getKind()) {
       case RequirementKind::SameType: {
         auto firstType = req.getFirstType().subst(
-                           QueryTypeSubstitutionMap{substitutions},
+                           getTypeSubstitution,
                            Builder.getLookupConformanceFn());
         if (!firstType)
           break;
@@ -1594,7 +1598,7 @@ public:
           return Action::Continue;
 
         auto secondType = req.getSecondType().subst(
-                           QueryTypeSubstitutionMap{substitutions},
+                           getTypeSubstitution,
                            Builder.getLookupConformanceFn());
         if (!secondType)
           break;
@@ -1618,7 +1622,7 @@ public:
       case RequirementKind::Superclass:
       case RequirementKind::Conformance: {
         auto subjectType = req.getFirstType().subst(
-                             QueryTypeSubstitutionMap{substitutions},
+                             getTypeSubstitution,
                              Builder.getLookupConformanceFn());
         if (!subjectType)
           break;

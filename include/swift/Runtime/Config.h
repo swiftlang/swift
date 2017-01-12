@@ -232,7 +232,12 @@
 #endif
 
 #if !defined(__USER_LABEL_PREFIX__)
+// MSVC doesn't define __USER_LABEL_PREFIX.
+#if defined(_MSC_VER)
+#define __USER_LABEL_PREFIX__
+#else
 #error __USER_LABEL_PREFIX__ is undefined
+#endif
 #endif
 
 // Workaround the bug of clang in Cygwin 64bit

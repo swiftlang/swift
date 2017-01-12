@@ -279,6 +279,8 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
     case Accessibility::Open:
       return SILFunction::PublicClass;
   }
+
+  llvm_unreachable("Unhandled Accessibility in switch.");
 }
 
 static bool verifySILSelfParameterType(SILDeclRef DeclRef,
@@ -387,7 +389,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   // it.
   CanSILFunctionType FTy = F->getLoweredFunctionType();
   if (FTy->hasSelfParam()) {
-    (void)verifySILSelfParameterType;
+    (void)&verifySILSelfParameterType;
     assert(verifySILSelfParameterType(constant, F, FTy) &&
            "Invalid signature for SIL Self parameter type");
   }

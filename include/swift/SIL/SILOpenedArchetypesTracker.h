@@ -20,6 +20,12 @@
 
 namespace swift {
 
+// Disable MSVC warning: multiple copy constructors specified.
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4521)
+#endif
+
 /// SILOpenedArchetypesTracker is a helper class that can be used to create
 /// and maintain a mapping from opened archetypes to instructions
 /// defining them, e.g. open_existential_ref, open_existential_addr,
@@ -117,16 +123,20 @@ public:
 private:
   // Never copy
   SILOpenedArchetypesTracker &operator = (const SILOpenedArchetypesTracker &) = delete;
-
   /// The function whose opened archetypes are being tracked.
   /// Used only for verification purposes.
   const SILFunction &F;
+
   /// Mapping from opened archetypes to their definitions.
   OpenedArchetypeDefsMap &OpenedArchetypeDefs;
   /// Local map to be used if no other map was provided in the
   /// constructor.
   OpenedArchetypeDefsMap LocalOpenedArchetypeDefs;
 };
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 // A state object containing information about opened archetypes.
 // This information can be used by constructors of SILInstructions,

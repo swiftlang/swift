@@ -216,6 +216,30 @@ public:
   /// \returns the result of transforming the type.
   Type transform(llvm::function_ref<Type(Type)> fn) const;
 
+  /// Transform the given type by applying the user-provided function to
+  /// each type.
+  ///
+  /// This routine applies the given function to transform one type into
+  /// another. If the function leaves the type unchanged, recurse into the
+  /// child type nodes and transform those. If any child type node changes,
+  /// the parent type node will be rebuilt.
+  ///
+  /// If at any time the function returns a null type, the null will be
+  /// propagated out.
+  ///
+  /// If the the function returns \c None, the transform operation will
+  ///
+  /// \param fn A function object with the signature
+  /// \c Optional<Type>(TypeBase *), which accepts a type pointer and returns a
+  /// transformed type, a null type (which will propagate the null type to the
+  /// outermost \c transform() call), or None (to indicate that the transform
+  /// operation should recursively transform the subtypes). The function object
+  /// should use \c dyn_cast rather \c getAs, because the transform itself
+  /// handles desugaring.
+  ///
+  /// \returns the result of transforming the type.
+  Type transformRec(llvm::function_ref<Optional<Type>(TypeBase *)> fn) const;
+
   /// Look through the given type and its children and apply fn to them.
   void visit(llvm::function_ref<void (Type)> fn) const {
     findIf([&fn](Type t) -> bool {

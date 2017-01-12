@@ -191,7 +191,8 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   }
   // If toType has more elements, it may be larger.
   auto fromElements = fromEnum->getAllElements();
-  if (numToElements > std::distance(fromElements.begin(), fromElements.end()))
+  if (static_cast<ptrdiff_t>(numToElements) >
+      std::distance(fromElements.begin(), fromElements.end()))
     return false;
 
   if (toElementTy.isNull())
@@ -549,6 +550,8 @@ SILType::canUseExistentialRepresentation(SILModule &M,
   case ExistentialRepresentation::Metatype:
     return is<ExistentialMetatypeType>();
   }
+
+  llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
 }
 
 SILType SILType::getReferentType(SILModule &M) const {

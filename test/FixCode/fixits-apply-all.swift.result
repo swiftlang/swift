@@ -20,3 +20,7 @@ func goo(_ e: Error) {
 
 
 func warn_unused_result_removal() -> Int { return 5 }
+
+func discardableResultOnVoidFunc() {}
+
+func discardableResultOnNeverFunc() -> Never { fatalError() }

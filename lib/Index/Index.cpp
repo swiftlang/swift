@@ -577,8 +577,10 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
     // FIXME handle extensions properly
     if (auto ParentVD = dyn_cast<ValueDecl>(Parent)) {
       SymbolRoleSet RelationsToParent = (SymbolRoleSet)SymbolRole::RelationChildOf;
-      if (Info.symInfo.SubKind >= SymbolSubKind::SwiftAccessorGetter &&
-          Info.symInfo.SubKind <= SymbolSubKind::SwiftAccessorMutableAddressor)
+      if (Info.symInfo.SubKind == SymbolSubKind::AccessorGetter ||
+          Info.symInfo.SubKind == SymbolSubKind::AccessorSetter ||
+          (Info.symInfo.SubKind >= SymbolSubKind::SwiftAccessorWillSet &&
+           Info.symInfo.SubKind <= SymbolSubKind::SwiftAccessorMutableAddressor))
         RelationsToParent |= (SymbolRoleSet)SymbolRole::RelationAccessorOf;
       if (addRelation(Info, RelationsToParent, ParentVD))
         return false;
@@ -659,7 +661,16 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
 
   if (IsRef) {
     IndexSymbol Info;
-    if (initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info))
+
+    // initCallRefIndexSymbol uses the top of the entities stack as the caller,
+    // but in this case the top of the stack is the referenced
+    // AbstractStorageDecl.
+    assert(getParentDecl() == D);
+    auto PreviousTop = EntitiesStack.pop_back_val();
+    bool initCallFailed = initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info);
+    EntitiesStack.push_back(PreviousTop);
+
+    if (initCallFailed)
       return true; // continue walking.
     if (updateInfo(Info))
       return true;
