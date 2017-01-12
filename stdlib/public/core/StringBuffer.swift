@@ -98,7 +98,8 @@ public struct _StringBuffer {
     where
     Input : Collection, // Sequence?
     Encoding : UnicodeCodec,
-    Input.Iterator.Element == Encoding.CodeUnit {
+  Input.Iterator.Element
+    == Encoding.EncodedScalar.Iterator.Element {
     // Determine how many UTF-16 code units we'll need
     let inputStream = input.makeIterator()
     guard let (utf16Count, isAscii) = UTF16.transcodedLength(

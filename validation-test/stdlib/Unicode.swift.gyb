@@ -88,50 +88,88 @@ UTF16APIs.test("trailSurrogate/trap/U+FFFF") {
   _ = UTF16.trailSurrogate(us)
 }
 
-func checkDecodeUTF<Codec : UnicodeCodec>(
+protocol TestableUnicodeEncoding : UnicodeEncoding {
+  associatedtype ValidEncoding : UnicodeEncoding
+}
+extension UTF8 : TestableUnicodeEncoding {
+  typealias ValidEncoding = ValidUTF8 
+}
+extension UTF16 : TestableUnicodeEncoding {
+  typealias ValidEncoding = ValidUTF16 
+}
+extension UTF32 : TestableUnicodeEncoding {
+  typealias ValidEncoding = UTF32
+}
+
+func checkDecodeUTF<Codec : UnicodeCodec & TestableUnicodeEncoding>(
     _ codec: Codec.Type, _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
-) -> AssertionResult {
-  do {
-    var decoded = [UInt32]()
-    let output: (UInt32) -> Void = { decoded.append($0) }
-    let iterator = utfStr.makeIterator()
-    transcode(
-      iterator,
-      from: codec,
-      to: UTF32.self,
-      stoppingOnError: true,
-      into: output)
-    if expectedHead != decoded {
-      return assertionFailure()
-          .withDescription("\n")
-          .withDescription("expectedHead: \(asHex(expectedHead))\n")
-          .withDescription("actual:       \(asHex(decoded))")
+) -> AssertionResult
+where Codec.CodeUnit == Codec.EncodedScalar.Iterator.Element,
+Codec.CodeUnit == Codec.ValidEncoding.EncodedScalar.Iterator.Element,
+Codec.EncodedScalar == Codec.ValidEncoding.EncodedScalar
+{
+  var decoded = [UInt32]()
+  var expected = expectedHead
+  func output(_ scalar: UInt32) { decoded.append(scalar) }
+  func output1(_ scalar: Codec.EncodedScalar) {
+    decoded.append(scalar.utf32.first!)
+  }
+  
+  var result = assertionSuccess()
+  
+  func check<C: Collection>(_ expected: C, _ description: String)
+  where C.Iterator.Element == UInt32
+  {
+    if !expected.elementsEqual(decoded) {
+      if result.description == "" { result = assertionFailure()  }
+      result = result.withDescription(" [\(description)]\n")
+        .withDescription("expected: \(asHex(expectedHead))\n")
+        .withDescription("actual:       \(asHex(decoded))")
     }
+    decoded.removeAll(keepingCapacity: true)
+  }
+  
+  do {
+    let iterator = utfStr.makeIterator()
+    _ = transcode(iterator, from: codec, to: UTF32.self,
+      stoppingOnError: true, into: output)
+  }
+  check(expected, "legacy, repairing: false")
+  
+  codec.parseForward(
+    utfStr, repairingIllFormedSequences: false, into: output1)
+  check(expected, "forward, repairing: false")
+  
+  if expectedRepairedTail.isEmpty {
+    Codec.ValidEncoding.parseForward(
+      utfStr, repairingIllFormedSequences: false, into: output1)    
+    check(expected, "forward assuming valid")
+    
+    Codec.ValidEncoding.parseReverse(
+      utfStr, repairingIllFormedSequences: false, into: output1)
+    check(expected.reversed(), "reverse assuming valid")
   }
 
+  expected += expectedRepairedTail
+
   do {
-    var expected = expectedHead
-    expected += expectedRepairedTail
-
-    var decoded = [UInt32]()
-    let output: (UInt32) -> Void = { decoded.append($0) }
     let iterator = utfStr.makeIterator()
-    transcode(
-      iterator,
-      from: codec,
-      to: UTF32.self,
-      stoppingOnError: false,
-      into: output)
-    if expected != decoded {
-      return assertionFailure()
-          .withDescription("\n")
-          .withDescription("expected: \(asHex(expected))\n")
-          .withDescription("actual:   \(asHex(decoded))")
-    }
+    _ = transcode(iterator, from: codec, to: UTF32.self,
+      stoppingOnError: false, into: output)
   }
-
-  return assertionSuccess()
+  check(expected, "legacy, repairing: true")
+  
+  codec.parseForward(
+    utfStr, repairingIllFormedSequences: true, into: output1)
+  check(expected, "forward, repairing: true")
+  
+  // FIXME: test reverse parsing without repair
+  codec.parseReverse(
+    utfStr, repairingIllFormedSequences: true, into: output1)
+  check(expected.reversed(), "reverse, repairing: true")
+  
+  return result
 }
 
 func checkDecodeUTF8(
