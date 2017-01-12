@@ -33,4 +33,10 @@ func testRenamedTopLevel() {
   // CHECK-DIAGS-4: 'accept(_:)'
   // CHECK-DIAGS-3: 'acceptPointer(_:)'
   // CHECK-DIAGS: note: 'acceptDoublePointer' was obsoleted in Swift 3
+
+  oldAcceptDoublePointer(&value)
+  // CHECK-DIAGS: versioned.swift:[[@LINE-1]]:3: error: 'oldAcceptDoublePointer' has been renamed to
+  // CHECK-DIAGS-4: 'accept(_:)'
+  // CHECK-DIAGS-3: 'acceptPointer(_:)'
+  // CHECK-DIAGS: note: 'oldAcceptDoublePointer' has been explicitly marked unavailable here
 }

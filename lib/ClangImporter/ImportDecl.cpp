@@ -6516,7 +6516,7 @@ getSwiftNameFromClangName(StringRef replacement) {
   if (!clangDecl)
     return "";
 
-  auto importedName = importFullName(clangDecl, ImportNameVersion::Swift3);
+  auto importedName = importFullName(clangDecl, CurrentVersion);
   if (!importedName)
     return "";
 
