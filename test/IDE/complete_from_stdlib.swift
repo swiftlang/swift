@@ -235,8 +235,8 @@ func testPostfixOperator1(_ x: Int) {
 func testPostfixOperator2(_ x: inout Int) {
   x#^POSTFIX_INT_2^#
 }
-// POSTFIX_LVALUE_INT: Decl[PostfixOperatorFunction]/OtherModule[Swift]: ++[#Int#]; name=
-// POSTFIX_LVALUE_INT: Decl[PostfixOperatorFunction]/OtherModule[Swift]: --[#Int#]; name=
+// POSTFIX_LVALUE_INT-NOT: Decl[PostfixOperatorFunction]/OtherModule[Swift]: ++[#Int#]; name=
+// POSTFIX_LVALUE_INT-NOT: Decl[PostfixOperatorFunction]/OtherModule[Swift]: --[#Int#]; name=
 
 func testPostfixOperator3(_ x: MyInt??) {
   x#^POSTFIX_OPTIONAL_1^#
@@ -250,7 +250,7 @@ func testInfixOperator1(_ x: Int) {
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ... {#Int#}[#CountableClosedRange<Int>#]
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  &+ {#Int#}[#Int#]
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#Int#}[#Int#]
-// INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  << {#Int#}[#Int#]
+// INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  &<< {#Int#}[#Int#]
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  < {#Int#}[#Bool#]
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Int#}[#Bool#]
 // INFIX_INT: End completions
@@ -263,7 +263,7 @@ func testInfixOperator2(_ x: inout Int) {
 // INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ... {#Int#}[#CountableClosedRange<Int>#]
 // INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  &+ {#Int#}[#Int#]
 // INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#Int#}[#Int#]
-// INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  << {#Int#}[#Int#]
+// INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  &<< {#Int#}[#Int#]
 // INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  < {#Int#}[#Bool#]
 // INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Int#}[#Bool#]
 // INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  += {#Int#}[#Void#]

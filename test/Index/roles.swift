@@ -8,18 +8,16 @@ let x = 2
 var y = x + 1
 // CHECK: [[@LINE-1]]:5 | variable/Swift | y | s:v14swift_ide_test1ySi | Def | rel: 0
 // CHECK: [[@LINE-2]]:9 | variable/Swift | x | s:v14swift_ide_test1xSi | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:11 | function/infix-operator/Swift | +(_:_:) | s:Fsoi1pFTSiSi_Si | Ref,Call | rel: 0
 
 // Read of x + Write of y
 y = x + 1
 // CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:v14swift_ide_test1ySi | Ref,Writ | rel: 0
 // CHECK: [[@LINE-2]]:5 | variable/Swift | x | s:v14swift_ide_test1xSi | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:7 | function/infix-operator/Swift | +(_:_:) | s:Fsoi1pFTSiSi_Si | Ref,Call | rel: 0
 
 // Read of y + Write of y
 y += x
 // CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:v14swift_ide_test1ySi | Ref,Read,Writ | rel: 0
-// CHECK: [[@LINE-2]]:3 | function/infix-operator/Swift | +=(_:_:) | s:Fsoi2peFTRSiSi_T_ | Ref,Call | rel: 0
+// CHECK: [[@LINE-2]]:3 | static-method/infix-operator/Swift | +=(_:_:) | s:ZFSioi2peFTRSiSi_T_ | Ref,Call,RelRec | rel: 1
 // CHECK: [[@LINE-3]]:6 | variable/Swift | x | s:v14swift_ide_test1xSi | Ref,Read | rel: 0
 
 var z: Int {
@@ -78,7 +76,7 @@ struct AStruct {
     // CHECK: [[@LINE-5]]:5 | function/acc-set/Swift | setter:x | s:FV14swift_ide_test7AStructs1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
     // CHECK-NEXT: RelCall | x | s:vV14swift_ide_test7AStruct1xSi
     // CHECK-NEXT: RelRec | AStruct | s:V14swift_ide_test7AStruct
-    // CHECK: [[@LINE-8]]:7 | function/infix-operator/Swift | +=(_:_:) | s:Fsoi2peFTRSiSi_T_ | Ref,Call,RelCall | rel: 1
+    // CHECK: [[@LINE-8]]:7 | static-method/infix-operator/Swift | +=(_:_:) | s:ZFSioi2peFTRSiSi_T_ | Ref,Call,RelRec,RelCall | rel: 2
     // CHECK-NEXT: RelCall | aMethod() | s:FV14swift_ide_test7AStruct7aMethodFT_T_
   }
 
