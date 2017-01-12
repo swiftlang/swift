@@ -48,7 +48,7 @@ enum class LayoutConstraintKind : unsigned char {
 /// This is a class representing the layout constraint.
 class LayoutConstraintInfo {
   // Alignment of the layout in bytes.
-  unsigned Alignment;
+  unsigned Alignment : 16;
   // Size of the layout in bits.
   unsigned SizeInBits : 24;
   // Kind of the layout.

@@ -983,6 +983,7 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
     return;
 
   auto reqAbbrCode = abbrCodes[GenericRequirementLayout::Code];
+  auto layoutReqAbbrCode = abbrCodes[LayoutRequirementLayout::Code];
   for (const auto &req : requirements) {
     if (req.getKind() != RequirementKind::Layout)
       GenericRequirementLayout::emitRecord(
@@ -990,7 +991,17 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
           getRawStableRequirementKind(req.getKind()),
           addTypeRef(req.getFirstType()), addTypeRef(req.getSecondType()));
     else {
-      // TODO: write layout requirement here.
+      // Write layout requirement.
+      auto layout = req.getLayoutConstraint();
+      unsigned size = 0;
+      unsigned alignment = 0;
+      if (layout->isKnownSizeTrivial()) {
+        size = layout->getTrivialSizeInBits();
+        alignment = layout->getAlignment();
+      }
+      LayoutRequirementLayout::emitRecord(
+          Out, ScratchRecord, layoutReqAbbrCode, (unsigned)layout->getKind(),
+          addTypeRef(req.getFirstType()), size, alignment);
     }
   }
 }
