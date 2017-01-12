@@ -659,7 +659,16 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
 
   if (IsRef) {
     IndexSymbol Info;
-    if (initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info))
+
+    // initCallRefIndexSymbol uses the top of the entities stack as the caller,
+    // but in this case the top of the stack is the referenced
+    // AbstractStorageDecl.
+    assert(getParentDecl() == D);
+    auto PreviousTop = EntitiesStack.pop_back_val();
+    bool initCallFailed = initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info);
+    EntitiesStack.push_back(PreviousTop);
+
+    if (initCallFailed)
       return true; // continue walking.
     if (updateInfo(Info))
       return true;
