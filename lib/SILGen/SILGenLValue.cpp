@@ -958,7 +958,8 @@ namespace {
         auto rawPointerTy = SILType::getRawPointerType(ctx);
 
         // The callback is a BB argument from the switch_enum.
-        SILValue callback = writebackBB->createPHIArgument(rawPointerTy);
+        SILValue callback = writebackBB->createPHIArgument(
+            rawPointerTy, ValueOwnershipKind::Trivial);
 
         // Cast the callback to the correct polymorphic function type.
         auto origCallbackFnType = gen.SGM.Types.getMaterializeForSetCallbackType(

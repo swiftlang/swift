@@ -85,6 +85,9 @@ static void updateRequirementSource(RequirementSource &source,
 }
 
 struct ArchetypeBuilder::Implementation {
+  /// Function used to look up conformances.
+  std::function<GenericFunction> LookupConformance;
+
   /// The generic parameters that this archetype builder is working with.
   SmallVector<GenericTypeParamType *, 4> GenericParams;
 
@@ -209,8 +212,12 @@ static ProtocolConformance *getSuperConformance(
 
   // Lookup the conformance of the superclass to this protocol.
   auto conformance =
-    builder.getModule().lookupConformance(superclass, proto,
-                                          builder.getLazyResolver());
+    builder.getLookupConformanceFn()(pa->getDependentType(
+                                         { }, /*allowUnresolved=*/true)
+                                       ->getCanonicalType(),
+                                     superclass,
+                                     proto->getDeclaredInterfaceType()
+                                       ->castTo<ProtocolType>());
   if (!conformance) return nullptr;
 
   // Conformance to this protocol is redundant; update the requirement source
@@ -527,7 +534,8 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
       builder.Impl->ConcreteSubs.erase({genericEnv, representative});
     };
 
-    return genericEnv->mapTypeIntoContext(&builder.getModule(), concreteType);
+    return genericEnv->mapTypeIntoContext(concreteType,
+                                          builder.getLookupConformanceFn());
   }
 
   // Check that we haven't referenced this type while substituting into the
@@ -565,8 +573,6 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
   if (auto parent = getParent()) {
     // For nested types, first substitute into the parent so we can form the
     // proper nested type.
-    auto &mod = builder.getModule();
-
     auto parentTy = parent->getTypeInContext(builder, genericEnv);
     if (!parentTy)
       return ErrorType::get(getDependentType(genericParams,
@@ -584,7 +590,9 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
         return type;
 
       auto depMemberType = type->castTo<DependentMemberType>();
-      Type memberType = depMemberType->substBaseType(&mod, parentTy, resolver);
+      Type memberType =
+        depMemberType->substBaseType(parentTy,
+                                     builder.getLookupConformanceFn());
 
       // If the member type maps to an archetype, resolve that archetype.
       if (auto memberPA = builder.resolveArchetype(memberType)) {
@@ -602,7 +610,8 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
       // that a same-type constraint affects this so late in the game.
       representative->SameTypeSource = parent->SameTypeSource;
 
-      return genericEnv->mapTypeIntoContext(&builder.getModule(), memberType);
+      return genericEnv->mapTypeIntoContext(memberType,
+                                            builder.getLookupConformanceFn());
     }
 
     // Check whether the parent already has a nested type with this name. If
@@ -624,14 +633,16 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     SWIFT_DEFER {
       builder.Impl->SuperclassSubs.erase({genericEnv, representative});
     };
-    superclass = genericEnv->mapTypeIntoContext(&builder.getModule(),
-                                                superclass);
+    superclass = genericEnv->mapTypeIntoContext(superclass,
+                                                builder.getLookupConformanceFn());
 
     // We might have recursively recorded the archetype; if so, return early.
     // FIXME: This should be detectable before we end up building archetypes.
     if (auto result = getAlreadyRecoveredGenericParam())
       return result;
   }
+
+  LayoutConstraint layout = representative->getLayout();
 
   // Build a new archetype.
 
@@ -669,14 +680,14 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
     // Create a nested archetype.
     arch = ArchetypeType::getNew(ctx, ParentArchetype, assocType, Protos,
-                                 superclass);
+                                 superclass, layout);
 
     // Register this archetype with its parent.
     ParentArchetype->registerNestedType(getName(), arch);
   } else {
     // Create a top-level archetype.
     arch = ArchetypeType::getNew(ctx, genericEnv, getName(), Protos,
-                                 superclass);
+                                 superclass, layout);
 
     // Register the archetype with the generic environment.
     genericEnv->addMapping(getGenericParamKey(), arch);
@@ -778,10 +789,11 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   }
 }
 
-ArchetypeBuilder::ArchetypeBuilder(ModuleDecl &mod)
-  : Mod(mod), Context(mod.getASTContext()), Diags(Context.Diags),
-    Impl(new Implementation)
-{
+ArchetypeBuilder::ArchetypeBuilder(
+                               ASTContext &ctx,
+                               std::function<GenericFunction> lookupConformance)
+  : Context(ctx), Diags(Context.Diags), Impl(new Implementation) {
+  Impl->LookupConformance = std::move(lookupConformance);
 }
 
 ArchetypeBuilder::ArchetypeBuilder(ArchetypeBuilder &&) = default;
@@ -792,6 +804,11 @@ ArchetypeBuilder::~ArchetypeBuilder() {
 
   for (auto PA : Impl->PotentialArchetypes)
     delete PA;
+}
+
+std::function<GenericFunction>
+ArchetypeBuilder::getLookupConformanceFn() const {
+  return Impl->LookupConformance;
 }
 
 LazyResolver *ArchetypeBuilder::getLazyResolver() const { 
@@ -918,6 +935,34 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   }
   
   Visited.erase(Proto);
+  return false;
+}
+
+bool ArchetypeBuilder::addLayoutRequirement(PotentialArchetype *PAT,
+                                            LayoutConstraint Layout,
+                                            RequirementSource Source) {
+  // Add the requirement to the representative.
+  auto T = PAT->getRepresentative();
+
+  if (T->Layout) {
+    if (T->Layout == Layout) {
+      // Update the source.
+      T->LayoutSource = Source;
+      return false;
+    }
+    // There is an existing layout constraint for this archetype.
+    Diags.diagnose(Source.getLoc(), diag::mutiple_layout_constraints,
+                   Layout, T->Layout);
+    Diags.diagnose(T->LayoutSource->getLoc(),
+                   diag::previous_layout_constraint, T->Layout);
+    T->setInvalid();
+
+    return true;
+  }
+
+  T->Layout = Layout;
+  T->LayoutSource = Source;
+
   return false;
 }
 
@@ -1223,10 +1268,14 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   // Make sure the concrete type fulfills the requirements on the archetype.
   DenseMap<ProtocolDecl *, ProtocolConformanceRef> conformances;
   if (!Concrete->is<ArchetypeType>()) {
+    CanType depTy = T->getDependentType({ }, /*allowUnresolved=*/true)
+                      ->getCanonicalType();
     for (auto conforms : T->getConformsTo()) {
       auto protocol = conforms.first;
-      auto conformance = Mod.lookupConformance(Concrete, protocol,
-                                               getLazyResolver());
+      auto conformance =
+        getLookupConformanceFn()(depTy, Concrete,
+                                 protocol->getDeclaredInterfaceType()
+                                   ->castTo<ProtocolType>());
       if (!conformance) {
         Diags.diagnose(Source.getLoc(),
                        diag::requires_generic_param_same_type_does_not_conform,
@@ -1348,8 +1397,8 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
       ->getGenericEnvironmentOfContext();
   if (isa<AssociatedTypeDecl>(decl) && genericEnv != nullptr) {
     auto *archetype = genericEnv->mapTypeIntoContext(
-        &Mod,
-        decl->getDeclaredInterfaceType())
+        decl->getDeclaredInterfaceType(),
+        getLookupConformanceFn())
             ->getAs<ArchetypeType>();
 
     if (archetype) {
@@ -1438,6 +1487,27 @@ bool ArchetypeBuilder::visitInherited(
 
 bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   switch (Req.getKind()) {
+  case RequirementReprKind::LayoutConstraint: {
+    // FIXME: Need to do something here.
+    PotentialArchetype *PA = resolveArchetype(Req.getSubject());
+    if (!PA) {
+      // FIXME: Poor location information.
+      // FIXME: Delay diagnostic until after type validation?
+      Diags.diagnose(Req.getColonLoc(), diag::requires_not_suitable_archetype,
+                     0, Req.getSubjectLoc(), 0);
+      return true;
+    }
+
+    RequirementSource source(
+        RequirementSource::Explicit,
+        Req.getLayoutConstraintLoc().getSourceRange().Start);
+
+    if (addLayoutRequirement(PA, Req.getLayoutConstraint(), source))
+      return true;
+
+    return false;
+  }
+
   case RequirementReprKind::TypeConstraint: {
     PotentialArchetype *PA = resolveArchetype(Req.getSubject());
     if (!PA) {
@@ -1488,6 +1558,17 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
 
     assert(req.getSecondType()->getClassOrBoundGenericClass());
     addSuperclassRequirement(pa, req.getSecondType(), source);
+    return;
+  }
+
+  case RequirementKind::Layout: {
+    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
+    if (!pa) return;
+
+    bool invalid = addLayoutRequirement(pa, req.getLayoutConstraint(), source);
+    assert(!invalid && "Re-introducing invalid requirement");
+    (void)invalid;
+
     return;
   }
 
@@ -1547,16 +1628,20 @@ public:
     if (!genericSig)
       return Action::Stop;
 
-    auto params = genericSig->getInnermostGenericParams();
+    /// Retrieves the type substitution.
     auto args = boundGeneric->getGenericArgs();
+    auto genericSigDepth =
+      genericSig->getInnermostGenericParams().front()->getDepth();
+    auto getTypeSubstitution = [&](SubstitutableType *dependentType) -> Type {
+      if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
+        if (gp->getDepth() == genericSigDepth)
+          return args[gp->getIndex()];
 
-    // Produce substitutions from the generic parameters to the actual
-    // arguments.
-    TypeSubstitutionMap substitutions;
-    for (unsigned i = 0, n = params.size(); i != n; ++i) {
-      substitutions[params[i]->getCanonicalType()->castTo<SubstitutableType>()]
-        = args[i];
-    }
+        return gp;
+      }
+
+      return dependentType;
+    };
 
     // Handle the requirements.
     RequirementSource source(RequirementSource::Inferred, Loc);
@@ -1564,8 +1649,8 @@ public:
       switch (req.getKind()) {
       case RequirementKind::SameType: {
         auto firstType = req.getFirstType().subst(
-                           &Builder.getModule(),
-                           substitutions);
+                           getTypeSubstitution,
+                           Builder.getLookupConformanceFn());
         if (!firstType)
           break;
 
@@ -1575,8 +1660,8 @@ public:
           return Action::Continue;
 
         auto secondType = req.getSecondType().subst(
-                            &Builder.getModule(), 
-                            substitutions);
+                           getTypeSubstitution,
+                           Builder.getLookupConformanceFn());
         if (!secondType)
           break;
         auto secondPA = Builder.resolveArchetype(secondType);
@@ -1597,10 +1682,11 @@ public:
       }
 
       case RequirementKind::Superclass:
+      case RequirementKind::Layout:
       case RequirementKind::Conformance: {
         auto subjectType = req.getFirstType().subst(
-                             &Builder.getModule(),
-                             substitutions);
+                             getTypeSubstitution,
+                             Builder.getLookupConformanceFn());
         if (!subjectType)
           break;
 
@@ -1616,6 +1702,11 @@ public:
           auto proto = req.getSecondType()->castTo<ProtocolType>();
           if (Builder.addConformanceRequirement(subjectPA, proto->getDecl(),
                                                 source)) {
+            return Action::Stop;
+          }
+        } else if (req.getKind() == RequirementKind::Layout) {
+          if (Builder.addLayoutRequirement(subjectPA, req.getLayoutConstraint(),
+                                           source)) {
             return Action::Stop;
           }
         } else {
@@ -1841,7 +1932,7 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
 void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
                      void (RequirementKind kind,
                            PotentialArchetype *archetype,
-                           llvm::PointerUnion<Type, PotentialArchetype *> type,
+                           ArchetypeBuilder::RequirementRHS constraint,
                            RequirementSource source)> f) {
   // First, collect all archetypes, and sort them.
   SmallVector<PotentialArchetype *, 8> archetypes;
@@ -1858,41 +1949,43 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     if (archetype->isInvalid())
       continue;
 
-    // If this type is not the representative, or if it was made concrete,
-    // we emit a same-type constraint.
-    if (archetype->getRepresentative() != archetype ||
-        archetype->isConcreteType()) {
-      auto *first = archetype;
-      auto *second = archetype->getRepresentative();
+    // If this type is equivalent to a concrete type, emit the same-type
+    // constraint.
+    auto rep = archetype->getRepresentative();
+    if (auto concreteType = rep->getConcreteType()) {
+      f(RequirementKind::SameType, archetype, concreteType,
+        (archetype->SameTypeSource ? archetype->getSameTypeSource()
+                                   : rep->getSameTypeSource()));
+      continue;
+    }
 
-      if (second->isConcreteType()) {
-        Type concreteType = second->getConcreteType();
-        f(RequirementKind::SameType, first, concreteType,
-          first->getSameTypeSource());
-        continue;
-      }
+    // If this type is not the anchor, we emit a same-type constraint to the
+    // anchor.
+    if (archetype->getArchetypeAnchor() != archetype) {
+      auto *anchor = archetype->getArchetypeAnchor();
 
-      assert(!first->isConcreteType());
-
-      // Neither one is concrete. Put the shorter type first.
-      if (compareDependentTypes(&first, &second) > 0)
-        std::swap(first, second);
-
-      f(RequirementKind::SameType, first, second,
-        archetype->getSameTypeSource());
+      f(RequirementKind::SameType, archetype, anchor,
+        (archetype->SameTypeSource ? archetype->getSameTypeSource()
+                                   : anchor->getSameTypeSource()));
       continue;
     }
 
     // If we have a superclass, produce a superclass requirement
-    if (Type superclass = archetype->getSuperclass()) {
+    if (Type superclass = rep->getSuperclass()) {
       f(RequirementKind::Superclass, archetype, superclass,
-        archetype->getSuperclassSource());
+        rep->getSuperclassSource());
+    }
+
+    // If we have a layout constraint, produce a layout requirement.
+    if (LayoutConstraint Layout = archetype->getLayout()) {
+      f(RequirementKind::Layout, archetype, Layout,
+        archetype->getLayoutSource());
     }
 
     // Enumerate conformance requirements.
     SmallVector<ProtocolDecl *, 4> protocols;
     DenseMap<ProtocolDecl *, RequirementSource> protocolSources;
-    for (const auto &conforms : archetype->getConformsTo()) {
+    for (const auto &conforms : rep->getConformsTo()) {
       protocols.push_back(conforms.first);
       assert(protocolSources.count(conforms.first) == 0 && 
              "redundant protocol requirement?");
@@ -1921,25 +2014,31 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "Requirements:";
   enumerateRequirements([&](RequirementKind kind,
                             PotentialArchetype *archetype,
-                            llvm::PointerUnion<Type, PotentialArchetype *> type,
+                            ArchetypeBuilder::RequirementRHS constraint,
                             RequirementSource source) {
     switch (kind) {
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
       out << "\n  ";
       out << archetype->getDebugName() << " : " 
-          << type.get<Type>().getString() << " [";
+          << constraint.get<Type>().getString() << " [";
       source.dump(out, &Context.SourceMgr);
       out << "]";
       break;
-
+    case RequirementKind::Layout:
+      out << "\n  ";
+      out << archetype->getDebugName() << " : "
+          << constraint.get<LayoutConstraint>().getString() << " [";
+      source.dump(out, &Context.SourceMgr);
+      out << "]";
+      break;
     case RequirementKind::SameType:
       out << "\n  ";
       out << archetype->getDebugName() << " == " ;
-      if (auto secondType = type.dyn_cast<Type>()) {
+      if (auto secondType = constraint.dyn_cast<Type>()) {
         out << secondType.getString();
       } else {
-        out << type.get<PotentialArchetype *>()->getDebugName();
+        out << constraint.get<PotentialArchetype *>()->getDebugName();
       }
       out << " [";
       source.dump(out, &Context.SourceMgr);
@@ -1970,7 +2069,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
                                 SmallVectorImpl<Requirement> &requirements) {
   builder.enumerateRequirements([&](RequirementKind kind,
           ArchetypeBuilder::PotentialArchetype *archetype,
-          llvm::PointerUnion<Type, ArchetypeBuilder::PotentialArchetype *> type,
+          ArchetypeBuilder::RequirementRHS type,
           RequirementSource source) {
     // Filter out redundant requirements.
     switch (source.getKind()) {
@@ -2007,6 +2106,9 @@ static void collectRequirements(ArchetypeBuilder &builder,
           })) {
         return;
       }
+    } else if (auto layoutConstraint = type.dyn_cast<LayoutConstraint>()) {
+      requirements.push_back(Requirement(kind, depTy, layoutConstraint));
+      return;
     } else {
       // ...or to a dependent type.
       repTy = type.get<ArchetypeBuilder::PotentialArchetype *>()
@@ -2040,9 +2142,9 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
   visitPotentialArchetypes([&](PotentialArchetype *pa) {
     if (auto archetype =
           genericEnv->mapTypeIntoContext(
-              &getModule(),
               pa->getDependentType(signature->getGenericParams(),
-                                   /*allowUnresolved=*/false))
+                                   /*allowUnresolved=*/false),
+              getLookupConformanceFn())
             ->getAs<ArchetypeType>())
       (void)archetype->getAllNestedTypes();
   });
@@ -2057,12 +2159,14 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
 
       auto depTy = pa->getDependentType(genericParams,
                                         /*allowUnresolved=*/false);
-      auto inContext = genericEnv->mapTypeIntoContext(&getModule(), depTy);
+      auto inContext = genericEnv->mapTypeIntoContext(depTy,
+                                                      getLookupConformanceFn());
 
       auto repDepTy = pa->getRepresentative()->getDependentType(
                                                     genericParams,
                                                     /*allowUnresolved=*/false);
-      auto repInContext = genericEnv->mapTypeIntoContext(&getModule(), repDepTy);
+      auto repInContext =
+        genericEnv->mapTypeIntoContext(repDepTy, getLookupConformanceFn());
       assert((inContext->isEqual(repInContext) ||
               inContext->hasError() ||
               repInContext->hasError()) &&

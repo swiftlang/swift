@@ -2088,8 +2088,7 @@ private:
   /// Emit an error message about an unbound generic parameter existing, and
   /// emit notes referring to the target of a diagnostic, e.g., the function
   /// or parameter being used.
-  void diagnoseUnboundArchetype(ArchetypeType *archetype,
-                                ConstraintLocator *targetLocator);
+  void diagnoseUnboundArchetype(ArchetypeType *archetype, Expr *anchor);
 
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
@@ -2133,6 +2132,13 @@ private:
                                        ArrayRef<Identifier> argLabels,
                                        bool hasTrailingClosure,
                                        CalleeCandidateInfo &candidates);
+
+  /// Produce diagnostic for failures related to unfulfilled requirements
+  /// of the generic parameters used as arguments.
+  bool diagnoseArgumentGenericRequirements(TypeChecker &TC, Expr *fnExpr,
+                                           Expr *argExpr,
+                                           CalleeCandidateInfo &candidates,
+                                           ArrayRef<Identifier> argLabels);
 
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
@@ -5669,6 +5675,139 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
   return false;
 }
 
+bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
+    TypeChecker &TC, Expr *fnExpr, Expr *argExpr,
+    CalleeCandidateInfo &candidates, ArrayRef<Identifier> argLabels) {
+  if (candidates.closeness != CC_ExactMatch || candidates.size() != 1)
+    return false;
+
+  auto DRE = dyn_cast<DeclRefExpr>(fnExpr);
+  if (!DRE)
+    return false;
+
+  auto AFD = dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
+  if (!AFD || !AFD->isGeneric() || !AFD->hasInterfaceType())
+    return false;
+
+  auto env = AFD->getGenericEnvironment();
+  if (!env)
+    return false;
+
+  auto const &candidate = candidates.candidates[0];
+  auto params = decomposeParamType(candidate.getArgumentType(),
+                                   candidate.getDecl(), candidate.level);
+  auto args = decomposeArgType(argExpr->getType(), argLabels);
+
+  SmallVector<ParamBinding, 4> bindings;
+  MatchCallArgumentListener listener;
+  if (matchCallArguments(args, params, candidates.hasTrailingClosure,
+                         /*allowFixes=*/false, listener, bindings))
+    return false;
+
+  auto loc = argExpr->getLoc();
+  auto noteLoc = AFD->getLoc();
+
+  TypeSubstitutionMap substitutions;
+  // First, let's collect all of the archetypes and their substitutions,
+  // that's going to help later on if there are cross-archetype
+  // requirements e.g. <A, B where A.Element == B.Element>.
+  for (unsigned i = 0, e = bindings.size(); i != e; ++i) {
+    auto param = params[i];
+    auto archetype = param.Ty->getAs<ArchetypeType>();
+    if (!archetype)
+      continue;
+
+    // Bindings specify the arguments that source the parameter. The only case
+    // this returns a non-singular value is when there are varargs in play.
+    for (auto argNo : bindings[i]) {
+      auto argType = args[argNo].Ty->getLValueOrInOutObjectType();
+
+      if (argType->is<ArchetypeType>()) {
+        diagnoseUnboundArchetype(archetype, fnExpr);
+        return true;
+      }
+
+      if (isUnresolvedOrTypeVarType(argType) || argType->hasError())
+        return false;
+
+      // Record substituation from generic parameter to the argument type.
+      substitutions[env->mapTypeOutOfContext(archetype)
+                        ->getCanonicalType()
+                        ->castTo<SubstitutableType>()] = argType;
+    }
+  }
+
+  if (substitutions.empty())
+    return false;
+
+  auto dc = env->getOwningDeclContext();
+  auto module = dc->getParentModule();
+  auto signature = env->getGenericSignature();
+
+  for (const auto &req : signature->getRequirements()) {
+    Type firstType = req.getFirstType().subst(module, substitutions);
+    if (firstType.isNull())
+      continue;
+
+    Type secondType = req.getSecondType();
+    if (secondType) {
+      secondType = secondType.subst(module, substitutions);
+      if (secondType.isNull())
+        continue;
+    }
+
+    // This means that we have encountered requirement which references
+    // generic parameter not used in the arguments, we can't diagnose it here.
+    if (firstType->hasTypeParameter() || firstType->isTypeVariableOrMember())
+      continue;
+
+    switch (req.getKind()) {
+    case RequirementKind::Conformance: {
+      auto protocol = secondType->castTo<ProtocolType>();
+      auto result = TC.conformsToProtocol(
+          firstType, protocol->getDecl(), dc,
+          ConformanceCheckFlags::SuppressDependencyTracking, loc, nullptr);
+
+      // Conformance failed and was diagnosed by `conformsToProtocol`.
+      if (!result.second)
+        return true;
+
+      break;
+    }
+
+    case RequirementKind::Superclass:
+      if (!TC.isSubtypeOf(firstType, secondType, dc)) {
+        TC.diagnose(loc, diag::type_does_not_inherit, AFD->getInterfaceType(),
+                    firstType, secondType);
+
+        TC.diagnose(
+            noteLoc, diag::type_does_not_inherit_requirement,
+            req.getFirstType(), req.getSecondType(),
+            signature->gatherGenericParamBindingsText(
+                {req.getFirstType(), req.getSecondType()}, substitutions));
+        return true;
+      }
+      break;
+
+    case RequirementKind::SameType:
+      if (!firstType->isEqual(secondType)) {
+        TC.diagnose(loc, diag::types_not_equal, AFD->getInterfaceType(),
+                    firstType, secondType);
+
+        TC.diagnose(
+            noteLoc, diag::types_not_equal_requirement, req.getFirstType(),
+            req.getSecondType(),
+            signature->gatherGenericParamBindingsText(
+                {req.getFirstType(), req.getSecondType()}, substitutions));
+        return true;
+      }
+      break;
+    }
+  }
+
+  return false;
+}
+
 /// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,
 /// issue a diagnostic that refers to the API for binding memory to a type.
 static bool isCastToTypedPointer(ASTContext &Ctx, const Expr *Fn,
@@ -5746,8 +5885,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // candidates later on.
     CalleeListener listener(CS->getContextualType());
 
-    if (auto OSR = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
-      assert(!OSR->getReferencedDecl() && "unexpected declaration reference");
+    if (isa<OverloadSetRefExpr>(fnExpr)) {
+      assert(!cast<OverloadSetRefExpr>(fnExpr)->getReferencedDecl() &&
+             "unexpected declaration reference");
 
       ConcreteDeclRef decl = nullptr;
       Optional<Type> type = CS->TC.getTypeOfExpressionWithoutApplying(
@@ -6038,6 +6178,15 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
     return true;
   }
+
+  // If all of the arguments are a perfect match, so let's check if there
+  // are problems with requirements placed on generic parameters, because
+  // CalleeCandidateInfo validates only conformance of the parameters
+  // to their protocol types (if any) but it doesn't check additional
+  // requirements placed on e.g. nested types or between parameters.
+  if (diagnoseArgumentGenericRequirements(CS->TC, fnExpr, argExpr, calleeInfo,
+                                          argLabels))
+    return true;
 
   if (isContextualConversionFailure(argExpr))
     return false;
@@ -7472,7 +7621,8 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
                      });
 
     auto param = unboundParams.front();
-    diagnoseUnboundArchetype(std::get<0>(param), std::get<1>(param));
+    diagnoseUnboundArchetype(std::get<0>(param),
+                             std::get<1>(param)->getAnchor());
     return true;
   }
 
@@ -7483,9 +7633,8 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
 /// emit notes referring to the target of a diagnostic, e.g., the function
 /// or parameter being used.
 void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
-                                            ConstraintLocator *targetLocator) {
+                                                Expr *anchor) {
   auto &tc = CS->getTypeChecker();
-  auto anchor = targetLocator->getAnchor();
 
   // The archetype may come from the explicit type in a cast expression.
   if (auto *ECE = dyn_cast_or_null<ExplicitCastExpr>(anchor)) {

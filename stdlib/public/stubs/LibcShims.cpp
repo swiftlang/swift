@@ -57,6 +57,11 @@ __swift_size_t swift::_swift_stdlib_strlen(const char *s) {
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_size_t swift::_swift_stdlib_strlen_unsigned(const unsigned char *s) {
+  return strlen((char *)s);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
 int swift::_swift_stdlib_memcmp(const void *s1, const void *s2,
                                 __swift_size_t n) {
   return memcmp(s1, s2, n);

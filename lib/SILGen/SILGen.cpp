@@ -1346,7 +1346,8 @@ public:
         auto returnBB = gen.createBasicBlock();
         if (gen.B.hasValidInsertionPoint())
           gen.B.createBranch(returnLoc, returnBB, returnValue);
-        returnValue = returnBB->createPHIArgument(returnType);
+        returnValue =
+            returnBB->createPHIArgument(returnType, ValueOwnershipKind::Owned);
         gen.B.emitBlock(returnBB);
 
         // Emit the rethrow block.

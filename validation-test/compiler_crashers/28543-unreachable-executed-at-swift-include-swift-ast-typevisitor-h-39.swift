@@ -7,6 +7,6 @@
 
 // This test is disabled because it may fail to crash on the Ubuntu 14.04 host.
 // REQUIRES: deterministic-behavior
-// REQUIRES: OS=linux-gnu
+// REQUIRES: deterministic-behavior
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 ([-.f\n{}{$0(n&[]{

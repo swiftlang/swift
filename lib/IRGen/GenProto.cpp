@@ -212,6 +212,7 @@ void PolymorphicConvention::enumerateRequirements(const RequirementCallback &cal
       // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
+      case RequirementKind::Layout:
         continue;
 
       case RequirementKind::Conformance: {
@@ -351,7 +352,6 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Deallocating:
       // Classes are sources of metadata.
       if (type->getClassOrBoundGenericClass()) {
         considerNewTypeSource(MetadataSource::Kind::ClassPointer,
@@ -633,10 +633,7 @@ static unsigned getDependentTypeIndex(CanGenericSignature generics,
   // Make a pass over all the dependent types.
   unsigned index = 0;
   for (auto depTy : generics->getAllDependentTypes()) {
-    // Unfortunately, we can't rely on either depTy or type actually
-    // being the marked witness type in the generic signature, so we have
-    // to ask the generic signature whether the types are equal.
-    if (generics->areSameTypeParameterInContext(depTy, type, M))
+    if (depTy->isEqual(type))
       return index;
     index++;
   }
@@ -657,11 +654,8 @@ getProtocolConformanceIndex(CanGenericSignature generics, ModuleDecl &M,
   // Make a pass over all the dependent types.
   unsigned index = 0;
   for (auto reqt : generics->getRequirements()) {
-    // Unfortunately, we can't rely on either depTy or type actually
-    // being the marked witness type in the generic signature, so we have
-    // to ask the generic signature whether the types are equal.
     if (reqt.getKind() == RequirementKind::Conformance &&
-        generics->areSameTypeParameterInContext(reqt.getFirstType(), type, M)) {
+        reqt.getFirstType()->isEqual(type)) {
       if (reqt.getSecondType()->getAnyNominal() == protocol)
         return index;
       index++;
@@ -2578,6 +2572,8 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // Figure out what we're actually still required to pass 
   PolymorphicConvention convention(IGM, fnType);
   convention.enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
+    assert(generics->isCanonicalTypeInContext(reqt.TypeParameter,
+                                              *IGM.getSwiftModule()));
     Requirements.push_back(reqt);
   });
 

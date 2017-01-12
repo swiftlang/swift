@@ -934,7 +934,6 @@ public:
     
     // Should not apply to callees.
     case ParameterConvention::Direct_Unowned:
-    case ParameterConvention::Direct_Deallocating:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_In_Guaranteed:

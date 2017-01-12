@@ -2678,43 +2678,42 @@ namespace {
     raw_ostream &OS;
     bool firstSourceEntity = true;
 
-    void anchor() {}
-
-    void printSymbolKind(SymbolKind kind, SymbolSubKindSet subKinds) {
-      OS << getSymbolKindString(kind);
-      if (subKinds) {
+    void printSymbolInfo(SymbolInfo SymInfo) {
+      OS << getSymbolKindString(SymInfo.Kind);
+      if (SymInfo.SubKind != SymbolSubKind::None)
+        OS << '/' << getSymbolSubKindString(SymInfo.SubKind);
+      if (SymInfo.Properties) {
         OS << '(';
-        printSymbolSubKinds(subKinds, OS);
+        printSymbolProperties(SymInfo.Properties, OS);
         OS << ')';
       }
-      // FIXME: add and use language enum
-      OS << '/' << "Swift";
+      OS << '/' << getSymbolLanguageString(SymInfo.Lang);
     }
 
   public:
     PrintIndexDataConsumer(raw_ostream &OS) : OS(OS) {}
 
-    void failed(StringRef error) {}
+    void failed(StringRef error) override {}
 
-    bool recordHash(StringRef hash, bool isKnown) { return true; }
-    bool startDependency(SymbolKind kind, StringRef name, StringRef path,
-                         bool isSystem, StringRef hash) {
-      OS << getSymbolKindString(kind) << " | ";
+    bool recordHash(StringRef hash, bool isKnown) override { return true; }
+    bool startDependency(StringRef name, StringRef path, bool isClangModule,
+                         bool isSystem, StringRef hash) override {
+      OS << (isClangModule ? "clang-module" : "module") << " | ";
       OS << (isSystem ? "system" : "user") << " | ";
       OS << name << " | " << path << "-" << hash << "\n";
       return true;
     }
-    bool finishDependency(SymbolKind kind) {
+    bool finishDependency(bool isClangModule) override {
       return true;
     }
 
-    Action startSourceEntity(const IndexSymbol &symbol) {
+    Action startSourceEntity(const IndexSymbol &symbol) override {
       if (firstSourceEntity) {
         firstSourceEntity = false;
         OS << "------------\n";
       }
       OS << symbol.line << ':' << symbol.column << " | ";
-      printSymbolKind(symbol.kind, symbol.subKinds);
+      printSymbolInfo(symbol.symInfo);
       OS << " | " << symbol.name << " | " << symbol.USR << " | ";
       clang::index::printSymbolRoles(symbol.roles, OS);
       OS << " | rel: " << symbol.Relations.size() << "\n";
@@ -2726,12 +2725,11 @@ namespace {
       }
       return Continue;
     }
-    bool finishSourceEntity(SymbolKind kind, SymbolSubKindSet subKinds,
-                                    SymbolRoleSet roles) {
+    bool finishSourceEntity(SymbolInfo symInfo, SymbolRoleSet roles) override {
       return true;
     }
 
-    void finish() {}
+    void finish() override {}
   };
 
 } // anonymous namespace

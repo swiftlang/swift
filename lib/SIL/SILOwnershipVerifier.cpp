@@ -434,7 +434,6 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitCallee(
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
-  case ParameterConvention::Direct_Deallocating:
     llvm_unreachable("Illegal convention for callee");
   case ParameterConvention::Direct_Unowned:
     return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};

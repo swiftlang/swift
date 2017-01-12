@@ -92,7 +92,7 @@ SubstitutionMap::lookupConformance(CanType type,
 void SubstitutionMap::
 addSubstitution(CanSubstitutableType type, Type replacement) {
   auto result = subMap.insert(std::make_pair(type, replacement));
-  assert(result.second);
+  assert(result.second || result.first->second->isEqual(replacement));
   (void) result;
 }
 
@@ -103,7 +103,8 @@ addConformances(CanType type, ArrayRef<ProtocolConformanceRef> conformances) {
 
   auto result = conformanceMap.insert(
       std::make_pair(type.getPointer(), conformances));
-  assert(result.second);
+  assert(result.second ||
+         result.first->getSecond().size() == conformances.size());
   (void) result;
 }
 

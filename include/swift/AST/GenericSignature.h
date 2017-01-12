@@ -102,6 +102,19 @@ public:
   /// array of the generic parameters for the innermost generic type.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParams() const;
 
+  /// Create a text string that describes the bindings of generic parameters
+  /// that are relevant to the given set of types, e.g.,
+  /// "[with T = Bar, U = Wibble]".
+  ///
+  /// \param types The types that will be scanned for generic type parameters,
+  /// which will be used in the resulting type.
+  ///
+  /// \param substitutions The generic parameter -> generic argument
+  /// substitutions that will have been applied to these types.
+  /// These are used to produce the "parameter = argument" bindings in the test.
+  std::string gatherGenericParamBindingsText(
+      ArrayRef<Type> types, const TypeSubstitutionMap &substitutions) const;
+
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
     return const_cast<GenericSignature *>(this)->getRequirementsBuffer();
@@ -199,6 +212,11 @@ public:
   /// constraint.
   Type getConcreteType(Type type, ModuleDecl &mod);
 
+  /// Return the layout constraint that the given dependent type is constrained
+  /// to, or the null LayoutConstraint if it is not the subject of layout
+  /// constraint.
+  LayoutConstraint getLayoutConstraint(Type type, ModuleDecl &mod);
+
   /// Return the preferred representative of the given type parameter within
   /// this generic signature.  This may yield a concrete type or a
   /// different type parameter.
@@ -214,6 +232,11 @@ public:
   /// signature.
   CanType getCanonicalTypeInContext(Type type, ModuleDecl &mod);
   bool isCanonicalTypeInContext(Type type, ModuleDecl &mod);
+
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
+  bool isCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,

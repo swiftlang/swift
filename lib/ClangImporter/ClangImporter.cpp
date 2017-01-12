@@ -1322,22 +1322,6 @@ ClangImporter::Implementation::exportName(Identifier name) {
   return ident;
 }
 
-namespace llvm {
-  // An Identifier is "pointer like".
-  template<typename T> class PointerLikeTypeTraits;
-  template<>
-  class PointerLikeTypeTraits<swift::DeclName> {
-  public:
-    static inline void *getAsVoidPointer(swift::DeclName name) {
-      return name.getOpaqueValue();
-    }
-    static inline swift::DeclName getFromVoidPointer(void *ptr) {
-      return swift::DeclName::getFromOpaqueValue(ptr);
-    }
-    enum { NumLowBitsAvailable = 0 };
-  };
-} // namespace llvm
-
 Identifier
 ClangImporter::Implementation::importIdentifier(
   const clang::IdentifierInfo *identifier,

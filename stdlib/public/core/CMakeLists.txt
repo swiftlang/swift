@@ -178,7 +178,6 @@ else()
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
   if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
-    find_package(ICU REQUIRED COMPONENTS uc i18n)
     list(APPEND swift_core_private_link_libraries
       ICU_UC ICU_I18N)
   else()

@@ -889,6 +889,15 @@ void ModuleFile::readGenericRequirements(
                                            subject, constraint));
         break;
       }
+      case GenericRequirementKind::Layout: {
+        auto subject = getType(rawTypeIDs[0]);
+        // TODO: Deserialize the layout constraint.
+        LayoutConstraint layoutConstraint;
+
+        requirements.push_back(Requirement(RequirementKind::Layout,
+                                           subject, layoutConstraint));
+        break;
+      }
       case GenericRequirementKind::Superclass: {
         auto subject = getType(rawTypeIDs[0]);
         auto constraint = getType(rawTypeIDs[1]);
@@ -3478,7 +3487,6 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   CASE(Direct_Owned)
   CASE(Direct_Unowned)
   CASE(Direct_Guaranteed)
-  CASE(Direct_Deallocating)
 #undef CASE
   }
   return None;
@@ -3749,6 +3757,9 @@ Type ModuleFile::getType(TypeID TID) {
     Type superclass;
     superclass = getType(superclassID);
 
+    // TODO: Read layout.
+    LayoutConstraint layout;
+
     SmallVector<ProtocolDecl *, 4> conformances;
     for (DeclID protoID : rawConformanceIDs)
       conformances.push_back(cast<ProtocolDecl>(getDecl(protoID)));
@@ -3761,11 +3772,11 @@ Type ModuleFile::getType(TypeID TID) {
     if (parent) {
       auto assocTypeDecl = cast<AssociatedTypeDecl>(getDecl(assocTypeOrNameID));
       archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
-                                        conformances, superclass);
+                                        conformances, superclass, layout);
     } else {
       archetype = ArchetypeType::getNew(ctx, genericEnv,
                                         getIdentifier(assocTypeOrNameID),
-                                        conformances, superclass);
+                                        conformances, superclass, layout);
     }
 
     typeOrOffset = archetype;
@@ -4306,7 +4317,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
       // Create an archetype builder, which will help us create the
       // synthetic environment.
-      ArchetypeBuilder builder(*getAssociatedModule());
+      ArchetypeBuilder builder(
+                         getContext(),
+                         LookUpConformanceInModule(getAssociatedModule()));
       builder.addGenericSignature(syntheticSig);
       builder.finalize(SourceLoc());
       syntheticEnv = builder.getGenericEnvironment(syntheticSig);

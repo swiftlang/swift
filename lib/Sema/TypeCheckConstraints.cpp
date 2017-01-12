@@ -39,6 +39,8 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/Format.h"
+#include "llvm/Support/Timer.h"
 #include <iterator>
 #include <map>
 #include <memory>
@@ -1493,6 +1495,28 @@ namespace {
       }
     }
   };
+
+  class ExpressionTimer {
+    Expr* E;
+    ASTContext &Context;
+    llvm::TimeRecord StartTime = llvm::TimeRecord::getCurrentTime();
+
+  public:
+    ExpressionTimer(Expr *E, ASTContext &Context) : E(E), Context(Context) {}
+
+    ~ExpressionTimer() {
+      llvm::TimeRecord endTime = llvm::TimeRecord::getCurrentTime(false);
+
+      auto elapsed = endTime.getProcessTime() - StartTime.getProcessTime();
+
+      // Round up to the nearest 100th of a millisecond.
+      llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100)
+                   << "ms\t";
+      E->getLoc().print(llvm::errs(), Context.SourceMgr);
+      llvm::errs() << "\n";
+    }
+  };
+
 } // end anonymous namespace
 
 #pragma mark High-level entry points
@@ -1502,6 +1526,10 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeCheckExprOptions options,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
+  Optional<ExpressionTimer> timer;
+  if (DebugTimeExpressions)
+    timer.emplace(expr, Context);
+
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.

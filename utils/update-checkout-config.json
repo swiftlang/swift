@@ -67,6 +67,24 @@
                 "swift-xcode-playground-support": "master-next"
             }
         },
+        "next-upstream" : {
+            "aliases": ["next-upstream"],
+            "repos": {
+                "llvm": "upstream-with-swift",
+                "clang": "upstream-with-swift",
+                "compiler-rt": "upstream-with-swift",
+                "swift": "master-next",
+                "lldb": "upstream",
+                "cmark": "master",
+                "llbuild": "master-next",
+                "swiftpm": "master-next",
+                "swift-corelibs-xctest": "master-next",
+                "swift-corelibs-foundation": "master-next",
+                "swift-corelibs-libdispatch": "master-next",
+                "swift-integration-tests": "master-next",
+                "swift-xcode-playground-support": "master-next"
+            }
+        },
         "upstream": {
             "aliases": ["upstream"],
             "repos": {

@@ -616,6 +616,9 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
       TC.enableDebugTimeFunctionBodies();
 
+    if (Options.contains(TypeCheckingFlags::DebugTimeExpressions))
+      TC.enableDebugTimeExpressions();
+
     if (Options.contains(TypeCheckingFlags::ForImmediateMode))
       TC.setInImmediateMode(true);
     

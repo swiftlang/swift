@@ -117,11 +117,13 @@ public:
   /// type or some type derived from it.
   class PotentialArchetype;
 
+  using RequirementRHS =
+      llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+
 private:
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
 
-  ModuleDecl &Mod;
   ASTContext &Context;
   DiagnosticEngine &Diags;
   struct Implementation;
@@ -187,8 +189,10 @@ private:
 public:
   /// Construct a new archetype builder.
   ///
-  /// \param mod The module in which the builder will create archetypes.
-  explicit ArchetypeBuilder(ModuleDecl &mod);
+  /// \param lookupConformance Conformance-lookup routine that will be used
+  /// to satisfy conformance requirements for concrete types.
+  explicit ArchetypeBuilder(ASTContext &ctx,
+                            std::function<GenericFunction> lookupConformance);
 
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
@@ -196,8 +200,8 @@ public:
   /// Retrieve the AST context.
   ASTContext &getASTContext() const { return Context; }
 
-  /// Retrieve the module.
-  ModuleDecl &getModule() const { return Mod; }
+  /// Retrieve the conformance-lookup function used by this archetype builder.
+  std::function<GenericFunction> getLookupConformanceFn() const;
 
   /// Retrieve the lazy resolver, if there is one.
   LazyResolver *getLazyResolver() const;
@@ -210,9 +214,8 @@ public:
   void enumerateRequirements(llvm::function_ref<
                       void (RequirementKind kind,
                             PotentialArchetype *archetype,
-                            llvm::PointerUnion<Type, PotentialArchetype *> type,
+                            RequirementRHS constraint,
                             RequirementSource source)> f);
-  
 
 private:
   PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,
@@ -242,7 +245,11 @@ public:
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
   void addRequirement(const Requirement &req, RequirementSource source);
-  
+
+  bool addLayoutRequirement(PotentialArchetype *PAT,
+                            LayoutConstraint Layout,
+                            RequirementSource Source);
+
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
 
@@ -340,6 +347,12 @@ class ArchetypeBuilder::PotentialArchetype {
 
   /// \brief The list of protocols to which this archetype will conform.
   llvm::MapVector<ProtocolDecl *, RequirementSource> ConformsTo;
+
+  /// \brief The layout constraint of this archetype, if specified.
+  LayoutConstraint Layout;
+
+  /// The source of the layout constraint requirement.
+  Optional<RequirementSource> LayoutSource;
 
   /// \brief The set of nested types of this archetype.
   ///
@@ -516,6 +529,14 @@ public:
   const RequirementSource &getSuperclassSource() const {
     return *SuperclassSource;
   } 
+
+  /// Retrieve the layout constraint of this archetype.
+  LayoutConstraint getLayout() const { return Layout; }
+
+  /// Retrieve the requirement source for the layout constraint requirement.
+  const RequirementSource &getLayoutSource() const {
+    return *LayoutSource;
+  }
 
   /// Retrieve the set of nested types.
   const llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>> &

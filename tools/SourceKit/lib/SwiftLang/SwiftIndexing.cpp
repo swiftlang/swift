@@ -31,15 +31,8 @@ using namespace swift::index;
 static UIdent KindImportModuleClang("source.lang.swift.import.module.clang");
 static UIdent KindImportModuleSwift("source.lang.swift.import.module.swift");
 
-static UIdent getUIDForDependencyKind(SymbolKind depKind) {
-  switch (depKind) {
-  case SymbolKind::Module:
-    return KindImportModuleSwift;
-  case SymbolKind::ClangModule:
-    return KindImportModuleClang;
-  default:
-    return UIdent();
-  }
+static UIdent getUIDForDependencyKind(bool isClangModule) {
+  return isClangModule ? KindImportModuleClang : KindImportModuleSwift;
 }
 
 class SKIndexDataConsumer : public IndexDataConsumer {
@@ -61,14 +54,14 @@ private:
     return impl.recordHash(hash, isKnown);
   }
 
-  bool startDependency(SymbolKind kind, StringRef name, StringRef path,
+  bool startDependency(StringRef name, StringRef path, bool isClangModule,
                        bool isSystem, StringRef hash) override {
-    auto kindUID = getUIDForDependencyKind(kind);
+    auto kindUID = getUIDForDependencyKind(isClangModule);
     return impl.startDependency(kindUID, name, path, isSystem, hash);
   }
 
-  bool finishDependency(SymbolKind kind) override {
-    return impl.finishDependency(getUIDForDependencyKind(kind));
+  bool finishDependency(bool isClangModule) override {
+    return impl.finishDependency(getUIDForDependencyKind(isClangModule));
   }
 
   Action startSourceEntity(const IndexSymbol &symbol) override {
@@ -103,10 +96,9 @@ private:
     return Continue;
   }
 
-  bool finishSourceEntity(SymbolKind kind, SymbolSubKindSet subKinds,
-                          SymbolRoleSet roles) override {
+  bool finishSourceEntity(SymbolInfo symInfo, SymbolRoleSet roles) override {
     bool isRef = roles & (unsigned)SymbolRole::Reference;
-    auto UID = SwiftLangSupport::getUIDForSymbol(kind, subKinds, isRef);
+    auto UID = SwiftLangSupport::getUIDForSymbol(symInfo, isRef);
     return impl.finishSourceEntity(UID);
   }
 
@@ -116,8 +108,7 @@ private:
     bool isRef = symbol.roles & (unsigned)SymbolRole::Reference;
     bool isImplicit = symbol.roles & (unsigned)SymbolRole::Implicit;
 
-    info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.kind, symbol.subKinds,
-                                                  isRef);
+    info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.symInfo, isRef);
     info.Name = isImplicit? "" : symbol.name;
     info.USR = symbol.USR;
     info.Group = symbol.group;
@@ -125,7 +116,7 @@ private:
     info.Column = symbol.column;
     info.ReceiverUSR = symbol.getReceiverUSR();
     info.IsDynamic = symbol.roles & (unsigned)SymbolRole::Dynamic;
-    info.IsTestCandidate = symbol.subKinds & SymbolSubKind::UnitTest;
+    info.IsTestCandidate = symbol.symInfo.Properties & SymbolProperty::UnitTest;
     std::vector<UIdent> uidAttrs;
     if (!isRef) {
       uidAttrs =
@@ -140,13 +131,12 @@ private:
     EntityInfo info;
     bool isRef = (relation.roles & (unsigned)SymbolRole::Reference) ||
       (relation.roles & (unsigned)SymbolRole::RelationOverrideOf);
-    info.Kind = SwiftLangSupport::getUIDForSymbol(relation.kind, relation.subKinds,
-                                                  isRef);
+    info.Kind = SwiftLangSupport::getUIDForSymbol(relation.symInfo, isRef);
     info.Name = relation.name;
     info.USR = relation.USR;
     info.Group = relation.group;
     info.IsDynamic = relation.roles & (unsigned)SymbolRole::Dynamic;
-    info.IsTestCandidate = relation.subKinds & SymbolSubKind::UnitTest;
+    info.IsTestCandidate = relation.symInfo.Properties & SymbolProperty::UnitTest;
     std::vector<UIdent> uidAttrs;
     if (!isRef) {
       uidAttrs =

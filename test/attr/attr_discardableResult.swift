@@ -140,10 +140,10 @@ func testFunctionsInExistential(p1 : P1) {
 }
 
 let x = 4
-"Hello \(x+1) world"  // expected-warning {{expression of type 'String' is unused}}
+"Hello \(x+1) world"  // expected-warning {{string literal is unused}}
 
 func f(a : () -> Int) {
-  42  // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
+  42  // expected-warning {{integer literal is unused}}
   
   4 + 5 // expected-warning {{result of operator '+' is unused}}
   a() // expected-warning {{result of call is unused, but produces 'Int'}}

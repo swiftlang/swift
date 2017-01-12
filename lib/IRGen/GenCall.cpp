@@ -876,7 +876,6 @@ void SignatureExpansion::expand(SILParameterInfo param) {
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
-  case ParameterConvention::Direct_Deallocating:
     switch (FnType->getLanguage()) {
     case SILFunctionLanguage::C: {
       llvm_unreachable("Unexpected C/ObjC method in parameter expansion!");

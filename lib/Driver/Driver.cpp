@@ -1204,6 +1204,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                         [&OI](sys::ProcessId PID,
                               int returnCode,
                               StringRef output,
+                              StringRef errors,
                               void *unused) -> sys::TaskFinishedResponse {
             if (returnCode == 0) {
               output = output.rtrim();

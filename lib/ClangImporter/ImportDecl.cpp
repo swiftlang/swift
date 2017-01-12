@@ -4072,8 +4072,8 @@ namespace {
       //
       // FIXME: Remove this once SILGen gets proper support for factory
       // initializers.
-      if (result->getName() ==
-          result->getASTContext().getIdentifier("OS_object")) {
+      if (decl->getName() == "OS_object" ||
+          decl->getName() == "OS_os_log") {
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
       }
 
@@ -4265,7 +4265,7 @@ namespace {
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
-      addObjCAttribute(result, None);
+      addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
       applyPropertyOwnership(result, decl->getPropertyAttributesAsWritten());
 
       // Handle attributes.
@@ -6982,7 +6982,8 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 // Calculate the generic environment from an imported generic param list.
 GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
     GenericParamList *genericParams, DeclContext *dc) {
-  ArchetypeBuilder builder(*dc->getParentModule());
+  ArchetypeBuilder builder(SwiftContext,
+                           LookUpConformanceInModule(dc->getParentModule()));
   for (auto param : *genericParams)
     builder.addGenericParameter(param);
   for (auto param : *genericParams) {

@@ -472,7 +472,8 @@ namespace {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
                                              GenericTypeParams);
 
-      ArchetypeBuilder Builder(*ctx.TheBuiltinModule);
+      ArchetypeBuilder Builder(ctx,
+                               LookUpConformanceInModule(ctx.TheBuiltinModule));
       for (auto gp : GenericTypeParams)
         Builder.addGenericParameter(gp);
 
