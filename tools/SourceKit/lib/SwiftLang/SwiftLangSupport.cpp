@@ -556,8 +556,8 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
 
   switch (sym.SubKind) {
   default: break;
-  case SymbolSubKind::SwiftAccessorGetter: return UID_FOR(AccessorGetter);
-  case SymbolSubKind::SwiftAccessorSetter: return UID_FOR(AccessorSetter);
+  case SymbolSubKind::AccessorGetter: return UID_FOR(AccessorGetter);
+  case SymbolSubKind::AccessorSetter: return UID_FOR(AccessorSetter);
   case SymbolSubKind::SwiftAccessorWillSet: return UID_FOR(AccessorWillSet);
   case SymbolSubKind::SwiftAccessorDidSet: return UID_FOR(AccessorDidSet);
   case SymbolSubKind::SwiftAccessorAddressor: return UID_FOR(AccessorAddress);

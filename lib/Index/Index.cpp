@@ -577,8 +577,10 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
     // FIXME handle extensions properly
     if (auto ParentVD = dyn_cast<ValueDecl>(Parent)) {
       SymbolRoleSet RelationsToParent = (SymbolRoleSet)SymbolRole::RelationChildOf;
-      if (Info.symInfo.SubKind >= SymbolSubKind::SwiftAccessorGetter &&
-          Info.symInfo.SubKind <= SymbolSubKind::SwiftAccessorMutableAddressor)
+      if (Info.symInfo.SubKind == SymbolSubKind::AccessorGetter ||
+          Info.symInfo.SubKind == SymbolSubKind::AccessorSetter ||
+          (Info.symInfo.SubKind >= SymbolSubKind::SwiftAccessorWillSet &&
+           Info.symInfo.SubKind <= SymbolSubKind::SwiftAccessorMutableAddressor))
         RelationsToParent |= (SymbolRoleSet)SymbolRole::RelationAccessorOf;
       if (addRelation(Info, RelationsToParent, ParentVD))
         return false;
