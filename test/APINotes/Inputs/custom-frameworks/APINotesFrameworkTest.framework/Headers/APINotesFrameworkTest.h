@@ -19,3 +19,4 @@ __attribute__((objc_root_class))
 
 #import <APINotesFrameworkTest/Properties.h>
 #import <APINotesFrameworkTest/Protocols.h>
+#import <APINotesFrameworkTest/Types.h>

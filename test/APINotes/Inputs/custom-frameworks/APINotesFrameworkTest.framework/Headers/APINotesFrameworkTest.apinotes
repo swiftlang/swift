@@ -89,3 +89,6 @@ SwiftVersions:
       - Name: acceptDoublePointer
         SwiftName: 'acceptPointer(_:)'
         Nullability: [ O ]
+    Tags:
+      - Name: SomeCStruct
+        SwiftName: ImportantCStruct
