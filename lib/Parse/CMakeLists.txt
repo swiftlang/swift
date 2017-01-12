@@ -1,5 +1,4 @@
 add_swift_library(swiftParse STATIC
-  ConditionResolver.cpp
   Lexer.cpp
   ParseDecl.cpp
   ParseExpr.cpp

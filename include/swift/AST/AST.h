@@ -27,7 +27,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-#include "swift/AST/StmtTransformer.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeRepr.h"
 
