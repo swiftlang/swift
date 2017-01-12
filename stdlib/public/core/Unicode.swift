@@ -255,7 +255,7 @@ extension UTF8 : UnicodeCodec {
     let scalarBits = UInt32(scalarLength * 8)
     
     self = ._swift3Buffer(
-      bits: buffer >> (scalarBits & 0x1f),
+      bits: UInt32(UInt64(buffer) >> UInt64(scalarBits & (64 - 1))),
       bitCount: bitCount - scalarBits)
     
     if _slowPath(scalarLength == 0) { return .emptyInput }
