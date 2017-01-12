@@ -95,11 +95,12 @@ public:
   /// available and SeparateErrors was true.  (This may not be available on all
   /// platforms.)
   /// \param Context the context which was passed when the task was added
+  /// \param Signal the terminating signal number
   ///
   /// \returns a TaskFinishedResponse indicating whether or not execution
   /// should proceed
   typedef std::function<TaskFinishedResponse(ProcessId Pid, StringRef ErrorMsg,
-                                             StringRef Output, StringRef Errors, void *Context)>
+                                             StringRef Output, StringRef Errors, void *Context, int Signal)>
     TaskSignalledCallback;
 #pragma clang diagnostic pop
 

@@ -615,7 +615,7 @@ int Compilation::performJobsImpl() {
 
   auto taskSignalled = [&](ProcessId Pid, StringRef ErrorMsg, StringRef Output,
                            StringRef Errors,
-                           void *Context) -> TaskFinishedResponse {
+                           void *Context, int Signal) -> TaskFinishedResponse {
     const Job *SignalledCmd = (const Job *)Context;
 
     if (ShowDriverTimeCompilation) {
@@ -625,7 +625,7 @@ int Compilation::performJobsImpl() {
     if (Level == OutputLevel::Parseable) {
       // Parseable output was requested.
       parseable_output::emitSignalledMessage(llvm::errs(), *SignalledCmd, Pid,
-                                             ErrorMsg, Output);
+                                             ErrorMsg, Output, Signal);
     } else {
       // Otherwise, send the buffered output to stderr, though only if we
       // support getting buffered output.
@@ -638,7 +638,7 @@ int Compilation::performJobsImpl() {
                      ErrorMsg);
 
     Diags.diagnose(SourceLoc(), diag::error_command_signalled,
-                   SignalledCmd->getSource().getClassName());
+                   SignalledCmd->getSource().getClassName(), Signal);
 
     // Since the task signalled, unconditionally set result to -2.
     Result = -2;
