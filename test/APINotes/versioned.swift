@@ -15,15 +15,21 @@
 
 import APINotesFrameworkTest
 
+// CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE-1]]:
+class ProtoWithVersionedUnavailableMemberImpl: ProtoWithVersionedUnavailableMember {
+  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:7: error: type 'ProtoWithVersionedUnavailableMemberImpl' cannot conform to protocol 'ProtoWithVersionedUnavailableMember' because it has requirements that cannot be satisfied
+  func requirement() -> Any? { return nil }
+}
+
 func testRenamedTopLevel() {
   var value = 0.0
 
-  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]
+  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
   accept(&value)
   // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:3: error: 'accept' has been renamed to 'acceptPointer(_:)'
   // CHECK-DIAGS-3: note: 'accept' was introduced in Swift 4
 
-  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]
+  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
   acceptPointer(&value)
   // CHECK-DIAGS-4: versioned.swift:[[@LINE-1]]:3: error: 'acceptPointer' has been renamed to 'accept(_:)'
   // CHECK-DIAGS-4: note: 'acceptPointer' was obsoleted in Swift 4

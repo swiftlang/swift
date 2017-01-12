@@ -79,6 +79,12 @@ SwiftVersions:
           - Name: accessorsOnlyRenamedRetypedClass
             PropertyKind:    Class
             SwiftImportAsAccessors: true
+    Protocols:
+      - Name: ProtoWithVersionedUnavailableMember
+        Methods:
+          - Selector: requirement
+            MethodKind: Instance
+            ResultType: 'ForwardClass * _Nullable'
     Functions:
       - Name: acceptDoublePointer
         SwiftName: 'acceptPointer(_:)'
