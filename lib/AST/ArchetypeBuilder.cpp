@@ -569,6 +569,12 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   return nested.front();
 }
 
+auto ArchetypeBuilder::PotentialArchetype::getNestedType(
+                            AssociatedTypeDecl *assocType,
+                            ArchetypeBuilder &builder) -> PotentialArchetype * {
+  return getNestedType(assocType->getName(), builder);
+}
+
 Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
                                                ArchetypeBuilder &builder,
                                                GenericEnvironment *genericEnv) {
@@ -913,6 +919,9 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
     if (!base)
       return nullptr;
 
+    if (auto assocType = dependentMember->getAssocType())
+      return base->getNestedType(assocType, *this);
+
     return base->getNestedType(dependentMember->getName(), *this);
   }
 
@@ -1003,7 +1012,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   for (auto Member : Proto->getMembers()) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
-      auto AssocPA = T->getNestedType(AssocType->getName(), *this);
+      auto AssocPA = T->getNestedType(AssocType, *this);
       if (AssocPA != T) {
         if (addAbstractTypeParamRequirements(AssocType, AssocPA,
                                              RequirementSource::Protocol,
