@@ -1031,7 +1031,7 @@ public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _
 }
 
 public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
-  let assertionType = _XCTAssertionType.assertion_NoThrow
+  let assertionType = _XCTAssertionType.noThrow
 
   let result = _XCTRunThrowableBlock { _ = try expression() }
 
