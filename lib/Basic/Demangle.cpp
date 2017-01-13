@@ -1424,15 +1424,6 @@ private:
     return entity;
   }
 
-  NodePointer demangleArchetypeRef(Node::IndexType depth, Node::IndexType i) {
-    // FIXME: Name won't match demangled context generic signatures correctly.
-    auto ref = NodeFactory::create(Node::Kind::ArchetypeRef,
-                                   archetypeName(i, depth));
-    ref->addChild(NodeFactory::create(Node::Kind::Index, depth));
-    ref->addChild(NodeFactory::create(Node::Kind::Index, i));
-    return ref;
-  }
-
   NodePointer getDependentGenericParamType(unsigned depth, unsigned index) {
     DemanglerPrinter PrintName;
     PrintName << archetypeName(index, depth);
@@ -1776,14 +1767,6 @@ private:
       NodePointer stdlib = NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
       return makeAssociatedType(stdlib);
     }
-    if (Mangled.nextIf('d')) {
-      Node::IndexType depth, index;
-      if (!demangleIndex(depth))
-        return nullptr;
-      if (!demangleIndex(index))
-        return nullptr;
-      return demangleArchetypeRef(depth + 1, index);
-    }
     if (Mangled.nextIf('q')) {
       NodePointer index = demangleIndexAsNode();
       if (!index)
@@ -1798,10 +1781,7 @@ private:
       qual_atype->addChild(decl_ctx);
       return qual_atype;
     }
-    Node::IndexType index;
-    if (!demangleIndex(index))
-      return nullptr;
-    return demangleArchetypeRef(0, index);
+    return nullptr;
   }
 
   NodePointer demangleTuple(IsVariadic isV) {
@@ -2452,7 +2432,6 @@ private:
   bool isSimpleType(NodePointer pointer) {
     switch (pointer->getKind()) {
     case Node::Kind::Archetype:
-    case Node::Kind::ArchetypeRef:
     case Node::Kind::AssociatedType:
     case Node::Kind::AssociatedTypeRef:
     case Node::Kind::BoundGenericClass:
@@ -3577,9 +3556,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << pointer->getText();
     return;
   }
-  case Node::Kind::ArchetypeRef:
-    Printer << pointer->getText();
-    return;
   case Node::Kind::AssociatedTypeRef:
     print(pointer->getChild(0));
     Printer << '.' << pointer->getChild(1)->getText();

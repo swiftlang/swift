@@ -1131,7 +1131,9 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
   // type ::= archetype
   case TypeKind::Archetype: {
     auto *archetype = cast<ArchetypeType>(tybase);
-    
+
+    assert(DWARFMangling && "Cannot mangle free-standing archetypes");
+
     // archetype ::= associated-type
     
     // associated-type ::= substitution
@@ -1161,36 +1163,29 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     auto GTPT = DC->mapTypeOutOfContext(archetype)
         ->castTo<GenericTypeParamType>();
 
-    if (DWARFMangling) {
-      Buffer << 'q' << Index(GTPT->getIndex());
+    Buffer << 'q' << Index(GTPT->getIndex());
 
-      {
-        // The DWARF output created by Swift is intentionally flat,
-        // therefore archetypes are emitted with their DeclContext if
-        // they appear at the top level of a type (_Tt).
-        // Clone a new, non-DWARF Mangler for the DeclContext.
-        Mangler ContextMangler(/*DWARFMangling=*/false);
-        SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
-        for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
-        for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
-        while (DC && DC->isGenericContext()) {
-          if (DC->isInnermostContextGeneric() &&
-              DC->getGenericParamsOfContext()->getDepth() == GTPT->getDepth())
-            break;
-          DC = DC->getParent();
-        }
-        assert(DC && "no decl context for archetype found");
-        if (!DC) return;
-        ContextMangler.mangleContext(DC);
-        ContextMangler.finalize(Buffer);
+    {
+      // The DWARF output created by Swift is intentionally flat,
+      // therefore archetypes are emitted with their DeclContext if
+      // they appear at the top level of a type (_Tt).
+      // Clone a new, non-DWARF Mangler for the DeclContext.
+      Mangler ContextMangler(/*DWARFMangling=*/false);
+      SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
+      for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
+      for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
+      while (DC && DC->isGenericContext()) {
+        if (DC->isInnermostContextGeneric() &&
+            DC->getGenericParamsOfContext()->getDepth() == GTPT->getDepth())
+          break;
+        DC = DC->getParent();
       }
-
-    } else {
-      if (GTPT->getDepth() != 0) {
-        Buffer << 'd' << Index(GTPT->getDepth() - 1);
-      }
-      Buffer << Index(GTPT->getIndex());
+      assert(DC && "no decl context for archetype found");
+      if (!DC) return;
+      ContextMangler.mangleContext(DC);
+      ContextMangler.finalize(Buffer);
     }
+
     return;
   }
 

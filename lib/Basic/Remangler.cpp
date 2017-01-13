@@ -474,18 +474,6 @@ void Remangler::mangleArchetype(Node *node) {
   unreachable("unsupported node");
 }
 
-void Remangler::mangleArchetypeRef(Node *node) {
-  Node::IndexType relativeDepth = node->getChild(0)->getIndex();
-  Node::IndexType index = node->getChild(1)->getIndex();
-
-  Buffer << 'Q';
-  if (relativeDepth != 0) {
-    Buffer << 'd';
-    mangleIndex(relativeDepth - 1);
-  }
-  mangleIndex(index);
-}
-
 void Remangler::mangleArgumentTuple(Node *node) {
   Node *Ty = getSingleChild(node, Node::Kind::Type);
   Node *Child = getSingleChild(Ty);

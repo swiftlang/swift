@@ -885,24 +885,8 @@ static std::string getArchetypeName(Node::IndexType index,
   return std::move(name).str();
 }
 
-NodePointer Demangler::createArchetypeRef(int depth, int i) {
-  if (depth < 0 || i < 0)
-    return nullptr;
-
-  // FIXME: Name won't match demangled context generic signatures correctly.
-  auto ref = NodeFactory::create(Node::Kind::ArchetypeRef,
-                                 getArchetypeName(i, depth));
-  ref->addChild(NodeFactory::create(Node::Kind::Index, depth));
-  ref->addChild(NodeFactory::create(Node::Kind::Index, i));
-  return createType(ref);
-}
-
 
 NodePointer Demangler::demangleArchetype() {
-  int index = demangleIndex();
-  if (index >= 0)
-    return createArchetypeRef(0, index);
-
   switch (nextChar()) {
     case 'a': {
       NodePointer Ident = popNode(Node::Kind::Identifier);
@@ -912,11 +896,6 @@ NodePointer Demangler::demangleArchetype() {
       addSubstitution(AssocTy);
       return AssocTy;
     }
-    case 'd': {
-      int depth = demangleIndex() + 1;
-      int index = demangleIndex();
-      return createArchetypeRef(depth, index);
-    }
     case 'q': {
       NodePointer Idx = demangleIndexAsNode();
       NodePointer Ctx = popContext();
@@ -924,9 +903,6 @@ NodePointer Demangler::demangleArchetype() {
       return createType(createWithChildren(Node::Kind::QualifiedArchetype,
                                            Idx, DeclCtx));
     }
-    case 'P':
-      // TODO: self type of protocol
-      return nullptr;
     case 'y': {
       NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());
       addSubstitution(T);
