@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK
 
 // REQUIRES: objc_interop
-// XFAIL: CPU=armv7k
+// REQUIRES: CPU=armv7k
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
@@ -13,9 +13,9 @@ public class FixedLayoutObjCSubclass : NSObject {
   public final var field: Int32 = 0
 };
 
-// CHECK-LABEL: define hidden void @_TF21class_resilience_objc29testConstantDirectFieldAccessFCS_23FixedLayoutObjCSubclassT_(%C21class_resilience_objc23FixedLayoutObjCSubclass*)
-// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_TWvdvC21class_resilience_objc23FixedLayoutObjCSubclass5fieldVs5Int32
-// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C21class_resilience_objc23FixedLayoutObjCSubclass* %0 to i8*
+// CHECK-LABEL: define hidden void @_TF28class_resilience_objc_armv7k29testConstantDirectFieldAccessFCS_23FixedLayoutObjCSubclassT_(%C28class_resilience_objc_armv7k23FixedLayoutObjCSubclass*)
+// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_TWvdvC28class_resilience_objc_armv7k23FixedLayoutObjCSubclass5fieldVs5Int32
+// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C28class_resilience_objc_armv7k23FixedLayoutObjCSubclass* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[OFFSET]]
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Vs5Int32*
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_ADDR]], i32 0, i32 0
@@ -31,9 +31,9 @@ public class NonFixedLayoutObjCSubclass : NSCoder {
   public final var field: Int32 = 0
 }
 
-// CHECK-LABEL: define hidden void @_TF21class_resilience_objc32testNonConstantDirectFieldAccessFCS_26NonFixedLayoutObjCSubclassT_(%C21class_resilience_objc26NonFixedLayoutObjCSubclass*)
-// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_TWvdvC21class_resilience_objc26NonFixedLayoutObjCSubclass5fieldVs5Int32
-// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C21class_resilience_objc26NonFixedLayoutObjCSubclass* %0 to i8*
+// CHECK-LABEL: define hidden void @_TF28class_resilience_objc_armv7k32testNonConstantDirectFieldAccessFCS_26NonFixedLayoutObjCSubclassT_(%C28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclass*)
+// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_TWvdvC28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclass5fieldVs5Int32
+// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclass* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[OFFSET]]
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Vs5Int32*
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_ADDR]], i32 0, i32 0
@@ -52,30 +52,19 @@ public class GenericObjCSubclass<T> : NSCoder {
   }
 }
 
-// CHECK-LABEL: define hidden void @_TF21class_resilience_objc31testConstantIndirectFieldAccessurFGCS_19GenericObjCSubclassx_T_(%C21class_resilience_objc19GenericObjCSubclass*)
+// CHECK-LABEL: define hidden void @_TF28class_resilience_objc_armv7k31testConstantIndirectFieldAccessurFGCS_19GenericObjCSubclassx_T_(%C28class_resilience_objc_armv7k19GenericObjCSubclass*)
 
 // FIXME: we could eliminate the unnecessary isa load by lazily emitting
 // metadata sources in EmitPolymorphicParameters
 
-// CHECK:         bitcast %C21class_resilience_objc19GenericObjCSubclass* %0
-
-// CHECK-32:      [[ADDR:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to %swift.type**
-// CHECK-32-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
-
-// CHECK-64:      [[ADDR:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to [[INT]]*
-// CHECK-64-NEXT: [[ISA:%.*]] = load [[INT]], [[INT]]* [[ADDR]]
-// CHECK-64-NEXT: [[ISA_MASK:%.*]] = load [[INT]], [[INT]]* @swift_isaMask
-// CHECK-64-NEXT: [[ISA_VALUE:%.*]] = and [[INT]] [[ISA]], [[ISA_MASK]]
-// CHECK-64-NEXT: [[ISA:%.*]] = inttoptr [[INT]] [[ISA_VALUE]] to %swift.type*
-
-// CHECK-NEXT:    [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to [[INT]]*
-
-// CHECK-32-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 16
-
-// CHECK-64-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 13
-
+// CHECK:      call %objc_class* @object_getClass
+// CHECK:      [[ADDR:%.*]] = bitcast %C28class_resilience_objc_armv7k19GenericObjCSubclass* %0 to %objc_object*
+// CHECK-NEXT: [[KLASS:%.*]] = call %objc_class* @object_getClass(%objc_object* [[ADDR]])
+// CHECK-NEXT: [[ISA:%.*]] = bitcast %objc_class* [[KLASS]] to %swift.type*
+// CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to [[INT]]*
+// CHECK-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 16
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_ADDR:%.*]]
-// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to i8*
+// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C28class_resilience_objc_armv7k19GenericObjCSubclass* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[FIELD_OFFSET]]
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Vs5Int32*
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_ADDR]], i32 0, i32 0
