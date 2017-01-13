@@ -1371,7 +1371,8 @@ namespace decls_block {
 
   using SpecializeDeclAttrLayout = BCRecordLayout<
     Specialize_DECL_ATTR,
-    BCArray<TypeIDField> // concrete types
+    BCFixed<1>, // exported flag
+    BCFixed<1> // specialization kind
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \
