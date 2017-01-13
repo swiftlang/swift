@@ -1277,7 +1277,9 @@ void Driver::buildActions(const ToolChain &TC,
     // the header into a temporary PCH, and replace the import argument with the
     // PCH in the subsequent frontend jobs.
     JobAction *PCH = nullptr;
-    if (!Args.hasArg(options::OPT_disable_bridging_pch)) {
+    if (Args.hasFlag(options::OPT_enable_bridging_pch,
+                     options::OPT_disable_bridging_pch,
+                     false)) {
       if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));

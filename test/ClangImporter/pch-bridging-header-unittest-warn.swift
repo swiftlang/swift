@@ -5,7 +5,7 @@
 // CHECK: IMPORTED_HEADER{{.*}}Inputs/app-bridging-header-to-pch.h
 
 // Should get a warning when we PCH-in the unit test header and then implicitly import the app header.
-// RUN: %target-swiftc_driver -D UNIT_TESTS -typecheck -Xfrontend -verify -import-objc-header %S/Inputs/unit-test-bridging-header-to-pch.h -I %t %s
+// RUN: %target-swiftc_driver -D UNIT_TESTS -typecheck -Xfrontend -verify -enable-bridging-pch -import-objc-header %S/Inputs/unit-test-bridging-header-to-pch.h -I %t %s
 
 // Should get a warning when skip the unit test header entirely and implicitly import the app header.
 // RUN: %target-swiftc_driver -typecheck -Xfrontend -verify -I %t %s
