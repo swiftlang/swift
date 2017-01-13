@@ -1031,36 +1031,36 @@ public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _
 }
 
 public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, _ errorHandler: (_ error: Error) -> Void = { _ in }) {
-    let assertionType = _XCTAssertionType.assertion_NoThrow
+  let assertionType = _XCTAssertionType.assertion_NoThrow
 
-    // evaluate expression exactly once
-    var caughtErrorOptional: Error?
+  // evaluate expression exactly once
+  var caughtErrorOptional: Error?
 
-    let result = _XCTRunThrowableBlock {
-        do {
-            _ = try expression()
-        } catch {
-            caughtErrorOptional = error
-        }
-    }
+  let result = _XCTRunThrowableBlock {
+      do {
+          _ = try expression()
+      } catch {
+          caughtErrorOptional = error
+      }
+  }
 
-    switch result {
-    case .success:
-        guard let caughtError = caughtErrorOptional else {
-            return
-        }
+  switch result {
+  case .success:
+      guard let caughtError = caughtErrorOptional else {
+          return
+      }
 
-        _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(caughtError)\"", message, file, line)
+      _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(caughtError)\"", message, file, line)
 
-    case .failedWithError(let error):
-        _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(error)\"", message, file, line)
+  case .failedWithError(let error):
+      _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(error)\"", message, file, line)
 
-    case .failedWithException(_, _, let reason):
-        _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
+  case .failedWithException(_, _, let reason):
+      _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
 
-    case .failedWithUnknownException:
-        _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 2), message, file, line)
-    }
+  case .failedWithUnknownException:
+      _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 2), message, file, line)
+  }
 
 }
 

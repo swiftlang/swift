@@ -322,51 +322,50 @@ XCTestTestSuite.test("XCTAssertNoThrow") {
 
 
 XCTestTestSuite.test("XCTAsserts with throwing expressions") {
-    class ErrorTestCase: XCTestCase {
-        var doThrow = true
-        var errorCode = 42
-        
-        dynamic func throwSomething() throws -> String {
-            if doThrow {
-                throw NSError(domain: "MyDomain", code: errorCode, userInfo: nil)
-            }
-            return "Hello"
-        }
-        
-        dynamic func test_withThrowing() {
-            XCTAssertEqual(try throwSomething(), "Hello")
-        }
-    }
-    
-    // Try success case
-    do {
-        let testCase = ErrorTestCase(selector: #selector(ErrorTestCase.test_withThrowing))
-        testCase.doThrow = false
-        execute(testCase.run)
-        let testRun = testCase.testRun!
-        
-        expectEqual(1, testRun.testCaseCount)
-        expectEqual(1, testRun.executionCount)
-        expectEqual(0, testRun.failureCount)
-        expectEqual(0, testRun.unexpectedExceptionCount)
-        expectEqual(0, testRun.totalFailureCount)
-        expectTrue(testRun.hasSucceeded)
-    }
-    
-    // Now try when the expression throws
-    do {
-        let testCase = ErrorTestCase(selector: #selector(ErrorTestCase.test_withThrowing))
-        execute(testCase.run)
-        let testRun = testCase.testRun!
-        
-        expectEqual(1, testRun.testCaseCount)
-        expectEqual(1, testRun.executionCount)
-        expectEqual(0, testRun.failureCount)
-        expectEqual(1, testRun.unexpectedExceptionCount)
-        expectEqual(1, testRun.totalFailureCount)
-        expectFalse(testRun.hasSucceeded)
-    }
-    
+  class ErrorTestCase: XCTestCase {
+      var doThrow = true
+      var errorCode = 42
+      
+      dynamic func throwSomething() throws -> String {
+          if doThrow {
+              throw NSError(domain: "MyDomain", code: errorCode, userInfo: nil)
+          }
+          return "Hello"
+      }
+      
+      dynamic func test_withThrowing() {
+          XCTAssertEqual(try throwSomething(), "Hello")
+      }
+  }
+
+  // Try success case
+  do {
+      let testCase = ErrorTestCase(selector: #selector(ErrorTestCase.test_withThrowing))
+      testCase.doThrow = false
+      execute(testCase.run)
+      let testRun = testCase.testRun!
+      
+      expectEqual(1, testRun.testCaseCount)
+      expectEqual(1, testRun.executionCount)
+      expectEqual(0, testRun.failureCount)
+      expectEqual(0, testRun.unexpectedExceptionCount)
+      expectEqual(0, testRun.totalFailureCount)
+      expectTrue(testRun.hasSucceeded)
+  }
+
+  // Now try when the expression throws
+  do {
+      let testCase = ErrorTestCase(selector: #selector(ErrorTestCase.test_withThrowing))
+      execute(testCase.run)
+      let testRun = testCase.testRun!
+      
+      expectEqual(1, testRun.testCaseCount)
+      expectEqual(1, testRun.executionCount)
+      expectEqual(0, testRun.failureCount)
+      expectEqual(1, testRun.unexpectedExceptionCount)
+      expectEqual(1, testRun.totalFailureCount)
+      expectFalse(testRun.hasSucceeded)
+  }
 }
 
 XCTestTestSuite.test("Test methods that wind up throwing") {
