@@ -2021,31 +2021,23 @@ extension _ArrayBufferProtocol {
   internal mutating func _arrayAppendSequence<S : Sequence>(
     _ newItems: S
   ) where S.Iterator.Element == Element {
+    // This function should only be called when capacity is already exhausted
 
     var stream = newItems.makeIterator()
     var nextItem = stream.next()
 
-    if nextItem == nil {
-      return
-    }
-
-    // This will force uniqueness
     var newCount = self.count
-    _arrayReserve(newCount + 1)
-    while true {
+    while nextItem != nil {
       let currentCapacity = self.capacity
+      _arrayReserve(_growArrayCapacity(currentCapacity))
       let base = self.firstElementAddress
 
-      while (nextItem != nil) && newCount < currentCapacity {
-        (base + newCount).initialize(to: nextItem!)
+      while let next = nextItem, newCount < currentCapacity {
+        (base + newCount).initialize(to: next)
         newCount += 1
         nextItem = stream.next()
       }
       self.count = newCount
-      if nextItem == nil {
-        return
-      }
-      self._arrayReserve(_growArrayCapacity(currentCapacity))
     }
   }
 }
