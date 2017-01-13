@@ -51,3 +51,17 @@ public func test5( ) -> Float {
 public func test6( ) -> Double {
   return sqrt(4)
 }
+
+// CHECK-LABEL: define {{.*}}test7
+// CHECK-NOT: ret float undef
+
+public func test7( ) -> Float {
+  return sqrt(-1)
+}
+
+// CHECK-LABEL: define {{.*}}test8
+// CHECK-NOT: ret double undef
+
+public func test8( ) -> Double {
+  return sqrt(-1)
+}
