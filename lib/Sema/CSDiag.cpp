@@ -3896,7 +3896,7 @@ addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem *CS,
     llvm::raw_svector_ostream OS(buffer);
     toType->print(OS);
     bool canUseAs = Kind == CheckedCastKind::Coercion ||
-      Kind == CheckedCastKind::BridgingCast;
+      Kind == CheckedCastKind::BridgingCoercion;
     diag.fixItInsert(Lexer::getLocForEndOfToken(CS->DC->getASTContext().SourceMgr,
                                                 expr->getEndLoc()),
                      (llvm::Twine(canUseAs ? " as " : " as! ") +

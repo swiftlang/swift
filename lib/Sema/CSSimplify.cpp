@@ -2421,7 +2421,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   };
 
   do {
-    // Dig out the fixed type to which this type refers.
+    // Dig out the fixed type this type refers to.
     fromType = getFixedTypeRecursive(fromType, flags, /*wantRValue=*/true);
 
     // If we hit a type variable without a fixed type, we can't
@@ -2429,7 +2429,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     if (fromType->isTypeVariableOrMember())
       return formUnsolved();
 
-    // Dig out the fixed type to which this type refers.
+    // Dig out the fixed type this type refers to.
     toType = getFixedTypeRecursive(toType, flags, /*wantRValue=*/true);
 
     // If we hit a type variable without a fixed type, we can't
@@ -2519,7 +2519,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
 
   case CheckedCastKind::Coercion:
-  case CheckedCastKind::BridgingCast:
+  case CheckedCastKind::BridgingCoercion:
+  case CheckedCastKind::Swift3BridgingDowncast:
   case CheckedCastKind::Unresolved:
     llvm_unreachable("Not a valid result");
   }
@@ -3404,6 +3405,15 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     Type bridgedValueType;
     if (auto objcClass = TC.Context.getBridgedToObjC(DC, unwrappedToType,
                                                      &bridgedValueType)) {
+      // Bridging NSNumber to NSValue is one-way, since there are multiple Swift
+      // value types that bridge to those object types. It requires a checked
+      // cast to get back.
+      // We accepted these coercions in Swift 3 mode, so we have to live with
+      // them (but give a warning) in that language mode.
+      if (!TC.Context.LangOpts.isSwiftVersion3()
+          && TC.isObjCClassWithMultipleSwiftBridgedTypes(objcClass, DC))
+        return SolutionKind::Error;
+
       // If the bridged value type is generic, the generic arguments
       // must either match or be bridged.
       // FIXME: This should be an associated type of the protocol.
