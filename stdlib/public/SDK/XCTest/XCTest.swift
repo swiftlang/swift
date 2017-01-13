@@ -1050,7 +1050,7 @@ public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T, _ mes
             return
         }
 
-        _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(error)\"", message, file, line)
+        _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(caughtError)\"", message, file, line)
 
     case .failedWithError(let error):
         _XCTRegisterFailure(false, "XCTAssertNoThrow failed: threw error \"\(error)\"", message, file, line)
