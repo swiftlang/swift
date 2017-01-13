@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SILGENFUNCTION_H
-#define SILGENFUNCTION_H
+#ifndef SWIFT_SILGEN_SILGENFUNCTION_H
+#define SWIFT_SILGEN_SILGENFUNCTION_H
 
 #include "SILGen.h"
 #include "JumpDest.h"
