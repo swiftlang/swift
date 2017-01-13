@@ -234,6 +234,24 @@ def dump_repo_hashes(config):
                               echo=False).strip()
             print(fmt.format(repo_name, h))
 
+def dump_hashes_config(args, config):
+    branch_scheme_name = args.dump_hashes_config
+    new_config = {}
+    config_copy_keys = ['ssh-clone-pattern', 'https-clone-pattern', 'repos']
+    for config_copy_key in config_copy_keys:
+        new_config[config_copy_key] = config[config_copy_key]
+    repos = {}
+    branch_scheme = {'aliases': [branch_scheme_name], 'repos': repos}
+    new_config['branch-schemes'] = {args.dump_hashes_config: branch_scheme}
+    for repo_name, repo_info in sorted(config['repos'].items(),
+                                       key=lambda x: x[0]):
+        with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
+                         dry_run=False,
+                         echo=False):
+            h = shell.capture(["git", "rev-parse", "HEAD"],
+                              echo=False).strip()
+            repos[repo_name] = str(h)
+    print(json.dumps(new_config, indent=4))
 
 def validate_config(config):
     # Make sure that our branch-names are unique.
@@ -318,6 +336,10 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         action='store_true',
         help='Dump the git hashes of all repositories being tracked')
     parser.add_argument(
+        '--dump-hashes-config',
+        help='Dump the git hashes of all repositories packaged into update-checkout-config.json',
+        metavar='BRANCH-SCHEME-NAME')
+    parser.add_argument(
         "--tag",
         help="""Check out each repository to the specified tag.""",
         metavar='TAG-NAME')
@@ -345,6 +367,10 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
     if args.dump_hashes:
         dump_repo_hashes(config)
+        return (None, None)
+
+    if args.dump_hashes_config:
+        dump_hashes_config(args, config)
         return (None, None)
 
     cross_repos_pr = {}
