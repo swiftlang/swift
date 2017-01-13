@@ -36,6 +36,7 @@ const char *Action::getClassName(ActionClass AC) {
     case REPLJob: return "repl";
     case LinkJob: return "link";
     case GenerateDSYMJob: return "generate-dSYM";
+    case GeneratePCHJob: return "generate-pch";
   }
 
   llvm_unreachable("invalid class");
@@ -62,3 +63,5 @@ void REPLJobAction::anchor() {}
 void LinkJobAction::anchor() {}
 
 void GenerateDSYMJobAction::anchor() {}
+
+void GeneratePCHJobAction::anchor() {}
