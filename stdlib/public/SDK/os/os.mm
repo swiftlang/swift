@@ -175,6 +175,15 @@ _os_log_encode_arg(const void *arg, uint16_t arg_len, os_log_value_type_t ctype,
   return true;
 }
 
+/// Like isalnum() but only for ASCII
+static bool
+isAlphanumeric(char c)
+{
+  return (c >= '0' && c <= '9')
+      || (c >= 'A' && c <= 'Z')
+      || (c >= 'a' && c <= 'z');
+}
+
 static bool
 _os_log_encode(const char *format, va_list args, int saved_errno, os_log_buffer_context_t context)
 {
@@ -243,13 +252,29 @@ _os_log_encode(const char *format, va_list args, int saved_errno, os_log_buffer_
             break;
 
           case '{': // annotated symbols
-            for (const char *curr2 = percent + 1; (ch = (*curr2)) != 0; curr2++) {
-              if (ch == '}') {
-                if (strncmp(percent + 1, "private", MIN(curr2 - percent - 1, 7)) == 0) {
+            // clang only looks at the first "word", so that's what we're doing as well
+            for (const char *curr2 = percent + 1;; curr2++) {
+              ch = *curr2;
+              if (ch == 0) return false;
+              if (!(isAlphanumeric(ch) || ch == '_')) {
+                if (strncmp(percent + 1, "private", curr2 - percent - 1) == 0) {
                   flags |= OS_LOG_CONTENT_FLAG_PRIVATE;
+                } else if (strncmp(percent + 1, "public", curr2 - percent - 1) == 0) {
+                  flags |= OS_LOG_CONTENT_FLAG_PUBLIC;
                 }
                 percent = curr2;
                 break;
+              }
+            }
+            if (ch != '}') {
+              for (const char *curr2 = percent + 1;; curr2++) {
+                ch = *curr2;
+                if (ch == 0) {
+                  return false;
+                } else if (ch == '}') {
+                  percent = curr2;
+                  break;
+                }
               }
             }
             break;
