@@ -5,10 +5,10 @@
 // CHECK: IMPORTED_HEADER{{.*}}Inputs/app-bridging-header-to-pch.h
 
 // Should get no warnings when we PCH-in the chained unit-test bridging header (thereby suppressing implicit import)
-// RUN: %target-swiftc_driver -D UNIT_TESTS -typecheck -Xfrontend -verify -import-objc-header %S/Inputs/chained-unit-test-bridging-header-to-pch.h  -I %S/Inputs -I %t %s
+// RUN: %target-swiftc_driver -D UNIT_TESTS -typecheck -Xfrontend -verify -enable-bridging-pch -import-objc-header %S/Inputs/chained-unit-test-bridging-header-to-pch.h  -I %S/Inputs -I %t %s
 
 // Should get no warnings when we PCH-in the app bridging header (thereby suppressing implicit import)
-// RUN: %target-swiftc_driver -typecheck -Xfrontend -verify -import-objc-header %S/Inputs/app-bridging-header-to-pch.h -I %t %s
+// RUN: %target-swiftc_driver -typecheck -Xfrontend -verify -enable-bridging-pch -import-objc-header %S/Inputs/app-bridging-header-to-pch.h -I %t %s
 
 import App
 
