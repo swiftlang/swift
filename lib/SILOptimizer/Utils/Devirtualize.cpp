@@ -561,6 +561,11 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
       return false;
   }
 
+  if (MI->isVolatile()) {
+    // dynamic dispatch is semantically required, can't devirtualize
+    return false;
+  }
+
   // Type of the actual function to be called.
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
