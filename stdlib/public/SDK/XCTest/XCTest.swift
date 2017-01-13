@@ -1030,6 +1030,39 @@ public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _
   }
 }
 
+public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, _ errorHandler: (_ error: Error) -> Void = { _ in }) {
+    let assertionType = _XCTAssertionType.assertion_NoThrow
+
+    // evaluate expression exactly once
+    var caughtErrorOptional: Error?
+
+    let result = _XCTRunThrowableBlock {
+        do {
+            _ = try expression
+        } catch {
+            caughtErrorOptional = error
+        }
+    }
+
+    switch result {
+    case .success:
+        guard let caughtError = caughtErrorOptional else {
+            return
+        }
+
+        _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(error)\"", message, file, line)
+
+    case .failedWithError(let error):
+        _XCTRegisterFailure(false, "XCTAssertNoThrow failed: threw error \"\(error)\"", message, file, line)
+
+    case .failedWithException(_, _, let reason):
+        _XCTRegisterFailure(true, "XCTAssertNoThrow failed: throwing \(reason)", message, file, line)
+
+    case .failedWithUnknownException:
+        _XCTRegisterFailure(true, "XCTAssertNoThrow failed: throwing an unknown exception", message, file, line)
+    }
+}
+
 #if XCTEST_ENABLE_EXCEPTION_ASSERTIONS
 // --- Currently-Unsupported Assertions ---
 
@@ -1047,12 +1080,6 @@ public func XCTAssertThrowsSpecific(_ expression: @autoclosure () -> Any?, _ exc
 
 public func XCTAssertThrowsSpecificNamed(_ expression: @autoclosure () -> Any?, _ exception: Any, _ name: String, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
   let assertionType = _XCTAssertionType.assertion_ThrowsSpecificNamed
-  
-  // FIXME: Unsupported
-}
-
-public func XCTAssertNoThrow(_ expression: @autoclosure () -> Any?, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
-  let assertionType = _XCTAssertionType.assertion_NoThrow
   
   // FIXME: Unsupported
 }
