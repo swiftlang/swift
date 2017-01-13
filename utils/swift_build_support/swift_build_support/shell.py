@@ -175,6 +175,9 @@ def copytree(src, dest, dry_run=None, echo=True):
     shutil.copytree(src, dest)
 
 
+# Initialized later
+lock = None
+
 def run(*args, **kwargs):
     repo_path = os.getcwd()
     echo_output = kwargs.pop('echo', False)
@@ -189,7 +192,8 @@ def run(*args, **kwargs):
     (stdout, stderr) = my_pipe.communicate()
     ret = my_pipe.wait()
 
-    lock.acquire()
+    if lock:
+        lock.acquire()
     if echo_output:
         print(repo_path)
         _echo_command(dry_run, *args, env=env)
@@ -198,7 +202,8 @@ def run(*args, **kwargs):
         if stderr:
             print(stderr, end="")
         print()
-    lock.release()
+    if lock:
+        lock.release()
 
     if ret != 0:
         eout = Exception()
