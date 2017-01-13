@@ -264,13 +264,7 @@ XCTestTestSuite.test("XCTAssertNoThrow") {
     }
 
     dynamic func test_throws() {
-
-      XCTAssertNoThrow(try throwSomething()) {
-        error in
-        let nserror = error as NSError
-        XCTAssertEqual(nserror.domain, "MyDomain")
-        XCTAssertEqual(nserror.code, 42)
-      }
+      XCTAssertNoThrow(try throwSomething())
     }
   }
 
