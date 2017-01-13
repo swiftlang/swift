@@ -1030,6 +1030,26 @@ public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _
   }
 }
 
+public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
+  let assertionType = _XCTAssertionType.noThrow
+
+  let result = _XCTRunThrowableBlock { _ = try expression() }
+
+  switch result {
+  case .success:
+    return
+
+  case .failedWithError(let error):
+    _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(error)\"", message, file, line)
+
+  case .failedWithException(_, _, let reason):
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
+
+  case .failedWithUnknownException:
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 2), message, file, line)
+  }
+}
+
 #if XCTEST_ENABLE_EXCEPTION_ASSERTIONS
 // --- Currently-Unsupported Assertions ---
 
@@ -1047,12 +1067,6 @@ public func XCTAssertThrowsSpecific(_ expression: @autoclosure () -> Any?, _ exc
 
 public func XCTAssertThrowsSpecificNamed(_ expression: @autoclosure () -> Any?, _ exception: Any, _ name: String, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
   let assertionType = _XCTAssertionType.assertion_ThrowsSpecificNamed
-  
-  // FIXME: Unsupported
-}
-
-public func XCTAssertNoThrow(_ expression: @autoclosure () -> Any?, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
-  let assertionType = _XCTAssertionType.assertion_NoThrow
   
   // FIXME: Unsupported
 }
