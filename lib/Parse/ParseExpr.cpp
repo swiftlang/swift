@@ -1402,14 +1402,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:  \
   Result = parseExprObjectLiteral(ObjectLiteralExpr::Name, isExprBasic); \
   break;
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
 
 #define POUND_OLD_OBJECT_LITERAL(Name, NewName, NewArg, OldArg)\
   case tok::pound_##Name:                                               \
     Result = parseExprObjectLiteral(ObjectLiteralExpr::NewName, isExprBasic, \
     "#" #NewName);                                                      \
   break;
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
 
   case tok::code_complete:
     Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
@@ -2687,7 +2687,7 @@ bool Parser::isCollectionLiteralStartingWithLSquareLit() {
      case tok::pound_##kw: (void)consumeToken(); break;
 #define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)\
      case tok::pound_##kw: (void)consumeToken(); break;
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
      default:
        return true;
    }
@@ -2754,7 +2754,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
           llvm::StringSwitch<StringRef>(OldArg)
 #define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)\
             .Case(#old_arg, #new_arg)
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
             .Default("");
        
         if (!NewArg.empty()) {    

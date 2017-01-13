@@ -11,7 +11,8 @@ add_swift_library(swiftParse STATIC
   PersistentParserState.cpp
   Scope.cpp
   LINK_LIBRARIES
-    swiftSIL
     swiftAST
+    swiftSIL
+    swiftSyntax
 )
 
