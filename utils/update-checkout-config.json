@@ -50,7 +50,7 @@
             }
         },
         "next" : {
-            "aliases": ["master-next", "stable-next"],
+            "aliases": ["next", "master-next", "stable-next"],
             "repos": {
                 "llvm": "stable-next",
                 "clang": "stable-next",
@@ -104,7 +104,7 @@
             }
         },
         "swift-3.0-preview-1" : {
-            "aliases": ["swift-3.0-preview-1-branch"],
+            "aliases": ["swift-3.0-preview-1", "swift-3.0-preview-1-branch"],
             "repos": {
                 "llvm": "swift-3.0-branch",
                 "clang": "swift-3.0-branch",
@@ -121,7 +121,7 @@
             }
         },
         "swift-3.0-preview-2" : {
-            "aliases": ["swift-3.0-preview-2-branch"],
+            "aliases": ["swift-3.0-preview-2", "swift-3.0-preview-2-branch"],
             "repos": {
                 "llvm": "swift-3.0-branch",
                 "clang": "swift-3.0-branch",
@@ -138,7 +138,7 @@
             }
         },
         "swift-3.0-preview-3" : {
-            "aliases": ["swift-3.0-preview-3-branch"],
+            "aliases": ["swift-3.0-preview-3", "swift-3.0-preview-3-branch"],
             "repos": {
                 "llvm": "swift-3.0-branch",
                 "clang": "swift-3.0-branch",
@@ -155,7 +155,7 @@
             }
         },
         "swift-3.0-preview-4" : {
-            "aliases": ["swift-3.0-preview-4-branch"],
+            "aliases": ["swift-3.0-preview-4", "swift-3.0-preview-4-branch"],
             "repos": {
                 "llvm": "swift-3.0-branch",
                 "clang": "swift-3.0-branch",
@@ -173,7 +173,7 @@
             }
         },
         "swift-3.0-preview-5" : {
-            "aliases": ["swift-3.0-preview-5-branch"],
+            "aliases": ["swift-3.0-preview-5", "swift-3.0-preview-5-branch"],
             "repos": {
                 "llvm": "swift-3.0-branch",
                 "clang": "swift-3.0-branch",

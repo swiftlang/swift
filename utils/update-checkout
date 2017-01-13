@@ -97,7 +97,7 @@ def update_repository_to_scheme(
     cross_repo = False
     repo_branch = scheme_name
     # This loop is only correct, since we know that each alias set has
-    # unique contents. This is checked by verify config. Thus the first
+    # unique contents. This is checked by validate_config. Thus the first
     # branch scheme data that has scheme_name as one of its aliases is
     # the only possible correct answer.
     for v in config['branch-schemes'].values():
@@ -240,6 +240,14 @@ def validate_config(config):
     scheme_names = config['branch-schemes'].keys()
     if len(scheme_names) != len(set(scheme_names)):
         raise RuntimeError('Configuration file has duplicate schemes?!')
+
+    # Ensure the branch-scheme name is also an alias
+    # This guarantees sensible behavior of update_repository_to_scheme when
+    # the branch-scheme is passed as the scheme name
+    for scheme_name in config['branch-schemes'].keys():
+        if not scheme_name in config['branch-schemes'][scheme_name]['aliases']:
+            raise RuntimeError('branch-scheme name: "{0}" must be an alias too.'
+                .format(scheme_name))
 
     # Then make sure the alias names used by our branches are unique.
     #
