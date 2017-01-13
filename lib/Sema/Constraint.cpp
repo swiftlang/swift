@@ -364,10 +364,6 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[value-to-optional]";
   case ConversionRestrictionKind::OptionalToOptional:
     return "[optional-to-optional]";
-  case ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional:
-    return "[unchecked-optional-to-optional]";
-  case ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional:
-    return "[optional-to-unchecked-optional]";
   case ConversionRestrictionKind::ClassMetatypeToAnyObject:
     return "[class-metatype-to-object]";
   case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
