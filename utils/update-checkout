@@ -283,8 +283,9 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         dest='skip_repository_list',
         action="append")
     parser.add_argument(
-        "--scheme", "--branch",
-        help='Use branches from the specified branch-scheme',
+        "--scheme",
+        help='Use branches from the specified branch-scheme. A "branch-scheme"'
+        ' is a list of (repo, branch) pairs.',
         metavar='BRANCH-SCHEME',
         dest='scheme')
     parser.add_argument(
