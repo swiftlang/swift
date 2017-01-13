@@ -363,6 +363,89 @@ bool ArchetypeBuilder::PotentialArchetype::hasConcreteTypeInPath() const {
   return false;
 }
 
+/// Canonical ordering for dependent types in generic signatures.
+static int compareDependentTypes(
+                             ArchetypeBuilder::PotentialArchetype * const* pa,
+                             ArchetypeBuilder::PotentialArchetype * const* pb) {
+  auto a = *pa, b = *pb;
+
+  // Fast-path check for equality.
+  if (a == b)
+    return 0;
+
+  // Ordering is as follows:
+  // - Generic params
+  if (a->isGenericParam() && b->isGenericParam())
+    return a->getGenericParamKey() < b->getGenericParamKey() ? -1 : +1;
+
+  // A generic parameter is always ordered before a nested type.
+  if (a->isGenericParam() != b->isGenericParam())
+    return a->isGenericParam() ? -1 : +1;
+
+  // - Dependent members
+  auto ppa = a->getParent();
+  auto ppb = b->getParent();
+
+  // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
+  if (int compareBases = compareDependentTypes(&ppa, &ppb))
+    return compareBases;
+
+  // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
+  if (int compareNames = a->getName().str().compare(b->getName().str()))
+    return compareNames;
+
+  if (auto *aa = a->getResolvedAssociatedType()) {
+    if (auto *ab = b->getResolvedAssociatedType()) {
+      // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
+      auto protoa = aa->getProtocol();
+      auto protob = ab->getProtocol();
+      if (int compareProtocols
+            = ProtocolType::compareProtocols(&protoa, &protob))
+        return compareProtocols;
+    } else {
+      // A resolved archetype is always ordered before an unresolved one.
+      return -1;
+    }
+  }
+
+  // A resolved archetype is always ordered before an unresolved one.
+  if (b->getResolvedAssociatedType())
+    return +1;
+
+  // Make sure typealiases are properly ordered, to avoid crashers.
+  // FIXME: Ideally we would eliminate typealiases earlier.
+  if (auto *aa = a->getTypeAliasDecl()) {
+    if (auto *ab = b->getTypeAliasDecl()) {
+      // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
+      auto protoa = aa->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      auto protob = ab->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      if (int compareProtocols
+            = ProtocolType::compareProtocols(&protoa, &protob))
+        return compareProtocols;
+    }
+
+    // A resolved archetype is always ordered before an unresolved one.
+    return -1;
+  }
+
+  // A resolved archetype is always ordered before an unresolved one.
+  if (b->getTypeAliasDecl())
+    return +1;
+
+  // Along the error path where one or both of the potential archetypes was
+  // renamed due to typo correction,
+  if (a->wasRenamed() || b->wasRenamed()) {
+    if (a->wasRenamed() != b->wasRenamed())
+      return a->wasRenamed() ? +1 : -1;
+
+    if (int compareNames = a->getOriginalName().str().compare(
+                                                    b->getOriginalName().str()))
+      return compareNames;
+  }
+
+  llvm_unreachable("potential archetype total order failure");
+}
+
 bool ArchetypeBuilder::PotentialArchetype::isBetterArchetypeAnchor(
        PotentialArchetype *other) const {
   auto concrete = hasConcreteTypeInPath();
@@ -1065,88 +1148,6 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
   return false;
 }
 
-/// Canonical ordering for dependent types in generic signatures.
-static int compareDependentTypes(ArchetypeBuilder::PotentialArchetype * const* pa,
-                                 ArchetypeBuilder::PotentialArchetype * const* pb) {
-  auto a = *pa, b = *pb;
-
-  // Fast-path check for equality.
-  if (a == b)
-    return 0;
-
-  // Ordering is as follows:
-  // - Generic params
-  if (a->isGenericParam() && b->isGenericParam())
-    return a->getGenericParamKey() < b->getGenericParamKey() ? -1 : +1;
-
-  // A generic parameter is always ordered before a nested type.
-  if (a->isGenericParam() != b->isGenericParam())
-    return a->isGenericParam() ? -1 : +1;
-
-  // - Dependent members
-  auto ppa = a->getParent();
-  auto ppb = b->getParent();
-
-  // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
-  if (int compareBases = compareDependentTypes(&ppa, &ppb))
-    return compareBases;
-
-  // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
-  if (int compareNames = a->getName().str().compare(b->getName().str()))
-    return compareNames;
-
-  if (auto *aa = a->getResolvedAssociatedType()) {
-    if (auto *ab = b->getResolvedAssociatedType()) {
-      // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
-      auto protoa = aa->getProtocol();
-      auto protob = ab->getProtocol();
-      if (int compareProtocols
-            = ProtocolType::compareProtocols(&protoa, &protob))
-        return compareProtocols;
-    } else {
-      // A resolved archetype is always ordered before an unresolved one.
-      return -1;
-    }
-  }
-
-  // A resolved archetype is always ordered before an unresolved one.
-  if (b->getResolvedAssociatedType())
-    return +1;
-
-  // Make sure typealiases are properly ordered, to avoid crashers.
-  // FIXME: Ideally we would eliminate typealiases earlier.
-  if (auto *aa = a->getTypeAliasDecl()) {
-    if (auto *ab = b->getTypeAliasDecl()) {
-      // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
-      auto protoa = aa->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-      auto protob = ab->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-      if (int compareProtocols
-            = ProtocolType::compareProtocols(&protoa, &protob))
-        return compareProtocols;
-    }
-
-    // A resolved archetype is always ordered before an unresolved one.
-    return -1;
-  }
-
-  // A resolved archetype is always ordered before an unresolved one.
-  if (b->getTypeAliasDecl())
-    return +1;
-
-  // Along the error path where one or both of the potential archetypes was
-  // renamed due to typo correction,
-  if (a->wasRenamed() || b->wasRenamed()) {
-    if (a->wasRenamed() != b->wasRenamed())
-      return a->wasRenamed() ? +1 : -1;
-
-    if (int compareNames = a->getOriginalName().str().compare(
-                                                    b->getOriginalName().str()))
-      return compareNames;
-  }
-
-  llvm_unreachable("potential archetype total order failure");
-}
-
 bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
        PotentialArchetype *T1,
        PotentialArchetype *T2,
@@ -1161,23 +1162,9 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
     return false;
 
   // Decide which potential archetype is to be considered the representative.
-  // We necessarily prefer potential archetypes rooted at parameters that come
-  // from outer generic parameter lists, since those generic parameters will
-  // have archetypes bound in the outer context.
-  //
-  // FIXME: The above comment is mostly obsolete, so why can't we just use
-  // compareDependentTypes() here?
-  auto T1Param = T1->getRootGenericParamKey();
-  auto T2Param = T2->getRootGenericParamKey();
-  unsigned T1Depth = T1->getNestingDepth();
-  unsigned T2Depth = T2->getNestingDepth();
-  auto T1Key = std::make_tuple(T1->wasRenamed(), +T1Param.Depth,
-                               +T1Param.Index, T1Depth);
-  auto T2Key = std::make_tuple(T2->wasRenamed(), +T2Param.Depth,
-                               +T2Param.Index, T2Depth);
-  if (T2Key < T1Key ||
-      (T2Key == T1Key &&
-       compareDependentTypes(&T2, &T1) < 0))
+  // It doesn't specifically matter which we use, but it's a minor optimization
+  // to prefer the canonical type.
+  if (compareDependentTypes(&T2, &T1) < 0)
     std::swap(T1, T2);
 
   // Merge any concrete constraints.
