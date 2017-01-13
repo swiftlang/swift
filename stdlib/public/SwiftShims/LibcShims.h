@@ -91,19 +91,34 @@ __swift_uint32_t
 _swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
 
 // Math library functions
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_remainderf(float, float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_squareRootf(float);
+static inline float _swift_stdlib_remainderf(float _self, float _other) {
+  return __builtin_remainderf(_self, _other);
+}
+  
+static inline float _swift_stdlib_squareRootf(float _self) {
+  return __builtin_sqrtf(_self);
+}
 
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_remainder(double, double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_squareRoot(double);
+static inline double _swift_stdlib_remainder(double _self, double _other) {
+  return __builtin_remainder(_self, _other);
+}
+
+static inline double _swift_stdlib_sqrt(double _self) {
+  return __builtin_sqrt(_self);
+}
 
 // TODO: Remove horrible workaround when importer does Float80 <-> long double.
 #if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
-SWIFT_RUNTIME_STDLIB_INTERFACE
-void _swift_stdlib_remainderl(void *_self, const void *_other);
-SWIFT_RUNTIME_STDLIB_INTERFACE
-void _swift_stdlib_squareRootl(void *_self);
-#endif
+static inline void _swift_stdlib_remainderl(void *_self, const void *_other) {
+  long double *_f80self = (long double *)_self;
+  *_f80self = __builtin_remainderl(*_f80self, *(const long double *)_other);
+}
+
+static inline void _swift_stdlib_sqrtl(void *_self) {
+  long double *_f80self = (long double *)_self;
+  *_f80self = __builtin_sqrtl(*_f80self);
+}
+#endif // Have Float80
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift
