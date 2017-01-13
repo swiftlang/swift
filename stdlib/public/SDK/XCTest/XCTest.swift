@@ -1038,7 +1038,7 @@ public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T, _ mes
 
     let result = _XCTRunThrowableBlock {
         do {
-            _ = try expression
+            _ = try expression()
         } catch {
             caughtErrorOptional = error
         }
