@@ -99,6 +99,13 @@ class NinjaTestCase(unittest.TestCase):
                 cxx=self.toolchain.cxx,
                 sysroot=xcrun.sdk_path('macosx')
             )
+        elif self.toolchain.cxx:
+            expect_env = (
+                "env "
+                "CXX={cxx} "
+            ).format(
+                cxx=self.toolchain.cxx,
+            )
 
         self.assertEqual(self.stdout.getvalue(), """\
 + rm -rf {build_dir}
