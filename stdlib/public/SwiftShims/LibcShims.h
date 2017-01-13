@@ -103,7 +103,7 @@ static inline double _swift_stdlib_remainder(double _self, double _other) {
   return __builtin_remainder(_self, _other);
 }
 
-static inline double _swift_stdlib_sqrt(double _self) {
+static inline double _swift_stdlib_squareRoot(double _self) {
   return __builtin_sqrt(_self);
 }
 
@@ -114,7 +114,7 @@ static inline void _swift_stdlib_remainderl(void *_self, const void *_other) {
   *_f80self = __builtin_remainderl(*_f80self, *(const long double *)_other);
 }
 
-static inline void _swift_stdlib_sqrtl(void *_self) {
+static inline void _swift_stdlib_squareRootl(void *_self) {
   long double *_f80self = (long double *)_self;
   *_f80self = __builtin_sqrtl(*_f80self);
 }
