@@ -1053,10 +1053,10 @@ public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T, _ mes
         _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(caughtError)\"", message, file, line)
 
     case .failedWithError(let error):
-        _XCTRegisterFailure(false, "XCTAssertNoThrow failed: threw error \"\(error)\"", message, file, line)
+        _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(error)\"", message, file, line)
 
     case .failedWithException(_, _, let reason):
-        _XCTRegisterFailure(false, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
+        _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
 
     case .failedWithUnknownException:
         _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 2), message, file, line)
