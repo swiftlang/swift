@@ -1453,7 +1453,6 @@ bool ConstraintSystem::Candidate::solve() {
   // because it would assign types to expressions, which
   // might interfere with solving higher-level expressions.
   ExprCleaner cleaner(E);
-  CleanupIllFormedExpressionRAII cleanup(TC.Context, E);
 
   // Allocate new constraint system for sub-expression.
   ConstraintSystem cs(TC, DC, None);
@@ -1496,18 +1495,6 @@ bool ConstraintSystem::Candidate::solve() {
 
   // Record found solutions as suggestions.
   this->applySolutions(solutions);
-
-  // Solution application is going to modify AST, so we need to avoid
-  // clean-up, but let's double-check if we have any implicit
-  // expressions with type variables and nullify their types.
-  cleanup.disable();
-  E->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-    Type type = childExpr->getType();
-    if (childExpr->isImplicit() && type && type->hasTypeVariable())
-      childExpr->setType(Type());
-    return childExpr;
-  });
-
   return false;
 }
 
