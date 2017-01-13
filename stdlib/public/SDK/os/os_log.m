@@ -21,23 +21,7 @@
 #include <wchar.h>
 
 #include "os_trace_blob.h"
-
-#ifndef os_fastpath
-#define os_fastpath(x) ((__typeof__(x))OS_EXPECT((long)(x), ~0l))
-#endif
-#ifndef os_slowpath
-#define os_slowpath(x) ((__typeof__(x))OS_EXPECT((long)(x), 0l))
-#endif
-#ifndef os_likely
-#define os_likely(x) OS_EXPECT(!!(x), 1)
-#endif
-#ifndef os_unlikely
-#define os_unlikely(x) OS_EXPECT(!!(x), 0)
-#endif
-
-#ifndef MIN
-#define MIN(a, b)  (((a)<(b))?(a):(b))
-#endif
+#include "thunks.h"
 
 #define OST_FORMAT_MAX_STRING_SIZE 1024
 #define OS_LOG_FMT_MAX_CMDS    48
@@ -92,12 +76,32 @@ typedef struct {
     uint8_t cmd_data[];
 } os_log_fmt_cmd_s, *os_log_fmt_cmd_t;
 
-
 typedef struct os_log_fmt_hdr_s {
     os_log_fmt_hdr_flags_t hdr_flags;
     uint8_t hdr_cmd_cnt;
     uint8_t hdr_data[];
 } os_log_fmt_hdr_s, *os_log_fmt_hdr_t;
+
+typedef struct os_log_pack_s {
+    uint64_t        olp_continuous_time;
+    struct timespec olp_wall_time;
+    const void     *olp_mh;
+    const void     *olp_pc;
+    const char     *olp_format;
+    uint8_t         olp_data[0];
+} os_log_pack_s, *os_log_pack_t;
+
+API_AVAILABLE(macosx(10.12.4), ios(10.3), tvos(10.2), watchos(3.2))
+size_t
+_os_log_pack_size(size_t os_log_format_buffer_size);
+
+API_AVAILABLE(macosx(10.12.4), ios(10.3), tvos(10.2), watchos(3.2))
+uint8_t *
+_os_log_pack_fill(os_log_pack_t pack, size_t size, int saved_errno, const void *dso, const char *fmt);
+
+API_AVAILABLE(macosx(10.12.4), ios(10.3), tvos(10.2), watchos(3.2))
+void
+os_log_pack_send(os_log_pack_t pack, os_log_t log, os_log_type_t type);
 
 static inline void
 _os_log_encode_arg(os_trace_blob_t ob, os_log_fmt_cmd_t cmd, const void *data)
@@ -299,9 +303,9 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args, 
 
 __attribute__((__visibility__("default")))
 void
-_swift_os_log(void *dso, os_log_t oslog, os_log_type_t type, const char *format, va_list args)
+_swift_os_log(void *dso, void *retaddr, os_log_t oslog, os_log_type_t type, const char *format, va_list args)
 {
-  int save_errno = errno; // %m
+  int saved_errno = errno; // %m
   char buf[OS_LOG_FMT_BUF_SIZE];
   os_trace_blob_s ob = {
     .ob_s = buf,
@@ -309,7 +313,27 @@ _swift_os_log(void *dso, os_log_t oslog, os_log_type_t type, const char *format,
     .ob_binary = true
   };
 
-  if (_os_log_encode(buf, format, args, save_errno, &ob)) {
-    _os_log_impl(dso, oslog, type, format, (uint8_t *)buf, ob.ob_len);
+  if (_os_log_encode(buf, format, args, saved_errno, &ob)) {
+    // Use os_log_pack_send where available.
+    if (os_log_pack_send) {
+      size_t sz = _os_log_pack_size(ob.ob_len);
+      union { os_log_pack_s pack; uint8_t buf[OS_LOG_FMT_BUF_SIZE + sizeof(os_log_pack_s)]; } u;
+      // _os_log_encode has already packed `saved_errno` into a OSLF_CMD_TYPE_SCALAR command
+      // as the OSLF_CMD_TYPE_ERRNO does not deploy backwards, so passes zero for errno here.
+      uint8_t *ptr = _os_log_pack_fill(&u.pack, sz, 0, dso, format);
+      u.pack.olp_pc = retaddr;
+      memcpy(ptr, buf, ob.ob_len);
+      os_log_pack_send(&u.pack, oslog, type);
+    } else {
+      _os_log_impl(dso, oslog, type, format, (uint8_t *)buf, ob.ob_len);
+    }
   }
 }
+
+__attribute__((__visibility__("default")))
+void *
+_swift_os_log_return_address(void)
+{
+  return __builtin_return_address(1);
+}
+
