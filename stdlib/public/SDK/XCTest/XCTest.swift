@@ -1030,27 +1030,16 @@ public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _
   }
 }
 
-public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, _ errorHandler: (_ error: Error) -> Void = { _ in }) {
+public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
   let assertionType = _XCTAssertionType.assertion_NoThrow
 
-  // evaluate expression exactly once
-  var caughtErrorOptional: Error?
-
-  let result = _XCTRunThrowableBlock {
-      do {
-          _ = try expression()
-      } catch {
-          caughtErrorOptional = error
-      }
-  }
+  let result = _XCTRunThrowableBlock { _ = try expression() }
 
   switch result {
   case .success:
-      guard let caughtError = caughtErrorOptional else {
+      guard let error = error else {
           return
       }
-
-      _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(caughtError)\"", message, file, line)
 
   case .failedWithError(let error):
       _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(error)\"", message, file, line)
@@ -1061,7 +1050,6 @@ public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T, _ mes
   case .failedWithUnknownException:
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 2), message, file, line)
   }
-
 }
 
 #if XCTEST_ENABLE_EXCEPTION_ASSERTIONS
