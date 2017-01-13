@@ -54,7 +54,7 @@ WARNING(could_not_rewrite_bridging_header,none,
   "failed to serialize bridging header; "
   "target may not be debuggable outside of its original project", ())
 ERROR(bridging_header_pch_error,Fatal,
-   "failed to emit PCH file '%0' for bridging header '%1'",
+   "failed to emit precompiled header '%0' for bridging header '%1'",
    (StringRef, StringRef))
 
 WARNING(invalid_swift_name_method,none,
