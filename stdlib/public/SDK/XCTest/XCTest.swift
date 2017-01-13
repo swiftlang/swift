@@ -1020,7 +1020,7 @@ public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _
     }
     
   case .failedWithError(let error):
-    _XCTRegisterFailure(false, "XCTAssertLessThanOrEqual failed: threw error \"\(error)\"", message, file, line)
+    _XCTRegisterFailure(false, "XCTAssertThrowsError failed: threw error \"\(error)\"", message, file, line)
     
   case .failedWithException(_, _, let reason):
     _XCTRegisterFailure(true, "XCTAssertThrowsError failed: throwing \(reason)", message, file, line)
