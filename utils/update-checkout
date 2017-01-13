@@ -337,7 +337,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
     if args.dump_hashes:
         dump_repo_hashes(config)
-        return 0
+        return (None, None)
 
     cross_repos_pr = {}
     if github_comment:
