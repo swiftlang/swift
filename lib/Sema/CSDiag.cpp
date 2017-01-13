@@ -5704,9 +5704,6 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
                          /*allowFixes=*/false, listener, bindings))
     return false;
 
-  auto loc = argExpr->getLoc();
-  auto noteLoc = AFD->getLoc();
-
   TypeSubstitutionMap substitutions;
   // First, let's collect all of the archetypes and their substitutions,
   // that's going to help later on if there are cross-archetype
@@ -5740,72 +5737,32 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
   if (substitutions.empty())
     return false;
 
-  auto dc = env->getOwningDeclContext();
-  auto module = dc->getParentModule();
-  auto signature = env->getGenericSignature();
+  class RequirementsListener : public GenericRequirementsCheckListener {
+  private:
+    bool DiagnosedAny = false;
 
-  for (const auto &req : signature->getRequirements()) {
-    Type firstType = req.getFirstType().subst(module, substitutions);
-    if (firstType.isNull())
-      continue;
-
-    Type secondType = req.getSecondType();
-    if (secondType) {
-      secondType = secondType.subst(module, substitutions);
-      if (secondType.isNull())
-        continue;
+  public:
+    bool shouldCheck(RequirementKind kind, Type first, Type second) override {
+      // This means that we have encountered requirement which references
+      // generic parameter not used in the arguments, we can't diagnose it here.
+      return !(first->hasTypeParameter() || first->isTypeVariableOrMember());
     }
 
-    // This means that we have encountered requirement which references
-    // generic parameter not used in the arguments, we can't diagnose it here.
-    if (firstType->hasTypeParameter() || firstType->isTypeVariableOrMember())
-      continue;
-
-    switch (req.getKind()) {
-    case RequirementKind::Conformance: {
-      auto protocol = secondType->castTo<ProtocolType>();
-      auto result = TC.conformsToProtocol(
-          firstType, protocol->getDecl(), dc,
-          ConformanceCheckFlags::SuppressDependencyTracking, loc, nullptr);
-
-      // Conformance failed and was diagnosed by `conformsToProtocol`.
-      if (!result.second)
-        return true;
-
-      break;
+    void diagnosed(const Requirement *requirement) override {
+      DiagnosedAny = true;
     }
 
-    case RequirementKind::Superclass:
-      if (!TC.isSubtypeOf(firstType, secondType, dc)) {
-        TC.diagnose(loc, diag::type_does_not_inherit, AFD->getInterfaceType(),
-                    firstType, secondType);
+    bool foundProblems() const { return DiagnosedAny; }
+  };
 
-        TC.diagnose(
-            noteLoc, diag::type_does_not_inherit_requirement,
-            req.getFirstType(), req.getSecondType(),
-            signature->gatherGenericParamBindingsText(
-                {req.getFirstType(), req.getSecondType()}, substitutions));
-        return true;
-      }
-      break;
+  RequirementsListener genericReqListener;
+  TC.checkGenericArguments(env->getOwningDeclContext(), argExpr->getLoc(),
+                           AFD->getLoc(), AFD->getInterfaceType(),
+                           env->getGenericSignature(), substitutions, nullptr,
+                           ConformanceCheckFlags::SuppressDependencyTracking,
+                           &genericReqListener);
 
-    case RequirementKind::SameType:
-      if (!firstType->isEqual(secondType)) {
-        TC.diagnose(loc, diag::types_not_equal, AFD->getInterfaceType(),
-                    firstType, secondType);
-
-        TC.diagnose(
-            noteLoc, diag::types_not_equal_requirement, req.getFirstType(),
-            req.getSecondType(),
-            signature->gatherGenericParamBindingsText(
-                {req.getFirstType(), req.getSecondType()}, substitutions));
-        return true;
-      }
-      break;
-    }
-  }
-
-  return false;
+  return genericReqListener.foundProblems();
 }
 
 /// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,

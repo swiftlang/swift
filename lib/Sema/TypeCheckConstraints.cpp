@@ -1375,6 +1375,16 @@ Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
 }
 
+GenericRequirementsCheckListener::~GenericRequirementsCheckListener() {}
+
+bool GenericRequirementsCheckListener::shouldCheck(RequirementKind kind,
+                                                   Type first, Type second) {
+  return true;
+}
+
+void GenericRequirementsCheckListener::diagnosed(
+    const Requirement *withRequirement) {}
+
 bool TypeChecker::
 solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    FreeTypeVariableBinding allowFreeTypeVariables,
