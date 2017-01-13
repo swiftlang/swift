@@ -1135,6 +1135,9 @@ private:
   }
 
   NodePointer demangleBoundGenericArgs(NodePointer nominalType) {
+    if (nominalType->getNumChildren() == 0)
+      return nullptr;
+
     // Generic arguments for the outermost type come first.
     NodePointer parentOrModule = nominalType->getChild(0);
 

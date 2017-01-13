@@ -232,4 +232,5 @@ _TFVV15nested_generics5Lunch6DinnerCfT11firstCoursex12secondCourseGSqqd___9lefto
 _TFVFC15nested_generics7HotDogs11applyRelishFT_T_L_6RelishCfT8materialx_GS1_x_ ---> nested_generics.HotDogs.(applyRelish () -> ()).(Relish #1).init (material : A) -> nested_generics.HotDogs.(applyRelish () -> ()).(Relish #1)<A>
 _TFVFE15nested_genericsSS3fooFT_T_L_6CheeseCfT8materialx_GS0_x_ ---> (extension in nested_generics):Swift.String.(foo () -> ()).(Cheese #1).init (material : A) -> (extension in nested_generics):Swift.String.(foo () -> ()).(Cheese #1)<A>
 _TTWOE5imojiCSo5Imoji14ImojiMatchRankS_9RankValueS_FS2_g9rankValueqq_Ss16RawRepresentable8RawValue ---> _TTWOE5imojiCSo5Imoji14ImojiMatchRankS_9RankValueS_FS2_g9rankValueqq_Ss16RawRepresentable8RawValue
+_TtFzas4VoidGC16FusionXBaseUtils6FutureQq_ZFVS_7Futures6futureurFFzT_GS0_x_GS0_x__ ---> _TtFzas4VoidGC16FusionXBaseUtils6FutureQq_ZFVS_7Futures6futureurFFzT_GS0_x_GS0_x__
 
