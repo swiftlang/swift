@@ -44,7 +44,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
   auto archetype = Builder.resolveArchetype(baseTy);
   assert(archetype && "Bad generic context nesting?");
 
-  return archetype->getRepresentative()
+  return archetype
            ->getNestedType(ref->getIdentifier(), Builder)
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/true);
 }
@@ -54,7 +54,7 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
   auto archetype = Builder.resolveArchetype(selfTy);
   assert(archetype && "Bad generic context nesting?");
   
-  return archetype->getRepresentative()
+  return archetype
            ->getNestedType(assocType->getName(), Builder)
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/true);
 }
@@ -152,7 +152,6 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // Resolve the base to a potential archetype.
   auto basePA = Builder.resolveArchetype(baseTy);
   assert(basePA && "Missing potential archetype for base");
-  basePA = basePA->getRepresentative();
 
   // Retrieve the potential archetype for the nested type.
   auto nestedPA = basePA->getNestedType(ref->getIdentifier(), Builder);
@@ -214,7 +213,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 
 Type CompleteGenericTypeResolver::resolveSelfAssociatedType(
        Type selfTy, AssociatedTypeDecl *assocType) {
-  return Builder.resolveArchetype(selfTy)->getRepresentative()
+  return Builder.resolveArchetype(selfTy)
            ->getNestedType(assocType->getName(), Builder)
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/false);
 }

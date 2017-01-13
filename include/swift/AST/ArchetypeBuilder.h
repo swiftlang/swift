@@ -448,6 +448,13 @@ class ArchetypeBuilder::PotentialArchetype {
     return getGenericParam();
   }
 
+  /// \brief Retrieve the representative for this archetype, performing
+  /// path compression on the way.
+  PotentialArchetype *getRepresentative();
+
+  friend class ArchetypeBuilder;
+  friend class GenericSignature;
+
 public:
   ~PotentialArchetype();
 
@@ -547,10 +554,6 @@ public:
   /// \brief Determine the nesting depth of this potential archetype, e.g.,
   /// the number of associated type references.
   unsigned getNestingDepth() const;
-
-  /// \brief Retrieve the representative for this archetype, performing
-  /// path compression on the way.
-  PotentialArchetype *getRepresentative();
 
   /// Retrieve the equivalence class containing this potential archetype.
   ArrayRef<PotentialArchetype *> getEquivalenceClass() {
