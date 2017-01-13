@@ -1514,6 +1514,11 @@ enum class DowngradeToWarning: bool {
   No,
   Yes
 };
+
+/// \see checkTypeAccessibility
+using CheckTypeAccessCallback =
+    void(AccessScope, const TypeRepr *, DowngradeToWarning);
+
 } // end anonymous namespace
 
 /// Checks if the access scope of the type described by \p TL contains
@@ -1529,7 +1534,7 @@ enum class DowngradeToWarning: bool {
 static void checkTypeAccessibilityImpl(
     TypeChecker &TC, TypeLoc TL, AccessScope contextAccessScope,
     const DeclContext *useDC, bool isParameter,
-    llvm::function_ref<void(AccessScope, const TypeRepr *)> diagnose) {
+    llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   if (!TC.getLangOpts().EnableAccessControl)
     return;
   if (!TL.getType())
@@ -1567,7 +1572,7 @@ static void checkTypeAccessibilityImpl(
             TL.getTypeRepr(),
             *typeAccessScope,
             useDC);
-  diagnose(*typeAccessScope, complainRepr);
+  diagnose(*typeAccessScope, complainRepr, DowngradeToWarning::No);
 }
 
 /// Checks if the access scope of the type described by \p TL is valid for the
@@ -1580,8 +1585,7 @@ static void checkTypeAccessibilityImpl(
 /// early versions of Swift 3 not diagnosing certain access violations.
 static void checkTypeAccessibility(
     TypeChecker &TC, TypeLoc TL, const ValueDecl *context,
-    llvm::function_ref<void(AccessScope, const TypeRepr *,
-                            DowngradeToWarning)> diagnose) {
+    llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   const DeclContext *DC = context->getDeclContext();
   bool isParam = false;
   if (isa<ParamDecl>(context)) {
@@ -1595,8 +1599,8 @@ static void checkTypeAccessibility(
   AccessScope contextAccessScope = context->getFormalAccessScope();
   checkTypeAccessibilityImpl(TC, TL, contextAccessScope, DC, isParam,
                              [=](AccessScope requiredAccessScope,
-                                 const TypeRepr *offendingTR) {
-    auto downgradeToWarning = DowngradeToWarning::No;
+                                 const TypeRepr *offendingTR,
+                                 DowngradeToWarning downgradeToWarning) {
     if (!contextAccessScope.isPublic() &&
         !isa<ModuleDecl>(contextAccessScope.getDeclContext())) {
       // Swift 3.0.0 mistakenly didn't diagnose any issues when the context
@@ -1642,11 +1646,7 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
   } accessibilityErrorKind;
   auto minAccessScope = AccessScope::getPublic();
   const TypeRepr *complainRepr = nullptr;
-
-  // Swift 3.0.0 mistakenly didn't diagnose any issues when the context access
-  // scope represented a private or fileprivate level.
-  bool shouldDowngradeToWarning =
-    !accessScope.isPublic() && !isa<ModuleDecl>(accessScope.getDeclContext());
+  auto downgradeToWarning = DowngradeToWarning::Yes;
 
   for (auto param : *params) {
     if (param->getInherited().empty())
@@ -1656,26 +1656,34 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
                                owner->getDeclContext(),
                                /*isParameter*/false,
                                [&](AccessScope typeAccessScope,
-                                   const TypeRepr *thisComplainRepr) {
+                                   const TypeRepr *thisComplainRepr,
+                                   DowngradeToWarning thisDowngrade) {
       if (typeAccessScope.isChildOf(minAccessScope) ||
+          (thisDowngrade == DowngradeToWarning::No &&
+           downgradeToWarning == DowngradeToWarning::Yes) ||
           (!complainRepr &&
            typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessibilityErrorKind = AEK_Parameter;
+        downgradeToWarning = thisDowngrade;
       }
     });
   }
 
   for (auto &requirement : params->getRequirements()) {
     auto callback = [&](AccessScope typeAccessScope,
-                        const TypeRepr *thisComplainRepr) {
+                        const TypeRepr *thisComplainRepr,
+                        DowngradeToWarning thisDowngrade) {
       if (typeAccessScope.isChildOf(minAccessScope) ||
+          (thisDowngrade == DowngradeToWarning::No &&
+           downgradeToWarning == DowngradeToWarning::Yes) ||
           (!complainRepr &&
            typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessibilityErrorKind = AEK_Requirement;
+        downgradeToWarning = thisDowngrade;
       }
     };
     switch (requirement.getKind()) {
@@ -1703,22 +1711,33 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
     }
   }
 
-  if (!minAccessScope.isPublic()) {
-    auto minAccess = minAccessScope.accessibilityForDiagnostics();
+  if (minAccessScope.isPublic())
+    return;
 
-    bool isExplicit =
-      owner->getAttrs().hasAttribute<AccessibilityAttr>() ||
-      owner->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-    auto diagID = diag::generic_param_access;
-    if (shouldDowngradeToWarning)
-      diagID = diag::generic_param_access_warn;
-    auto diag = TC.diagnose(owner, diagID,
-                            owner->getDescriptiveKind(), isExplicit,
-                            contextAccess, minAccess,
-                            isa<FileUnit>(owner->getDeclContext()),
-                            accessibilityErrorKind);
-    highlightOffendingType(TC, diag, complainRepr);
+  // Swift 3.0.0 mistakenly didn't diagnose any issues when the context access
+  // scope represented a private or fileprivate level.
+  // FIXME: Conditionalize this on Swift 3 mode.
+  if (downgradeToWarning == DowngradeToWarning::No) {
+    if (!accessScope.isPublic() &&
+        !isa<ModuleDecl>(accessScope.getDeclContext())) {
+      downgradeToWarning = DowngradeToWarning::Yes;
+    }
   }
+
+  auto minAccess = minAccessScope.accessibilityForDiagnostics();
+
+  bool isExplicit =
+    owner->getAttrs().hasAttribute<AccessibilityAttr>() ||
+    owner->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+  auto diagID = diag::generic_param_access;
+  if (downgradeToWarning == DowngradeToWarning::Yes)
+    diagID = diag::generic_param_access_warn;
+  auto diag = TC.diagnose(owner, diagID,
+                          owner->getDescriptiveKind(), isExplicit,
+                          contextAccess, minAccess,
+                          isa<FileUnit>(owner->getDeclContext()),
+                          accessibilityErrorKind);
+  highlightOffendingType(TC, diag, complainRepr);
 }
 
 static void checkGenericParamAccessibility(TypeChecker &TC,
