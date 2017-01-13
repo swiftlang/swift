@@ -18,6 +18,7 @@
 #define SWIFT_PARSER_H
 
 #include "swift/AST/AST.h"
+#include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/OptionSet.h"
@@ -696,6 +697,12 @@ public:
   bool parseDeclAttributeList(DeclAttributes &Attributes,
                               bool &FoundCodeCompletionToken);
 
+  /// Parse the @_specialize attribute.
+  /// \p closingBrace is the expected closing brace, which can be either ) or ]
+  /// \p Attr is where to store the parsed attribute
+  bool parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
+                                SourceLoc Loc, SpecializeAttr *&Attr);
+
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 
@@ -853,6 +860,10 @@ public:
   ParserResult<TypeRepr> parseTypeSimple();
   ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID,
                                          bool HandleCodeCompletion = true);
+
+  // \brief Parse layout constraint. 
+  LayoutConstraintInfo parseLayoutConstraint(Identifier LayoutConstraintID);
+
   bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
@@ -1250,12 +1261,10 @@ public:
   ParserStatus
   parseFreestandingGenericWhereClause(GenericParamList *&GPList,
                              WhereClauseKind kind=WhereClauseKind::Declaration);
-  
-  ParserStatus parseGenericWhereClause(SourceLoc &WhereLoc,
-                               SmallVectorImpl<RequirementRepr> &Requirements,
-                                       bool &FirstTypeInComplete);
-  
 
+  ParserStatus parseGenericWhereClause(
+      SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,
+      bool &FirstTypeInComplete, bool AllowLayoutConstraints = false);
 
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing

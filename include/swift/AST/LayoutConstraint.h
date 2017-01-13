@@ -258,7 +258,7 @@ public:
 /// Checks if ID is a name of a layout constraint and returns this
 /// constraint. If ID does not match any known layout constraint names,
 /// returns UnknownLayout.
-LayoutConstraintInfo getLayoutConstraintInfo(Identifier ID);
+LayoutConstraintInfo getLayoutConstraintInfo(Identifier ID, ASTContext &Ctx);
 
 } // end namespace swift
 
