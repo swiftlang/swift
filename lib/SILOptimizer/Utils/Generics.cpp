@@ -214,11 +214,15 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 
   // First substitute concrete types into the existing function type.
   auto FnTy = OrigFnTy->substGenericArgs(
-      M, QueryTypeSubstitutionMap{SubstMap.getMap()},
+      M, QuerySubstitutionMap{SubstMap},
         LookUpConformanceInSubstitutionMap(SubstMap));
 
-  SpecializedGenericSig = nullptr;
-  SpecializedGenericEnv = nullptr;
+  if ((SpecializedGenericSig &&
+       SpecializedGenericSig->areAllParamsConcrete()) ||
+      !HasUnboundGenericParams) {
+    SpecializedGenericSig = nullptr;
+    SpecializedGenericEnv = nullptr;
+  }
 
   // Use the new specialized generic signature.
   auto NewFnTy = SILFunctionType::get(
@@ -226,9 +230,11 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
       FnTy->getParameters(), FnTy->getResults(),
       FnTy->getOptionalErrorResult(), M.getASTContext());
 
-  // This is an interface type. It should not have any type parameters or
-  // archetypes.
-  assert(!NewFnTy->hasTypeParameter() && !NewFnTy->hasArchetype());
+  // This is an interface type. It should not have any archetypes.
+  if (NewFnTy->hasArchetype()) {
+    NewFnTy->dump();
+  }
+  assert(!NewFnTy->hasArchetype());
   return NewFnTy;
 }
 
@@ -277,6 +283,190 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
                          SubstFTy->getCalleeConvention(), SpecializedParams,
                          SpecializedResults, SubstFTy->getOptionalErrorResult(),
                          M.getASTContext());
+}
+
+std::pair<GenericEnvironment *, GenericSignature *>
+getSignatureWithRequirements(GenericSignature *OrigGenSig,
+                             GenericEnvironment *OrigGenericEnv,
+                             ArrayRef<Requirement> Requirements,
+                             SILModule &M) {
+  // Form a new generic signature based on the old one.
+  ArchetypeBuilder Builder(M.getASTContext(),
+                           LookUpConformanceInModule(M.getSwiftModule()));
+
+  // First, add the old generic signature.
+  Builder.addGenericSignature(OrigGenSig);
+
+  RequirementSource Source(RequirementSource::Explicit, SourceLoc());
+  // For each substitution with a concrete type as a replacement,
+  // add a new concrete type equality requirement.
+  for (auto &Req : Requirements) {
+    Builder.addRequirement(Req, Source);
+  }
+
+  Builder.finalize(SourceLoc(), OrigGenSig->getGenericParams());
+  auto *GenericSig = Builder.getGenericSignature();
+  // Remember the new generic environment.
+  auto *GenericEnv = GenericSig->createGenericEnvironment(*M.getSwiftModule());
+
+  return std::make_pair(GenericEnv, GenericSig);
+}
+
+/// Perform some sanity checks for the requirements
+static void
+checkSpecializationRequirements(ArrayRef<Requirement> Requirements) {
+  for (auto &Req : Requirements) {
+    if (Req.getKind() == RequirementKind::SameType) {
+      auto FirstType = Req.getFirstType();
+      auto SecondType = Req.getSecondType();
+      assert(FirstType && SecondType);
+
+      bool isFirstTypeNonConcrete =
+          FirstType->hasArchetype() || FirstType->hasTypeParameter();
+      bool isSecondTypeNonConcrete =
+          SecondType->hasArchetype() || SecondType->hasTypeParameter();
+      // Only one of the types should be concrete.
+      assert((isFirstTypeNonConcrete ^ isSecondTypeNonConcrete) &&
+             "Only concrete type same-type requirements are supported by "
+             "generic specialization");
+      continue;
+    }
+
+    if (Req.getKind() == RequirementKind::Layout) {
+      continue;
+    }
+
+    llvm_unreachable("Unknown type of requirement in generic specialization");
+  }
+}
+
+ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
+                                     ArrayRef<Requirement> Requirements) {
+  if (!OrigF->shouldOptimize()) {
+    DEBUG(llvm::dbgs() << "    Cannot specialize function " << OrigF->getName()
+                       << " marked to be excluded from optimizations.\n");
+    return;
+  }
+
+  // Perform some sanity checks for the requirements
+  checkSpecializationRequirements(Requirements);
+
+  SpecializedGenericEnv = nullptr;
+
+  OriginalF = OrigF;
+  SILModule &M = OrigF->getModule();
+  ModuleDecl *SM = M.getSwiftModule();
+  auto &Ctx = M.getASTContext();
+
+  auto OrigGenericSig = OrigF->getLoweredFunctionType()->getGenericSignature();
+  auto OrigGenericEnv = OrigF->getGenericEnvironment();
+  SpecializedGenericSig = OrigGenericSig;
+  auto ForwardingSubs = OrigGenericEnv->getForwardingSubstitutions();
+  auto ForwardingInterfaceSubsMap =
+      OrigGenericSig->getSubstitutionMap(ForwardingSubs);
+  // Map archetypes of the original function to the contextual types
+  // of the specialized function.
+  SubstitutionMap ClonerArchetypeToConcreteMap;
+  SubstitutionMap CallerArchetypeToConcreteMap;
+  SubstitutionMap CallerArchetypeToInterfaceMap;
+
+  for (auto &Req : Requirements) {
+    if (Req.getKind() == RequirementKind::SameType) {
+      auto CallerArchetype = dyn_cast<SubstitutableType>(
+          OrigGenericEnv->mapTypeIntoContext(Req.getFirstType())
+              ->getCanonicalType());
+      // Remember that a given generic parameter is mapped
+      // to a concrete type.
+      CallerArchetypeToInterfaceMap.addSubstitution(
+          CallerArchetype, Req.getSecondType()->getCanonicalType());
+
+      // Remember how the original interace type is mapped to a concrete type.
+      ClonerArchetypeToConcreteMap.addSubstitution(
+          CallerArchetype, Req.getSecondType()->getCanonicalType());
+
+      // Remember how the original interace type is mapped to a concrete type.
+      CallerArchetypeToConcreteMap.addSubstitution(
+          CallerArchetype, Req.getSecondType()->getCanonicalType());
+    }
+  }
+
+  std::tie(SpecializedGenericEnv, SpecializedGenericSig) =
+      getSignatureWithRequirements(OrigGenericSig, OrigGenericEnv,
+                                   Requirements, M);
+
+  for (auto Req : SpecializedGenericSig->getRequirements()) {
+    // Remember how the original contextual type is represented in
+    // the specialized function.
+    if (Req.getKind() == RequirementKind::Layout) {
+      auto CallerArchetype = dyn_cast<SubstitutableType>(
+          OrigGenericEnv->mapTypeIntoContext(Req.getFirstType())
+              ->getCanonicalType());
+
+      ClonerArchetypeToConcreteMap.addSubstitution(
+          CallerArchetype,
+          SpecializedGenericEnv->mapTypeIntoContext(Req.getFirstType()));
+
+      CallerArchetypeToInterfaceMap.addSubstitution(
+          CallerArchetype,
+          SpecializedGenericEnv->mapTypeOutOfContext(Req.getFirstType()));
+    }
+  }
+
+  // If this is a partial specialization, some of the generic type parameters
+  // are not substituted, so add the missing substitutions which basically map
+  // the caller archetypes to their interface types or the corresponding
+  // archetypes in the specialized function.
+  for (auto GP : SpecializedGenericSig->getGenericParams()) {
+    auto CallerArchetype = dyn_cast<SubstitutableType>(
+        OrigGenericEnv->mapTypeIntoContext(GP)->getCanonicalType());
+    if (CallerArchetypeToInterfaceMap.lookupSubstitution(CallerArchetype))
+      continue;
+    CallerArchetypeToInterfaceMap.addSubstitution(CallerArchetype,
+                                                  GP->getCanonicalType());
+    if (ClonerArchetypeToConcreteMap.lookupSubstitution(CallerArchetype))
+      continue;
+    auto SpecializedArchetype =
+        SpecializedGenericEnv->mapTypeIntoContext(GP);
+    ClonerArchetypeToConcreteMap.addSubstitution(CallerArchetype,
+                                                 SpecializedArchetype);
+  }
+
+  // Substitute into forwarding substitutions to get the cloner substitutions
+  // and substitutions to be used by the caller for calling the specialized
+  // function.
+  SmallVector<Substitution, 4> ClonerSubsList;
+  SmallVector<Substitution, 4> CallerSubsList;
+  SmallVector<Substitution, 4> InterfaceCallerSubsList;
+  for (auto Sub : ForwardingSubs) {
+    auto ClonerSub = Sub.subst(
+        SM, QuerySubstitutionMap{ClonerArchetypeToConcreteMap},
+        LookUpConformanceInModule(SM));
+    ClonerSubsList.push_back(ClonerSub);
+
+    auto CallerSub = Sub.subst(
+        SM, QuerySubstitutionMap{CallerArchetypeToConcreteMap},
+        LookUpConformanceInModule(SM));
+    CallerSubsList.push_back(CallerSub);
+
+    auto InterfaceCallerSub = Sub.subst(
+        SM, QuerySubstitutionMap{CallerArchetypeToInterfaceMap},
+        LookUpConformanceInModule(SM));
+    InterfaceCallerSubsList.push_back(InterfaceCallerSub);
+  }
+
+  ClonerParamSubs = Ctx.AllocateCopy(ClonerSubsList);
+
+  CallerInterfaceSubs = OrigGenericSig->getSubstitutionMap(InterfaceCallerSubsList);
+
+  auto CallerParamSubsMap = OrigGenericSig->getSubstitutionMap(CallerSubsList);
+  CallerSubsList.clear();
+  SpecializedGenericSig->getSubstitutions(CallerParamSubsMap, CallerSubsList);
+  CallerParamSubs = Ctx.AllocateCopy(CallerSubsList);
+
+  OriginalParamSubs = CallerParamSubs;
+
+  HasUnboundGenericParams = !SpecializedGenericSig->areAllParamsConcrete();
+  createSubstitutedAndSpecializedTypes();
 }
 
 // =============================================================================
