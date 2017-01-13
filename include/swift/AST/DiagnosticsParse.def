@@ -620,8 +620,9 @@ ERROR(expected_type_function_result,PointsToFirstBadToken,
       "expected type for function result", ())
 ERROR(generic_non_function,PointsToFirstBadToken,
       "only syntactic function types can be generic", ())
-ERROR(rethrowing_function_type,PointsToFirstBadToken,
-      "only function declarations may be marked 'rethrows'", ())
+ERROR(rethrowing_function_type,none,
+      "only function declarations may be marked 'rethrows'; "
+      "did you mean 'throws'?", ())
 ERROR(throws_in_wrong_position,none,
       "'throws' may only occur before '->'", ())
 ERROR(rethrows_in_wrong_position,none,
