@@ -5,6 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-print(_===#keyPath(t>c
+// RUN: not %target-swift-frontend %s -emit-ir
+([-.f\n{}{$0(n&[]{
