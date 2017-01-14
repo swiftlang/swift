@@ -4069,7 +4069,7 @@ void LayoutConstraintInfo::print(raw_ostream &OS,
 void LayoutConstraint::print(raw_ostream &OS,
                              const PrintOptions &PO) const {
   assert(*this);
-  this->print(OS, PO);
+  getPointer()->print(OS, PO);
 }
 
 void LayoutConstraintInfo::print(ASTPrinter &Printer,
