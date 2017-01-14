@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift
-
-import Swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 ////
 // Members of structs
@@ -9,9 +7,9 @@ import Swift
 struct X {
   func f0(_ i: Int) -> X { }
 
-  func f1(_ i: Int) { }
+  func f1(_ i: Int) { } // expected-note {{found this candidate}}
 
-  mutating func f1(_ f: Float) { }
+  mutating func f1(_ f: Float) { } // expected-note {{found this candidate}}
 
   func f2<T>(_ x: T) -> T { }
 }
@@ -29,7 +27,11 @@ func g0(_: (inout X) -> (Float) -> ()) {}
 
 _ = x.f0(i)
 x.f0(i).f1(i)
+
+// FIXME: Is this a bug in Swift 4 mode?
 g0(X.f1)
+// expected-error@-1 {{ambiguous reference to member 'f1'}}
+
 _ = x.f0(x.f2(1))
 _ = x.f0(1).f2(i)
 _ = yf.f0(1)
