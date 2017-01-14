@@ -454,7 +454,7 @@ function(_compile_swift_files
   add_custom_command_target(
       dependency_target
       COMMAND
-        "${line_directive_tool}" "${source_files}" --
+        "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "${source_files}" --
         "${swift_compiler_tool}" "${main_command}" ${swift_flags}
         ${output_option} ${embed_bitcode_option} "${source_files}"
       ${command_touch_standard_outputs}
@@ -485,7 +485,7 @@ function(_compile_swift_files
     add_custom_command_target(
         module_dependency_target
         COMMAND
-          "${line_directive_tool}" "${source_files}" --
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "${source_files}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}" ${swift_flags}
           "${source_files}"
         ${command_touch_module_outputs}
@@ -502,7 +502,7 @@ function(_compile_swift_files
     add_custom_command_target(
         sib_dependency_target
         COMMAND
-          "${line_directive_tool}" "${source_files}" --
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "${source_files}" --
           "${swift_compiler_tool}" "-emit-sib" "-o" "${sib_file}" ${swift_flags} -Onone
           "${source_files}"
         ${command_touch_sib_outputs}
@@ -518,7 +518,7 @@ function(_compile_swift_files
     add_custom_command_target(
         sibopt_dependency_target
         COMMAND
-          "${line_directive_tool}" "${source_files}" --
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "${source_files}" --
           "${swift_compiler_tool}" "-emit-sib" "-o" "${sibopt_file}" ${swift_flags} -O
           "${source_files}"
         ${command_touch_sibopt_outputs}
@@ -535,7 +535,7 @@ function(_compile_swift_files
     add_custom_command_target(
         sibgen_dependency_target
         COMMAND
-          "${line_directive_tool}" "${source_files}" --
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "${source_files}" --
           "${swift_compiler_tool}" "-emit-sibgen" "-o" "${sibgen_file}" ${swift_flags}
           "${source_files}"
         ${command_touch_sibgen_outputs}
