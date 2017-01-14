@@ -157,7 +157,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-warnings-as-errors", "-suppress-warnings");
   }
-  
+
   // Check for missing debug option when verifying debug info.
   if (Args.hasArg(options::OPT_verify_debug_info)) {
     bool hasDebugOption = true;
@@ -167,6 +167,18 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
     if (!hasDebugOption)
       diags.diagnose(SourceLoc(),
                      diag::verify_debug_info_requires_debug_option);
+  }
+
+  for (const Arg *A : make_range(Args.filtered_begin(options::OPT_D),
+                                 Args.filtered_end())) {
+    StringRef name = A->getValue();
+    if (name.find('=') != StringRef::npos)
+      diags.diagnose(SourceLoc(),
+                     diag::cannot_assign_value_to_conditional_compilation_flag,
+                     name);
+    else if (!Lexer::isIdentifier(name))
+      diags.diagnose(SourceLoc(), diag::invalid_conditional_compilation_flag,
+                     name);
   }
 }
 
