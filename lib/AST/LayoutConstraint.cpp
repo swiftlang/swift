@@ -58,6 +58,8 @@ StringRef LayoutConstraintInfo::getName(LayoutConstraintKind Kind) {
   case LayoutConstraintKind::TrivialOfExactSize:
     return "_Trivial";
   }
+
+  llvm_unreachable("Unhandled LayoutConstraintKind in switch.");
 }
 
 SourceRange LayoutConstraintLoc::getSourceRange() const { return getLoc(); }

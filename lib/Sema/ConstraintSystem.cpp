@@ -1359,6 +1359,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     return true;
   }
   }
+
+  llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
