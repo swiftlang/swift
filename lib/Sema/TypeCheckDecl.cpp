@@ -6082,7 +6082,10 @@ public:
       if (baseDecl->hasKnownSwiftImplementation() && 
           !base->isDynamic() &&
           override->getDeclContext()->isExtensionContext()) {
-        TC.diagnose(override, diag::override_class_declaration_in_extension);
+        // For compatibility, only generate a warning in Swift 3
+        TC.diagnose(override, (TC.Context.isSwiftVersion3()
+          ? diag::override_class_declaration_in_extension_warning
+          : diag::override_class_declaration_in_extension));
         TC.diagnose(base, diag::overridden_here);
       }
     }
