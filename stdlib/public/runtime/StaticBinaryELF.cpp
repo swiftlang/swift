@@ -17,7 +17,10 @@
 #if defined(__ELF__) && defined(__linux__)
 
 #include "ImageInspection.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "swift/Basic/Lazy.h"
+#include <cassert>
 #include <string>
 #include <vector>
 #include <elf.h>
@@ -25,6 +28,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <linux/limits.h>
+#include <sys/auxv.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -54,7 +58,7 @@ typedef Elf32_Section Elf_Section;
 #define ELF_ST_TYPE(x) ELF32_ST_TYPE(x)
 #endif
 
-extern const Elf_Ehdr __ehdr_start;
+extern const Elf_Ehdr elfHeader asm("__ehdr_start");
 
 class StaticBinaryELF {
 
@@ -70,6 +74,7 @@ private:
       if (fd < 0 || offset + length > fileSize) {
         mapping = nullptr;
         mapLength = 0;
+        diff = 0;
         return;
       }
       long pageSize = sysconf(_SC_PAGESIZE);
@@ -78,7 +83,7 @@ private:
       off_t alignedOffset = offset & pageMask;
       diff = (offset - alignedOffset);
       mapLength = diff + length;
-      mapping = mmap(nullptr, mapLength, PROT_READ, MAP_SHARED, fd,
+      mapping = mmap(nullptr, mapLength, PROT_READ, MAP_PRIVATE, fd,
                      alignedOffset);
       if (mapping == MAP_FAILED) {
         mapping = nullptr;
@@ -87,8 +92,11 @@ private:
     }
 
     template<typename T>
-    T data() {
-      return reinterpret_cast<T>(reinterpret_cast<char *>(mapping) + diff);
+    const ArrayRef<T> data() {
+      size_t elements = (mapLength - diff) / sizeof(T);
+      const T *data = reinterpret_cast<T *>(reinterpret_cast<char *>(mapping)
+                                            + diff);
+      return ArrayRef<T>(data, elements);
     }
 
     ~Mapping() {
@@ -99,7 +107,6 @@ private:
   };
 
   string fullPathName;
-  const Elf_Ehdr *elfHeader = &__ehdr_start;
   const Elf_Phdr *programHeaders = nullptr;
   const Elf_Shdr *symbolTable = nullptr;
   const Elf_Shdr *stringTable = nullptr;
@@ -109,18 +116,21 @@ private:
 
 public:
   StaticBinaryELF() {
-    programHeaders = reinterpret_cast<const Elf_Phdr *>(elfHeader +
-                                                        elfHeader->e_phoff);
+    getExecutablePathName();
 
+    programHeaders = reinterpret_cast<const Elf_Phdr *>(getauxval(AT_PHDR));
+    if (programHeaders == nullptr) {
+      return;
+    }
     // If a interpreter is set in the program headers then this is a
     // dynamic executable and therefore not valid.
-    for (size_t idx = 0; idx < elfHeader->e_phnum; idx++) {
+    for (size_t idx = 0; idx < elfHeader.e_phnum; idx++) {
       if (programHeaders[idx].p_type == PT_INTERP) {
+        programHeaders = nullptr;
         return;
       }
     }
 
-    getExecutablePathName();
     if (!fullPathName.empty()) {
       mmapExecutable();
     }
@@ -140,7 +150,7 @@ public:
     if (programHeaders) {
       auto searchAddr = reinterpret_cast<Elf_Addr>(addr);
 
-      for (size_t idx = 0; idx < elfHeader->e_phnum; idx++) {
+      for (size_t idx = 0; idx < elfHeader.e_phnum; idx++) {
         auto header = &programHeaders[idx];
         if (header->p_type == PT_LOAD && searchAddr >= header->p_vaddr
             && searchAddr <= (header->p_vaddr + header->p_memsz)) {
@@ -155,10 +165,9 @@ public:
   const Elf_Sym *findSymbol(const void *addr) {
     if (symbolTable) {
       auto searchAddr = reinterpret_cast<Elf_Addr>(addr);
-      auto entries = symbolTable->sh_size / symbolTable->sh_entsize;
-      auto symbols = symbolTableData->data<const Elf_Sym *>();
+      const ArrayRef<Elf_Sym> symbols = symbolTableData->data<Elf_Sym>();
 
-      for (decltype(entries) idx = 0; idx < entries; idx++) {
+      for (size_t idx = 0; idx < symbols.size(); idx++) {
         auto symbol = &symbols[idx];
         if (ELF_ST_TYPE(symbol->st_info) == STT_FUNC
             && searchAddr >= symbol->st_value
@@ -172,7 +181,8 @@ public:
 
   const char *symbolName(const Elf_Sym *symbol) {
     if (stringTable && symbol->st_name < stringTable->sh_size) {
-      return stringTableData->data<const char *>() + symbol->st_name;
+      const ArrayRef<char> strings = stringTableData->data<char>();
+      return &strings[symbol->st_name];
     }
     return nullptr;
   }
@@ -184,7 +194,7 @@ private:
   // file anyway. Dont use /proc/self/exe as the symlink will be removed
   // if the main thread terminates - see proc(5).
   void getExecutablePathName() {
-    uintptr_t address = (uintptr_t)&__ehdr_start;
+    uintptr_t address = (uintptr_t)&elfHeader;
 
     FILE *fp = fopen("/proc/self/maps", "r");
     if (!fp) {
@@ -242,12 +252,13 @@ private:
     }
 
     // Map in the section headers.
-    size_t sectionHeadersSize = (elfHeader->e_shentsize * elfHeader->e_shnum);
-    sectionHeaders = new Mapping(fd, buf.st_size, elfHeader->e_shoff,
+    size_t sectionHeadersSize = (elfHeader.e_shentsize * elfHeader.e_shnum);
+    sectionHeaders = new Mapping(fd, buf.st_size, elfHeader.e_shoff,
                                  sectionHeadersSize);
     if (sectionHeaders->mapping) {
       auto section = findSectionHeader(SHT_SYMTAB);
       if (section) {
+        assert(section->sh_entsize == sizeof(Elf_Sym));
         symbolTableData = new Mapping(fd, buf.st_size, section->sh_offset,
                                       section->sh_size);
         if (symbolTableData->mapping) {
@@ -270,9 +281,9 @@ private:
   // Find the section header of a specified type in the section headers table.
   const Elf_Shdr *findSectionHeader(Elf_Word sectionType) {
     if (sectionHeaders && sectionHeaders->mapping) {
-      auto headers = sectionHeaders->data<const Elf_Shdr *>();
-      for (size_t idx = 0; idx < elfHeader->e_shnum; idx++) {
-        if (idx == elfHeader->e_shstrndx) {
+      const ArrayRef<Elf_Shdr> headers = sectionHeaders->data<Elf_Shdr>();
+      for (size_t idx = 0; idx < elfHeader.e_shnum; idx++) {
+        if (idx == elfHeader.e_shstrndx) {
           continue;
         }
         auto header = &headers[idx];
@@ -292,11 +303,13 @@ private:
 };
 
 
+static swift::Lazy<StaticBinaryELF> TheBinary;
+
 int
 swift::lookupSymbol(const void *address, SymbolInfo *info) {
   // The pointers returned point into the mmap()'d binary so keep the
   // object once instantiated.
-  static auto binary = StaticBinaryELF();
+  auto &binary = TheBinary.get();
 
   info->fileName = binary.getPathName();
   info->baseAddress = binary.getSectionLoadAddress(address);
