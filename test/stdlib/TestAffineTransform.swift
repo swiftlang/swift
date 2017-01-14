@@ -169,7 +169,7 @@ class TestAffineTransform : TestAffineTransformSuper {
         checkPointTransformation(noop, point: point, expectedPoint: point)
         
         var tenEighty = AffineTransform.identity
-        tenEighty.rotate(byRadians: CGFloat(6 * .pi))
+        tenEighty.rotate(byRadians: CGFloat(6 * Double.pi))
         checkPointTransformation(tenEighty, point: point, expectedPoint: point)
         
         var rotateCounterClockwise = AffineTransform.identity
@@ -181,7 +181,7 @@ class TestAffineTransform : TestAffineTransformSuper {
         checkPointTransformation(rotateClockwise, point: point, expectedPoint: NSPoint(x: CGFloat(10.0), y: CGFloat(-10.0)))
         
         var reflectAboutOrigin = AffineTransform.identity
-        reflectAboutOrigin.rotate(byRadians: CGFloat(.pi))
+        reflectAboutOrigin.rotate(byRadians: CGFloat(Double.pi))
         checkPointTransformation(reflectAboutOrigin, point: point, expectedPoint: NSPoint(x: CGFloat(-10.0), y: CGFloat(-10.0)))
     }
     
