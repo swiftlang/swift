@@ -20,6 +20,11 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* Bridging conversions from `NSNumber` or `NSValue` back to Swift number or
+  struct types using the `as` operator will now raise a warning, because these
+  conversions are type-checked at runtime. Dynamic casting with `as!` or `as?`
+  should be used going forward.
+
 * The `withoutActuallyEscaping` function from [SE-0103][] has been implemented.
   To pass off a non-escaping closure to an API that formally takes an
   `@escaping` closure, but which is used in a way that will not in fact 
