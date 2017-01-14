@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library -swift-version 4
 
 @objc class ObjCClassA {}
 @objc class ObjCClassB : ObjCClassA {}
