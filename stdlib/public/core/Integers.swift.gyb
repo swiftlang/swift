@@ -1003,13 +1003,6 @@ ${mutatingOperationComment(x.operator)}
 % end
 }
 
-extension Arithmetic {
-  @_transparent
-  public init() {
-    self = 0
-  }
-}
-
 % for Protocol in ['Arithmetic', 'BinaryInteger', 'FloatingPoint']:
 % # Explicitly providing these operations for BinaryInteger and FloatingPoint
 % # protocols because Strideable conformance creates ambiguity if the
@@ -1081,7 +1074,7 @@ extension SignedArithmetic {
 
   @_transparent
   public mutating func negate() {
-    self = Self() - self
+    self = 0 - self
   }
 }
 
@@ -1503,6 +1496,10 @@ ${operationComment(x.operator)}
 }
 
 extension BinaryInteger {
+  public init() {
+    self = 0
+  }
+
   public init?<T : FloatingPoint>(exactly source: T) {
     // FIXME(integers): implement
     fatalError()
@@ -2068,7 +2065,7 @@ ${overflowOperationComment(x.operator)}
 }
 
 extension FixedWidthInteger {
-  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0 or init()")
+  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
 }
 
