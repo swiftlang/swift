@@ -110,6 +110,13 @@ insertDeallocStackAtEndOf(SmallVectorImpl<SILInstruction *> &FunctionExits,
   }
 }
 
+/// Hack to workaround a clang LTO bug.
+__attribute__((noinline))
+void moveAllocStackToBeginningOfBlock(AllocStackInst* AS, SILBasicBlock *BB) {
+  AS->removeFromParent();
+  BB->push_front(AS);
+}
+
 /// Assign a single alloc_stack instruction to all the alloc_stacks in the
 /// partition.
 void Partition::assignStackLocation(
@@ -120,8 +127,7 @@ void Partition::assignStackLocation(
 
   // Move this assigned location to the beginning of the entry block.
   auto *EntryBB = AssignedLoc->getFunction()->getEntryBlock();
-  AssignedLoc->removeFromParent();
-  EntryBB->push_front(AssignedLoc);
+  moveAllocStackToBeginningOfBlock(AssignedLoc, EntryBB);
 
   // Erase the dealloc_stacks.
   eraseDeallocStacks(AssignedLoc);
