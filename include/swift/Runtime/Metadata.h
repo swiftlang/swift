@@ -3442,7 +3442,7 @@ inline int swift_getFunctionPointerExtraInhabitantIndex(void * const* src) {
 inline void swift_storeFunctionPointerExtraInhabitant(void **dest, int index) {
   // This must be consistent with the storeFunctionPointerExtraInhabitantIndex
   // implementation in IRGen's ExtraInhabitants.cpp.
-  *dest = reinterpret_cast<void*>((unsigned) index);
+  *dest = reinterpret_cast<void*>(static_cast<uintptr_t>(index));
 }
 
 /// Return the number of extra inhabitants in a function pointer.
