@@ -204,9 +204,9 @@ class SignalledMessage : public TaskOutputMessage {
   Optional<int> Signal;
 public:
   SignalledMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
-                   StringRef ErrorMsg, Optional<int> Signal) : TaskOutputMessage("signalled", Cmd,
-                                                           Pid, Output),
-                                         ErrorMsg(ErrorMsg), Signal(Signal) {}
+                   StringRef ErrorMsg, Optional<int> Signal) :
+      TaskOutputMessage("signalled", Cmd, Pid, Output), ErrorMsg(ErrorMsg),
+      Signal(Signal) {}
 
   void provideMapping(swift::json::Output &out) override {
     TaskOutputMessage::provideMapping(out);
@@ -262,7 +262,8 @@ void parseable_output::emitFinishedMessage(raw_ostream &os,
 void parseable_output::emitSignalledMessage(raw_ostream &os,
                                             const Job &Cmd, ProcessId Pid,
                                             StringRef ErrorMsg,
-                                            StringRef Output, Optional<int> Signal) {
+                                            StringRef Output,
+                                            Optional<int> Signal) {
   SignalledMessage msg(Cmd, Pid, Output, ErrorMsg, Signal);
   emitMessage(os, msg);
 }

@@ -640,8 +640,7 @@ int Compilation::performJobsImpl() {
     if (Signal.hasValue()) {
       Diags.diagnose(SourceLoc(), diag::error_command_signalled,
                      SignalledCmd->getSource().getClassName(), Signal.getValue());
-    }
-    else {
+    } else {
       Diags.diagnose(SourceLoc(), diag::error_command_signalled_without_signal_number,
                      SignalledCmd->getSource().getClassName());
     }
