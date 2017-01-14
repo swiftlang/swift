@@ -645,6 +645,8 @@ private:
   Type UInt8Type;
   Type NSObjectType;
   Type NSErrorType;
+  Type NSNumberType;
+  Type NSValueType;
   Type ObjCSelectorType;
   Type ExceptionType;
 
@@ -724,8 +726,13 @@ public:
   Type getUInt8Type(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
   Type getNSErrorType(DeclContext *dc);
+  Type getNSNumberType(DeclContext *dc);
+  Type getNSValueType(DeclContext *dc);
   Type getObjCSelectorType(DeclContext *dc);
   Type getExceptionType(DeclContext *dc, SourceLoc loc);
+  
+  /// True if `t` is an ObjC class that multiple Swift value types bridge into.
+  bool isObjCClassWithMultipleSwiftBridgedTypes(Type t, DeclContext *dc);
 
   /// \brief Try to resolve an IdentTypeRepr, returning either the referenced
   /// Type or an ErrorType in case of error.

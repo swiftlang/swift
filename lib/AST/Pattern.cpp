@@ -298,7 +298,7 @@ bool Pattern::isRefutablePattern() const {
     // If this is an always matching 'is' pattern, then it isn't refutable.
     if (auto *is = dyn_cast<IsPattern>(Node))
       if (is->getCastKind() == CheckedCastKind::Coercion ||
-          is->getCastKind() == CheckedCastKind::BridgingCast)
+          is->getCastKind() == CheckedCastKind::BridgingCoercion)
         return;
 
     // If this is an ExprPattern that isn't resolved yet, do some simple
