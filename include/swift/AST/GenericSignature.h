@@ -212,6 +212,11 @@ public:
   /// constraint.
   Type getConcreteType(Type type, ModuleDecl &mod);
 
+  /// Return the layout constraint that the given dependent type is constrained
+  /// to, or the null LayoutConstraint if it is not the subject of layout
+  /// constraint.
+  LayoutConstraint getLayoutConstraint(Type type, ModuleDecl &mod);
+
   /// Return the preferred representative of the given type parameter within
   /// this generic signature.  This may yield a concrete type or a
   /// different type parameter.
@@ -227,6 +232,11 @@ public:
   /// signature.
   CanType getCanonicalTypeInContext(Type type, ModuleDecl &mod);
   bool isCanonicalTypeInContext(Type type, ModuleDecl &mod);
+
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
+  bool isCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,

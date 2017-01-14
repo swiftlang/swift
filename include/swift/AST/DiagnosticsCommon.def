@@ -79,6 +79,8 @@ ERROR(func_decl_without_brace,PointsToFirstBadToken,
 NOTE(convert_let_to_var,none,
      "change 'let' to 'var' to make it mutable", ())
 
+NOTE(note_typo_candidate,none,
+     "did you mean '%0'?", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

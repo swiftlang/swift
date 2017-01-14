@@ -690,6 +690,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::Layout:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -816,6 +817,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::Layout:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -930,6 +932,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::Layout:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -997,6 +1000,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::Layout:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -1205,29 +1209,18 @@ selectOptionalConversionRestriction(Type type1, Type type2,
         kind >= ConstraintKind::Conversion)
       return ConversionRestrictionKind::ForceUnchecked;
 
-    return llvm::None;
+    return None;
   }
-
-  if (optionalKind1 == optionalKind2)
-    return ConversionRestrictionKind::OptionalToOptional;
 
   if (optionalKind1 == OTK_None)
     return ConversionRestrictionKind::ValueToOptional;
 
-  if (optionalKind1 == OTK_Optional) {
-    if (kind >= ConstraintKind::Conversion)
-      return ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional;
+  if (optionalKind1 == OTK_Optional &&
+      optionalKind2 == OTK_ImplicitlyUnwrappedOptional &&
+      kind < ConstraintKind::Conversion)
+    return None;
 
-    assert(optionalKind2 == OTK_ImplicitlyUnwrappedOptional &&
-           "Result has unexpected optional kind!");
-
-    return llvm::None;
-  }
-
-  assert(optionalKind1 == OTK_ImplicitlyUnwrappedOptional &&
-         "Source has unexpected optional kind!");
-
-  return ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional;
+  return ConversionRestrictionKind::OptionalToOptional;
 }
 
 
@@ -1500,6 +1493,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::Layout:
     case ConstraintKind::Defaultable:
     case ConstraintKind::Disjunction:
     case ConstraintKind::DynamicTypeOf:
@@ -2004,9 +1998,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // Instance type check for the above. We are going to check conformance once
   // we hit commit_to_conversions below, but we have to add a token restriction
   // to ensure we wrap the metatype value in a metatype erasure.
-  if (concrete && type2->isExistentialType() &&
-      kind >= ConstraintKind::Subtype) {
-    conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
+
+  // Disallow direct IUO-to-Any conversions. This will allow us to
+  // force-unwrap the IUO before attempting to convert, which makes it
+  // possible to disambiguate certain cases where we would otherwise
+  // consider an IUO or plain optional to be equally desirable choices
+  // where we really want the IUO to decay to a plain optional.
+  {
+    bool disallowExistentialConversion = false;
+    if (type2->isAny() &&
+        type1->getRValueType()->getImplicitlyUnwrappedOptionalObjectType())
+      disallowExistentialConversion = true;
+
+    if (concrete && !disallowExistentialConversion &&
+        type2->isExistentialType() && kind >= ConstraintKind::Subtype) {
+      conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
+    }
   }
 
   // A value of type T! can be converted to type U if T is convertible
@@ -2414,7 +2421,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   };
 
   do {
-    // Dig out the fixed type to which this type refers.
+    // Dig out the fixed type this type refers to.
     fromType = getFixedTypeRecursive(fromType, flags, /*wantRValue=*/true);
 
     // If we hit a type variable without a fixed type, we can't
@@ -2422,7 +2429,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     if (fromType->isTypeVariableOrMember())
       return formUnsolved();
 
-    // Dig out the fixed type to which this type refers.
+    // Dig out the fixed type this type refers to.
     toType = getFixedTypeRecursive(toType, flags, /*wantRValue=*/true);
 
     // If we hit a type variable without a fixed type, we can't
@@ -2512,7 +2519,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
 
   case CheckedCastKind::Coercion:
-  case CheckedCastKind::BridgingCast:
+  case CheckedCastKind::BridgingCoercion:
+  case CheckedCastKind::Swift3BridgingDowncast:
   case CheckedCastKind::Unresolved:
     llvm_unreachable("Not a valid result");
   }
@@ -3397,6 +3405,15 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     Type bridgedValueType;
     if (auto objcClass = TC.Context.getBridgedToObjC(DC, unwrappedToType,
                                                      &bridgedValueType)) {
+      // Bridging NSNumber to NSValue is one-way, since there are multiple Swift
+      // value types that bridge to those object types. It requires a checked
+      // cast to get back.
+      // We accepted these coercions in Swift 3 mode, so we have to live with
+      // them (but give a warning) in that language mode.
+      if (!TC.Context.LangOpts.isSwiftVersion3()
+          && TC.isObjCClassWithMultipleSwiftBridgedTypes(objcClass, DC))
+        return SolutionKind::Error;
+
       // If the bridged value type is generic, the generic arguments
       // must either match or be bridged.
       // FIXME: This should be an associated type of the protocol.
@@ -3790,8 +3807,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //   T $< U ===> T! $< U?
   // also:
   //   T <c U ===> T? <c U!
-  case ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional:
-  case ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional:
   case ConversionRestrictionKind::OptionalToOptional: {
     addContextualScore();
     assert(matchKind >= ConstraintKind::Subtype);
@@ -4181,6 +4196,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
                                                  subflags, locator);
 
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(first, second, kind, locator,
@@ -4335,6 +4351,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return SolutionKind::Solved;
 
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(

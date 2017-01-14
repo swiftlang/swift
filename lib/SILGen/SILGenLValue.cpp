@@ -1670,9 +1670,8 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
   SILValue address = gen.emitTemporaryAllocation(e, typeData.TypeOfRValue);
   address = gen.B.createMarkUninitialized(e, address,
                                           MarkUninitializedInst::Var);
-  gen.enterDestroyCleanup(address);
   LValue lv;
-  lv.add<ValueComponent>(ManagedValue::forUnmanaged(address), typeData);
+  lv.add<ValueComponent>(gen.emitManagedBufferWithCleanup(address), typeData);
   return lv;
 }
 

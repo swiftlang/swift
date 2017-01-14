@@ -77,6 +77,13 @@ IDENTIFIER(value)
 IDENTIFIER_WITH_NAME(value_, "_value")
 IDENTIFIER(with)
 
+// Kinds of layout constraints
+IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")
+IDENTIFIER_WITH_NAME(TrivialLayout, "_Trivial")
+IDENTIFIER_WITH_NAME(TrivialAtMostLayout, "_TrivialAtMost")
+IDENTIFIER_WITH_NAME(RefCountedObjectLayout, "_RefCountedObject")
+IDENTIFIER_WITH_NAME(NativeRefCountedObjectLayout, "_NativeRefCountedObject")
+
 // Operators
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")
 IDENTIFIER_WITH_NAME(EqualsOperator, "==")

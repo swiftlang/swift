@@ -595,8 +595,6 @@ ERROR(use_undeclared_type,none,
       "use of undeclared type %0", (Identifier))
 ERROR(use_undeclared_type_did_you_mean,none,
       "use of undeclared type %0; did you mean to use '%1'?", (Identifier, StringRef))
-NOTE(note_typo_candidate,none,
-     "did you mean '%0'?", (StringRef))
 NOTE(note_typo_candidate_implicit_member,none,
      "did you mean the implicitly-synthesized %1 '%0'?", (StringRef, StringRef))
 NOTE(note_remapped_type,none,
@@ -812,6 +810,10 @@ ERROR(missing_unwrap_optional_try,none,
 ERROR(missing_forced_downcast,none,
       "%0 is not convertible to %1; "
       "did you mean to use 'as!' to force downcast?", (Type, Type))
+WARNING(missing_forced_downcast_swift3_compat_warning,none,
+        "bridging %0 to %1 may fail at runtime and will become a checked "
+        "cast in Swift 4; did you mean to use 'as!' to force downcast?",
+        (Type, Type))
 ERROR(missing_explicit_conversion,none,
       "%0 is not implicitly convertible to %1; "
       "did you mean to use 'as' to explicitly convert?", (Type, Type))
@@ -1578,6 +1580,11 @@ ERROR(requires_same_type_conflict,none,
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
+ERROR(mutiple_layout_constraints,none,
+      "multiple layout constraints cannot be used at the same time: %0 and %1",
+      (LayoutConstraint, LayoutConstraint))
+NOTE(previous_layout_constraint, none,
+    "previous layout constraint declaration %0 was here", (LayoutConstraint))
 
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{"

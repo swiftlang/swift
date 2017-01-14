@@ -474,18 +474,6 @@ void Remangler::mangleArchetype(Node *node) {
   unreachable("unsupported node");
 }
 
-void Remangler::mangleArchetypeRef(Node *node) {
-  Node::IndexType relativeDepth = node->getChild(0)->getIndex();
-  Node::IndexType index = node->getChild(1)->getIndex();
-
-  Buffer << 'Q';
-  if (relativeDepth != 0) {
-    Buffer << 'd';
-    mangleIndex(relativeDepth - 1);
-  }
-  mangleIndex(index);
-}
-
 void Remangler::mangleArgumentTuple(Node *node) {
   Node *Ty = getSingleChild(node, Node::Kind::Type);
   Node *Child = getSingleChild(Ty);
@@ -677,6 +665,24 @@ void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
     default: Buffer << "RT"; break;
   }
   mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
+}
+
+void Remangler::mangleDependentGenericLayoutRequirement(Node *node) {
+  auto NumMembersAndParamIdx = mangleConstrainedType(node->getChild(0).get());
+  switch (NumMembersAndParamIdx.first) {
+    case -1: Buffer << "RL"; return; // substitution
+    case 0: Buffer << "Rl"; break;
+    case 1: Buffer << "Rm"; break;
+    default: Buffer << "RM"; break;
+  }
+  mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
+  assert(node->getChild(1)->getKind() == Node::Kind::Identifier);
+  assert(node->getChild(1)->getText().size() == 1);
+  Buffer << node->getChild(1)->getText()[0];
+  if (node->getNumChildren() >=3)
+    mangleChildNode(node, 2);
+  if (node->getNumChildren() >=4)
+    mangleChildNode(node, 3);
 }
 
 void Remangler::mangleDependentGenericSignature(Node *node) {

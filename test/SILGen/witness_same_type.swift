@@ -11,7 +11,7 @@ struct X {}
 
 // Ensure that the protocol witness for requirements with same-type constraints
 // is set correctly. <rdar://problem/16369105>
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV17witness_same_type3FooS_7FooableS_FS1_3foouRd__S1_wx3Barzwd__S2_rfT1xqd___wxS2_ : $@convention(witness_method) <τ_0_0 where τ_0_0 : Fooable, τ_0_0.Bar == X> (@in τ_0_0, @in_guaranteed Foo) -> @out X
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV17witness_same_type3FooS_7FooableS_FS1_3foouRd__S1_wd__3BarzwxS2_rfT1xqd___wxS2_ : $@convention(witness_method) <τ_0_0 where τ_0_0 : Fooable, τ_0_0.Bar == X> (@in τ_0_0, @in_guaranteed Foo) -> @out X
 struct Foo: Fooable {
   typealias Bar = X
 

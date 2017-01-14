@@ -708,6 +708,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -867,6 +868,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
       SWIFT_FALLTHROUGH;
         
+    case ConstraintKind::Layout:
     case ConstraintKind::LiteralConformsTo: {
       // If there is a 'nil' literal constraint, we might need optional
       // supertype bindings.
@@ -2197,11 +2199,7 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   if (auto restriction = constraint->getRestriction()) {
     // Non-optional conversions are better than optional-to-optional
     // conversions.
-    if (*restriction == ConversionRestrictionKind::OptionalToOptional ||
-        *restriction
-          == ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional ||
-        *restriction
-          == ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional)
+    if (*restriction == ConversionRestrictionKind::OptionalToOptional)
       return true;
     
     // Array-to-pointer conversions are better than inout-to-pointer conversions.

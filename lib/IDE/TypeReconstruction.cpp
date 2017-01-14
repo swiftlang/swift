@@ -749,40 +749,9 @@ static void VisitNodeArchetype(
   if (ast) {
     result._types.push_back(ArchetypeType::getNew(
         *ast, nullptr, ast->getIdentifier(archetype_name), conforms_to,
-        Type()));
+        Type(), LayoutConstraint()));
   } else {
     result._error = "invalid ASTContext";
-  }
-}
-
-static void VisitNodeArchetypeRef(
-    ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
-    Demangle::NodePointer &cur_node, VisitNodeResult &result,
-    const VisitNodeResult &generic_context) { // set by GenericType case
-  const StringRef &archetype_name(cur_node->getText());
-  Type result_type;
-  for (const Type &archetype : generic_context._types) {
-    const ArchetypeType *cast_archetype =
-        dyn_cast<ArchetypeType>(archetype.getPointer());
-
-    if (cast_archetype &&
-        !cast_archetype->getName().str().compare(archetype_name)) {
-      result_type = archetype;
-      break;
-    }
-  }
-
-  if (result_type)
-    result._types.push_back(result_type);
-  else {
-    if (ast) {
-      SmallVector<ProtocolDecl *, 1> protocols;
-      result._types.push_back(ArchetypeType::getNew(
-        *ast, nullptr, ast->getIdentifier(archetype_name), protocols,
-        Type()));
-    } else {
-      result._error = "invalid ASTContext";
-    }
   }
 }
 
@@ -1995,10 +1964,6 @@ static void visitNodeImpl(
   case Demangle::Node::Kind::UnsafeAddressor:
   case Demangle::Node::Kind::UnsafeMutableAddressor:
     VisitNodeAddressor(ast, nodes, node, result, genericContext);
-    break;
-
-  case Demangle::Node::Kind::ArchetypeRef:
-    VisitNodeArchetypeRef(ast, nodes, node, result, genericContext);
     break;
 
   case Demangle::Node::Kind::Archetype:

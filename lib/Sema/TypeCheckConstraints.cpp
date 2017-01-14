@@ -1375,6 +1375,16 @@ Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
 }
 
+GenericRequirementsCheckListener::~GenericRequirementsCheckListener() {}
+
+bool GenericRequirementsCheckListener::shouldCheck(RequirementKind kind,
+                                                   Type first, Type second) {
+  return true;
+}
+
+void GenericRequirementsCheckListener::diagnosed(
+    const Requirement *withRequirement) {}
+
 bool TypeChecker::
 solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    FreeTypeVariableBinding allowFreeTypeVariables,
@@ -2901,10 +2911,19 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
        !unwrappedIUO)) {
     return CheckedCastKind::Coercion;
   }
-
+  
   // Check for a bridging conversion.
-  if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO)
-    return CheckedCastKind::BridgingCast;
+  // Anything bridges to AnyObject in ObjC interop mode.
+  if (Context.LangOpts.EnableObjCInterop
+      && toType->isAnyObject())
+    return CheckedCastKind::BridgingCoercion;
+  
+  // Do this check later in Swift 3 mode so that we check for NSNumber and
+  // NSValue casts (and container casts thereof) first.
+  if (!Context.LangOpts.isSwiftVersion3()
+      && isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO){
+    return CheckedCastKind::BridgingCoercion;
+  }
 
   Type origFromType = fromType;
   Type origToType = toType;
@@ -2955,117 +2974,132 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   // If the unwrapped from/to types are equivalent or bridged, this isn't a real
   // downcast. Complain.
-  if (fromType->isEqual(toType) ||
-      isExplicitlyConvertibleTo(fromType, toType, dc)) {
-    assert(extraFromOptionals > 0 && "No extra 'from' optionals?");
-    
-    // FIXME: Add a Fix-It, when the caller provides us with enough information.
-    if (!suppressDiagnostics) {
-      bool isBridged =
-        !fromType->isEqual(toType) && !isConvertibleTo(fromType, toType, dc);
+  if (extraFromOptionals > 0) {
+    switch (typeCheckCheckedCast(fromType, toType,
+                                 CheckedCastContextKind::None, dc,
+                                 SourceLoc(), nullptr, SourceRange())) {
+    case CheckedCastKind::Coercion:
+    case CheckedCastKind::BridgingCoercion: {
+      // FIXME: Add a Fix-It, when the caller provides us with enough
+      // information.
+      if (!suppressDiagnostics) {
+        bool isBridged =
+          !fromType->isEqual(toType) && !isConvertibleTo(fromType, toType, dc);
 
-      switch (contextKind) {
-      case CheckedCastContextKind::None:
-        llvm_unreachable("suppressing diagnostics");
+        switch (contextKind) {
+        case CheckedCastContextKind::None:
+          llvm_unreachable("suppressing diagnostics");
 
-      case CheckedCastContextKind::ForcedCast: {
-        std::string extraFromOptionalsStr(extraFromOptionals, '!');
-        auto diag = diagnose(diagLoc, diag::downcast_same_type,
-                             origFromType, origToType,
-                             extraFromOptionalsStr,
-                             isBridged);
-        diag.highlight(diagFromRange);
-        diag.highlight(diagToRange);
-
-        /// Add the '!''s needed to adjust the type.
-        diag.fixItInsertAfter(diagFromRange.End,
-                              std::string(extraFromOptionals, '!'));
-        if (isBridged) {
-          // If it's bridged, we still need the 'as' to perform the bridging.
-          diag.fixItReplaceChars(diagLoc, diagLoc.getAdvancedLocOrInvalid(3),
-                                 "as");
-        } else {
-          // Otherwise, implicit conversions will handle it in most cases.
-          SourceLoc afterExprLoc = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                              diagFromRange.End);
-
-          diag.fixItRemove(SourceRange(afterExprLoc, diagToRange.End));
-        }
-        break;
-      }
-
-      case CheckedCastContextKind::ConditionalCast:
-        // If we're only unwrapping a single optional, that optional value is
-        // effectively carried through to the underlying conversion, making this
-        // the moral equivalent of a map. Complain that one can do this with
-        // 'as' more effectively.
-        if (extraFromOptionals == 1) {
-          // A single optional is carried through. It's better to use 'as' to
-          // the appropriate optional type.
-          auto diag = diagnose(diagLoc, diag::conditional_downcast_same_type,
+        case CheckedCastContextKind::ForcedCast: {
+          std::string extraFromOptionalsStr(extraFromOptionals, '!');
+          auto diag = diagnose(diagLoc, diag::downcast_same_type,
                                origFromType, origToType,
-                               fromType->isEqual(toType) ? 0
-                                             : isBridged ? 2
-                                             : 1);
+                               extraFromOptionalsStr,
+                               isBridged);
           diag.highlight(diagFromRange);
           diag.highlight(diagToRange);
 
+          /// Add the '!''s needed to adjust the type.
+          diag.fixItInsertAfter(diagFromRange.End,
+                                std::string(extraFromOptionals, '!'));
           if (isBridged) {
-            // For a bridged cast, replace the 'as?' with 'as'.
+            // If it's bridged, we still need the 'as' to perform the bridging.
             diag.fixItReplaceChars(diagLoc, diagLoc.getAdvancedLocOrInvalid(3),
                                    "as");
-
-            // Make sure we'll cast to the appropriately-optional type by adding
-            // the '?'.
-            // FIXME: Parenthesize!
-            diag.fixItInsertAfter(diagToRange.End, "?");
           } else {
-            // Just remove the cast; implicit conversions will handle it.
-            SourceLoc afterExprLoc =
-              Lexer::getLocForEndOfToken(Context.SourceMgr, diagFromRange.End);
+            // Otherwise, implicit conversions will handle it in most cases.
+            SourceLoc afterExprLoc = Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                                                diagFromRange.End);
 
-            if (afterExprLoc.isValid() && diagToRange.isValid())
-              diag.fixItRemove(SourceRange(afterExprLoc, diagToRange.End));
+            diag.fixItRemove(SourceRange(afterExprLoc, diagToRange.End));
           }
+          break;
         }
 
-        // If there is more than one extra optional, don't do anything: this
-        // conditional cast is trying to unwrap some levels of optional;
-        // let the runtime handle it.
-        break;
+        case CheckedCastContextKind::ConditionalCast:
+          // If we're only unwrapping a single optional, that optional value is
+          // effectively carried through to the underlying conversion, making this
+          // the moral equivalent of a map. Complain that one can do this with
+          // 'as' more effectively.
+          if (extraFromOptionals == 1) {
+            // A single optional is carried through. It's better to use 'as' to
+            // the appropriate optional type.
+            auto diag = diagnose(diagLoc, diag::conditional_downcast_same_type,
+                                 origFromType, origToType,
+                                 fromType->isEqual(toType) ? 0
+                                               : isBridged ? 2
+                                               : 1);
+            diag.highlight(diagFromRange);
+            diag.highlight(diagToRange);
 
-      case CheckedCastContextKind::IsExpr:
-        // If we're only unwrapping a single optional, we could have just
-        // checked for 'nil'.
-        if (extraFromOptionals == 1) {
-          auto diag = diagnose(diagLoc, diag::is_expr_same_type,
-                               origFromType, origToType);
-          diag.highlight(diagFromRange);
-          diag.highlight(diagToRange);
+            if (isBridged) {
+              // For a bridged cast, replace the 'as?' with 'as'.
+              diag.fixItReplaceChars(diagLoc, diagLoc.getAdvancedLocOrInvalid(3),
+                                     "as");
 
-          diag.fixItReplace(SourceRange(diagLoc, diagToRange.End), "!= nil");
+              // Make sure we'll cast to the appropriately-optional type by adding
+              // the '?'.
+              // FIXME: Parenthesize!
+              diag.fixItInsertAfter(diagToRange.End, "?");
+            } else {
+              // Just remove the cast; implicit conversions will handle it.
+              SourceLoc afterExprLoc =
+                Lexer::getLocForEndOfToken(Context.SourceMgr, diagFromRange.End);
 
-          // Add parentheses if needed.
-          if (!fromExpr->canAppendCallParentheses()) {
-            diag.fixItInsert(fromExpr->getStartLoc(), "(");
-            diag.fixItInsertAfter(fromExpr->getEndLoc(), ")");
+              if (afterExprLoc.isValid() && diagToRange.isValid())
+                diag.fixItRemove(SourceRange(afterExprLoc, diagToRange.End));
+            }
           }
+
+          // If there is more than one extra optional, don't do anything: this
+          // conditional cast is trying to unwrap some levels of optional;
+          // let the runtime handle it.
+          break;
+
+        case CheckedCastContextKind::IsExpr:
+          // If we're only unwrapping a single optional, we could have just
+          // checked for 'nil'.
+          if (extraFromOptionals == 1) {
+            auto diag = diagnose(diagLoc, diag::is_expr_same_type,
+                                 origFromType, origToType);
+            diag.highlight(diagFromRange);
+            diag.highlight(diagToRange);
+
+            diag.fixItReplace(SourceRange(diagLoc, diagToRange.End), "!= nil");
+
+            // Add parentheses if needed.
+            if (!fromExpr->canAppendCallParentheses()) {
+              diag.fixItInsert(fromExpr->getStartLoc(), "(");
+              diag.fixItInsertAfter(fromExpr->getEndLoc(), ")");
+            }
+          }
+
+          // If there is more than one extra optional, don't do anything: this
+          // is performing a deeper check that the runtime will handle.
+          break;
+
+        case CheckedCastContextKind::IsPattern:
+        case CheckedCastContextKind::EnumElementPattern:
+          // Note: Don't diagnose these, because the code is testing whether
+          // the optionals can be unwrapped.
+          break;
         }
-
-        // If there is more than one extra optional, don't do anything: this
-        // is performing a deeper check that the runtime will handle.
-        break;
-
-      case CheckedCastContextKind::IsPattern:
-      case CheckedCastContextKind::EnumElementPattern:
-        // Note: Don't diagnose these, because the code is testing whether
-        // the optionals can be unwrapped.
-        break;
       }
+
+      // Treat this as a value cast so we preserve the semantics.
+      return CheckedCastKind::ValueCast;
     }
 
-    // Treat this as a value cast so we preserve the semantics.
-    return CheckedCastKind::ValueCast;
+    case CheckedCastKind::Swift3BridgingDowncast:
+    case CheckedCastKind::ArrayDowncast:
+    case CheckedCastKind::DictionaryDowncast:
+    case CheckedCastKind::SetDowncast:
+    case CheckedCastKind::ValueCast:
+      break;
+
+    case CheckedCastKind::Unresolved:
+      return failed();
+    }
   }
 
   // Check for casts between specific concrete types that cannot succeed.
@@ -3079,8 +3113,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       case CheckedCastKind::Coercion:
         return CheckedCastKind::Coercion;
 
-      case CheckedCastKind::BridgingCast:
-        return CheckedCastKind::BridgingCast;
+      case CheckedCastKind::BridgingCoercion:
+        return CheckedCastKind::BridgingCoercion;
+
+      case CheckedCastKind::Swift3BridgingDowncast:
+        return CheckedCastKind::Swift3BridgingDowncast;
 
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
@@ -3097,7 +3134,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (auto toKeyValue = cs.isDictionaryType(toType)) {
     if (auto fromKeyValue = cs.isDictionaryType(fromType)) {
       bool hasCoercion = false;
-      bool hasBridgingConversion = false;
+      enum { NoBridging, BridgingCoercion, Swift3BridgingDowncast }
+        hasBridgingConversion = NoBridging;
       bool hasCast = false;
       switch (typeCheckCheckedCast(fromKeyValue->first, toKeyValue->first,
                                    CheckedCastContextKind::None, dc,
@@ -3106,8 +3144,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         hasCoercion = true;
         break;
 
-      case CheckedCastKind::BridgingCast:
-        hasBridgingConversion = true;
+      case CheckedCastKind::BridgingCoercion:
+        hasBridgingConversion = std::max(hasBridgingConversion,
+                                         BridgingCoercion);
+        break;
+      case CheckedCastKind::Swift3BridgingDowncast:
+        hasBridgingConversion = std::max(hasBridgingConversion,
+                                         Swift3BridgingDowncast);
         break;
 
       case CheckedCastKind::ArrayDowncast:
@@ -3128,8 +3171,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         hasCoercion = true;
         break;
 
-      case CheckedCastKind::BridgingCast:
-        hasBridgingConversion = true;
+      case CheckedCastKind::BridgingCoercion:
+        hasBridgingConversion = std::max(hasBridgingConversion,
+                                         BridgingCoercion);
+        break;
+      case CheckedCastKind::Swift3BridgingDowncast:
+        hasBridgingConversion = std::max(hasBridgingConversion,
+                                         Swift3BridgingDowncast);
         break;
 
       case CheckedCastKind::ArrayDowncast:
@@ -3144,7 +3192,14 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       }
 
       if (hasCast) return CheckedCastKind::DictionaryDowncast;
-      if (hasBridgingConversion) return CheckedCastKind::BridgingCast;
+      switch (hasBridgingConversion) {
+      case NoBridging:
+        break;
+      case BridgingCoercion:
+        return CheckedCastKind::BridgingCoercion;
+      case Swift3BridgingDowncast:
+        return CheckedCastKind::Swift3BridgingDowncast;
+      }
       assert(hasCoercion && "Not a coercion?");
       return CheckedCastKind::Coercion;
     }
@@ -3158,8 +3213,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       case CheckedCastKind::Coercion:
         return CheckedCastKind::Coercion;
 
-      case CheckedCastKind::BridgingCast:
-        return CheckedCastKind::BridgingCast;
+      case CheckedCastKind::BridgingCoercion:
+        return CheckedCastKind::BridgingCoercion;
+      
+      case CheckedCastKind::Swift3BridgingDowncast:
+        return CheckedCastKind::Swift3BridgingDowncast;
 
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
@@ -3173,6 +3231,19 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
+  // We accepted `NSNumber`-to-`*Int*` and `NSValue`-to-struct as bridging
+  // conversions in Swift 3. For compatibility, we need to distinguish these
+  // cases so we can accept them as coercions (with a warning).
+  if (Context.LangOpts.isSwiftVersion3() && extraFromOptionals == 0) {
+    // Do the check for a bridging conversion now that we deferred above.
+    if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO) {
+      if (isObjCClassWithMultipleSwiftBridgedTypes(fromType, dc)) {
+        return CheckedCastKind::Swift3BridgingDowncast;
+      }
+      return CheckedCastKind::BridgingCoercion;
+    }
+  }
+  
   // If we can bridge through an Objective-C class, do so.
   if (Type bridgedToClass = getDynamicBridgedThroughObjCClass(dc, fromType,
                                                               toType)) {
@@ -3180,7 +3251,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  CheckedCastContextKind::None, dc, SourceLoc(),
                                  nullptr, SourceRange())) {
     case CheckedCastKind::ArrayDowncast:
-    case CheckedCastKind::BridgingCast:
+    case CheckedCastKind::BridgingCoercion:
+    case CheckedCastKind::Swift3BridgingDowncast:
     case CheckedCastKind::Coercion:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::SetDowncast:
@@ -3199,7 +3271,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  CheckedCastContextKind::None, dc, SourceLoc(),
                                  nullptr, SourceRange())) {
     case CheckedCastKind::ArrayDowncast:
-    case CheckedCastKind::BridgingCast:
+    case CheckedCastKind::BridgingCoercion:
+    case CheckedCastKind::Swift3BridgingDowncast:
     case CheckedCastKind::Coercion:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::SetDowncast:

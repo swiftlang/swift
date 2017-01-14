@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
@@ -1709,20 +1710,32 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
                      diag::unsupported_platform_runtime_condition_argument);
           return ConditionalCompilationExprState::error();
         }
+
+        std::vector<StringRef> suggestions;
+        SWIFT_DEFER {
+          for (const StringRef& suggestion : suggestions) {
+            D.diagnose(UDRE->getLoc(), diag::note_typo_candidate,
+                       suggestion)
+            .fixItReplace(UDRE->getSourceRange(), suggestion);
+          }
+        };
         if (fnName == "os") {
-          if (!LangOptions::checkPlatformConditionOS(argument)) {
+          if (!LangOptions::checkPlatformConditionOS(argument,
+                                                     suggestions)) {
             D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
                        "operating system", fnName);
             return ConditionalCompilationExprState::error();
           }
         } else if (fnName == "arch") {
-          if (!LangOptions::isPlatformConditionArchSupported(argument)) {
+          if (!LangOptions::isPlatformConditionArchSupported(argument,
+                                                             suggestions)) {
             D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
                        "architecture", fnName);
             return ConditionalCompilationExprState::error();
           }
         } else if (fnName == "_endian") {
-          if (!LangOptions::isPlatformConditionEndiannessSupported(argument)) {
+          if (!LangOptions::isPlatformConditionEndiannessSupported(argument,
+                                                                   suggestions)) {
             D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
                        "endianness", fnName);
           }
