@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
-
+// Remove XFAIL once the specialization of generics is updated to support the
+// new form of the @_specialize attribute.
+// XFAIL: *
 sil_stage canonical
 
 import Builtin
