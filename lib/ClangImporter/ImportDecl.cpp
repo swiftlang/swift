@@ -1133,14 +1133,18 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 
     // To keep DI happy, initialize stored properties before computed.
     for (unsigned pass = 0; pass < 2; pass++) {
+      unsigned paramPos = 0;
+
       for (unsigned i = 0, e = members.size(); i < e; i++) {
         auto var = members[i];
 
         if (var->hasClangNode() && isa<clang::IndirectFieldDecl>(var->getClangDecl()))
           continue;
 
-        if (var->hasStorage() == (pass != 0))
+        if (var->hasStorage() == (pass != 0)) {
+          paramPos++;
           continue;
+        }
 
         // Construct left-hand side.
         Expr *lhs = new (context) DeclRefExpr(selfDecl, DeclNameLoc(),
@@ -1149,12 +1153,14 @@ createValueConstructor(ClangImporter::Implementation &Impl,
                                           /*Implicit=*/true);
 
         // Construct right-hand side.
-        auto rhs = new (context) DeclRefExpr(valueParameters[i], DeclNameLoc(),
+        auto rhs = new (context) DeclRefExpr(valueParameters[paramPos],
+                                             DeclNameLoc(),
                                              /*Implicit=*/true);
 
         // Add assignment.
         stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs,
                                                  /*Implicit=*/true));
+        paramPos++;
       }
     }
 
