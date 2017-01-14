@@ -124,7 +124,7 @@ public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConv
          [    0       0    1 ]
      */
     public init(rotationByDegrees angle: CGFloat) {
-        let α = Double(angle) * M_PI / 180.0
+        let α = Double(angle) * .pi / 180.0
         self.init(rotationByRadians: CGFloat(α))
     }
     
@@ -153,7 +153,7 @@ public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConv
          [    0       0    1 ]
      */
     public mutating func rotate(byDegrees angle: CGFloat) {
-        let α = Double(angle) * M_PI / 180.0
+        let α = Double(angle) * .pi / 180.0
         return rotate(byRadians: CGFloat(α))
     }
     
