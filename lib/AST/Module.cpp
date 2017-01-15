@@ -590,6 +590,9 @@ TypeBase::gatherAllSubstitutions(ModuleDecl *module,
   unsigned lastGenericIndex = genericParams.size();
   while (parent) {
     if (auto boundGeneric = parent->getAs<BoundGenericType>()) {
+      // FIXME: we should check the situation early.
+      if (lastGenericIndex < boundGeneric->getGenericArgs().size())
+        return {};
       unsigned index = lastGenericIndex - boundGeneric->getGenericArgs().size();
       for (Type arg : boundGeneric->getGenericArgs()) {
         auto paramTy = genericParams[index++];
