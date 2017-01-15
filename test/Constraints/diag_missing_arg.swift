@@ -66,6 +66,8 @@ param2FuncNonNamed3(1) // expected-error {{missing argument for parameter #2 in 
 param2FuncNonNamed3("foo") // expected-error {{missing argument for parameter #2 in call}} {{26-26=, <#String#>}}
                            // FIXME: Bad diagnostic. Could this be #1?
 
+func unlabeledParamFollowingVariadic(_: Any..., _: Any, _: Any) {} // expected-warning {{a parameter following a variadic parameter requires a label}}
+
 func param3Func(x: Int, y: Int, z: Int) {} // expected-note * {{here}}
 param3Func(x: 1, y: 1) // expected-error {{missing argument for parameter 'z' in call}} {{22-22=, z: <#Int#>}}
 param3Func(x: 1, z: 1) // expected-error {{missing argument for parameter 'y' in call}} {{16-16=, y: <#Int#>}}
