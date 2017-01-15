@@ -1449,77 +1449,65 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
 }
 
 bool ConstraintSystem::Candidate::solve() {
-  // For cleanup to work correctly e.g. `CleanupIllFormedExpressionRAII`
-  // `E` has to be 'reference to pointer' but, in this situation, it can't
-  // because we don't want to accidently modify AST while trying to reduce
-  // type domains of sub-expressions. Because constraint generation _might_
-  // produce completely different expression let's use a locally scoped
-  // 'reference to pointer' variable instead of `E` which enables both
-  // proper constraint generation/solving and cleanup.
-  auto *&expr = E;
-  {
-    // Cleanup after constraint system generation/solving,
-    // because it would assign types to expressions, which
-    // might interfere with solving higher-level expressions.
-    ExprCleaner cleaner(expr);
-    CleanupIllFormedExpressionRAII cleanup(TC.Context, expr);
-
-    // Allocate new constraint system for sub-expression.
-    ConstraintSystem cs(TC, DC, None);
-
-    // Generate constraints for the new system.
-    if (auto generatedExpr = cs.generateConstraints(expr)) {
-      expr = generatedExpr;
-    } else {
-      // Failure to generate constraint system for sub-expression
-      // means we can't continue solving sub-expressions.
-      return true;
-    }
-
-    // If there is contextual type present, add an explicit "conversion"
-    // constraint to the system.
-    if (!CT.isNull()) {
-      auto constraintKind = ConstraintKind::Conversion;
-      if (CTP == CTP_CallArgument)
-        constraintKind = ConstraintKind::ArgumentConversion;
-
-      cs.addConstraint(constraintKind, cs.getType(expr), CT,
-                       cs.getConstraintLocator(expr), /*isFavored=*/true);
-    }
-
-    // Try to solve the system and record all available solutions.
-    llvm::SmallVector<Solution, 2> solutions;
-    {
-      SolverState state(cs);
-
-      // Use solveRec() instead of solve() in here, because solve()
-      // would try to deduce the best solution, which we don't
-      // really want. Instead, we want the reduced set of domain choices.
-      cs.solveRec(solutions, FreeTypeVariableBinding::Allow);
-    }
-
-    // No solutions for the sub-expression means that either main expression
-    // needs salvaging or it's inconsistent (read: doesn't have solutions).
-    if (solutions.empty())
-      return true;
-
-    // Record found solutions as suggestions.
-    this->applySolutions(solutions);
-
-    // Solution application is going to modify types of sub-expresssions,
-    // so we need to avoid clean-up afterwords, but let's double-check
-    // if we have any implicit expressions with type variables and
-    // nullify their types.
-    cleanup.disable();
+  auto cleanupImplicitExprs = [&](Expr *expr) {
     expr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
       Type type = childExpr->getType();
       if (childExpr->isImplicit() && type && type->hasTypeVariable())
         childExpr->setType(Type());
       return childExpr;
     });
+  };
 
-    return false;
+  // Allocate new constraint system for sub-expression.
+  ConstraintSystem cs(TC, DC, None);
+
+  // Cleanup after constraint system generation/solving,
+  // because it would assign types to expressions, which
+  // might interfere with solving higher-level expressions.
+  ExprCleaner cleaner(E);
+
+  // Generate constraints for the new system.
+  if (auto generatedExpr = cs.generateConstraints(E)) {
+    E = generatedExpr;
+  } else {
+    // Failure to generate constraint system for sub-expression
+    // means we can't continue solving sub-expressions.
+    cleanupImplicitExprs(E);
+    return true;
   }
+
+  // If there is contextual type present, add an explicit "conversion"
+  // constraint to the system.
+  if (!CT.isNull()) {
+    auto constraintKind = ConstraintKind::Conversion;
+    if (CTP == CTP_CallArgument)
+      constraintKind = ConstraintKind::ArgumentConversion;
+
+    cs.addConstraint(constraintKind, cs.getType(E), CT,
+                     cs.getConstraintLocator(E), /*isFavored=*/true);
+  }
+
+  // Try to solve the system and record all available solutions.
+  llvm::SmallVector<Solution, 2> solutions;
+  {
+    SolverState state(cs);
+
+    // Use solveRec() instead of solve() in here, because solve()
+    // would try to deduce the best solution, which we don't
+    // really want. Instead, we want the reduced set of domain choices.
+    cs.solveRec(solutions, FreeTypeVariableBinding::Allow);
+  }
+
+  // Record found solutions as suggestions.
+  this->applySolutions(solutions);
+
+  // Let's double-check if we have any implicit expressions
+  // with type variables and nullify their types.
+  cleanupImplicitExprs(E);
+
+  // No solutions for the sub-expression means that either main expression
+  // needs salvaging or it's inconsistent (read: doesn't have solutions).
+  return solutions.empty();
 }
 
 void ConstraintSystem::Candidate::applySolutions(
