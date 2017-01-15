@@ -23,13 +23,3 @@ _ = DBL_MAX // expected-warning {{is deprecated}}
 _ = DBL_EPSILON // expected-warning {{is deprecated}}
 _ = DBL_MIN // expected-warning {{is deprecated}}
 _ = DBL_TRUE_MIN // expected-warning {{is deprecated}}
-
-#if arch(i386) || arch (x86_64)
-_ = LDBL_MANT_DIG // expected-warning {{is deprecated}}
-_ = LDBL_MIN_EXP // expected-warning {{is deprecated}}
-_ = LDBL_MAX_EXP // expected-warning {{is deprecated}}
-_ = LDBL_MAX // expected-warning {{is deprecated}}
-_ = LDBL_EPSILON // expected-warning {{is deprecated}}
-_ = LDBL_MIN // expected-warning {{is deprecated}}
-_ = LDBL_TRUE_MIN // expected-warning {{is deprecated}}
-#endif
