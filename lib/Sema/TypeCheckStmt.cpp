@@ -1038,6 +1038,8 @@ static void diagnoseIgnoredLiteral(TypeChecker &TC, LiteralExpr *LE) {
 #include "swift/AST/ExprNodes.def"
       llvm_unreachable("Not a literal expression");
     }
+
+    llvm_unreachable("Unhandled ExprKind in switch.");
   };
 
   TC.diagnose(LE->getLoc(), diag::expression_unused_literal,

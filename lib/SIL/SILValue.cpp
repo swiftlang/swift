@@ -114,6 +114,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   case ValueOwnershipKind::Any:
     return os << "Any";
   }
+
+  llvm_unreachable("Unhandled ValueOwnershipKind in switch.");
 }
 
 Optional<ValueOwnershipKind>
@@ -433,6 +435,8 @@ ValueOwnershipKindVisitor::visitSILFunctionArgument(SILFunctionArgument *Arg) {
   case SILArgumentConvention::Direct_Deallocating:
     llvm_unreachable("No ownership associated with deallocating");
   }
+
+  llvm_unreachable("Unhandled SILArgumentConvention in switch.");
 }
 
 // This is a forwarding instruction through only one of its arguments.
@@ -486,6 +490,8 @@ ValueOwnershipKindVisitor::visitLoadInst(LoadInst *LI) {
   case LoadOwnershipQualifier::Trivial:
     return ValueOwnershipKind::Trivial;
   }
+
+  llvm_unreachable("Unhandled LoadOwnershipQualifier in switch.");
 }
 
 ValueOwnershipKind SILValue::getOwnershipKind() const {
