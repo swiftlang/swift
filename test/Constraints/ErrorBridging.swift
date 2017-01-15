@@ -68,3 +68,8 @@ extension Error {
     return self // expected-error{{cannot convert return expression of type 'Self' to return type 'NSError'}}
   }
 }
+
+// rdar://problem/27543121
+func throwErrorCode() throws {
+  throw FictionalServerError.meltedDown // expected-error{{thrown error code type 'FictionalServerError.Code' does not conform to 'Error'; construct an 'FictionalServerError' instance}}{{29-29=(}}{{40-40=)}}
+}
