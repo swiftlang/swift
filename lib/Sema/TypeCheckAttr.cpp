@@ -1278,6 +1278,9 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
 }
 
 static bool hasThrowingFunctionParameter(CanType type) {
+  if (auto inoutType = type->getAs<InOutType>())
+    type = inoutType->getInOutObjectType()->getCanonicalType();
+
   // Only consider throwing function types.
   if (auto fnType = dyn_cast<AnyFunctionType>(type)) {
     return fnType->getExtInfo().throws();

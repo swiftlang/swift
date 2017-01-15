@@ -137,11 +137,13 @@ public:
   static AbstractFunction decomposeFunction(Expr *fn) {
     assert(fn->getValueProvidingExpr() == fn);
 
-    // Look through Optional unwraps
+    // Look through Optional unwraps as well as lvalue loads.
     while (true) {
       if (auto conversion = dyn_cast<ForceValueExpr>(fn)) {
         fn = conversion->getSubExpr()->getValueProvidingExpr();
       } else if (auto conversion = dyn_cast<BindOptionalExpr>(fn)) {
+        fn = conversion->getSubExpr()->getValueProvidingExpr();
+      } else if (auto conversion = dyn_cast<LoadExpr>(fn)) {
         fn = conversion->getSubExpr()->getValueProvidingExpr();
       } else {
         break;
@@ -499,7 +501,16 @@ private:
 
   Classification classifyThrowingParameterBody(ParamDecl *param,
                                                PotentialReason reason) {
-    assert(param->getType()->lookThroughAllAnyOptionalTypes()->castTo<AnyFunctionType>()->throws());
+    if (param->getType()->is<InOutType>())
+      assert(param->getType()
+                 ->getInOutObjectType()
+                 ->castTo<AnyFunctionType>()
+                 ->throws());
+    else
+      assert(param->getType()
+                 ->lookThroughAllAnyOptionalTypes()
+                 ->castTo<AnyFunctionType>()
+                 ->throws());
 
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
