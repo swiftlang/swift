@@ -342,20 +342,20 @@ std::string nodeToString(NodePointer Root,
 
 struct NodeFactory {
   static NodePointer create(Node::Kind K) {
-    return NodePointer(new Node(K));
+    return make_shared<Node>(K);
   }
   static NodePointer create(Node::Kind K, Node::IndexType Index) {
-    return NodePointer(new Node(K, Index));
+    return make_shared<Node>(K, Index);
   }
   static NodePointer create(Node::Kind K, llvm::StringRef Text) {
-    return NodePointer(new Node(K, Text));
+    return make_shared<Node>(K, Text);
   }
   static NodePointer create(Node::Kind K, std::string &&Text) {
-    return NodePointer(new Node(K, std::move(Text)));
+    return make_shared<Node>(K, std::move(Text));
   }
   template <size_t N>
   static NodePointer create(Node::Kind K, const char (&Text)[N]) {
-    return NodePointer(new Node(K, llvm::StringRef(Text)));
+    return make_shared<Node>(K, llvm::StringRef(Text));
   }
 };
 
