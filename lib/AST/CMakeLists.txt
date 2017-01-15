@@ -2,6 +2,7 @@ add_swift_library(swiftAST
   ArchetypeBuilder.cpp
   ASTContext.cpp
   ASTDumper.cpp
+  MscrStaticAnalyzer.cpp
   ASTNode.cpp
   ASTPrinter.cpp
   ASTWalker.cpp
