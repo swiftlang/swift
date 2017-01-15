@@ -1147,7 +1147,7 @@ protected:
         Cache(caches[File]),
         Context(File->getASTContext()) {}
 
-  bool visitDecl(ValueDecl *VD, bool isInParameter = false) {
+  bool visitDecl(ValueDecl *VD) {
     if (!VD || isa<GenericTypeParamDecl>(VD))
       return true;
 
@@ -1156,23 +1156,6 @@ protected:
     if (!VD->hasAccessibility()) {
       if (isa<AssociatedTypeDecl>(VD))
         return true;
-    }
-
-    // Simulation for Swift 3 bugs where typealiases got canonicalized away and
-    // thus a reference to a private typealias would not be diagnosed.
-    if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
-      if (Context.isSwiftVersion3()) {
-        // - If the typealias was a dependent type, Swift 3 resolved it down to
-        //   its underlying type.
-        if (VD->getInterfaceType()->hasTypeParameter())
-          return true;
-        // - If the typealias was a function type in parameter position, Swift 3
-        //   would rebuild the type to mark it non-escaping, losing the sugar.
-        if (isInParameter &&
-            TAD->getDeclaredInterfaceType()->getAs<AnyFunctionType>()) {
-          return true;
-        }
-      }
     }
 
     auto cached = Cache.find(VD);
@@ -1192,72 +1175,39 @@ protected:
 };
 
 class TypeReprAccessScopeChecker : private ASTWalker, AccessScopeChecker {
-  SmallVector<const TypeRepr *, 4> ParamParents;
-
   TypeReprAccessScopeChecker(const DeclContext *useDC,
-                             decltype(TypeChecker::TypeAccessScopeCache) &caches,
-                             bool isParameter)
+                             decltype(TypeChecker::TypeAccessScopeCache) &caches)
       : AccessScopeChecker(useDC, caches) {
-    if (isParameter)
-      ParamParents.push_back(nullptr);
-  }
-
-  bool isParamParent(const TypeRepr *TR) const {
-    return !ParamParents.empty() && ParamParents.back() == TR;
   }
 
   bool walkToTypeReprPre(TypeRepr *TR) override {
-    if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR)) {
-      // In Swift 3, components other than the last one were not properly
-      // checked for availability.
-      // FIXME: We should try to downgrade these errors to warnings, not just
-      // skip diagnosing them.
-      if (Context.LangOpts.isSwiftVersion3()) {
-        const TypeRepr *parent = Parent.getAsTypeRepr();
-        if (auto *compound = dyn_cast_or_null<CompoundIdentTypeRepr>(parent))
-          if (compound->Components.back() != CITR)
-            return true;
-      }
-
-      return visitDecl(CITR->getBoundDecl(),
-                       isParamParent(Parent.getAsTypeRepr()));
-    }
-
-    auto parentTR = Parent.getAsTypeRepr();
-    if (auto parentFn = dyn_cast_or_null<FunctionTypeRepr>(parentTR)) {
-      // The argument tuple for a function is a parent of parameter TRs.
-      if (parentFn->getArgsTypeRepr() == TR)
-        ParamParents.push_back(TR);
-    } else if (isa<CompoundIdentTypeRepr>(TR) && isParamParent(parentTR)) {
-      // Compound TRs that would have been parameter TRs contain parameter
-      // TRs.
-      ParamParents.push_back(TR);
-    }
-
+    if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR))
+      return visitDecl(CITR->getBoundDecl());
     return true;
   }
 
   bool walkToTypeReprPost(TypeRepr *TR) override {
-    if (isParamParent(TR))
-      ParamParents.pop_back();
     return Scope.hasValue();
   }
 
 public:
   static Optional<AccessScope>
   getAccessScope(TypeRepr *TR, const DeclContext *useDC,
-                 decltype(TypeChecker::TypeAccessScopeCache) &caches,
-                 bool isParameter) {
-    TypeReprAccessScopeChecker checker(useDC, caches, isParameter);
+                 decltype(TypeChecker::TypeAccessScopeCache) &caches) {
+    TypeReprAccessScopeChecker checker(useDC, caches);
     TR->walk(checker);
     return checker.Scope;
   }
 };
 
 class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
+  bool CanonicalizeParentTypes;
+
   TypeAccessScopeChecker(const DeclContext *useDC,
-                         decltype(TypeChecker::TypeAccessScopeCache) &caches)
-      : AccessScopeChecker(useDC, caches) {}
+                         decltype(TypeChecker::TypeAccessScopeCache) &caches,
+                         bool canonicalizeParentTypes)
+      : AccessScopeChecker(useDC, caches),
+        CanonicalizeParentTypes(canonicalizeParentTypes) {}
 
   Action walkToTypePre(Type T) override {
     ValueDecl *VD;
@@ -1268,14 +1218,34 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
     else
       VD = nullptr;
 
-    return visitDecl(VD) ? Action::Continue : Action::Stop;
+    if (!visitDecl(VD))
+      return Action::Stop;
+
+    if (!CanonicalizeParentTypes)
+      return Action::Continue;
+
+    Type nominalParentTy;
+    if (auto nominalTy = dyn_cast<NominalType>(T.getPointer())) {
+      nominalParentTy = nominalTy->getParent();
+    } else if (auto genericTy = dyn_cast<BoundGenericType>(T.getPointer())) {
+      nominalParentTy = genericTy->getParent();
+      for (auto genericArg : genericTy->getGenericArgs())
+        genericArg.walk(*this);
+    } else {
+      return Action::Continue;
+    }
+
+    if (nominalParentTy)
+      nominalParentTy->getCanonicalType().walk(*this);
+    return Action::SkipChildren;
   }
 
 public:
   static Optional<AccessScope>
   getAccessScope(Type T, const DeclContext *useDC,
-                 decltype(TypeChecker::TypeAccessScopeCache) &caches) {
-    TypeAccessScopeChecker checker(useDC, caches);
+                 decltype(TypeChecker::TypeAccessScopeCache) &caches,
+                 bool canonicalizeParentTypes = false) {
+    TypeAccessScopeChecker checker(useDC, caches, canonicalizeParentTypes);
     T.walk(checker);
     return checker.Scope;
   }
@@ -1311,8 +1281,7 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
       auto accessScope =
           TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(),
                                                      ED->getDeclContext(),
-                                                     TypeAccessScopeCache,
-                                                     /*isParameter*/false);
+                                                     TypeAccessScopeCache);
       // This is an error case and will be diagnosed elsewhere.
       if (!accessScope.hasValue())
         return Accessibility::Public;
@@ -1514,6 +1483,11 @@ enum class DowngradeToWarning: bool {
   No,
   Yes
 };
+
+/// \see checkTypeAccessibility
+using CheckTypeAccessCallback =
+    void(AccessScope, const TypeRepr *, DowngradeToWarning);
+
 } // end anonymous namespace
 
 /// Checks if the access scope of the type described by \p TL contains
@@ -1528,8 +1502,8 @@ enum class DowngradeToWarning: bool {
 /// is never null.
 static void checkTypeAccessibilityImpl(
     TypeChecker &TC, TypeLoc TL, AccessScope contextAccessScope,
-    const DeclContext *useDC, bool isParameter,
-    llvm::function_ref<void(AccessScope, const TypeRepr *)> diagnose) {
+    const DeclContext *useDC,
+    llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   if (!TC.getLangOpts().EnableAccessControl)
     return;
   if (!TL.getType())
@@ -1546,8 +1520,7 @@ static void checkTypeAccessibilityImpl(
   auto typeAccessScope =
     (TL.getTypeRepr()
      ? TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(), useDC,
-                                                  TC.TypeAccessScopeCache,
-                                                  isParameter)
+                                                  TC.TypeAccessScopeCache)
      : TypeAccessScopeChecker::getAccessScope(TL.getType(), useDC,
                                               TC.TypeAccessScopeCache));
 
@@ -1557,17 +1530,48 @@ static void checkTypeAccessibilityImpl(
   if (!typeAccessScope.hasValue())
     return;
 
-  if (typeAccessScope->isPublic() ||
-      typeAccessScope->hasEqualDeclContextWith(contextAccessScope) ||
-      contextAccessScope.isChildOf(*typeAccessScope))
+  auto shouldComplainAboutAccessScope =
+      [contextAccessScope](AccessScope scope) -> bool {
+    if (scope.isPublic())
+      return false;
+    if (scope.hasEqualDeclContextWith(contextAccessScope))
+      return false;
+    if (contextAccessScope.isChildOf(scope))
+      return false;
+    return true;
+  };
+
+  if (!shouldComplainAboutAccessScope(typeAccessScope.getValue()))
     return;
+
+  // Swift 3.0 wasn't nearly as strict as checking types because it didn't
+  // look at the TypeRepr at all except to highlight a particular part of the
+  // type in diagnostics, and looked through typealiases in other cases.
+  // Approximate this behavior by running our non-TypeRepr-based check again
+  // and downgrading to a warning when the checks disagree.
+  auto downgradeToWarning = DowngradeToWarning::No;
+  if (TC.getLangOpts().isSwiftVersion3()) {
+    auto typeOnlyAccessScope =
+       TypeAccessScopeChecker::getAccessScope(TL.getType(), useDC,
+                                              TC.TypeAccessScopeCache,
+                                              /*canonicalizeParents*/true);
+    if (typeOnlyAccessScope.hasValue()) {
+      // If Swift 4 would have complained about a private type, but Swift 4
+      // would only diagnose an internal type, complain about the Swift 3
+      // offense first to avoid confusing users.
+      if (shouldComplainAboutAccessScope(typeOnlyAccessScope.getValue()))
+        typeAccessScope = typeOnlyAccessScope;
+      else
+        downgradeToWarning = DowngradeToWarning::Yes;
+    }
+  }
 
   const TypeRepr *complainRepr =
         TypeAccessScopeDiagnoser::findTypeWithScope(
             TL.getTypeRepr(),
             *typeAccessScope,
             useDC);
-  diagnose(*typeAccessScope, complainRepr);
+  diagnose(*typeAccessScope, complainRepr, downgradeToWarning);
 }
 
 /// Checks if the access scope of the type described by \p TL is valid for the
@@ -1580,12 +1584,9 @@ static void checkTypeAccessibilityImpl(
 /// early versions of Swift 3 not diagnosing certain access violations.
 static void checkTypeAccessibility(
     TypeChecker &TC, TypeLoc TL, const ValueDecl *context,
-    llvm::function_ref<void(AccessScope, const TypeRepr *,
-                            DowngradeToWarning)> diagnose) {
+    llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   const DeclContext *DC = context->getDeclContext();
-  bool isParam = false;
   if (isa<ParamDecl>(context)) {
-    isParam = true;
     context = dyn_cast<AbstractFunctionDecl>(DC);
     if (!context)
       context = cast<SubscriptDecl>(DC);
@@ -1593,10 +1594,10 @@ static void checkTypeAccessibility(
   }
 
   AccessScope contextAccessScope = context->getFormalAccessScope();
-  checkTypeAccessibilityImpl(TC, TL, contextAccessScope, DC, isParam,
+  checkTypeAccessibilityImpl(TC, TL, contextAccessScope, DC,
                              [=](AccessScope requiredAccessScope,
-                                 const TypeRepr *offendingTR) {
-    auto downgradeToWarning = DowngradeToWarning::No;
+                                 const TypeRepr *offendingTR,
+                                 DowngradeToWarning downgradeToWarning) {
     if (!contextAccessScope.isPublic() &&
         !isa<ModuleDecl>(contextAccessScope.getDeclContext())) {
       // Swift 3.0.0 mistakenly didn't diagnose any issues when the context
@@ -1642,11 +1643,7 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
   } accessibilityErrorKind;
   auto minAccessScope = AccessScope::getPublic();
   const TypeRepr *complainRepr = nullptr;
-
-  // Swift 3.0.0 mistakenly didn't diagnose any issues when the context access
-  // scope represented a private or fileprivate level.
-  bool shouldDowngradeToWarning =
-    !accessScope.isPublic() && !isa<ModuleDecl>(accessScope.getDeclContext());
+  auto downgradeToWarning = DowngradeToWarning::Yes;
 
   for (auto param : *params) {
     if (param->getInherited().empty())
@@ -1654,71 +1651,89 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
     assert(param->getInherited().size() == 1);
     checkTypeAccessibilityImpl(TC, param->getInherited().front(), accessScope,
                                owner->getDeclContext(),
-                               /*isParameter*/false,
                                [&](AccessScope typeAccessScope,
-                                   const TypeRepr *thisComplainRepr) {
+                                   const TypeRepr *thisComplainRepr,
+                                   DowngradeToWarning thisDowngrade) {
       if (typeAccessScope.isChildOf(minAccessScope) ||
+          (thisDowngrade == DowngradeToWarning::No &&
+           downgradeToWarning == DowngradeToWarning::Yes) ||
           (!complainRepr &&
            typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessibilityErrorKind = AEK_Parameter;
+        downgradeToWarning = thisDowngrade;
       }
     });
   }
 
   for (auto &requirement : params->getRequirements()) {
     auto callback = [&](AccessScope typeAccessScope,
-                        const TypeRepr *thisComplainRepr) {
+                        const TypeRepr *thisComplainRepr,
+                        DowngradeToWarning thisDowngrade) {
       if (typeAccessScope.isChildOf(minAccessScope) ||
+          (thisDowngrade == DowngradeToWarning::No &&
+           downgradeToWarning == DowngradeToWarning::Yes) ||
           (!complainRepr &&
            typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessibilityErrorKind = AEK_Requirement;
+        downgradeToWarning = thisDowngrade;
       }
     };
     switch (requirement.getKind()) {
     case RequirementReprKind::TypeConstraint:
       checkTypeAccessibilityImpl(TC, requirement.getSubjectLoc(),
                                  accessScope, owner->getDeclContext(),
-                                 /*isParameter*/false, callback);
+                                 callback);
       checkTypeAccessibilityImpl(TC, requirement.getConstraintLoc(),
                                  accessScope, owner->getDeclContext(),
-                                 /*isParameter*/false, callback);
+                                 callback);
       break;
     case RequirementReprKind::LayoutConstraint:
       checkTypeAccessibilityImpl(TC, requirement.getSubjectLoc(),
                                  accessScope, owner->getDeclContext(),
-                                 /*isParameter*/false, callback);
+                                 callback);
       break;
     case RequirementReprKind::SameType:
       checkTypeAccessibilityImpl(TC, requirement.getFirstTypeLoc(),
                                  accessScope, owner->getDeclContext(),
-                                 /*isParameter*/false, callback);
+                                 callback);
       checkTypeAccessibilityImpl(TC, requirement.getSecondTypeLoc(),
                                  accessScope, owner->getDeclContext(),
-                                 /*isParameter*/false, callback);
+                                 callback);
       break;
     }
   }
 
-  if (!minAccessScope.isPublic()) {
-    auto minAccess = minAccessScope.accessibilityForDiagnostics();
+  if (minAccessScope.isPublic())
+    return;
 
-    bool isExplicit =
-      owner->getAttrs().hasAttribute<AccessibilityAttr>() ||
-      owner->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-    auto diagID = diag::generic_param_access;
-    if (shouldDowngradeToWarning)
-      diagID = diag::generic_param_access_warn;
-    auto diag = TC.diagnose(owner, diagID,
-                            owner->getDescriptiveKind(), isExplicit,
-                            contextAccess, minAccess,
-                            isa<FileUnit>(owner->getDeclContext()),
-                            accessibilityErrorKind);
-    highlightOffendingType(TC, diag, complainRepr);
+  // Swift 3.0.0 mistakenly didn't diagnose any issues when the context access
+  // scope represented a private or fileprivate level.
+  // FIXME: Conditionalize this on Swift 3 mode.
+  if (downgradeToWarning == DowngradeToWarning::No) {
+    if (!accessScope.isPublic() &&
+        !isa<ModuleDecl>(accessScope.getDeclContext())) {
+      downgradeToWarning = DowngradeToWarning::Yes;
+    }
   }
+
+  auto minAccess = minAccessScope.accessibilityForDiagnostics();
+
+  bool isExplicit =
+    owner->getAttrs().hasAttribute<AccessibilityAttr>() ||
+    owner->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+  auto diagID = diag::generic_param_access;
+  if (downgradeToWarning == DowngradeToWarning::Yes)
+    diagID = diag::generic_param_access_warn;
+  auto diag = TC.diagnose(owner, diagID,
+                          owner->getDescriptiveKind(), isExplicit,
+                          contextAccess, minAccess,
+                          isa<FileUnit>(owner->getDeclContext()),
+                          accessibilityErrorKind);
+  highlightOffendingType(TC, diag, complainRepr);
 }
 
 static void checkGenericParamAccessibility(TypeChecker &TC,

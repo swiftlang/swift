@@ -11,14 +11,14 @@ struct S<T> : P {
 }
 
 public struct G<T> {
-  typealias A = S<T>
+  typealias A = S<T> // expected-note {{declared here}}
 
-  public func foo<U : P>(u: U) where U.Element == A.Element {}
+  public func foo<U : P>(u: U) where U.Element == A.Element {} // expected-warning {{instance method should not be declared public because its generic requirement uses an internal type}}
 }
 
 public final class ReplayableGenerator<S: Sequence> : IteratorProtocol {
-    typealias Sequence = S
-    public typealias Element = Sequence.Iterator.Element
+    typealias Sequence = S // expected-note {{declared here}}
+    public typealias Element = Sequence.Iterator.Element // expected-warning {{type alias should not be declared public because its underlying type uses an internal type}}
 
     public func next() -> Element? {
       return nil
@@ -29,9 +29,9 @@ struct Generic<T> {
   fileprivate typealias Dependent = T
 }
 
-var x: Generic<Int>.Dependent = 3
+var x: Generic<Int>.Dependent = 3 // expected-warning {{variable should be declared fileprivate because its type uses a fileprivate type}}
 
-func internalFuncWithFileprivateAlias() -> Generic<Int>.Dependent {
+func internalFuncWithFileprivateAlias() -> Generic<Int>.Dependent { // expected-warning {{function should be declared fileprivate because its result uses a fileprivate type}}
   return 3
 }
 
@@ -44,14 +44,14 @@ var y = privateFuncWithFileprivateAlias()
 
 private typealias FnType = (_ x: Int) -> Void // expected-note * {{type declared here}}
 
-public var fn1: (FnType) -> Void = { _ in }
-public var fn2: (_ x: FnType) -> Void = { _ in }
-public var fn3: (main.FnType) -> Void = { _ in }
-public var fn4: (_ x: main.FnType) -> Void = { _ in }
-public var nested1: (_ x: (FnType) -> Void) -> Void = { _ in }
-public var nested2: (_ x: (main.FnType) -> Void) -> Void = { _ in }
-public func test1(x: FnType) {}
-public func test2(x: main.FnType) {}
+public var fn1: (FnType) -> Void = { _ in } // expected-warning {{should not be declared public}}
+public var fn2: (_ x: FnType) -> Void = { _ in } // expected-warning {{should not be declared public}}
+public var fn3: (main.FnType) -> Void = { _ in } // expected-warning {{should not be declared public}}
+public var fn4: (_ x: main.FnType) -> Void = { _ in } // expected-warning {{should not be declared public}}
+public var nested1: (_ x: (FnType) -> Void) -> Void = { _ in } // expected-warning {{should not be declared public}}
+public var nested2: (_ x: (main.FnType) -> Void) -> Void = { _ in } // expected-warning {{should not be declared public}}
+public func test1(x: FnType) {} // expected-warning {{should not be declared public}}
+public func test2(x: main.FnType) {} // expected-warning {{should not be declared public}}
 
 
 public func reject1(x: FnType?) {} // expected-error {{cannot be declared public}}
@@ -68,8 +68,8 @@ public var escaping3: (@escaping main.FnType) -> Void = { _ in } // expected-err
 public var escaping4: (_ x: @escaping main.FnType) -> Void = { _ in } // expected-error {{cannot be declared public}}
 
 public struct SubscriptTest {
-  public subscript(test1 x: FnType) -> () { return }
-  public subscript(test2 x: main.FnType) -> () { return }
+  public subscript(test1 x: FnType) -> () { return } // expected-warning {{should not be declared public}}
+  public subscript(test2 x: main.FnType) -> () { return } // expected-warning {{should not be declared public}}
 
   public subscript(reject1 x: FnType?) -> () { return } // expected-error {{cannot be declared public}}
   public subscript(reject2 x: main.FnType?) -> () { return } // expected-error {{cannot be declared public}}
