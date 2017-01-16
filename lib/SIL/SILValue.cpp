@@ -188,6 +188,16 @@ CONSTANT_OWNERSHIP_INST(Owned, LoadWeak)
 CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
 CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
 CONSTANT_OWNERSHIP_INST(Owned, ThinToThickFunction)
+
+// One would think that these /should/ be unowned. In truth they are owned since
+// objc metatypes do not go through the retain/release fast path. In their
+// implementations of retain/release nothing happens, so this is safe.
+//
+// You could even have an optimization that just always removed retain/release
+// operations on these objects.
+CONSTANT_OWNERSHIP_INST(Owned, ObjCExistentialMetatypeToObject)
+CONSTANT_OWNERSHIP_INST(Owned, ObjCMetatypeToObject)
+
 // All addresses have trivial ownership. The values stored at the address may
 // not though.
 CONSTANT_OWNERSHIP_INST(Trivial, AddressToPointer)
@@ -214,9 +224,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, MarkFunctionEscape)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitialized)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, Metatype)
-CONSTANT_OWNERSHIP_INST(Trivial,
-                        ObjCExistentialMetatypeToObject) // Is this right?
-CONSTANT_OWNERSHIP_INST(Trivial, ObjCMetatypeToObject)   // Is this right?
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCProtocol)           // Is this right?
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCToThickMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, OpenExistentialAddr)
