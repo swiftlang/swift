@@ -26,13 +26,16 @@ add_swift_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     TARGET_SDKS ANDROID CYGWIN FREEBSD LINUX
     DEPENDS glibc_modulemap)
 
-add_swift_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-    msvcrt.swift
-    ${swift_platform_sources}
+# This uses module definitions, which are not supported by MSVC.
+if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+  add_swift_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+      msvcrt.swift
+      ${swift_platform_sources}
 
-    SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
-    LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS WINDOWS)
+      SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+      LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+      TARGET_SDKS WINDOWS)
+endif()
 
 set(glibc_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})
