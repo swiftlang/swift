@@ -123,7 +123,22 @@ public:
   SILValue getValue() const { return valueAndFlag.getPointer(); }
   
   SILType getType() const { return getValue()->getType(); }
-  
+
+  /// Transform the given ManagedValue, replacing the underlying value, but
+  /// keeping the same cleanup.
+  ///
+  /// For owned values, this is equivalent to forwarding the cleanup and
+  /// creating a new cleanup of the same type on the new value. This is useful
+  /// for forwarding sequences.
+  ///
+  /// For all other values, it is a move.
+  ManagedValue transform(SILValue newValue) && {
+    assert(getValue().getOwnershipKind() == newValue.getOwnershipKind() &&
+           "New value and old value must have the same ownership kind");
+    ManagedValue M(newValue, isLValue(), getCleanup());
+    *this = ManagedValue();
+    return M;
+  }
 
   CanType getSwiftType() const {
     return isLValue()
