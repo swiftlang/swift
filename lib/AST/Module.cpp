@@ -29,6 +29,7 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -841,8 +842,8 @@ namespace {
 
   template <typename T>
   struct OperatorLookup {
-    // This assertion fails in MSVC, but not clang-cl.
-#if !defined(_MSC_VER) || defined(__clang__)
+    // TODO: this assertion fails in MSVC, but not clang-cl.
+#if !COMPILER_IS_MSVC
     static_assert(static_cast<T*>(nullptr), "Only usable with operators");
 #endif
   };

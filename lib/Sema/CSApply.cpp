@@ -6409,6 +6409,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       case DeclTypeCheckingSemantics::Normal:
         return nullptr;
       }
+
+      llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
     };
 
   // The function is always an rvalue.

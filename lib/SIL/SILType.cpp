@@ -601,4 +601,6 @@ ValueOwnershipKind SILResultInfo::getOwnershipKind(SILModule &M) const {
       return ValueOwnershipKind::Trivial;
     return ValueOwnershipKind::Unowned;
   }
+
+  llvm_unreachable("Unhandled ResultConvention in switch.");
 }

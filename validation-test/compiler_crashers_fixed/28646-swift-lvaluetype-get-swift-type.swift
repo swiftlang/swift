@@ -5,6 +5,8 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-Array(_==#keyPath(t>Void!
+// RUN: not %target-swift-frontend %s -emit-ir
+#keyPath(a
+print(Int
+print(_=#keyPath(a
+print(

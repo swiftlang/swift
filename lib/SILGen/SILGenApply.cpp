@@ -925,11 +925,11 @@ public:
         objcMetaType = CanExistentialMetatypeType::get(type,
                                                   MetatypeRepresentation::ObjC);
       }
-      selfMetaObjC = ManagedValue(
-                       SGF.B.emitThickToObjCMetatype(
-                         loc, selfMeta.getValue(),
-                         SGF.SGM.getLoweredType(objcMetaType)),
-                       selfMeta.getCleanup());
+      // ObjC metatypes are trivial and thus do not have a cleanup. Only if we
+      // convert them to an object do they become non-trivial.
+      assert(!selfMeta.hasCleanup());
+      selfMetaObjC = ManagedValue::forUnmanaged(SGF.B.emitThickToObjCMetatype(
+          loc, selfMeta.getValue(), SGF.SGM.getLoweredType(objcMetaType)));
     }
 
     // Allocate the object.

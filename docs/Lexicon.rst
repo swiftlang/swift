@@ -231,6 +231,17 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     library on the system when the library on the system cannot be modified.
     Apple has a number of overlays for its own SDKs in stdlib/public/SDK/.
 
+  PCH
+    Precompiled header, a type of file ending in .pch. A precompiled header is
+    like a precompiled module, in the sense that it's the same file format and
+    is just a cache file produced by clang and read by ``clang::ASTReader``. The
+    difference is that PCH files are not "modular": they do not correspond to a
+    named module, and cannot be read in any order or imported by module-name;
+    rather they must be the first file parsed by the compiler. PCHs are used
+    only to accelerate the process of reading C/C++/Objective-C headers, such as
+    the bridging headers read in by the ``-import-objc-header`` command-line
+    flag to swiftc.
+
   PR
     1. "Problem Report": An issue reported in `LLVM's bug tracker`__.
        See also `SR`.

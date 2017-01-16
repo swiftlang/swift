@@ -1657,6 +1657,8 @@ NodePointer Demangler::demangleGenericRequirement() {
     return LayoutRequirement;
   }
   }
+
+  llvm_unreachable("Unhandled TypeKind in switch.");
 }
 
 NodePointer Demangler::demangleGenericType() {

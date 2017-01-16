@@ -41,8 +41,7 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   // just return undef.
   if (ti.isKnownEmpty(ResilienceExpansion::Minimal)) {
     if (DebugInfo && var->getDecl()) {
-      DebugTypeInfo DbgTy(var->getDecl(), var->getLoweredType().getSwiftType(),
-                          Int8Ty, Size(0), Alignment(1));
+      auto DbgTy = DebugTypeInfo::getGlobal(var, Int8Ty, Size(0), Alignment(1));
       DebugInfo->emitGlobalVariableDeclaration(
           nullptr, var->getDecl()->getName().str(), "", DbgTy,
           var->getLinkage() != SILLinkage::Public, SILLocation(var->getDecl()));

@@ -5,7 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-{let β=b&[{{{#keyPath(n&[{{{{{{{{{{{{{{{{{{{{{{{{{{a{{{{s
+// RUN: not %target-swift-frontend %s -emit-ir
+func a|Set(#keyPath(t>a>a{

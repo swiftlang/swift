@@ -7,5 +7,5 @@
 
 // REQUIRES: deterministic-behavior
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-f\n&[print{$0
-e
+
+c|[{t in(0/0

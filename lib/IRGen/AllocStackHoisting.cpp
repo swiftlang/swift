@@ -111,7 +111,7 @@ insertDeallocStackAtEndOf(SmallVectorImpl<SILInstruction *> &FunctionExits,
 }
 
 /// Hack to workaround a clang LTO bug.
-__attribute__((noinline))
+LLVM_ATTRIBUTE_NOINLINE
 void moveAllocStackToBeginningOfBlock(AllocStackInst* AS, SILBasicBlock *BB) {
   AS->removeFromParent();
   BB->push_front(AS);

@@ -335,6 +335,15 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
 
+  // We've been asked to precompile a bridging header; we want to
+  // avoid touching any other inputs and just parse, emit and exit.
+  if (Action == FrontendOptions::EmitPCH) {
+    auto clangImporter = static_cast<ClangImporter *>(
+      Instance->getASTContext().getClangModuleLoader());
+    return clangImporter->emitBridgingPCH(
+      Invocation.getInputFilenames()[0], opts.getSingleOutputFilename());
+  }
+
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
   bool inputIsLLVMIr = Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR;

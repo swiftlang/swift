@@ -114,6 +114,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   case ValueOwnershipKind::Any:
     return os << "Any";
   }
+
+  llvm_unreachable("Unhandled ValueOwnershipKind in switch.");
 }
 
 Optional<ValueOwnershipKind>
@@ -185,6 +187,17 @@ CONSTANT_OWNERSHIP_INST(Owned, LoadUnowned)
 CONSTANT_OWNERSHIP_INST(Owned, LoadWeak)
 CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
 CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
+CONSTANT_OWNERSHIP_INST(Owned, ThinToThickFunction)
+
+// One would think that these /should/ be unowned. In truth they are owned since
+// objc metatypes do not go through the retain/release fast path. In their
+// implementations of retain/release nothing happens, so this is safe.
+//
+// You could even have an optimization that just always removed retain/release
+// operations on these objects.
+CONSTANT_OWNERSHIP_INST(Owned, ObjCExistentialMetatypeToObject)
+CONSTANT_OWNERSHIP_INST(Owned, ObjCMetatypeToObject)
+
 // All addresses have trivial ownership. The values stored at the address may
 // not though.
 CONSTANT_OWNERSHIP_INST(Trivial, AddressToPointer)
@@ -211,9 +224,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, MarkFunctionEscape)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitialized)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, Metatype)
-CONSTANT_OWNERSHIP_INST(Trivial,
-                        ObjCExistentialMetatypeToObject) // Is this right?
-CONSTANT_OWNERSHIP_INST(Trivial, ObjCMetatypeToObject)   // Is this right?
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCProtocol)           // Is this right?
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCToThickMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, OpenExistentialAddr)
@@ -236,10 +246,8 @@ CONSTANT_OWNERSHIP_INST(Trivial, SuperMethod)
 CONSTANT_OWNERSHIP_INST(Trivial, TailAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, ThickToObjCMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, ThinFunctionToPointer)
-CONSTANT_OWNERSHIP_INST(Trivial, ThinToThickFunction)
 CONSTANT_OWNERSHIP_INST(Trivial, TupleElementAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedAddrCast)
-CONSTANT_OWNERSHIP_INST(Trivial, UncheckedBitwiseCast)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedRefCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedTakeEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedTrivialBitCast)
@@ -390,6 +398,35 @@ FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
 #undef FORWARDING_OWNERSHIP_INST
 
+ValueOwnershipKind
+ValueOwnershipKindVisitor::
+visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
+  ValueOwnershipKind OpOwnership = UBCI->getOperand().getOwnershipKind();
+  bool ResultTypeIsTrivial = UBCI->getType().isTrivial(UBCI->getModule());
+
+  // First check if our operand has a trivial value ownership kind...
+  if (OpOwnership == ValueOwnershipKind::Trivial) {
+    // If we do have a trivial value ownership kind, see if our result type is
+    // trivial or non-trivial. If it is trivial, then we have trivial
+    // ownership. Otherwise, we have unowned ownership since from an ownership
+    // perspective, the value has instantaneously come into existance and
+    // nothing has taken ownership of it.
+    if (ResultTypeIsTrivial) {
+      return ValueOwnershipKind::Trivial;
+    }
+    return ValueOwnershipKind::Unowned;
+  }
+
+  // If our operand has non-trivial ownership, but our result does, then of
+  // course the result has trivial ownership.
+  if (ResultTypeIsTrivial) {
+    return ValueOwnershipKind::Trivial;
+  }
+
+  // Otherwise, we forward our ownership.
+  return visitForwardingInst(UBCI);
+}
+
 // An enum without payload is trivial. One with non-trivial payload is
 // forwarding.
 ValueOwnershipKind
@@ -433,6 +470,8 @@ ValueOwnershipKindVisitor::visitSILFunctionArgument(SILFunctionArgument *Arg) {
   case SILArgumentConvention::Direct_Deallocating:
     llvm_unreachable("No ownership associated with deallocating");
   }
+
+  llvm_unreachable("Unhandled SILArgumentConvention in switch.");
 }
 
 // This is a forwarding instruction through only one of its arguments.
@@ -486,6 +525,8 @@ ValueOwnershipKindVisitor::visitLoadInst(LoadInst *LI) {
   case LoadOwnershipQualifier::Trivial:
     return ValueOwnershipKind::Trivial;
   }
+
+  llvm_unreachable("Unhandled LoadOwnershipQualifier in switch.");
 }
 
 ValueOwnershipKind SILValue::getOwnershipKind() const {

@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_ANY_FUNCTION_REF_H
 #define SWIFT_AST_ANY_FUNCTION_REF_H
 
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -151,7 +152,7 @@ public:
   }
 
 // Disable "only for use within the debugger" warning.
-#if defined(_MSC_VER)
+#if COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4996)
 #endif
@@ -176,7 +177,7 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
 };
-#if defined(_MSC_VER)
+#if COMPILER_IS_MSVC
 #pragma warning(pop)
 #endif
 
