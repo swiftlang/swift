@@ -549,7 +549,7 @@ extension UTF8 {
     
     public var endIndex: UInt8 {
       let lowByte = UInt8(truncatingBitPattern: _bits)
-      return _encodedLength(leadByte: lowByte)
+      return UTF8._encodedLength(leadByte: lowByte)
     }
     
     internal init(_ _0: CodeUnit) {
