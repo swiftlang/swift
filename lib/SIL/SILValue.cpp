@@ -241,7 +241,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, ThickToObjCMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, ThinFunctionToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, TupleElementAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedAddrCast)
-CONSTANT_OWNERSHIP_INST(Trivial, UncheckedBitwiseCast)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedRefCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedTakeEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedTrivialBitCast)
@@ -391,6 +390,35 @@ FORWARDING_OWNERSHIP_INST(UncheckedRefCast)
 FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
 #undef FORWARDING_OWNERSHIP_INST
+
+ValueOwnershipKind
+ValueOwnershipKindVisitor::
+visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
+  ValueOwnershipKind OpOwnership = UBCI->getOperand().getOwnershipKind();
+  bool ResultTypeIsTrivial = UBCI->getType().isTrivial(UBCI->getModule());
+
+  // First check if our operand has a trivial value ownership kind...
+  if (OpOwnership == ValueOwnershipKind::Trivial) {
+    // If we do have a trivial value ownership kind, see if our result type is
+    // trivial or non-trivial. If it is trivial, then we have trivial
+    // ownership. Otherwise, we have unowned ownership since from an ownership
+    // perspective, the value has instantaneously come into existance and
+    // nothing has taken ownership of it.
+    if (ResultTypeIsTrivial) {
+      return ValueOwnershipKind::Trivial;
+    }
+    return ValueOwnershipKind::Unowned;
+  }
+
+  // If our operand has non-trivial ownership, but our result does, then of
+  // course the result has trivial ownership.
+  if (ResultTypeIsTrivial) {
+    return ValueOwnershipKind::Trivial;
+  }
+
+  // Otherwise, we forward our ownership.
+  return visitForwardingInst(UBCI);
+}
 
 // An enum without payload is trivial. One with non-trivial payload is
 // forwarding.
