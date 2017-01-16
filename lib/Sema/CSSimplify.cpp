@@ -2009,13 +2009,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                      decl1 == TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
             assert(boundGenericType1->getGenericArgs().size() == 1);
             conversionsOrFixes.push_back(
-                       ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional);
+                       ConversionRestrictionKind::OptionalToOptional);
           } else if (optionalKind2 == OTK_ImplicitlyUnwrappedOptional &&
                      kind >= ConstraintKind::Conversion &&
                      decl1 == TC.Context.getOptionalDecl()) {
             assert(boundGenericType1->getGenericArgs().size() == 1);
             conversionsOrFixes.push_back(
-                       ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional);
+                       ConversionRestrictionKind::OptionalToOptional);
           }
         }
         
@@ -3818,8 +3818,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //   T $< U ===> T! $< U?
   // also:
   //   T <c U ===> T? <c U!
-  case ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional:
-  case ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional:
   case ConversionRestrictionKind::OptionalToOptional: {
     addContextualScore();
     assert(matchKind >= ConstraintKind::Subtype);

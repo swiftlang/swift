@@ -2223,11 +2223,7 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   if (auto restriction = constraint->getRestriction()) {
     // Non-optional conversions are better than optional-to-optional
     // conversions.
-    if (*restriction == ConversionRestrictionKind::OptionalToOptional ||
-        *restriction
-          == ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional ||
-        *restriction
-          == ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional)
+    if (*restriction == ConversionRestrictionKind::OptionalToOptional)
       return true;
     
     // Array-to-pointer conversions are better than inout-to-pointer conversions.
