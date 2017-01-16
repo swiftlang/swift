@@ -14,6 +14,8 @@
 #define SWIFT_SIL_SILALLOCATED_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Compiler.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <stddef.h>
 
 namespace swift {
@@ -28,11 +30,8 @@ public:
   void *operator new(size_t) = delete;
   void *operator new[](size_t) = delete;
 
-  // Work around MSVC error: attempting to reference a deleted function.
-#if !defined(_MSC_VER) || defined(__clang__)
   /// Disable non-placement delete.
-  void operator delete(void *) = delete;
-#endif
+  void operator delete(void *) SWIFT_DELETE_OPERATOR_DELETED;
   void operator delete[](void *) = delete;
 
   /// Custom version of 'new' that uses the SILModule's BumpPtrAllocator with

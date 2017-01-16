@@ -19,6 +19,7 @@
 
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILArgumentConvention.h"
@@ -80,11 +81,7 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
 
   SILInstruction() = delete;
   void operator=(const SILInstruction &) = delete;
-
-  // Work around MSVC error: attempting to reference a deleted function.
-#if !defined(_MSC_VER) || defined(__clang__)
-  void operator delete(void *Ptr, size_t) = delete;
-#endif
+  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
 
   /// Check any special state of instructions that are not represented in the
   /// instructions operands/type.

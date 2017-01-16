@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_UNDEF_H
 #define SWIFT_SIL_UNDEF_H
 
+#include "swift/Basic/Compiler.h"
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
@@ -20,11 +21,7 @@ namespace swift {
 
 class SILUndef : public ValueBase {
   void operator=(const SILArgument &) = delete;
-
-  // Work around MSVC error: attempting to reference a deleted function.
-#if !defined(_MSC_VER) || defined(__clang__)
-  void operator delete(void *Ptr, size_t) = delete;
-#endif
+  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
 
   SILUndef(SILType Ty) : ValueBase(ValueKind::SILUndef, Ty) {}
 public:
