@@ -152,7 +152,7 @@ public:
   }
 
 // Disable "only for use within the debugger" warning.
-#if COMPILER_IS_MSVC
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4996)
 #endif
@@ -177,7 +177,7 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
 };
-#if COMPILER_IS_MSVC
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning(pop)
 #endif
 

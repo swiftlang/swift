@@ -278,12 +278,12 @@ struct ASTContext::Implementation {
         conformance.~SpecializedProtocolConformance();
       // Work around MSVC warning: local variable is initialized but
       // not referenced.
-#if COMPILER_IS_MSVC
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning (disable: 4189)
 #endif
       for (auto &conformance : InheritedConformances)
         conformance.~InheritedProtocolConformance();
-#if COMPILER_IS_MSVC
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning (default: 4189)
 #endif
 

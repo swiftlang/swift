@@ -334,12 +334,12 @@ void Constraint::dump(ConstraintSystem *CS) const {
   llvm::SaveAndRestore<bool> X(CS->getASTContext().LangOpts.
                                DebugConstraintSolver, true);
   // Disable MSVC warning: only for use within the debugger.
-#if COMPILER_IS_MSVC
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4996)
 #endif
   dump(&CS->getASTContext().SourceMgr);
-#if COMPILER_IS_MSVC
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning(pop)
 #endif
 }
