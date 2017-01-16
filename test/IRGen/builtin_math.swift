@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -O %s | %FileCheck %s
 
+// REQUIRES: 30043258
 // XFAIL: linux
 
 import Darwin
