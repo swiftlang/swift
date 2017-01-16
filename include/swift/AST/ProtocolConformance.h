@@ -24,6 +24,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Witness.h"
+#include "swift/Basic/Compiler.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -265,11 +266,7 @@ public:
   
   // Make vanilla new/delete illegal for protocol conformances.
   void *operator new(size_t bytes) = delete;
-
-  // Work around MSVC error: attempting to reference a deleted function.
-#if !defined(_MSC_VER) || defined(__clang__)
-  void operator delete(void *data) = delete;
-#endif
+  void operator delete(void *data) SWIFT_DELETE_OPERATOR_DELETED;
 
   // Only allow allocation of protocol conformances using the allocator in
   // ASTContext or by doing a placement new.

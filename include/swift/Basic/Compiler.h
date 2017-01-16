@@ -14,9 +14,18 @@
 #define SWIFT_BASIC_COMPILER_H
 
 #if defined(_MSC_VER) && !defined(__clang__)
-#define COMPILER_IS_MSVC 1
+#define SWIFT_COMPILER_IS_MSVC 1
 #else
-#define COMPILER_IS_MSVC 0
+#define SWIFT_COMPILER_IS_MSVC 0
+#endif
+
+#if SWIFT_COMPILER_IS_MSVC
+// Work around MSVC bug: attempting to reference a deleted function
+// https://connect.microsoft.com/VisualStudio/feedback/details/3116505
+#define SWIFT_DELETE_OPERATOR_DELETED                                                \
+  { llvm_unreachable("Delete operator should not be called."); }
+#else
+#define SWIFT_DELETE_OPERATOR_DELETED = delete;
 #endif
 
 #endif // SWIFT_BASIC_COMPILER_H

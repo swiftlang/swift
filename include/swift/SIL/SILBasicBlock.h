@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_BASICBLOCK_H
 #define SWIFT_SIL_BASICBLOCK_H
 
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/TransformArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
@@ -53,10 +54,7 @@ private:
   SILBasicBlock() : Parent(nullptr) {}
   void operator=(const SILBasicBlock &) = delete;
 
-  // Work around MSVC error: attempting to reference a deleted function.
-#if !defined(_MSC_VER) || defined(__clang__)
-  void operator delete(void *Ptr, size_t) = delete;
-#endif
+  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
 
   SILBasicBlock(SILFunction *F, SILBasicBlock *afterBB = nullptr);
 

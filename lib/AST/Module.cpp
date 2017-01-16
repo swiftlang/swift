@@ -843,7 +843,7 @@ namespace {
   template <typename T>
   struct OperatorLookup {
     // TODO: this assertion fails in MSVC, but not clang-cl.
-#if !COMPILER_IS_MSVC
+#if !SWIFT_COMPILER_IS_MSVC
     static_assert(static_cast<T*>(nullptr), "Only usable with operators");
 #endif
   };

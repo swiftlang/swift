@@ -23,7 +23,7 @@ namespace swift {
 
 // Disable MSVC warning: multiple copy constructors specified.
 // TODO: silence this warning.
-#if COMPILER_IS_MSVC
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4521)
 #endif
@@ -136,7 +136,7 @@ private:
   OpenedArchetypeDefsMap LocalOpenedArchetypeDefs;
 };
 
-#if COMPILER_IS_MSVC
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning(pop)
 #endif
 
