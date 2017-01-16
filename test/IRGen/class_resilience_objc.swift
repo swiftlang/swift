@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: objc_interop
+// XFAIL: CPU=armv7k
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 

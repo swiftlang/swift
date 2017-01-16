@@ -1056,8 +1056,6 @@ Types
 
   assoc-type-list ::= assoc-type-name '_' assoc-type-name*
 
-  archetype ::= 'Q' INDEX                    // archetype with depth=0, idx=N
-  archetype ::= 'Qd' INDEX INDEX             // archetype with depth=M+1, idx=N
   archetype ::= context 'Qq' INDEX           // archetype+context (DWARF only)
   archetype ::= associated-type
 

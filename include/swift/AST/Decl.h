@@ -2646,6 +2646,8 @@ static inline bool isRawPointerKind(PointerTypeKind PTK) {
   case PTK_AutoreleasingUnsafeMutablePointer:
     return false;
   }
+
+  llvm_unreachable("Unhandled PointerTypeKind in switch.");
 }
 
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.

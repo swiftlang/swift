@@ -2973,7 +2973,7 @@ namespace {
         break;
           
       case CheckedCastKind::Coercion:
-      case CheckedCastKind::BridgingCast:
+      case CheckedCastKind::BridgingCoercion:
         // Check is trivially true.
         tc.diagnose(expr->getLoc(), diag::isa_is_always_true, "is");
         expr->setCastKind(castKind);
@@ -2988,6 +2988,7 @@ namespace {
         }
         expr->setCastKind(castKind);
         break;
+      case CheckedCastKind::Swift3BridgingDowncast:
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -3296,6 +3297,20 @@ namespace {
 
       Expr *sub = expr->getSubExpr();
       Type toInstanceType = toType->lookThroughAllAnyOptionalTypes();
+      
+      // Warn about NSNumber and NSValue bridging coercions we accepted in
+      // Swift 3 but which can fail at runtime.
+      if (tc.Context.LangOpts.isSwiftVersion3()
+          && tc.typeCheckCheckedCast(sub->getType(), toInstanceType,
+                                     CheckedCastContextKind::None,
+                                     dc, SourceLoc(), sub, SourceRange())
+               == CheckedCastKind::Swift3BridgingDowncast) {
+        tc.diagnose(expr->getLoc(),
+                    diag::missing_forced_downcast_swift3_compat_warning,
+                    sub->getType(), toInstanceType)
+          .fixItReplace(expr->getAsLoc(), "as!");
+      }
+      
       sub = buildObjCBridgeExpr(sub, toInstanceType, locator);
       if (!sub) return nullptr;
       expr->setSubExpr(sub);
@@ -3329,7 +3344,7 @@ namespace {
       case CheckedCastKind::Unresolved:
         return nullptr;
       case CheckedCastKind::Coercion:
-      case CheckedCastKind::BridgingCast: {
+      case CheckedCastKind::BridgingCoercion: {
         if (SuppressDiagnostics)
           return nullptr;
 
@@ -3355,6 +3370,7 @@ namespace {
       }
 
       // Valid casts.
+      case CheckedCastKind::Swift3BridgingDowncast:
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -3399,7 +3415,7 @@ namespace {
         break;
 
       case CheckedCastKind::Coercion:
-      case CheckedCastKind::BridgingCast: {
+      case CheckedCastKind::BridgingCoercion: {
         if (SuppressDiagnostics)
           return nullptr;
 
@@ -3427,6 +3443,7 @@ namespace {
       }
 
       // Valid casts.
+      case CheckedCastKind::Swift3BridgingDowncast:
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -5528,8 +5545,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return result;
     }
 
-    case ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional:
-    case ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional:
     case ConversionRestrictionKind::OptionalToOptional:
       return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
 
@@ -6394,6 +6409,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       case DeclTypeCheckingSemantics::Normal:
         return nullptr;
       }
+
+      llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
     };
 
   // The function is always an rvalue.
@@ -7015,17 +7032,35 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
                         fromType, toType, CheckedCastContextKind::None, DC,
                         coerceExpr->getLoc(), subExpr,
                         coerceExpr->getCastTypeLoc().getSourceRange());
-
+      
       switch (castKind) {
       // Invalid cast.
       case CheckedCastKind::Unresolved:
         // Fix didn't work, let diagnoseFailureForExpr handle this.
         return false;
       case CheckedCastKind::Coercion:
-      case CheckedCastKind::BridgingCast:
+      case CheckedCastKind::BridgingCoercion:
         llvm_unreachable("Coercions handled in other disjunction branch");
 
       // Valid casts.
+      case CheckedCastKind::Swift3BridgingDowncast: {
+        // Swift 3 accepted coercions from NSNumber and NSValue to Swift
+        // value types, even though there are multiple Swift types that
+        // bridge to those classes, and the bridging operation back into Swift
+        // is type-checked. For compatibility, downgrade to a warning.
+        assert(TC.Context.LangOpts.isSwiftVersion3()
+               && "should only appear in Swift 3 compat mode");
+
+        TC.diagnose(coerceExpr->getLoc(),
+                    diag::missing_forced_downcast_swift3_compat_warning,
+                    fromType, toType)
+          .highlight(coerceExpr->getSourceRange())
+          .fixItReplace(coerceExpr->getLoc(), "as!");
+
+        // This is just a warning, so allow the expression to type-check.
+        return false;
+      }
+
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:

@@ -331,6 +331,35 @@ public:
                                 Expr *expr);
 };
 
+/// An abstract interface that is used by `checkGenericArguments`.
+class GenericRequirementsCheckListener {
+public:
+  virtual ~GenericRequirementsCheckListener();
+
+  /// Callback invoked before trying to check generic requirement placed
+  /// between given types. Note: if either of the types assigned to the
+  /// requirement is generic parameter or dependent member, this callback
+  /// method is going to get their substitutions.
+  ///
+  /// \param kind The kind of generic requirement to check.
+  ///
+  /// \param first The left-hand side type assigned to the requirement,
+  /// possibly represented by its generic substitute.
+  ///
+  /// \param second The right-hand side type assinged to the requirement,
+  /// possibly represented by its generic substitute.
+  ///
+  ///
+  /// \returns true if it's ok to validate requirement, false otherwise.
+  virtual bool shouldCheck(RequirementKind kind, Type first, Type second);
+
+  /// Callback invoked when given requirement has been diagnosed as invalid.
+  ///
+  /// \param requirement The requirement which didn't pass the check.
+  ///
+  virtual void diagnosed(const Requirement *requirement);
+};
+
 /// Flags that describe the context of type checking a pattern or
 /// type.
 enum TypeResolutionFlags : unsigned {
@@ -645,6 +674,8 @@ private:
   Type UInt8Type;
   Type NSObjectType;
   Type NSErrorType;
+  Type NSNumberType;
+  Type NSValueType;
   Type ObjCSelectorType;
   Type ExceptionType;
 
@@ -733,8 +764,13 @@ public:
   Type getUInt8Type(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
   Type getNSErrorType(DeclContext *dc);
+  Type getNSNumberType(DeclContext *dc);
+  Type getNSValueType(DeclContext *dc);
   Type getObjCSelectorType(DeclContext *dc);
   Type getExceptionType(DeclContext *dc, SourceLoc loc);
+  
+  /// True if `t` is an ObjC class that multiple Swift value types bridge into.
+  bool isObjCClassWithMultipleSwiftBridgedTypes(Type t, DeclContext *dc);
 
   /// \brief Try to resolve an IdentTypeRepr, returning either the referenced
   /// Type or an ErrorType in case of error.
@@ -1156,18 +1192,21 @@ public:
   /// \param substitutions Substitutions from interface types of the signature.
   /// \param unsatisfiedDependency Optional callback for reporting unsatisfied
   /// dependencies.
+  /// \param conformanceOptions The flags to use when checking conformance
+  /// requirement.
+  /// \param listener The generic check listener used to pick requirements and
+  /// notify callers about diagnosed errors.
   ///
   /// \returns One of the following:
   /// - (true, false) if there was an unsatisfied dependency
   /// - (false, true) on success
   /// - (false, false) on failure
   std::pair<bool, bool> checkGenericArguments(
-                             DeclContext *dc, SourceLoc loc,
-                             SourceLoc noteLoc,
-                             Type owner,
-                             GenericSignature *genericSig,
-                             const TypeSubstitutionMap &substitutions,
-                             UnsatisfiedDependency *unsatisfiedDependency);
+      DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
+      GenericSignature *genericSig, const TypeSubstitutionMap &substitutions,
+      UnsatisfiedDependency *unsatisfiedDependency,
+      ConformanceCheckOptions conformanceOptions = ConformanceCheckFlags::Used,
+      GenericRequirementsCheckListener *listener = nullptr);
 
   /// Resolve the superclass of the given class.
   void resolveSuperclass(ClassDecl *classDecl) override;

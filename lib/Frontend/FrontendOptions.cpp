@@ -28,6 +28,7 @@ bool FrontendOptions::actionHasOutput() const {
   case DumpScopeMaps:
   case DumpTypeRefinementContexts:
     return false;
+  case EmitPCH:
   case EmitSILGen:
   case EmitSIL:
   case EmitSIBGen:
@@ -57,6 +58,7 @@ bool FrontendOptions::actionIsImmediate() const {
   case PrintAST:
   case DumpScopeMaps:
   case DumpTypeRefinementContexts:
+  case EmitPCH:
   case EmitSILGen:
   case EmitSIL:
   case EmitSIBGen:

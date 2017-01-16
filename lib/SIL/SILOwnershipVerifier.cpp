@@ -442,6 +442,8 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitCallee(
   case ParameterConvention::Direct_Guaranteed:
     return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed), false};
   }
+
+  llvm_unreachable("Unhandled ParameterConvention in switch.");
 }
 
 OwnershipUseCheckerResult
@@ -468,6 +470,8 @@ OwnershipCompatibilityUseChecker::visitApplyInst(ApplyInst *I) {
   case SILArgumentConvention::Direct_Deallocating:
     llvm_unreachable("No ownership associated with deallocating");
   }
+
+  llvm_unreachable("Unhandled SILArgumentConvention in switch.");
 }
 
 OwnershipUseCheckerResult
@@ -494,6 +498,8 @@ OwnershipCompatibilityUseChecker::visitTryApplyInst(TryApplyInst *I) {
   case SILArgumentConvention::Direct_Deallocating:
     llvm_unreachable("No ownership associated with deallocating");
   }
+
+  llvm_unreachable("Unhandled SILArgumentConvention in switch.");
 }
 
 OwnershipUseCheckerResult

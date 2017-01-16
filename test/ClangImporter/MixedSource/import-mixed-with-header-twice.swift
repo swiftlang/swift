@@ -13,7 +13,7 @@
 // USE-SERIALIZED-HEADER: redefinition of 'Point2D'
 // USE-SERIALIZED-HEADER: previous definition is here
 
-import MixedWithHeaderAgain
+import MixedWithHeaderAgain // expected-warning {{implicit import of bridging header 'header-again.h' via module 'MixedWithHeaderAgain' is deprecated and will be removed in a later version of Swift}}
 
 func testLine(line: Line) {
   testLineImpl(line)

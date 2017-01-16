@@ -176,3 +176,9 @@ func testOptionalChaining(c1: C1?, s1: S1?) {
   s1?.f2Optional() // expected-warning {{result of call to 'f2Optional()' is unused}}
   s1!.f2Optional() // expected-warning {{result of call to 'f2Optional()' is unused}}
 }
+
+@discardableResult func SR2948 (_ closure: @escaping ()->()) -> (()->()) {
+  closure()
+  return closure
+}
+SR2948({}) // okay

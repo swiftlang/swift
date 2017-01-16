@@ -4069,7 +4069,7 @@ void LayoutConstraintInfo::print(raw_ostream &OS,
 void LayoutConstraint::print(raw_ostream &OS,
                              const PrintOptions &PO) const {
   assert(*this);
-  this->print(OS, PO);
+  getPointer()->print(OS, PO);
 }
 
 void LayoutConstraintInfo::print(ASTPrinter &Printer,
@@ -4168,8 +4168,10 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "dictionary_downcast";
   case CheckedCastKind::SetDowncast:
     return "set_downcast";
-  case CheckedCastKind::BridgingCast:
-    return "bridging_cast";
+  case CheckedCastKind::BridgingCoercion:
+    return "bridging_coercion";
+  case CheckedCastKind::Swift3BridgingDowncast:
+    return "bridging_downcast";
   }
   llvm_unreachable("bad checked cast name");
 }

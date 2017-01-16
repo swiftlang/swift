@@ -1038,6 +1038,8 @@ static void diagnoseIgnoredLiteral(TypeChecker &TC, LiteralExpr *LE) {
 #include "swift/AST/ExprNodes.def"
       llvm_unreachable("Not a literal expression");
     }
+
+    llvm_unreachable("Unhandled ExprKind in switch.");
   };
 
   TC.diagnose(LE->getLoc(), diag::expression_unused_literal,
@@ -1082,9 +1084,22 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
   // TODO: What about tuples which contain functions by-value that are
   // dead?
   if (E->getType()->is<AnyFunctionType>()) {
-    diagnose(E->getLoc(), diag::expression_unused_function)
-      .highlight(E->getSourceRange());
-    return;
+    bool isDiscardable = false;
+    if (auto *Fn = dyn_cast<ApplyExpr>(E)) {
+      if (auto *declRef = dyn_cast<DeclRefExpr>(Fn->getFn())) {
+        if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(declRef->getDecl())) {
+          if (funcDecl->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+            isDiscardable = true;
+          }
+        }
+      }
+    }
+
+    if (!isDiscardable) {
+      diagnose(E->getLoc(), diag::expression_unused_function)
+          .highlight(E->getSourceRange());
+      return;
+    }
   }
 
   // If the result of this expression is of type "Never" or "()"

@@ -116,7 +116,9 @@ static void populateInputInfoMap(InputInfoMap &inputs,
                                  const PerformJobsState &endState) {
   for (auto &entry : endState.UnfinishedCommands) {
     for (auto *action : entry.first->getSource().getInputs()) {
-      auto inputFile = cast<InputAction>(action);
+      auto inputFile = dyn_cast<InputAction>(action);
+      if (!inputFile)
+        continue;
 
       CompileJobAction::InputInfo info;
       info.previousModTime = entry.first->getInputModTime();
@@ -133,7 +135,9 @@ static void populateInputInfoMap(InputInfoMap &inputs,
       continue;
 
     for (auto *action : compileAction->getInputs()) {
-      auto inputFile = cast<InputAction>(action);
+      auto inputFile = dyn_cast<InputAction>(action);
+      if (!inputFile)
+        continue;
 
       CompileJobAction::InputInfo info;
       info.previousModTime = entry->getInputModTime();

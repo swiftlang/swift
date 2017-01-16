@@ -568,6 +568,8 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::Archetype: {
       auto *archetype = cast<ArchetypeType>(tybase);
 
+      assert(DWARFMangling && "Cannot mangle free-standing archetypes");
+
       // Mangle the associated type of a parent archetype.
       if (auto parent = archetype->getParent()) {
         assert(archetype->getAssocType()
@@ -591,30 +593,23 @@ void ASTMangler::appendType(Type type) {
       auto GTPT = DC->mapTypeOutOfContext(archetype)
           ->castTo<GenericTypeParamType>();
 
-      if (DWARFMangling) {
-        Buffer << 'q' << Index(GTPT->getIndex());
+      Buffer << 'q' << Index(GTPT->getIndex());
 
-        // The DWARF output created by Swift is intentionally flat,
-        // therefore archetypes are emitted with their DeclContext if
-        // they appear at the top level of a type.
-        DWARFMangling = false;
-        while (DC && DC->isGenericContext()) {
-          if (DC->isInnermostContextGeneric() &&
-              DC->getGenericParamsOfContext()->getDepth() == GTPT->getDepth())
-            break;
-          DC = DC->getParent();
-        }
-        assert(DC && "no decl context for archetype found");
-        if (!DC) return;
-        appendContext(DC);
-        DWARFMangling = true;
-        return appendOperator("Qq", Index(GTPT->getIndex()));
+      // The DWARF output created by Swift is intentionally flat,
+      // therefore archetypes are emitted with their DeclContext if
+      // they appear at the top level of a type.
+      DWARFMangling = false;
+      while (DC && DC->isGenericContext()) {
+        if (DC->isInnermostContextGeneric() &&
+            DC->getGenericParamsOfContext()->getDepth() == GTPT->getDepth())
+          break;
+        DC = DC->getParent();
       }
-      if (GTPT->getDepth() != 0) {
-        return appendOperator("Qd", Index(GTPT->getDepth() - 1),
-                              Index(GTPT->getIndex()));
-      }
-      return appendOperator("Q", Index(GTPT->getIndex()));
+      assert(DC && "no decl context for archetype found");
+      if (!DC) return;
+      appendContext(DC);
+      DWARFMangling = true;
+      return appendOperator("Qq", Index(GTPT->getIndex()));
     }
 
     case TypeKind::DynamicSelf: {
