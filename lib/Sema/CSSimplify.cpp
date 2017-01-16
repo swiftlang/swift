@@ -1209,18 +1209,29 @@ selectOptionalConversionRestriction(Type type1, Type type2,
         kind >= ConstraintKind::Conversion)
       return ConversionRestrictionKind::ForceUnchecked;
 
-    return None;
+    return llvm::None;
   }
+
+  if (optionalKind1 == optionalKind2)
+    return ConversionRestrictionKind::OptionalToOptional;
 
   if (optionalKind1 == OTK_None)
     return ConversionRestrictionKind::ValueToOptional;
 
-  if (optionalKind1 == OTK_Optional &&
-      optionalKind2 == OTK_ImplicitlyUnwrappedOptional &&
-      kind < ConstraintKind::Conversion)
-    return None;
+  if (optionalKind1 == OTK_Optional) {
+    if (kind >= ConstraintKind::Conversion)
+      return ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional;
 
-  return ConversionRestrictionKind::OptionalToOptional;
+    assert(optionalKind2 == OTK_ImplicitlyUnwrappedOptional &&
+           "Result has unexpected optional kind!");
+
+    return llvm::None;
+  }
+
+  assert(optionalKind1 == OTK_ImplicitlyUnwrappedOptional &&
+         "Source has unexpected optional kind!");
+
+  return ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional;
 }
 
 
@@ -3807,6 +3818,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //   T $< U ===> T! $< U?
   // also:
   //   T <c U ===> T? <c U!
+  case ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional:
+  case ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional:
   case ConversionRestrictionKind::OptionalToOptional: {
     addContextualScore();
     assert(matchKind >= ConstraintKind::Subtype);
