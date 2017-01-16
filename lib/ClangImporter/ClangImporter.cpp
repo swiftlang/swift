@@ -1081,9 +1081,8 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
 bool
 ClangImporter::emitBridgingPCH(StringRef headerPath,
                                StringRef outputPCHPath) {
-  llvm::IntrusiveRefCntPtr<clang::CompilerInvocation> invocation{
-    new clang::CompilerInvocation(*Impl.Invocation)
-  };
+  auto invocation = std::make_shared<clang::CompilerInvocation>
+    (clang::CompilerInvocation(*Impl.Invocation));
   invocation->getFrontendOpts().DisableFree = false;
   invocation->getFrontendOpts().Inputs.clear();
   invocation->getFrontendOpts().Inputs.push_back(
@@ -1093,7 +1092,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
 
   clang::CompilerInstance emitInstance(
     Impl.Instance->getPCHContainerOperations());
-  emitInstance.setInvocation(&*invocation);
+  emitInstance.setInvocation(std::move(invocation));
   emitInstance.createDiagnostics(&Impl.Instance->getDiagnosticClient(),
                                  false);
 
