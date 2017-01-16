@@ -74,14 +74,9 @@ import Foundation
   func methodNotExportedToObjC() {}
 }
 
-// CHECK: /**
-// CHECK-NEXT: Foo: A feer, a female feer.
-// CHECK-NEXT: */
-
+// CHECK: /// Foo: A feer, a female feer.
 // CHECK-NEXT: typedef SWIFT_ENUM(NSInteger, FooComments) {
-// CHECK: /**
-// CHECK-NEXT: Zim: A zeer, a female zeer.
-// CHECK: */
+// CHECK: /// Zim: A zeer, a female zeer.
 // CHECK-NEXT:   FooCommentsZim = 0,
 // CHECK-NEXT:   FooCommentsZang = 1,
 // CHECK-NEXT:   FooCommentsZung = 2,
