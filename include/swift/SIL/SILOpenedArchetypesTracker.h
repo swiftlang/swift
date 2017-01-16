@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_SILOPENEDARCHETYPESTRACKER_H
 #define SWIFT_SIL_SILOPENEDARCHETYPESTRACKER_H
 
+#include "swift/Basic/Compiler.h"
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
@@ -21,7 +22,8 @@
 namespace swift {
 
 // Disable MSVC warning: multiple copy constructors specified.
-#if defined(_MSC_VER)
+// TODO: silence this warning.
+#if COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4521)
 #endif
@@ -134,7 +136,7 @@ private:
   OpenedArchetypeDefsMap LocalOpenedArchetypeDefs;
 };
 
-#if defined(_MSC_VER)
+#if COMPILER_IS_MSVC
 #pragma warning(pop)
 #endif
 
