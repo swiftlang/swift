@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/Statistic.h"
@@ -133,8 +134,7 @@ class SILPerformanceInliner {
   bool isProfitableToInline(FullApplySite AI,
                             Weight CallerWeight,
                             ConstantTracker &callerTracker,
-                            int &NumCallerBlocks,
-                            bool IsGeneric);
+                            int &NumCallerBlocks);
 
   bool decideInWarmBlock(FullApplySite AI,
                          Weight CallerWeight,
@@ -254,12 +254,25 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   return Callee;
 }
 
+static bool canSpecializeGeneric(SILFunction *F, ArrayRef<Substitution> Subs) {
+  ReabstractionInfo ReInfo(F, Subs);
+  if (!ReInfo.getSpecializedType())
+    return false;
+  return true;
+}
+
 bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                                                  Weight CallerWeight,
                                                  ConstantTracker &callerTracker,
-                                                 int &NumCallerBlocks,
-                                                 bool IsGeneric) {
+                                                 int &NumCallerBlocks) {
   SILFunction *Callee = AI.getReferencedFunction();
+  bool IsGeneric = !AI.getSubstitutions().empty();
+
+  // Bail out if this generic call can be optimized by means of
+  // the generic specialization.
+  if (IsGeneric && canSpecializeGeneric(Callee, AI.getSubstitutions()))
+    return false;
+
   SILLoopInfo *LI = LA->get(Callee);
   ShortestPathAnalysis *SPA = getSPA(Callee, LI);
   assert(SPA->isValid());
@@ -275,6 +288,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   
   // Start with a base benefit.
   int BaseBenefit = RemovedCallBenefit;
+
+  SubstitutionMap CalleeSubstMap;
   const SILOptions &Opts = Callee->getModule().getOptions();
   
   // For some reason -Ounchecked can accept a higher base benefit without
@@ -295,89 +310,94 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
       
       CalleeCost += (int)instructionInlineCost(I);
 
-      if (FullApplySite AI = FullApplySite::isa(&I)) {
-        
+      if (FullApplySite FAI = FullApplySite::isa(&I)) {
         // Check if the callee is passed as an argument. If so, increase the
         // threshold, because inlining will (probably) eliminate the closure.
-        SILInstruction *def = constTracker.getDefInCaller(AI.getCallee());
+        SILInstruction *def = constTracker.getDefInCaller(FAI.getCallee());
         if (def && (isa<FunctionRefInst>(def) || isa<PartialApplyInst>(def)))
           BlockW.updateBenefit(Benefit, RemovedClosureBenefit);
         // Check if inlining the callee would allow for further
         // optimizations like devirtualization or generic specialization. 
         if (!def)
-          def = dyn_cast_or_null<SILInstruction>(AI.getCallee());
+          def = dyn_cast_or_null<SILInstruction>(FAI.getCallee());
 
-        if (def && (isa<FunctionRefInst>(def) || isa<ClassMethodInst>(def) ||
-                    isa<WitnessMethodInst>(def))) {
-          auto Subs = AI.getSubstitutions();
-          SmallVector<Substitution, 32> NewSubs;
-          SubstitutionMap SubstMap;
+        if (!def)
+          continue;
 
-          if (!Subs.empty()) {
-            if (auto FRI = dyn_cast<FunctionRefInst>(def)) {
-              auto Callee = FRI->getReferencedFunction();
-              if (Callee) {
-                auto GenSig =
-                    Callee->getLoweredFunctionType()->getGenericSignature();
-                if (GenSig)
-                  SubstMap = GenSig->getSubstitutionMap(Subs);
-              }
-            } else if (auto CMI = dyn_cast<ClassMethodInst>(def)) {
-              auto GenSig = CMI->getType()
-                                .getSwiftRValueType()
-                                ->castTo<SILFunctionType>()
-                                ->getGenericSignature();
-              if (GenSig)
-                SubstMap = GenSig->getSubstitutionMap(Subs);
-            } else if (auto WMI = dyn_cast<WitnessMethodInst>(def)) {
-              auto GenSig = WMI->getType()
-                                .getSwiftRValueType()
-                                ->castTo<SILFunctionType>()
-                                ->getGenericSignature();
-              if (GenSig)
-                SubstMap = GenSig->getSubstitutionMap(Subs);
-            }
+        auto Subs = FAI.getSubstitutions();
 
-            // It is a generic call. Check if after inlining it will be
-            // possible to perform a generic specializatio or devirtualization
-            // of this call.
+        // Bail if it is not a generic call.
+        if (Subs.empty())
+          continue;
 
-            // Create the list of substitutions as they will be after
-            // inlining.
-            for (auto Sub : Subs) {
-              if (!Sub.getReplacement()->hasArchetype()) {
-                // This substitution is a concrete type.
-                NewSubs.push_back(Sub);
-                continue;
-              }
-              // This substituion is a generic type.
-              auto NewSub =
-                  Sub.subst(AI.getModule().getSwiftModule(), SubstMap);
-              NewSubs.push_back(NewSub);
-            }
+        if (!isa<FunctionRefInst>(def) && !isa<ClassMethodInst>(def) &&
+            !isa<WitnessMethodInst>(def))
+          continue;
 
-            // Check if the call can be devirtualized.
-            if (isa<ClassMethodInst>(def) || isa<WitnessMethodInst>(def) ||
-                isa<SuperMethodInst>(def)) {
-              if (canDevirtualizeApply(AI, nullptr)) {
-                DEBUG(llvm::dbgs() << "Devirtualization will be possible after "
-                                      "inlining for the call:\n";
-                      AI.getInstruction()->dumpInContext());
-                BlockW.updateBenefit(Benefit, DevirtualizedCallBenefit);
-              }
-            }
+        SmallVector<Substitution, 32> NewSubs;
+        SubstitutionMap SubstMap;
+        GenericSignature *GenSig = nullptr;
 
-            // Check if a generic specialization would be possible.
-            if (def && isa<FunctionRefInst>(def) &&
-                hasUnboundGenericTypes(Subs) &&
-                !hasUnboundGenericTypes(NewSubs)) {
-              DEBUG(llvm::dbgs()
-                        << "Generic specialization will be possible after "
-                           "inlining for the call:\n";
-                    AI.getInstruction()->dumpInContext());
-              BlockW.updateBenefit(Benefit, GenericSpecializationBenefit);
-            }
+        if (auto FRI = dyn_cast<FunctionRefInst>(def)) {
+          auto Callee = FRI->getReferencedFunction();
+          if (Callee) {
+            GenSig = Callee->getLoweredFunctionType()->getGenericSignature();
           }
+        } else if (auto CMI = dyn_cast<ClassMethodInst>(def)) {
+          GenSig = CMI->getType()
+                       .getSwiftRValueType()
+                       ->castTo<SILFunctionType>()
+                       ->getGenericSignature();
+        } else if (auto WMI = dyn_cast<WitnessMethodInst>(def)) {
+          GenSig = WMI->getType()
+                       .getSwiftRValueType()
+                       ->castTo<SILFunctionType>()
+                       ->getGenericSignature();
+        }
+
+        // It is a generic call inside the callee. Check if after inlining
+        // it will be possible to perform a generic specialization or
+        // devirtualization of this call.
+
+        // Create the list of substitutions as they will be after
+        // inlining.
+        for (auto Sub : Subs) {
+          if (!Sub.getReplacement()->hasArchetype()) {
+            // This substitution is a concrete type.
+            NewSubs.push_back(Sub);
+            continue;
+          }
+          // This substitution is not a concrete type.
+          if (IsGeneric && CalleeSubstMap.getMap().empty()) {
+            CalleeSubstMap =
+                Callee->getGenericEnvironment()->getSubstitutionMap(
+                    AI.getModule().getSwiftModule(), AI.getSubstitutions());
+          }
+          auto NewSub = Sub.subst(AI.getModule().getSwiftModule(), CalleeSubstMap);
+          NewSubs.push_back(NewSub);
+        }
+
+        // Check if the call can be devirtualized.
+        if (isa<ClassMethodInst>(def) || isa<WitnessMethodInst>(def) ||
+            isa<SuperMethodInst>(def)) {
+          // TODO: Take AI.getSubstitutions() into account.
+          if (canDevirtualizeApply(FAI, nullptr)) {
+            DEBUG(llvm::dbgs() << "Devirtualization will be possible after "
+                                  "inlining for the call:\n";
+                  FAI.getInstruction()->dumpInContext());
+            BlockW.updateBenefit(Benefit, DevirtualizedCallBenefit);
+          }
+        }
+
+        // Check if a generic specialization would be possible.
+        if (isa<FunctionRefInst>(def)) {
+          auto CalleeF = FAI.getCalleeFunction();
+          if (!canSpecializeGeneric(CalleeF, NewSubs))
+            continue;
+          DEBUG(llvm::dbgs() << "Generic specialization will be possible after "
+                                "inlining for the call:\n";
+                FAI.getInstruction()->dumpInContext());
+          BlockW.updateBenefit(Benefit, GenericSpecializationBenefit);
         }
       } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
         // Check if it's a load from a stack location in the caller. Such a load
@@ -510,8 +530,7 @@ decideInWarmBlock(FullApplySite AI,
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
 
-  return isProfitableToInline(AI, CallerWeight, callerTracker, NumCallerBlocks,
-                              /* IsGeneric */ !AI.getSubstitutions().empty());
+  return isProfitableToInline(AI, CallerWeight, callerTracker, NumCallerBlocks);
 }
 
 /// Return true if inlining this call site into a cold block is profitable.
