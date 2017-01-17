@@ -31,6 +31,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
@@ -277,12 +278,12 @@ struct ASTContext::Implementation {
         conformance.~SpecializedProtocolConformance();
       // Work around MSVC warning: local variable is initialized but
       // not referenced.
-#if defined(_MSC_VER)
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning (disable: 4189)
 #endif
       for (auto &conformance : InheritedConformances)
         conformance.~InheritedProtocolConformance();
-#if defined(_MSC_VER)
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning (default: 4189)
 #endif
 

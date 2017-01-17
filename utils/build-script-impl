@@ -1545,7 +1545,7 @@ if [[ -n "${DISTCC}" ]]; then
     fi
 fi
 
-eval CMAKE_BUILD=("${CMAKE}" "--build")
+eval CMAKE_BUILD=("${DISTCC_PUMP}" "${CMAKE}" "--build")
 
 
 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then

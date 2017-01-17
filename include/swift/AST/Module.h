@@ -23,6 +23,7 @@
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
@@ -506,11 +507,7 @@ public:
 private:
   // Make placement new and vanilla new/delete illegal for Modules.
   void *operator new(size_t Bytes) throw() = delete;
-
-  // Work around MSVC error: attempting to reference a deleted function.
-#if !defined(_MSC_VER) && !defined(__clang__)
-  void operator delete(void *Data) throw() = delete;
-#endif
+  void operator delete(void *Data) throw() SWIFT_DELETE_OPERATOR_DELETED;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 public:
   // Only allow allocation of Modules using the allocator in ASTContext

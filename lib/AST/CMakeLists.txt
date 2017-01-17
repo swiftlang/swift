@@ -53,6 +53,7 @@ add_swift_library(swiftAST STATIC
     swiftMarkup
     swiftBasic
 
+  INTERFACE_LINK_LIBRARIES
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
     clangCodeGen

@@ -20,7 +20,9 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/Basic/Compiler.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <utility>
 
@@ -183,9 +185,7 @@ public:
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
-#if !defined(_MSC_VER) || defined(__clang__)
-  void operator delete(void *Data) = delete;
-#endif
+  void operator delete(void *Data) SWIFT_DELETE_OPERATOR_DELETED;
 
   /// Only allow placement new.
   void *operator new(size_t Bytes, void *Mem) {

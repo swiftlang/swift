@@ -566,7 +566,8 @@ void IRGenDebugInfo::createParameterType(
     llvm::SmallVectorImpl<llvm::Metadata *> &Parameters, SILType type,
     DeclContext *DeclCtx) {
   // FIXME: This use of getSwiftType() is extremely suspect.
-  DebugTypeInfo DbgTy(type.getSwiftType(), IGM.getTypeInfo(type), DeclCtx);
+  auto DbgTy = DebugTypeInfo::getFromTypeInfo(DeclCtx, type.getSwiftType(),
+                                              IGM.getTypeInfo(type));
   Parameters.push_back(getOrCreateType(DbgTy));
 }
 
@@ -826,9 +827,10 @@ void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF,
     return;
 
   auto TName = BumpAllocatedString(("$swift.type." + Name).str());
-  DebugTypeInfo DbgTy(getMetadataType(), Metadata->getType(),
-                      (Size)CI.getTargetInfo().getPointerWidth(0),
-                      (Alignment)CI.getTargetInfo().getPointerAlign(0));
+  auto DbgTy = DebugTypeInfo::getMetadata(
+      getMetadataType()->getDeclaredInterfaceType().getPointer(),
+      Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
+      Alignment(CI.getTargetInfo().getPointerAlign(0)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
                           nullptr, TName, 0,
                           // swift.type is already a pointer type,
@@ -1059,7 +1061,7 @@ llvm::DINodeArray IRGenDebugInfo::getTupleElements(
       IGM.getTypeInfoForUnlowered(AbstractionPattern(genericSig,
                                                   ElemTy->getCanonicalType()),
                                   ElemTy);
-    DebugTypeInfo DbgTy(ElemTy, elemTI, DeclContext);
+    auto DbgTy = DebugTypeInfo::getFromTypeInfo(DeclContext, ElemTy, elemTI);
     Elements.push_back(
         createMemberType(DbgTy, StringRef(), OffsetInBits, Scope, File, Flags));
   }
@@ -1077,11 +1079,11 @@ IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
   for (VarDecl *VD : D->getStoredProperties()) {
     auto memberTy =
         BaseTy->getTypeOfMember(IGM.getSwiftModule(), VD, nullptr);
-    DebugTypeInfo DbgTy(
-        VD->getInterfaceType(),
+
+    auto DbgTy = DebugTypeInfo::getFromTypeInfo(
+        VD->getDeclContext(), VD->getInterfaceType(),
         IGM.getTypeInfoForUnlowered(IGM.getSILTypes().getAbstractionPattern(VD),
-                                    memberTy),
-        nullptr);
+                                    memberTy));
     Elements.push_back(createMemberType(DbgTy, VD->getName().str(),
                                         OffsetInBits, Scope, File, Flags));
   }
@@ -1141,18 +1143,20 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
       // one of the raw type as long as it is large enough to hold
       // all enum values. Use the raw type for the debug type, but
       // the storage size from the enum.
-      ElemDbgTy = DebugTypeInfo(ED->getRawType(), DbgTy.StorageType,
-                                DbgTy.size, DbgTy.align, ED);
+      ElemDbgTy = DebugTypeInfo(ED, ED->getRawType(), DbgTy.StorageType,
+                                DbgTy.size, DbgTy.align);
     else if (ElemDecl->hasArgumentType()) {
       // A discriminated union. This should really be described as a
       // DW_TAG_variant_type. For now only describing the data.
       auto &TI = IGM.getTypeInfoForUnlowered(ElemDecl->getArgumentType());
-      ElemDbgTy = DebugTypeInfo(ElemDecl->getArgumentType(), TI, ED);
+      ElemDbgTy =
+          DebugTypeInfo::getFromTypeInfo(ED, ElemDecl->getArgumentType(), TI);
     } else {
       // Discriminated union case without argument. Fallback to Int
       // as the element type; there is no storage here.
       Type IntTy = IGM.Context.getIntDecl()->getDeclaredType();
-      ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.StorageType, 0, 1, ED);
+      ElemDbgTy =
+          DebugTypeInfo(ED, IntTy, DbgTy.StorageType, Size(0), Alignment(1));
     }
     unsigned Offset = 0;
     auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
@@ -1192,8 +1196,8 @@ llvm::DICompositeType *IRGenDebugInfo::createEnumType(
 
 llvm::DIType *IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
                                                        DebugTypeInfo DbgTy) {
-  DebugTypeInfo BlandDbgTy(Ty, DbgTy.StorageType, DbgTy.size, DbgTy.align,
-                           DbgTy.getDeclContext());
+  DebugTypeInfo BlandDbgTy(DbgTy.getDeclContext(), Ty, DbgTy.StorageType,
+                           DbgTy.size, DbgTy.align);
   return getOrCreateType(BlandDbgTy);
 }
 
@@ -1602,7 +1606,9 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     for (auto *ProtocolDecl : Archetype->getConformsTo()) {
       auto PTy = IGM.getLoweredType(ProtocolDecl->getInterfaceType())
                      .getSwiftRValueType();
-      auto PDbgTy = DebugTypeInfo(ProtocolDecl, IGM.getTypeInfoForLowered(PTy));
+      auto PDbgTy = DebugTypeInfo::getFromTypeInfo(
+          DbgTy.getDeclContext(), ProtocolDecl->getInterfaceType(),
+          IGM.getTypeInfoForLowered(PTy));
       auto PDITy = getOrCreateType(PDbgTy);
       Protocols.push_back(DBuilder.createInheritance(FwdDecl.get(),
                                                      PDITy, 0, Flags));
@@ -1669,9 +1675,9 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::BuiltinVector: {
     (void)MangledName; // FIXME emit the name somewhere.
     auto *BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
-    DebugTypeInfo ElemDbgTy(BuiltinVectorTy->getElementType(),
-                            DbgTy.StorageType,
-                            DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
+    DebugTypeInfo ElemDbgTy(DbgTy.getDeclContext(),
+                            BuiltinVectorTy->getElementType(),
+                            DbgTy.StorageType, DbgTy.size, DbgTy.align);
     auto Subscripts = nullptr;
     return DBuilder.createVectorType(BuiltinVectorTy->getNumElements(),
                                      AlignInBits, getOrCreateType(ElemDbgTy),
@@ -1701,8 +1707,8 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto File = getOrCreateFile(L.Filename);
     // For NameAlias types, the DeclContext for the aliasED type is
     // in the decl of the alias type.
-    DebugTypeInfo AliasedDbgTy(AliasedTy, DbgTy.StorageType,
-                               DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
+    DebugTypeInfo AliasedDbgTy(DbgTy.getDeclContext(), AliasedTy,
+                               DbgTy.StorageType, DbgTy.size, DbgTy.align);
     return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                   File, L.Line, File);
   }

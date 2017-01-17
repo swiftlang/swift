@@ -5,6 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-// REQUIRES: asserts
-switch{case{}|0/(let(0t
+// RUN: not %target-swift-frontend %s -emit-ir
+{{guard let c:
+sil_scope

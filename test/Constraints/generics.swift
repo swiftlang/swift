@@ -426,3 +426,16 @@ func genericFunc<T>(t: T) {
   // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
   // expected-error@-2 2 {{type 'T' does not conform to protocol 'Hashable'}}
 }
+
+struct SR_3525<T> {}
+func sr3525_arg_int(_: inout SR_3525<Int>) {}
+func sr3525_arg_gen<T>(_: inout SR_3525<T>) {}
+func sr3525_1(t: SR_3525<Int>) {
+  let _ = sr3525_arg_int(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+}
+func sr3525_2(t: SR_3525<Int>) {
+  let _ = sr3525_arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+}
+func sr3525_3<T>(t: SR_3525<T>) {
+  let _ = sr3525_arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+}

@@ -28,6 +28,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Witness.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
@@ -864,11 +865,7 @@ public:
 
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
-
-  // Work around MSVC error: attempting to reference a deleted function.
-#if !defined(_MSC_VER) || defined(__clang__)
-  void operator delete(void *Data) = delete;
-#endif
+  void operator delete(void *Data) SWIFT_DELETE_OPERATOR_DELETED;
 
   // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.

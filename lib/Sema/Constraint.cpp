@@ -18,6 +18,7 @@
 #include "Constraint.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -332,13 +333,13 @@ void Constraint::dump(ConstraintSystem *CS) const {
   // Print all type variables as $T0 instead of _ here.
   llvm::SaveAndRestore<bool> X(CS->getASTContext().LangOpts.
                                DebugConstraintSolver, true);
-  // Disabled MSVC warning: only for use within the debugger
-#if defined(_MSC_VER)
+  // Disable MSVC warning: only for use within the debugger.
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4996)
 #endif
   dump(&CS->getASTContext().SourceMgr);
-#if defined(_MSC_VER)
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning(pop)
 #endif
 }

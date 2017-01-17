@@ -164,3 +164,15 @@ SR_3248().callback("test")  // expected-error {{cannot convert value of type 'St
 
 _? = nil  // expected-error {{'nil' requires a contextual type}}
 _?? = nil // expected-error {{'nil' requires a contextual type}}
+
+
+infix operator !====
+func !====(_ lhs: AnyObject?, _ rhs: AnyObject?) -> Bool { return false }
+
+func calleeRdar29977523(_ lhs: AnyObject?, _ rhs: AnyObject?) { }
+
+func rdar29977523(lhs: AnyObject?!, rhs: AnyObject?) {
+  if lhs !==== rhs { }
+
+  calleeRdar29977523(lhs, rhs)
+}
