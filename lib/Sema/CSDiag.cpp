@@ -2075,6 +2075,20 @@ public:
   bool diagnoseCalleeResultContextualConversionError();
 
 private:
+  /// Validate potential contextual type for type-checking one of the
+  /// sub-expressions, usually correct/valid types are the ones which
+  /// either don't have type variables or are not generic, because
+  /// generic types with left-over type variables or unresolved types
+  /// degrade quality of diagnostics if allowed to be used as contextual.
+  ///
+  /// \param contextualType The candidate contextual type.
+  /// \param CTP The contextual purpose attached to the given candidate.
+  ///
+  /// \returns Pair of validated type and it's purpose, potentially nullified
+  /// if it wasn't an appropriate type to be used.
+  std::pair<Type, ContextualTypePurpose>
+  validateContextualType(Type contextualType, ContextualTypePurpose CTP);
+
   /// Check the specified closure to see if it is a multi-statement closure with
   /// an uninferred type.  If so, diagnose the problem with an error and return
   /// true.
@@ -3433,29 +3447,11 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   
     CS->TC.addExprForDiagnosis(subExpr, subExpr);
   }
-  
-  // If we have a conversion type, but it has type variables (from the current
-  // ConstraintSystem), then we can't use it.
-  if (convertType) {
-    // If we're asked to convert to an autoclosure, then we really want to
-    // convert to the result of it.
-    if (auto *FT = convertType->getAs<AnyFunctionType>())
-      if (FT->isAutoClosure())
-        convertType = FT->getResult();
 
-    // Replace archetypes and type parameters with UnresolvedType.
-    convertType = replaceTypeParametersWithUnresolved(convertType);
-    convertType = replaceTypeVariablesWithUnresolved(convertType);
-    
-    // If the conversion type contains no info, drop it.
-    if (convertType->is<UnresolvedType>() ||
-        (convertType->is<MetatypeType>() && convertType->hasUnresolvedType())) {
-      convertType = Type();
-      convertTypePurpose = CTP_Unused;
-    }
-  }
+  // Validate contextual type before trying to use it.
+  std::tie(convertType, convertTypePurpose) =
+      validateContextualType(convertType, convertTypePurpose);
 
-  
   // If we have no contextual type information and the subexpr is obviously a
   // overload set, don't recursively simplify this.  The recursive solver will
   // sometimes pick one based on arbitrary ranking behavior (e.g. like
@@ -7376,6 +7372,61 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
   }
 }
 
+std::pair<Type, ContextualTypePurpose>
+FailureDiagnosis::validateContextualType(Type contextualType,
+                                         ContextualTypePurpose CTP) {
+  if (!contextualType)
+    return {contextualType, CTP};
+
+  // If we're asked to convert to an autoclosure, then we really want to
+  // convert to the result of it.
+  if (auto *FT = contextualType->getAs<AnyFunctionType>())
+    if (FT->isAutoClosure())
+      contextualType = FT->getResult();
+
+  bool shouldNullify = false;
+  if (auto objectType = contextualType->getLValueOrInOutObjectType()) {
+    // Note that simply checking for `objectType->hasUnresolvedType()` is not
+    // appropriate in this case standalone, because if it's in a function,
+    // for example, or inout type, we still want to preserve it's skeleton
+    /// because that helps to diagnose inout argument issues. Complete
+    // nullification is only appropriate for generic types with unresolved
+    // types or standalone archetypes because that's going to give
+    // sub-expression solver a chance to try and compute type as it sees fit
+    // and higher level code would have a chance to check it, which avoids
+    // diagnostic messages like `cannot convert (_) -> _ to (Int) -> Void`.
+    switch (objectType->getDesugaredType()->getKind()) {
+    case TypeKind::Archetype:
+    case TypeKind::Unresolved:
+      shouldNullify = true;
+      break;
+
+    case TypeKind::BoundGenericEnum:
+    case TypeKind::BoundGenericClass:
+    case TypeKind::BoundGenericStruct:
+    case TypeKind::UnboundGeneric:
+    case TypeKind::GenericFunction:
+    case TypeKind::Metatype:
+      shouldNullify = objectType->hasUnresolvedType();
+      break;
+
+    default:
+      shouldNullify = false;
+      break;
+    }
+  }
+
+  // If the conversion type contains no info, drop it.
+  if (shouldNullify)
+    return {Type(), CTP_Unused};
+
+  // Remove all of the potentially leftover type variables or type parameters
+  // from the contextual type to be used by new solver.
+  contextualType = replaceTypeParametersWithUnresolved(contextualType);
+  contextualType = replaceTypeVariablesWithUnresolved(contextualType);
+
+  return {contextualType, CTP};
+}
 
 /// Check the specified closure to see if it is a multi-statement closure with
 /// an uninferred type.  If so, diagnose the problem with an error and return
