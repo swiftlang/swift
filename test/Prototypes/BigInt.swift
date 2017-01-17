@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -55,16 +55,22 @@ extension FixedWidthInteger {
   }
 }
 
+//===--- BigInt -----------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
 /// A dynamically-sized signed integer.
-public struct BigInt : SignedInteger, CustomStringConvertible,
-  CustomDebugStringConvertible {
+///
+/// The `_BigInt` type is fully generic on the size of its "word" -- the
+/// `BigInt` alias uses the system's word-sized `UInt` as its word type, but
+/// any word size should work properly.
+public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
+  BinaryInteger, SignedInteger, CustomStringConvertible,
+  CustomDebugStringConvertible
+  where Word.Magnitude == Word
+{
 
-  /// The type that represents each word. Must be an unsigned
-  /// `FixedWidthInteger`.
-  typealias Word = UInt
-
-  /// The binary representation of the value, with the least significant word
-  /// at index `0`.
+  /// The binary representation of the value's magnitude, with the least
+  /// significant word at index `0`.
   ///
   /// - `_data` has no trailing zero elements
   /// - If `self == 0`, then `isNegative == false` and `_data == []`
@@ -78,7 +84,7 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     return _data.count == 0
   }
 
-  // MARK: Numeric initializers
+  //===--- Numeric initializers -------------------------------------------===//
 
   /// Creates a new instance equal to zero.
   public init() { }
@@ -96,9 +102,19 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
   public init<T : BinaryInteger>(_ source: T) {
     var source = source
     if source < 0 as T {
-      self.isNegative = true
-      source *= -1
+      if source.bitWidth <= UInt64.bitWidth {
+        let sourceMag = Int(extendingOrTruncating: source).magnitude
+        self = _BigInt(sourceMag)
+        self.isNegative = true
+        return
+      } else {
+        // Have to kind of assume that we're working with another BigInt here
+        self.isNegative = true
+        source *= -1
+      }
     }
+
+    // FIXME: This is broken on 32-bit arch w/ Word = UInt64
     let wordRatio = UInt.bitWidth / Word.bitWidth
     _sanityCheck(wordRatio != 0)
     for i in 0..<source.countRepresentedWords {
@@ -148,22 +164,22 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
       randomBits.quotientAndRemainder(dividingBy: Word.bitWidth)
 
     // Get the bits for any full words.
-    self._data = (0..<words).map({ _ in BigInt._randomWord() })
+    self._data = (0..<words).map({ _ in _BigInt._randomWord() })
 
     // Get another random number - the highest bit will determine the sign,
     // while the lower `Word.bitWidth - 1` bits are available for any leftover
     // bits in `randomBits`.
-    let word = BigInt._randomWord()
+    let word = _BigInt._randomWord()
     if extraBits != 0 {
       let mask = ~((~0 as Word) << Word(extraBits))
       _data.append(word & mask)
     }
-    isNegative = word >> (Word.bitWidth - 1) == 0
+    isNegative = word & ~(~0 >> 1) == 0
 
     _standardize()
   }
 
-  // MARK: Private methods
+  //===--- Private methods ------------------------------------------------===//
 
   /// Standardizes this instance after mutation, removing trailing zeros
   /// and making sure zero is nonnegative. Calling this method satisfies the
@@ -184,15 +200,16 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
   /// - If `self == 0`, then `isNegative == false`
   func _checkInvariants(source: String = #function) {
     if _data.count == 0 {
-      assert(isNegative == false, "\(source): isNegative with zero length _data")
+      assert(isNegative == false,
+        "\(source): isNegative with zero length _data")
     }
     assert(_data.last != 0, "\(source): extra zeroes on _data")
   }
 
-  // MARK: - Word-based arithmetic
+  //===--- Word-based arithmetic ------------------------------------------===//
 
   mutating func _unsignedAdd(_ rhs: Word) {
-    defer { _checkInvariants() }
+    defer { _standardize() }
 
     // Quick return if `rhs == 0`
     guard rhs != 0 else { return }
@@ -336,16 +353,18 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     return carry
   }
 
-  // MARK: Arithmetic
+  //===--- Arithmetic -----------------------------------------------------===//
 
-  public var magnitude: BigInt {
+  public typealias Magnitude = _BigInt
+
+  public var magnitude: _BigInt {
     var result = self
     result.isNegative = false
     return result
   }
 
-  /// Adds `rhs` to this instance, ignoring the sign.
-  mutating func _unsignedAdd(_ rhs: BigInt) {
+  /// Adds `rhs` to this instance, ignoring any signs.
+  mutating func _unsignedAdd(_ rhs: _BigInt) {
     defer { _checkInvariants() }
 
     let commonCount = Swift.min(_data.count, rhs._data.count)
@@ -366,7 +385,7 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
         (carry, _data[i]) = Word.doubleWidthAdd(_data[i], carry)
       }
 
-      // If there are leftover words in `rhs`, need to copy to `self` with carries
+    // If there are leftover words in `rhs`, need to copy to `self` with carries
     } else if _data.count < rhs._data.count {
       for i in commonCount..<maxCount {
         // Append remaining words if nothing to carry
@@ -390,7 +409,7 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
   ///
   /// - Precondition: `rhs.magnitude <= self.magnitude` (unchecked)
   /// - Precondition: `rhs._data.count <= self._data.count`
-  mutating func _unsignedSubtract(_ rhs: BigInt) {
+  mutating func _unsignedSubtract(_ rhs: _BigInt) {
     _precondition(rhs._data.count <= _data.count)
 
     var carry: Word = 0
@@ -408,7 +427,7 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     _standardize()
   }
 
-  public static func +=(lhs: inout BigInt, rhs: BigInt) {
+  public static func +=(lhs: inout _BigInt, rhs: _BigInt) {
     defer { lhs._checkInvariants() }
     if lhs.isNegative == rhs.isNegative {
       lhs._unsignedAdd(rhs)
@@ -417,7 +436,7 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     }
   }
 
-  public static func -=(lhs: inout BigInt, rhs: BigInt) {
+  public static func -=(lhs: inout _BigInt, rhs: _BigInt) {
     defer { lhs._checkInvariants() }
 
     // Subtracting something of the opposite sign just adds magnitude.
@@ -430,7 +449,7 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     // the smaller magnitude from the larger magnitude.
     switch lhs._compareMagnitude(to: rhs) {
     case .equal:
-      self = 0
+      lhs = 0
     case .greaterThan:
       lhs._unsignedSubtract(rhs)
     case .lessThan:
@@ -442,15 +461,16 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     }
   }
 
-  public static func *=(lhs: inout BigInt, rhs: BigInt) {
+  public static func *=(lhs: inout _BigInt, rhs: _BigInt) {
     // If either `lhs` or `rhs` is zero, the result is zero.
     guard !lhs.isZero && !rhs.isZero else {
-      self = 0
+      lhs = 0
       return
     }
 
-    var newData: [Word] = Array(repeating: 0, count: lhs._data.count + rhs._data.count)
-    let (a, b) = _data.count > rhs._data.count
+    var newData: [Word] = Array(repeating: 0,
+      count: lhs._data.count + rhs._data.count)
+    let (a, b) = lhs._data.count > rhs._data.count
       ? (lhs._data, rhs._data)
       : (rhs._data, lhs._data)
     _sanityCheck(a.count >= b.count)
@@ -506,13 +526,13 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
 
   /// Divides this instance by `rhs`, returning the remainder.
   @discardableResult
-  mutating func _internalDivide(by rhs: BigInt) -> BigInt {
+  mutating func _internalDivide(by rhs: _BigInt) -> _BigInt {
     _precondition(!rhs.isZero, "Divided by zero")
     defer { _checkInvariants() }
 
     // Handle quick cases that don't require division:
-    // If `self < rhs`, the result is zero, remainder = self
-    // If `self == rhs`, the result is 1 or -1, remainder = 0
+    // If `abs(self) < abs(rhs)`, the result is zero, remainder = self
+    // If `abs(self) == abs(rhs)`, the result is 1 or -1, remainder = 0
     switch _compareMagnitude(to: rhs) {
     case .lessThan:
       defer { self = 0 }
@@ -524,17 +544,16 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
       break
     }
 
-    let n = countBits - rhs.countBits
-
-    var quotient: BigInt = 0
     var tempSelf = self.magnitude
+    let n = tempSelf.bitWidth - rhs.magnitude.bitWidth
+    var quotient: _BigInt = 0
     var tempRHS = rhs.magnitude << n
-    var tempQuotient: BigInt = 1 << n
+    var tempQuotient: _BigInt = 1 << n
 
     for _ in (0...n).reversed() {
-      if tempRHS._compare(to: tempSelf) != .greaterThan {
-        tempSelf.subtract(tempRHS)
-        quotient.add(tempQuotient)
+      if tempRHS._compareMagnitude(to: tempSelf) != .greaterThan {
+        tempSelf -= tempRHS
+        quotient += tempQuotient
       }
       tempRHS >>= 1
       tempQuotient >>= 1
@@ -544,7 +563,6 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     tempSelf.isNegative = self.isNegative
     tempSelf._standardize()
 
-    // `quotient` is the quotient
     quotient.isNegative = isNegative != rhs.isNegative
     self = quotient
     _standardize()
@@ -552,52 +570,140 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     return tempSelf
   }
 
-  public static func /=(lhs: inout BigInt, rhs: BigInt) {
-    defer { _checkInvariants() }
-    _internalDivide(by: rhs)
+  public static func /=(lhs: inout _BigInt, rhs: _BigInt) {
+    lhs._internalDivide(by: rhs)
   }
 
-  // MARK: BinaryInteger
+  // FIXME: Remove once default implementations are provided:
+
+  public static func +(_ lhs: _BigInt, _ rhs: _BigInt) -> _BigInt {
+    var lhs = lhs
+    lhs += rhs
+    return lhs
+  }
+
+  public static func -(_ lhs: _BigInt, _ rhs: _BigInt) -> _BigInt {
+    var lhs = lhs
+    lhs -= rhs
+    return lhs
+  }
+
+  public static func *(_ lhs: _BigInt, _ rhs: _BigInt) -> _BigInt {
+    var lhs = lhs
+    lhs *= rhs
+    return lhs
+  }
+
+  public static func /(_ lhs: _BigInt, _ rhs: _BigInt) -> _BigInt {
+    var lhs = lhs
+    lhs /= rhs
+    return lhs
+  }
+
+  public static func %(_ lhs: _BigInt, _ rhs: _BigInt) -> _BigInt {
+    var lhs = lhs
+    lhs %= rhs
+    return lhs
+  }
+
+  //===--- BinaryInteger --------------------------------------------------===//
+
+  /// Creates a new instance using the given data array in two's complement
+  /// representation.
+  init(_twosComplementData: [Word]) {
+    guard _twosComplementData.count > 0 else {
+      self = 0
+      return
+    }
+
+    // Is the highest bit set?
+    isNegative = _twosComplementData.last!.leadingZeros == 0
+    if isNegative {
+      _data = _twosComplementData.map(~)
+      self._unsignedAdd(1 as Word)
+    } else {
+      _data = _twosComplementData
+    }
+    _standardize()
+  }
+
+  /// Returns a array of the value's data using two's complement representation.
+  func _dataAsTwosComplement() -> [Word] {
+    // Special cases:
+    // * Nonnegative values are already in 2's complement
+    if !isNegative {
+      // Positive values need to have a leading zero bit
+      if _data.last?.leadingZeros == 0 {
+        return _data + [0]
+      } else {
+        return _data
+      }
+    }
+    // * -1 will get zeroed out below, easier to handle here
+    if _data.count == 1 && _data.first == 1 { return [~0] }
+
+    var x = self
+    x._unsignedSubtract(1 as Word)
+
+    if x._data.last!.leadingZeros == 0 {
+      // The highest bit is set to 1, which moves to 0 after negation.
+      // We need to add another word at the high end so the highest bit is 1.
+      return x._data.map(~) + [Word.max]
+    } else {
+      // The highest bit is set to 0, which moves to 1 after negation.
+      return x._data.map(~)
+    }
+  }
 
   public func word(at n: Int) -> UInt {
     let ratio = UInt.bitWidth / Word.bitWidth
     _sanityCheck(ratio != 0)
 
-    // Early return if `n` is larger than `_data`.
-    guard n * ratio < _data.count else {
-      return isNegative ? ~0 : 0
-    }
+    var twosComplementData = _dataAsTwosComplement()
 
-    // Subtract one from magnitude if negative to fake two's complement.
-    // Seems unnecessary to make copy `_data` here...
-    var x = self
-    if isNegative {
-      x.add(1 as Word)
-    }
-
+    // Find beginning of range. If we're beyond the value, return 1s or 0s.
     let start = n * ratio
-    let end = Swift.min(x._data.count, (n + 1) * ratio)
-    let wordSlice = x._data[start..<end]
+    if start >= twosComplementData.count {
+      return isNegative ? UInt.max : 0
+    }
+
+    // Find end of range. If the range extends beyond the representation,
+    // add bits to the end.
+    let end = (n + 1) * ratio
+    if end > twosComplementData.count {
+      twosComplementData.append(contentsOf:
+        repeatElement(isNegative ? Word.max : 0,
+          count: end - twosComplementData.count))
+    }
+
+    // Build the correct word from the range determined above.
+    let wordSlice = twosComplementData[start..<end]
     var result: UInt = 0
     for v in wordSlice.reversed() {
       result <<= Word.bitWidth
       result |= UInt(extendingOrTruncating: v)
     }
 
-    return isNegative ? ~result : result
+    return result
   }
 
   /// The number of bits used for storage of this value. Always a multiple of
   /// `Word.bitWidth`.
   public var bitWidth: Int {
-    return _data.count * Word.bitWidth
-  }
+    if isZero {
+      return 0
+    } else {
+      let twosComplementData = _dataAsTwosComplement()
 
-  /// The number of bits actually used in the binary representation of this
-  /// value's magnitude. Always less than or equal to `bitWidth`. Does not
-  /// include any sign.
-  public var countBits: Int {
-    return isZero ? 0 : bitWidth - _data.last!.leadingZeros
+      // If negative, it's okay to have 1s padded on high end
+      if isNegative {
+        return twosComplementData.count * Word.bitWidth
+      }
+
+      // If positive, need to make space for at least one zero on high end
+      return twosComplementData.count * Word.bitWidth
+        - twosComplementData.last!.leadingZeros + 1
+    }
   }
 
   /// The number of sequential zeros in the least-significant position of this
@@ -614,43 +720,142 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     return i * Word.bitWidth + _data[i].trailingZeros
   }
 
-  public var minimumSignedRepresentationBitWidth: Int {
-    return countBits + 1
+  public static func %=(lhs: inout _BigInt, rhs: _BigInt) {
+    defer { lhs._checkInvariants() }
+    lhs = lhs._internalDivide(by: rhs)
   }
 
-  public mutating func formRemainder(dividingBy rhs: BigInt) {
-    defer { _checkInvariants() }
-    self = _internalDivide(by: rhs)
-  }
-
-  public func quotientAndRemainder(dividingBy rhs: BigInt) -> (BigInt, BigInt) {
+  public func quotientAndRemainder(dividingBy rhs: _BigInt) ->
+    (_BigInt, _BigInt)
+  {
     var x = self
     let r = x._internalDivide(by: rhs)
     return (x, r)
   }
 
-  // MARK: SignedArithmetic
+  public static func &=(lhs: inout _BigInt, rhs: _BigInt) {
+    var lhsTemp = lhs._dataAsTwosComplement()
+    let rhsTemp = rhs._dataAsTwosComplement()
 
-  public mutating func negate() {
-    defer { _checkInvariants() }
-    guard _data.count > 0 else { return }
-    isNegative = !isNegative
+    // If `lhs` is longer than `rhs`, behavior depends on sign of `rhs`
+    // * If `rhs < 0`, length is extended with 1s
+    // * If `rhs >= 0`, length is extended with 0s, which crops `lhsTemp`
+    if lhsTemp.count > rhsTemp.count && !rhs.isNegative {
+      lhsTemp.removeLast(lhsTemp.count - rhsTemp.count)
+    }
+
+    // If `rhs` is longer than `lhs`, behavior depends on sign of `lhs`
+    // * If `lhs < 0`, length is extended with 1s, so `lhs` should get extra
+    //   bits from `rhs`
+    // * If `lhs >= 0`, length is extended with 0s
+    if lhsTemp.count < rhsTemp.count && lhs.isNegative {
+      lhsTemp.append(contentsOf: rhsTemp[lhsTemp.count..<rhsTemp.count])
+    }
+
+    // Perform bitwise & on words that both `lhs` and `rhs` have.
+    for i in 0..<Swift.min(lhsTemp.count, rhsTemp.count) {
+      lhsTemp[i] &= rhsTemp[i]
+    }
+
+    lhs = _BigInt(_twosComplementData: lhsTemp)
   }
 
-  // MARK: Strideable
+  public static func |=(lhs: inout _BigInt, rhs: _BigInt) {
+    var lhsTemp = lhs._dataAsTwosComplement()
+    let rhsTemp = rhs._dataAsTwosComplement()
 
-  public func distance(to other: BigInt) -> BigInt {
-    return other.subtracting(self)
+    // If `lhs` is longer than `rhs`, behavior depends on sign of `rhs`
+    // * If `rhs < 0`, length is extended with 1s, so those bits of `lhs`
+    //   should all be 1
+    // * If `rhs >= 0`, length is extended with 0s, which is a no-op
+    if lhsTemp.count > rhsTemp.count && rhs.isNegative {
+      lhsTemp.replaceSubrange(rhsTemp.count..<lhsTemp.count,
+        with: repeatElement(Word.max, count: lhsTemp.count - rhsTemp.count))
+    }
+
+    // If `rhs` is longer than `lhs`, behavior depends on sign of `lhs`
+    // * If `lhs < 0`, length is extended with 1s, so those bits of lhs
+    //   should all be 1
+    // * If `lhs >= 0`, length is extended with 0s, so those bits should be
+    //   copied from rhs
+    if lhsTemp.count < rhsTemp.count {
+      if lhs.isNegative {
+        lhsTemp.append(contentsOf:
+          repeatElement(Word.max, count: rhsTemp.count - lhsTemp.count))
+      } else {
+        lhsTemp.append(contentsOf: rhsTemp[lhsTemp.count..<rhsTemp.count])
+      }
+    }
+
+    // Perform bitwise | on words that both `lhs` and `rhs` have.
+    for i in 0..<Swift.min(lhsTemp.count, rhsTemp.count) {
+      lhsTemp[i] |= rhsTemp[i]
+    }
+
+    lhs = _BigInt(_twosComplementData: lhsTemp)
   }
 
-  public func advanced(by n: BigInt) -> BigInt {
-    return self.adding(n)
+  public static func ^=(lhs: inout _BigInt, rhs: _BigInt) {
+    var lhsTemp = lhs._dataAsTwosComplement()
+    let rhsTemp = rhs._dataAsTwosComplement()
+
+    // If `lhs` is longer than `rhs`, behavior depends on sign of `rhs`
+    // * If `rhs < 0`, length is extended with 1s, so those bits of `lhs`
+    //   should all be flipped
+    // * If `rhs >= 0`, length is extended with 0s, which is a no-op
+    if lhsTemp.count > rhsTemp.count && rhs.isNegative {
+      for i in rhsTemp.count..<lhsTemp.count {
+        lhsTemp[i] = ~lhsTemp[i]
+      }
+    }
+
+    // If `rhs` is longer than `lhs`, behavior depends on sign of `lhs`
+    // * If `lhs < 0`, length is extended with 1s, so those bits of `lhs`
+    //   should all be flipped copies of `rhs`
+    // * If `lhs >= 0`, length is extended with 0s, so those bits should
+    //   be copied from rhs
+    if lhsTemp.count < rhsTemp.count {
+      if lhs.isNegative {
+        lhsTemp += rhsTemp.suffix(from: lhsTemp.count).map(~)
+      } else {
+        lhsTemp.append(contentsOf: rhsTemp[lhsTemp.count..<rhsTemp.count])
+      }
+    }
+
+    // Perform bitwise ^ on words that both `lhs` and `rhs` have.
+    for i in 0..<Swift.min(lhsTemp.count, rhsTemp.count) {
+      lhsTemp[i] ^= rhsTemp[i]
+    }
+
+    lhs = _BigInt(_twosComplementData: lhsTemp)
   }
 
-  // MARK: Other arithmetic
+  public static prefix func ~(x: _BigInt) -> _BigInt {
+    return -x - 1
+  }
+
+  //===--- SignedArithmetic -----------------------------------------------===//
+
+  public static prefix func -(x: inout _BigInt) {
+    defer { x._checkInvariants() }
+    guard x._data.count > 0 else { return }
+    x.isNegative = !x.isNegative
+  }
+
+  //===--- Strideable -----------------------------------------------------===//
+
+  public func distance(to other: _BigInt) -> _BigInt {
+    return other - self
+  }
+
+  public func advanced(by n: _BigInt) -> _BigInt {
+    return self + n
+  }
+
+  //===--- Other arithmetic -----------------------------------------------===//
 
   /// Returns the greatest common divisor for this value and `other`.
-  public func greatestCommonDivisor(with other: BigInt) -> BigInt {
+  public func greatestCommonDivisor(with other: _BigInt) -> _BigInt {
     // Quick return if either is zero
     if other.isZero {
       return magnitude
@@ -692,7 +897,7 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
   }
 
   /// Returns the lowest common multiple for this value and `other`.
-  public func lowestCommonMultiple(with other: BigInt) -> BigInt {
+  public func lowestCommonMultiple(with other: _BigInt) -> _BigInt {
     let gcd = greatestCommonDivisor(with: other)
     if _compareMagnitude(to: other) == .lessThan {
       return ((self / gcd) * other).magnitude
@@ -701,7 +906,7 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     }
   }
 
-  // MARK: - String methods
+  //===--- String methods ------------------------------------------------===//
 
   /// Creates a new instance from the given string.
   ///
@@ -760,26 +965,28 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
   public func toString(radix: Int = 10, lowercase: Bool = true) -> String {
     assert(2...36 ~= radix, "radix must be in range 2...36")
 
-    let digitsStart = Word(("0" as UnicodeScalar).value)
-    let lettersStart = Word(((lowercase ? "a" : "A") as UnicodeScalar).value - 10)
-    func toLetter(_ x: Word) -> UnicodeScalar {
+    let digitsStart = ("0" as UnicodeScalar).value
+    let lettersStart = ((lowercase ? "a" : "A") as UnicodeScalar).value - 10
+    func toLetter(_ x: UInt32) -> UnicodeScalar {
       return x < 10
-        ? UnicodeScalar(UInt32(digitsStart + x))!
-        : UnicodeScalar(UInt32(lettersStart + x))!
+        ? UnicodeScalar(digitsStart + x)!
+        : UnicodeScalar(lettersStart + x)!
     }
 
-    let radix = Word(radix)
+    let radix = _BigInt(radix)
     var result: [UnicodeScalar] = []
 
-    var x = self
+    var x = self.magnitude
     while !x.isZero {
-      result.append(toLetter(x.divide(by: radix)))
+      let remainder: _BigInt
+      (x, remainder) = x.quotientAndRemainder(dividingBy: radix)
+      result.append(toLetter(UInt32(remainder)))
     }
 
     let sign = isNegative ? "-" : ""
     let rest = result.count == 0
       ? "0"
-      : String(result.reversed())
+      : String(String.UnicodeScalarView(result.reversed()))
     return sign + rest
   }
 
@@ -788,7 +995,7 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
   }
 
   public var debugDescription: String {
-    return "BigInt(\(hexString), words: \(_data.count))"
+    return "_BigInt(\(hexString), words: \(_data.count))"
   }
 
   /// A string representation of this instance's value in base 2.
@@ -811,7 +1018,7 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     return toString(radix: 36, lowercase: false)
   }
 
-  // MARK: Comparable
+  //===--- Comparable -----------------------------------------------------===//
 
   enum _ComparisonResult {
     case lessThan, equal, greaterThan
@@ -819,37 +1026,25 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
 
   /// Returns whether this instance is less than, greather than, or equal to
   /// the given value.
-  func _compare(to rhs: BigInt) -> _ComparisonResult {
+  func _compare(to rhs: _BigInt) -> _ComparisonResult {
     // Negative values are less than positive values
     guard isNegative == rhs.isNegative else {
       return isNegative ? .lessThan : .greaterThan
     }
 
-    guard _data.count == rhs._data.count else {
-      return isNegative
-        // A negative value with fewer bits is greater
-        ? _data.count < rhs._data.count ? .greaterThan : .lessThan
-        // A positive value with fewer bits is less
-        : _data.count < rhs._data.count ? .lessThan : .greaterThan
+    switch _compareMagnitude(to: rhs) {
+    case .equal:
+      return .equal
+    case .lessThan:
+      return isNegative ? .greaterThan : .lessThan
+    case .greaterThan:
+      return isNegative ? .lessThan : .greaterThan
     }
-
-    // Equal signs and number of words: compare from most significant word
-    for i in (0..<_data.count).reversed() {
-      if _data[i] < rhs._data[i] {
-        return isNegative ? .greaterThan : .lessThan
-      }
-      if _data[i] > rhs._data[i] {
-        return isNegative ? .lessThan : .greaterThan
-      }
-    }
-
-    // Everything is equal
-    return .equal
   }
 
   /// Returns whether the magnitude of this instance is less than, greather
   /// than, or equal to the magnitude of the given value.
-  func _compareMagnitude(to rhs: BigInt) -> _ComparisonResult {
+  func _compareMagnitude(to rhs: _BigInt) -> _ComparisonResult {
     guard _data.count == rhs._data.count else {
       return _data.count < rhs._data.count ? .lessThan : .greaterThan
     }
@@ -862,15 +1057,15 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     return .equal
   }
 
-  public static func ==(lhs: BigInt, rhs: BigInt) -> Bool {
+  public static func ==(lhs: _BigInt, rhs: _BigInt) -> Bool {
     return lhs._compare(to: rhs) == .equal
   }
 
-  public static func < (lhs: BigInt, rhs: BigInt) -> Bool {
+  public static func < (lhs: _BigInt, rhs: _BigInt) -> Bool {
     return lhs._compare(to: rhs) == .lessThan
   }
 
-  // MARK: Hashable
+  //===--- Hashable -------------------------------------------------------===//
 
   public var hashValue: Int {
 #if arch(i386) || arch(arm)
@@ -885,19 +1080,19 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     return Int(bitPattern: _data.reduce(h, { ($0 &* p) ^ UInt($1) }))
   }
 
-  // MARK: Bit shifting operators
+  //===--- Bit shifting operators -----------------------------------------===//
 
-  mutating func _shiftLeft(byWords words: Int) {
+  static func _shiftLeft(_ data: inout [Word], byWords words: Int) {
     guard words > 0 else { return }
-    _data.insert(contentsOf: repeatElement(0, count: words), at: 0)
+    data.insert(contentsOf: repeatElement(0, count: words), at: 0)
   }
 
-  mutating func _shiftRight(byWords words: Int) {
+  static func _shiftRight(_ data: inout [Word], byWords words: Int) {
     guard words > 0 else { return }
-    _data.removeFirst(Swift.min(_data.count, words))
+    data.removeFirst(Swift.min(data.count, words))
   }
 
-  public static func <<=(lhs: inout BigInt, rhs: Int) {
+  public static func <<=(lhs: inout _BigInt, rhs: Int) {
     defer { lhs._checkInvariants() }
     guard rhs != 0 else { return }
     guard rhs > 0 else {
@@ -908,33 +1103,17 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
     // We can add `rhs / bits` extra words full of zero at the low end.
     let extraWords = rhs / Word.bitWidth
     lhs._data.reserveCapacity(lhs._data.count + extraWords + 1)
-    lhs._shiftLeft(byWords: extraWords)
+    _BigInt._shiftLeft(&lhs._data, byWords: extraWords)
 
     // Each existing word will need to be shifted left by `rhs % bits`.
     // For each pair of words, we'll use the high `offset` bits of the
     // lower word and the low `Word.bitWidth - offset` bits of the higher
-    // word. If we start out with `_data == [0b01101110, 0b00110110]` and
-    // `rhs == 3`, these are the steps:
-    //
-    //             (  2  )  (  1  )  (  0  )
-    //
-    //     pre 1: _0000000 _0110110 _1101110
-    //                ^^^^  ###
-    //    post 1: _0000011 _0110110 _1101110
-    //             ^^^^###
-    //     pre 2: _0000011 _0110110 _1101110
-    //                         ^^^^  ###
-    //    post 2: _0000011 _0110110 _1101110
-    //                      ^^^^###
-    //     pre 3: _0000011 _0110110 _1101110
-    //                                  ^^^^
-    //    post 4: _0000011 _0110110 _1110000
-    //                               ^^^^
+    // word.
     let highOffset = rhs % Word.bitWidth
     let lowOffset = Word.bitWidth - highOffset
 
     // If there's no offset, we're finished, as `rhs` was a multiple of
-    // `BigInt.bits`. No need to even standardize.
+    // `Word.bitWidth`.
     guard highOffset != 0 else { return }
 
     // Add new word at the end, then shift everything left by `offset` bits.
@@ -943,13 +1122,13 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
       lhs._data[i] = lhs._data[i] << highOffset
         | lhs._data[i - 1] >> lowOffset
     }
-    // Finally, shift the lowest word and standardize the result.
-    lhs._data[extraWords] = lhs._data[extraWords] << highOffset
 
+    // Finally, shift the lowest word.
+    lhs._data[extraWords] = lhs._data[extraWords] << highOffset
     lhs._standardize()
   }
 
-  public static func >>=(lhs: inout BigInt, rhs: Int) {
+  public static func >>=(lhs: inout _BigInt, rhs: Int) {
     defer { lhs._checkInvariants() }
     guard rhs != 0 else { return }
     guard rhs > 0 else {
@@ -957,61 +1136,49 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
       return
     }
 
+    var tempData = lhs._dataAsTwosComplement()
+
     // We can remove `rhs / bits` full words at the low end.
     // If that removes the entirety of `_data`, we're done.
     let wordsToRemove = rhs / Word.bitWidth
-    lhs._shiftRight(byWords: wordsToRemove)
-    guard lhs._data.count != 0 else {
-      lhs._standardize()
+    _BigInt._shiftRight(&tempData, byWords: wordsToRemove)
+    guard tempData.count != 0 else {
+      lhs = lhs.isNegative ? -1 : 0
       return
     }
 
     // Each existing word will need to be shifted right by `rhs % bits`.
     // For each pair of words, we'll use the low `offset` bits of the
-    // higher word and the high `BigInt.Word.bitWidth - offset` bits of the lower
-    // word. If we start out with `_data == [0b01101110, 0b00110110, 0b00001111]`
-    // and `rhs == 3`, these are the steps:
-    //
-    //             (  2  )  (  1  )  (  0  )
-    //     pre 1: _0001111 _0110110 _1101110
-    //                          ^^^  ####
-    //    post 1: _0001111 _0110110 _1101101
-    //                               ^^^####
-    //     pre 2: _0001111 _0110110 _1101110
-    //                 ^^^  ####
-    //    post 2: _0001111 _1110110 _1101101
-    //                      ^^^####
-    //     pre 3: _0001111 _0110110 _1101110
-    //             ####
-    //    post 3: _0000001 _1110110 _1101101
-    //                ####
+    // higher word and the high `_BigInt.Word.bitWidth - offset` bits of
+    // the lower word.
     let lowOffset = rhs % Word.bitWidth
     let highOffset = Word.bitWidth - lowOffset
 
     // If there's no offset, we're finished, as `rhs` was a multiple of
-    // `BigInt.bits`. No need to even standardize.
+    // `Word.bitWidth`.
     guard lowOffset != 0 else {
-      lhs._standardize()
+      lhs = _BigInt(_twosComplementData: tempData)
       return
     }
 
     // Shift everything right by `offset` bits.
-    for i in 0..<(lhs._data.count - 1) {
-      lhs._data[i] = lhs._data[i] >> lowOffset |
-        lhs._data[i + 1] << highOffset
+    for i in 0..<(tempData.count - 1) {
+      tempData[i] = tempData[i] >> lowOffset |
+        tempData[i + 1] << highOffset
     }
+
     // Finally, shift the highest word and standardize the result.
-    lhs._data[lhs._data.count - 1] >>= lowOffset
-    lhs._standardize()
+    tempData[tempData.count - 1] >>= lowOffset
+    lhs = _BigInt(_twosComplementData: tempData)
   }
 
-  public static func <<(lhs: BigInt, rhs: Int) -> BigInt {
+  public static func <<(lhs: _BigInt, rhs: Int) -> _BigInt {
     var lhs = lhs
     lhs <<= rhs
     return lhs
   }
 
-  public static func >>(lhs: BigInt, rhs: Int) -> BigInt {
+  public static func >>(lhs: _BigInt, rhs: Int) -> _BigInt {
     var lhs = lhs
     lhs >>= rhs
     return lhs
@@ -1020,48 +1187,18 @@ public struct BigInt : SignedInteger, CustomStringConvertible,
 
 // MARK: - Tests
 
-var DivisionTests = TestSuite("DoubleWidthDivide")
-
-DivisionTests.test("Unsigned division") {
-  let result1 = UInt8.doubleWidthDivide((4, 0), 8)
-  expectEqual(result1.quotient, 128)
-  expectEqual(result1.remainder, 0)
-
-  let result2 = UInt64.doubleWidthDivide((18446744073709551614, 1001), UInt64.max)
-  expectEqual(result2.quotient, UInt64.max)
-  expectEqual(result2.remainder, 1000)
-}
-
-DivisionTests.test("Signed division") {
-  let result1 = Int8.doubleWidthDivide((4, 0), 8)
-  // Not a good result: 0b00000100_00000000 >> 3 == 0b10000000 == -128
-  // Trap on overflow instead?
-  expectEqual(result1.quotient, -128)
-  expectEqual(result1.remainder, 0)
-
-  // Not a good result: Int8 has room to store -64
-  expectCrashLater()
-  _ = Int8.doubleWidthDivide((-4, 0), 16)
-}
-
-DivisionTests.test("Divide by zero") {
-  let x = (0, 0 as Int.Magnitude)
-  let y = 0
-
-  expectCrashLater()
-  _ = Int.doubleWidthDivide(x, y)
-}
-
-DivisionTests.test("Overflow") {
-  expectCrashLater()
-  _ = UInt8.doubleWidthDivide((4, 0), 4)
-}
-
-var BigIntTests = TestSuite("BigInt")
+typealias BigInt = _BigInt<UInt>
+typealias BigInt8 = _BigInt<UInt8>
 
 func testBinaryInit<T: BinaryInteger>(_ x: T) -> BigInt {
   return BigInt(x)
 }
+
+func randomBitLength() -> Int {
+  return Int(arc4random_uniform(1000) + 2)
+}
+
+var BigIntTests = TestSuite("BigInt")
 
 BigIntTests.test("Initialization") {
   let x = testBinaryInit(1_000_000 as Int)
@@ -1080,8 +1217,8 @@ BigIntTests.test("Initialization") {
 }
 
 BigIntTests.test("Identity/Fixed point") {
-  let x = BigInt(repeatElement(BigInt.Word.max, count: 20))
-  let y = x.negated()
+  let x = BigInt(repeatElement(UInt.max, count: 20))
+  let y = -x
 
   expectEqual(x / x, 1)
   expectEqual(x / y, -1)
@@ -1109,8 +1246,8 @@ BigIntTests.test("Identity/Fixed point") {
 }
 
 BigIntTests.test("Max arithmetic") {
-  let x = BigInt(repeatElement(BigInt.Word.max, count: 50))
-  let y = BigInt(repeatElement(BigInt.Word.max, count: 35))
+  let x = BigInt(repeatElement(UInt.max, count: 50))
+  let y = BigInt(repeatElement(UInt.max, count: 35))
   let (q, r) = x.quotientAndRemainder(dividingBy: y)
 
   expectEqual(q * y + r, x)
@@ -1144,12 +1281,12 @@ BigIntTests.test("Conformances") {
   expectGT(y, y - 1)
   expectGT(y, 0)
 
-  let z = y.negated()
+  let z = -y
   expectLT(z, z + 1)
   expectGT(z, z - 1)
   expectLT(z, 0)
 
-  expectEqual(z.negated(), y)
+  expectEqual(-z, y)
   expectEqual(y + z, 0)
 
   // Hashable
@@ -1160,7 +1297,7 @@ BigIntTests.test("Conformances") {
   expectTrue(set.contains(x))
   expectTrue(set.contains(y))
   expectTrue(set.contains(z))
-  expectFalse(set.contains(x.negated()))
+  expectFalse(set.contains(-x))
 }
 
 BigIntTests.test("BinaryInteger interop") {
@@ -1168,37 +1305,105 @@ BigIntTests.test("BinaryInteger interop") {
   let xComp = UInt8(x)
   expectTrue(x == xComp)
   expectTrue(x < xComp + 1)
+  expectFalse(xComp + 1 < x)
 
   let y: BigInt = -100
   let yComp = Int8(y)
   expectTrue(y == yComp)
-  expectTrue(y < yComp + 1)
+  expectTrue(y < yComp + (1 as Int8))
+  expectFalse(yComp + (1 as Int8) < y)
+  // should be: expectTrue(y < yComp + 1), but:
+  // warning: '+' is deprecated: Mixed-type addition is deprecated.
+  // Please use explicit type conversion.
 
-  let z = BigInt(Int.min)
-  let zComp = Int(extendingOrTruncating: z)
+  let zComp = Int.min + 1
+  let z = BigInt(zComp)
   expectTrue(z == zComp)
+  expectTrue(zComp == z)
+  expectFalse(zComp + 1 < z)
   expectTrue(z < zComp + 1)
 
   let w = BigInt(UInt.max)
   let wComp = UInt(extendingOrTruncating: w)
   expectTrue(w == wComp)
-  expectTrue(w > wComp - 1)
+  expectTrue(wComp == w)
+  expectTrue(wComp - (1 as UInt) < w)
+  expectFalse(w < wComp - (1 as UInt))
+  // should be:
+  //  expectTrue(wComp - 1 < w)
+  //  expectTrue(w > wComp - 1)
+  // but crashes at runtime
 }
 
 BigIntTests.test("Huge") {
   let x = BigInt(randomBits: 1_000_000)
   expectGT(x, x - 1)
-  let y = x.negated()
+  let y = -x
   expectGT(y, y - 1)
 }
 
-BigIntTests.test("Randomized arithmetic").forEach(in: Array(1...20)) { _ in
-  // Get bit lengths for six BigInts
-  let bitLengths = Array(sequence(first: 0, next: { _ in Int(arc4random_uniform(1000) + 1) }).dropFirst().prefix(6))
+BigIntTests.test("Arithmetic").forEach(in: [
+  ("3GFWFN54YXNBS6K2ST8K9B89Q2AMRWCNYP4JAS5ZOPPZ1WU09MXXTIT27ZPVEG2Y",
+   "9Y1QXS4XYYDSBMU4N3LW7R3R1WKK",
+   "CIFJIVHV0K4MSX44QEX2US0MFFEAWJVQ8PJZ",
+   "26HILZ7GZQN8MB4O17NSPO5XN1JI"),
+  ("7PM82EHP7ZN3ZL7KOPB7B8KYDD1R7EEOYWB6M4SEION47EMS6SMBEA0FNR6U9VAM70HPY4WKXBM8DCF1QOR1LE38NJAVOPOZEBLIU1M05",
+   "-202WEEIRRLRA9FULGA15RYROVW69ZPDHW0FMYSURBNWB93RNMSLRMIFUPDLP5YOO307XUNEFLU49FV12MI22MLCVZ5JH",
+   "-3UNIZHA6PAL30Y",
+   "1Y13W1HYB0QV2Z5RDV9Z7QXEGPLZ6SAA2906T3UKA46E6M4S6O9RMUF5ETYBR2QT15FJZP87JE0W06FA17RYOCZ3AYM3"),
+  ("-ICT39SS0ONER9Z7EAPVXS3BNZDD6WJA791CV5LT8I4POLF6QYXBQGUQG0LVGPVLT0L5Z53BX6WVHWLCI5J9CHCROCKH3B381CCLZ4XAALLMD",
+   "6T1XIVCPIPXODRK8312KVMCDPBMC7J4K0RWB7PM2V4VMBMODQ8STMYSLIXFN9ORRXCTERWS5U4BLUNA4H6NG8O01IM510NJ5STE",
+   "-2P2RVZ11QF",
+   "-3YSI67CCOD8OI1HFF7VF5AWEQ34WK6B8AAFV95U7C04GBXN0R6W5GM5OGOO22HY0KADIUBXSY13435TW4VLHCKLM76VS51W5Z9J"),
+  ("-326JY57SJVC",
+   "-8H98AQ1OY7CGAOOSG",
+   "0",
+   "-326JY57SJVC"),
+  ("-XIYY0P3X9JIDF20ZQG2CN5D2Q5CD9WFDDXRLFZRDKZ8V4TSLE2EHRA31XL3YOHPYLE0I0ZAV2V9RF8AGPCYPVWEIYWWWZ3HVDR64M08VZTBL85PR66Z2F0W5AIDPXIAVLS9VVNLNA6I0PKM87YW4T98P0K",
+   "-BUBZEC4NTOSCO0XHCTETN4ROPSXIJBTEFYMZ7O4Q1REOZO2SFU62KM3L8D45Z2K4NN3EC4BSRNEE",
+   "2TX1KWYGAW9LAXUYRXZQENY5P3DSVXJJXK4Y9DWGNZHOWCL5QD5PLLZCE6D0G7VBNP9YGFC0Z9XIPCB",
+   "-3LNPZ9JK5PUXRZ2Y1EJ4E3QRMAMPKZNI90ZFOBQJM5GZUJ84VMF8EILRGCHZGXJX4AXZF0Z00YA"),
+  ("AZZBGH7AH3S7TVRHDJPJ2DR81H4FY5VJW2JH7O4U7CH0GG2DSDDOSTD06S4UM0HP1HAQ68B2LKKWD73UU0FV5M0H0D0NSXUJI7C2HW3P51H1JM5BHGXK98NNNSHMUB0674VKJ57GVVGY4",
+   "1LYN8LRN3PY24V0YNHGCW47WUWPLKAE4685LP0J74NZYAIMIBZTAF71",
+   "6TXVE5E9DXTPTHLEAG7HGFTT0B3XIXVM8IGVRONGSSH1UC0HUASRTZX8TVM2VOK9N9NATPWG09G7MDL6CE9LBKN",
+   "WY37RSPBTEPQUA23AXB3B5AJRIUL76N3LXLP3KQWKFFSR7PR4E1JWH"),
+  ("1000000000000000000000000000000000000000000000",
+   "1000000000000000000000000000000000000",
+   "1000000000",
+   "0"),
+  ])
+{ strings in
+  let x = BigInt(strings.0, radix: 36)!
+  let y = BigInt(strings.1, radix: 36)!
+  let q = BigInt(strings.2, radix: 36)!
+  let r = BigInt(strings.3, radix: 36)!
 
+  let (testQ, testR) = x.quotientAndRemainder(dividingBy: y)
+  expectEqual(testQ, q)
+  expectEqual(testR, r)
+  expectEqual(x, y * q + r)
+}
+
+BigIntTests.test("Strings") {
+  let x = BigInt("-3UNIZHA6PAL30Y", radix: 36)!
+  expectEqual(x.binaryString, "-1000111001110110011101001110000001011001110110011011110011000010010010")
+  expectEqual(x.decimalString, "-656993338084259999890")
+  expectEqual(x.hexString, "-239D9D3816766F3092")
+  expectEqual(x.compactString, "-3UNIZHA6PAL30Y")
+
+  expectTrue(BigInt("12345") == 12345)
+  expectTrue(BigInt("-12345") == -12345)
+
+  expectTrue(BigInt("-3UNIZHA6PAL30Y", radix: 10) == nil)
+  expectTrue(BigInt("---") == nil)
+  expectTrue(BigInt(" 123") == nil)
+}
+
+BigIntTests.test("Randomized arithmetic").forEach(in: Array(1...10)) { _ in
   // Test x == (x / y) * x + (x % y)
   let (x, y) = (
-    BigInt(randomBits: bitLengths[0]), BigInt(randomBits: bitLengths[1]))
+    BigInt(randomBits: randomBitLength()),
+    BigInt(randomBits: randomBitLength()))
   if !y.isZero {
     let (q, r) = x.quotientAndRemainder(dividingBy: y)
     expectEqual(q * y + r, x)
@@ -1207,11 +1412,105 @@ BigIntTests.test("Randomized arithmetic").forEach(in: Array(1...20)) { _ in
 
   // Test (x0 + y0)(x1 + y1) == x0x1 + x0y1 + y0x1 + y0y1
   let (x0, y0, x1, y1) = (
-    BigInt(randomBits: bitLengths[2]), BigInt(randomBits: bitLengths[3]),
-    BigInt(randomBits: bitLengths[4]), BigInt(randomBits: bitLengths[5]))
+    BigInt(randomBits: randomBitLength()),
+    BigInt(randomBits: randomBitLength()),
+    BigInt(randomBits: randomBitLength()),
+    BigInt(randomBits: randomBitLength()))
   let r1 = (x0 + y0) * (x1 + y1)
-  let r2 = (x0 * x1) + (x0 * y1) + (y0 * x1) + (y0 * y1)
-  expectEqual(r1, r2)
+  let r2 = ((x0 * x1) + (x0 * y1), (y0 * x1) + (y0 * y1))
+  expectEqual(r1, r2.0 + r2.1)
+}
+
+var BigInt8Tests = TestSuite("BigInt<UInt8>")
+
+BigInt8Tests.test("BinaryInteger interop") {
+  let x: BigInt8 = 100
+  let xComp = UInt8(x)
+  expectTrue(x == xComp)
+  expectTrue(x < xComp + 1)
+  expectFalse(xComp + 1 < x)
+
+  let y: BigInt8 = -100
+  let yComp = Int8(y)
+  expectTrue(y == yComp)
+  expectTrue(y < yComp + (1 as Int8))
+  expectFalse(yComp + (1 as Int8) < y)
+
+  let zComp = Int.min + 1
+  let z = BigInt8(zComp)
+  expectTrue(z == zComp)
+  expectTrue(zComp == z)
+  expectFalse(zComp + 1 < z)
+  expectTrue(z < zComp + 1)
+
+  let w = BigInt8(UInt.max)
+  let wComp = UInt(extendingOrTruncating: w)
+  expectTrue(w == wComp)
+  expectTrue(wComp == w)
+  expectTrue(wComp - (1 as UInt) < w)
+  expectFalse(w < wComp - (1 as UInt))
+}
+
+BigInt8Tests.test("Randomized arithmetic").forEach(in: Array(1...10)) { _ in
+  // Test x == (x / y) * x + (x % y)
+  let (x, y) = (
+    BigInt8(randomBits: randomBitLength()),
+    BigInt8(randomBits: randomBitLength()))
+  if !y.isZero {
+    let (q, r) = x.quotientAndRemainder(dividingBy: y)
+    expectEqual(q * y + r, x)
+    expectEqual(q * y, x - r)
+  }
+
+  // Test (x0 + y0)(x1 + y1) == x0x1 + x0y1 + y0x1 + y0y1
+  let (x0, y0, x1, y1) = (
+    BigInt8(randomBits: randomBitLength()),
+    BigInt8(randomBits: randomBitLength()),
+    BigInt8(randomBits: randomBitLength()),
+    BigInt8(randomBits: randomBitLength()))
+  let r1 = (x0 + y0) * (x1 + y1)
+  let r2 = ((x0 * x1) + (x0 * y1), (y0 * x1) + (y0 * y1))
+  expectEqual(r1, r2.0 + r2.1)
+}
+
+BigInt8Tests.test("Bitshift") {
+  expectEqual(BigInt8(255) << 1, 510)
+  expectTrue(BigInt(UInt32.max) << 16 == UInt(UInt32.max) << 16)
+  var (x, y) = (1 as BigInt, 1 as UInt)
+  for i in 0..<64 {   // don't test 64-bit shift, UInt64 << 64 == 0
+    expectTrue(x << i == y << i)
+  }
+
+  (x, y) = (BigInt(UInt.max), UInt.max)
+  for i in 0...64 {   // test 64-bit shift, should both be zero
+    expectTrue(x >> i == y >> i)
+  }
+
+  x = BigInt(-1)
+  var z = -1 as Int
+  for i in 0..<64 {
+    expectTrue(x << i == z << i)
+  }
+}
+
+BigInt8Tests.test("Bitwise").forEach(in: [
+  BigInt8(Int.max - 2),
+  BigInt8(255),
+  BigInt8(256),
+  BigInt8(UInt32.max),
+  ])
+{ value in
+  for x in [value, -value] {
+    expectTrue(x | 0 == x)
+    expectTrue(x & 0 == 0)
+    expectTrue(x & ~0 == x)
+    expectTrue(x ^ 0 == x)
+    expectTrue(x ^ ~0 == ~x)
+    expectTrue(x == BigInt8(Int(extendingOrTruncating: x)))
+    expectTrue(~x == BigInt8(~Int(extendingOrTruncating: x)))
+  }
+}
+
 }
 
 runAllTests()
