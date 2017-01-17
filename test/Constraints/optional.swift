@@ -166,13 +166,15 @@ _? = nil  // expected-error {{'nil' requires a contextual type}}
 _?? = nil // expected-error {{'nil' requires a contextual type}}
 
 
+// rdar://problem/29993596
+func takeAnyObjects(_ lhs: AnyObject?, _ rhs: AnyObject?) { }
+
 infix operator !====
+
 func !====(_ lhs: AnyObject?, _ rhs: AnyObject?) -> Bool { return false }
 
-func calleeRdar29977523(_ lhs: AnyObject?, _ rhs: AnyObject?) { }
-
-func rdar29977523(lhs: AnyObject?!, rhs: AnyObject?) {
+func testAnyObjectImplicitForce(lhs: AnyObject?!, rhs: AnyObject?) {
   if lhs !==== rhs { }
 
-  calleeRdar29977523(lhs, rhs)
+  takeAnyObjects(lhs, rhs)
 }
