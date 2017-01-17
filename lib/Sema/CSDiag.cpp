@@ -4727,13 +4727,23 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
   // compiler would add implicit 'self.' prefix to the call of 'max'.
   ExprCleaner cleanup(argExpr);
 
-  // Let's type check argument expression without any contextual information.
-  ConcreteDeclRef ref = nullptr;
-  auto typeResult = TC.getTypeOfExpressionWithoutApplying(argExpr, CS->DC, ref);
-  if (!typeResult.hasValue())
-    return false;
+  auto argType = argExpr->getType();
+  // If argument wasn't properly type-checked, let's retry without changing AST.
+  if (!argType || argType->hasUnresolvedType() || argType->hasTypeVariable() ||
+      argType->hasTypeParameter()) {
+    // Let's type check argument expression without any contextual information.
+    ConcreteDeclRef ref = nullptr;
+    auto typeResult = TC.getTypeOfExpressionWithoutApplying(argExpr, CS->DC,
+                                                            ref);
+    if (!typeResult.hasValue())
+      return false;
 
-  auto argType = typeResult.getValue();
+    argType = typeResult.getValue();
+  }
+
+  auto typeKind = argType->getKind();
+  if (typeKind != TypeKind::Tuple && typeKind != TypeKind::Paren)
+    return false;
 
   // If argument type couldn't be properly resolved or has errors,
   // we can't diagnose anything in here, it points to the different problem.
