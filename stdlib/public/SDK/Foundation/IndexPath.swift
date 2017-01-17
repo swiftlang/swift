@@ -135,10 +135,24 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
 
     /// Sorting an array of `IndexPath` using this comparison results in an array representing nodes in depth-first traversal order.
     public func compare(_ other: IndexPath) -> ComparisonResult  {
-        // This is temporary
-        let me = self.makeReference()
-        let other = other.makeReference()
-        return me.compare(other as IndexPath)
+        let thisLength = count
+        let otherLength = other.count
+        let length = min(thisLength, otherLength)
+        for idx in 0..<length {
+            let otherValue = other[idx]
+            let value = self[idx]
+            if value < otherValue {
+                return .orderedAscending
+            } else if value > otherValue {
+                return .orderedDescending
+            }
+        }
+        if thisLength > otherLength {
+            return .orderedDescending
+        } else if thisLength < otherLength {
+            return .orderedAscending
+        }
+        return .orderedSame
     }
 
     public var hashValue: Int {
@@ -154,14 +168,10 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         if count == 0 {
             _indexes = []
         } else {
-            var ptr = malloc(count * MemoryLayout<Element>.size)
-            defer { free(ptr) }
-
-            let elementPtr = ptr!.bindMemory(to: Element.self, capacity: count)
-            nsIndexPath.getIndexes(elementPtr, range: NSMakeRange(0, count))
-            
-            let buffer = UnsafeBufferPointer(start: elementPtr, count: count)
-            _indexes = buffer.map { $0 }
+            _indexes = Array<Int>(repeating: 0, count: count)
+            _indexes.withUnsafeBufferPointer {
+                nsIndexPath.getIndexes($0.baseAddress!, range: NSMakeRange(0, count))
+            }
         }
     }
     
