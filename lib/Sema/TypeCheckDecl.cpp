@@ -6087,6 +6087,23 @@ public:
           new (TC.Context) OverrideAttr(SourceLoc()));
     }
 
+    // If the overridden method is declared in a Swift Class Declaration,
+    // dispatch will use table dispatch. If the override is in an extension
+    // warn, since it is not added to the class vtable.
+    //
+    // FIXME: Only warn if the extension is in another module, and if
+    // it is in the same module, update the vtable.
+    if (auto *baseDecl = dyn_cast<ClassDecl>(base->getDeclContext())) {
+      if (baseDecl->hasKnownSwiftImplementation() && 
+          !base->isDynamic() &&
+          override->getDeclContext()->isExtensionContext()) {
+        // For compatibility, only generate a warning in Swift 3
+        TC.diagnose(override, (TC.Context.isSwiftVersion3()
+          ? diag::override_class_declaration_in_extension_warning
+          : diag::override_class_declaration_in_extension));
+        TC.diagnose(base, diag::overridden_here);
+      }
+    }
     // If the overriding declaration is 'throws' but the base is not,
     // complain.
     if (auto overrideFn = dyn_cast<AbstractFunctionDecl>(override)) {
