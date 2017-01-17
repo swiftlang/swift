@@ -2028,8 +2028,8 @@ extension _ArrayBufferProtocol {
     var newCount = self.count
 
     // there might not be any elements to append remaining,
-    // so use an iterator+while loop to check, then increase
-    // capacity and fill that capacity with elements
+    // so check for nil element first, then increase capacity,
+    // then inner-loop to fill that capacity with elements
     var stream = newItems.makeIterator()
     var nextItem = stream.next()
     while nextItem != nil {
