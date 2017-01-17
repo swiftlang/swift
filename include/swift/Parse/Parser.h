@@ -603,9 +603,8 @@ public:
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
-  /// \brief Parse the list of statements, expressions, or declarations.
+  /// \brief Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                         tok SeparatorK, bool OptionalSep,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
                          std::function<ParserStatus()> callback);
 
@@ -723,15 +722,15 @@ public:
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
                                 SourceLoc *classRequirementLoc);
+  bool parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                     Diag<> ErrorDiag, ParseDeclOptions Options,
+                     llvm::function_ref<void(Decl*)> handler);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
   ParserStatus parseDeclEnumCase(ParseDeclOptions Flags, DeclAttributes &Attributes,
                                  SmallVectorImpl<Decl *> &decls);
-  bool parseNominalDeclMembers(SourceLoc LBLoc, SourceLoc &RBLoc,
-                               Diag<> ErrorDiag, ParseDeclOptions flags,
-                               llvm::function_ref<void(Decl*)> handler);
   ParserResult<StructDecl>
   parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<ClassDecl>

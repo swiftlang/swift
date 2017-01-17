@@ -744,8 +744,6 @@ public:
   /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;
 
-  SourceLoc TrailingSemiLoc;
-
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
