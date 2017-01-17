@@ -80,9 +80,8 @@ let y2 = Y2() // expected-note{{change 'let' to 'var' to make it mutable}}{{1-4=
 _ = y2[0] // expected-error{{cannot use mutating getter on immutable value: 'y2' is a 'let' constant}}
 
 // Parsing errors
-// FIXME: Recovery here is horrible
 struct A0 {
-  subscript // expected-error{{expected '(' for subscript parameters}}
+  subscript // expected-error {{subscripts cannot have a name}} {{5-7=}}
     i : Int
      -> Int {
     get {
@@ -91,6 +90,10 @@ struct A0 {
     set {
       stored = value
     }
+  }
+  
+  subscript -> Int { // expected-error {{expected '(' for subscript parameters}} {{12-12=()}}
+    return 1
   }
 }
 
@@ -173,9 +176,3 @@ struct A8 {
     }
   }
 } // expected-error{{extraneous '}' at top level}} {{1-3=}}
-
-struct A9 {
-  subscript -> Int { // expected-error {{expected '(' for subscript parameters}} {{12-12=()}}
-    return 1
-  }
-}

@@ -17,6 +17,8 @@ struct FooStructConstructorC {
 
 struct FooStructDeinitializerA {
   deinit // expected-error {{expected '{' for deinitializer}}
+  deinit x // expected-error {{deinitializers cannot have a name}} {{10-12=}}
+  deinit x() // expected-error {{deinitializers cannot have a name}} {{10-11=}}
 }
 
 struct FooStructDeinitializerB {
