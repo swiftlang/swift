@@ -25,6 +25,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Availability.h"
+#include "swift/Basic/Compiler.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
@@ -671,30 +672,15 @@ class TrailingCallArguments
     return *static_cast<const Derived *>(this);
   }
 
-  // Work around MSVC bug: can't infer llvm::trailing_objects_internal,
-  // even though we granted friend access to it.
   size_t numTrailingObjects(
-#if defined(_MSC_VER) && !defined(__clang__)
-      llvm::trailing_objects_internal::TrailingObjectsBase::OverloadToken<
-      Identifier>) const {
-#else
-      typename TrailingObjects::template OverloadToken<Identifier>) const {
-#endif
+      SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Identifier)) const {
     return asDerived().getNumArguments();
   }
 
-  // Work around MSVC bug: can't infer llvm::trailing_objects_internal,
-  // even though we granted friend access to it.
   size_t numTrailingObjects(
-#if defined(_MSC_VER) && !defined(__clang__)
-      llvm::trailing_objects_internal::TrailingObjectsBase::OverloadToken<
-      SourceLoc>) const {
-#else
-      typename TrailingObjects::template OverloadToken<SourceLoc>) const {
-#endif
-    return asDerived().hasArgumentLabelLocs()
-             ? asDerived().getNumArguments()
-             : 0;
+      SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(SourceLoc)) const {
+    return asDerived().hasArgumentLabelLocs() ? asDerived().getNumArguments()
+                                              : 0;
   }
 
   /// Retrieve the buffer containing the argument labels.

@@ -460,15 +460,8 @@ public:
     }
   }
 
-  // Work around MSVC bug: can't infer llvm::trailing_objects_internal,
-  // even though we granted friend access to it.
-  size_t numTrailingObjects(
-#if defined(_MSC_VER) && !defined(__clang__)
-      llvm::trailing_objects_internal::TrailingObjectsBase::OverloadToken<
-      Operand>) const {
-#else
-      typename TrailingBase::template OverloadToken<Operand>) const {
-#endif
+  size_t
+      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
     return NumOperands;
   }
 
@@ -2310,16 +2303,8 @@ public:
   SILType getBoundType() const { return BoundType ; }
 
   // Implement llvm::TrailingObjects.
-
-  // Work around MSVC bug: can't infer llvm::trailing_objects_internal,
-  // even though we granted friend access to it.
-  size_t numTrailingObjects(
-#if defined(_MSC_VER) && !defined(__clang__)
-      llvm::trailing_objects_internal::TrailingObjectsBase::OverloadToken<
-      Operand>) const {
-#else
-      typename TrailingBase::template OverloadToken<Operand>) const {
-#endif
+  size_t
+      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
     return NumOperands;
   }
 
