@@ -514,10 +514,10 @@ public:
     return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
-  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue Src,
-                                 SILValue DestAddr) {
-    return insert(new (F.getModule())
-                      EndBorrowInst(getSILDebugLocation(Loc), Src, DestAddr));
+  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue BorrowedValue,
+                                 SILValue OriginalValue) {
+    return insert(new (F.getModule()) EndBorrowInst(
+        getSILDebugLocation(Loc), BorrowedValue, OriginalValue));
   }
 
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {

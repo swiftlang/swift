@@ -134,22 +134,24 @@ SILGenFunction::emitManagedBeginBorrow(SILLocation loc, SILValue v,
 }
 
 ManagedValue
-SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue borrowee,
+SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue original,
                                                      SILValue borrowed) {
-  assert(borrowee->getType().getObjectType() ==
+  assert(original->getType().getObjectType() ==
          borrowed->getType().getObjectType());
-  auto &lowering = getTypeLowering(borrowee->getType());
-  return emitManagedBorrowedRValueWithCleanup(borrowee, borrowed, lowering);
+  auto &lowering = getTypeLowering(original->getType());
+  return emitManagedBorrowedRValueWithCleanup(original, borrowed, lowering);
 }
 
 ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
-    SILValue borrowee, SILValue borrowed, const TypeLowering &lowering) {
+    SILValue original, SILValue borrowed, const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() ==
-         borrowee->getType().getObjectType());
+         original->getType().getObjectType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(borrowed);
 
-  return ManagedValue(borrowed, enterEndBorrowCleanup(borrowee, borrowed));
+  if (borrowed->getType().isObject())
+    enterEndBorrowCleanup(original, borrowed);
+  return ManagedValue(borrowed, CleanupHandle::invalid());
 }
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {

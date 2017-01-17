@@ -1069,8 +1069,10 @@ public:
   }
 
   void visitEndBorrowInst(EndBorrowInst *EBI) {
-    *this << getID(EBI->getDest()) << " from " << getID(EBI->getSrc()) << " : "
-          << EBI->getDest()->getType() << ", " << EBI->getSrc()->getType();
+    *this << getID(EBI->getBorrowedValue()) << " from "
+          << getID(EBI->getOriginalValue()) << " : "
+          << EBI->getBorrowedValue()->getType() << ", "
+          << EBI->getOriginalValue()->getType();
   }
 
   void visitAssignInst(AssignInst *AI) {

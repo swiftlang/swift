@@ -1811,20 +1811,21 @@ class EndBorrowInst : public SILInstruction {
 
 public:
   enum {
-    /// The source of the value being borrowed.
-    Src,
-    /// The destination of the borrowed value.
-    Dest
+    /// The borrowed value.
+    BorrowedValue,
+    /// The original value that was borrowed from.
+    OriginalValue
   };
 
 private:
   FixedOperandList<2> Operands;
-  EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+  EndBorrowInst(SILDebugLocation DebugLoc, SILValue BorrowedValue,
+                SILValue OriginalValue);
 
 public:
-  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getBorrowedValue() const { return Operands[BorrowedValue].get(); }
 
-  SILValue getDest() const { return Operands[Dest].get(); }
+  SILValue getOriginalValue() const { return Operands[OriginalValue].get(); }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }

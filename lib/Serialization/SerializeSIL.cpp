@@ -1301,15 +1301,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned abbrCode = SILAbbrCodes[SILTwoOperandsLayout::Code];
     unsigned Attr = 0;
     auto *EBI = cast<EndBorrowInst>(&SI);
-    SILValue Src = EBI->getSrc();
-    SILValue Dest = EBI->getDest();
+    SILValue BorrowedValue = EBI->getBorrowedValue();
+    SILValue OriginalValue = EBI->getOriginalValue();
 
     SILTwoOperandsLayout::emitRecord(
         Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), Attr,
-        S.addTypeRef(Src->getType().getSwiftRValueType()),
-        (unsigned)Src->getType().getCategory(), addValueRef(Src),
-        S.addTypeRef(Dest->getType().getSwiftRValueType()),
-        (unsigned)Dest->getType().getCategory(), addValueRef(Dest));
+        S.addTypeRef(BorrowedValue->getType().getSwiftRValueType()),
+        (unsigned)BorrowedValue->getType().getCategory(),
+        addValueRef(BorrowedValue),
+        S.addTypeRef(OriginalValue->getType().getSwiftRValueType()),
+        (unsigned)OriginalValue->getType().getCategory(),
+        addValueRef(OriginalValue));
     break;
   }
 
