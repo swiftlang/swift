@@ -51,6 +51,11 @@ public protocol UnicodeEncoding {
   /// encoding.
   associatedtype EncodedScalar : EncodedScalarProtocol
   // where Iterator.Element : UnsignedInteger
+
+  /// Provide a means to produce a scalar of this encoding from any other
+  /// encoding
+  static func transcodeScalar<T: EncodedScalarProtocol>(
+    _:T) -> Self.EncodedScalar
   
   /// Parse a single unicode scalar forward from `input`.
   ///
@@ -350,6 +355,11 @@ public enum UTF8 : UnicodeEncoding {
     return x & (0b11111 >> (x >> 5 & 1))
   }
   
+  public static func transcodeScalar<T: EncodedScalarProtocol>(
+    _ other:T) -> UTF8.EncodedScalar {
+    return other.utf8
+  }
+
   public static func parse1Forward<C: Collection>(
     _ input: C, knownCount knownCount_: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
@@ -592,6 +602,12 @@ public enum ValidUTF8 : UnicodeEncoding {
     return UTF8.maxLengthOfEncodedScalar
   }
 
+  public static func transcodeScalar<T: EncodedScalarProtocol>(
+    _ other:T) -> ValidUTF8.EncodedScalar {
+    // FIXME: validity? May need to substitute for invalid forms?
+    return other.utf8
+  }
+
   public static func parse1Forward<C: Collection>(
     _ input: C,
     knownCount: Int = 0
@@ -713,6 +729,11 @@ public enum UTF16 : UnicodeEncoding {
     return 0x10000 + ((UInt32(unit0 & 0x03ff) << 10) | UInt32(unit1 & 0x03ff))
   }
   
+  public static func transcodeScalar<T: EncodedScalarProtocol>(
+    _ other:T) -> UTF16.EncodedScalar {
+    return other.utf16
+  }
+
   public static func parse1Forward<C: Collection>(
     _ input: C, knownCount: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
@@ -846,6 +867,12 @@ public enum ValidUTF16 : UnicodeEncoding {
     return UTF16.maxLengthOfEncodedScalar
   }
   
+  public static func transcodeScalar<T: EncodedScalarProtocol>(
+    _ other:T) -> ValidUTF16.EncodedScalar {
+    // FIXME: validity? May need to substitute for invalid forms?
+    return other.utf16
+  }
+
   public static func parse1Forward<C: Collection>(
     _ input: C, knownCount: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
@@ -909,6 +936,11 @@ public enum UTF32 : UnicodeEncoding {
     return u <= 0xD7FF || 0xE000...0x10FFFF ~= u
   }
   
+  public static func transcodeScalar<T: EncodedScalarProtocol>(
+    _ other:T) -> UTF32.EncodedScalar {
+    return other.utf32
+  }
+
   public static func parse1Forward<C: Collection>(
     _ input: C, knownCount: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
