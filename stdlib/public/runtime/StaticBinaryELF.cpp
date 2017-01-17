@@ -18,6 +18,7 @@
 
 #include "ImageInspection.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/Lazy.h"
 #include <cassert>
@@ -88,11 +89,12 @@ private:
       if (mapping == MAP_FAILED) {
         mapping = nullptr;
         mapLength = 0;
+        diff = 0;
       }
     }
 
     template<typename T>
-    const ArrayRef<T> data() {
+    ArrayRef<T> data() {
       size_t elements = (mapLength - diff) / sizeof(T);
       const T *data = reinterpret_cast<T *>(reinterpret_cast<char *>(mapping)
                                             + diff);
@@ -108,11 +110,8 @@ private:
 
   string fullPathName;
   const Elf_Phdr *programHeaders = nullptr;
-  const Elf_Shdr *symbolTable = nullptr;
-  const Elf_Shdr *stringTable = nullptr;
-  Mapping *sectionHeaders = nullptr;
-  Mapping *symbolTableData = nullptr;
-  Mapping *stringTableData = nullptr;
+  Optional<Mapping> symbolTable;
+  Optional<Mapping> stringTable;
 
 public:
   StaticBinaryELF() {
@@ -136,12 +135,6 @@ public:
     }
   }
 
-  ~StaticBinaryELF() {
-    delete stringTableData;
-    delete symbolTableData;
-    delete sectionHeaders;
-  }
-
   const char *getPathName() {
     return fullPathName.empty() ? nullptr : fullPathName.c_str();
   }
@@ -163,9 +156,9 @@ public:
 
   // Lookup a function symbol by address.
   const Elf_Sym *findSymbol(const void *addr) {
-    if (symbolTable) {
+    if (symbolTable.hasValue()) {
       auto searchAddr = reinterpret_cast<Elf_Addr>(addr);
-      const ArrayRef<Elf_Sym> symbols = symbolTableData->data<Elf_Sym>();
+      auto symbols = symbolTable->data<Elf_Sym>();
 
       for (size_t idx = 0; idx < symbols.size(); idx++) {
         auto symbol = &symbols[idx];
@@ -180,9 +173,11 @@ public:
   }
 
   const char *symbolName(const Elf_Sym *symbol) {
-    if (stringTable && symbol->st_name < stringTable->sh_size) {
-      const ArrayRef<char> strings = stringTableData->data<char>();
-      return &strings[symbol->st_name];
+    if (stringTable.hasValue()) {
+      auto strings = stringTable->data<char>();
+      if (symbol->st_name < strings.size()) {
+        return &strings[symbol->st_name];
+      }
     }
     return nullptr;
   }
@@ -253,24 +248,25 @@ private:
 
     // Map in the section headers.
     size_t sectionHeadersSize = (elfHeader.e_shentsize * elfHeader.e_shnum);
-    sectionHeaders = new Mapping(fd, buf.st_size, elfHeader.e_shoff,
-                                 sectionHeadersSize);
-    if (sectionHeaders->mapping) {
-      auto section = findSectionHeader(SHT_SYMTAB);
+    Mapping sectionHeaders = Mapping(fd, buf.st_size, elfHeader.e_shoff,
+                                     sectionHeadersSize);
+    if (sectionHeaders.mapping) {
+      auto headers = sectionHeaders.data<Elf_Shdr>();
+      auto section = findSectionHeader(headers, SHT_SYMTAB);
       if (section) {
         assert(section->sh_entsize == sizeof(Elf_Sym));
-        symbolTableData = new Mapping(fd, buf.st_size, section->sh_offset,
-                                      section->sh_size);
-        if (symbolTableData->mapping) {
-          symbolTable = section;
+        symbolTable.emplace(fd, buf.st_size, section->sh_offset,
+                            section->sh_size);
+        if (symbolTable->mapping == nullptr) {
+          symbolTable.reset();
         }
       }
-      section = findSectionHeader(SHT_STRTAB);
+      section = findSectionHeader(headers, SHT_STRTAB);
       if (section) {
-        stringTableData = new Mapping(fd, buf.st_size, section->sh_offset,
-                                      section->sh_size);
-        if (stringTableData->mapping) {
-          stringTable = section;
+        stringTable.emplace(fd, buf.st_size, section->sh_offset,
+                            section->sh_size);
+        if (stringTable->mapping == nullptr) {
+          stringTable.reset();
         }
       }
     }
@@ -279,23 +275,22 @@ private:
   }
 
   // Find the section header of a specified type in the section headers table.
-  const Elf_Shdr *findSectionHeader(Elf_Word sectionType) {
-    if (sectionHeaders && sectionHeaders->mapping) {
-      const ArrayRef<Elf_Shdr> headers = sectionHeaders->data<Elf_Shdr>();
-      for (size_t idx = 0; idx < elfHeader.e_shnum; idx++) {
-        if (idx == elfHeader.e_shstrndx) {
-          continue;
+  const Elf_Shdr *findSectionHeader(ArrayRef<Elf_Shdr> headers,
+                                    Elf_Word sectionType) {
+    assert(elfHeader.e_shnum == headers.size());
+    for (size_t idx = 0; idx < headers.size(); idx++) {
+      if (idx == elfHeader.e_shstrndx) {
+        continue;
+      }
+      auto header = &headers[idx];
+      if (header->sh_type == sectionType) {
+        if (header->sh_entsize > 0 && header->sh_size % header->sh_entsize) {
+          fprintf(stderr,
+                  "section size is not a multiple of entrysize (%ld/%ld)\n",
+                  header->sh_size, header->sh_entsize);
+          return nullptr;
         }
-        auto header = &headers[idx];
-        if (header->sh_type == sectionType) {
-          if (header->sh_entsize > 0 && header->sh_size % header->sh_entsize) {
-            fprintf(stderr,
-                    "section size is not a multiple of entrysize (%ld/%ld)\n",
-                    header->sh_size, header->sh_entsize);
-            return nullptr;
-          }
-          return header;
-        }
+        return header;
       }
     }
     return nullptr;
