@@ -2597,21 +2597,36 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
       // Swift does not permit class methods with Objective-C selectors 'load',
       // 'alloc', or 'allocWithZone:'.
       if (!method->isInstanceMember()) {
-        auto isForbiddenSelector = [&TC](ObjCSelector sel) {
+        auto isForbiddenSelector = [&TC](ObjCSelector sel)
+        -> Optional<Diag<unsigned, DeclName, ObjCSelector>> {
           switch (sel.getNumArgs()) {
           case 0:
-            return sel.getSelectorPieces().front() == TC.Context.Id_load ||
-                   sel.getSelectorPieces().front() == TC.Context.Id_alloc;
+            if (sel.getSelectorPieces().front() == TC.Context.Id_load ||
+                sel.getSelectorPieces().front() == TC.Context.Id_alloc)
+              return diag::objc_class_method_not_permitted;
+            // Swift 3 and earlier allowed you to override `initialize`, but
+            // Swift's semantics do not guarantee that it will be called at
+            // the point you expect. It is disallowed in Swift 4 and later.
+            if (sel.getSelectorPieces().front() == TC.Context.Id_initialize) {
+              if (TC.getLangOpts().isSwiftVersion3())
+                return
+                  diag::objc_class_method_not_permitted_swift3_compat_warning;
+              else
+                return diag::objc_class_method_not_permitted;
+            }
+            return None;
           case 1:
-            return sel.getSelectorPieces().front()==TC.Context.Id_allocWithZone;
+            if (sel.getSelectorPieces().front() == TC.Context.Id_allocWithZone)
+              return diag::objc_class_method_not_permitted;
+            return None;
           default:
-            return false;
+            return None;
           }
         };
         auto sel = method->getObjCSelector(&TC);
-        if (isForbiddenSelector(sel)) {
+        if (auto diagID = isForbiddenSelector(sel)) {
           auto diagInfo = getObjCMethodDiagInfo(method);
-          TC.diagnose(method, diag::objc_class_method_not_permitted,
+          TC.diagnose(method, *diagID,
                       diagInfo.first, diagInfo.second, sel);
         }
       }

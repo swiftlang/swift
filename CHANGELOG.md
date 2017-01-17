@@ -20,6 +20,12 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* Swift will now warn when an `NSObject` subclass attempts to override the
+  class `initialize` method. Swift doesn't guarantee that references to class
+  names trigger Objective-C class realization if they have no other
+  side effects, leading to bugs when Swift code attempted to override
+  `initialize`.
+
 * [SR-2394](https://bugs.swift.org/browse/SR-2394)
 
   C functions that "return twice" are no longer imported into Swift. Instead,
