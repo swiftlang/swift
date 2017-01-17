@@ -454,6 +454,9 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   ++NamesSeen[VD->getFullName()];
   SmallVector<ValueDecl *, 8> RelatedDecls;
 
+  if (isa<ParamDecl>(VD))
+    return; // Parameters don't have interesting related declarations.
+
   // FIXME: Extract useful related declarations, overloaded functions,
   // if VD is an initializer, we should extract other initializers etc.
   // For now we use UnqualifiedLookup to fetch other declarations with the same
