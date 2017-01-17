@@ -1584,7 +1584,12 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
               diag::unsupported_conditional_compilation_expression_type);
           return ConditionalCompilationExprState::error();
         } else {
-          // TODO: Emit a warning.
+          SourceRange ignoredRange(elements[iOperator]->getLoc(),
+                                   elements[iOperand]->getEndLoc());
+          D.diagnose(
+              elements[iOperator]->getLoc(),
+              diag::swift3_unsupported_conditional_compilation_expression_type)
+            .highlight(ignoredRange);
         }
       }
 
