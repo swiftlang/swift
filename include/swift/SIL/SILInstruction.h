@@ -443,9 +443,9 @@ protected:
   friend llvm::TrailingObjects<DERIVED, Operand, TRAILING_TYPES...>;
 
   typedef llvm::TrailingObjects<DERIVED, Operand, TRAILING_TYPES...>
-      TrailingBase;
+      TrailingObjects;
 
-  using TrailingBase::totalSizeToAlloc;
+  using TrailingObjects::totalSizeToAlloc;
 
   // Total number of operands of this instruction.
   // It is number of type dependent operands + 1.
@@ -520,12 +520,12 @@ public:
   getType() const { return ValueBase::getType(); }
 
   ArrayRef<Operand> getAllOperands() const {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 
@@ -2273,9 +2273,9 @@ class BindMemoryInst final :
     public SILInstruction,
     protected llvm::TrailingObjects<BindMemoryInst, Operand> {
 
-  typedef llvm::TrailingObjects<BindMemoryInst, Operand> TrailingBase;
-  friend TrailingBase;
-  using TrailingBase::totalSizeToAlloc;
+  typedef llvm::TrailingObjects<BindMemoryInst, Operand> TrailingObjects;
+  friend TrailingObjects;
+  using TrailingObjects::totalSizeToAlloc;
 
   friend SILBuilder;
 
@@ -2324,12 +2324,12 @@ public:
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 
