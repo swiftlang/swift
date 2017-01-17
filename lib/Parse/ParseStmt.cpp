@@ -1570,9 +1570,21 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
               break;
           }
         } else {
-          D.diagnose(SE->getLoc(),
-                     diag::unsupported_conditional_compilation_binary_expression);
+          D.diagnose(
+              SE->getLoc(),
+              diag::unsupported_conditional_compilation_binary_expression);
           return ConditionalCompilationExprState::error();
+        }
+      } else {
+        // Swift3 didn't have this branch. the operator and the RHS are
+        // silently ignored.
+        if (!Context.isSwiftVersion3()) {
+          D.diagnose(
+              elements[iOperator]->getLoc(),
+              diag::unsupported_conditional_compilation_expression_type);
+          return ConditionalCompilationExprState::error();
+        } else {
+          // TODO: Emit a warning.
         }
       }
 
