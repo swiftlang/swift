@@ -508,6 +508,24 @@ include_directories(BEFORE
 )
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  if(SWIFT_BUILD_SOURCEKIT)
+    add_custom_command(
+      OUTPUT "${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/.libs/libdispatch.so"
+      COMMAND autoreconf -fvi
+      COMMAND /usr/bin/env "CC=${PATH_TO_CLANG_BUILD}/bin/clang" "CXX=${PATH_TO_CLANG_BUILD}/bin/clang++" ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/configure --prefix="${CMAKE_INSTALL_PREFIX}"
+      COMMAND /usr/bin/make
+      COMMAND /bin/mkdir -p ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/.libs/
+      COMMAND /bin/cp ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/.libs/libdispatch.so ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/.libs/libdispatch.so
+      COMMAND /usr/bin/make distclean
+      WORKING_DIRECTORY ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}
+      COMMENT "Generating libdispatch.so"
+      USES_TERMINAL
+    )
+    add_custom_target(needs-libdispatch
+      DEPENDS "${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/.libs/libdispatch.so"
+    )
+  endif()
+
   include_directories(AFTER ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
 
   add_library(dispatch SHARED IMPORTED)
