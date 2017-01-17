@@ -443,9 +443,9 @@ protected:
   friend llvm::TrailingObjects<DERIVED, Operand, TRAILING_TYPES...>;
 
   typedef llvm::TrailingObjects<DERIVED, Operand, TRAILING_TYPES...>
-      TrailingBase;
+      TrailingObjects;
 
-  using TrailingBase::totalSizeToAlloc;
+  using TrailingObjects::totalSizeToAlloc;
 
   // Total number of operands of this instruction.
   // It is number of type dependent operands + 1.
@@ -460,15 +460,8 @@ public:
     }
   }
 
-  // Work around MSVC bug: can't infer llvm::trailing_objects_internal,
-  // even though we granted friend access to it.
-  size_t numTrailingObjects(
-#if defined(_MSC_VER) && !defined(__clang__)
-      llvm::trailing_objects_internal::TrailingObjectsBase::OverloadToken<
-      Operand>) const {
-#else
-      typename TrailingBase::template OverloadToken<Operand>) const {
-#endif
+  size_t
+      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
     return NumOperands;
   }
 
@@ -520,12 +513,12 @@ public:
   getType() const { return ValueBase::getType(); }
 
   ArrayRef<Operand> getAllOperands() const {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 
@@ -2273,9 +2266,9 @@ class BindMemoryInst final :
     public SILInstruction,
     protected llvm::TrailingObjects<BindMemoryInst, Operand> {
 
-  typedef llvm::TrailingObjects<BindMemoryInst, Operand> TrailingBase;
-  friend TrailingBase;
-  using TrailingBase::totalSizeToAlloc;
+  typedef llvm::TrailingObjects<BindMemoryInst, Operand> TrailingObjects;
+  friend TrailingObjects;
+  using TrailingObjects::totalSizeToAlloc;
 
   friend SILBuilder;
 
@@ -2310,26 +2303,18 @@ public:
   SILType getBoundType() const { return BoundType ; }
 
   // Implement llvm::TrailingObjects.
-
-  // Work around MSVC bug: can't infer llvm::trailing_objects_internal,
-  // even though we granted friend access to it.
-  size_t numTrailingObjects(
-#if defined(_MSC_VER) && !defined(__clang__)
-      llvm::trailing_objects_internal::TrailingObjectsBase::OverloadToken<
-      Operand>) const {
-#else
-      typename TrailingBase::template OverloadToken<Operand>) const {
-#endif
+  size_t
+      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
     return NumOperands;
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 
