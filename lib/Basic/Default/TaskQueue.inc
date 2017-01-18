@@ -68,8 +68,9 @@ unsigned TaskQueue::getNumberOfParallelTasks() const {
 }
 
 void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
-                        ArrayRef<const char *> Env, void *Context) {
-  std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context));
+                        ArrayRef<const char *> Env, void *Context,
+                        bool SeparateErrors) {
+  std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context, SeparateErrors));
   QueuedTasks.push(std::move(T));
 }
 
@@ -113,7 +114,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // a signal during execution.
       if (Signalled) {
         TaskFinishedResponse Response =
-            Signalled(PI.Pid, ErrMsg, StringRef(), StringRef(), T->Context);
+            Signalled(PI.Pid, ErrMsg, StringRef(), StringRef(), T->Context, None);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else {
         // If we don't have a Signalled callback, unconditionally stop.
