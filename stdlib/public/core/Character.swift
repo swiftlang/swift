@@ -127,14 +127,17 @@ public struct Character :
   ) {
     // Most character literals are going to be fewer than eight UTF-8 code
     // units; for those, build the small character representation directly.
-    if _fastPath(Int(utf8CodeUnitCount) <= 8) {
+    let maxCodeUnitCount = MemoryLayout<UInt64>.size
+    if _fastPath(Int(utf8CodeUnitCount) <= maxCodeUnitCount) {
       var buffer: UInt64 = ~0
       _memcpy(
         dest: UnsafeMutableRawPointer(Builtin.addressof(&buffer)),
         src: UnsafeMutableRawPointer(start),
         size: UInt(utf8CodeUnitCount))
+      // Copying the bytes directly from the literal into an integer assumes
+      // little endianness, so convert the copied data into host endianness.
       let utf8Chunk = UInt64(littleEndian: buffer)
-      let bits = MemoryLayout.size(ofValue: utf8Chunk) &* 8 &- 1
+      let bits = maxCodeUnitCount &* 8 &- 1
       // Verify that the highest bit isn't set so that we can truncate it to
       // 63 bits.
       if _fastPath(utf8Chunk & (1 << numericCast(bits)) != 0) {
