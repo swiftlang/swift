@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-inst-utils"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -222,6 +223,199 @@ SILValue swift::stripExpectIntrinsic(SILValue V) {
   if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::expect)
     return V;
   return BI->getArguments()[0];
+}
+
+void ConformanceCollector::scanType(Type type) {
+  type = type->getCanonicalType();
+  if (Visited.count(type.getPointer()) != 0)
+    return;
+
+  // Look for all possible metatypes and conformances which are used in type.
+  type.visit([this](Type SubType) {
+    if (NominalTypeDecl *NT = SubType->getNominalOrBoundGenericNominal()) {
+      if (Visited.count(SubType.getPointer()) == 0) {
+
+        if (Visited.count(NT) == 0) {
+          EscapingMetaTypes.push_back(NT);
+          Visited.insert(NT);
+        }
+
+        // Also inserts the type passed to scanType().
+        Visited.insert(SubType.getPointer());
+        auto substs = SubType->gatherAllSubstitutions(M.getSwiftModule(),
+                                                     nullptr);
+        scanSubsts(substs);
+      }
+    }
+  });
+}
+
+void ConformanceCollector::scanSubsts(ArrayRef<Substitution> substs) {
+  for (const Substitution &subst : substs) {
+    scanConformances(subst.getConformances());
+    scanType(subst.getReplacement());
+  }
+}
+
+void ConformanceCollector::scanConformance(ProtocolConformance *C) {
+  if (!C || Visited.count(C) != 0)
+    return;
+  Visited.insert(C);
+  Conformances.push_back(C);
+
+  switch (C->getKind()) {
+    case ProtocolConformanceKind::Normal:
+      break;
+    case ProtocolConformanceKind::Inherited:
+      scanConformance(cast<InheritedProtocolConformance>(C)->
+                        getInheritedConformance());
+      break;
+    case ProtocolConformanceKind::Specialized: {
+
+      auto *SpecC = cast<SpecializedProtocolConformance>(C);
+      scanConformance(SpecC->getGenericConformance());
+      scanSubsts(SpecC->getGenericSubstitutions());
+      break;
+    }
+  }
+
+  SILWitnessTable *WT = M.lookUpWitnessTable(C, /*deserializeLazily*/ false);
+  if (!WT)
+    return;
+
+  for (const SILWitnessTable::Entry &entry : WT->getEntries()) {
+    switch (entry.getKind()) {
+      case SILWitnessTable::AssociatedTypeProtocol:
+        scanConformance(entry.getAssociatedTypeProtocolWitness().Witness);
+        break;
+        
+      case SILWitnessTable::BaseProtocol:
+        scanConformance(entry.getBaseProtocolWitness().Witness);
+        break;
+        
+      case SILWitnessTable::AssociatedType:
+        scanType(entry.getAssociatedTypeWitness().Witness);
+        break;
+
+      case SILWitnessTable::Method:
+      case SILWitnessTable::Invalid:
+      case SILWitnessTable::MissingOptional:
+        break;
+    }
+  }
+}
+
+void ConformanceCollector::scanConformances(
+                                     ArrayRef<ProtocolConformanceRef> CRefs) {
+  for (ProtocolConformanceRef CRef : CRefs) {
+    scanConformance(CRef);
+  }
+}
+
+void ConformanceCollector::collect(swift::SILInstruction *I) {
+  switch (I->getKind()) {
+    case ValueKind::InitExistentialAddrInst: {
+      auto *IEI = cast<InitExistentialAddrInst>(I);
+      for (ProtocolConformanceRef CRef : IEI->getConformances()) {
+        if (CRef.isConcrete()) {
+          scanConformance(CRef.getConcrete()->getRootNormalConformance());
+        }
+      }
+      scanType(IEI->getFormalConcreteType());
+      break;
+    }
+    case ValueKind::InitExistentialRefInst:
+      scanConformances(cast<InitExistentialRefInst>(I)->getConformances());
+      break;
+    case ValueKind::InitExistentialMetatypeInst:
+      scanConformances(cast<InitExistentialMetatypeInst>(I)->getConformances());
+      break;
+    case ValueKind::WitnessMethodInst:
+      scanConformance(cast<WitnessMethodInst>(I)->getConformance());
+      break;
+    case ValueKind::AllocBoxInst: {
+      CanSILBoxType BTy = cast<AllocBoxInst>(I)->getBoxType();
+      size_t NumFields = BTy->getLayout()->getFields().size();
+      for (size_t Idx = 0; Idx < NumFields; ++Idx) {
+        scanType(BTy->getFieldLoweredType(M, Idx));
+      }
+      scanType(I->getType().getSwiftRValueType());
+      break;
+    }
+    case ValueKind::AllocExistentialBoxInst: {
+      auto *AEBI = cast<AllocExistentialBoxInst>(I);
+      scanType(AEBI->getFormalConcreteType());
+      scanConformances(AEBI->getConformances());
+      break;
+    }
+    case ValueKind::AllocRefInst:
+    case ValueKind::AllocRefDynamicInst:
+    case ValueKind::MetatypeInst:
+    case ValueKind::UnconditionalCheckedCastInst:
+      scanType(I->getType().getSwiftRValueType());
+      break;
+    case ValueKind::AllocStackInst: {
+      Type Ty = I->getType().getSwiftRValueType();
+      if (Ty->hasArchetype())
+        scanType(Ty);
+      break;
+    }
+    case ValueKind::CheckedCastAddrBranchInst: {
+      auto *CCABI = cast<CheckedCastAddrBranchInst>(I);
+      scanType(CCABI->getSourceType());
+      scanType(CCABI->getTargetType());
+      break;
+    }
+    case ValueKind::UnconditionalCheckedCastAddrInst: {
+      auto *UCCAI = cast<UnconditionalCheckedCastAddrInst>(I);
+      scanType(UCCAI->getSourceType());
+      scanType(UCCAI->getTargetType());
+      break;
+    }
+    case ValueKind::CheckedCastBranchInst:
+      scanType(cast<CheckedCastBranchInst>(I)->getCastType().
+                 getSwiftRValueType());
+      break;
+    case ValueKind::ValueMetatypeInst: {
+      auto *VMTI = cast<ValueMetatypeInst>(I);
+      scanType(VMTI->getOperand()->getType().getSwiftRValueType());
+      break;
+    }
+    case ValueKind::DestroyAddrInst: {
+      auto *DAI = cast<DestroyAddrInst>(I);
+      scanType(DAI->getOperand()->getType().getSwiftRValueType());
+      break;
+    }
+    default:
+      if (ApplySite AS = ApplySite::isa(I)) {
+        auto substs = AS.getSubstitutions();
+        scanSubsts(substs);
+
+        CanSILFunctionType OrigFnTy = AS.getOrigCalleeType();
+        CanSILFunctionType SubstFnTy = AS.getSubstCalleeType();
+
+        scanFuncParams(OrigFnTy->getParameters(), SubstFnTy->getParameters());
+        scanFuncParams(OrigFnTy->getAllResults(), SubstFnTy->getAllResults());
+
+        if (OrigFnTy->getRepresentation() ==
+            SILFunctionType::Representation::WitnessMethod) {
+          // The self parameter of a witness method is always generic.
+          scanType(OrigFnTy->getSelfInstanceType());
+        }
+      }
+      break;
+  }
+}
+
+void ConformanceCollector::collect(SILWitnessTable *WT) {
+  scanConformance(WT->getConformance());
+}
+
+void ConformanceCollector::dump() {
+  llvm::errs() << "ConformanceCollector:\n";
+  for (const ProtocolConformance *C : Conformances) {
+    C->dump();
+  }
 }
 
 namespace {
