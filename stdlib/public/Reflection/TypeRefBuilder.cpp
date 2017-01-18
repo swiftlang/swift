@@ -165,6 +165,8 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
     MangledName = B->getMangledName();
   else if (auto N = dyn_cast<NominalTypeRef>(TR))
     MangledName = N->getMangledName();
+  else if (auto B = dyn_cast<BoundGenericTypeRef>(TR))
+    MangledName = B->getMangledName();
   else
     return nullptr;
 
