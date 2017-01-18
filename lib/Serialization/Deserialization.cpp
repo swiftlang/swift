@@ -379,6 +379,7 @@ Pattern *ModuleFile::maybeReadPattern(DeclContext *owningDC) {
     auto result = new (getContext()) ParenPattern(SourceLoc(),
                                                   subPattern,
                                                   SourceLoc(),
+                                                  /*hasTrailingClosure=*/false,
                                                   isImplicit);
 
     if (Type interfaceType = subPattern->getDelayedInterfaceType())
@@ -416,7 +417,9 @@ Pattern *ModuleFile::maybeReadPattern(DeclContext *owningDC) {
     }
 
     auto result = TuplePattern::create(getContext(), SourceLoc(),
-                                       elements, SourceLoc(), isImplicit);
+                                       elements, SourceLoc(),
+                                       /*hasTrailingClosure=*/false,
+                                       isImplicit);
     recordPatternType(result, getType(tupleTypeID));
     restoreOffset.reset();
     return result;

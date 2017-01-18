@@ -352,7 +352,8 @@ public:
   Pattern *visitParenExpr(ParenExpr *E) {
     Pattern *subPattern = getSubExprPattern(E->getSubExpr());
     return new (TC.Context) ParenPattern(E->getLParenLoc(), subPattern,
-                                         E->getRParenLoc());
+                                         E->getRParenLoc(),
+                                         E->hasTrailingClosure());
   }
   
   // Convert all tuples to patterns.
@@ -368,7 +369,8 @@ public:
     }
     
     return TuplePattern::create(TC.Context, E->getLoc(),
-                                patternElts, E->getRParenLoc());
+                                patternElts, E->getRParenLoc(),
+                                E->hasTrailingClosure());
   }
 
   Pattern *convertBindingsToOptionalSome(Expr *E) {
@@ -1028,7 +1030,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
             return true;
           TuplePatternElt elt(sub);
           P = TuplePattern::create(Context, PP->getLParenLoc(), elt,
-                                   PP->getRParenLoc());
+                                   PP->getRParenLoc(),
+                                   PP->hasTrailingClosure());
           if (PP->isImplicit())
             P->setImplicit();
           P->setType(type);
@@ -1162,6 +1165,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       if (TP->getLParenLoc().isValid()) {
         P = new (Context) ParenPattern(TP->getLParenLoc(), sub,
                                        TP->getRParenLoc(),
+                                       TP->hasTrailingClosure(),
                                        /*implicit*/ TP->isImplicit());
         P->setType(sub->getType());
       } else {

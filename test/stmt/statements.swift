@@ -504,6 +504,21 @@ func bad_if() {
   if (x: 1) {} // expected-error {{'(x: Int)' is not convertible to 'Bool'}}
 }
 
+enum Crasher28653 {
+  case A(Int, () -> Int)
+  case B(() -> Int)
+  case C(() -> Int)
+}
+
+func testEnumPatternWithTrailingClosure(e: Crasher28653) {
+  switch e {
+    case .A(1) { 2 }: break // expected-error {{expression pattern of type '() -> Int' cannot match values of type '() -> Int'}}
+    case .B() { 3 }: break // expected-error {{expression pattern of type '() -> Int' cannot match values of type '() -> Int'}}
+    case .C { 4 }: break // expected-error {{expression pattern of type '() -> Int' cannot match values of type '() -> Int'}}
+    default: break
+  }
+}
+
 // Errors in case syntax
 class
 case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected pattern}}

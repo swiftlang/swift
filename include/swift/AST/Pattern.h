@@ -52,10 +52,17 @@ class alignas(8) Pattern {
   enum { NumPatternBits = 10 };
   enum { NumBitsAllocated = 32 };
 
+  class ParenPatternBitfields {
+    friend class ParenPattern;
+    unsigned : NumPatternBits;
+    unsigned HasTrailingClosure : 1;
+  };
+
   class TuplePatternBitfields {
     friend class TuplePattern;
     unsigned : NumPatternBits;
-    unsigned NumElements : NumBitsAllocated - NumPatternBits;
+    unsigned HasTrailingClosure : 1;
+    unsigned NumElements : NumBitsAllocated - NumPatternBits - 1;
   };
 
   class TypedPatternBitfields {
@@ -67,6 +74,7 @@ class alignas(8) Pattern {
 protected:
   union {
     PatternBitfields PatternBits;
+    ParenPatternBitfields ParenPatternBits;
     TuplePatternBitfields TuplePatternBits;
     TypedPatternBitfields TypedPatternBits;
   };
@@ -216,9 +224,11 @@ class ParenPattern : public Pattern {
   Pattern *SubPattern;
 public:
   ParenPattern(SourceLoc lp, Pattern *sub, SourceLoc rp,
+               bool hasTrailingClosure = false,
                Optional<bool> implicit = None)
     : Pattern(PatternKind::Paren),
       LPLoc(lp), RPLoc(rp), SubPattern(sub) {
+    ParenPatternBits.HasTrailingClosure = hasTrailingClosure;
     assert(lp.isValid() == rp.isValid());
     if (implicit.hasValue() ? *implicit : !lp.isValid())
       setImplicit();
@@ -228,9 +238,19 @@ public:
   const Pattern *getSubPattern() const { return SubPattern; }
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
+  bool hasTrailingClosure() const {
+    return ParenPatternBits.HasTrailingClosure;
+  }
+
   SourceLoc getLParenLoc() const { return LPLoc; }
   SourceLoc getRParenLoc() const { return RPLoc; }
-  SourceRange getSourceRange() const { return SourceRange(LPLoc, RPLoc); }
+  SourceRange getSourceRange() const {
+    SourceLoc startLoc = LPLoc.isInvalid() ?
+      getSubPattern()->getStartLoc() : LPLoc;
+    SourceLoc endLoc = RPLoc.isInvalid() || hasTrailingClosure() ?
+      getSubPattern()->getEndLoc() : RPLoc;
+    return SourceRange(startLoc, endLoc);
+  }
   SourceLoc getLoc() const { return SubPattern->getLoc(); }
 
   static bool classof(const Pattern *P) {
@@ -280,9 +300,12 @@ class TuplePattern final : public Pattern,
   // TuplePatternBits.NumElements
 
   TuplePattern(SourceLoc lp, unsigned numElements, SourceLoc rp,
+               bool hasTrailingClosure,
                bool implicit)
       : Pattern(PatternKind::Tuple), LPLoc(lp), RPLoc(rp) {
+    assert(!hasTrailingClosure || numElements != 0);
     TuplePatternBits.NumElements = numElements;
+    TuplePatternBits.HasTrailingClosure = hasTrailingClosure;
     assert(lp.isValid() == rp.isValid());
     if (implicit)
       setImplicit();
@@ -291,12 +314,14 @@ class TuplePattern final : public Pattern,
 public:
   static TuplePattern *create(ASTContext &C, SourceLoc lp,
                               ArrayRef<TuplePatternElt> elements, SourceLoc rp,
+                              bool hasTrailingClosure = false,
                               Optional<bool> implicit = None);
 
   /// \brief Create either a tuple pattern or a paren pattern, depending
   /// on the elements.
   static Pattern *createSimple(ASTContext &C, SourceLoc lp,
                                ArrayRef<TuplePatternElt> elements, SourceLoc rp,
+                               bool hasTrailingClosure = false,
                                Optional<bool> implicit = None);
 
   unsigned getNumElements() const {
@@ -312,6 +337,10 @@ public:
 
   const TuplePatternElt &getElement(unsigned i) const {return getElements()[i];}
   TuplePatternElt &getElement(unsigned i) { return getElements()[i]; }
+
+  bool hasTrailingClosure() const {
+    return TuplePatternBits.HasTrailingClosure;
+  }
 
   SourceLoc getLParenLoc() const { return LPLoc; }
   SourceLoc getRParenLoc() const { return RPLoc; }

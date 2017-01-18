@@ -342,6 +342,7 @@ Identifier NamedPattern::getBoundName() const {
 /// Allocate a new pattern that matches a tuple.
 TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
                                    ArrayRef<TuplePatternElt> elts, SourceLoc rp,
+                                   bool hasTrailingClosure,
                                    Optional<bool> implicit) {
   if (!implicit.hasValue())
     implicit = !lp.isValid();
@@ -349,7 +350,9 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
   unsigned n = elts.size();
   void *buffer = C.Allocate(totalSizeToAlloc<TuplePatternElt>(n),
                             alignof(TuplePattern));
-  TuplePattern *pattern = ::new (buffer) TuplePattern(lp, n, rp, *implicit);
+  TuplePattern *pattern = ::new (buffer) TuplePattern(lp, n, rp,
+                                                      hasTrailingClosure,
+                                                      *implicit);
   std::uninitialized_copy(elts.begin(), elts.end(),
                           pattern->getTrailingObjects<TuplePatternElt>());
   return pattern;
@@ -358,26 +361,29 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
 Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
                                     ArrayRef<TuplePatternElt> elements,
                                     SourceLoc rp,
+                                    bool hasTrailingClosure,
                                     Optional<bool> implicit) {
   assert(lp.isValid() == rp.isValid());
 
   if (elements.size() == 1 &&
       elements[0].getPattern()->getBoundName().empty()) {
     auto &first = const_cast<TuplePatternElt&>(elements.front());
-    return new (C) ParenPattern(lp, first.getPattern(), rp, implicit);
+    return new (C) ParenPattern(lp, first.getPattern(), rp, hasTrailingClosure,
+                                implicit);
   }
 
-  return create(C, lp, elements, rp, implicit);
+  return create(C, lp, elements, rp, hasTrailingClosure, implicit);
 }
 
 SourceRange TuplePattern::getSourceRange() const {
+  SourceLoc endLoc = hasTrailingClosure() ?
+    getElements().back().getPattern()->getEndLoc() : RPLoc;
   if (LPLoc.isValid())
-    return { LPLoc, RPLoc };
+    return { LPLoc, endLoc };
   auto Fields = getElements();
   if (Fields.empty())
     return {};
-  return { Fields.front().getPattern()->getStartLoc(),
-           Fields.back().getPattern()->getEndLoc() };
+  return { Fields.front().getPattern()->getStartLoc(), endLoc };
 }
 
 SourceRange TypedPattern::getSourceRange() const {
