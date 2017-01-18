@@ -31,8 +31,8 @@ void SILLoop::dump() const {
 #endif
 }
 
-SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) {
-  LI.analyze(*DT);
+SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) : Dominance(DT) {
+  LI.analyze(*Dominance);
 }
 
 bool SILLoop::canDuplicate(SILInstruction *I) const {
@@ -82,5 +82,5 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
 }
 
 void SILLoopInfo::verify() const {
-  LI.verify();
+  LI.verify(*Dominance);
 }

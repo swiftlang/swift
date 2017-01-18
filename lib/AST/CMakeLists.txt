@@ -76,7 +76,7 @@ add_swift_library(swiftAST STATIC
     clangBasic
 
   LLVM_COMPONENT_DEPENDS
-    bitreader bitwriter coverage irreader debuginfoDWARF
+    bitreader bitwriter coroutines coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
     bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
   )

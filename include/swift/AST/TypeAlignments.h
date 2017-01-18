@@ -22,7 +22,7 @@
 #ifndef SWIFT_TYPEALIGNMENTS_H
 #define SWIFT_TYPEALIGNMENTS_H
 
-#include "llvm/Support/AlignOf.h"
+#include <cstddef>
 
 namespace swift {
   class AbstractStorageDecl;
@@ -101,7 +101,6 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::NormalProtocolConformance,
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::GenericEnvironment,
                             swift::DeclAlignInBits)
 
-static_assert(llvm::AlignOf<void*>::Alignment >= 2,
-              "pointer alignment is too small");
+static_assert(alignof(void*) >= 2, "pointer alignment is too small");
 
 #endif

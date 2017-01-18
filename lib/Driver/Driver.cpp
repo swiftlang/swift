@@ -270,7 +270,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
   bool optionsMatch = true;
 
   auto readTimeValue = [&scratch](yaml::Node *node,
-                                  llvm::sys::TimeValue &timeValue) -> bool {
+                                  llvm::sys::TimePoint<> &timeValue) -> bool {
     auto *seq = dyn_cast<yaml::SequenceNode>(node);
     if (!seq)
       return true;
@@ -282,7 +282,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     auto *secondsRaw = dyn_cast<yaml::ScalarNode>(&*seqI);
     if (!secondsRaw)
       return true;
-    llvm::sys::TimeValue::SecondsType parsedSeconds;
+    std::time_t parsedSeconds;
     if (secondsRaw->getValue(scratch).getAsInteger(10, parsedSeconds))
       return true;
 
@@ -293,7 +293,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     auto *nanosecondsRaw = dyn_cast<yaml::ScalarNode>(&*seqI);
     if (!nanosecondsRaw)
       return true;
-    llvm::sys::TimeValue::NanoSecondsType parsedNanoseconds;
+    std::chrono::system_clock::rep parsedNanoseconds;
     if (nanosecondsRaw->getValue(scratch).getAsInteger(10, parsedNanoseconds))
       return true;
 
@@ -301,8 +301,8 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     if (seqI != seqE)
       return true;
 
-    timeValue.seconds(parsedSeconds);
-    timeValue.nanoseconds(parsedNanoseconds);
+    timeValue = llvm::sys::TimePoint<>(std::chrono::seconds(parsedSeconds));
+    timeValue += std::chrono::nanoseconds(parsedNanoseconds);
     return false;
   };
 
@@ -346,7 +346,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
         return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
                                         buildRecordPath, reason);
       }
-      llvm::sys::TimeValue timeVal;
+      llvm::sys::TimePoint<> timeVal;
       if (readTimeValue(i->getValue(), timeVal))
         return true;
       map[nullptr] = { InputInfo::NeedsCascadingBuild, timeVal };
@@ -377,7 +377,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
         if (!previousBuildState)
           return true;
 
-        llvm::sys::TimeValue timeValue;
+        llvm::sys::TimePoint<> timeValue;
         if (readTimeValue(value, timeValue))
           return true;
 
@@ -453,7 +453,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     ArrayRef<const char *> Args) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
 
-  llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+  llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
 
   std::unique_ptr<InputArgList> ArgList(parseArgStrings(Args.slice(1)));
   if (Diags.hadAnyError())
@@ -1305,7 +1305,7 @@ void Driver::buildActions(const ToolChain &TC,
 
         CompileJobAction::InputInfo previousBuildState = {
           CompileJobAction::InputInfo::NeedsCascadingBuild,
-          llvm::sys::TimeValue::MinTime()
+          llvm::sys::TimePoint<>::min()
         };
         if (OutOfDateMap)
           previousBuildState = OutOfDateMap->lookup(InputArg);

@@ -1037,8 +1037,8 @@ IndexSwiftASTWalker::hashFileReference(llvm::hash_code code,
   // Don't use inode because it can easily change when you update the repository
   // even though the file is supposed to be the same (same size/time).
   code = hash_combine(code, Filename);
-  return hash_combine(code, Status.getSize(),
-                      Status.getLastModificationTime().toEpochTime());
+  auto mtime = Status.getLastModificationTime().time_since_epoch().count();
+  return hash_combine(code, Status.getSize(), mtime);
 }
 
 llvm::hash_code IndexSwiftASTWalker::hashModule(llvm::hash_code code,

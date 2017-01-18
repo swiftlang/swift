@@ -543,7 +543,7 @@ BufferStamp SwiftASTManager::Implementation::getBufferStamp(StringRef FilePath){
                   << " (" << Ret.message() << ')');
     return -1;
   }
-  return Status.getLastModificationTime().toEpochTime();
+  return Status.getLastModificationTime().time_since_epoch().count();
 }
 
 std::unique_ptr<llvm::MemoryBuffer>

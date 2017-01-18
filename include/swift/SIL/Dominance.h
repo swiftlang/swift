@@ -171,8 +171,7 @@ namespace llvm {
 /// DominatorTree GraphTraits specialization so the DominatorTree can be
 /// iterable by generic graph iterators.
 template <> struct GraphTraits<swift::DominanceInfoNode *> {
-  using NodeType = swift::DominanceInfoNode;
-  using ChildIteratorType = NodeType::iterator;
+  using ChildIteratorType = swift::DominanceInfoNode::iterator;
   typedef swift::DominanceInfoNode *NodeRef;
 
   static NodeRef getEntryNode(NodeRef N) { return N; }
@@ -181,8 +180,7 @@ template <> struct GraphTraits<swift::DominanceInfoNode *> {
 };
 
 template <> struct GraphTraits<const swift::DominanceInfoNode *> {
-  using NodeType = const swift::DominanceInfoNode;
-  using ChildIteratorType = NodeType::const_iterator;
+  using ChildIteratorType = swift::DominanceInfoNode::const_iterator;
   typedef const swift::DominanceInfoNode *NodeRef;
 
   static NodeRef getEntryNode(NodeRef N) { return N; }

@@ -329,7 +329,8 @@ static void emitRecordID(unsigned ID, const char *Name,
 }
 
 /// \brief Emit bitcode for abbreviation for source locations.
-static void addSourceLocationAbbrev(llvm::BitCodeAbbrev *Abbrev) {
+static void
+addSourceLocationAbbrev(std::shared_ptr<llvm::BitCodeAbbrev> Abbrev) {
   using namespace llvm;
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 10)); // File ID.
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 32)); // Line.
@@ -338,13 +339,14 @@ static void addSourceLocationAbbrev(llvm::BitCodeAbbrev *Abbrev) {
 }
 
 /// \brief Emit bitcode for abbreviation for source ranges.
-static void addRangeLocationAbbrev(llvm::BitCodeAbbrev *Abbrev) {
+static void
+addRangeLocationAbbrev(std::shared_ptr<llvm::BitCodeAbbrev> Abbrev) {
   addSourceLocationAbbrev(Abbrev);
   addSourceLocationAbbrev(Abbrev);
 }
 
 void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
-  State->Stream.EnterBlockInfoBlock(3);
+  State->Stream.EnterBlockInfoBlock();
 
   using namespace llvm;
   llvm::BitstreamWriter &Stream = State->Stream;
@@ -357,7 +359,7 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
 
   emitBlockID(BLOCK_META, "Meta", Stream, Record);
   emitRecordID(RECORD_VERSION, "Version", Stream, Record);
-  BitCodeAbbrev *Abbrev = new BitCodeAbbrev();
+  auto Abbrev = std::make_shared<BitCodeAbbrev>();
   Abbrev->Add(BitCodeAbbrevOp(RECORD_VERSION));
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 32));
   Abbrevs.set(RECORD_VERSION, Stream.EmitBlockInfoAbbrev(BLOCK_META, Abbrev));
@@ -375,7 +377,7 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
   emitRecordID(RECORD_FIXIT, "FixIt", Stream, Record);
 
   // Emit abbreviation for RECORD_DIAG.
-  Abbrev = new BitCodeAbbrev();
+  Abbrev = std::make_shared<BitCodeAbbrev>();
   Abbrev->Add(BitCodeAbbrevOp(RECORD_DIAG));
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 3));  // Diag level.
   addSourceLocationAbbrev(Abbrev);
@@ -386,7 +388,7 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
   Abbrevs.set(RECORD_DIAG, Stream.EmitBlockInfoAbbrev(BLOCK_DIAG, Abbrev));
 
   // Emit abbreviation for RECORD_CATEGORY.
-  Abbrev = new BitCodeAbbrev();
+  Abbrev = std::make_shared<BitCodeAbbrev>();
   Abbrev->Add(BitCodeAbbrevOp(RECORD_CATEGORY));
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 16)); // Category ID.
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 8));  // Text size.
@@ -394,14 +396,14 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
   Abbrevs.set(RECORD_CATEGORY, Stream.EmitBlockInfoAbbrev(BLOCK_DIAG, Abbrev));
 
   // Emit abbreviation for RECORD_SOURCE_RANGE.
-  Abbrev = new BitCodeAbbrev();
+  Abbrev = std::make_shared<BitCodeAbbrev>();
   Abbrev->Add(BitCodeAbbrevOp(RECORD_SOURCE_RANGE));
   addRangeLocationAbbrev(Abbrev);
   Abbrevs.set(RECORD_SOURCE_RANGE,
               Stream.EmitBlockInfoAbbrev(BLOCK_DIAG, Abbrev));
 
   // Emit the abbreviation for RECORD_DIAG_FLAG.
-  Abbrev = new BitCodeAbbrev();
+  Abbrev = std::make_shared<BitCodeAbbrev>();
   Abbrev->Add(BitCodeAbbrevOp(RECORD_DIAG_FLAG));
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 10)); // Mapped Diag ID.
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 16)); // Text size.
@@ -410,7 +412,7 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
                                                            Abbrev));
 
   // Emit the abbreviation for RECORD_FILENAME.
-  Abbrev = new BitCodeAbbrev();
+  Abbrev = std::make_shared<BitCodeAbbrev>();
   Abbrev->Add(BitCodeAbbrevOp(RECORD_FILENAME));
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 10)); // Mapped file ID.
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 32)); // Size.
@@ -421,7 +423,7 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
                                                           Abbrev));
 
   // Emit the abbreviation for RECORD_FIXIT.
-  Abbrev = new BitCodeAbbrev();
+  Abbrev = std::make_shared<BitCodeAbbrev>();
   Abbrev->Add(BitCodeAbbrevOp(RECORD_FIXIT));
   addRangeLocationAbbrev(Abbrev);
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 16)); // Text size.

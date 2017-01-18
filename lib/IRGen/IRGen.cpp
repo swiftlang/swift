@@ -36,7 +36,7 @@
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
-#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -61,6 +61,7 @@
 #include "llvm/Target/TargetSubtargetInfo.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Object/ObjectFile.h"
@@ -163,7 +164,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     PMBuilder.OptLevel = 0;
     if (!Opts.DisableLLVMOptzns)
       PMBuilder.Inliner =
-        llvm::createAlwaysInlinerPass(/*insertlifetime*/false);
+        llvm::createAlwaysInlinerLegacyPass(/*insertlifetime*/false);
   }
 
   // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer
