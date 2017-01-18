@@ -1,7 +1,7 @@
 // RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all=0 -o /dev/null 2>&1  %s
 // REQUIRES: asserts
 
-// This file is meant to contain tests that if they fail are false
+// This file is meant to contain dataflow tests that if they fail are false
 // positives.
 
 //////////////////
