@@ -101,15 +101,6 @@ public:
     return getType().isTrivial(Mod);
   }
 
-  void error(SILInstruction *User) {
-    llvm::errs() << "Have operand with incompatible ownership?!\n"
-                 << "Value: " << *getValue() << "User: " << *User
-                 << "Conv: " << getOwnershipKind() << "\n";
-    if (PrintMessageInsteadOfAssert)
-      return;
-    llvm_unreachable("triggering standard assertion failure routine");
-  }
-
   OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I);
 
   /// Check if \p User as compatible ownership with the SILValue that we are
@@ -120,7 +111,13 @@ public:
   bool check(SILInstruction *User) {
     auto Result = visit(User);
     if (!Result.HasCompatibleOwnership) {
-      error(User);
+      llvm::errs() << "Function: '" << User->getFunction()->getName() << "'\n"
+                   << "Have operand with incompatible ownership?!\n"
+                   << "Value: " << *getValue() << "User: " << *User
+                   << "Conv: " << getOwnershipKind() << "\n";
+      if (PrintMessageInsteadOfAssert)
+        return false;
+      llvm_unreachable("triggering standard assertion failure routine");
     }
 
     assert((!Result.ShouldCheckForDataflowViolations ||
