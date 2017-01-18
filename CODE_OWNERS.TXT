@@ -12,6 +12,11 @@ E: ben_cohen@apple.com
 G: airspeedswift
 D: Swift standard library
 
+N: Brian Croom
+E: bcroom@apple.com
+G: briancroom
+D: XCTest overlay
+
 N: Erik Eckstein
 E: eeckstein@apple.com
 G: eeckstein
@@ -47,6 +52,11 @@ E: rjmccall@apple.com
 G: rjmccall
 D: Demangler, IRGen, Runtime
 
+N: Tony Parker
+E: anthony.parker@apple.com
+G: parkera
+D: Foundation overlay
+
 N: Slava Pestov
 E: spestov@apple.com
 G: slavapestov
@@ -56,6 +66,11 @@ N: Jordan Rose
 E: jordan_rose@apple.com
 G: jrose-apple
 D: ClangImporter, Serialization, PrintAsObjC, Driver, Frontend
+
+N: Daniel Steffen
+E: dsteffen@apple.com
+G: das
+D: Dispatch overlay
 
 N: Anna Zaks
 E: ganna@apple.com
