@@ -1049,7 +1049,8 @@ static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
 
 static SILLinkage getConformanceLinkage(IRGenModule &IGM,
                                         const ProtocolConformance *conf) {
-  if (auto wt = IGM.getSILModule().lookUpWitnessTable(conf)) {
+  if (auto wt = IGM.getSILModule().lookUpWitnessTable(conf,
+                                               /*deserializeLazily*/ false)) {
     return wt->getLinkage();
   } else {
     return SILLinkage::PublicExternal;
