@@ -31,6 +31,8 @@ set(SWIFT_BENCH_MODULES
     single-source/ByteSwap
     single-source/Calculator
     single-source/CaptureProp
+    single-source/CharacterLiteralsLarge
+    single-source/CharacterLiteralsSmall
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/DeadArray
