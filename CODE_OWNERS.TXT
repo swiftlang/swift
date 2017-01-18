@@ -4,49 +4,60 @@ They are also the gatekeepers for their part of Swift, with the final word on
 what goes in or not.
 
 The list is sorted by surname and formatted to allow easy grepping and
-beautification by scripts.  The fields are: name (N), email (E), web-address
-(W), description (D).
+beautification by scripts.  The fields are: name (N), email (E),
+GitHub account (G), description (D).
 
 N: Ben Cohen
 E: ben_cohen@apple.com
+G: airspeedswift
 D: Swift standard library
 
 N: Erik Eckstein
 E: eeckstein@apple.com
+G: eeckstein
 D: SILOptimizer
 
 N: Xi Ge
 E: xi_ge@apple.com
+G: nkcsgexi
 D: Markup, Migrator, lib/Syntax
 
 N: Doug Gregor
 E: dgregor@apple.com
+G: DougGregor
 D: AST, Basic, Parse, Sema
 
 N: Joe Groff
 E: jgroff@apple.com
+G: jckarter
 D: SIL, SILGen, everything in Swift not covered by someone else
 
 N: Argyrios Kyrzidis
 E: kyrtzidis@apple.com
+G: akyrtzi
 D: IDE, SourceKit, swift-ide-test
 
 N: Luke Larson
 E: llarson@apple.com
+G: lplarson
 D: Swift Benchmark Suite
 
 N: John McCall
 E: rjmccall@apple.com
+G: rjmccall
 D: Demangler, IRGen, Runtime
 
 N: Slava Pestov
 E: spestov@apple.com
+G: slavapestov
 D: Reflection, SwiftRemoteMirror
 
 N: Jordan Rose
 E: jordan_rose@apple.com
+G: jrose-apple
 D: ClangImporter, Serialization, (Objective-)C printer, Driver
 
 N: Anna Zaks
 E: ganna@apple.com
+G: AnnaZaks
 D: SIL diagnostics passes
