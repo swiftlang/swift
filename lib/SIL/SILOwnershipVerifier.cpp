@@ -521,15 +521,24 @@ OwnershipCompatibilityUseChecker::visitBuiltinInst(BuiltinInst *I) {
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitAssignInst(AssignInst *I) {
-  if (getValue() == I->getSrc())
+  if (getValue() == I->getSrc()) {
+    if (isAddressOrTrivialType()) {
+      return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+    }
     return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
+  }
+
   return {true, false};
 }
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitStoreInst(StoreInst *I) {
-  if (getValue() == I->getSrc())
+  if (getValue() == I->getSrc()) {
+    if (isAddressOrTrivialType()) {
+      return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+    }
     return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
+  }
   return {true, false};
 }
 
