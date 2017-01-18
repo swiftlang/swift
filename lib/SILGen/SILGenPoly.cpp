@@ -2456,18 +2456,6 @@ buildThunkSignature(SILGenFunction &gen,
       [&](Type depTy, ArrayRef<Requirement> reqs) -> bool {
     auto canTy = depTy->getCanonicalType();
 
-    // Add abstract conformances.
-    auto conformances =
-        ctx.AllocateUninitialized<ProtocolConformanceRef>(
-            reqs.size());
-    for (unsigned i = 0, e = reqs.size(); i < e; i++) {
-      auto reqt = reqs[i];
-      assert(reqt.getKind() == RequirementKind::Conformance);
-      auto *proto = reqt.getSecondType()
-          ->castTo<ProtocolType>()->getDecl();
-      conformances[i] = ProtocolConformanceRef(proto);
-    }
-
     ArchetypeType *oldArchetype;
     // The opened existential archetype maps to the new generic parameter's
     // archetype.
@@ -2484,11 +2472,19 @@ buildThunkSignature(SILGenFunction &gen,
 
     if (isa<SubstitutableType>(canTy)) {
       interfaceSubs.addSubstitution(cast<SubstitutableType>(canTy),
-                                  oldArchetype);
+                                    oldArchetype);
     }
 
-    contextSubs.addConformances(CanType(oldArchetype), conformances);
-    interfaceSubs.addConformances(canTy, conformances);
+    // Add abstract conformances.
+    for (unsigned i = 0, e = reqs.size(); i < e; i++) {
+      auto reqt = reqs[i];
+      assert(reqt.getKind() == RequirementKind::Conformance);
+      auto *proto = reqt.getSecondType()
+          ->castTo<ProtocolType>()->getDecl();
+      auto conformance = ProtocolConformanceRef(proto);
+      contextSubs.addConformance(CanType(oldArchetype), conformance);
+      interfaceSubs.addConformance(canTy, conformance);
+    }
 
     return false;
   });

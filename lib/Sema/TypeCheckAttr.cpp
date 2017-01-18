@@ -1445,26 +1445,11 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   }
 
   // Capture the conformances needed for the substitution map.
-  CanType currentType;
-  SmallVector<ProtocolConformanceRef, 4> currentConformances;
-  auto flushConformances = [&] {
-    subMap.addConformances(currentType,
-                           TC.Context.AllocateCopy(currentConformances));
-    currentConformances.clear();
-  };
-
   for (const auto &req : genericSig->getRequirements()) {
-    // If we're on to a new dependent type, flush the conformances gathered
-    // thus far.
-    CanType canFirstType = req.getFirstType()->getCanonicalType();
-    if (canFirstType != currentType) {
-      if (currentType) flushConformances();
-      currentType = canFirstType;
-    }
-
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
       // Get the conformance and record it.
+      auto origType = req.getFirstType()->getCanonicalType();
       auto firstType = req.getFirstType().subst(subMap);
       auto protoType = req.getSecondType()->castTo<ProtocolType>();
       auto conformance =
@@ -1481,7 +1466,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
         return;
       }
 
-      currentConformances.push_back(*conformance);
+      subMap.addConformance(origType, *conformance);
       break;
     }
     case RequirementKind::Superclass: {
@@ -1514,7 +1499,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     }
     }
   }
-  if (currentType) flushConformances();
 
   // Compute the substitutions.
   SmallVector<Substitution, 4> substitutions;

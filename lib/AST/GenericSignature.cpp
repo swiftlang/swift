@@ -313,11 +313,11 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> subs,
     subs = subs.slice(1);
 
     auto canTy = depTy->getCanonicalType();
-    if (isa<SubstitutableType>(canTy)) {
+    if (isa<SubstitutableType>(canTy))
       result.addSubstitution(cast<SubstitutableType>(canTy),
                              sub.getReplacement());
-    }
-    result.addConformances(canTy, sub.getConformances());
+    for (auto conformance : sub.getConformances())
+      result.addConformance(canTy, conformance);
   }
 
   for (auto reqt : getRequirements()) {
