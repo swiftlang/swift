@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -106,7 +106,7 @@ public struct Character :
 
   /// Creates a character with the specified value.
   ///
-  /// Don't call this initializer directly. It is used by the compiler when you
+  /// Do not call this initializer directly. It is used by the compiler when you
   /// use a string literal to initialize a `Character` instance. For example:
   ///
   ///     let snowflake: Character = "❄︎"
@@ -134,8 +134,9 @@ public struct Character :
 
   /// Creates a character with the specified value.
   ///
-  /// Don't call this initializer directly. It is used by the compiler when you
-  /// use a string literal to initialize a `Character` instance. For example:
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// you use a string literal to initialize a `Character` instance. For
+  /// example:
   ///
   ///     let oBreve: Character = "o\u{306}"
   ///     print(oBreve)
@@ -176,7 +177,7 @@ public struct Character :
     let (count, initialUTF8) = s._core._encodeSomeUTF8(from: 0)
     // Notice that the result of sizeof() is a small non-zero number and can't
     // overflow when multiplied by 8.
-    let bits = MemoryLayout._ofInstance(initialUTF8).size &* 8 &- 1
+    let bits = MemoryLayout.size(ofValue: initialUTF8) &* 8 &- 1
     if _fastPath(
       count == s._core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
       _representation = .small(Builtin.trunc_Int64_Int63(initialUTF8._value))

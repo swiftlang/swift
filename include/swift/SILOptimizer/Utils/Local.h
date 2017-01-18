@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,8 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBuilder.h"
@@ -80,8 +82,7 @@ bool isInstructionTriviallyDead(SILInstruction *I);
 
 /// \brief Return true if this is a release instruction that's not going to
 /// free the object.
-bool isIntermediateRelease(SILInstruction *I,
-                           ConsumedArgToEpilogueReleaseMatcher &ERM); 
+bool isIntermediateRelease(SILInstruction *I, EpilogueARCFunctionInfo *ERFI);
 
 /// \brief Recursively collect all the uses and transitive uses of the
 /// instruction.
@@ -129,32 +130,28 @@ bool canCastValueToABICompatibleType(SILModule &M,
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right
 /// after \p ABI and returns it.
-ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI);
+ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index);
 
 /// Replace an apply with an instruction that produces the same value,
 /// then delete the apply and the instructions that produce its callee
 /// if possible.
 void replaceDeadApply(ApplySite Old, ValueBase *New);
 
-/// \brief Return true if the substitution map contains a
-/// substitution that is an unbound generic type.
-bool hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap);
+/// \brief Return true if the substitution map contains replacement types
+/// that are dependent on the type parameters of the caller.
+bool hasTypeParameterTypes(SubstitutionMap &SubsMap);
 
-/// Return true if the substitution list contains a substitution
-/// that is an unbound generic.
-bool hasUnboundGenericTypes(ArrayRef<Substitution> Subs);
+/// \brief Return true if the substitution list contains replacement types
+/// that are dependent on the type parameters of the caller.
+bool hasArchetypes(ArrayRef<Substitution> Subs);
 
 /// \brief Return true if the substitution map contains a
 /// substitution that refers to the dynamic Self type.
-bool hasDynamicSelfTypes(TypeSubstitutionMap &SubsMap);
-
-/// \brief Return true if the substitution list contains a
-/// substitution that refers to the dynamic Self type.
-bool hasDynamicSelfTypes(ArrayRef<Substitution> Subs);
+bool hasDynamicSelfTypes(const SubstitutionMap &SubsMap);
 
 /// \brief Return true if any call inside the given function may bind dynamic
 /// 'Self' to a generic argument of the callee.
-bool computeMayBindDynamicSelf(SILFunction *F);
+bool mayBindDynamicSelf(SILFunction *F);
 
 /// \brief Move an ApplyInst's FuncRef so that it dominates the call site.
 void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
@@ -367,17 +364,17 @@ public:
     auto *Fn = BI->getFunction();
     auto *SrcBB = BI->getParent();
     auto *DestBB = BI->getDestBB();
-    auto *EdgeBB = new (Fn->getModule()) SILBasicBlock(Fn, SrcBB);
+    auto *EdgeBB = Fn->createBasicBlock(SrcBB);
 
     // Create block arguments.
-    unsigned ArgIdx = 0;
-    for (auto Arg : BI->getArgs()) {
-      assert(Arg->getType() == DestBB->getBBArg(ArgIdx)->getType() &&
+    for (unsigned ArgIdx : range(DestBB->getNumArguments())) {
+      auto *DestPHIArg = cast<SILPHIArgument>(DestBB->getArgument(ArgIdx));
+      assert(BI->getArg(ArgIdx)->getType() == DestPHIArg->getType() &&
              "Types must match");
-      auto *BlockArg = EdgeBB->createBBArg(Arg->getType());
-      ValueMap[DestBB->getBBArg(ArgIdx)] = SILValue(BlockArg);
-      AvailVals.push_back(std::make_pair(DestBB->getBBArg(ArgIdx), BlockArg));
-      ++ArgIdx;
+      auto *BlockArg = EdgeBB->createPHIArgument(
+          DestPHIArg->getType(), DestPHIArg->getOwnershipKind());
+      ValueMap[DestPHIArg] = SILValue(BlockArg);
+      AvailVals.push_back(std::make_pair(DestPHIArg, BlockArg));
     }
 
     // Redirect the branch.
@@ -405,18 +402,16 @@ class BasicBlockCloner : public BaseThreadingCloner {
         // Create a new BB that is to be used as a target
         // for cloning.
         To = From->getParent()->createBasicBlock();
-        for (auto *Arg : FromBB->getBBArgs()) {
-          To->createBBArg(Arg->getType(), Arg->getDecl());
-        }
+        To->cloneArgumentList(From);
       }
       DestBB = To;
 
       // Populate the value map so that uses of the BBArgs in the SrcBB are
       // replaced with the BBArgs of the DestBB.
-      for (unsigned i = 0, e = FromBB->bbarg_size(); i != e; ++i) {
-        ValueMap[FromBB->getBBArg(i)] = DestBB->getBBArg(i);
+      for (unsigned i = 0, e = FromBB->args_size(); i != e; ++i) {
+        ValueMap[FromBB->getArgument(i)] = DestBB->getArgument(i);
         AvailVals.push_back(
-            std::make_pair(FromBB->getBBArg(i), DestBB->getBBArg(i)));
+            std::make_pair(FromBB->getArgument(i), DestBB->getArgument(i)));
       }
     }
 
@@ -693,6 +688,28 @@ void replaceLoadSequence(SILInstruction *I,
 /// Do we have enough information to determine all callees that could
 /// be reached by calling the function represented by Decl?
 bool calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl);
+
+// Attempt to get the instance for S, whose static type is the same as
+// its exact dynamic type, returning a null SILValue() if we cannot find it.
+// The information that a static type is the same as the exact dynamic,
+// can be derived e.g.:
+// - from a constructor or
+// - from a successful outcome of a checked_cast_br [exact] instruction.
+SILValue getInstanceWithExactDynamicType(SILValue S, SILModule &M,
+                                         ClassHierarchyAnalysis *CHA);
+
+/// Try to determine the exact dynamic type of an object.
+/// returns the exact dynamic type of the object, or an empty type if the exact
+/// type could not be determined.
+SILType getExactDynamicType(SILValue S, SILModule &M,
+                            ClassHierarchyAnalysis *CHA,
+                            bool ForUnderlyingObject = false);
+
+/// Try to statically determine the exact dynamic type of the underlying object.
+/// returns the exact dynamic type of the underlying object, or an empty SILType
+/// if the exact type could not be determined.
+SILType getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
+                                              ClassHierarchyAnalysis *CHA);
 
 /// Hoist the address projection rooted in \p Op to \p InsertBefore.
 /// Requires the projected value to dominate the insertion point.

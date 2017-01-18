@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -105,6 +105,7 @@
 #include "ScalarTypeInfo.h"
 #include "GenFunc.h"
 #include "Signature.h"
+#include "IRGenMangler.h"
 
 using namespace swift;
 using namespace irgen;
@@ -491,7 +492,7 @@ namespace {
       IGF.unimplemented(SourceLoc(), "destroying @block_storage");
     }
   };
-}
+} // end anonymous namespace
 
 const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
   // The block storage consists of the block header (ObjCBlockStructTy)
@@ -555,6 +556,7 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::CFunctionPointer:
+  case SILFunctionType::Representation::Closure:
     return ThinFuncTypeInfo::create(CanSILFunctionType(T),
                                     IGM.FunctionPtrTy,
                                     IGM.getPointerSize(),
@@ -612,6 +614,7 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::WitnessMethod:
   case SILFunctionType::Representation::ObjCMethod:
+  case SILFunctionType::Representation::Closure:
     return ti.as<ThinFuncTypeInfo>();
   case SILFunctionType::Representation::Thick:
     return ti.as<FuncTypeInfo>();
@@ -698,13 +701,20 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   llvm::FunctionType *fwdTy = IGM.getFunctionType(outType, outAttrs);
   // Build a name for the thunk. If we're thunking a static function reference,
   // include its symbol name in the thunk name.
-  llvm::SmallString<20> thunkName;
-  thunkName += "_TPA";
+  llvm::SmallString<20> OldThunkName;
+  StringRef FnName;
+  OldThunkName += "_TPA";
   if (staticFnPtr) {
-    thunkName += '_';
-    thunkName += staticFnPtr->getName();
+    FnName = staticFnPtr->getName();
+    OldThunkName += '_';
+    OldThunkName += FnName;
   }
-  
+  IRGenMangler Mangler;
+  std::string NewThunkName = Mangler.manglePartialApplyForwarder(FnName);
+
+  std::string thunkName = NewMangling::selectMangling(OldThunkName.str(),
+                                                      NewThunkName);
+
   // FIXME: Maybe cache the thunk by function and closure types?.
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
@@ -768,7 +778,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   struct AddressToDeallocate {
     SILType Type;
     const TypeInfo &TI;
-    Address Addr;
+    StackAddress Addr;
   };
   SmallVector<AddressToDeallocate, 4> addressesToDeallocate;
 
@@ -784,8 +794,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   case ParameterConvention::Direct_Guaranteed:
     consumesContext = false;
     break;
-  case ParameterConvention::Direct_Deallocating:
-    llvm_unreachable("callables do not have destructors");
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_In:
@@ -841,6 +849,13 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       (origType->hasSelfParam() &&
        isSelfContextParameter(origType->getSelfParameter()));
 
+  // Witness method calls expect self, followed by the self type followed by,
+  // the witness table at the end of the parameter list. But polymorphic
+  // arguments come before this.
+  bool isWitnessMethodCallee = origType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod;
+  Explosion witnessMethodSelfValue;
+
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
   if (!layout) {
@@ -872,7 +887,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         dependsOnContextLifetime = true;
       break;
 
-    case ParameterConvention::Direct_Deallocating:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
       llvm_unreachable("should never happen!");
@@ -916,7 +930,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   // If there's a data pointer required, grab it and load out the
   // extra, previously-curried parameters.
-  } else if (!layout->isKnownEmpty()) {
+  } else {
     unsigned origParamI = outType->getParameters().size();
     assert(layout->getElements().size() == conventions.size()
            && "conventions don't match context layout");
@@ -941,14 +955,14 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         // The +1 argument is passed indirectly, so we need to copy into a
         // temporary.
         needsAllocas = true;
-        auto caddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
-        fieldTI.initializeWithCopy(subIGF, caddr.getAddress(), fieldAddr,
-                                   fieldTy);
-        param.add(caddr.getAddressPointer());
+        auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, false, "arg.temp");
+        auto addressPointer = stackAddr.getAddress().getAddress();
+        fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr, fieldTy);
+        param.add(addressPointer);
         
         // Remember to deallocate later.
         addressesToDeallocate.push_back(
-                  AddressToDeallocate{fieldTy, fieldTI, caddr.getContainer()});
+            AddressToDeallocate{fieldTy, fieldTI, stackAddr});
 
         break;
       }
@@ -969,15 +983,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         // depends on the context to not be deallocated.
         if (!fieldTI.isPOD(ResilienceExpansion::Maximal))
           dependsOnContextLifetime = true;
-        SWIFT_FALLTHROUGH;
-      case ParameterConvention::Direct_Deallocating:
+
         // Load these parameters directly. We can "take" since the parameter is
-        // +0. This can happen due to either:
-        //
-        // 1. The context keeping the parameter alive.
-        // 2. The object being a deallocating object. This means retains and
-        //    releases do not affect the object since we do not support object
-        //    resurrection.
+        // +0. This can happen since the context will keep the parameter alive.
         cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Owned:
@@ -993,9 +1001,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         emitApplyArgument(subIGF, origParamInfo,
                           substType->getParameters()[origParamI],
                           param, origParam);
-
-        needsAllocas |=
-          addNativeArgument(subIGF, origParam, origParamInfo, args);
+        bool isWitnessMethodCalleeSelf = (isWitnessMethodCallee &&
+            origParamI + 1 == origType->getParameters().size());
+        needsAllocas |= addNativeArgument(
+            subIGF, origParam, origParamInfo,
+            isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args);
         ++origParamI;
       } else {
         args.add(param.claimAll());
@@ -1006,7 +1016,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // If the parameters can live independent of the context, release it now
     // so we can tail call. The safety of this assumes that neither this release
     // nor any of the loads can throw.
-    if (consumesContext && !dependsOnContextLifetime)
+    if (consumesContext && !dependsOnContextLifetime && rawData)
       subIGF.emitNativeStrongRelease(rawData);
   }
 
@@ -1043,8 +1053,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // witness table. Metadata for Self is derived inside the partial
   // application thunk and doesn't need to be stored in the outer
   // context.
-  if (origType->getRepresentation() ==
-      SILFunctionTypeRepresentation::WitnessMethod) {
+  if (isWitnessMethodCallee) {
     assert(fnContext->getType() == IGM.Int8PtrTy);
     llvm::Value *wtable = subIGF.Builder.CreateBitCast(
         fnContext, IGM.WitnessTablePtrTy);
@@ -1061,6 +1070,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     args.add(llvm::UndefValue::get(IGM.RefCountedPtrTy));
   }
 
+  // Add the witness methods self argument before the error parameter after the
+  // polymorphic arguments.
+  if (isWitnessMethodCallee)
+    witnessMethodSelfValue.transferInto(args, witnessMethodSelfValue.size());
+
   // Pass down the error result.
   if (origType->hasErrorResult()) {
     llvm::Value *errorResultPtr = origParams.claimNext();
@@ -1070,8 +1084,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   assert(origParams.empty());
 
-  if (origType->getRepresentation() ==
-      SILFunctionTypeRepresentation::WitnessMethod) {
+  if (isWitnessMethodCallee) {
     assert(witnessMetadata.SelfMetadata->getType() == IGM.TypeMetadataPtrTy);
     args.add(witnessMetadata.SelfMetadata);
     assert(witnessMetadata.SelfWitnessTable->getType() == IGM.WitnessTablePtrTy);
@@ -1172,7 +1185,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Deallocating:
       argLoweringTy = argType.getSwiftRValueType();
       break;
       
@@ -1343,7 +1355,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                                        layout);
 
   llvm::Value *data;
-  if (layout.isKnownEmpty()) {
+  if (args.empty() && layout.isKnownEmpty()) {
     data = IGF.IGM.RefCountedNull;
   } else {
     // Allocate a new object.
@@ -1379,7 +1391,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Guaranteed:
-      case ParameterConvention::Direct_Deallocating:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
         cast<LoadableTypeInfo>(fieldLayout.getType())
@@ -1468,6 +1479,7 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
                                      IGM.getModule());
   func->setAttributes(IGM.constructInitialAttributes());
   IRGenFunction IGF(IGM, func);
+  assert(!func->hasFnAttribute(llvm::Attribute::SanitizeThread));
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, func);
   

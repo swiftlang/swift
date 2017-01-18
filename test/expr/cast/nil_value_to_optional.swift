@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var t = true
 var f = false
@@ -27,3 +27,5 @@ var diuopt: D! = nil
 _ = d! // expected-error {{cannot force unwrap value of non-optional type 'D'}}
 _ = dopt == nil
 _ = diuopt == nil
+_ = diuopt is ExpressibleByNilLiteral // expected-warning {{'is' test is always true}}
+// expected-warning@-1 {{conditional cast from 'D!' to 'ExpressibleByNilLiteral' always succeeds}}

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -14,9 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Parser.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
@@ -27,12 +27,36 @@
 using namespace swift;
 
 TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
+                                       SourceLoc InOutLoc,
                                        const TypeAttributes &attrs) {
   // Apply those attributes that do apply.
-  if (attrs.empty())
-    return ty;
+  if (!attrs.empty())
+    ty = new (Context) AttributedTypeRepr(attrs, ty);
 
-  return new (Context) AttributedTypeRepr(attrs, ty);
+  // Apply 'inout'
+  if (InOutLoc.isValid()) {
+    if (auto *fnTR = dyn_cast<FunctionTypeRepr>(ty)) {
+      // If the input to the function isn't parenthesized, apply the inout
+      // to the first (only) parameter, as we would in Swift 2. (This
+      // syntax is deprecated in Swift 3.)
+      TypeRepr *argsTR = fnTR->getArgsTypeRepr();
+      if (!isa<TupleTypeRepr>(argsTR)) {
+        auto *newArgsTR =
+          new (Context) InOutTypeRepr(argsTR, InOutLoc);
+        auto *newTR =
+          new (Context) FunctionTypeRepr(fnTR->getGenericParams(),
+              newArgsTR,
+              fnTR->getThrowsLoc(),
+              fnTR->getArrowLoc(),
+              fnTR->getResultTypeRepr());
+        newTR->setGenericEnvironment(fnTR->getGenericEnvironment());
+        return newTR;
+      }
+    }
+    ty = new (Context) InOutTypeRepr(ty, InOutLoc);
+  }
+
+  return ty;
 }
 
 ParserResult<TypeRepr> Parser::parseTypeSimple() {
@@ -43,13 +67,14 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ///   type-simple:
 ///     type-identifier
 ///     type-tuple
-///     type-composition
+///     type-composition-deprecated
 ///     'Any'
 ///     type-simple '.Type'
 ///     type-simple '.Protocol'
 ///     type-simple '?'
 ///     type-simple '!'
 ///     type-collection
+///     type-array
 ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
                                                bool HandleCodeCompletion) {
   ParserResult<TypeRepr> ty;
@@ -59,12 +84,9 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
 
   switch (Tok.getKind()) {
   case tok::kw_Self:
-    ty = parseTypeIdentifier();
-    break;
-  case tok::identifier:
-  case tok::kw_protocol:
   case tok::kw_Any:
-    ty = parseTypeIdentifierOrTypeComposition();
+  case tok::identifier:
+    ty = parseTypeIdentifier();
     break;
   case tok::l_paren:
     ty = parseTypeTupleBody();
@@ -89,13 +111,24 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   case tok::l_square:
     ty = parseTypeCollection();
     break;
+  case tok::kw_protocol:
+    if (startsWithLess(peekToken())) {
+      ty = parseOldStyleProtocolComposition();
+      break;
+    }
+    SWIFT_FALLTHROUGH;
   default:
-    checkForInputIncomplete();
     diagnose(Tok, MessageID);
+    if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
+      ty = makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
+      consumeToken();
+      return ty;
+    }
+    checkForInputIncomplete();
     return nullptr;
   }
   
-  // '.Type', '.Protocol', '?', and '!' still leave us with type-simple.
+  // '.Type', '.Protocol', '?', '!', and '[]' still leave us with type-simple.
   while (ty.isNonNull()) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
       if (peekToken().isContextualKeyword("Type")) {
@@ -123,12 +156,17 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
         ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
         continue;
       }
+      // Parse legacy array types for migration.
+      if (Tok.is(tok::l_square)) {
+        ty = parseTypeArray(ty.get());
+        continue;
+      }
     }
     break;
   }
 
   // If we parsed an inout modifier, prepend it.
-  if (InOutLoc.isValid())
+  if (InOutLoc.isValid() && ty.isNonNull())
     ty = makeParserResult(new (Context) InOutTypeRepr(ty.get(),
                                                       InOutLoc));
 
@@ -139,114 +177,188 @@ ParserResult<TypeRepr> Parser::parseType() {
   return parseType(diag::expected_type);
 }
 
+ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
+                                               const TypeAttributes &attrs,
+                                               Optional<Scope> &GenericsScope) {
+  auto LBraceLoc = consumeToken(tok::l_brace);
+  
+  SmallVector<SILBoxTypeRepr::Field, 4> Fields;
+  if (!Tok.is(tok::r_brace)) {
+    for (;;) {
+      bool Mutable;
+      if (Tok.is(tok::kw_var)) {
+        Mutable = true;
+      } else if (Tok.is(tok::kw_let)) {
+        Mutable = false;
+      } else {
+        diagnose(Tok, diag::sil_box_expected_var_or_let);
+        return makeParserError();
+      }
+      SourceLoc VarOrLetLoc = consumeToken();
+      
+      auto fieldTy = parseType();
+      if (!fieldTy.getPtrOrNull())
+        return makeParserError();
+      Fields.push_back({VarOrLetLoc, Mutable, fieldTy.get()});
+      
+      if (consumeIf(tok::comma))
+        continue;
+      
+      break;
+    }
+  }
+  
+  if (!Tok.is(tok::r_brace)) {
+    diagnose(Tok, diag::sil_box_expected_r_brace);
+    return makeParserError();
+  }
+  
+  auto RBraceLoc = consumeToken(tok::r_brace);
+  
+  // The generic arguments are taken from the enclosing scope. Pop the
+  // box layout's scope now.
+  GenericsScope.reset();
+  
+  SourceLoc LAngleLoc, RAngleLoc;
+  SmallVector<TypeRepr*, 4> Args;
+  if (Tok.isContextualPunctuator("<")) {
+    LAngleLoc = consumeToken();
+    for (;;) {
+      auto argTy = parseType();
+      if (!argTy.getPtrOrNull())
+        return makeParserError();
+      Args.push_back(argTy.get());
+      if (consumeIf(tok::comma))
+        continue;
+      break;
+    }
+    if (!Tok.isContextualPunctuator(">")) {
+      diagnose(Tok, diag::sil_box_expected_r_angle);
+      return makeParserError();
+    }
+    
+    RAngleLoc = consumeToken();
+  }
+  
+  auto repr = SILBoxTypeRepr::create(Context, generics,
+                                     LBraceLoc, Fields, RBraceLoc,
+                                     LAngleLoc, Args, RAngleLoc);
+  return makeParserResult(applyAttributeToType(repr, SourceLoc(), attrs));
+}
+
+
 /// parseType
 ///   type:
+///     attribute-list type-composition
 ///     attribute-list type-function
-///     attribute-list type-array
 ///
 ///   type-function:
-///     type-simple '->' type
+///     type-composition '->' type
+///     type-composition 'throws' '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
-                                         bool HandleCodeCompletion) {
+                                         bool HandleCodeCompletion,
+                                         bool IsSILFuncDecl) {
   // Parse attributes.
+  SourceLoc inoutLoc;
   TypeAttributes attrs;
-  parseTypeAttributeList(attrs);
+  parseTypeAttributeList(inoutLoc, attrs);
 
-  // Parse Generic Parameters. Generic Parameters are visible in the function
-  // body.
+  Optional<Scope> GenericsScope;
+
+  // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
   if (isInSILMode()) {
+    // If this is part of a sil function decl, generic parameters are visible in
+    // the function body; otherwise, they are visible when parsing the type.
+    if (!IsSILFuncDecl)
+      GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
   }
+  
+  // In SIL mode, parse box types { ... }.
+  if (isInSILMode() && Tok.is(tok::l_brace)) {
+    return parseSILBoxType(generics, attrs, GenericsScope);
+  }
 
-  ParserResult<TypeRepr> ty = parseTypeSimple(MessageID, HandleCodeCompletion);
+  ParserResult<TypeRepr> ty =
+    parseTypeSimpleOrComposition(MessageID, HandleCodeCompletion);
   if (ty.hasCodeCompletion())
     return makeParserCodeCompletionResult<TypeRepr>();
-
   if (ty.isNull())
     return nullptr;
+  auto tyR = ty.get();
 
-  // Parse a throws specifier.  'throw' is probably a typo for 'throws',
-  // but in local contexts we could just be at the end of a statement,
-  // so we need to check for the arrow.
-  ParserPosition beforeThrowsPos;
+  // Parse a throws specifier.
+  // Don't consume 'throws', if the next token is not '->', so we can emit a
+  // more useful diagnostic when parsing a function decl.
   SourceLoc throwsLoc;
-  bool rethrows = false;
-  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows) ||
-      (Tok.is(tok::kw_throw) && peekToken().is(tok::arrow))) {
-    if (Tok.is(tok::kw_throw)) {
-      diagnose(Tok.getLoc(), diag::throw_in_function_type)
+  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw) &&
+      peekToken().is(tok::arrow)) {
+    if (Tok.isNot(tok::kw_throws)) {
+      // 'rethrows' is only allowed on function declarations for now.
+      // 'throw' is probably a typo for 'throws'.
+      Diag<> DiagID = Tok.is(tok::kw_rethrows) ?
+        diag::rethrowing_function_type : diag::throw_in_function_type;
+      diagnose(Tok.getLoc(), DiagID)
         .fixItReplace(Tok.getLoc(), "throws");
     }
-
-    beforeThrowsPos = getParserPosition();
-    rethrows = Tok.is(tok::kw_rethrows);
     throwsLoc = consumeToken();
   }
 
-  // Handle type-function if we have an arrow.
-  SourceLoc arrowLoc;
-  if (consumeIf(tok::arrow, arrowLoc)) {
+  if (Tok.is(tok::arrow)) {
+    // Handle type-function if we have an arrow.
+    SourceLoc arrowLoc = consumeToken();
     ParserResult<TypeRepr> SecondHalf =
       parseType(diag::expected_type_function_result);
     if (SecondHalf.hasCodeCompletion())
       return makeParserCodeCompletionResult<TypeRepr>();
     if (SecondHalf.isNull())
       return nullptr;
-    if (rethrows) {
-      // 'rethrows' is only allowed on function declarations for now.
-      diagnose(throwsLoc, diag::rethrowing_function_type);
-    }
-    auto fnTy = new (Context) FunctionTypeRepr(generics, ty.get(),
-                                               throwsLoc,
-                                               arrowLoc,
-                                               SecondHalf.get());
-    return makeParserResult(applyAttributeToType(fnTy, attrs));
-  } else if (throwsLoc.isValid()) {
-    // Don't consume 'throws', so we can emit a more useful diagnostic when
-    // parsing a function decl.
-    restoreParserPosition(beforeThrowsPos);
-    return ty;
-  }
-  
-  // Only function types may be generic.
-  if (generics) {
+    tyR = new (Context) FunctionTypeRepr(generics, tyR, throwsLoc, arrowLoc,
+                                         SecondHalf.get());
+  } else if (generics) {
+    // Only function types may be generic.
     auto brackets = generics->getSourceRange();
     diagnose(brackets.Start, diag::generic_non_function);
   }
 
-  // Parse legacy array types for migration.
-  while (ty.isNonNull() && !Tok.isAtStartOfLine()) {
-    if (Tok.is(tok::l_square)) {
-      ty = parseTypeArray(ty.get());
-    } else {
-      break;
-    }
-  }
-
-  if (ty.isNonNull() && !ty.hasCodeCompletion()) {
-    ty = makeParserResult(applyAttributeToType(ty.get(), attrs));
-  }
-  return ty;
+  return makeParserResult(applyAttributeToType(tyR, inoutLoc, attrs));
 }
 
-ParserResult<TypeRepr> Parser::parseTypeIdentifierWithRecovery(
+ParserResult<TypeRepr> Parser::parseTypeForInheritance(
     Diag<> MessageID, Diag<TypeLoc> NonIdentifierTypeMessageID) {
-  ParserResult<TypeRepr> Ty = parseType(MessageID);
+  ParserResult<TypeRepr> Ty = parseTypeSimpleOrComposition(MessageID);
 
-  if (!Ty.isParseError() && !isa<IdentTypeRepr>(Ty.get()) &&
-      !isa<ErrorTypeRepr>(Ty.get())) {
-    diagnose(Ty.get()->getStartLoc(), NonIdentifierTypeMessageID, Ty.get())
-        .highlight(Ty.get()->getSourceRange());
-    Ty.setIsParseError();
-    Ty = makeParserResult(
-        Ty, new (Context) ErrorTypeRepr(Ty.get()->getSourceRange()));
+  if (Ty.hasCodeCompletion())
+    return makeParserCodeCompletionResult<TypeRepr>();
+
+  if (Ty.isParseError() || isa<ErrorTypeRepr>(Ty.get()))
+    return Ty;
+
+  if (isa<IdentTypeRepr>(Ty.get()))
+    return Ty;
+
+  if (auto Comp = dyn_cast<CompositionTypeRepr>(Ty.get())) {
+    bool hasNonIdent = false;
+    for (auto T : Comp->getTypes()) {
+      if (isa<IdentTypeRepr>(T))
+        continue;
+      hasNonIdent = true;
+      diagnose(T->getLoc(), NonIdentifierTypeMessageID, T)
+        .highlight(T->getSourceRange());
+    }
+    // IdentType only composition are allowed.
+    if (!hasNonIdent)
+      return Ty;
+  } else {
+    diagnose(Ty.get()->getLoc(), NonIdentifierTypeMessageID, Ty.get())
+      .highlight(Ty.get()->getSourceRange());
   }
 
-  assert(Ty.isNull() ||
-         isa<IdentTypeRepr>(Ty.get()) ||
-         isa<ErrorTypeRepr>(Ty.get()));
+  return makeParserErrorResult(
+    new (Context) ErrorTypeRepr(Ty.get()->getSourceRange()));
+
   return Ty;
 }
 
@@ -393,127 +505,162 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
   return makeParserResult(Status, ITR);
 }
 
-/// parseTypeIdentifierOrTypeComposition
-/// - Identifiers and compositions both start with the same identifier
-///   token, parse it and continue constructing a composition if the
-///   next token is '&'
+ParserResult<TypeRepr> Parser::parseTypeSimpleOrComposition() {
+  return parseTypeSimpleOrComposition(diag::expected_identifier_for_type);
+}
+
+/// parseTypeSimpleOrComposition
 ///
 ///   type-composition:
-///     type-identifier ('&' type-identifier)*
-///     'protocol' '<' type-composition-list-deprecated? '>'
+///     type-simple
+///     type-composition '&' type-simple
+ParserResult<TypeRepr>
+Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
+                                     bool HandleCodeCompletion) {
+  // Parse the first type
+  ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID,
+                                                     HandleCodeCompletion);
+  if (FirstType.hasCodeCompletion())
+    return makeParserCodeCompletionResult<TypeRepr>();
+  if (FirstType.isNull() || !Tok.isContextualPunctuator("&"))
+    return FirstType;
+  
+  SmallVector<TypeRepr *, 4> Types;
+  ParserStatus Status(FirstType);
+  SourceLoc FirstTypeLoc = FirstType.get()->getStartLoc();
+  SourceLoc FirstAmpersandLoc = Tok.getLoc();
+
+  auto addType = [&](TypeRepr *T) {
+    if (!T) return;
+    if (auto Comp = dyn_cast<CompositionTypeRepr>(T)) {
+      // Accept protocol<P1, P2> & P3; explode it.
+      auto TyRs = Comp->getTypes();
+      if (!TyRs.empty()) // If empty, is 'Any'; ignore.
+        Types.append(TyRs.begin(), TyRs.end());
+      return;
+    }
+    Types.push_back(T);
+  };
+
+  addType(FirstType.get());
+  
+  while (Tok.isContextualPunctuator("&")) {
+    consumeToken(); // consume '&'
+    ParserResult<TypeRepr> ty =
+      parseTypeSimple(diag::expected_identifier_for_type, HandleCodeCompletion);
+    if (ty.hasCodeCompletion())
+      return makeParserCodeCompletionResult<TypeRepr>();
+    Status |= ty;
+    addType(ty.getPtrOrNull());
+  };
+  
+  return makeParserResult(Status, CompositionTypeRepr::create(
+    Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc}));
+}
+
+ParserResult<CompositionTypeRepr> Parser::parseAnyType() {
+  return makeParserResult(CompositionTypeRepr
+    ::createEmptyComposition(Context, consumeToken(tok::kw_Any)));
+}
+
+/// parseOldStyleProtocolComposition
+///   type-composition-deprecated:
+///     'protocol' '<' '>'
+///     'protocol' '<' type-composition-list-deprecated '>'
 ///
 ///   type-composition-list-deprecated:
-///     type-identifier (',' type-identifier)*
-ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
-  
-  // Handle deprecated case
-  if (Tok.getKind() == tok::kw_protocol && startsWithLess(peekToken())) {
-    SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
-    SourceLoc LAngleLoc = consumeStartingLess();
-    
-    // Check for empty protocol composition.
-    if (startsWithGreater(Tok)) {
-      SourceLoc RAngleLoc = consumeStartingGreater();
-      auto AnyRange = SourceRange(ProtocolLoc, RAngleLoc);
-      
-      // Warn that 'protocol<>' is deprecated and offer to
-      // replace with the 'Any' keyword
-      diagnose(LAngleLoc, diag::deprecated_any_composition)
-        .fixItReplace(AnyRange, "Any");
-      
-      return makeParserResult(
-        ProtocolCompositionTypeRepr::createEmptyComposition(Context, ProtocolLoc));
-    }
-    
-    // Parse the type-composition-list.
-    ParserStatus Status;
-    SmallVector<IdentTypeRepr *, 4> Protocols;
+///     type-identifier
+///     type-composition-list-deprecated ',' type-identifier
+ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
+  assert(Tok.is(tok::kw_protocol) && startsWithLess(peekToken()));
+
+  SourceLoc ProtocolLoc = consumeToken();
+  SourceLoc LAngleLoc = consumeStartingLess();
+
+  // Parse the type-composition-list.
+  ParserStatus Status;
+  SmallVector<TypeRepr *, 4> Protocols;
+  bool IsEmpty = startsWithGreater(Tok);
+  if (!IsEmpty) {
     do {
       // Parse the type-identifier.
       ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
       Status |= Protocol;
-      if (auto *ident = dyn_cast_or_null<IdentTypeRepr>(Protocol.getPtrOrNull()))
+      if (auto *ident =
+            dyn_cast_or_null<IdentTypeRepr>(Protocol.getPtrOrNull()))
         Protocols.push_back(ident);
     } while (consumeIf(tok::comma));
+  }
 
-    // Check for the terminating '>'.
-    SourceLoc RAngleLoc = PreviousLoc;
-    if (startsWithGreater(Tok)) {
-      RAngleLoc = consumeStartingGreater();
-    } else {
-      if (Status.isSuccess()) {
-        diagnose(Tok, diag::expected_rangle_protocol);
-        diagnose(LAngleLoc, diag::opening_angle);
-        Status.setIsParseError();
-      }
-      
-      // Skip until we hit the '>'.
-      RAngleLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
+  // Check for the terminating '>'.
+  SourceLoc RAngleLoc = PreviousLoc;
+  if (startsWithGreater(Tok)) {
+    RAngleLoc = consumeStartingGreater();
+  } else {
+    if (Status.isSuccess()) {
+      diagnose(Tok, diag::expected_rangle_protocol);
+      diagnose(LAngleLoc, diag::opening_angle);
+      Status.setIsParseError();
     }
     
-    auto composition = ProtocolCompositionTypeRepr::create(
-      Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
+    // Skip until we hit the '>'.
+    RAngleLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
+  }
 
-    if (Status.isSuccess()) {
-      // Only if we have complete protocol<...> construct, diagnose deprecated.
+  auto composition = CompositionTypeRepr::create(
+    Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
 
-      auto extractText = [&](IdentTypeRepr *Ty) -> StringRef {
+  if (Status.isSuccess()) {
+    // Only if we have complete protocol<...> construct, diagnose deprecated.
+    SmallString<32> replacement;
+    if (Protocols.empty()) {
+      replacement = "Any";
+    } else {
+      auto extractText = [&](TypeRepr *Ty) -> StringRef {
         auto SourceRange = Ty->getSourceRange();
         return SourceMgr.extractText(
           Lexer::getCharSourceRangeFromSourceRange(SourceMgr, SourceRange));
       };
-      SmallString<32> replacement;
       auto Begin = Protocols.begin();
       replacement += extractText(*Begin);
-      while(++Begin != Protocols.end()) {
+      while (++Begin != Protocols.end()) {
         replacement += " & ";
         replacement += extractText(*Begin);
       }
-
-      // Replace 'protocol<T1, T2>' with 'T1 & T2'
-      diagnose(ProtocolLoc,
-        Protocols.size() > 1 ? diag::deprecated_protocol_composition
-                             : diag::deprecated_protocol_composition_single)
-        .highlight(composition->getSourceRange())
-        .fixItReplace(composition->getSourceRange(), replacement);
     }
 
-    return makeParserResult(Status, composition);
+    if (Protocols.size() > 1) {
+      // Need parenthesis if the next token looks like postfix TypeRepr.
+      // i.e. '?', '!', '.Type', '.Protocol'
+      bool needParen = false;
+      needParen |= !Tok.isAtStartOfLine() && 
+          (isOptionalToken(Tok) || isImplicitlyUnwrappedOptionalToken(Tok));
+      needParen |= Tok.isAny(tok::period, tok::period_prefix);
+      if (needParen) {
+        replacement.insert(replacement.begin(), '(');
+        replacement += ")";
+      }
+    }
+
+    // Copy split token after '>' to the replacement string.
+    // FIXME: lexer should smartly separate '>' and trailing contents like '?'.
+    StringRef TrailingContent = L->getTokenAt(RAngleLoc).getRange().str().
+      substr(1);
+    if (!TrailingContent.empty()) {
+      replacement += TrailingContent;
+    }
+
+    // Replace 'protocol<T1, T2>' with 'T1 & T2'
+    diagnose(ProtocolLoc,
+      IsEmpty              ? diag::deprecated_any_composition :
+      Protocols.size() > 1 ? diag::deprecated_protocol_composition :
+                             diag::deprecated_protocol_composition_single)
+      .highlight(composition->getSourceRange())
+      .fixItReplace(composition->getSourceRange(), replacement);
   }
-  
-  SourceLoc FirstTypeLoc = Tok.getLoc();
-  
-  // Parse the first type
-  ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
-  if (!Tok.isContextualPunctuator("&"))
-    return FirstType;
-  
-  SmallVector<IdentTypeRepr *, 4> Protocols;
-  ParserStatus Status;
 
-  // If it is not 'Any', add it to the protocol list
-  if (auto *ident = dyn_cast_or_null<IdentTypeRepr>(FirstType.getPtrOrNull()))
-    Protocols.push_back(ident);
-  Status |= FirstType;
-  auto FirstAmpersandLoc = Tok.getLoc();
-  
-  while (Tok.isContextualPunctuator("&")) {
-    consumeToken(); // consume '&'
-    ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
-    Status |= Protocol;
-    if (auto *ident = dyn_cast_or_null<IdentTypeRepr>(Protocol.getPtrOrNull()))
-      Protocols.push_back(ident);
-  };
-  
-  return makeParserResult(Status, ProtocolCompositionTypeRepr::create(
-    Context, Protocols, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc}));
+  return makeParserResult(Status, composition);
 }
-
-ParserResult<ProtocolCompositionTypeRepr> Parser::parseAnyType() {
-  return makeParserResult(ProtocolCompositionTypeRepr
-    ::createEmptyComposition(Context, consumeToken(tok::kw_Any)));
-}
-
 
 /// parseTypeTupleBody
 ///   type-tuple:
@@ -535,19 +682,16 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     Labels;
 
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
-                                  tok::comma, /*OptionalSep=*/false,
                                   /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
+    TypeRepr *tyR;
+
     // If this is a deprecated use of the inout marker in an argument list,
     // consume the inout.
     SourceLoc InOutLoc;
-    bool hasAnyInOut = false;
-    bool hasValidInOut = false;
-    if (consumeIf(tok::kw_inout, InOutLoc)) {
-      hasAnyInOut = true;
-      hasValidInOut = false;
-    }
+    consumeIf(tok::kw_inout, InOutLoc);
+
     // If the tuple element starts with a potential argument label followed by a
     // ':' or another potential argument label, then the identifier is an
     // element tag, and it is followed by a type annotation.
@@ -574,65 +718,49 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
       SourceLoc postColonLoc = Tok.getLoc();
 
-      // Consume 'inout' if present.
-      if (!hasAnyInOut && consumeIf(tok::kw_inout, InOutLoc)) {
-        hasValidInOut = true;
-      }
-
-      SourceLoc extraneousInOutLoc;
-      while (consumeIf(tok::kw_inout, extraneousInOutLoc)) {
-        diagnose(Tok, diag::parameter_inout_var_let_repeated)
-          .fixItRemove(extraneousInOutLoc);
-      }
-
       // Parse the type annotation.
-      ParserResult<TypeRepr> type = parseType(diag::expected_type);
+      auto type = parseType(diag::expected_type);
       if (type.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
       if (type.isNull())
         return makeParserError();
+      tyR = type.get();
 
-      if (!hasValidInOut && hasAnyInOut) {
+      // Complain obsoleted 'inout' position; (inout name: Ty)
+      if (InOutLoc.isValid() && !isa<InOutTypeRepr>(tyR))
         diagnose(Tok.getLoc(), diag::inout_as_attr_disallowed)
           .fixItRemove(InOutLoc)
           .fixItInsert(postColonLoc, "inout ");
-      }
-
-      // If an 'inout' marker was specified, build the type.  Note that we bury
-      // the inout locator within the named locator.  This is weird but required
-      // by sema apparently.
-      if (InOutLoc.isValid())
-        type = makeParserResult(new (Context) InOutTypeRepr(type.get(),
-                                                            InOutLoc));
 
       // Record the label. We will look at these at the end.
-      if (Labels.empty()) {
-        Labels.assign(ElementsR.size(),
-                      std::make_tuple(Identifier(), SourceLoc(),
-                                      Identifier(), SourceLoc()));
-      }
-      Labels.push_back(std::make_tuple(name, nameLoc,
-                                       secondName, secondNameLoc));
-
-      ElementsR.push_back(type.get());
+      if (Labels.empty())
+        Labels.resize(ElementsR.size());
+      Labels.emplace_back(name, nameLoc, secondName, secondNameLoc);
     } else {
       // Otherwise, this has to be a type.
-      ParserResult<TypeRepr> type = parseType();
+      auto type = parseType();
       if (type.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
       if (type.isNull())
         return makeParserError();
-      if (InOutLoc.isValid())
-        type = makeParserResult(new (Context) InOutTypeRepr(type.get(),
-                                                            InOutLoc));
+      tyR = type.get();
 
-      if (!Labels.empty()) {
-        Labels.push_back(std::make_tuple(Identifier(), SourceLoc(),
-                                         Identifier(), SourceLoc()));
-      }
-
-      ElementsR.push_back(type.get());
+      if (!Labels.empty())
+        Labels.emplace_back();
     }
+
+    // If an 'inout' marker was specified, build inout type.
+    // Note that we bury the inout locator within the named locator.
+    // This is weird but required by Sema apparently.
+    if (InOutLoc.isValid()) {
+      if (isa<InOutTypeRepr>(tyR))
+        diagnose(Tok, diag::parameter_inout_var_let_repeated)
+          .fixItRemove(InOutLoc);
+      else
+        tyR = new (Context) InOutTypeRepr(tyR, InOutLoc);
+    }
+
+    ElementsR.push_back(tyR);
 
     // Parse '= expr' here so we can complain about it directly, rather
     // than dying when we see it.
@@ -665,12 +793,21 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   if (EllipsisLoc.isInvalid())
     EllipsisIdx = ElementsR.size();
 
+  SmallVector<Identifier, 4> ElementNames;
+  SmallVector<SourceLoc, 4> ElementNameLocs;
+  SmallVector<SourceLoc, 4> UnderscoreLocs;
   // If there were any labels, figure out which labels should go into the type
   // representation.
   if (!Labels.empty()) {
     assert(Labels.size() == ElementsR.size());
+
     bool isFunctionType = Tok.isAny(tok::arrow, tok::kw_throws,
                                     tok::kw_rethrows);
+    ElementNames.resize(ElementsR.size());
+    ElementNameLocs.resize(ElementsR.size());
+    if (isFunctionType)
+      UnderscoreLocs.resize(ElementsR.size());
+
     for (unsigned i : indices(ElementsR)) {
       auto &currentLabel = Labels[i];
 
@@ -694,8 +831,8 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         }
 
         // Form the named type representation.
-        ElementsR[i] = new (Context) NamedTypeRepr(firstName, ElementsR[i],
-                                                   firstNameLoc);
+        ElementNames[i] = firstName;
+        ElementNameLocs[i] = firstNameLoc;
         continue;
       }
 
@@ -711,12 +848,21 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         else
           diag.fixItReplace(SourceRange(firstNameLoc), "_");
       }
+
+      if (firstNameLoc.isValid() || secondNameLoc.isValid()) {
+        // Form the named parameter type representation.
+        ElementNames[i] = secondName;
+        ElementNameLocs[i] = secondNameLoc;
+        UnderscoreLocs[i]  = firstNameLoc;
+      }
     }
   }
 
   return makeParserResult(Status,
                           TupleTypeRepr::create(Context, ElementsR,
                                                 SourceRange(LPLoc, RPLoc),
+                                                ElementNames, ElementNameLocs,
+                                                UnderscoreLocs,
                                                 EllipsisLoc, EllipsisIdx));
 }
 
@@ -940,6 +1086,9 @@ bool Parser::canParseGenericArguments() {
 }
 
 bool Parser::canParseType() {
+  // Accept 'inout' at for better recovery.
+  consumeIf(tok::kw_inout);
+
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:
@@ -1090,26 +1239,6 @@ bool Parser::canParseOldStyleProtocolComposition() {
   return true;
 }
 
-bool Parser::canParseAttributes() {
-  while (consumeIf(tok::at_sign)) {
-    if (!consumeIf(tok::identifier)) return false;
-    
-    if (consumeIf(tok::equal)) {
-      if (Tok.isNot(tok::identifier) &&
-          Tok.isNot(tok::integer_literal) &&
-          Tok.isNot(tok::floating_literal))
-        return false;
-      consumeToken();
-    } else if (Tok.is(tok::l_paren)) {
-      // Attributes like cc(x,y,z)
-      skipSingle();
-    }
-    
-    consumeIf(tok::comma);
-  }
-  return true;
-}
-
 bool Parser::canParseTypeTupleBody() {
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
       Tok.isNotEllipsis() && !isStartOfDecl()) {
@@ -1128,9 +1257,8 @@ bool Parser::canParseTypeTupleBody() {
         }
         consumeToken(tok::colon);
 
-        // Parse attributes then a type.
-        if (!canParseAttributes() ||
-            !canParseType())
+        // Parse a type.
+        if (!canParseType())
           return false;
 
         // Parse default values. This aren't actually allowed, but we recover
@@ -1148,11 +1276,6 @@ bool Parser::canParseTypeTupleBody() {
       }
       
       // Otherwise, this has to be a type.
-
-      // Parse attributes.
-      if (!canParseAttributes())
-        return false;
- 
       if (!canParseType())
         return false;
 
@@ -1164,6 +1287,3 @@ bool Parser::canParseTypeTupleBody() {
   
   return consumeIf(tok::r_paren);
 }
-
-
-

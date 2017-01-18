@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,7 +14,7 @@ import SwiftPrivate
 import SwiftPrivateLibcExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
 import Glibc
 #endif
 
@@ -36,7 +36,7 @@ func findSubstring(_ string: String, _ substring: String) -> String.Index? {
 #else
   // FIXME(performance): This is a very non-optimal algorithm, with a worst
   // case of O((n-m)*m). When non-objc String has a match function that's better,
-  // this should be removed in favour of using that.
+  // this should be removed in favor of using that.
 
   // Operate on unicode scalars rather than codeunits.
   let haystack = string.unicodeScalars
@@ -232,3 +232,16 @@ public func forAllPermutations<S : Sequence>(
     return ()
   }
 }
+
+public func cartesianProduct<C1 : Collection, C2 : Collection>(
+  _ c1: C1, _ c2: C2
+) -> [(C1.Iterator.Element, C2.Iterator.Element)] {
+  var result: [(C1.Iterator.Element, C2.Iterator.Element)] = []
+  for e1 in c1 {
+    for e2 in c2 {
+      result.append((e1, e2))
+    }
+  }
+  return result
+}
+

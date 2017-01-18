@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -26,69 +26,16 @@
 namespace swift {
 
 class ArchetypeBuilder;
-
-/// Iterator that walks the generic parameter types declared in a generic
-/// signature and their dependent members.
-class GenericSignatureWitnessIterator {
-  ArrayRef<Requirement> p;
-  
-public:
-  GenericSignatureWitnessIterator() = default;
-  GenericSignatureWitnessIterator(ArrayRef<Requirement> p)
-    : p(p)
-  {
-    assert(p.empty() || p.front().getKind() == RequirementKind::WitnessMarker);
-  }
-  
-  GenericSignatureWitnessIterator &operator++() {
-    do {
-      p = p.slice(1);
-    } while (!p.empty()
-             && p.front().getKind() != RequirementKind::WitnessMarker);
-    return *this;
-  }
-  
-  GenericSignatureWitnessIterator operator++(int) {
-    auto copy = *this;
-    ++(*this);
-    return copy;
-  }
-  
-  Type operator*() const {
-    assert(p.front().getKind() == RequirementKind::WitnessMarker);
-    return p.front().getFirstType();
-  }
-  
-  Type operator->() const {
-    assert(p.front().getKind() == RequirementKind::WitnessMarker);
-    return p.front().getFirstType();
-  }
-  
-  bool operator==(const GenericSignatureWitnessIterator &o) {
-    return p.data() == o.p.data() && p.size() == o.p.size();
-  }
-  
-  bool operator!=(const GenericSignatureWitnessIterator &o) {
-    return p.data() != o.p.data() || p.size() != o.p.size();
-  }
-  
-  static GenericSignatureWitnessIterator emptyRange() {
-    return GenericSignatureWitnessIterator();
-  }
-  
-  // Allow the witness iterator to be used with a ranged for.
-  GenericSignatureWitnessIterator begin() const {
-    return *this;
-  }
-  GenericSignatureWitnessIterator end() const {
-    return GenericSignatureWitnessIterator({p.end(), p.end()});
-  }
-};
+class ProtocolConformanceRef;
+class ProtocolType;
+class Substitution;
+class SubstitutionMap;
 
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
 /// generic parameters.
-class GenericSignature final : public llvm::FoldingSetNode,
+class alignas(1 << TypeAlignInBits) GenericSignature final
+  : public llvm::FoldingSetNode,
     private llvm::TrailingObjects<GenericSignature, GenericTypeParamType *,
                                   Requirement> {
   friend TrailingObjects;
@@ -130,6 +77,8 @@ class GenericSignature final : public llvm::FoldingSetNode,
   /// Retrieve the archetype builder for the given generic signature.
   ArchetypeBuilder *getArchetypeBuilder(ModuleDecl &mod);
 
+  friend class ArchetypeType;
+
 public:
   /// Create a new generic signature with the given type parameters and
   /// requirements.
@@ -153,49 +102,91 @@ public:
   /// array of the generic parameters for the innermost generic type.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParams() const;
 
+  /// Create a text string that describes the bindings of generic parameters
+  /// that are relevant to the given set of types, e.g.,
+  /// "[with T = Bar, U = Wibble]".
+  ///
+  /// \param types The types that will be scanned for generic type parameters,
+  /// which will be used in the resulting type.
+  ///
+  /// \param substitutions The generic parameter -> generic argument
+  /// substitutions that will have been applied to these types.
+  /// These are used to produce the "parameter = argument" bindings in the test.
+  std::string gatherGenericParamBindingsText(
+      ArrayRef<Type> types, const TypeSubstitutionMap &substitutions) const;
+
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
     return const_cast<GenericSignature *>(this)->getRequirementsBuffer();
   }
 
-  // Only allow allocation by doing a placement new.
+  /// Check if the generic signature makes all generic parameters
+  /// concrete.
+  bool areAllParamsConcrete() const {
+    auto iter = getAllDependentTypes();
+    return iter.begin() == iter.end();
+  }
+
+  /// Only allow allocation by doing a placement new.
   void *operator new(size_t Bytes, void *Mem) {
     assert(Mem);
     return Mem;
   }
-  
-  /// Build a substitution map from a vector of Substitutions that correspond to
-  /// the generic parameters in this generic signature. The order of primary
-  /// archetypes in the substitution vector must match the order of generic
-  /// parameters in getGenericParams().
-  TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
-  
-  /// Return a range that iterates through first all of the generic parameters
-  /// of the signature, followed by all of their recursive member types exposed
-  /// through protocol requirements.
-  ///
-  /// The member types are presented in the
-  /// same order as GenericParamList::getAllArchetypes would present for an
-  /// equivalent GenericParamList.
-  GenericSignatureWitnessIterator getAllDependentTypes() const {
-    return GenericSignatureWitnessIterator(getRequirements());
-  }
 
-  /// Determines whether this ASTContext is canonical.
+  /// Build an interface type substitution map from a vector of Substitutions
+  /// that correspond to the generic parameters in this generic signature.
+  SubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
+
+  /// Same as above, but updates an existing map.
+  void getSubstitutionMap(ArrayRef<Substitution> args,
+                          SubstitutionMap &subMap) const;
+
+  using GenericFunction = auto(CanType canType, Type conformingReplacementType,
+    ProtocolType *conformedProtocol)
+    ->Optional<ProtocolConformanceRef>;
+  using LookupConformanceFn = llvm::function_ref<GenericFunction>;
+
+  /// Build an array of substitutions from an interface type substitution map,
+  /// using the given function to look up conformances.
+  void getSubstitutions(TypeSubstitutionFn substitution,
+                        LookupConformanceFn lookupConformance,
+                        SmallVectorImpl<Substitution> &result) const;
+
+  /// Build an array of substitutions from an interface type substitution map,
+  /// using the given function to look up conformances.
+  void getSubstitutions(const TypeSubstitutionMap &subMap,
+                        LookupConformanceFn lookupConformance,
+                        SmallVectorImpl<Substitution> &result) const;
+
+  /// Build an array of substitutions from an interface type substitution map,
+  /// using the given function to look up conformances.
+  void getSubstitutions(const SubstitutionMap &subMap,
+                        SmallVectorImpl<Substitution> &result) const;
+
+  /// Return a range that iterates through all of the types that require
+  /// substitution, which includes the generic parameter types as well as
+  /// other dependent types that require additional conformances.
+  SmallVector<Type, 4> getAllDependentTypes() const;
+
+  /// Enumerate all of the dependent types in the type signature that will
+  /// occur in substitution lists (in order), along with the set of
+  /// conformance requirements placed on that dependent type.
+  ///
+  /// \param fn Callback function that will receive each (type, requirements)
+  /// pair, in the order they occur within a list of substitutions. If this
+  /// returns \c true, the enumeration will be aborted.
+  ///
+  /// \returns true if any call to \c fn returned \c true, otherwise \c false.
+  bool enumeratePairedRequirements(
+         llvm::function_ref<bool(Type, ArrayRef<Requirement>)> fn) const;
+
+  /// Determines whether this GenericSignature is canonical.
   bool isCanonical() const;
   
   ASTContext &getASTContext() const;
   
   /// Canonicalize the components of a generic signature.
   CanGenericSignature getCanonicalSignature() const;
-  
-  /// Canonicalize a generic signature down to its essential requirements,
-  /// for mangling purposes.
-  ///
-  /// TODO: This is what getCanonicalSignature() ought to do, but currently
-  /// cannot due to implementation dependencies on 'getAllDependentTypes'
-  /// order matching 'getAllArchetypes' order of a generic param list.
-  CanGenericSignature getCanonicalManglingSignature(ModuleDecl &M) const;
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -221,6 +212,11 @@ public:
   /// constraint.
   Type getConcreteType(Type type, ModuleDecl &mod);
 
+  /// Return the layout constraint that the given dependent type is constrained
+  /// to, or the null LayoutConstraint if it is not the subject of layout
+  /// constraint.
+  LayoutConstraint getLayoutConstraint(Type type, ModuleDecl &mod);
+
   /// Return the preferred representative of the given type parameter within
   /// this generic signature.  This may yield a concrete type or a
   /// different type parameter.
@@ -236,6 +232,11 @@ public:
   /// signature.
   CanType getCanonicalTypeInContext(Type type, ModuleDecl &mod);
   bool isCanonicalTypeInContext(Type type, ModuleDecl &mod);
+
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
+  bool isCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -81,7 +81,7 @@ namespace {
       return { S->getStartLoc(), S->getEndLoc() };
     }
   };
-}
+} // end anonymous namespace
 
 template <class T> static SourceRange getSourceRangeImpl(const T *S) {
   static_assert(isOverriddenFromStmt(&T::getSourceRange) ||
@@ -287,7 +287,7 @@ void PoundAvailableInfo::
 getPlatformKeywordLocs(SmallVectorImpl<SourceLoc> &PlatformLocs) {
   for (unsigned i = 0; i < NumQueries; i++) {
     auto *VersionSpec =
-      dyn_cast<VersionConstraintAvailabilitySpec>(getQueries()[i]);
+      dyn_cast<PlatformVersionConstraintAvailabilitySpec>(getQueries()[i]);
     if (!VersionSpec)
       continue;
     
@@ -309,9 +309,16 @@ SourceRange StmtConditionElement::getSourceRange() const {
       Start = IntroducerLoc;
     else
       Start = getPattern()->getStartLoc();
-
-    return SourceRange(Start, getInitializer()->getEndLoc());
+    
+    SourceLoc End = getInitializer()->getEndLoc();
+    if (Start.isValid() && End.isValid()) {
+      return SourceRange(Start, End);
+    } else {
+      return SourceRange();
+    }
   }
+
+  llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
 SourceLoc StmtConditionElement::getStartLoc() const {
@@ -321,10 +328,10 @@ SourceLoc StmtConditionElement::getStartLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getStartLoc();
   case StmtConditionElement::CK_PatternBinding:
-    if (IntroducerLoc.isValid())
-      return IntroducerLoc;
-    return getPattern()->getStartLoc();
+    return getSourceRange().Start;
   }
+
+  llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
 SourceLoc StmtConditionElement::getEndLoc() const {
@@ -334,8 +341,10 @@ SourceLoc StmtConditionElement::getEndLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getEndLoc();
   case StmtConditionElement::CK_PatternBinding:
-    return getInitializer()->getEndLoc();
+    return getSourceRange().End;
   }
+
+  llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
 static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {

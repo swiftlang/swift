@@ -1,12 +1,12 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_VOID_1 | FileCheck %s -check-prefix=RETURN_VOID_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_INT_1 | FileCheck %s -check-prefix=RETURN_INT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_INT_2 | FileCheck %s -check-prefix=RETURN_INT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_VOID_1 | %FileCheck %s -check-prefix=RETURN_VOID_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_INT_1 | %FileCheck %s -check-prefix=RETURN_INT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_INT_2 | %FileCheck %s -check-prefix=RETURN_INT_2
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TRY_RETURN_INT | FileCheck %s -check-prefix=RETURN_INT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TRY_RETURN_VOID | FileCheck %s -check-prefix=RETURN_VOID_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR1 | FileCheck %s -check-prefix=RETURN_TR1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR2 | FileCheck %s -check-prefix=RETURN_TR2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR3 | FileCheck %s -check-prefix=RETURN_TR3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TRY_RETURN_INT | %FileCheck %s -check-prefix=RETURN_INT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TRY_RETURN_VOID | %FileCheck %s -check-prefix=RETURN_VOID_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR1 | %FileCheck %s -check-prefix=RETURN_TR1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR2 | %FileCheck %s -check-prefix=RETURN_TR2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR3 | %FileCheck %s -check-prefix=RETURN_TR3
 
 struct FooStruct {
   var instanceVar : Int

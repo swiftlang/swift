@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -163,6 +163,8 @@ public:
     case ApplyArgToParam:
       return 2;
     }
+
+    llvm_unreachable("Unhandled PathElementKind in switch.");
   }
 
   /// Flags for efficiently recording certain information about a path.
@@ -172,12 +174,9 @@ public:
   /// flags for a concatenated paths is simply the bitwise-or of the
   /// flags of the component paths.
   enum Flag : unsigned {
-    /// Is this not a simple path?
-    IsNotSimple = 0x1,
-
     /// Does this path involve a function conversion, i.e. a
     /// FunctionArgument or FunctionResult node?
-    IsFunctionConversion = 0x2,
+    IsFunctionConversion = 0x1,
   };
 
   static unsigned getSummaryFlagsForPathElement(PathElementKind kind) {
@@ -202,12 +201,6 @@ public:
     case SubscriptMember:
     case SubscriptResult:
     case OpenedGeneric:
-      return 0;
-
-    case FunctionArgument:
-    case FunctionResult:
-      return IsFunctionConversion;
-
     case Archetype:
     case AssociatedType:
     case GenericArgument:
@@ -216,9 +209,14 @@ public:
     case TupleElement:
     case Requirement:
     case Witness:
-      return IsNotSimple;
+      return 0;
+
+    case FunctionArgument:
+    case FunctionResult:
+      return IsFunctionConversion;
     }
-    llvm_unreachable("bad path element kind");
+
+    llvm_unreachable("Unhandled PathElementKind in switch.");
   }
 
   template<unsigned N> struct incomplete;
@@ -359,6 +357,8 @@ public:
       case StoredKindAndValue:
         return decodeStorage(storage).first;
       }
+
+      llvm_unreachable("Unhandled StoredKind in switch.");
     }
 
     /// \brief Retrieve the value associated with this path element,
@@ -436,12 +436,6 @@ public:
   }
 
   unsigned getSummaryFlags() const { return summaryFlags; }
-
-  /// \brief Determines whether this locator has a "simple" path, without
-  /// any transformations that break apart types.
-  bool hasSimplePath() const {
-    return !(getSummaryFlags() & IsNotSimple);
-  }
 
   /// \brief Determines whether this locator is part of a function
   /// conversion.
@@ -626,6 +620,7 @@ public:
   }
 };
 
-} } // end namespace swift::constraints
+} // end namespace constraints
+} // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINTLOCATOR_H

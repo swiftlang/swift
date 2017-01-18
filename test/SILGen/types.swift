@@ -1,21 +1,20 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | %FileCheck %s
 
 class C {
   var member: Int = 0
 
   // Methods have method calling convention.
-  // CHECK-LABEL: sil hidden @_TFC5types1C3foo{{.*}} : $@convention(method) (Int, @guaranteed C) -> () {
+  // CHECK-LABEL: sil hidden @_TFC5types1C3foofT1xSi_T_ : $@convention(method) (Int, @guaranteed C) -> () {
   func foo(x x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $C):
     member = x
 
-    // CHECK-NOT: strong_retain
+    // CHECK-NOT: copy_value
     // CHECK: [[FN:%[0-9]+]] = class_method %1 : $C, #C.member!setter.1
     // CHECK: apply [[FN]](%0, %1) : $@convention(method) (Int, @guaranteed C) -> ()
-    // CHECK-NOT: strong_release
-
-
+    // CHECK-NOT: destroy_value
   }
+  // CHECK: } // end sil function '_TFC5types1C3foofT1xSi_T_'
 }
 
 struct S {
@@ -27,23 +26,20 @@ struct S {
     var x = x
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
-    // CHECK: [[THIS_LOCAL_ADDR:%[0-9]+]] = alloc_box $S
-    // CHECK: [[THIS_LOCAL:%[0-9]+]] = project_box [[THIS_LOCAL_ADDR]]
-    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
+    // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
     // CHECK: [[X:%[0-9]+]] = project_box [[XADDR]]
-    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS_LOCAL]] : $*S, #S.member
+    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS]] : $*S, #S.member
     // CHECK: copy_addr [[X]] to [[MEMBER]]
   }
 
   class SC {
-    // CHECK-LABEL: sil hidden  @_TFCV5types1S2SC3bar{{.*}}
+    // CHECK-LABEL: sil hidden @_TFCV5types1S2SC3bar{{.*}}
     func bar() {}
   }
 }
 
 func f() {
   class FC {
-    // CHECK-LABEL: sil shared @_TFCF5types1fFT_T_L_2FC3zim{{.*}}
     func zim() {}
   }
 }
@@ -51,12 +47,10 @@ func f() {
 func g(b b : Bool) {
   if (b) {
     class FC {
-      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L_2FC3zim{{.*}}
       func zim() {}
     }
   } else {
     class FC {
-      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L0_2FC3zim{{.*}}
       func zim() {}
     }
   }
@@ -97,3 +91,7 @@ func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
     return (nil, g)
   }
 }
+
+// CHECK-LABEL: sil shared @_TFCF5types1fFT_T_L_2FC3zim{{.*}}
+// CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L_2FC3zim{{.*}}
+// CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L0_2FC3zim{{.*}}

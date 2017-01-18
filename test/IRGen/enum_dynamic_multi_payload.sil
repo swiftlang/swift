@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -gnone -emit-ir -I %S/Inputs | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 import Builtin
 
@@ -58,13 +58,11 @@ entry(%e : $Either<(), ()>):
   %a = unchecked_enum_data %l : $Either<(), ()>, #Either.Left!enumelt.1
   %b = unchecked_enum_data %r : $Either<(), ()>, #Either.Right!enumelt.1
 
-  // CHECK-NEXT: switch 
-  // CHECK-NEXT:   i1 false, label %6
-  // CHECK-NEXT:   i1 true, label %7
+  // CHECK-NEXT: br i1 {{%.*}}, label %6, label %5
+  // CHECK:      <label>:5
+  // CHECK:        br label %7
   // CHECK:      <label>:6
   // CHECK:        br label %8
-  // CHECK:      <label>:7
-  // CHECK:        br label %9
   switch_enum %e : $Either<(), ()>,
     case #Either.Left!enumelt.1: left,
     case #Either.Right!enumelt.1: right
@@ -77,13 +75,13 @@ right(%y : $()):
   %1 = integer_literal $Builtin.Int8, 1
   br next(%1 : $Builtin.Int8)
 
-  // CHECK:        phi i8 [ 1, %9 ], [ 0, %8 ]
+  // CHECK:        phi i8 [ 1, %8 ], [ 0, %7 ]
 next(%z : $Builtin.Int8):
   dealloc_stack %s : $*Either<(), ()>
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @empty_instance2(i2) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} void @empty_instance2(i8) {{.*}} {
 sil @empty_instance2 : $@convention(thin) (EitherOr<(), ()>) -> () {
 // CHECK-NEXT: entry:
 entry(%e : $EitherOr<(), ()>):
@@ -97,20 +95,20 @@ entry(%e : $EitherOr<(), ()>):
   // CHECK-NEXT: llvm.lifetime.start
   %s = alloc_stack $EitherOr<(), ()>
 
-  // CHECK-NEXT: bitcast {{.*}} to i2*
-  // CHECK-NEXT: store i2 0
+  // CHECK-NEXT: bitcast {{.*}} to i8*
+  // CHECK-NEXT: store i8 0
   %l = enum $EitherOr<(), ()>, #EitherOr.Left!enumelt.1, undef : $()
   store %l to %s : $*EitherOr<(), ()>
-  // CHECK-NEXT: bitcast {{.*}} to i2*
-  // CHECK-NEXT: store i2 1
+  // CHECK-NEXT: bitcast {{.*}} to i8*
+  // CHECK-NEXT: store i8 1
   %r = enum $EitherOr<(), ()>, #EitherOr.Right!enumelt.1, undef : $()
   store %r to %s : $*EitherOr<(), ()>
-  // CHECK-NEXT: bitcast {{.*}} to i2*
-  // CHECK-NEXT: store i2 -2
+  // CHECK-NEXT: bitcast {{.*}} to i8*
+  // CHECK-NEXT: store i8 2
   %m = enum $EitherOr<(), ()>, #EitherOr.Middle!enumelt
   store %m to %s : $*EitherOr<(), ()>
-  // CHECK-NEXT: bitcast {{.*}} to i2*
-  // CHECK-NEXT: store i2 -1
+  // CHECK-NEXT: bitcast {{.*}} to i8*
+  // CHECK-NEXT: store i8 3
   %k = enum $EitherOr<(), ()>, #EitherOr.Center!enumelt
   store %k to %s : $*EitherOr<(), ()>
 
@@ -118,10 +116,10 @@ entry(%e : $EitherOr<(), ()>):
   %b = unchecked_enum_data %r : $EitherOr<(), ()>, #EitherOr.Right!enumelt.1
 
   // CHECK-NEXT: switch
-  // CHECK-NEXT:   i2  0, label %[[LEFT_PRE:[0-9]+]]
-  // CHECK-NEXT:   i2  1, label %[[RIGHT_PRE:[0-9]+]]
-  // CHECK-NEXT:   i2 -2, label [[MIDDLE:%[0-9]+]]
-  // CHECK-NEXT:   i2 -1, label [[CENTER:%[0-9]+]]
+  // CHECK-NEXT:   i8 0, label %[[LEFT_PRE:[0-9]+]]
+  // CHECK-NEXT:   i8 1, label %[[RIGHT_PRE:[0-9]+]]
+  // CHECK-NEXT:   i8 2, label [[MIDDLE:%[0-9]+]]
+  // CHECK-NEXT:   i8 3, label [[CENTER:%[0-9]+]]
   switch_enum %e : $EitherOr<(), ()>,
     case #EitherOr.Left!enumelt.1: left,
     case #EitherOr.Middle!enumelt: middle,
@@ -151,7 +149,7 @@ right(%y : $()):
 
 next(%z : $Builtin.Int8):
   // CHECK:      phi i8 [ 3, [[RIGHT]] ], [ 2, [[CENTER]] ], [ 1, [[MIDDLE]] ], [ 0, [[LEFT]] ]
-  dealloc_stack %s : $*EitherOr<(), ()> 
+  dealloc_stack %s : $*EitherOr<(), ()>
   return undef : $()
 }
 
@@ -340,10 +338,9 @@ next(%x : $Builtin.Int8):
 sil @dynamic_value_semantics : $@convention(thin) <T> (@in EitherOr<T, Builtin.Int64>) -> @out EitherOr<T, Builtin.Int64> {
 entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
-  // CHECK:        switch i32 [[TAG]], label %[[NOOP:[0-9]+]] [
   // -- only the Left branch of this instance needs cleanup
-  // CHECK-NEXT:     i32 0, label %[[LEFT:[0-9]+]]
-  // CHECK-NEXT:   ]
+  // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
+  // CHECK-NEXT:   br i1 [[COND]], label %[[NOOP:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      <label>:[[LEFT]]
   // CHECK:        call void %destroy(%swift.opaque* {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[NOOP]]
@@ -351,10 +348,9 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   destroy_addr %a : $*EitherOr<T, Builtin.Int64>
 
   // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
-  // CHECK:        switch i32 [[TAG]], label %[[TRIVIAL:[0-9]+]] [
   // -- only the Left branch of this instance needs nontrivial take
-  // CHECK-NEXT:     i32 0, label %[[LEFT:[0-9]+]]
-  // CHECK-NEXT:   ]
+  // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
+  // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      <label>:[[LEFT]]
   // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
@@ -384,15 +380,14 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        call void %destroy(%swift.opaque* {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[NOOP]]
   // CHECK:      <label>:[[RIGHT]]
-  // CHECK:        call void {{.*}} @rt_swift_release
+  // CHECK:        call void {{.*}} @swift_rt_swift_release
   // CHECK:      <label>:[[NOOP]]
   destroy_addr %a : $*EitherOr<T, C>
 
   // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
-  // CHECK:        switch i32 [[TAG]], label %[[TRIVIAL:[0-9]+]] [
-  // -- only the Left branch of this instance needs nontrivial take
-  // CHECK-NEXT:     i32 0, label %[[LEFT:[0-9]+]]
-  // CHECK-NEXT:   ]
+  // -- only the Left branch of this instance needs cleanup
+  // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
+  // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      <label>:[[LEFT]]
   // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
@@ -412,7 +407,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        call %swift.opaque* %initializeWithCopy(%swift.opaque* {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[RIGHT]]
-  // CHECK:        call void @rt_swift_retain
+  // CHECK:        call void @swift_rt_swift_retain
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[TRIVIAL]]
   // CHECK:        call void @llvm.memcpy

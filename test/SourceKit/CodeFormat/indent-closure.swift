@@ -32,6 +32,26 @@ func foo4() {
     }()
 }
 
+func foo5(input: Int, block: (Int) -> ()) -> Int {
+  return 0
+}
+
+func foo6() {
+  _ = foo5(input: 0, block: { [unowned self] blockInput in
+    foo4()
+  })
+}
+
+func foo7(A: ()->(), B: ()->()) {}
+
+func foo8() {
+  foo7(A: { _ in
+    print("hello")
+}, B: {
+    print("world")
+  })
+}
+
 // RUN: %sourcekitd-test -req=format -line=3 -length=1 %s >%t.response
 // RUN: %sourcekitd-test -req=format -line=4 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=5 -length=1 %s >>%t.response
@@ -46,7 +66,9 @@ func foo4() {
 // RUN: %sourcekitd-test -req=format -line=30 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=31 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=32 -length=1 %s >>%t.response
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %sourcekitd-test -req=format -line=42 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=50 -length=1 %s >>%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "        var abc = 1"
 // CHECK: key.sourcetext: "        let a: String = {"
@@ -68,3 +90,7 @@ func foo4() {
 // CHECK: key.sourcetext: "    let test = {"
 // CHECK: key.sourcetext: "        return 0"
 // CHECK: key.sourcetext: "    }()"
+
+// CHECK: key.sourcetext: "  })"
+
+// CHECK: key.sourcetext: "  }, B: {"

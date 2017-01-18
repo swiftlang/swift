@@ -1,5 +1,6 @@
-// RUN: %target-swift-remoteast-test %s | FileCheck %s
+// RUN: %target-swift-remoteast-test %s | %FileCheck %s
 
+// REQUIRES: swift-remoteast-test
 // REQUIRES: PTRSIZE=64
 
 @_silgen_name("printTypeMemberOffset")

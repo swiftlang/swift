@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -46,27 +46,14 @@ void makeDynamic(ASTContext &ctx, ValueDecl *D);
 void markAsObjC(TypeChecker &TC, ValueDecl *D,
                 Optional<ObjCReason> isObjC,
                 Optional<ForeignErrorConvention> errorConvention = None);
-Type configureImplicitSelf(TypeChecker &tc,
-                           AbstractFunctionDecl *func);
-void configureConstructorType(ConstructorDecl *ctor,
-                              Type selfType,
-                              Type argType);
 bool checkOverrides(TypeChecker &TC, ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.
-void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC);
 void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC);
 void synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
                                                 TypeChecker &TC);
-void synthesizeMaterializeForSet(FuncDecl *materializeForSet,
-                                 AbstractStorageDecl *storage,
-                                 TypeChecker &TC);
 void maybeAddMaterializeForSet(AbstractStorageDecl *storage,
                                TypeChecker &TC);
-
-void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
-                                  TypeChecker &TC);
-
 void maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC);
 
 /// \brief Describes the kind of implicit constructor that will be

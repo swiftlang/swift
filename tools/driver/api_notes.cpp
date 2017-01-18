@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -43,8 +43,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
                                "binary-to-yaml",
                                "Convert binary format to YAML"),
                     clEnumValN(api_notes::ActionType::Dump,
-                            "dump", "Parse and dump the output"),
-                    clEnumValEnd),
+                            "dump", "Parse and dump the output")),
          cl::cat(APINotesCategory));
 
   static cl::opt<std::string>
@@ -59,13 +58,13 @@ int apinotes_main(ArrayRef<const char *> Args) {
   OutputFilename("o", cl::desc("Output file name"), cl::cat(APINotesCategory));
 
   // Hide unrelated options.
-  StringMap<cl::Option*> &Options = cl::getRegisteredOptions();
-  for (StringMap<cl::Option *>::iterator I = Options.begin(),
-                                         E = Options.end();
-                                         I != E; ++I) {
-    if (I->second->Category != &APINotesCategory &&
-        I->first() != "help" && I->first() != "version")
-      I->second->setHiddenFlag(cl::ReallyHidden);
+  StringMap<cl::Option *> &Options =
+      cl::getRegisteredOptions(*cl::TopLevelSubCommand);
+  for (auto &Option : Options) {
+    if (Option.second->Category != &APINotesCategory &&
+        Option.first() != "help" && Option.first() != "version") {
+      Option.second->setHiddenFlag(cl::ReallyHidden);
+    }
   }
 
   cl::ParseCommandLineOptions(Args.size(),
@@ -123,7 +122,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
     llvm::raw_fd_ostream os(OutputFilename, EC,
                             llvm::sys::fs::OpenFlags::F_None);
 
-    if (api_notes::compileAPINotes(input, os, targetOS))
+    if (api_notes::compileAPINotes(input, /*sourceFile=*/nullptr, os, targetOS))
       return 1;
     
     os.flush();

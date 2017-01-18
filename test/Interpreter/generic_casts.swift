@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
-// RUN: %target-run %t/a.out.optimized | FileCheck %s
+// RUN: %target-run %t/a.out.optimized | %FileCheck %s
 // REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
@@ -158,8 +158,15 @@ print(allToAll(type(of: C()), AnyObject.self)) // CHECK-NEXT: true
 // Bridging
 print(allToAll(0, AnyObject.self)) // CHECK-NEXT: true
 
+// This will get bridged using _SwiftValue.
 struct NotBridged { var x: Int }
-print(allToAll(NotBridged(x: 0), AnyObject.self)) // CHECK-NEXT: false
+print(allToAll(NotBridged(x: 0), AnyObject.self)) // CHECK-NEXT: true
+print(allToAll(NotBridged(x: 0), NSCopying.self)) // CHECK-NEXT: true
+
+// These casts fail (intentionally) even though _SwiftValue does
+// technically conform to these protocols through NSObject.
+print(allToAll(NotBridged(x: 0), CustomStringConvertible.self)) // CHECK-NEXT: false
+print(allToAll(NotBridged(x: 0), (AnyObject & CustomStringConvertible).self)) // CHECK-NEXT: false
 
 //
 // rdar://problem/19482567

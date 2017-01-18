@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,15 +23,17 @@ from gyb_stdlib_support import (
 %   Self = defaultIndicesForTraversal(Traversal)
 %   collection = documentationNameForTraversal(Traversal)
 
-// FIXME(ABI)(compiler limitation): There should be just one default
+// FIXME(ABI)#42 (Conditional Conformance): There should be just one default
 // indices type that has conditional conformances to
 // `BidirectionalCollection` and `RandomAccessCollection`.
+// <rdar://problem/17144340>
 
 /// A collection of indices for an arbitrary ${collection}.
 public struct ${Self}<
-  Elements : ${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
-  // FIXME(ABI)(compiler limitation):
+  Elements : _${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
+  // FIXME(ABI)#43 (Recursive Protocol Constraints):
   // Elements : Collection
+  // rdar://problem/20531108
 > : ${collectionForTraversal(Traversal)} {
 
   // FIXME(compiler limitation): this typealias should be inferred.
@@ -105,7 +107,11 @@ public struct ${Self}<
   internal var _endIndex: Elements.Index
 }
 
-extension ${collectionForTraversal(Traversal)} where Indices == ${Self}<Self> {
+extension ${collectionForTraversal(Traversal)}
+%     if Traversal != 'RandomAccess':
+  where Indices == ${Self}<Self>
+%     end
+{
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   ///

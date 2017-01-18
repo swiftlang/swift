@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Parse/Parser.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -35,7 +36,7 @@ using namespace swift;
 // NameBinder
 //===----------------------------------------------------------------------===//
 
-using ImportedModule = Module::ImportedModule;
+using ImportedModule = ModuleDecl::ImportedModule;
 using ImportOptions = SourceFile::ImportOptions;
 
 namespace {  
@@ -58,11 +59,11 @@ namespace {
     /// Load a module referenced by an import statement.
     ///
     /// Returns null if no module can be loaded.
-    Module *getModule(ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
+    ModuleDecl *getModule(ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
   };
-}
+} // end anonymous namespace
 
-Module *
+ModuleDecl *
 NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
@@ -111,6 +112,8 @@ static bool isCompatibleImportKind(ImportKind expected, ImportKind actual) {
   case ImportKind::Func:
     return false;
   }
+
+  llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
 static const char *getImportKindString(ImportKind kind) {
@@ -132,6 +135,8 @@ static const char *getImportKindString(ImportKind kind) {
   case ImportKind::Func:
     return "func";
   }
+
+  llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
 static bool shouldImportSelfImportClang(const ImportDecl *ID,
@@ -162,7 +167,7 @@ void NameBinder::addImport(
     return;
   }
 
-  Module *M = getModule(ID->getModulePath());
+  ModuleDecl *M = getModule(ID->getModulePath());
   if (!M) {
     SmallString<64> modulePathStr;
     interleave(ID->getModulePath(),
@@ -186,7 +191,7 @@ void NameBinder::addImport(
 
   ID->setModule(M);
 
-  Module *topLevelModule;
+  ModuleDecl *topLevelModule;
   if (ID->getModulePath().size() == 1) {
     topLevelModule = M;
   } else {
@@ -336,10 +341,6 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   }
 
   SF.addImports(ImportedModules);
-
-  // FIXME: This algorithm has quadratic memory usage.  (In practice,
-  // import statements after the first "chunk" should be rare, though.)
-  // FIXME: Can we make this more efficient?
 
   SF.ASTStage = SourceFile::NameBound;
   verify(SF);

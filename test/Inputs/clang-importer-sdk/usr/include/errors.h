@@ -45,6 +45,7 @@
 + (float) bounce: (NSError**) err __attribute__((swift_error(nonnull_error)));
 + (void) flounce: (NSError**) err __attribute__((swift_error(nonnull_error)));
 + (int) ounce: (NSError**) err __attribute__((swift_error(zero_result)));
++ (NSInteger) ounceWord: (NSError**) err __attribute__((swift_error(zero_result)));
 + (int) once: (NSError**) err __attribute__((swift_error(nonzero_result)));
 + (BOOL) sconce: (NSError**) err __attribute__((swift_error(zero_result)));
 + (BOOL) scotch: (NSError**) err __attribute__((swift_error(nonzero_result)));

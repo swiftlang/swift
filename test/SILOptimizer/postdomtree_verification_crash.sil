@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all  -sil-verify-without-invalidation %s -compute-dominance-info
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all  -sil-verify-without-invalidation %s -compute-dominance-info
 
 // Check if post-dominator verification does not crash on multiple roots.
 

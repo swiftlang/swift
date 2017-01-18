@@ -20,6 +20,14 @@ configure_file(
 set(SOURCEKIT_DEPLOYMENT_OS "${SWIFT_HOST_VARIANT}")
 set(SOURCEKIT_DEPLOYMENT_TARGET "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
 
+swift_is_installing_component(sourcekit-inproc SOURCEKIT_INSTALLING_INPROC)
+
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
+  set(CMAKE_OSX_ARCHITECTURES "${SWIFT_HOST_VARIANT_ARCH}")
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "")
+endif()
+
 function(add_sourcekit_symbol_exports target_name export_file)
   # Makefile.rules contains special cases for different platforms.
   # We restrict ourselves to Darwin for the time being.
@@ -41,13 +49,13 @@ function(add_sourcekit_symbol_exports target_name export_file)
         break()
       endif()
     endforeach()
-  
+
     # Force re-linking when the exports file changes. Actually, it
     # forces recompilation of the source file. The LINK_DEPENDS target
     # property only works for makefile-based generators.
     set_property(SOURCE ${first_source_file} APPEND PROPERTY
       OBJECT_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/symbol.exports)
-  
+
     set_property(TARGET ${target_name} APPEND_STRING PROPERTY
                  LINK_FLAGS " -Wl,-exported_symbols_list,${CMAKE_CURRENT_BINARY_DIR}/symbol.exports")
 
@@ -83,6 +91,7 @@ function(add_sourcekit_default_compiler_flags target)
     BUILD_TYPE "${build_type}"
     ENABLE_ASSERTIONS "${enable_assertions}"
     ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    LTO_OBJECT_NAME "${target}-${sdk}-${arch}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     RESULT_VAR_NAME link_flags)
 
@@ -107,7 +116,7 @@ endfunction()
 # Usage:
 #   add_sourcekit_library(name       # Name of the library
 #     [DEPENDS dep1 ...]             # Libraries this library depends on
-#     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
+#     [LLVM_COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [INSTALL_IN_COMPONENT comp]    # The Swift installation component that this library belongs to.
 #     [SHARED]
 #     source1 [source2 source3 ...]) # Sources to add into this library
@@ -115,7 +124,7 @@ macro(add_sourcekit_library name)
   cmake_parse_arguments(SOURCEKITLIB
       "SHARED"
       "INSTALL_IN_COMPONENT"
-      "DEPENDS;COMPONENT_DEPENDS"
+      "DEPENDS;LLVM_COMPONENT_DEPENDS"
       ${ARGN})
   set(srcs ${SOURCEKITLIB_UNPARSED_ARGUMENTS})
 
@@ -178,7 +187,7 @@ macro(add_sourcekit_library name)
     target_link_libraries("${name}" INTERFACE ${SOURCEKITLIB_DEPENDS})
   endif()
 
-  swift_common_llvm_config(${name} ${SOURCEKITLIB_COMPONENT_DEPENDS})
+  swift_common_llvm_config(${name} ${SOURCEKITLIB_LLVM_COMPONENT_DEPENDS})
 
   if(SOURCEKITLIB_SHARED AND EXPORTED_SYMBOL_FILE)
     add_sourcekit_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
@@ -212,7 +221,7 @@ endmacro()
 # Usage:
 #   add_sourcekit_executable(name     # Name of the executable
 #     [DEPENDS dep1 ...]              # Libraries this executable depends on
-#     [COMPONENT_DEPENDS comp1 ...]   # LLVM components this executable 
+#     [LLVM_COMPONENT_DEPENDS comp1 ...]   # LLVM components this executable
 #                                     # depends on
 #     [EXCLUDE_FROM_ALL]              # Whether to exclude this executable from
 #                                     # the ALL_BUILD target
@@ -221,7 +230,7 @@ macro(add_sourcekit_executable name)
   cmake_parse_arguments(SOURCEKITEXE
     "EXCLUDE_FROM_ALL"
     ""
-    "DEPENDS;COMPONENT_DEPENDS"
+    "DEPENDS;LLVM_COMPONENT_DEPENDS"
     ${ARGN})
 
   if (${SOURCEKITEXE_EXCLUDE_FROM_ALL})
@@ -240,7 +249,7 @@ macro(add_sourcekit_executable name)
   endif()
 
   target_link_libraries(${name} ${SOURCEKITEXE_DEPENDS})
-  swift_common_llvm_config(${name} ${SOURCEKITEXE_COMPONENT_DEPENDS})
+  swift_common_llvm_config(${name} ${SOURCEKITEXE_LLVM_COMPONENT_DEPENDS})
   target_link_libraries(${name} ${LLVM_COMMON_LIBS})
 
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit executables")
@@ -263,13 +272,13 @@ endmacro()
 # Usage:
 #   add_sourcekit_framework(name     # Name of the framework
 #     [DEPENDS dep1 ...]             # Libraries this framework depends on
-#     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this framework depends on
+#     [LLVM_COMPONENT_DEPENDS comp1 ...]  # LLVM components this framework depends on
 #     [MODULEMAP modulemap]          # Module map file for this framework
 #     [INSTALL_IN_COMPONENT comp]    # The Swift installation component that this framework belongs to.
 #     source1 [source2 source3 ...]) # Sources to add into this framework
 macro(add_sourcekit_framework name)
   cmake_parse_arguments(SOURCEKITFW
-    "" "MODULEMAP;INSTALL_IN_COMPONENT" "DEPENDS;COMPONENT_DEPENDS" ${ARGN})
+    "" "MODULEMAP;INSTALL_IN_COMPONENT" "DEPENDS;LLVM_COMPONENT_DEPENDS" ${ARGN})
   set(srcs ${SOURCEKITFW_UNPARSED_ARGUMENTS})
 
   set(lib_dir ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
@@ -312,7 +321,7 @@ macro(add_sourcekit_framework name)
   endif(LLVM_COMMON_DEPENDS)
 
   target_link_libraries(${name} PRIVATE ${SOURCEKITFW_DEPENDS})
-  swift_common_llvm_config(${name} ${SOURCEKITFW_COMPONENT_DEPENDS})
+  swift_common_llvm_config(${name} ${SOURCEKITFW_LLVM_COMPONENT_DEPENDS})
 
   if (EXPORTED_SYMBOL_FILE)
     add_sourcekit_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
@@ -379,10 +388,10 @@ endmacro(add_sourcekit_framework)
 # Usage:
 #   add_sourcekit_xpc_service(name    # Name of the XPC service
 #     [DEPENDS dep1 ...]              # Libraries this service depends on
-#     [COMPONENT_DEPENDS comp1 ...]   # LLVM components this service depends on
+#     [LLVM_COMPONENT_DEPENDS comp1 ...]   # LLVM components this service depends on
 #     source1 [source2 source3 ...])  # Sources to add into this service
 macro(add_sourcekit_xpc_service name framework_target)
-  cmake_parse_arguments(SOURCEKITXPC "" "" "DEPENDS;COMPONENT_DEPENDS" ${ARGN})
+  cmake_parse_arguments(SOURCEKITXPC "" "" "DEPENDS;LLVM_COMPONENT_DEPENDS" ${ARGN})
   set(srcs ${SOURCEKITXPC_UNPARSED_ARGUMENTS})
 
   set(lib_dir ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
@@ -397,7 +406,7 @@ macro(add_sourcekit_xpc_service name framework_target)
     set(xpc_bin_dir "${xpc_contents_dir}")
   endif()
 
-  set(XPCSERVICE_NAME ${name})  
+  set(XPCSERVICE_NAME ${name})
   set(XPCSERVICE_IDENTIFIER "com.apple.${name}.${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_SHORT_VERSION_STRING "1.0")
@@ -424,9 +433,9 @@ macro(add_sourcekit_xpc_service name framework_target)
   endif(LLVM_COMMON_DEPENDS)
 
   target_link_libraries(${name} ${SOURCEKITXPC_DEPENDS})
-  swift_common_llvm_config(${name} ${SOURCEKITXPC_COMPONENT_DEPENDS})
+  swift_common_llvm_config(${name} ${SOURCEKITXPC_LLVM_COMPONENT_DEPENDS})
   target_link_libraries(${name} ${LLVM_COMMON_LIBS})
-  
+
   add_dependencies(${framework_target} ${name})
 
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
@@ -448,7 +457,7 @@ endmacro()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # Choose a deployment target if none was set.
-  set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING 
+  set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING
       "Deployment target for SourceKit.")
   if (NOT SOURCEKIT_DEPLOYMENT_TARGET)
     execute_process(COMMAND sw_vers -productVersion
@@ -456,10 +465,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
     string(REGEX MATCH "[0-9]+\\.[0-9]+" SOURCEKIT_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
   endif()
-
-  # Choose a deployment OS if none was set.
-  set(SOURCEKIT_DEPLOYMENT_OS "macosx" CACHE STRING
-      "Deployment OS for SourceKit [macosx, iphoneos, iphonesimulator].")
 
   # Sadly there are two OS naming conventions.
   # xcrun SDK name:   macosx iphoneos iphonesimulator (+ "internal" or version)
@@ -481,14 +486,10 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     message(FATAL_ERROR "Can't understand SOURCEKIT_DEPLOYMENT_OS '${SOURCEKIT_DEPLOYMENT_OS}';")
   endif()
 
-  # Determine deployment flags for the C/C++ compiler and linker.
-  set(SOURCEKIT_GLOBAL_DEPLOYMENT_TARGET_FLAGS
-    "-m${version_min_os}-version-min=${SOURCEKIT_DEPLOYMENT_TARGET}")
-
   # Add deployment target to C/C++ compiler and linker flags.
   # FIXME: CMAKE_OSX_DEPLOYMENT_TARGET falls over when used for iOS versions.
   if (XCODE)
-    if (${SOURCEKIT_DEPLOYMENT_OS} MATCHES "^macosx") 
+    if (${SOURCEKIT_DEPLOYMENT_OS} MATCHES "^macosx")
       set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
     else()
       set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})

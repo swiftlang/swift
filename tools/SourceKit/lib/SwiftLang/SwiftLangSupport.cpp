@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -40,7 +40,9 @@ using namespace swift;
 using namespace swift::ide;
 using swift::index::SymbolKind;
 using swift::index::SymbolSubKind;
-using swift::index::SymbolSubKindSet;
+using swift::index::SymbolProperty;
+using swift::index::SymbolPropertySet;
+using swift::index::SymbolInfo;
 using swift::index::SymbolRole;
 using swift::index::SymbolRoleSet;
 
@@ -153,6 +155,13 @@ static UIdent KindStructureElemCondExpr("source.lang.swift.structure.elem.condit
 static UIdent KindStructureElemPattern("source.lang.swift.structure.elem.pattern");
 static UIdent KindStructureElemTypeRef("source.lang.swift.structure.elem.typeref");
 
+static UIdent KindRangeSingleStatement("source.lang.swift.range.singlestatement");
+static UIdent KindRangeSingleExpression("source.lang.swift.range.singleexpression");
+static UIdent KindRangeSingleDeclaration("source.lang.swift.range.singledeclaration");
+
+static UIdent KindRangeMultiStatement("source.lang.swift.range.multistatement");
+
+static UIdent KindRangeInvalid("source.lang.swift.range.invalid");
 
 std::unique_ptr<LangSupport>
 SourceKit::createSwiftLangSupport(SourceKit::Context &SKCtx) {
@@ -530,37 +539,61 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureElementKind(
     case SyntaxStructureElementKind::TypeRef: return KindStructureElemTypeRef;
   }
 }
+SourceKit::UIdent SwiftLangSupport::
+getUIDForRangeKind(swift::ide::RangeKind Kind) {
+  switch (Kind) {
+    case swift::ide::RangeKind::SingleExpression: return KindRangeSingleExpression;
+    case swift::ide::RangeKind::SingleStatement: return KindRangeSingleStatement;
+    case swift::ide::RangeKind::SingleDecl: return KindRangeSingleDeclaration;
+    case swift::ide::RangeKind::MultiStatement: return KindRangeMultiStatement;
+    case swift::ide::RangeKind::Invalid: return KindRangeInvalid;
+  }
+}
 
-UIdent SwiftLangSupport::getUIDForSymbol(SymbolKind kind, SymbolSubKindSet subKinds,
-                                         bool isRef) {
+UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
 
 #define UID_FOR(CLASS) isRef ? KindRef##CLASS : KindDecl##CLASS;
+
+  switch (sym.SubKind) {
+  default: break;
+  case SymbolSubKind::AccessorGetter: return UID_FOR(AccessorGetter);
+  case SymbolSubKind::AccessorSetter: return UID_FOR(AccessorSetter);
+  case SymbolSubKind::SwiftAccessorWillSet: return UID_FOR(AccessorWillSet);
+  case SymbolSubKind::SwiftAccessorDidSet: return UID_FOR(AccessorDidSet);
+  case SymbolSubKind::SwiftAccessorAddressor: return UID_FOR(AccessorAddress);
+  case SymbolSubKind::SwiftAccessorMutableAddressor: return UID_FOR(AccessorMutableAddress);
+  }
 
 #define SIMPLE_CASE(KIND) \
   case SymbolKind::KIND: \
     return UID_FOR(KIND);
 
-  switch (kind) {
+  switch (sym.Kind) {
   SIMPLE_CASE(Enum)
   SIMPLE_CASE(Struct)
   SIMPLE_CASE(Class)
   SIMPLE_CASE(Protocol)
-  SIMPLE_CASE(TypeAlias)
-  SIMPLE_CASE(AssociatedType)
-  SIMPLE_CASE(GenericTypeParam)
-  SIMPLE_CASE(Subscript)
-  SIMPLE_CASE(EnumElement)
   SIMPLE_CASE(Constructor)
   SIMPLE_CASE(Destructor)
 
+  case SymbolKind::EnumConstant:
+    return UID_FOR(EnumElement);
+
+  case SymbolKind::TypeAlias:
+    if (sym.SubKind == SymbolSubKind::SwiftAssociatedType)
+      return UID_FOR(AssociatedType);
+    if (sym.SubKind == SymbolSubKind::SwiftGenericTypeParam)
+      return UID_FOR(GenericTypeParam);
+    return UID_FOR(TypeAlias);
+
   case SymbolKind::Function:
+    if (sym.SubKind == SymbolSubKind::SwiftPrefixOperator)
+      return UID_FOR(FunctionPrefixOperator);
+    if (sym.SubKind == SymbolSubKind::SwiftPostfixOperator)
+      return UID_FOR(FunctionPostfixOperator);
+    if (sym.SubKind == SymbolSubKind::SwiftInfixOperator)
+      return UID_FOR(FunctionInfixOperator);
     return UID_FOR(FunctionFree);
-  case SymbolKind::PrefixOperator:
-    return UID_FOR(FunctionPrefixOperator);
-  case SymbolKind::PostfixOperator:
-    return UID_FOR(FunctionPostfixOperator);
-  case SymbolKind::InfixOperator:
-    return UID_FOR(FunctionInfixOperator);
   case SymbolKind::Variable:
     return UID_FOR(VarGlobal);
   case SymbolKind::InstanceMethod:
@@ -570,6 +603,8 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolKind kind, SymbolSubKindSet subKi
   case SymbolKind::StaticMethod:
     return UID_FOR(MethodStatic);
   case SymbolKind::InstanceProperty:
+    if (sym.SubKind == SymbolSubKind::SwiftSubscript)
+      return UID_FOR(Subscript);
     return UID_FOR(VarInstance);
   case SymbolKind::ClassProperty:
     return UID_FOR(VarClass);
@@ -578,32 +613,16 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolKind kind, SymbolSubKindSet subKi
 
   case SymbolKind::Extension:
     assert(!isRef && "reference to extension decl?");
-    SWIFT_FALLTHROUGH;
-  case SymbolKind::Accessor:
-    if (subKinds & SymbolSubKind::AccessorGetter) {
-      return UID_FOR(AccessorGetter);
-    } else if (subKinds & SymbolSubKind::AccessorSetter) {
-      return UID_FOR(AccessorSetter);
-    } else if (subKinds & SymbolSubKind::AccessorWillSet) {
-      return UID_FOR(AccessorWillSet);
-    } else if (subKinds & SymbolSubKind::AccessorDidSet) {
-      return UID_FOR(AccessorDidSet);
-    } else if (subKinds & SymbolSubKind::AccessorAddressor) {
-      return UID_FOR(AccessorAddress);
-    } else if (subKinds & SymbolSubKind::AccessorMutableAddressor) {
-      return UID_FOR(AccessorMutableAddress);
-
-    } else if (subKinds & SymbolSubKind::ExtensionOfStruct) {
+    if (sym.SubKind == SymbolSubKind::SwiftExtensionOfStruct) {
       return KindDeclExtensionStruct;
-    } else if (subKinds & SymbolSubKind::ExtensionOfClass) {
+    } else if (sym.SubKind == SymbolSubKind::SwiftExtensionOfClass) {
       return KindDeclExtensionClass;
-    } else if (subKinds & SymbolSubKind::ExtensionOfEnum) {
+    } else if (sym.SubKind == SymbolSubKind::SwiftExtensionOfEnum) {
       return KindDeclExtensionEnum;
-    } else if (subKinds & SymbolSubKind::ExtensionOfProtocol) {
+    } else if (sym.SubKind == SymbolSubKind::SwiftExtensionOfProtocol) {
       return KindDeclExtensionProtocol;
-
     } else {
-      llvm_unreachable("missing sub kind");
+      llvm_unreachable("missing extension sub kind");
     }
 
   default:

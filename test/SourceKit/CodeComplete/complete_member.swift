@@ -42,8 +42,8 @@ func testOverrideUSR() {
 // RUN: %sourcekitd-test -req=complete -pos=15:5 %s -- %s > %t.response
 // RUN: diff -u %s.response %t.response
 //
-// RUN: %sourcekitd-test -req=complete -pos=19:5 %s -- %s | FileCheck %s -check-prefix=CHECK-OPTIONAL
-// RUN: %sourcekitd-test -req=complete.open -pos=19:5 %s -- %s | FileCheck %s -check-prefix=CHECK-OPTIONAL-OPEN
+// RUN: %sourcekitd-test -req=complete -pos=19:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-OPTIONAL
+// RUN: %sourcekitd-test -req=complete.open -pos=19:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-OPTIONAL-OPEN
 // CHECK-OPTIONAL:     {
 // CHECK-OPTIONAL:       key.kind: source.lang.swift.decl.function.method.instance,
 // CHECK-OPTIONAL:       key.name: "fooInstanceFunc0()",
@@ -56,15 +56,15 @@ func testOverrideUSR() {
 // CHECK-OPTIONAL-NEXT:       key.modulename: "complete_member"
 // CHECK-OPTIONAL-NEXT:     },
 
-// RUN: %sourcekitd-test -req=complete.open -pos=19:5 %s -- %s | FileCheck %s -check-prefix=CHECK-OPTIONAL-OPEN
+// RUN: %sourcekitd-test -req=complete.open -pos=19:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-OPTIONAL-OPEN
 // CHECK-OPTIONAL-OPEN-NOT:       key.description: "fooInstanceFunc1
 // CHECK-OPTIONAL-OPEN:       key.description: "?.fooInstanceFunc1(a: Int)",
 // CHECK-OPTIONAL-OPEN-NOT:       key.description: "fooInstanceFunc1
 
-// RUN: %sourcekitd-test -req=complete -pos=27:5 %s -- %s | FileCheck %s -check-prefix=CHECK-UNAVAIL
+// RUN: %sourcekitd-test -req=complete -pos=27:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-UNAVAIL
 // CHECK-UNAVAIL-NOT: key.name: "unavail()",
 
-// RUN: %sourcekitd-test -req=complete -pos=39:15 %s -- %s | FileCheck %s -check-prefix=CHECK-OVERRIDE_USR
+// RUN: %sourcekitd-test -req=complete -pos=39:15 %s -- %s | %FileCheck %s -check-prefix=CHECK-OVERRIDE_USR
 // CHECK-OVERRIDE_USR:      {
 // CHECK-OVERRIDE_USR:          key.kind: source.lang.swift.decl.function.method.instance,
 // CHECK-OVERRIDE_USR-NEXT:     key.name: "foo()",

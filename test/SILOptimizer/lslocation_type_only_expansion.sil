@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt %s -lslocation-dump -ml=only-type-expansion | FileCheck %s
-// RUN: %target-sil-opt %s -lslocation-dump-use-new-projection -lslocation-dump -ml=only-type-expansion | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -lslocation-dump -ml=only-type-expansion | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -lslocation-dump-use-new-projection -lslocation-dump -ml=only-type-expansion | %FileCheck %s
 
 sil_stage canonical
 
@@ -37,7 +37,7 @@ struct S2 {
 
 class C1 {
   var a : Int
-   deinit 
+   deinit
   init(a: Int)
 }
 
@@ -75,9 +75,9 @@ sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
 sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
 sil @C1_init : $@convention(thin) (@thick C1.Type) -> @owned C1
 sil @S3_init : $@convention(thin) (@thin S3.Type) -> @owned S3
-sil @S4_init : $@convention(thin) (@thin S4.Type) -> @owned S4 
+sil @S4_init : $@convention(thin) (@thin S4.Type) -> @owned S4
 sil @S5_init : $@convention(thin) (@thin S5.Type) -> @owned S5
-sil @S6_init : $@convention(thin) (@thin S6.Type) -> S6 
+sil @S6_init : $@convention(thin) (@thin S6.Type) -> S6
 
 // CHECK-LABEL: @test_struct_type_expansion
 // CHECK: #0  store
@@ -127,7 +127,7 @@ bb0:
 // Make sure we do not expand the reference type.
 //
 // CHECK-LABEL: test_class_stack_slot
-// CHECK: #0  store 
+// CHECK: #0  store
 // CHECK-NOT: var
 // CHECK: #1  store
 sil hidden @test_class_stack_slot : $@convention(thin) () -> () {
@@ -189,7 +189,7 @@ bb0:
 // Test tuple expansion.
 //
 // CHECK-LABEL: test_tuple
-// CHECK:  #0 store 
+// CHECK:  #0 store
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
@@ -337,9 +337,9 @@ bb0:
 /// like union in C, i.e. its memory can be interpreted differently depending
 /// on the chosen tag.
 ///
-/// CHECK-LABEL: enum_test 
+/// CHECK-LABEL: enum_test
 /// CHECK: #0  store
-/// CHECK-NOT: Int64 
+/// CHECK-NOT: Int64
 /// CHECK-NOT: Int32
 /// CHECK: #1  store
 /// CHECK-NEXT: Address Projection Type: $*Builtin.Int64

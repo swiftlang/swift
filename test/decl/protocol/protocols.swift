@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
@@ -117,7 +117,7 @@ struct IsNotSimpleAssoc : SimpleAssoc {} // expected-error{{type 'IsNotSimpleAss
 
 protocol StreamWithAssoc {
   associatedtype Element
-  func get() -> Element // expected-note{{protocol requires function 'get()' with type '() -> Element'}}
+  func get() -> Element // expected-note{{protocol requires function 'get()' with type '() -> NotAStreamType.Element'}}
 }
 
 struct AnRange<Int> : StreamWithAssoc {
@@ -170,7 +170,7 @@ extension IntIterator : SequenceViaStream {
 }
 
 struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
-  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
+  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'NotSequence.SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> Int {}
 }
 
@@ -235,7 +235,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
-  var x = e.makeIterator() // expected-error{{'Sequence' is not convertible to '<<error type>>'}}
+  var x = e.makeIterator() // expected-error{{'Sequence.Iterator' is not convertible to 'Sequence'}}
   x.next()
   x.nonexistent()
 }
@@ -419,7 +419,7 @@ protocol P2 {
 struct X3<T : P1> where T.Assoc : P2 {}
 
 struct X4 : P1 { // expected-error{{type 'X4' does not conform to protocol 'P1'}}
-  func getX1() -> X3<X4> { return X3() }
+  func getX1() -> X3<X4> { return X3() } // expected-error{{cannot convert return expression of type 'X3<_>' to return type 'X3<X4>'}}
 }
 
 protocol ShouldntCrash {

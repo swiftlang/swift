@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 let x: Int = 1
 let y: Int = x.self
@@ -38,3 +38,19 @@ class SE0071Derived : SE0071Base {
     super.default()
   }
 }
+
+// SR-3043: Diagnostics when accessing deinit
+
+class SR3043Base {
+}
+
+class SR3043Derived: SR3043Base {
+  deinit {
+    super.deinit() // expected-error {{deinitializers cannot be accessed}}
+  }
+}
+
+let sr3043 = SR3043Derived()
+sr3043.deinit() // expected-error {{deinitializers cannot be accessed}}
+sr3043.deinit // expected-error {{deinitializers cannot be accessed}}
+SR3043Derived.deinit() // expected-error {{deinitializers cannot be accessed}}

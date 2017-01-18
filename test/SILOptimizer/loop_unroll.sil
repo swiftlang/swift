@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -loop-unroll %s | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -loop-unroll %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -69,4 +69,72 @@ bb2:
 bb3:
  %8 = tuple()
  return %8 : $()
+}
+
+class B {}
+
+// CHECK-LABEL: sil @unroll_with_stack_allocation
+// CHECK: = alloc_ref [stack]
+// CHECK: dealloc_ref [stack]
+// CHECK: = alloc_ref [stack]
+// CHECK: dealloc_ref [stack]
+// CHECK: }
+sil @unroll_with_stack_allocation : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %a = alloc_ref [stack] $B
+  br bb2
+
+bb2:
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  dealloc_ref [stack] %a : $B
+  cond_br %7, bb4, bb3
+
+bb3:
+  br bb1(%6 : $Builtin.Int64)
+
+bb4:
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil @dont_copy_stack_allocation_with_dealloc_outside_loop
+// CHECK:   = alloc_ref [stack]
+// CHECK: bb2:
+// CHECK:   dealloc_ref [stack]
+// CHECK: bb3:
+// CHECK:   dealloc_ref [stack]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @dont_copy_stack_allocation_with_dealloc_outside_loop : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %a = alloc_ref [stack] $B
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  dealloc_ref [stack] %a : $B
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+  dealloc_ref [stack] %a : $B
+  %8 = tuple()
+  return %8 : $()
 }

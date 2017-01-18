@@ -1,10 +1,10 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 
 // RUN: cp %s %t/main.swift
 // RUN: cp %S/Inputs/rdar25405605/helper-1.swift %t/helper.swift
 // RUN: touch -t 201401240005 %t/*.swift
 
-// RUN: cd %t && %target-build-swift -c -incremental -output-file-map %S/Inputs/rdar25405605/output.json -parse-as-library ./main.swift ./helper.swift -parseable-output -j1 -module-name main 2>&1 | FileCheck -check-prefix=CHECK-1 %s
+// RUN: cd %t && %target-build-swift -c -incremental -output-file-map %S/Inputs/rdar25405605/output.json -parse-as-library ./main.swift ./helper.swift -parseable-output -j1 -module-name main 2>&1 | %FileCheck -check-prefix=CHECK-1 %s
 
 // CHECK-1-NOT: warning
 // CHECK-1: {{^{$}}
@@ -19,12 +19,12 @@
 // CHECK-1: ".\/helper.swift"
 // CHECK-1: {{^}$}}
 
-// RUN: ls %t/ | FileCheck -check-prefix=CHECK-LS %s
+// RUN: ls %t/ | %FileCheck -check-prefix=CHECK-LS %s
 
 // CHECK-LS-DAG: main.o
 // CHECK-LS-DAG: helper.o
 
-// RUN: cd %t && %target-build-swift -c -incremental -output-file-map %S/Inputs/rdar25405605/output.json -parse-as-library ./main.swift ./helper.swift -parseable-output -j1 -module-name main 2>&1 | FileCheck -check-prefix=CHECK-1-SKIPPED %s
+// RUN: cd %t && %target-build-swift -c -incremental -output-file-map %S/Inputs/rdar25405605/output.json -parse-as-library ./main.swift ./helper.swift -parseable-output -j1 -module-name main 2>&1 | %FileCheck -check-prefix=CHECK-1-SKIPPED %s
 
 // CHECK-1-SKIPPED-NOT: warning
 // CHECK-1-SKIPPED: {{^{$}}
@@ -41,7 +41,7 @@
 
 // RUN: cp %S/Inputs/rdar25405605/helper-2.swift %t/helper.swift
 // RUN: touch -t 201401240006 %t/helper.swift
-// RUN: cd %t && not %target-build-swift -c -incremental -output-file-map %S/Inputs/rdar25405605/output.json -parse-as-library ./main.swift ./helper.swift -parseable-output -j1 -module-name main 2>&1 | FileCheck -check-prefix=CHECK-2 %s
+// RUN: cd %t && not %target-build-swift -c -incremental -output-file-map %S/Inputs/rdar25405605/output.json -parse-as-library ./main.swift ./helper.swift -parseable-output -j1 -module-name main 2>&1 | %FileCheck -check-prefix=CHECK-2 %s
 
 // CHECK-2-NOT: warning
 // CHECK-2: {{^{$}}
@@ -58,7 +58,7 @@
 
 // RUN: cp %S/Inputs/rdar25405605/helper-3.swift %t/helper.swift
 // RUN: touch -t 201401240007 %t/helper.swift
-// RUN: cd %t && not %target-build-swift -c -incremental -output-file-map %S/Inputs/rdar25405605/output.json -parse-as-library ./main.swift ./helper.swift -parseable-output -j1 -module-name main 2>&1 | FileCheck -check-prefix=CHECK-3 %s
+// RUN: cd %t && not %target-build-swift -c -incremental -output-file-map %S/Inputs/rdar25405605/output.json -parse-as-library ./main.swift ./helper.swift -parseable-output -j1 -module-name main 2>&1 | %FileCheck -check-prefix=CHECK-3 %s
 
 // CHECK-3-NOT: warning
 // CHECK-3: {{^{$}}

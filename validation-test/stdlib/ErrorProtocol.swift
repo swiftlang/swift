@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-// REQUIRES: rdar27541751
 // REQUIRES: objc_interop
 
 import SwiftPrivate

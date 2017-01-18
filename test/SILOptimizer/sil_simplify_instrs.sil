@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 import Builtin
 import Swift
@@ -94,6 +94,39 @@ bb0(%x : $Builtin.Word):
 // CHECK-LABEL: sil @fold_trunc_sext
 // CHECK-NOT: builtin
 // CHECK: return %0 : $Builtin.Word
+}
+
+// Simplify trunc((x)) -> x with same type
+sil @fold_trunc_n_to_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+  %trunc = builtin "truncOrBitCast_Int64_Word"(%x : $Builtin.Int64) : $Builtin.Int64
+  return %trunc : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_trunc_n_to_n
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Int64
+}
+
+// Simplify sext((x)) -> x with same type
+sil @fold_sext_n_to_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+  %trunc = builtin "sextOrBitCast_Int64_Int64"(%x : $Builtin.Int64) : $Builtin.Int64
+  return %trunc : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_sext_n_to_n
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Int64
+}
+
+// Simplify zext((x)) -> x with same type
+sil @fold_zext_n_to_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+  %trunc = builtin "zextOrBitCast_Int64_Int64"(%x : $Builtin.Int64) : $Builtin.Int64
+  return %trunc : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_zext_n_to_n
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Int64
 }
 
 class IntClass {
@@ -263,3 +296,20 @@ bb0(%0 : $BitwiseStruct1):
   %4 = tuple (%1 : $BitwiseStruct1, %3 : $BitwiseStruct1)
   return %4 : $(BitwiseStruct1, BitwiseStruct1)
 }
+
+// simplify_shifts_by_zero
+sil @simplify_shifts_by_zero : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = builtin "ashr_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %3 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %4 = builtin "shl_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %5 = tuple (%2 : $Builtin.Int64, %3 : $Builtin.Int64, %4 : $Builtin.Int64)
+  return %5 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
+
+// CHECK-LABEL: sil @simplify_shifts_by_zero
+// CHECK: bb0
+// CHECK-NEXT: %1 = tuple (%0 : $Builtin.Int64, %0 : $Builtin.Int64, %0 : $Builtin.Int64)
+// CHECK-NEXT: return %1 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
+}
+

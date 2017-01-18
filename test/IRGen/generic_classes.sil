@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -214,7 +214,7 @@ sil @_TFC15generic_classes31RecursiveGenericInheritsGenericD : $@convention(meth
 // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i16*
 // CHECK:   [[ALIGN16:%.*]] = load i16, i16* [[T1]], align 4
 // CHECK:   [[ALIGN:%.*]] = zext i16 [[ALIGN16]] to i64
-// CHECK:   call noalias %swift.refcounted* @rt_swift_allocObject(%swift.type* [[METADATA]], i64 [[SIZE]], i64 [[ALIGN]])
+// CHECK:   call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[METADATA]], i64 [[SIZE]], i64 [[ALIGN]])
 sil @RootGeneric_fragile_dependent_alloc : $<G> () -> RootGeneric<G> {
 entry:
   %x = alloc_ref $RootGeneric<G>

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 
 // RUN: not %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_notASwiftSymbol
 
@@ -6,7 +6,7 @@
 // RUN: %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_test14InternalStruct
 // RUN: not %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_testP13PrivateStruct
 // RUN: not %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_testP1_13PrivateStruct
-// RUN: %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_testP33_5CB4BCC03C4B9CB2AEEDDFF10FE7BD1E13PrivateStruct | FileCheck -check-prefix=THIS-FILE %s
+// RUN: %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_testP33_5CB4BCC03C4B9CB2AEEDDFF10FE7BD1E13PrivateStruct | %FileCheck -check-prefix=THIS-FILE %s
 
 // RUN: %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_test5Outer5Inner
 // RUN: not %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_test5Outer6Absent
@@ -23,8 +23,8 @@
 
 // RUN: %target-swift-ide-test -source-filename=%t/test.swift -print-ast-typechecked -I %t -find-mangled=_TtV6Lookup12PublicStruct
 // RUN: %target-swift-ide-test -source-filename=%t/test.swift -print-ast-typechecked -I %t -find-mangled=_TtV6Lookup14InternalStruct
-// RUN: %target-swift-ide-test -source-filename=%t/test.swift -print-ast-typechecked -I %t -find-mangled=_TtV6LookupP33_FB24ABFEF851D18A6D2510DCD3FD6D6013PrivateStruct | FileCheck -check-prefix=THIS-FILE %s
-// RUN: %target-swift-ide-test -source-filename=%t/test.swift -print-ast-typechecked -I %t -find-mangled=_TtV6LookupP33_F999E3591DC4FCB0EC84CD4166BF8EDB13PrivateStruct | FileCheck -check-prefix=OTHER-FILE %s
+// RUN: %target-swift-ide-test -source-filename=%t/test.swift -print-ast-typechecked -I %t -find-mangled=_TtV6LookupP33_FB24ABFEF851D18A6D2510DCD3FD6D6013PrivateStruct | %FileCheck -check-prefix=THIS-FILE %s
+// RUN: %target-swift-ide-test -source-filename=%t/test.swift -print-ast-typechecked -I %t -find-mangled=_TtV6LookupP33_F999E3591DC4FCB0EC84CD4166BF8EDB13PrivateStruct | %FileCheck -check-prefix=OTHER-FILE %s
 
 public struct PublicStruct {}
 internal struct InternalStruct {}

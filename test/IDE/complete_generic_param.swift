@@ -1,9 +1,9 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT1 | FileCheck %s -check-prefix=INHERIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT2 | FileCheck %s -check-prefix=INHERIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT3 | FileCheck %s -check-prefix=INHERIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT4 | FileCheck %s -check-prefix=INHERIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT5 | FileCheck %s -check-prefix=INHERIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT6 | FileCheck %s -check-prefix=INHERIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT1 | %FileCheck %s -check-prefix=INHERIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT2 | %FileCheck %s -check-prefix=INHERIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT3 | %FileCheck %s -check-prefix=INHERIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT4 | %FileCheck %s -check-prefix=INHERIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT5 | %FileCheck %s -check-prefix=INHERIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT6 | %FileCheck %s -check-prefix=INHERIT
 
 class C1{}
 protocol P1{}

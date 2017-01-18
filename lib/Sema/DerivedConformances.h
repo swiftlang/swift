@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -87,17 +87,6 @@ ValueDecl *deriveHashable(TypeChecker &tc,
                           Decl *parentDecl,
                           NominalTypeDecl *type,
                           ValueDecl *requirement);
-  
-/// Derive an Error requirement for an enum type.
-///
-/// A unique string representation of the enum type will be used as the domain
-/// for members of the enum, and each case will have its own integer code.
-///
-/// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveError(TypeChecker &tc,
-                               Decl *parentDecl,
-                               NominalTypeDecl *type,
-                               ValueDecl *requirement);
 
 /// Derive a _BridgedNSError requirement for an @objc enum type.
 ///

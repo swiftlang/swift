@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -21,9 +21,9 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
@@ -45,24 +45,22 @@ class SILEpilogueARCMatcherDumper : public SILModuleTransform {
 
       // Find the epilogue releases of each owned argument. 
       for (auto Arg : F.getArguments()) {
-        auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(&F);
-        auto *AA = PM->getAnalysis<AliasAnalysis>();
-        auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(&F);
+        auto *EA = PM->getAnalysis<EpilogueARCAnalysis>()->get(&F);
         llvm::outs() <<"START: " <<  F.getName() << "\n";
         llvm::outs() << *Arg;
 
         // Find the retain instructions for the argument.
-        llvm::SmallVector<SILInstruction *, 1> RelInsts = 
-          computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Release,
-                                         Arg, &F, PO, AA, RCFI);
+        llvm::SmallSetVector<SILInstruction *, 1> RelInsts = 
+          EA->computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Release,
+                                             Arg);
         for (auto I : RelInsts) {
           llvm::outs() << *I << "\n";
         }
 
         // Find the release instructions for the argument.
-        llvm::SmallVector<SILInstruction *, 1> RetInsts = 
-          computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Retain,
-                                         Arg, &F, PO, AA, RCFI);
+        llvm::SmallSetVector<SILInstruction *, 1> RetInsts = 
+          EA->computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Retain,
+                                             Arg);
         for (auto I : RetInsts) {
           llvm::outs() << *I << "\n";
         }

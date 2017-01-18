@@ -1,4 +1,6 @@
-// RUN: %target-swift-remoteast-test %s | FileCheck %s
+// RUN: %target-swift-remoteast-test %s | %FileCheck %s
+
+// REQUIRES: swift-remoteast-test
 
 @_silgen_name("printMetadataType")
 func printType(_: Any.Type)

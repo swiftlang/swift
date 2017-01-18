@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-prop | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -capture-prop | %FileCheck %s
 
 // Check the CapturePropagation specialized the reabstraction thunk.
 
@@ -11,7 +11,7 @@ sil @capture_helper_2 : $@convention(thin) (Int32) -> ()
 
 // CHECK-LABEL: test_capture_propagation
 // CHECK: %[[FR:[0-9]+]] = function_ref @_TTSf3cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ : $@convention(thin) (@in Int32) -> ()
-// CHECK: partial_apply %[[FR]]() : $@convention(thin) (@in Int32) -> ()
+// CHECK: thin_to_thick_function %[[FR]] : $@convention(thin) (@in Int32) -> ()
 sil private @test_capture_propagation : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int32                           // users: %3, %9, %10
@@ -113,3 +113,232 @@ bb0(%0 : $@callee_owned () -> ()):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// Test dead partial applied arguments
+
+sil @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+
+sil @nonthrowing_closure : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> Bool
+  return %4 : $Bool
+}
+
+// CHECK-LABEL: sil @return_nonthrowing_closure
+// CHECK: [[F:%[0-9]+]] = function_ref @specialized_nonthrowing_closure
+// CHECK: [[R:%[0-9]+]] = thin_to_thick_function [[F]]
+// CHECK: return [[R]]
+sil @return_nonthrowing_closure : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @nonthrowing_closure : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+sil @specialized_throwing_closure : $@convention(thin) (Int32, Int32) -> (Bool, @error Error)
+
+sil @throwing_closure : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error) {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_throwing_closure : $@convention(thin) (Int32, Int32) -> (Bool, @error Error)
+  try_apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> (Bool, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Bool):
+  return %5 : $Bool
+
+bb2(%7 : $Error):
+  throw %7 : $Error
+}
+
+// CHECK-LABEL: sil @return_throwing_closure
+// CHECK: [[F:%[0-9]+]] = function_ref @specialized_throwing_closure
+// CHECK: [[R:%[0-9]+]] = thin_to_thick_function [[F]]
+// CHECK: return [[R]]
+sil @return_throwing_closure : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> (Bool, @error Error) {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @throwing_closure : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  return %2 : $@callee_owned (Int32, Int32) -> (Bool, @error Error)
+}
+
+// Negative tests
+
+sil @swapped_arguments : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+  %4 = apply %3(%1, %0) : $@convention(thin) (Int32, Int32) -> Bool
+  return %4 : $Bool
+}
+
+// CHECK-LABEL: sil @return_swapped_arguments
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @swapped_arguments
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_swapped_arguments : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @swapped_arguments : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+
+sil @wrong_return1 : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> Bool
+  %i = integer_literal $Builtin.Int1, 0
+  %b = struct $Bool (%i : $Builtin.Int1)
+  return %b : $Bool
+}
+
+// CHECK-LABEL: sil @return_wrong_return1
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @wrong_return1
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_wrong_return1 : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @wrong_return1 : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+
+sil @second_apply : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+  %u = apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> Bool
+  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> Bool
+  return %4 : $Bool
+}
+
+// CHECK-LABEL: sil @return_second_apply
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @second_apply
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_second_apply : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @second_apply : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+
+class X { }
+
+sil @other_inst : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> Bool
+  %r = alloc_ref $X
+  strong_release %r : $X
+  return %4 : $Bool
+}
+
+// CHECK-LABEL: sil @return_other_inst
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @other_inst
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_other_inst : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @other_inst : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+
+sil @other_inst_in_returnblock : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error) {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_throwing_closure : $@convention(thin) (Int32, Int32) -> (Bool, @error Error)
+  try_apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> (Bool, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Bool):
+  %r = alloc_ref $X
+  strong_release %r : $X
+  return %5 : $Bool
+
+bb2(%7 : $Error):
+  throw %7 : $Error
+}
+
+// CHECK-LABEL: sil @return_other_inst_in_returnblock
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @other_inst_in_returnblock
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_other_inst_in_returnblock : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> (Bool, @error Error) {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @other_inst_in_returnblock : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  return %2 : $@callee_owned (Int32, Int32) -> (Bool, @error Error)
+}
+
+
+sil @wrong_return2 : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error) {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_throwing_closure : $@convention(thin) (Int32, Int32) -> (Bool, @error Error)
+  try_apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> (Bool, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Bool):
+  %i = integer_literal $Builtin.Int1, 0
+  %b = struct $Bool (%i : $Builtin.Int1)
+  return %b : $Bool
+
+bb2(%7 : $Error):
+  throw %7 : $Error
+}
+
+// CHECK-LABEL: sil @return_wrong_return2
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @wrong_return2
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_wrong_return2 : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> (Bool, @error Error) {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @wrong_return2 : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  return %2 : $@callee_owned (Int32, Int32) -> (Bool, @error Error)
+}
+
+
+sil @wrong_terminator : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error) {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_throwing_closure : $@convention(thin) (Int32, Int32) -> (Bool, @error Error)
+  try_apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> (Bool, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Bool):
+  return %5 : $Bool
+
+bb2(%7 : $Error):
+  br bb3
+
+bb3:
+  %i = integer_literal $Builtin.Int1, 1
+  cond_fail %i : $Builtin.Int1
+  unreachable
+}
+
+// CHECK-LABEL: sil @return_wrong_terminator
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @wrong_terminator
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_wrong_terminator : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> (Bool, @error Error) {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @wrong_terminator : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  return %2 : $@callee_owned (Int32, Int32) -> (Bool, @error Error)
+}
+

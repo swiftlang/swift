@@ -1,15 +1,19 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime
 
 import Swift
 
+sil @error_user : $@convention(thin) (@owned Error) -> ()
+
 // CHECK-LABEL: define{{( protected)?}} void @retain_release_boxed_existential(%swift.error*)
-sil @retain_release_boxed_existential : $@convention(thin) (Error) -> () {
+sil @retain_release_boxed_existential : $@convention(thin) (@owned Error) -> () {
 entry(%e : $Error):
   // CHECK-objc: @swift_errorRetain
-  // CHECK-native: @rt_swift_retain
+  // CHECK-native: @swift_rt_swift_retain
   strong_retain %e : $Error
+  %1 = function_ref @error_user : $@convention(thin) (@owned Error) -> ()
+  apply %1(%e) : $@convention(thin) (@owned Error) -> ()
   // CHECK-objc: @swift_errorRelease
-  // CHECK-native: @rt_swift_release
+  // CHECK-native: @swift_rt_swift_release
   strong_release %e : $Error
   return undef : $()
 }
@@ -103,13 +107,13 @@ entry(%b : $Error):
   // CHECK: [[ADDR:%.*]] = load {{.*}} [[OUT_ADDR]]
   // CHECK: [[OUT_TYPE:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 1
   // CHECK: [[TYPE:%.*]] = load {{.*}} [[OUT_TYPE]]
-  // CHECK: [[DYNAMIC_TYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[ADDR]], %swift.type* [[TYPE]])
+  // CHECK: [[DYNAMIC_TYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[ADDR]], %swift.type* [[TYPE]], i1 true)
   // CHECK: [[OUT_WITNESS:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 2
   // CHECK: [[WITNESS:%.*]] = load {{.*}} [[OUT_WITNESS]]
   %m = existential_metatype $@thick Error.Type, %b : $Error
 
   // CHECK-objc:   call void @swift_errorRelease(%swift.error* %0)
-  // CHECK-native: call void bitcast (void (%swift.refcounted*)* @rt_swift_release to void (%swift.error*)*)(%swift.error* %0)
+  // CHECK-native: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%swift.error*)*)(%swift.error* %0)
   strong_release %b : $Error
 
   // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* [[DYNAMIC_TYPE]], 0

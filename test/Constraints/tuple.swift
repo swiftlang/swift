@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Test various tuple constraints.
 
@@ -168,7 +168,7 @@ struct MagicKingdom<K> : Kingdom {
   typealias King = K
 }
 func magify<T>(_ t: T) -> MagicKingdom<T> { return MagicKingdom() }
-func foo(_ pair: (Int,Int)) -> Victory<(x:Int, y:Int)> {
+func foo(_ pair: (Int, Int)) -> Victory<(x: Int, y: Int)> {
   return Victory(magify(pair)) // expected-error {{cannot convert return expression of type 'Victory<(Int, Int)>' to return type 'Victory<(x: Int, y: Int)>'}}
 }
 
@@ -190,7 +190,7 @@ extension r25271859 {
   func map<U>(f: (T) -> U) -> r25271859<U> {
   }
 
-  func andThen<U>(f: (T)->r25271859<U>) {
+  func andThen<U>(f: (T) -> r25271859<U>) {
   }
 }
 

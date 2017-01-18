@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim -dead-store-elim | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -redundant-load-elim -dead-store-elim | %FileCheck %s
 
 // NOTE, the order redundant-load and dead-store are ran is important. we have a pass dependence for some
 // of the tests to work.
@@ -71,7 +71,7 @@ sil_global @test_global : $Int64
 // CHECK: {{store }}
 // CHECK-NOT: {{store }}
 // CHECK-NOT: {{load }}
-// CHECK: return 
+// CHECK: return
 sil @aliasing_store : $@convention(thin) (@inout A) -> () {
 bb0(%0: $*A):
   %1 = alloc_stack $A
@@ -163,7 +163,7 @@ bb0(%0 : $*Builtin.Int32):
 // CHECK: {{load }}
 // CHECK: {{load }}
 // CHECK-NOT: {{load }}
-// CHECK: return 
+// CHECK: return
 sil @forward_partial_aliasing_loads : $@convention(thin) (@in AA) -> () {
 bb0(%0 : $*AA):
   %1 = struct_element_addr %0 : $*AA, #AA.a

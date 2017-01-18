@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -105,7 +105,7 @@ public:
         // loaded.  Except it's not really an invariant, because
         // argument emission likes to lie sometimes.
         if (eltTI.isLoadable()) {
-          elt = gen.B.createLoad(loc, elt);
+          elt = eltTI.emitLoad(gen.B, loc, elt, LoadOwnershipQualifier::Take);
         }
       }
 
@@ -140,6 +140,8 @@ public:
     case ImplodeKind::Copy:
       return v.copyUnmanaged(gen, l).forward(gen);
     }
+
+    llvm_unreachable("Unhandled ImplodeKind in switch.");
   }
 
   ImplodeLoadableTupleValue(ArrayRef<ManagedValue> values,
@@ -254,8 +256,18 @@ public:
     : gen(gen), parent(parent), loc(l), functionArgs(functionArgs) {}
 
   RValue visitType(CanType t) {
-    SILValue arg = new (gen.SGM.M)
-      SILArgument(parent, gen.getLoweredType(t), loc.getAsASTNode<ValueDecl>());
+    SILValue arg;
+    if (functionArgs) {
+      arg = parent->createFunctionArgument(gen.getLoweredType(t),
+                                           loc.getAsASTNode<ValueDecl>());
+    } else {
+      SILType lty = gen.getLoweredType(t);
+      ValueOwnershipKind ownershipkind = lty.isAddress()
+                                             ? ValueOwnershipKind::Trivial
+                                             : ValueOwnershipKind::Owned;
+      arg = parent->createPHIArgument(lty, ownershipkind,
+                                      loc.getAsASTNode<ValueDecl>());
+    }
     ManagedValue mv = isa<InOutType>(t)
       ? ManagedValue::forLValue(arg)
       : gen.emitManagedRValueWithCleanup(arg);
@@ -363,9 +375,24 @@ static void copyOrInitValuesInto(Initialization *init,
   init->finishInitialization(gen);
 }
 
+static unsigned
+expectedExplosionSize(CanType type) {
+  auto tuple = dyn_cast<TupleType>(type);
+  if (!tuple)
+    return 1;
+  unsigned total = 0;
+  for (unsigned i = 0; i < tuple->getNumElements(); ++i) {
+    total += expectedExplosionSize(tuple.getElementType(i));
+  }
+  return total;
+}
 
 RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
   : values(values.begin(), values.end()), type(type), elementsToBeAdded(0) {
+  
+  assert(values.size() == expectedExplosionSize(type)
+         && "creating rvalue with wrong number of pre-exploded elements");
+  
   if (values.size() == 1 && values[0].isInContext()) {
     values = ArrayRef<ManagedValue>();
     type = CanType();
@@ -373,6 +400,11 @@ RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
     return;
   }
 
+}
+
+RValue RValue::withPreExplodedElements(ArrayRef<ManagedValue> values,
+                                       CanType type) {
+  return RValue(values, type);
 }
 
 RValue::RValue(SILGenFunction &gen, SILLocation l, CanType formalType,
@@ -560,15 +592,14 @@ RValue RValue::extractElement(unsigned n) && {
   assert(isComplete() && "rvalue is not complete");
 
   CanTupleType tupleTy = dyn_cast<TupleType>(type);
-	if (!tupleTy) {
-		assert(n == 0);
+  if (!tupleTy) {
+    assert(n == 0);
     unsigned to = getRValueSize(type);
-		assert(to == values.size());
-		RValue element({llvm::makeArrayRef(values).slice(0, to), type});
-		makeUsed();
-		return element;
+    assert(to == values.size());
+    RValue element({llvm::makeArrayRef(values).slice(0, to), type});
+    makeUsed();
+    return element;
   }
-
 
   auto range = getElementRange(tupleTy, n);
   unsigned from = range.first, to = range.second;
@@ -583,12 +614,12 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   assert(isComplete() && "rvalue is not complete");
 
   CanTupleType tupleTy = dyn_cast<TupleType>(type);
-	if (!tupleTy) {
+  if (!tupleTy) {
     unsigned to = getRValueSize(type);
-		assert(to == values.size());
-		elements.push_back({llvm::makeArrayRef(values).slice(0, to), type});
-		makeUsed();
-		return;
+    assert(to == values.size());
+    elements.push_back({llvm::makeArrayRef(values).slice(0, to), type});
+    makeUsed();
+    return;
   }
 
   unsigned from = 0;

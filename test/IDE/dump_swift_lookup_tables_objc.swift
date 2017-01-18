@@ -1,5 +1,5 @@
 // RUN: %target-swift-ide-test -dump-importer-lookup-table -source-filename %s -import-objc-header %S/Inputs/swift_name_objc.h > %t.log 2>&1
-// RUN: FileCheck %s < %t.log
+// RUN: %FileCheck %s < %t.log
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx

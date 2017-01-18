@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -447,29 +447,25 @@ ${orderingExplanation}
     by areInIncreasingOrder:
       (${IElement}, ${IElement}) -> Bool
   ) {
-    typealias EscapingBinaryPredicate =
-      (Iterator.Element, Iterator.Element) -> Bool
-    let escapableIsOrderedBefore =
-      unsafeBitCast(areInIncreasingOrder, to: EscapingBinaryPredicate.self)
 
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      bufferPointer.sort(by: escapableIsOrderedBefore)
+      bufferPointer.sort(by: areInIncreasingOrder)
       return ()
     }
     if didSortUnsafeBuffer == nil {
       _introSort(
         &self,
         subRange: startIndex..<endIndex,
-        by: escapableIsOrderedBefore)
+        by: areInIncreasingOrder)
     }
   }
 }
 
-% for Self in 'Indexable', 'MutableIndexable':
+% for Self in '_Indexable', '_MutableIndexable':
 %{
 
 subscriptCommentPre = """\
@@ -505,6 +501,7 @@ subscriptCommentPost = """\
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection."""
 }%
+// FIXME(ABI)#180 (Type checker)
 // WORKAROUND rdar://25214066 - should be on Collection
 extension ${Self} {
 ${subscriptCommentPre}
@@ -532,6 +529,7 @@ ${subscriptCommentPost}
   }
 }
 
+// FIXME(ABI)#180 (Type checker)
 // WORKAROUND rdar://25214066 - should be on Collection
 extension ${Self} where Index : Strideable, Index.Stride : SignedInteger {
 ${subscriptCommentPre}
@@ -547,7 +545,7 @@ ${subscriptCommentPost}
     }
 %   end
   }
-  
+
 ${subscriptCommentPre}
 ${subscriptCommentMid}
 ${subscriptCommentPost}
@@ -565,7 +563,7 @@ ${subscriptCommentPost}
 % end
 
 //===--- Unavailable stuff ------------------------------------------------===//
-    
+
 extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, message: "call partition(by:)")
   public mutating func partition(
@@ -597,6 +595,22 @@ extension MutableCollection
   }
 }
 
+extension Sequence {
+  @available(*, unavailable, renamed: "sorted(by:)")
+  public func sort(
+    _ isOrderedBefore: (${IElement}, ${IElement}) -> Bool
+  ) -> [${IElement}] {
+    Builtin.unreachable()
+  }
+}
+
+extension Sequence where ${IElement} : Comparable {
+  @available(*, unavailable, renamed: "sorted()")
+  public func sort() -> [${IElement}] {
+    Builtin.unreachable()
+  }
+}
+
 extension MutableCollection
   where
   Self : RandomAccessCollection,
@@ -611,7 +625,7 @@ extension MutableCollection
 extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, renamed: "sort(by:)")
   public mutating func sortInPlace(
-    _ isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
+    _ isOrderedBefore: (${IElement}, ${IElement}) -> Bool
   ) {
     Builtin.unreachable()
   }

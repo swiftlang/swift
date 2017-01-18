@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
@@ -11,9 +11,9 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/error-delegate.h -emit-module -o %t %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/error-delegate.h -parse-as-library %t/error-delegate.swiftmodule -parse -emit-objc-header-path %t/error-delegate.h
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/error-delegate.h -parse-as-library %t/error-delegate.swiftmodule -typecheck -emit-objc-header-path %t/error-delegate.h
 
-// RUN: FileCheck %s < %t/error-delegate.h
+// RUN: %FileCheck %s < %t/error-delegate.h
 // RUN: %check-in-clang %t/error-delegate.h
 
 import Foundation

@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
@@ -9,8 +9,8 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -emit-module-doc -o %t -module-name simd_test %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse-as-library %t/simd_test.swiftmodule -parse -emit-objc-header-path %t/simd.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck %s < %t/simd.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse-as-library %t/simd_test.swiftmodule -typecheck -emit-objc-header-path %t/simd.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %FileCheck %s < %t/simd.h
 // RUN: %check-in-clang %t/simd.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/simd.h -include Foundation.h
 
@@ -29,13 +29,13 @@ import simd
 
 // CHECK-LABEL: @interface Foo : NSObject
 @objc class Foo: NSObject {
-  // CHECK-LABEL: - (swift_float4)doStuffWithFloat4:(swift_float4)x;
+  // CHECK-LABEL: - (swift_float4)doStuffWithFloat4:(swift_float4)x SWIFT_WARN_UNUSED_RESULT;
   @objc func doStuffWithFloat4(_ x: float4) -> float4 { return x }
-  // CHECK-LABEL: - (swift_double2)doStuffWithDouble2:(swift_double2)x;
+  // CHECK-LABEL: - (swift_double2)doStuffWithDouble2:(swift_double2)x SWIFT_WARN_UNUSED_RESULT;
   @objc func doStuffWithDouble2(_ x: double2) -> double2 { return x }
-  // CHECK-LABEL: - (swift_int3)doStuffWithInt3:(swift_int3)x;
+  // CHECK-LABEL: - (swift_int3)doStuffWithInt3:(swift_int3)x SWIFT_WARN_UNUSED_RESULT;
   @objc func doStuffWithInt3(_ x: int3) -> int3 { return x }
-  // CHECK-LABEL: - (swift_uint4)doStuffWithUInt4:(swift_uint4)x;
+  // CHECK-LABEL: - (swift_uint4)doStuffWithUInt4:(swift_uint4)x SWIFT_WARN_UNUSED_RESULT;
   @objc func doStuffWithUInt4(_ x: uint4) -> uint4 { return x }
 }
 

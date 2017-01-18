@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -emit-sil %s 2>&1 | FileCheck --check-prefix=CHECK-%target-ptrsize %s
+// RUN: not %target-swift-frontend -emit-sil %s 2>&1 | %FileCheck --check-prefix=CHECK-%target-ptrsize %s
 
 // FIXME: This test should be merged back into
 // diagnostic_constant_propagation.swift when we have fixed:

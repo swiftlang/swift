@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | %FileCheck %s
 
 enum TrivialUnion {
   case Foo
@@ -52,17 +52,17 @@ func destroyUnionRValues() {
 
   // CHECK:   [[GET_NON_TRIVIAL_UNION_1:%.*]] = function_ref @_TF15lifetime_unions19getNonTrivialUnion1FT_OS_16NonTrivialUnion1 : $@convention(thin) () -> @owned NonTrivialUnion1
   // CHECK:   [[NON_TRIVIAL_UNION_1:%.*]] = apply [[GET_NON_TRIVIAL_UNION_1]]() : $@convention(thin) () -> @owned NonTrivialUnion1
-  // CHECK:   release_value [[NON_TRIVIAL_UNION_1]] : $NonTrivialUnion1
+  // CHECK:   destroy_value [[NON_TRIVIAL_UNION_1]] : $NonTrivialUnion1
   getNonTrivialUnion1()
 
   // CHECK:   [[GET_NON_TRIVIAL_UNION_2:%.*]] = function_ref @_TF15lifetime_unions19getNonTrivialUnion2FT_OS_16NonTrivialUnion2 : $@convention(thin) () -> @owned NonTrivialUnion2
   // CHECK:   [[NON_TRIVIAL_UNION_2:%.*]] = apply [[GET_NON_TRIVIAL_UNION_2]]() : $@convention(thin) () -> @owned NonTrivialUnion2
-  // CHECK:   release_value [[NON_TRIVIAL_UNION_2]] : $NonTrivialUnion2
+  // CHECK:   destroy_value [[NON_TRIVIAL_UNION_2]] : $NonTrivialUnion2
   getNonTrivialUnion2()
 
   // CHECK:   [[GET_NON_TRIVIAL_UNION_3:%.*]] = function_ref @_TF15lifetime_unions19getNonTrivialUnion3FT_OS_16NonTrivialUnion3 : $@convention(thin) () -> @owned NonTrivialUnion3
   // CHECK:   [[NON_TRIVIAL_UNION_3:%.*]] = apply [[GET_NON_TRIVIAL_UNION_3]]() : $@convention(thin) () -> @owned NonTrivialUnion3
-  // CHECK:   release_value [[NON_TRIVIAL_UNION_3]] : $NonTrivialUnion3
+  // CHECK:   destroy_value [[NON_TRIVIAL_UNION_3]] : $NonTrivialUnion3
   getNonTrivialUnion3()
 
   /* TODO: Address-only unions

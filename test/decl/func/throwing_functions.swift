@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 enum Exception : Error { case A }
 
@@ -105,7 +105,7 @@ func testSubtypeArgument1(_ x1: (_ fn: ((String) -> Int)) -> Int,
 func subtypeArgument2(_ x: (_ fn: ((String) throws -> Int)) -> Int) { }
 func testSubtypeArgument2(_ x1: (_ fn: ((String) -> Int)) -> Int,
                           x2: (_ fn: ((String) throws -> Int)) -> Int) {
-  subtypeArgument2(x1) // expected-error{{cannot convert value of type '((@escaping (String) -> Int)) -> Int' to expected argument type '((@escaping (String) throws -> Int)) -> Int'}}
+  subtypeArgument2(x1) // expected-error{{cannot convert value of type '(((String) -> Int)) -> Int' to expected argument type '(((String) throws -> Int)) -> Int'}}
   subtypeArgument2(x2)
 }
 

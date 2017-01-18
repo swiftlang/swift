@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 
 // REQUIRES: CPU=i386_or_x86_64
 
@@ -74,7 +74,7 @@ struct SyncUp<Deliverable> : Synergy {
 sil @testGenericWitnessMethod : $@convention(thin) <T> (@in SyncUp<T>) -> @out T {
 entry(%ret : $*T, %self : $*SyncUp<T>):
   %m = witness_method $SyncUp<T>, #Synergy.actionItem!1 : $@convention(witness_method) <U: Synergy> (@in_guaranteed U) -> @out U.LowHangingFruit
-  %z = apply %m<SyncUp<T>, T>(%ret, %self) : $@convention(witness_method) <U: Synergy> (@in_guaranteed U) -> @out U.LowHangingFruit
+  %z = apply %m<SyncUp<T>>(%ret, %self) : $@convention(witness_method) <U: Synergy> (@in_guaranteed U) -> @out U.LowHangingFruit
   return %z : $()
 }
 
@@ -97,6 +97,6 @@ protocol Strategy {
 sil @testArchetypeWitnessMethod : $@convention(thin) <T : Strategy> (@in T) -> @out T.GrowthHack {
 entry(%ret : $*T.GrowthHack, %self : $*T):
   %m = witness_method $T, #Strategy.disrupt!1 : $@convention(witness_method) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
-  %z = apply %m<T, T.GrowthHack>(%ret, %self) : $@convention(witness_method) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
+  %z = apply %m<T>(%ret, %self) : $@convention(witness_method) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
   return %z : $()
 }

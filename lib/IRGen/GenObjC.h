@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -46,6 +46,42 @@ namespace irgen {
     Peer
   };
 
+  /// Represents an ObjC method reference that will be invoked by a form of
+  /// objc_msgSend.
+  class ObjCMethod {
+    /// The SILDeclRef declaring the method.
+    SILDeclRef method;
+    /// For a bounded call, the static type that provides the lower bound for
+    /// the search. Null for unbounded calls that will look for the method in
+    /// the dynamic type of the object.
+    llvm::PointerIntPair<SILType, 1, bool> searchTypeAndSuper;
+
+  public:
+    ObjCMethod(SILDeclRef method, SILType searchType, bool startAtSuper)
+      : method(method), searchTypeAndSuper(searchType, startAtSuper)
+    {}
+    
+    SILDeclRef getMethod() const { return method; }
+    SILType getSearchType() const { return searchTypeAndSuper.getPointer(); }
+    bool shouldStartAtSuper() const { return searchTypeAndSuper.getInt(); }
+    
+    /// FIXME: Thunk down to a Swift function value?
+    llvm::Value *getExplosionValue(IRGenFunction &IGF) const {
+      llvm_unreachable("thunking unapplied objc method to swift function "
+                       "not yet implemented");
+    }
+    
+    /// Determine the kind of message that should be sent to this
+    /// method.
+    ObjCMessageKind getMessageKind() const {
+      // Determine the kind of message send to perform.
+      if (!getSearchType()) return ObjCMessageKind::Normal;
+
+      return shouldStartAtSuper()? ObjCMessageKind::Super
+                                 : ObjCMessageKind::Peer;
+    }
+  };
+
   CallEmission prepareObjCMethodRootCall(IRGenFunction &IGF,
                                          SILDeclRef method,
                                          CanSILFunctionType origFnType,
@@ -62,7 +98,7 @@ namespace irgen {
   /// Emit a partial application of an Objective-C method to its 'self'
   /// argument.
   void emitObjCPartialApplication(IRGenFunction &IGF,
-                                  SILDeclRef method,
+                                  ObjCMethod method,
                                   CanSILFunctionType origType,
                                   CanSILFunctionType partialAppliedType,
                                   llvm::Value *self,

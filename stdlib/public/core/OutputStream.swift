@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -81,22 +81,26 @@ extension TextOutputStream {
 
 /// A source of text-streaming operations.
 ///
-/// Instances of types that conform to the `Streamable` protocol can write
-/// their value to instances of any type that conforms to the `TextOutputStream`
-/// protocol. The Swift standard library's text-related types, `String`,
-/// `Character`, and `UnicodeScalar`, all conform to `Streamable`.
+/// Instances of types that conform to the `TextOutputStreamable` protocol can
+/// write their value to instances of any type that conforms to the
+/// `TextOutputStream` protocol. The Swift standard library's text-related
+/// types, `String`, `Character`, and `UnicodeScalar`, all conform to
+/// `TextOutputStreamable`.
 ///
-/// Conforming to the Streamable Protocol
+/// Conforming to the TextOutputStreamable Protocol
 /// =====================================
 ///
-/// To add `Streamable` conformance to a custom type, implement the required
-/// `write(to:)` method. Call the given output stream's `write(_:)` method in
-/// your implementation.
-public protocol Streamable {
+/// To add `TextOutputStreamable` conformance to a custom type, implement the
+/// required `write(to:)` method. Call the given output stream's `write(_:)`
+/// method in your implementation.
+public protocol TextOutputStreamable {
   /// Writes a textual representation of this instance into the given output
   /// stream.
   func write<Target : TextOutputStream>(to target: inout Target)
 }
+
+@available(*, unavailable, renamed: "TextOutputStreamable")
+typealias Streamable = TextOutputStreamable
 
 /// A type with a customized textual representation.
 ///
@@ -266,16 +270,24 @@ internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
       case .tuple:
         target.write("(")
         var first = true
-        for (_, value) in mirror.children {
+        for (label, value) in mirror.children {
           if first {
             first = false
           } else {
             target.write(", ")
           }
+
+          if let label = label {
+            if !label.isEmpty && label[label.startIndex] != "." {
+              target.write(label)
+              target.write(": ")
+            }
+          }
+
           _debugPrint_unlocked(value, &target)
         }
         target.write(")")
-      case .`struct`:
+      case .struct:
         printTypeName(mirror.subjectType)
         target.write("(")
         var first = true
@@ -292,7 +304,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
           }
         }
         target.write(")")
-      case .`enum`:
+      case .enum:
         if let cString = _getEnumCaseName(value),
             let caseName = String(validatingUTF8: cString) {
           // Write the qualified type name in debugPrint.
@@ -306,7 +318,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
           printTypeName(mirror.subjectType)
         }
         if let (_, value) = mirror.children.first {
-          if (Mirror(reflecting: value).displayStyle == .tuple) {
+          if Mirror(reflecting: value).displayStyle == .tuple {
             _debugPrint_unlocked(value, &target)
           } else {
             target.write("(")
@@ -346,7 +358,7 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
     debugPrintable.debugDescription.write(to: &target)
     return
   }
-  if case let streamableObject as Streamable = value {
+  if case let streamableObject as TextOutputStreamable = value {
     streamableObject.write(to: &target)
     return
   }
@@ -373,7 +385,7 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
 /// This function is forbidden from being inlined because when building the
 /// standard library inlining makes us drop the special semantics.
 @inline(never) @effects(readonly)
-func _toStringReadOnlyStreamable<T : Streamable>(_ x: T) -> String {
+func _toStringReadOnlyStreamable<T : TextOutputStreamable>(_ x: T) -> String {
   var result = ""
   x.write(to: &result)
   return result
@@ -402,7 +414,7 @@ public func _debugPrint_unlocked<T, TargetStream : TextOutputStream>(
     return
   }
 
-  if let streamableObject = value as? Streamable {
+  if let streamableObject = value as? TextOutputStreamable {
     streamableObject.write(to: &target)
     return
   }
@@ -415,7 +427,8 @@ internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream
 ) {
   if let displayStyle = mirror.displayStyle {
-    // Containers and tuples are always displayed in terms of their element count
+    // Containers and tuples are always displayed in terms of their element
+    // count
     switch displayStyle {
     case .tuple:
       let count = mirror.children.count
@@ -448,7 +461,7 @@ internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
     return
   }
 
-  if let streamableObject = value as? Streamable {
+  if let streamableObject = value as? TextOutputStreamable {
     streamableObject.write(to: &target)
     return
   }
@@ -492,11 +505,13 @@ internal struct _Stdout : TextOutputStream {
   mutating func write(_ string: String) {
     if string.isEmpty { return }
 
-    if string._core.isASCII {
+    if let asciiBuffer = string._core.asciiBuffer {
       defer { _fixLifetime(string) }
 
-      _swift_stdlib_fwrite_stdout(UnsafePointer(string._core.startASCII),
-                                  string._core.count, 1)
+      _swift_stdlib_fwrite_stdout(
+        UnsafePointer(asciiBuffer.baseAddress!),
+        asciiBuffer.count,
+        1)
       return
     }
 
@@ -519,7 +534,7 @@ extension String : TextOutputStream {
 // Streamables
 //===----------------------------------------------------------------------===//
 
-extension String : Streamable {
+extension String : TextOutputStreamable {
   /// Writes the string into the given output stream.
   /// 
   /// - Parameter target: An output stream.
@@ -528,7 +543,7 @@ extension String : Streamable {
   }
 }
 
-extension Character : Streamable {
+extension Character : TextOutputStreamable {
   /// Writes the character into the given output stream.
   ///
   /// - Parameter target: An output stream.
@@ -537,7 +552,7 @@ extension Character : Streamable {
   }
 }
 
-extension UnicodeScalar : Streamable {
+extension UnicodeScalar : TextOutputStreamable {
   /// Writes the textual representation of the Unicode scalar into the given
   /// output stream.
   ///
@@ -568,7 +583,7 @@ internal struct _TeeStream<
 @available(*, unavailable, renamed: "TextOutputStream")
 public typealias OutputStreamType = TextOutputStream
 
-extension Streamable {
+extension TextOutputStreamable {
   @available(*, unavailable, renamed: "write(to:)")
   public func writeTo<Target : TextOutputStream>(_ target: inout Target) {
     Builtin.unreachable()

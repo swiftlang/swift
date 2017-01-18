@@ -1,0 +1,29 @@
+// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+
+import Builtin
+
+sil_stage canonical
+
+sil @subject : $@convention(thin) (Builtin.Int64) -> ()
+
+// CHECK-LABEL: sil @partial_apply_callee_owned_by_default : $@convention(thin) () -> @callee_owned () -> () {
+sil @partial_apply_callee_owned_by_default : $@convention(thin) () -> @callee_owned () -> () {
+entry:
+  %f = function_ref @subject : $@convention(thin) (Builtin.Int64) -> ()
+  %z = integer_literal $Builtin.Int64, 0
+  // CHECK: [[PA:%.*]] = partial_apply {{.*}} $@convention(thin) (Builtin.Int64) -> ()
+  %g = partial_apply %f(%z) : $@convention(thin) (Builtin.Int64) -> ()
+  // CHECK: return [[PA]] : $@callee_owned () -> ()
+  return %g : $@callee_owned () -> ()
+}
+
+// CHECK-LABEL: sil @partial_apply_callee_guaranteed_by_attr : $@convention(thin) () -> @callee_guaranteed () -> () {
+sil @partial_apply_callee_guaranteed_by_attr : $@convention(thin) () -> @callee_guaranteed () -> () {
+entry:
+  %f = function_ref @subject : $@convention(thin) (Builtin.Int64) -> ()
+  %z = integer_literal $Builtin.Int64, 0
+  // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] {{.*}} $@convention(thin) (Builtin.Int64) -> ()
+  %g = partial_apply [callee_guaranteed] %f(%z) : $@convention(thin) (Builtin.Int64) -> ()
+  // CHECK: return [[PA]] : $@callee_guaranteed () -> ()
+  return %g : $@callee_guaranteed () -> ()
+}

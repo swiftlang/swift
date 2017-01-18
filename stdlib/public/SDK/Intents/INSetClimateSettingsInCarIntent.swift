@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,7 +24,7 @@ extension INSetClimateSettingsInCarIntent {
     enableAutoMode: Bool? = nil,
     airCirculationMode: INCarAirCirculationMode = .unknown,
     fanSpeedIndex: Int? = nil,
-    fanSpeedPercentage: Int? = nil,
+    fanSpeedPercentage: Double? = nil,
     relativeFanSpeedSetting: INRelativeSetting = .unknown,
     temperature: Measurement<UnitTemperature>? = nil,
     relativeTemperatureSetting: INRelativeSetting = .unknown,
@@ -42,34 +42,34 @@ extension INSetClimateSettingsInCarIntent {
       climateZone: climateZone)
   }
 
-  @nonobjc  
+  @nonobjc
   public final var enableFan: Bool? {
     return __enableFan?.boolValue
   }
 
-  @nonobjc  
+  @nonobjc
   public final var enableAirConditioner: Bool? {
     return __enableAirConditioner?.boolValue
   }
 
-  @nonobjc  
+  @nonobjc
   public final var enableClimateControl: Bool? {
     return __enableClimateControl?.boolValue
   }
 
-  @nonobjc  
+  @nonobjc
   public final var enableAutoMode: Bool? {
     return __enableAutoMode?.boolValue
   }
 
-  @nonobjc  
+  @nonobjc
   public final var fanSpeedIndex: Int? {
     return __fanSpeedIndex?.intValue
   }
 
-  @nonobjc  
-  public final var fanSpeedPercentage: Int? {
-    return __fanSpeedPercentage?.intValue
+  @nonobjc
+  public final var fanSpeedPercentage: Double? {
+    return __fanSpeedPercentage?.doubleValue
   }
 }
 #endif

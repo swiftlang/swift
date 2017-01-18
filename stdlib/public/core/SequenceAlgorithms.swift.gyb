@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -70,7 +70,7 @@ extension Sequence {
   /// These counters can only be used as indices in instances of zero-based,
   /// integer-indexed collections, such as `Array` and `ContiguousArray`. For
   /// other collections the counters may be out of range or of the wrong type
-  /// to use as an index. To iterate over the elements of collection with its
+  /// to use as an index. To iterate over the elements of a collection with its
   /// indices, use the `zip(_:_:)` function.
   ///
   /// This example iterates over the indices and elements of a set, building a
@@ -312,7 +312,7 @@ ${equivalenceExplanation}
 extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 
 %   if preds:
-  /// Returns a Boolean value indicating whether the sequence and a given
+  /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain equivalent elements, using the given predicate as the
   /// equivalence test.
   ///
@@ -328,13 +328,13 @@ ${equivalenceExplanation}
   ///
   /// - SeeAlso: `elementsEqual(_:)`
 %   else:
-  /// Returns a Boolean value indicating whether the sequence and a given
+  /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain the same elements in the same order.
   ///
   /// At least one of the sequences must be finite.
   ///
   /// This example tests whether one countable range shares the same elements
-  /// as another countable range and as an array with the same elements.
+  /// as another countable range and an array.
   ///
   ///     let a = 1...3
   ///     let b = 1...10
@@ -393,7 +393,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 
 %   if preds:
   /// Returns a Boolean value indicating whether the sequence precedes another
-  /// sequence in a lexicographical ("dictionary") ordering, using the given
+  /// sequence in a lexicographical (dictionary) ordering, using the given
   /// predicate to compare elements.
   ///
 ${orderingExplanation}
@@ -412,7 +412,7 @@ ${orderingExplanation}
   /// - SeeAlso: `lexicographicallyPrecedes(_:)`
 %   else:
   /// Returns a Boolean value indicating whether the sequence precedes another
-  /// sequence in a lexicographical ("dictionary") ordering, using the
+  /// sequence in a lexicographical (dictionary) ordering, using the
   /// less-than operator (`<`) to compare elements.
   ///
   /// This example uses the `lexicographicallyPrecedes` method to test which
@@ -432,14 +432,14 @@ ${orderingExplanation}
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
   ///   ordering, which has no connection to Unicode.  If you are sorting
-  ///   strings to present to the end user, you should use `String` APIs that
+  ///   strings to present to the end user, use `String` APIs that
   ///   perform localized comparison.
   /// - SeeAlso: `lexicographicallyPrecedes(_:by:)`
 %   end
   public func lexicographicallyPrecedes<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
-    by areInIncreasingOrder: 
+    by areInIncreasingOrder:
       (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
@@ -516,7 +516,7 @@ extension Sequence {
   ///         case ok
   ///         case error(Int)
   ///     }
-  /// 
+  ///
   ///     let lastThreeResponses: [HTTPResponse] = [.ok, .ok, .error(404)]
   ///     let hadError = lastThreeResponses.contains { element in
   ///         if case .error = element {
@@ -557,37 +557,47 @@ extension Sequence {
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
-  /// Returns the result of calling the given combining closure with each
-  /// element of this sequence and an accumulating value.
+  /// Returns the result of combining the elements of the sequence using the
+  /// given closure.
+  ///
+  /// Use the `reduce(_:_:)` method to produce a single value from the elements
+  /// of an entire sequence. For example, you can use this method on an array
+  /// of numbers to find their sum or product.
   ///
   /// The `nextPartialResult` closure is called sequentially with an
-  /// accumulating value initialized to `initialResult` and each
-  /// element of the sequence. This example shows how to find the sum
-  /// of an array of numbers.
+  /// accumulating value initialized to `initialResult` and each element of
+  /// the sequence. This example shows how to find the sum of an array of
+  /// numbers.
   ///
   ///     let numbers = [1, 2, 3, 4]
-  ///     let addTwo: (Int, Int) -> Int = { x, y in x + y }
-  ///     let numberSum = numbers.reduce(0, addTwo)
-  ///     // 'numberSum' == 10
+  ///     let numberSum = numbers.reduce(0, { x, y in
+  ///         x + y
+  ///     })
+  ///     // numberSum == 10
   ///
-  /// When `numbers.reduce(_:_:)` is called, the
-  /// following steps occur:
+  /// When `numbers.reduce(_:_:)` is called, the following steps occur:
   ///
-  /// 1. The `nextPartialResult` closure is called with the initial
-  ///    result and the first element of `numbers`, returning the sum:
+  /// 1. The `nextPartialResult` closure is called with `initialResult`---`0`
+  ///    in this case---and the first element of `numbers`, returning the sum:
   ///    `1`.
-  /// 2. The closure is called again repeatedly with the previous call's
-  ///    return value and each element of the sequence.
+  /// 2. The closure is called again repeatedly with the previous call's return
+  ///    value and each element of the sequence.
   /// 3. When the sequence is exhausted, the last value returned from the
   ///    closure is returned to the caller.
   ///
+  /// If the sequence has no elements, `nextPartialResult` is never executed
+  /// and `initialResult` is the result of the call to `reduce(_:_:)`.
+  ///
   /// - Parameters:
-  ///   - initialResult: the initial accumulating value.
-  ///   - nextPartialResult: A closure that combines an accumulating
-  ///     value and an element of the sequence into a new accumulating
-  ///     value, to be used in the next call of the
-  ///     `nextPartialResult` closure or returned to the caller.
-  /// - Returns: The final accumulated value.
+  ///   - initialResult: The value to use as the initial accumulating value.
+  ///     `initialResult` is passed to `nextPartialResult` the first time the
+  ///     closure is executed.
+  ///   - nextPartialResult: A closure that combines an accumulating value and
+  ///     an element of the sequence into a new accumulating value, to be used
+  ///     in the next call of the `nextPartialResult` closure or returned to
+  ///     the caller.
+  /// - Returns: The final accumulated value. If the sequence has no elements,
+  ///   the result is `initialResult`.
   public func reduce<Result>(
     _ initialResult: Result,
     _ nextPartialResult:
@@ -611,7 +621,7 @@ extension Sequence {
   ///
   /// The sequence must be finite.
   ///
-  /// - Complexity: O(N), where N is the length of the sequence.
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
   ///
   /// - Returns: An array containing the elements of this sequence in
   ///   reverse order.
@@ -643,10 +653,10 @@ extension Sequence {
   /// `flatMap` with a transformation that returns an array.
   ///
   ///     let numbers = [1, 2, 3, 4]
-  /// 
+  ///
   ///     let mapped = numbers.map { Array(count: $0, repeatedValue: $0) }
   ///     // [[1], [2, 2], [3, 3, 3], [4, 4, 4, 4]]
-  /// 
+  ///
   ///     let flatMapped = numbers.flatMap { Array(count: $0, repeatedValue: $0) }
   ///     // [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
   ///
@@ -682,11 +692,11 @@ extension Sequence {
   /// `flatMap` with a transformation that returns an optional `Int` value.
   ///
   ///     let possibleNumbers = ["1", "2", "three", "///4///", "5"]
-  /// 
-  ///     let mapped: [Int?] = numbers.map { str in Int(str) }
+  ///
+  ///     let mapped: [Int?] = possibleNumbers.map { str in Int(str) }
   ///     // [1, 2, nil, nil, 5]
-  /// 
-  ///     let flatMapped: [Int] = numbers.flatMap { str in Int(str) }
+  ///
+  ///     let flatMapped: [Int] = possibleNumbers.flatMap { str in Int(str) }
   ///     // [1, 2, 5]
   ///
   /// - Parameter transform: A closure that accepts an element of this
@@ -745,6 +755,17 @@ extension Sequence {
     Builtin.unreachable()
   }
 
+  @available(*, unavailable, renamed: "elementsEqual(_:by:)")
+  public func elementsEqual<OtherSequence>(
+    _ other: OtherSequence,
+    isEquivalent: (${GElement}, ${GElement}) throws -> Bool
+  ) rethrows -> Bool
+    where
+    OtherSequence: Sequence,
+    OtherSequence.${GElement} == ${GElement} {
+    Builtin.unreachable()
+  }
+
   @available(*, unavailable, renamed: "lexicographicallyPrecedes(_:by:)")
   public func lexicographicalCompare<
     OtherSequence
@@ -755,6 +776,21 @@ extension Sequence {
     where
     OtherSequence : Sequence,
     OtherSequence.${GElement} == ${GElement} {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "contains(where:)")
+  public func contains(
+    _ predicate: (${GElement}) throws -> Bool
+  ) rethrows -> Bool {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "reduce(_:_:)")
+  public func reduce<Result>(
+    _ initial: Result,
+    combine: (_ partialResult: Result, ${GElement}) throws -> Result
+  ) rethrows -> Result {
     Builtin.unreachable()
   }
 }

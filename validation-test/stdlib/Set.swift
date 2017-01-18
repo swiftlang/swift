@@ -127,7 +127,7 @@ func equalsUnordered(_ lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
 }
 
 func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
-  switch s._variantStorage {
+  switch s._variantBuffer {
   case .native:
     return true
   case .cocoa:
@@ -138,7 +138,9 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
 #if _runtime(_ObjC)
 func isNativeNSSet(_ s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(type(of: s)) as NSString
-  return className.range(of: "NativeSetStorage").length > 0
+  return ["_SwiftDeferredNSSet", "NativeSetStorage"].contains {
+    className.range(of: $0).length > 0
+  }
 }
 
 func isCocoaNSSet(_ s: NSSet) -> Bool {
@@ -325,9 +327,9 @@ SetTestSuite.test("AssociatedTypes") {
 SetTestSuite.test("sizeof") {
   var s = Set(["Hello", "world"])
 #if arch(i386) || arch(arm)
-  expectEqual(4, MemoryLayout._ofInstance(s).size)
+  expectEqual(4, MemoryLayout.size(ofValue: s))
 #else
-  expectEqual(8, MemoryLayout._ofInstance(s).size)
+  expectEqual(8, MemoryLayout.size(ofValue: s))
 #endif
 }
 
@@ -605,7 +607,7 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
   // Try to find a key that is not present.
   do {
     var foundIndex1 = s.index(of: 1111)
-    expectEmpty(foundIndex1)
+    expectNil(foundIndex1)
     expectEqual(identity1, s._rawIdentifier())
   }
 
@@ -613,7 +615,7 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
     var s2: Set<MinimalHashableValue> = []
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     MinimalHashableValue.timesHashValueWasCalled = 0
-    expectEmpty(s2.index(of: MinimalHashableValue(42)))
+    expectNil(s2.index(of: MinimalHashableValue(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
@@ -641,7 +643,7 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
   // Try to find a key that is not present.
   do {
     var foundIndex1 = s.index(of: TestKeyTy(1111))
-    expectEmpty(foundIndex1)
+    expectNil(foundIndex1)
     expectEqual(identity1, s._rawIdentifier())
   }
 
@@ -649,7 +651,7 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
     var s2: Set<MinimalHashableClass> = []
     MinimalHashableClass.timesEqualEqualWasCalled = 0
     MinimalHashableClass.timesHashValueWasCalled = 0
-    expectEmpty(s2.index(of: MinimalHashableClass(42)))
+    expectNil(s2.index(of: MinimalHashableClass(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
@@ -672,7 +674,7 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
     expectEqual(1010, removed)
 
     expectEqual(identity1, s._rawIdentifier())
-    expectEmpty(s.index(of: 1010))
+    expectNil(s.index(of: 1010))
   }
 
   do {
@@ -693,7 +695,7 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
 
     expectEqual(identity1, s1._rawIdentifier())
     expectNotEqual(identity1, s2._rawIdentifier())
-    expectEmpty(s2.index(of: 1010))
+    expectNil(s2.index(of: 1010))
   }
 }
 
@@ -711,7 +713,7 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
     expectEqual(TestKeyTy(1010), removed)
 
     expectEqual(identity1, s._rawIdentifier())
-    expectEmpty(s.index(of: TestKeyTy(1010)))
+    expectNil(s.index(of: TestKeyTy(1010)))
   }
 
   do {
@@ -732,7 +734,7 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
 
     expectEqual(identity1, s1._rawIdentifier())
     expectNotEqual(identity1, s2._rawIdentifier())
-    expectEmpty(s2.index(of: TestKeyTy(1010)))
+    expectNil(s2.index(of: TestKeyTy(1010)))
   }
 }
 
@@ -742,7 +744,7 @@ SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate") {
     var identity1 = s1._rawIdentifier()
 
     var deleted = s1.remove(0)
-    expectEmpty(deleted)
+    expectNil(deleted)
     expectEqual(identity1, s1._rawIdentifier())
 
     deleted = s1.remove(1010)
@@ -759,7 +761,7 @@ SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate") {
 
     var s2 = s1
     var deleted = s2.remove(0)
-    expectEmpty(deleted)
+    expectNil(deleted)
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity1, s2._rawIdentifier())
 
@@ -780,7 +782,7 @@ SetTestSuite.test("COW.Slow.RemoveDoesNotReallocate") {
     var identity1 = s1._rawIdentifier()
 
     var deleted = s1.remove(TestKeyTy(0))
-    expectEmpty(deleted)
+    expectNil(deleted)
     expectEqual(identity1, s1._rawIdentifier())
 
     deleted = s1.remove(TestKeyTy(1010))
@@ -797,7 +799,7 @@ SetTestSuite.test("COW.Slow.RemoveDoesNotReallocate") {
 
     var s2 = s1
     var deleted = s2.remove(TestKeyTy(0))
-    expectEmpty(deleted)
+    expectNil(deleted)
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity1, s2._rawIdentifier())
 
@@ -832,7 +834,7 @@ SetTestSuite.test("COW.Fast.UnionInPlaceSmallSetDoesNotReallocate") {
 SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWFastSet()
-    let originalCapacity = s._variantStorage.asNative.capacity
+    let originalCapacity = s._variantBuffer.asNative.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(1010))
 
@@ -840,7 +842,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     // We cannot expectTrue that identity changed, since the new buffer of
     // smaller size can be allocated at the same address as the old one.
     var identity1 = s._rawIdentifier()
-    expectTrue(s._variantStorage.asNative.capacity < originalCapacity)
+    expectTrue(s._variantBuffer.asNative.capacity < originalCapacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
 
@@ -853,19 +855,19 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWFastSet()
     var identity1 = s._rawIdentifier()
-    let originalCapacity = s._variantStorage.asNative.capacity
+    let originalCapacity = s._variantBuffer.asNative.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(1010))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s._variantBuffer.asNative.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s._variantBuffer.asNative.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
   }
@@ -894,7 +896,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s1 = getCOWFastSet()
     var identity1 = s1._rawIdentifier()
-    let originalCapacity = s1._variantStorage.asNative.capacity
+    let originalCapacity = s1._variantBuffer.asNative.capacity
     expectEqual(3, s1.count)
     expectTrue(s1.contains(1010))
 
@@ -905,7 +907,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     expectNotEqual(identity1, identity2)
     expectEqual(3, s1.count)
     expectTrue(s1.contains(1010))
-    expectEqual(originalCapacity, s2._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s2._variantBuffer.asNative.capacity)
     expectEqual(0, s2.count)
     expectFalse(s2.contains(1010))
 
@@ -918,7 +920,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWSlowSet()
-    let originalCapacity = s._variantStorage.asNative.capacity
+    let originalCapacity = s._variantBuffer.asNative.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(TestKeyTy(1010)))
 
@@ -926,7 +928,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     // We cannot expectTrue that identity changed, since the new buffer of
     // smaller size can be allocated at the same address as the old one.
     var identity1 = s._rawIdentifier()
-    expectTrue(s._variantStorage.asNative.capacity < originalCapacity)
+    expectTrue(s._variantBuffer.asNative.capacity < originalCapacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
 
@@ -939,19 +941,19 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWSlowSet()
     var identity1 = s._rawIdentifier()
-    let originalCapacity = s._variantStorage.asNative.capacity
+    let originalCapacity = s._variantBuffer.asNative.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(TestKeyTy(1010)))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s._variantBuffer.asNative.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s._variantBuffer.asNative.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
   }
@@ -980,7 +982,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s1 = getCOWSlowSet()
     var identity1 = s1._rawIdentifier()
-    let originalCapacity = s1._variantStorage.asNative.capacity
+    let originalCapacity = s1._variantBuffer.asNative.capacity
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestKeyTy(1010)))
 
@@ -991,7 +993,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     expectNotEqual(identity1, identity2)
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestKeyTy(1010)))
-    expectEqual(originalCapacity, s2._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s2._variantBuffer.asNative.capacity)
     expectEqual(0, s2.count)
     expectFalse(s2.contains(TestKeyTy(1010)))
 
@@ -1005,7 +1007,7 @@ SetTestSuite.test("COW.Fast.FirstDoesNotReallocate") {
   var s = getCOWFastSet()
   var identity1 = s._rawIdentifier()
 
-  expectNotEmpty(s.first)
+  expectNotNil(s.first)
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -1021,7 +1023,7 @@ SetTestSuite.test("COW.Slow.FirstDoesNotReallocate") {
   var s = getCOWSlowSet()
   var identity1 = s._rawIdentifier()
 
-  expectNotEmpty(s.first)
+  expectNotNil(s.first)
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -1194,7 +1196,7 @@ class CustomImmutableNSSet : NSSet {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>?, count: Int) {
     expectUnreachable()
     super.init(objects: objects, count: count)
   }
@@ -1236,10 +1238,10 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.SetIsCopied") {
   expectTrue(isCocoaSet(s))
 
   expectTrue(s.contains(TestObjCKeyTy(1010)))
-  expectNotEmpty(nss.member(TestObjCKeyTy(1010)))
+  expectNotNil(nss.member(TestObjCKeyTy(1010)))
 
   nss.remove(TestObjCKeyTy(1010))
-  expectEmpty(nss.member(TestObjCKeyTy(1010)))
+  expectNil(nss.member(TestObjCKeyTy(1010)))
 
   expectTrue(s.contains(TestObjCKeyTy(1010)))
 }
@@ -1249,10 +1251,10 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SetIsCopied") {
   expectTrue(isNativeSet(s))
 
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
-  expectNotEmpty(nss.member(TestBridgedKeyTy(1010) as AnyObject))
+  expectNotNil(nss.member(TestBridgedKeyTy(1010) as AnyObject))
 
   nss.remove(TestBridgedKeyTy(1010) as AnyObject)
-  expectEmpty(nss.member(TestBridgedKeyTy(1010) as AnyObject))
+  expectNil(nss.member(TestBridgedKeyTy(1010) as AnyObject))
 
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
 }
@@ -1354,7 +1356,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.IndexForMember") {
   expectEqual(TestObjCKeyTy(3030), member)
 
   // Try to find a key that does not exist.
-  expectEmpty(s.index(of: TestObjCKeyTy(4040)))
+  expectNil(s.index(of: TestObjCKeyTy(4040)))
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -1373,7 +1375,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.IndexForMember") {
     expectEqual(TestBridgedKeyTy(3030), member)
   }
 
-  expectEmpty(s.index(of: TestBridgedKeyTy(4040)))
+  expectNil(s.index(of: TestBridgedKeyTy(4040)))
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -1642,7 +1644,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   expectTrue(isNativeSet(s))
   expectEqual(2, s.count)
   expectEqual(TestObjCKeyTy(1010), removedElement)
-  expectEmpty(s.index(of: TestObjCKeyTy(1010)))
+  expectNil(s.index(of: TestObjCKeyTy(1010)))
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
@@ -1659,7 +1661,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
   expectTrue(isNativeSet(s))
   expectEqual(1010, removedElement.value)
   expectEqual(2, s.count)
-  expectEmpty(s.index(of: TestBridgedKeyTy(1010)))
+  expectNil(s.index(of: TestBridgedKeyTy(1010)))
 }
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
@@ -1669,7 +1671,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
     expectTrue(isCocoaSet(s))
 
     var deleted: AnyObject? = s.remove(TestObjCKeyTy(0))
-    expectEmpty(deleted)
+    expectNil(deleted)
     expectEqual(identity1, s._rawIdentifier())
     expectTrue(isCocoaSet(s))
 
@@ -1695,7 +1697,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
     expectTrue(isCocoaSet(s2))
 
     var deleted: AnyObject? = s2.remove(TestObjCKeyTy(0))
-    expectEmpty(deleted)
+    expectNil(deleted)
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity1, s2._rawIdentifier())
     expectTrue(isCocoaSet(s1))
@@ -1731,7 +1733,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove") {
     // Trying to remove something not in the set should
     // leave it completely unchanged.
     var deleted = s.remove(TestBridgedKeyTy(0))
-    expectEmpty(deleted)
+    expectNil(deleted)
     expectEqual(identity1, s._rawIdentifier())
     expectTrue(isNativeSet(s))
 
@@ -1764,7 +1766,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove") {
     expectTrue(isNativeSet(s2))
 
     var deleted = s2.remove(TestBridgedKeyTy(0))
-    expectEmpty(deleted)
+    expectNil(deleted)
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity1, s2._rawIdentifier())
     expectTrue(isNativeSet(s1))
@@ -1943,9 +1945,9 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -1962,9 +1964,9 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -1974,12 +1976,12 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   expectTrue(isCocoaSet(s))
 
   var iter = s.makeIterator()
-  expectEmpty(iter.next())
+  expectNil(iter.next())
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -1989,12 +1991,12 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   expectTrue(isNativeSet(s))
 
   var iter = s.makeIterator()
-  expectEmpty(iter.next())
+  expectNil(iter.next())
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -2011,9 +2013,9 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   expectTrue(equalsUnordered(members, hugeNumberArray))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -2030,34 +2032,25 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   expectTrue(equalsUnordered(members, hugeNumberArray))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
-  expectEmpty(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
   expectEqual(identity1, s._rawIdentifier())
 }
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   var s1 = getBridgedVerbatimSet([])
-  var identity1 = s1._rawIdentifier()
   expectTrue(isCocoaSet(s1))
 
   var s2 = getBridgedVerbatimSet([])
-  var identity2 = s2._rawIdentifier()
   expectTrue(isCocoaSet(s2))
-  expectEqual(identity1, identity2)
 
   expectEqual(s1, s2)
-  expectEqual(identity1, s1._rawIdentifier())
-  expectEqual(identity2, s2._rawIdentifier())
 
   s2.insert(TestObjCKeyTy(4040))
   expectTrue(isNativeSet(s2))
-  expectNotEqual(identity2, s2._rawIdentifier())
-  identity2 = s2._rawIdentifier()
 
   expectNotEqual(s1, s2)
-  expectEqual(identity1, s1._rawIdentifier())
-  expectEqual(identity2, s2._rawIdentifier())
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
@@ -2182,12 +2175,12 @@ SetTestSuite.test("BridgedToObjC.Verbatim.Contains") {
   expectEqual(3030, (v as! TestObjCKeyTy).value)
   let idValue30 = unsafeBitCast(v, to: UInt.self)
 
-  expectEmpty(s.member(TestObjCKeyTy(4040)))
+  expectNil(s.member(TestObjCKeyTy(4040)))
 
   // NSSet can store mixed key types.  Swift's Set is typed, but when bridged
   // to NSSet, it should behave like one, and allow queries for mismatched key
   // types.
-  expectEmpty(s.member(TestObjCInvalidKeyTy()))
+  expectNil(s.member(TestObjCInvalidKeyTy()))
 
   for i in 0..<3 {
     expectEqual(idValue10,
@@ -2347,9 +2340,9 @@ SetTestSuite.test("BridgedToObjC.ObjectEnumerator.NextObject") {
   }
   expectTrue(equalsUnordered([1010, 2020, 3030], members))
 
-  expectEmpty(enumerator.nextObject())
-  expectEmpty(enumerator.nextObject())
-  expectEmpty(enumerator.nextObject())
+  expectNil(enumerator.nextObject())
+  expectNil(enumerator.nextObject())
+  expectNil(enumerator.nextObject())
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
@@ -2358,9 +2351,9 @@ SetTestSuite.test("BridgedToObjC.ObjectEnumerator.NextObject.Empty") {
   let s = getBridgedEmptyNSSet()
   let enumerator = s.objectEnumerator()
 
-  expectEmpty(enumerator.nextObject())
-  expectEmpty(enumerator.nextObject())
-  expectEmpty(enumerator.nextObject())
+  expectNil(enumerator.nextObject())
+  expectNil(enumerator.nextObject())
+  expectNil(enumerator.nextObject())
 }
 
 //
@@ -2489,7 +2482,7 @@ SetTestSuite.test("SetUpcastBridged") {
   }
 
   do {
-    var s = s as Set<NSObject>
+    var s = s as! Set<NSObject>
 
     expectEqual(3, s.count)
     expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
@@ -3036,7 +3029,7 @@ SetTestSuite.test("replace") {
   do {
     // Replacing an element that isn't present
     let oldMember = s1.update(with: fortyForty)
-    expectEmpty(oldMember)
+    expectNil(oldMember)
   }
   
   do {
@@ -3431,7 +3424,7 @@ SetTestSuite.test("removeFirst") {
   expectTrue(s2.contains(a1))
   expectNotEqual(s1._rawIdentifier(), s2._rawIdentifier())
   expectTrue(s1.isSubset(of: s2))
-  expectEmpty(empty.first)
+  expectNil(empty.first)
 }
 
 SetTestSuite.test("remove(member)") {
@@ -3445,7 +3438,7 @@ SetTestSuite.test("remove(member)") {
   // remove something that's not there.
   let fortyForty = s2.remove(4040)
   expectEqual(s2, s1)
-  expectEmpty(fortyForty)
+  expectNil(fortyForty)
   expectEqual(identity1, s2._rawIdentifier())
 
   // Remove things that are there.
@@ -3492,7 +3485,7 @@ SetTestSuite.test("first") {
   let emptySet = Set<Int>()
 
   expectTrue(s1.contains(s1.first!))
-  expectEmpty(emptySet.first)
+  expectNil(emptySet.first)
 }
 
 SetTestSuite.test("isEmpty") {
@@ -3516,7 +3509,7 @@ class MockSetWithCustomCount : NSSet {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>?, count: Int) {
     expectUnreachable()
     super.init(objects: objects, count: count)
   }
@@ -3617,7 +3610,7 @@ SetTestSuite.test("index(of:)") {
   let foundIndex1 = s1.index(of: 1010)!
   expectEqual(1010, s1[foundIndex1])
 
-  expectEmpty(s1.index(of: 999))
+  expectNil(s1.index(of: 999))
 }
 
 SetTestSuite.test("popFirst") {
@@ -3625,7 +3618,7 @@ SetTestSuite.test("popFirst") {
   do {
     var s = Set<Int>()
     let popped = s.popFirst()
-    expectEmpty(popped)
+    expectNil(popped)
     expectTrue(s.isEmpty)
   }
 
@@ -3648,7 +3641,7 @@ SetTestSuite.test("removeAt") {
     let removed = s.remove(at: s.index(of: i*1010)!)
     expectEqual(i*1010, removed)
     expectEqual(2, s.count)
-    expectEmpty(s.index(of: i*1010))
+    expectNil(s.index(of: i*1010))
     let origKeys: [Int] = [1010, 2020, 3030]
     expectEqual(origKeys.filter { $0 != (i*1010) }, [Int](s).sorted())
   }
@@ -3659,7 +3652,7 @@ SetTestSuite.test("_customIndexOfEquatableElement") {
   let foundIndex1 = s1._customIndexOfEquatableElement(1010)!!
   expectEqual(1010, s1[foundIndex1])
 
-  expectEmpty(s1._customIndexOfEquatableElement(999)!)
+  expectNil(s1._customIndexOfEquatableElement(999)!)
 }
 
 SetTestSuite.test("commutative") {
@@ -3727,14 +3720,13 @@ SetTestSuite.test("misc") {
 SetTestSuite.test("Hashable") {
   let s1 = Set([1010])
   let s2 = Set([2020])
-  checkHashable(s1 == s2, s1, s2)
+  checkHashable([s1, s2], equalityOracle: { $0 == $1 })
 
   // Explicit types help the type checker quite a bit.
   let ss1 = Set([Set([1010] as [Int]), Set([2020] as [Int]), Set([3030] as [Int])])
   let ss11 = Set([Set([2020] as [Int]), Set([3030] as [Int]), Set([2020] as [Int])])
   let ss2 = Set([Set([9090] as [Int])])
-  checkHashable(ss1 == ss11, ss1, ss11)
-  checkHashable(ss1 == ss2, ss1, ss2)
+  checkHashable([ss1, ss11, ss2], equalityOracle: { $0 == $1 })
 }
 
 SetTestSuite.test("Operator.Precedence") {

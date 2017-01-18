@@ -12,7 +12,7 @@ func f() {
   markUsed("jump directly to def")
 }
 
-// RUN: %target-swift-frontend -primary-file %s -S -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -S -g -o - | %FileCheck %s
 // CHECK: .file	[[MAIN:.*]] "{{.*}}line-directive.swift"
 // CHECK: .loc	[[MAIN]] 1
 // CHECK: .file	[[ABC:.*]] "abc.swift"

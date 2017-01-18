@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -30,15 +30,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-function-signature-opt"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/FunctionSignatureOptUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILFunction.h"
@@ -61,6 +63,15 @@ using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
 //===----------------------------------------------------------------------===//
 //                           Utilities
 //===----------------------------------------------------------------------===//
+
+/// Return the single return value of the function.
+static SILValue findReturnValue(SILFunction *F) {
+  auto RBB = F->findReturnBB();
+  if (RBB == F->end())
+    return SILValue();
+  auto Term = dyn_cast<ReturnInst>(RBB->getTerminator());
+  return Term->getOperand();
+}
 
 /// Return the single apply found in this function.
 static SILInstruction *findOnlyApply(SILFunction *F) {
@@ -97,17 +108,15 @@ class FunctionSignatureTransform {
   /// The newly created function.
   SILFunction *NewF;
 
-  /// The pass manager we are using.
-  SILPassManager *PM;
-
-  /// The alias analysis we are using.
-  AliasAnalysis *AA;
-
   /// The RC identity analysis we are using.
   RCIdentityAnalysis *RCIA;
 
+  /// Post order analysis we are using.
+  EpilogueARCAnalysis *EA;
+
   // The function signature mangler we are using.
-  FunctionSignatureSpecializationMangler &FM;
+  FunctionSignatureSpecializationMangler &OldFM;
+  NewMangling::FunctionSignatureSpecializationMangler &NewFM;
 
   // Keep tracks to argument mapping.
   ArgumentIndexMap &AIM;
@@ -123,23 +132,11 @@ class FunctionSignatureTransform {
   /// will use during our optimization.
   llvm::SmallVector<ResultDescriptor, 4> &ResultDescList;
 
-  /// May dynamically bind to self.
-  bool MayDynamicBindSelf;
-
-  /// Does this function have a caller inside current module
-  bool hasCaller;
-
   /// Return a function name based on ArgumentDescList and ResultDescList.
   std::string createOptimizedSILFunctionName();
 
   /// Return a function type based on ArgumentDescList and ResultDescList.
   CanSILFunctionType createOptimizedSILFunctionType();
-
-  // This implicitly asserts that a function binding dynamic self has a 
-  // self metadata argument or object from which self metadata can be obtained.
-  bool isArgumentABIRequired(SILArgument *Arg) {
-    return MayDynamicBindSelf && (F->getSelfMetadataArgument() == Arg);
-  }
 
 private:
   /// ----------------------------------------------------------///
@@ -214,13 +211,13 @@ private:
     if (AD.Explode) {
       llvm::SmallVector<SILValue, 4> LeafValues;
       AD.ProjTree.createTreeFromValue(Builder, BB->getParent()->getLocation(),
-                                      BB->getBBArg(AD.Index), LeafValues);
+                                      BB->getArgument(AD.Index), LeafValues);
       NewArgs.append(LeafValues.begin(), LeafValues.end());
       return;
     }
 
     // All other arguments get pushed as what they are.
-    NewArgs.push_back(BB->getBBArg(AD.Index));
+    NewArgs.push_back(BB->getArgument(AD.Index));
   } 
 
   /// Take ArgumentDescList and ResultDescList and create an optimized function
@@ -233,26 +230,33 @@ private:
 
 public:
   /// Constructor.
-  FunctionSignatureTransform(SILFunction *F, bool hasCaller, SILPassManager *PM,
-                             AliasAnalysis *AA, RCIdentityAnalysis *RCIA,
-                             FunctionSignatureSpecializationMangler &FM,
+  FunctionSignatureTransform(SILFunction *F,
+                             RCIdentityAnalysis *RCIA, EpilogueARCAnalysis *EA,
+                             FunctionSignatureSpecializationMangler &OldFM,
+                    NewMangling::FunctionSignatureSpecializationMangler &NewFM,
                              ArgumentIndexMap &AIM,
                              llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
                              llvm::SmallVector<ResultDescriptor, 4> &RDL)
-    : F(F), NewF(nullptr), PM(PM), AA(AA), RCIA(RCIA), FM(FM),
+    : F(F), NewF(nullptr), RCIA(RCIA), EA(EA), OldFM(OldFM), NewFM(NewFM),
       AIM(AIM), shouldModifySelfArgument(false), ArgumentDescList(ADL),
-      ResultDescList(RDL), MayDynamicBindSelf(computeMayBindDynamicSelf(F)),
-      hasCaller(hasCaller) {}
+      ResultDescList(RDL) {}
 
   /// Return the optimized function.
   SILFunction *getOptimizedFunction() { return NewF; }
 
   /// Run the optimization.
-  bool run() {
+  bool run(bool hasCaller) {
     bool Changed = false;
+
+    if (!hasCaller && canBeCalledIndirectly(F->getRepresentation())) {
+      DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
+      return false;
+    }
+
     // Run OwnedToGuaranteed optimization.
     if (OwnedToGuaranteedAnalyze()) {
       Changed = true;
+      DEBUG(llvm::dbgs() << "  transform owned-to-guaranteed\n");
       OwnedToGuaranteedTransform();
     }
 
@@ -261,6 +265,7 @@ public:
     // already created a thunk.
     if ((hasCaller || Changed) && DeadArgumentAnalyzeParameters()) {
       Changed = true;
+      DEBUG(llvm::dbgs() << "  remove dead arguments\n");
       DeadArgumentTransformFunction();
     }
 
@@ -283,9 +288,45 @@ public:
     // Create the specialized function and invalidate the old function.
     if (Changed) {
       createFunctionSignatureOptimizedFunction();
-      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
     }
     return Changed;
+  }
+
+  /// Run dead argument elimination of partially applied functions.
+  /// After this optimization CapturePropagation can replace the partial_apply
+  /// by a direct reference to the specialized function.
+  bool removeDeadArgs(int minPartialAppliedArgs) {
+    if (minPartialAppliedArgs < 1)
+      return false;
+
+    if (!DeadArgumentAnalyzeParameters())
+      return false;
+
+    // Check if at least the minimum number of partially applied arguments
+    // are dead. Otherwise no partial_apply can be removed anyway.
+    for (unsigned Idx = 0, Num = ArgumentDescList.size(); Idx < Num; ++Idx) {
+      if (Idx < Num - minPartialAppliedArgs) {
+        // Don't remove arguments other than the partial applied ones, even if
+        // they are dead.
+        ArgumentDescList[Idx].IsEntirelyDead = false;
+      } else {
+        // Is the partially applied argument dead?
+        if (!ArgumentDescList[Idx].IsEntirelyDead)
+          return false;
+        
+        // Currently we require that all dead parameters have trivial types.
+        // The reason is that it's very hard to find places where we can release
+        // those parameters (as a replacement for the removed partial_apply).
+        // TODO: maybe we can skip this restriction when we have semantic ARC.
+        if (!ArgumentDescList[Idx].Arg->getType().isTrivial(F->getModule()))
+          return false;
+      }
+    }
+
+    DEBUG(llvm::dbgs() << "  remove dead arguments for partial_apply\n");
+    DeadArgumentTransformFunction();
+    createFunctionSignatureOptimizedFunction();
+    return true;
   }
 };
 
@@ -294,7 +335,8 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   for (unsigned i : indices(ArgumentDescList)) {
     const ArgumentDescriptor &Arg = ArgumentDescList[i];
     if (Arg.IsEntirelyDead) {
-      FM.setArgumentDead(i);
+      OldFM.setArgumentDead(i);
+      NewFM.setArgumentDead(i);
       // No point setting other attribute if argument is dead.
       continue;
     }   
@@ -302,23 +344,37 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
     // If we have an @owned argument and found a callee release for it,
     // convert the argument to guaranteed.
     if (Arg.OwnedToGuaranteed) {
-      FM.setArgumentOwnedToGuaranteed(i);
+      OldFM.setArgumentOwnedToGuaranteed(i);
+      NewFM.setArgumentOwnedToGuaranteed(i);
     }
 
     // If this argument is not dead and we can explode it, add 's' to the
     // mangling.
     if (Arg.Explode) {
-      FM.setArgumentSROA(i);
-    }   
+      OldFM.setArgumentSROA(i);
+      NewFM.setArgumentSROA(i);
+    }
   }
 
   // Handle return value's change.
   // FIXME: handle multiple direct results here
-  if (ResultDescList.size() == 1 && !ResultDescList[0].CalleeRetain.empty())
-    FM.setReturnValueOwnedToUnowned();
+  if (ResultDescList.size() == 1 && !ResultDescList[0].CalleeRetain.empty()) {
+    OldFM.setReturnValueOwnedToUnowned();
+    NewFM.setReturnValueOwnedToUnowned();
+  }
 
-  FM.mangle();
-  return FM.getMangler().finalize();
+  OldFM.mangle();
+  SILModule &M = F->getModule();
+  std::string Old = getUniqueName(OldFM.getMangler().finalize(), M);
+
+  int UniqueID = 0;
+  std::string New;
+  do {
+    New = NewFM.mangle(UniqueID);
+    ++UniqueID;
+  } while (M.lookUpFunction(New));
+
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// Compute what the function interface will look like based on the
@@ -424,13 +480,21 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
 void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Create the optimized function !
   SILModule &M = F->getModule();
-  std::string Name = getUniqueName(createOptimizedSILFunctionName(), M);
+  std::string Name = createOptimizedSILFunctionName();
+  SILLinkage linkage = F->getLinkage();
+  if (isAvailableExternally(linkage))
+    linkage = SILLinkage::Shared;
+
+  DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
+
   NewF = M.createFunction(
-      F->getLinkage(), Name,
-      createOptimizedSILFunctionType(), nullptr, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isFragile(), F->isThunk(), F->getClassVisibility(),
-      F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
-      F->getDeclContext());
+      linkage, Name, createOptimizedSILFunctionType(), nullptr,
+      F->getLocation(), F->isBare(), F->isTransparent(), F->isFragile(),
+      F->isThunk(), F->getClassVisibility(), F->getInlineStrategy(),
+      F->getEffectsKind(), nullptr, F->getDebugScope(), F->getDeclContext());
+  if (F->hasUnqualifiedOwnership()) {
+    NewF->setUnqualifiedOwnership();
+  }
 
   // Then we transfer the body of F to NewF.
   NewF->spliceBody(F);
@@ -456,7 +520,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   F->setInlineStrategy(AlwaysInline);
   SILBasicBlock *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgumentDescList) {
-    ThunkBody->createBBArg(ArgDesc.Arg->getType(), ArgDesc.Decl);
+    ThunkBody->createFunctionArgument(ArgDesc.Arg->getType(), ArgDesc.Decl);
   }
 
   SILLocation Loc = ThunkBody->getParent()->getLocation();
@@ -481,11 +545,13 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     // We need a try_apply to call a function with an error result.
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
-    ReturnValue = NormalBlock->createBBArg(ResultType, 0);
+    ReturnValue =
+        NormalBlock->createPHIArgument(ResultType, ValueOwnershipKind::Owned);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createBBArg(Error, 0);
+    auto *ErrorArg =
+        ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
@@ -516,7 +582,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
   // Did we decide we should optimize any parameter?
   bool SignatureOptimize = false;
-  ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
+  auto Args = F->begin()->getFunctionArguments();
 
   // Analyze the argument information.
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
@@ -526,13 +592,11 @@ bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
     }
 
     // Check whether argument is dead.
-    A.IsEntirelyDead = true;
-    A.IsEntirelyDead &= !isArgumentABIRequired(Args[i]);
-    A.IsEntirelyDead &= !hasNonTrivialNonDebugUse(Args[i]); 
-    SignatureOptimize |= A.IsEntirelyDead;
-
-    if (A.IsEntirelyDead && Args[i]->isSelf()) {
-      shouldModifySelfArgument = true;
+    if (!hasNonTrivialNonDebugUse(Args[i])) {
+      A.IsEntirelyDead = true;
+      SignatureOptimize = true;
+      if (Args[i]->isSelf())
+        shouldModifySelfArgument = true;
     }
   }
   return SignatureOptimize;
@@ -543,7 +607,7 @@ void FunctionSignatureTransform::DeadArgumentTransformFunction() {
   for (const ArgumentDescriptor &AD : ArgumentDescList) {
     if (!AD.IsEntirelyDead)
       continue;
-    eraseUsesOfValue(BB->getBBArg(AD.Index));
+    eraseUsesOfValue(BB->getArgument(AD.Index));
   }
 }
 
@@ -553,7 +617,7 @@ void FunctionSignatureTransform::DeadArgumentFinalizeOptimizedFunction() {
   for (const ArgumentDescriptor &AD : reverse(ArgumentDescList)) {
     if (!AD.IsEntirelyDead)
       continue;
-    BB->eraseBBArg(AD.Arg->getIndex());
+    BB->eraseArgument(AD.Arg->getIndex());
   }
 }
 
@@ -561,7 +625,7 @@ void FunctionSignatureTransform::DeadArgumentFinalizeOptimizedFunction() {
 /// Owned to Guaranteed transformation.                       ///
 /// ----------------------------------------------------------///
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
-  ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
+  auto Args = F->begin()->getFunctionArguments();
   // A map from consumed SILArguments to the release associated with an
   // argument.
   //
@@ -614,10 +678,12 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeResults() {
 
   bool SignatureOptimize = false;
   if (ResultDescList[0].hasConvention(ResultConvention::Owned)) {
+    auto RV = findReturnValue(F);
+    if (!RV)
+      return false;
     auto &RI = ResultDescList[0];
     // We have an @owned return value, find the epilogue retains now.
-    ConsumedResultToEpilogueRetainMatcher ReturnRetainMap(RCIA->get(F), AA, F);
-    auto Retains = ReturnRetainMap.getEpilogueRetains();
+    auto Retains = EA->get(F)->computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Retain, RV); 
     // We do not need to worry about the throw block, as the return value is only
     // going to be used in the return block/normal block of the try_apply
     // instruction.
@@ -642,6 +708,10 @@ void FunctionSignatureTransform::OwnedToGuaranteedTransformFunctionParameters() 
     for (auto &X : AD.CalleeReleaseInThrowBlock) { 
       X->eraseFromParent();
     }
+
+    // Now we need to replace the FunctionArgument so that we have the correct
+    // ValueOwnershipKind.
+    AD.Arg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
   }
 }
 
@@ -726,7 +796,7 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
     SILBasicBlock *NormalBB = dyn_cast<TryApplyInst>(Call)->getNormalBB();
     Builder.setInsertionPoint(&*NormalBB->begin());
     Builder.createRetainValue(RegularLocation(SourceLoc()),
-                              NormalBB->getBBArg(0), Atomicity::Atomic);
+                              NormalBB->getArgument(0), Atomicity::Atomic);
   }
 }
 
@@ -736,7 +806,7 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
 bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
   // Did we decide we should optimize any parameter?
   bool SignatureOptimize = false;
-  ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
+  auto Args = F->begin()->getFunctionArguments();
   ConsumedArgToEpilogueReleaseMatcher ArgToReturnReleaseMap(RCIA->get(F), F);
 
   // Analyze the argument information.
@@ -782,9 +852,12 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     // order of leaf values matches the order of leaf types.
     llvm::SmallVector<const ProjectionTreeNode*, 8> LeafNodes;
     AD.ProjTree.getLeafNodes(LeafNodes);
-    for (auto Node : LeafNodes) {
-      LeafValues.push_back(BB->insertBBArg(ArgOffset++, Node->getType(),
-                           BB->getBBArg(OldArgIndex)->getDecl()));
+
+    for (auto *Node : LeafNodes) {
+      auto OwnershipKind = *AD.getTransformedOwnershipKind(Node->getType());
+      LeafValues.push_back(BB->insertFunctionArgument(
+          ArgOffset++, Node->getType(), OwnershipKind,
+          BB->getArgument(OldArgIndex)->getDecl()));
       AIM[TotalArgIndex - 1] = AD.Index;
       TotalArgIndex ++;
     }
@@ -802,12 +875,12 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
                                              LeafValues);
 
     // Replace all uses of the original arg with the new value.
-    SILArgument *OrigArg = BB->getBBArg(OldArgIndex);
+    SILArgument *OrigArg = BB->getArgument(OldArgIndex);
     OrigArg->replaceAllUsesWith(NewOrigArgValue);
 
     // Now erase the old argument since it does not have any uses. We also
     // decrement ArgOffset since we have one less argument now.
-    BB->eraseBBArg(OldArgIndex); 
+    BB->eraseArgument(OldArgIndex);
     TotalArgIndex --;
   }
 }
@@ -817,44 +890,56 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
 //===----------------------------------------------------------------------===//
 namespace {
 class FunctionSignatureOpts : public SILFunctionTransform {
+  
+  /// If true, perform a special kind of dead argument elimination to enable
+  /// removal of partial_apply instructions where all partially applied
+  /// arguments are dead.
+  bool OptForPartialApply;
+
 public:
+
+  FunctionSignatureOpts(bool OptForPartialApply) :
+     OptForPartialApply(OptForPartialApply) { }
+
   void run() override {
     auto *F = getFunction();
-    // This is the function to optimize.
-    DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName() << " ***\n");
 
     // Don't optimize callees that should not be optimized.
     if (!F->shouldOptimize())
       return;
 
-    // Does this function have a caller inside this module.
-    bool hasCaller = PM->getAnalysis<CallerAnalysis>()->hasCaller(F);
-
-    // If this function does not have a direct caller in the current module
-    // and maybe called indirectly, e.g. from virtual table do not function
-    // signature specialize it, as this will introduce a thunk.
-    if (!hasCaller && canBeCalledIndirectly(F->getRepresentation()))
-      return; 
+    // This is the function to optimize.
+    DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName() << " ***\n");
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
-    if (!canSpecializeFunction(F))
+    if (!canSpecializeFunction(F)) {
+      DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
       return;
+    }
 
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
+    CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
+    auto *EA = PM->getAnalysis<EpilogueARCAnalysis>();
+
+    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getCallerInfo(F);
+
+    // Lock BCA so it's not invalidated along with the rest of the call graph.
+    AnalysisPreserver BCAP(PM->getAnalysis<BasicCalleeAnalysis>());
 
     // As we optimize the function more and more, the name of the function is
     // going to change, make sure the mangler is aware of all the changes done
     // to the function.
     Mangle::Mangler M;
-    auto P = SpecializationPass::FunctionSignatureOpts;
-    FunctionSignatureSpecializationMangler FM(P, M, F->isFragile(), F);
+    auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
+    FunctionSignatureSpecializationMangler OldFM(P, M, F->isFragile(), F);
+    NewMangling::FunctionSignatureSpecializationMangler NewFM(P, F->isFragile(),
+                                                              F);
 
     /// Keep a map between the exploded argument index and the original argument
     /// index.
     llvm::SmallDenseMap<int, int> AIM;
-    int asize = F->begin()->getBBArgs().size();
+    int asize = F->begin()->getArguments().size();
     for (auto i = 0; i < asize; ++i) {
       AIM[i] = i;
     }
@@ -862,7 +947,7 @@ public:
     // Allocate the argument and result descriptors.
     llvm::SmallVector<ArgumentDescriptor, 4> ArgumentDescList;
     llvm::SmallVector<ResultDescriptor, 4> ResultDescList;
-    ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
+    auto Args = F->begin()->getFunctionArguments();
     for (unsigned i = 0, e = Args.size(); i != e; ++i) {
       ArgumentDescList.emplace_back(Args[i]);
     }
@@ -871,15 +956,34 @@ public:
     }
 
     // Owned to guaranteed optimization.
-    FunctionSignatureTransform FST(F, hasCaller, PM, AA, RCIA, FM, AIM,
+    FunctionSignatureTransform FST(F, RCIA, EA, OldFM, NewFM, AIM,
                                    ArgumentDescList, ResultDescList);
-    if (FST.run()) {
+
+    bool Changed = false;
+    if (OptForPartialApply) {
+      Changed = FST.removeDeadArgs(FuncInfo.getMinPartialAppliedArgs());
+    } else {
+      Changed = FST.run(FuncInfo.hasCaller());
+    }
+    if (Changed) {
       ++ NumFunctionSignaturesOptimized;
       // The old function must be a thunk now.
       assert(F->isThunk() && "Old function should have been turned into a thunk");
+
+      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
+
       // Make sure the PM knows about this function. This will also help us
       // with self-recursion.
-      notifyPassManagerOfFunction(FST.getOptimizedFunction());
+      notifyPassManagerOfFunction(FST.getOptimizedFunction(), F);
+
+      if (!OptForPartialApply) {
+        // We have to restart the pipeline for this thunk in order to run the
+        // inliner (and other opts) again. This is important if the new
+        // specialized function (which is called from this thunk) is
+        // function-signature-optimized again and also becomes an
+        // always-inline-thunk.
+        restartPassPipeline();
+      }
     }
   }
 
@@ -889,5 +993,9 @@ public:
 } // end anonymous namespace
 
 SILTransform *swift::createFunctionSignatureOpts() {
-  return new FunctionSignatureOpts();
+  return new FunctionSignatureOpts(/* OptForPartialApply */ false);
+}
+
+SILTransform *swift::createDeadArgSignatureOpt() {
+  return new FunctionSignatureOpts(/* OptForPartialApply */ true);
 }

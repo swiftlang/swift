@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 import SwiftShims
@@ -113,7 +113,11 @@ import SwiftShims
 public protocol Error {
   var _domain: String { get }
   var _code: Int { get }
-  var _userInfo: Any? { get }
+
+  // Note: _userInfo is always an NSDictionary, but we cannot use that type here
+  // because the standard library cannot depend on Foundation. However, the
+  // underscore implies that we control all implementations of this requirement.
+  var _userInfo: AnyObject? { get }
 
 #if _runtime(_ObjC)
   func _getEmbeddedNSError() -> AnyObject?
@@ -184,23 +188,44 @@ public func _errorInMain(_ error: Error) {
   fatalError("Error raised at top level: \(String(reflecting: error))")
 }
 
+/// Runtime function to determine the default code for an Error-conforming type.
+@_silgen_name("swift_getDefaultErrorCode")
+public func _swift_getDefaultErrorCode<T : Error>(_ x: T) -> Int
+
 @available(*, unavailable, renamed: "Error")
 public typealias ErrorType = Error
 
 @available(*, unavailable, renamed: "Error")
 public typealias ErrorProtocol = Error
 
-
 extension Error {
+  public var _code: Int {
+    return _swift_getDefaultErrorCode(self)
+  }
+
   public var _domain: String {
     return String(reflecting: type(of: self))
   }
 
-  public var _userInfo: Any? {
+  public var _userInfo: AnyObject? {
 #if _runtime(_ObjC)
     return _stdlib_getErrorDefaultUserInfo(self)
 #else
     return nil
 #endif
+  }
+}
+
+extension Error where Self: RawRepresentable, Self.RawValue: SignedInteger {
+  // The error code of Error with integral raw values is the raw value.
+  public var _code: Int {
+    return numericCast(self.rawValue)
+  }
+}
+
+extension Error where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
+  // The error code of Error with integral raw values is the raw value.
+  public var _code: Int {
+    return numericCast(self.rawValue)
   }
 }

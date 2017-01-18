@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -23,6 +23,10 @@ namespace swift {
   class SILOptions;
   class SILTransform;
 
+  namespace irgen {
+    class IRGenModule;
+  }
+
   /// \brief Run all the SIL diagnostic passes on \p M.
   ///
   /// \returns true if the diagnostic passes produced an error
@@ -34,12 +38,18 @@ namespace swift {
   /// \brief Run all SIL passes for -Onone on module \p M.
   void runSILPassesForOnone(SILModule &M);
 
+  /// \brief Run the SIL ownership eliminator pass on \p M.
+  bool runSILOwnershipEliminatorPass(SILModule &M);
+
   void runSILOptimizationPassesWithFileSpecification(SILModule &Module,
                                                      StringRef FileName);
 
   /// \brief Detect and remove unreachable code. Diagnose provably unreachable
   /// user code.
   void performSILDiagnoseUnreachable(SILModule *M);
+
+  /// \brief Remove dead functions from \p M.
+  void performSILDeadFunctionElimination(SILModule *M);
 
   /// \brief Link a SILFunction declaration to the actual definition in the
   /// serialized modules.
@@ -63,7 +73,12 @@ namespace swift {
     invalidPassKind
   };
 
+  PassKind PassKindFromString(StringRef ID);
+  StringRef PassKindName(PassKind Kind);
+  StringRef PassKindID(PassKind Kind);
+
 #define PASS(ID, NAME, DESCRIPTION) SILTransform *create##ID();
+#define IRGEN_PASS(ID, NAME, DESCRIPTION)
 #include "Passes.def"
 
 } // end namespace swift

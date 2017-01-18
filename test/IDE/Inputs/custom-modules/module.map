@@ -37,11 +37,6 @@ module ImportAsMember {
     header "ImportAsMemberC.h"
   }
 
-  module Proto {
-    requires objc
-    header "ImportAsMemberProto.h"
-  }
-
   module Class {
     requires objc
     header "ImportAsMemberClass.h"

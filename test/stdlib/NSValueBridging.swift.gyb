@@ -1,0 +1,93 @@
+//===-- NSValueBridging.swift - Test bridging through NSValue -*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %gyb %s -o %t/NSValueBridging.swift
+// RUN: %target-build-swift -g -module-name a %t/NSValueBridging.swift -o %t.out
+// RUN: %target-run %t.out
+// REQUIRES: executable_test
+//
+// REQUIRES: objc_interop
+
+import StdlibUnittest
+import StdlibUnittestFoundationExtras
+import Foundation
+import CoreGraphics
+
+#if os(iOS) || os(tvOS) || os(watchOS)
+import UIKit
+#endif
+
+var nsValueBridging = TestSuite("NSValueBridging")
+
+func rangesEqual(_ x: NSRange, _ y: NSRange) -> Bool {
+  return x.location == y.location && x.length == y.length
+}
+
+%{
+
+def testCase(name, value, accessor, equal):
+  if accessor:
+    return """
+nsValueBridging.test("{name}") {{
+  expectBridgeToNSValue({value},
+                        nsValueInitializer: {{ NSValue({accessor}: $0) }},
+                        nsValueGetter: {{ $0.{accessor}Value }},
+                        equal: {equal})
+}}
+""".format(name=name, value=value, accessor=accessor, equal=equal)
+  else:
+    return """
+nsValueBridging.test("{name}") {{
+  expectBridgeToNSValue({value},
+                        equal: {equal})
+}}
+""".format(name=name, value=value, equal=equal)
+
+}%
+
+${ testCase("NSRange", "NSRange(location: 17, length: 38)", "range", "rangesEqual") }
+
+// For historic reasons, macOS has different NSValue methods for the
+// CoreGraphics types from other Apple platforms.
+
+#if os(OSX)
+
+${ testCase("CGRect",            "CGRect(x: 17, y: 38, width: 6, height: 79)", "rect",  "(==)") }
+${ testCase("CGPoint",           "CGPoint(x: 17, y: 38)",                      "point", "(==)") }
+${ testCase("CGSize",            "CGSize(width: 6, height: 79)",               "size",  "(==)") }
+${ testCase("CGVector",          "CGVector(dx: 6, dy: 79)",                    None,    "(==)") }
+${ testCase("CGAffineTransform", "CGAffineTransform(rotationAngle: .pi)",      None,    "(==)") }
+
+#endif
+
+#if os(iOS) || os(tvOS) || os(watchOS)
+
+${ testCase("CGRect",            "CGRect(x: 17, y: 38, width: 6, height: 79)", "cgRect",            "(==)") }
+${ testCase("CGPoint",           "CGPoint(x: 17, y: 38)",                      "cgPoint",           "(==)") }
+${ testCase("CGSize",            "CGSize(width: 6, height: 79)",               "cgSize",            "(==)") }
+${ testCase("CGVector",          "CGVector(dx: 6, dy: 79)",                    "cgVector",          "(==)") }
+${ testCase("CGAffineTransform", "CGAffineTransform(rotationAngle: .pi)",      "cgAffineTransform", "(==)") }
+
+#endif
+
+nsValueBridging.test("NSValue can only be cast back to its original type") {
+  let range = NSRange(location: 17, length: 38)
+  let rangeObject: Any = NSValue(range: range)
+  expectEqual((rangeObject as? NSRange)?.location, range.location)
+  expectEqual((rangeObject as? NSRange)?.length, range.length)
+  expectEqual(rangeObject as? CGRect, .none)
+
+  expectCrashLater()
+  _ = rangeObject as! CGRect
+}
+
+runAllTests()

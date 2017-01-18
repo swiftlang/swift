@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -204,7 +204,7 @@ void LoopRegionFunctionInfo::verify() {
       // If R and OtherR are blocks, then OtherR should be a successor of the
       // real block.
       if (R->isBlock() && OtherR->isBlock())
-        assert(R->getBlock()->isSuccessor(OtherR->getBlock()) &&
+        assert(R->getBlock()->isSuccessorBlock(OtherR->getBlock()) &&
                "Expected either R was not a block or OtherR was a CFG level "
                "successor of R.");
     }
@@ -298,7 +298,7 @@ void LoopRegionFunctionInfo::initializeBlockRegionSuccessors(
 void LoopRegionFunctionInfo::markIrreducibleLoopPredecessorsOfNonLoopHeader(
     BlockTy *NonHeaderBB, RegionTy *NonHeaderBBRegion,
     PostOrderFunctionInfo *PI) {
-  for (BlockTy *Pred : NonHeaderBB->getPreds()) {
+  for (BlockTy *Pred : NonHeaderBB->getPredecessorBlocks()) {
     // If we do not have an RPO number for a predecessor, it is because the
     // predecessor is unreachable and a pass did not clean up after
     // itself. Just ignore it, it will be cleaned up by simplify-cfg.
@@ -1034,26 +1034,32 @@ alledge_iterator LoopRegionWrapper::end() {
 
 namespace llvm {
 template <> struct GraphTraits<LoopRegionWrapper> {
-  using NodeType = LoopRegionWrapper;
   using ChildIteratorType = alledge_iterator;
+  typedef LoopRegionWrapper *NodeRef;
 
-  static NodeType *getEntryNode(NodeType *BB) { return BB; }
+  static NodeRef getEntryNode(NodeRef BB) { return BB; }
 
-  static ChildIteratorType child_begin(NodeType *N) { return N->begin(); }
-  static ChildIteratorType child_end(NodeType *N) { return N->end(); }
+  static ChildIteratorType child_begin(NodeRef N) { return N->begin(); }
+  static ChildIteratorType child_end(NodeRef N) { return N->end(); }
 };
 
 template <>
 struct GraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
     : public GraphTraits<LoopRegionWrapper> {
   using GraphType = LoopRegionFunctionInfoGrapherWrapper;
+  typedef LoopRegionWrapper *NodeRef;
 
-  static NodeType *getEntryNode(GraphType *F) { return &F->Data[0]; }
+  static NodeRef getEntryNode(GraphType *F) { return &F->Data[0]; }
 
-  using nodes_iterator = std::vector<LoopRegionWrapper>::iterator;
+  using nodes_iterator =
+          pointer_iterator<std::vector<LoopRegionWrapper>::iterator>;
 
-  static nodes_iterator nodes_begin(GraphType *F) { return F->Data.begin(); }
-  static nodes_iterator nodes_end(GraphType *F) { return F->Data.end(); }
+  static nodes_iterator nodes_begin(GraphType *F) {
+    return nodes_iterator(F->Data.begin());
+  }
+  static nodes_iterator nodes_end(GraphType *F) {
+    return nodes_iterator(F->Data.end());
+  }
   static unsigned size(GraphType *F) { return F->Data.size(); }
 };
 
@@ -1076,8 +1082,7 @@ static llvm::cl::opt<LongLineBehavior> LLBehavior(
         clEnumValN(LongLineBehavior::None, "none", "Print everything"),
         clEnumValN(LongLineBehavior::Truncate, "truncate",
                    "Truncate long lines"),
-        clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines"),
-        clEnumValEnd));
+        clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines")));
 
 static llvm::cl::opt<bool> RemoveUseListComments(
     "view-loop-regions-remove-use-list-comments", llvm::cl::init(false),
@@ -1231,7 +1236,7 @@ struct DOTGraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
                             SuccIter, ParentRegion->Region->backedge_begin());
   }
 };
-} // end llvm namespace
+} // namespace llvm
 
 static llvm::cl::opt<std::string> TargetFunction(
     "view-loop-regions-only-for-function", llvm::cl::init(""),

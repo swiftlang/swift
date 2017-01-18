@@ -2,24 +2,24 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SIL_TypeLowering_h
-#define SIL_TypeLowering_h
+#ifndef SWIFT_SIL_TYPELOWERING_H
+#define SWIFT_SIL_TYPELOWERING_H
 
-#include "swift/AST/ArchetypeBuilder.h"
-#include "swift/AST/CaptureInfo.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/CaptureInfo.h"
 #include "swift/SIL/AbstractionPattern.h"
+#include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
@@ -210,6 +210,21 @@ public:
                                SILValue addr,
                                IsInitialization_t isInit) const = 0;
 
+  /// Emit a store of \p value into \p addr given the StoreOwnershipQualifier
+  /// qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types.
+  virtual void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                         SILValue addr, StoreOwnershipQualifier qual) const = 0;
+
+  /// Emit a load from \p addr given the LoadOwnershipQualifier \p qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types.
+  virtual SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                            LoadOwnershipQualifier qual) const = 0;
+
   /// Put an exact copy of the value in the source address in the
   /// destination address.
   virtual void emitCopyInto(SILBuilder &B,
@@ -231,16 +246,12 @@ public:
   virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                                  SILValue value) const = 0;
 
-  enum class LoweringStyle {
-    Shallow,
-    Deep,
-    DeepNoEnum
-  };
+  enum class LoweringStyle { Shallow, Deep };
 
   /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  virtual void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
+  virtual void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
                                        SILValue value,
                                        LoweringStyle loweringStyle) const = 0;
 
@@ -248,32 +259,24 @@ public:
                                     SILValue value,
                                     LoweringStyle loweringStyle) const {
     if (loweringStyle != LoweringStyle::Shallow)
-      return emitLoweredReleaseValue(B, loc, value, loweringStyle);
-    return emitReleaseValue(B, loc, value);
+      return emitLoweredDestroyValue(B, loc, value, loweringStyle);
+    return emitDestroyValue(B, loc, value);
   }
 
   /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredReleaseValueShallow(SILBuilder &B, SILLocation loc,
+  void emitLoweredDestroyValueShallow(SILBuilder &B, SILLocation loc,
                                       SILValue value) const {
-    emitLoweredReleaseValue(B, loc, value, LoweringStyle::Shallow);
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Shallow);
   }
 
   /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredReleaseValueDeep(SILBuilder &B, SILLocation loc,
+  void emitLoweredDestroyValueDeep(SILBuilder &B, SILLocation loc,
                                    SILValue value) const {
-    emitLoweredReleaseValue(B, loc, value, LoweringStyle::Deep);
-  }
-
-  /// Emit a lowered 'release_value' operation.
-  ///
-  /// This type must be loadable.
-  void emitLoweredReleaseValueDeepNoEnum(SILBuilder &B, SILLocation loc,
-                                         SILValue value) const {
-    emitLoweredReleaseValue(B, loc, value, LoweringStyle::DeepNoEnum);
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Deep);
   }
 
   /// Given a primitively loaded value of this type (which must be
@@ -284,57 +287,50 @@ public:
   /// example, it performs an unowned_release on a value of [unknown]
   /// type.  It is therefore not necessarily the right thing to do on
   /// a semantic load.
-  virtual void emitReleaseValue(SILBuilder &B, SILLocation loc,
+  virtual void emitDestroyValue(SILBuilder &B, SILLocation loc,
                                 SILValue value) const = 0;
 
   /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
-  virtual void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                                    SILValue value,
-                                    LoweringStyle style) const = 0;
+  virtual SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                        SILValue value,
+                                        LoweringStyle style) const = 0;
 
   /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredRetainValueShallow(SILBuilder &B, SILLocation loc,
-                                   SILValue value) const {
-    emitLoweredRetainValue(B, loc, value, LoweringStyle::Shallow);
+  SILValue emitLoweredCopyValueShallow(SILBuilder &B, SILLocation loc,
+                                       SILValue value) const {
+    return emitLoweredCopyValue(B, loc, value, LoweringStyle::Shallow);
   }
 
   /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredRetainValueDeep(SILBuilder &B, SILLocation loc,
-                                SILValue value) const {
-    emitLoweredRetainValue(B, loc, value, LoweringStyle::Deep);
-  }
-
-  /// Emit a lowered 'retain_value' operation.
-  ///
-  /// This type must be loadable.
-  void emitLoweredRetainValueDeepNoEnum(SILBuilder &B, SILLocation loc,
-                                      SILValue value) const {
-    emitLoweredRetainValue(B, loc, value, LoweringStyle::DeepNoEnum);
+  SILValue emitLoweredCopyValueDeep(SILBuilder &B, SILLocation loc,
+                                    SILValue value) const {
+    return emitLoweredCopyValue(B, loc, value, LoweringStyle::Deep);
   }
 
   /// Given a primitively loaded value of this type (which must be
-  /// loadable), +1 it.
+  /// loadable), Perform a copy of this value. This is equivalent to performing
+  /// +1 on class values.
   ///
   /// This should be used for duplicating a value from place to place
   /// with exactly the same semantics.  For example, it performs an
   /// unowned_retain on a value of [unknown] type.  It is therefore
   /// not necessarily the right thing to do on a semantic load.
-  virtual void emitRetainValue(SILBuilder &B, SILLocation loc,
-                             SILValue value) const = 0;
+  virtual SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                                 SILValue value) const = 0;
 
-  void emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value,
-                                 LoweringStyle style) const {
+  SILValue emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
+                                     SILValue value,
+                                     LoweringStyle style) const {
     if (style != LoweringStyle::Shallow) {
-      emitLoweredRetainValue(B, loc, value, style);
+      return emitLoweredCopyValue(B, loc, value, style);
     } else {
-      emitRetainValue(B, loc, value);
+      return emitCopyValue(B, loc, value);
     }
   }
 
@@ -366,16 +362,9 @@ struct SILConstantInfo {
   /// The SIL function type of the constant.
   CanSILFunctionType SILFnType;
   
-  /// The context generic parameters used by the constant.
-  /// This will be the innermost generic parameter list that applies to the
-  /// constant, which may be the generic parameter list of an enclosing context.
-  GenericParamList *ContextGenericParams;
+  /// The generic environment used by the constant.
+  GenericEnvironment *GenericEnv;
   
-  /// The generic parameter list of the function.
-  /// If the function does not have any generic parameters of its own, this
-  /// will be null.
-  GenericParamList *InnerGenericParams;
-
   SILType getSILType() const {
     return SILType::getPrimitiveObjectType(SILFnType);
   }
@@ -384,8 +373,7 @@ struct SILConstantInfo {
     return lhs.FormalInterfaceType == rhs.FormalInterfaceType &&
            lhs.LoweredInterfaceType == rhs.LoweredInterfaceType &&
            lhs.SILFnType == rhs.SILFnType &&
-           lhs.ContextGenericParams == rhs.ContextGenericParams &&
-           lhs.InnerGenericParams == rhs.InnerGenericParams;
+           lhs.GenericEnv == rhs.GenericEnv;
   }
   friend bool operator!=(SILConstantInfo lhs, SILConstantInfo rhs) {
     return !(lhs == rhs);
@@ -521,11 +509,8 @@ class TypeConverter {
   
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
-  /// Get the context parameters for a constant. Returns a pair of the innermost
-  /// generic parameter list and the generic param list that directly applies
-  /// to the constant, if any.
-  std::pair<GenericParamList *, GenericParamList*>
-  getConstantContextGenericParams(SILDeclRef constant);
+  /// Get the generic environment for a constant.
+  GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
   
   // Types converted during foreign bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
@@ -534,8 +519,6 @@ class TypeConverter {
 
   const TypeLowering &getTypeLoweringForLoweredType(TypeKey key);
   const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
-  const TypeLowering &getTypeLoweringForLoweredFunctionType(TypeKey key);
-  const TypeLowering &getTypeLoweringForUncachedLoweredFunctionType(TypeKey key);
 
 public:
   SILModule &M;
@@ -746,8 +729,8 @@ public:
                                     Type lvalueType);
 
   /// Retrieve the set of archetypes closed over by the given function.
-  GenericParamList *getEffectiveGenericParams(AnyFunctionRef fn,
-                                              CaptureInfo captureInfo);
+  GenericEnvironment *getEffectiveGenericEnvironment(AnyFunctionRef fn,
+                                                     CaptureInfo captureInfo);
 
   /// Retrieve the set of generic parameters closed over by the given function.
   CanGenericSignature getEffectiveGenericSignature(AnyFunctionRef fn,
@@ -779,6 +762,7 @@ public:
   /// Get the capture list from a closure, with transitive function captures
   /// flattened.
   CaptureInfo getLoweredLocalCaptures(AnyFunctionRef fn);
+  bool hasLoweredLocalCaptures(AnyFunctionRef fn);
 
   enum class ABIDifference : uint8_t {
     // No ABI differences, function can be trivially bitcast to result type.
@@ -798,7 +782,7 @@ public:
   /// The ABI compatible relation is not symmetric on function types -- while
   /// T and T! are both subtypes of each other, a calling convention conversion
   /// of T! to T always requires a thunk.
-  ABIDifference checkForABIDifferences(CanType type1, CanType type2);
+  ABIDifference checkForABIDifferences(SILType type1, SILType type2);
 
   /// \brief Same as above but for SIL function types.
   ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
@@ -811,7 +795,24 @@ public:
   CanSILFunctionType
   getUncachedSILFunctionTypeForConstant(SILDeclRef constant,
                                   CanAnyFunctionType origInterfaceType);
+  
+  /// Get the boxed interface type to use for a capture of the given decl.
+  CanSILBoxType
+  getInterfaceBoxTypeForCapture(ValueDecl *captured,
+                                CanType loweredInterfaceType,
+                                bool isMutable);
+  /// Get the boxed contextual type to use for a capture of the given decl
+  /// in the given generic environment.
+  CanSILBoxType
+  getContextBoxTypeForCapture(ValueDecl *captured,
+                              CanType loweredContextType,
+                              GenericEnvironment *env,
+                              bool isMutable);
+
 private:
+  CanType getLoweredRValueType(AbstractionPattern origType, CanType substType,
+                               unsigned uncurryLevel);
+
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
                               bool canBridgeBool,
                               bool bridgedCollectionsAreOptional);

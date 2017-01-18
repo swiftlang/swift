@@ -1,0 +1,98 @@
+// -*- swift -*-
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+// FIXME: Casting.cpp has dozens of places to fail a cast. This test does not
+// attempt to enumerate them all.
+
+// XFAIL: linux
+
+import StdlibUnittest
+
+
+import Foundation
+
+
+% types = []
+% objectTypes = []
+% protocolTypes = []
+
+% types.append(['main.Class1', 'main.Class2'])
+% objectTypes.append(['main.Class1', 'main.Class2'])
+class Class1 { }
+class Class2 { }
+
+% types.append(['main.Struct1', 'main.Struct2'])
+struct Struct1 { }
+struct Struct2 { }
+
+% types.append(['main.ObjCClass1', 'main.ObjCClass2'])
+% objectTypes.append(['main.ObjCClass1', 'main.ObjCClass2'])
+class ObjCClass1 : NSObject { }
+class ObjCClass2 : NSObject { }
+
+% types.append(['DateFormatter', 'NumberFormatter'])
+% objectTypes.append(['DateFormatter', 'NumberFormatter'])
+// non-Swift Objective-C class
+
+% protocolTypes.append('main.Proto1')
+% protocolTypes.append('main.Proto2')
+protocol Proto1 { }
+protocol Proto2 { }
+% protocolTypes.append('URLSessionDelegate')
+// non-Swift Objective-C protocol
+
+
+var CastTrapsTestSuite = TestSuite("CastTraps")
+
+// Test `(T1() as Any) as T2` cast failure
+// for all type pairs.
+
+% for (t1, _) in types:
+%   for (_, t2) in types:
+
+CastTrapsTestSuite.test("${t1}__${t2}")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type '")
+  .crashOutputMatches("${t1}' ")
+  .crashOutputMatches(" to '")
+  .crashOutputMatches("${t2}'")
+  .code
+{
+  let o = ${t1}() as Any
+  expectCrashLater()
+  let r = o as! ${t2}
+  _blackHole(r)
+}
+
+%   end
+% end
+
+// Test `(T1() as AnyObject) as T2` cast failure
+// for object type to protocol type pairs
+
+% for (t1, _) in objectTypes:
+%   for (t2) in protocolTypes:
+
+CastTrapsTestSuite.test("${t1}__${t2}")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type '")
+  .crashOutputMatches("${t1}' ")
+  .crashOutputMatches(" to '")
+  .crashOutputMatches("${t2}'")
+  .code
+{
+  let o = ${t1}() as AnyObject
+  expectCrashLater()
+  let r = o as! ${t2}
+  _blackHole(r)
+}
+
+%   end
+% end
+
+runAllTests()

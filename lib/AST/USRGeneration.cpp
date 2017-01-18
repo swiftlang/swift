@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,6 +14,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -31,6 +32,7 @@ static inline StringRef getUSRSpacePrefix() {
 }
 
 bool ide::printTypeUSR(Type Ty, raw_ostream &OS) {
+  assert(!Ty->hasArchetype() && "cannot have contextless archetypes mangled.");
   using namespace Mangle;
   Mangler Mangler(true);
   Mangler.mangleTypeForDebugger(Ty->getRValueType(), nullptr);
@@ -112,14 +114,14 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     return Ignore;
   }
 
-  if (!D->hasType())
+  if (!D->hasInterfaceType())
     return true;
 
   // FIXME: mangling 'self' in destructors crashes in mangler.
   if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
     return true;
 
-  OS << getUSRSpacePrefix();
+  std::string Old = getUSRSpacePrefix().str();
   Mangler Mangler;
 
   Mangler.bindGenericParameters(VD->getDeclContext());
@@ -138,7 +140,13 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     Mangler.mangleEntity(VD, /*uncurryingLevel=*/0);
   }
 
-  Mangler.finalize(OS);
+  Old += Mangler.finalize();
+
+  NewMangling::ASTMangler NewMangler;
+  std::string New = NewMangler.mangleDeclAsUSR(VD, getUSRSpacePrefix());
+
+  OS << NewMangling::selectMangling(Old, New);
+
   return false;
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s
 
 // REQUIRES: CPU=i386_or_x86_64
 
@@ -69,7 +69,7 @@ protocol FastRuncible {
 func testFastRuncible<T: Runcible, U: FastRuncible where T.RuncerType == U.RuncerType>(_ t: T, u: U) {
   U.RuncerType.Runcee.accelerate()
 }
-// CHECK: define hidden void @_TF16associated_types16testFastRuncibleu0_RxS_8Runcible_S_12FastRunciblewx10RuncerTypezw_10RuncerTyperFTx1uq__T_(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U, i8** %T.Runcible, i8** %U.FastRuncible)
+// CHECK: define hidden void @_TF16associated_types16testFastRuncibleu0_RxS_8Runcible_S_12FastRunciblew_10RuncerTypezwx10RuncerTyperFTx1uq__T_(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U, i8** %T.Runcible, i8** %U.FastRuncible)
 //   1. Get the type metadata for U.RuncerType.Runcee.
 //     1a. Get the type metadata for U.RuncerType.
 //         Note that we actually look things up in T, which is going to prove unfortunate.

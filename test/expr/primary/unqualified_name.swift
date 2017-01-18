@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 func f0(_ x: Int, y: Int, z: Int) { }
 func f1(_ x: Int, while: Int) { }
@@ -73,3 +73,14 @@ class C1 : C0 {
   }
 }
 
+struct S1 {
+  init(x: Int) {} // expected-note {{'init(x:)' declared here}}
+
+  func testS1() {
+    _ = S1.init(x:)(1)
+    _ = S1.init(`x`: 1)  // expected-warning {{keyword 'x' does not need to be escaped in argument list}} {{17-18=}} {{19-20=}}
+
+    // Test for unknown token.
+    _ = S1.init(x: 0xG) // expected-error {{expected a digit after integer literal prefix}} expected-error {{missing argument for parameter 'x' in call}}
+  }
+}

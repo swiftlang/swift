@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline -generic-specializer -inline %s > %t.sil
-// RUN: %target-sil-opt -sil-full-demangle -enable-sil-verify-all -specdevirt %t.sil | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -inline -generic-specializer -inline %s > %t.sil
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-full-demangle -enable-sil-verify-all -specdevirt %t.sil | %FileCheck %s
 
 // Check that the  @_semantics("optimize.sil.never") annotation prevents
 // any optimizations of the annotated function:
@@ -16,13 +16,13 @@ import SwiftShims
 
 public class C {
   @inline(never) func foo() -> Int32
-   deinit 
+   deinit
   init()
 }
 
 public class D : C {
   @inline(never) override func foo() -> Int32
-   deinit 
+   deinit
   override init()
 }
 

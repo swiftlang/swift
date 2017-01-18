@@ -1,9 +1,9 @@
-// RUN: %swift-ide-test -code-completion -code-completion-token=REPEAT_1 -source-filename=%s | FileCheck %s -check-prefix=REPEAT_1
-// RUN: %swift-ide-test -code-completion -code-completion-token=REPEAT_2 -source-filename=%s | FileCheck %s -check-prefix=REPEAT_2
-// RUN: %swift-ide-test -code-completion -code-completion-token=REPEAT_3 -source-filename=%s | FileCheck %s -check-prefix=REPEAT_3
-// RUN: %swift-ide-test -code-completion -code-completion-token=REPEAT_4 -source-filename=%s | FileCheck %s -check-prefix=REPEAT_4
-// RUN: %swift-ide-test -code-completion -code-completion-token=REPEAT_5 -source-filename=%s | FileCheck %s -check-prefix=REPEAT_5
-// RUN: %swift-ide-test -code-completion -code-completion-token=REPEAT_COND_1 -source-filename=%s | FileCheck %s -check-prefix=REPEAT_COND_1
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=REPEAT_1 -source-filename=%s | %FileCheck %s -check-prefix=REPEAT_1
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=REPEAT_2 -source-filename=%s | %FileCheck %s -check-prefix=REPEAT_2
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=REPEAT_3 -source-filename=%s | %FileCheck %s -check-prefix=REPEAT_3
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=REPEAT_4 -source-filename=%s | %FileCheck %s -check-prefix=REPEAT_4
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=REPEAT_5 -source-filename=%s | %FileCheck %s -check-prefix=REPEAT_5
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=REPEAT_COND_1 -source-filename=%s | %FileCheck %s -check-prefix=REPEAT_COND_1
 
 repeat {
   let local1 = 1

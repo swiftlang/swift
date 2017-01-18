@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -parse-stdlib -o /dev/null -verify
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-sil %s -parse-stdlib -o /dev/null -verify
 
 import Swift
 
@@ -414,7 +414,6 @@ class SomeDerivedClass : SomeClass {
 //  Delegating initializers
 //===----------------------------------------------------------------------===//
 
-
 class DelegatingCtorClass {
   var ivar: EmptyStruct
 
@@ -531,50 +530,15 @@ protocol TriviallyConstructible {
 }
 
 extension TriviallyConstructible {
-  init(up: Int) {
-    self.init()
-    go(up)
-  }
-
   init(down: Int) {
     go(down) // expected-error {{'self' used before self.init call}}
     self.init()
   }
 }
 
-class TrivialClass : TriviallyConstructible {
-  required init() {}
-
-  func go(_ x: Int) {}
-
-  convenience init(y: Int) {
-    self.init(up: y * y)
-  }
-}
-
-struct TrivialStruct : TriviallyConstructible {
-  init() {}
-
-  func go(_ x: Int) {}
-
-  init(y: Int) {
-    self.init(up: y * y)
-  }
-}
-
-enum TrivialEnum : TriviallyConstructible {
-  case NotSoTrivial
-
-  init() {
-    self = .NotSoTrivial
-  }
-
-  func go(_ x: Int) {}
-
-  init(y: Int) {
-    self.init(up: y * y)
-  }
-}
+//===----------------------------------------------------------------------===//
+//  Various bugs
+//===----------------------------------------------------------------------===//
 
 // rdar://16119509 - Dataflow problem where we reject valid code.
 class rdar16119509_Buffer {
@@ -1157,7 +1121,7 @@ func test22436880() {
 
 // sr-184
 let x: String? // expected-note 2 {{constant defined here}}
-print(x?.characters.count) // expected-error {{constant 'x' used before being initialized}}
+print(x?.characters.count as Any) // expected-error {{constant 'x' used before being initialized}}
 print(x!) // expected-error {{constant 'x' used before being initialized}}
 
 

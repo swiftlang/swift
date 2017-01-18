@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,7 +20,7 @@ using namespace swift;
 using namespace namelookup;
 
 namespace {
-  using ModuleLookupCache = llvm::SmallDenseMap<Module::ImportedModule,
+  using ModuleLookupCache = llvm::SmallDenseMap<ModuleDecl::ImportedModule,
                                                 TinyPtrVector<ValueDecl *>,
                                                 32>;
 
@@ -49,7 +49,7 @@ static bool isOverloadable(const ValueDecl *VD) {
 static bool isValidOverload(CanTypeSet &overloads, const ValueDecl *VD) {
   if (!isOverloadable(VD))
     return overloads.empty();
-  if (overloads.count(VD->getType()->getCanonicalType()))
+  if (overloads.count(VD->getInterfaceType()->getCanonicalType()))
     return false;
   return true;
 }
@@ -69,9 +69,9 @@ static bool updateOverloadSet(CanTypeSet &overloads,
   for (auto result : decls) {
     if (!isOverloadable(result))
       return false;
-    if (!result->hasType())
+    if (!result->hasInterfaceType())
       continue;
-    overloads.insert(result->getType()->getCanonicalType());
+    overloads.insert(result->getInterfaceType()->getCanonicalType());
   }
   return true;
 }
@@ -85,10 +85,10 @@ static bool updateOverloadSet(NamedCanTypeSet &overloads,
     auto &entry = overloads[result->getName()];
     if (!isOverloadable(result))
       entry.first = ResolutionKind::Exact;
-    else if (!result->hasType())
+    else if (!result->hasInterfaceType())
       continue;
     else
-      entry.second.insert(result->getType()->getCanonicalType());
+      entry.second.insert(result->getInterfaceType()->getCanonicalType());
   }
   return true;
 }
@@ -107,7 +107,7 @@ static ResolutionKind recordImportDecls(LazyResolver *typeResolver,
     // may be ambiguous with respect to each other, just not any existing decls.
     std::copy_if(newDecls.begin(), newDecls.end(), std::back_inserter(results),
                  [&](ValueDecl *result) -> bool {
-      if (!result->hasType()) {
+      if (!result->hasInterfaceType()) {
         if (typeResolver) {
           typeResolver->resolveDeclSignature(result);
           if (result->isInvalid())
@@ -143,18 +143,18 @@ static ResolutionKind recordImportDecls(LazyResolver *typeResolver,
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
 template <typename OverloadSetTy, typename CallbackTy>
-static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
+static void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            ResolutionKind resolutionKind, bool canReturnEarly,
                            LazyResolver *typeResolver,
                            ModuleLookupCache &cache,
                            const DeclContext *moduleScopeContext,
                            bool respectAccessControl,
-                           ArrayRef<Module::ImportedModule> extraImports,
+                           ArrayRef<ModuleDecl::ImportedModule> extraImports,
                            CallbackTy callback) {
   assert(module);
   assert(std::none_of(extraImports.begin(), extraImports.end(),
-                      [](Module::ImportedModule import) -> bool {
+                      [](ModuleDecl::ImportedModule import) -> bool {
     return !import.second;
   }));
 
@@ -194,10 +194,10 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
   bool foundDecls = decls.size() > initialCount;
   if (!foundDecls || !canReturnEarly ||
       resolutionKind == ResolutionKind::Overloadable) {
-    SmallVector<Module::ImportedModule, 8> reexports;
+    SmallVector<ModuleDecl::ImportedModule, 8> reexports;
     module->getImportedModulesForLookup(reexports);
     assert(std::none_of(reexports.begin(), reexports.end(),
-                        [](Module::ImportedModule import) -> bool {
+                        [](ModuleDecl::ImportedModule import) -> bool {
       return !import.second;
     }));
     reexports.append(extraImports.begin(), extraImports.end());
@@ -208,11 +208,11 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
     for (auto next : reexports) {
       // Filter any whole-module imports, and skip specific-decl imports if the
       // import path doesn't match exactly.
-      Module::AccessPathTy combinedAccessPath;
+      ModuleDecl::AccessPathTy combinedAccessPath;
       if (accessPath.empty()) {
         combinedAccessPath = next.first;
       } else if (!next.first.empty() &&
-                 !Module::isSameAccessPath(next.first, accessPath)) {
+                 !ModuleDecl::isSameAccessPath(next.first, accessPath)) {
         // If we ever allow importing non-top-level decls, it's possible the
         // rule above isn't what we want.
         assert(next.first.size() == 1 && "import of non-top-level decl");
@@ -255,15 +255,15 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                       decls.end());
 }
 
-void namelookup::lookupInModule(Module *startModule,
-                                Module::AccessPathTy topAccessPath,
+void namelookup::lookupInModule(ModuleDecl *startModule,
+                                ModuleDecl::AccessPathTy topAccessPath,
                                 DeclName name,
                                 SmallVectorImpl<ValueDecl *> &decls,
                                 NLKind lookupKind,
                                 ResolutionKind resolutionKind,
                                 LazyResolver *typeResolver,
                                 const DeclContext *moduleScopeContext,
-                                ArrayRef<Module::ImportedModule> extraImports) {
+                                ArrayRef<ModuleDecl::ImportedModule> extraImports) {
   assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
   ModuleLookupCache cache;
   bool respectAccessControl = startModule->getASTContext().LangOpts
@@ -272,7 +272,7 @@ void namelookup::lookupInModule(Module *startModule,
                                resolutionKind, /*canReturnEarly=*/true,
                                typeResolver, cache, moduleScopeContext,
                                respectAccessControl, extraImports,
-    [=](Module *module, Module::AccessPathTy path,
+    [=](ModuleDecl *module, ModuleDecl::AccessPathTy path,
         SmallVectorImpl<ValueDecl *> &localDecls) {
       module->lookupValue(path, name, lookupKind, localDecls);
     }
@@ -280,14 +280,14 @@ void namelookup::lookupInModule(Module *startModule,
 }
 
 void namelookup::lookupVisibleDeclsInModule(
-    Module *M,
-    Module::AccessPathTy accessPath,
+    ModuleDecl *M,
+    ModuleDecl::AccessPathTy accessPath,
     SmallVectorImpl<ValueDecl *> &decls,
     NLKind lookupKind,
     ResolutionKind resolutionKind,
     LazyResolver *typeResolver,
     const DeclContext *moduleScopeContext,
-    ArrayRef<Module::ImportedModule> extraImports) {
+    ArrayRef<ModuleDecl::ImportedModule> extraImports) {
   assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
   ModuleLookupCache cache;
   bool respectAccessControl = M->getASTContext().LangOpts.EnableAccessControl;
@@ -295,7 +295,7 @@ void namelookup::lookupVisibleDeclsInModule(
                                     resolutionKind, /*canReturnEarly=*/false,
                                     typeResolver, cache, moduleScopeContext,
                                     respectAccessControl, extraImports,
-    [=](Module *module, Module::AccessPathTy path,
+    [=](ModuleDecl *module, ModuleDecl::AccessPathTy path,
         SmallVectorImpl<ValueDecl *> &localDecls) {
       VectorDeclConsumer consumer(localDecls);
       module->lookupVisibleDecls(path, consumer, lookupKind);

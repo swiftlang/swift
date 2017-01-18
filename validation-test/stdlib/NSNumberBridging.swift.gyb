@@ -97,7 +97,7 @@ NSNumberTests.test("Bool.init(_: NSNumber)") {
 }
 
 func isTypePreservingNSNumber(_ n: NSNumber) -> Bool {
-  let className = NSStringFromClass(type(of: n))
+  let className = String(describing: type(of: n))
   return className.range(of: "_SwiftTypePreservingNSNumber") != nil
 }
 
@@ -107,7 +107,7 @@ NSNumberTests.test("isTypePreservingNSNumber(_:)") {
 }
 
 NSNumberTests.test("_SwiftTypePreservingNSNumber.classForCoder") {
-  // Check that internal subclass is not achived.
+  // Check that internal subclass is not archived.
   let n: NSNumber = (42 as Int)._bridgeToObjectiveC()
   expectTrue(isTypePreservingNSNumber(n))
   expectEqual("NSNumber", String(describing: n.classForCoder))
@@ -128,7 +128,7 @@ NSNumberTests.test("_SwiftTypePreservingNSNumber.init(coder:)")
 NSNumberTests.test("_SwiftTypePreservingNSNumber.copy(zone:)") {
   let n: NSNumber = (42 as Int)._bridgeToObjectiveC()
   expectTrue(isTypePreservingNSNumber(n))
-  let copy = n.copy() as! AnyObject
+  let copy = n.copy() as AnyObject
   expectTrue(n === copy)
 }
 
@@ -151,7 +151,7 @@ extension ${Self} {
   func toNSNumberByteArray() -> [UInt8] {
     var v = self.bitPattern
     var result: [UInt8] = []
-    for _ in 0 ..< MemoryLayout._ofInstance(v).size {
+    for _ in 0 ..< MemoryLayout.size(ofValue: v) {
       result.append(UInt8(v & 0xff))
       v = v >> 8
     }
@@ -197,7 +197,11 @@ NSNumberTests.test("_SwiftTypePreservingNSNumber(${Self}).getValue(_:), objCType
   .forEach(in: ${Self}._interestingValues) {
   input in
   let bridgedNSNumber = input._bridgeToObjectiveC()
+%   if Self == 'Bool':
+  expectTrue(CFGetTypeID(bridgedNSNumber) == CFBooleanGetTypeID())
+%   else:
   expectTrue(isTypePreservingNSNumber(bridgedNSNumber))
+%   end
 
   let expectedObjCType: String
 %   if Self == 'Int':
@@ -229,7 +233,9 @@ NSNumberTests.test("_SwiftTypePreservingNSNumber(${Self}).getValue(_:), objCType
   _UnknownArchError()
 #endif
 %   elif Self == 'Bool':
-  expectedObjCType = "B"
+  // NSNumber always encodes booleans as 'signed char', even on platforms where
+  // ObjCBool is a true Bool. This is a very old compatibility concern.
+  expectedObjCType = "c"
 %   else:
   _UnknownTypeError()
 %   end
@@ -247,25 +253,32 @@ NSNumberTests.test("${Self} bridges to NSNumber (actually _SwiftTypePreservingNS
   input in
   // Bridged NSNumbers preserve the Swift type when put into AnyHashable.
   let bridgedNSNumber = input._bridgeToObjectiveC()
+%   if Self == 'Bool':
+  expectTrue(CFGetTypeID(bridgedNSNumber) == CFBooleanGetTypeID())
+%   else:
   expectTrue(isTypePreservingNSNumber(bridgedNSNumber))
-  expectNotEmpty(bridgedNSNumber._toCustomAnyHashable())
+%   end
+  expectNotNil(bridgedNSNumber._toCustomAnyHashable())
 
   // Explicitly constructed NSNumbers don't have a special AnyHashable
   // representation.
 %   if Self == 'CGFloat':
   let explicitNSNumber = NSNumber(value: input.native)
+%   elif Self == 'Bool':
+  // Bool actually /is/ type-preserving for NSNumber. Use a dummy value instead.
+  let explicitNSNumber = NSNumber(value: (input ? 1 : 0) as Int8)
 %   else:
   let explicitNSNumber = NSNumber(value: input)
 %   end
   expectFalse(isTypePreservingNSNumber(explicitNSNumber))
-  expectEmpty(explicitNSNumber._toCustomAnyHashable())
+  expectNil(explicitNSNumber._toCustomAnyHashable())
   expectTrue(
     Set(["__NSCFNumber", "__NSCFBoolean"]).contains(
       String(describing: type(of: AnyHashable(explicitNSNumber).base))))
   expectEqual(AnyHashable(explicitNSNumber), AnyHashable(explicitNSNumber))
 
   let ah = AnyHashable(bridgedNSNumber)
-  expectEqual("${Self}", String(describing: type(of: ah.base)))
+  expectEqual(${Self}.self, type(of: ah.base))
 %   if Self in ['Float', 'Double', 'CGFloat']:
   // FIXME: remove special cases for floating point when we fix their
   // conformances to Equatable.

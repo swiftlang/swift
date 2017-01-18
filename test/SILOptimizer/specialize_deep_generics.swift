@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
 // Check that this Church Numerals inspired example does not hang
 // a compiler in the generic specializer.
@@ -19,7 +19,7 @@ struct PlusOne<X : Nat> : Nat {
 
 // Compiler used to keep performing the generic specialization of
 // computeNat for increasingly deeply nested bound generic types
-// like  PlusOne<PlusOne<....<PlusOne<Zero>>>
+// like PlusOne<PlusOne<....<PlusOne<Zero>>>
 func computeNat<T: Nat>(_ v : Int32, _ t: T) -> Int32 {
   if v == 0 {
     return t.val

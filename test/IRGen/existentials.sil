@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -disable-objc-interop | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -disable-objc-interop | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -12,15 +12,15 @@ protocol CP: class {}
 sil @class_existential_unowned : $@convention(thin) (@owned CP) -> @owned CP {
 entry(%s : $CP):
   %u = ref_to_unowned %s : $CP to $@sil_unowned CP
-  // CHECK: call void @rt_swift_unownedRetain(%swift.refcounted* %0)
+  // CHECK: call void @swift_rt_swift_unownedRetain(%swift.refcounted* %0)
   unowned_retain %u : $@sil_unowned CP
-  // CHECK: call void @rt_swift_unownedRelease(%swift.refcounted* %0)
+  // CHECK: call void @swift_rt_swift_unownedRelease(%swift.refcounted* %0)
   unowned_release %u : $@sil_unowned CP
 
-  // CHECK: call void @rt_swift_unownedRetainStrong(%swift.refcounted* %0)
+  // CHECK: call void @swift_rt_swift_unownedRetainStrong(%swift.refcounted* %0)
   strong_retain_unowned %u : $@sil_unowned CP
   %t = unowned_to_ref %u : $@sil_unowned CP to $CP
-  // CHECK: call void @rt_swift_release(%swift.refcounted* %0)
+  // CHECK: call void @swift_rt_swift_release(%swift.refcounted* %0)
   strong_release %t : $CP
 
   %v = ref_to_unmanaged %s : $CP to $@sil_unmanaged CP

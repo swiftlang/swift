@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 #if _compiler_version("999.*.999.999.999")
   let w = 1
@@ -31,7 +31,7 @@
 
 #if !_compiler_version("777.*.7")
   // This shouldn't emit any diagnostics.
-  $#%^*&
+  %#^*&
 #endif
 
 #if _compiler_version("700a.*.10") // expected-error {{version component contains non-numeric characters}}

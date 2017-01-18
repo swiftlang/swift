@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline -function-signature-opts %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -inline -function-signature-opts %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck -check-prefix=CHECK-NEGATIVE %s
 
 import Builtin
 import Swift
@@ -10,14 +10,14 @@ import Swift
 
 class foo {
   var a: Int
-   deinit 
+   deinit
   init()
 }
 
 class bar {
   var start: foo
   var end: foo
-   deinit 
+   deinit
   init()
 }
 
@@ -115,7 +115,7 @@ sil [fragile] @create_object : $@convention(thin) () -> Builtin.NativeObject
 // CHECK-LABEL: sil [thunk] [always_inline] @dead_argument_due_to_only_release_user
 // CHECK: [[IN:%.*]] = function_ref @_TTSf4gs__dead_argument_due_to_only_release_user
 // CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $boo, #boo.a
-// CHECK: apply [[IN]]([[IN2]]) 
+// CHECK: apply [[IN]]([[IN2]])
 sil @dead_argument_due_to_only_release_user : $@convention(thin) (@owned boo) -> (Int, Int) {
 bb0(%0 : $boo):
   // make it a non-trivial function
@@ -280,7 +280,7 @@ bb3:
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
 // CHECK: [[IN1:%.*]] = function_ref @_TTSf4d__exploded_release_to_dead_argument
 // CHECK: apply [[IN1]]()
-// CHECK: release_value [[INPUT_ARG0]] 
+// CHECK: release_value [[INPUT_ARG0]]
 sil @exploded_release_to_dead_argument : $@convention(thin) (@owned boo) -> () {
 bb0(%0 : $boo):
   // make it a non-trivial function
@@ -321,8 +321,8 @@ bb0(%0 : $boo):
 //
 // CHECK-LABEL: sil [thunk] [always_inline] @exploded_release_to_guaranteed_param
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
-// CHECK: [[IN1:%.*]] = function_ref @_TTSf4gs__exploded_release_to_guaranteed_param 
-// CHECK: release_value [[INPUT_ARG0]] 
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4gs__exploded_release_to_guaranteed_param
+// CHECK: release_value [[INPUT_ARG0]]
 sil @exploded_release_to_guaranteed_param : $@convention(thin) (@owned boo) -> () {
 bb0(%0 : $boo):
   // make it a non-trivial function
@@ -363,9 +363,9 @@ bb0(%0 : $boo):
 
 // CHECK-LABEL: sil [thunk] [always_inline] @single_owned_return_value
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
-// CHECK: [[IN1:%.*]] = function_ref @_TTSf4n_g_single_owned_return_value 
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4n_g_single_owned_return_value
 // CHECK: [[IN2:%.*]] = apply [[IN1]]([[INPUT_ARG0]]
-// CHECK: retain_value [[IN2]] 
+// CHECK: retain_value [[IN2]]
 sil @single_owned_return_value : $@convention(thin) (@owned boo) -> @owned boo {
 bb0(%0 : $boo):
   // make it a non-trivial function
@@ -680,8 +680,8 @@ bb0(%0 : $boo):
 // CHECK: release_value [[RET]]
 sil @single_owned_return_value_with_self_recursion_callsite : $@convention(thin) (@owned boo) -> () {
 bb0(%0 : $boo):
-  %2 = function_ref @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo 
-  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo 
+  %2 = function_ref @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo
+  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo
   release_value %4 : $boo
   %5 = tuple()
   return %5 : $()
@@ -708,8 +708,8 @@ bb2:
   br bb3
 
 bb3:
-  %2 = function_ref @single_owned_return_value : $@convention(thin) (@owned boo) -> @owned boo 
-  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo 
+  %2 = function_ref @single_owned_return_value : $@convention(thin) (@owned boo) -> @owned boo
+  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo
   %4 = tuple()
   return %4 : $()
 }
@@ -725,8 +725,8 @@ bb2:
   br bb3
 
 bb3:
-  %2 = function_ref @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned boo) -> boo 
-  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> boo 
+  %2 = function_ref @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned boo) -> boo
+  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> boo
   %4 = tuple()
   return %4 : $()
 }
@@ -1299,6 +1299,53 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+
+// CHECK-NEGATIVE-NOT: sil {{.*}}_dont_explode_single_enum
+
+sil [noinline] @dont_explode_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo {
+bb0(%0 : $Optional<(foo, foo)>):
+  %281 = unchecked_enum_data %0 : $Optional<(foo, foo)>, #Optional.some!enumelt.1
+  %282 = tuple_extract %281 : $(foo, foo), 0
+  %283 = tuple_extract %281 : $(foo, foo), 1
+  strong_release %283 : $foo
+  return %282 : $foo
+}
+
+
+
+// CHECK-LABEL: sil @call_with_single_enum
+// CHECK: [[F:%[0-9]+]] = function_ref @dont_explode_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo
+// CHECK: apply [[F]](%0)
+// CHECK: return
+sil @call_with_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo {
+bb0(%0 : $Optional<(foo, foo)>):
+  %f = function_ref @dont_explode_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo
+  %a = apply %f(%0) : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo
+  return %a : $foo
+}
+
+
+// Check if externally available functions are optimized.
+
+sil public_external [noinline] @externally_available_with_dead_arg : $@convention(thin) (@guaranteed foo) -> () {
+bb0(%0 : $foo):
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_externally_available
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSf4d__externally_available_with_dead_arg : $@convention(thin) () -> ()
+// CHECK: apply [[F]]()
+// CHECK: return
+sil @call_externally_available : $@convention(thin) (@guaranteed foo) -> () {
+bb0(%0 : $foo):
+  %f = function_ref @externally_available_with_dead_arg : $@convention(thin) (@guaranteed foo) -> ()
+  %a = apply %f(%0) : $@convention(thin) (@guaranteed foo) -> ()
+  %r = tuple()
+  return %r : $()
+}
+
 
 // We should remove the array semantic from specialized calls.
 

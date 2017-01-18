@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -27,16 +27,8 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+
 using namespace swift;
-
-void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
-  assert(this != RHS && "Cannot RAUW a value with itself");
-  while (!use_empty()) {
-    Operand *Op = *use_begin();
-    Op->set(RHS);
-  }
-}
-
 
 SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   // Unique these.
@@ -76,6 +68,8 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
     // access these symbols.
     return FormalLinkage::HiddenUnique;
   }
+
+  llvm_unreachable("Unhandled Accessibility in switch.");
 }
 
 FormalLinkage swift::getTypeLinkage(CanType type) {
@@ -88,9 +82,6 @@ FormalLinkage swift::getTypeLinkage(CanType type) {
     // For any nominal type reference, look at the type declaration.
     if (auto nominal = type->getAnyNominal())
       result ^= getDeclLinkage(nominal);
-
-    assert(!isa<PolymorphicFunctionType>(type) &&
-           "Don't expect a polymorphic function type here");
 
     return false; // continue searching
   });

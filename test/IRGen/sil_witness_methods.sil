@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -137,7 +137,7 @@ entry:
 }
 
 // CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @partial_apply_concrete_witness() {{.*}} {
-// CHECK:         [[CONTEXT:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject({{.*}})
+// CHECK:         [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject({{.*}})
 // CHECK:         [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, i8* }>*
 // CHECK:         [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, i8* }>, <{ %swift.refcounted, i8* }>* [[LAYOUT]], i32 0, i32 1
 // CHECK:         store i8* null, i8** [[WTABLE]]

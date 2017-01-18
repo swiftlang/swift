@@ -2,17 +2,18 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_AST_SOURCE_ENTITY_WALKER_H
 #define SWIFT_AST_SOURCE_ENTITY_WALKER_H
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -52,6 +53,12 @@ public:
   /// Walks the provided DeclContext.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(DeclContext *DC);
+  /// Walks the provided Stmt.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(Stmt *S);
+  /// Walks the provided Expr.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(Expr *E);
 
   /// This method is called when first visiting a decl, before walking into its
   /// children.  If it returns false, the subtree is skipped.
@@ -86,7 +93,8 @@ public:
   /// \c ConstructorDecl, to point to the type declaration that the source
   /// refers to.
   virtual bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                                  TypeDecl *CtorTyRef, Type T);
+                                  TypeDecl *CtorTyRef, Type T,
+                                  SemaReferenceKind Kind);
 
   /// This method is called when a ValueDecl for a subscript is referenced in
   /// source. If it returns false, the remaining traversal is terminated
@@ -118,7 +126,7 @@ public:
   /// Whether walk into the inactive region in a #if config statement.
   virtual bool shouldWalkInactiveConfigRegion() { return false; }
 
-  virtual bool shouldWalkIntoFunctionGenericParams() { return true; }
+  virtual bool shouldWalkIntoGenericParams() { return true; }
 
 protected:
   SourceEntityWalker() = default;

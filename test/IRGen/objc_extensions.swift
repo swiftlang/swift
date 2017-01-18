@@ -1,7 +1,7 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_extension_base.swift -o %t
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -160,7 +160,7 @@ extension NSDogcow {
   @NSManaged var woof: Int
 }
 
-class  SwiftSubGizmo : SwiftBaseGizmo {
+class SwiftSubGizmo : SwiftBaseGizmo {
 
   // Don't crash on this call. Emit an objC method call to super.
   //

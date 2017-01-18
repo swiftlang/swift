@@ -4,10 +4,9 @@ add_swift_library(swiftLLVMPasses STATIC
   LLVMARCOpts.cpp
   LLVMARCContract.cpp
   LLVMInlineTree.cpp
-  LLVMStackPromotion.cpp
   LLVMMergeFunctions.cpp
 
-  COMPONENT_DEPENDS
+  LLVM_COMPONENT_DEPENDS
   analysis
   )
 

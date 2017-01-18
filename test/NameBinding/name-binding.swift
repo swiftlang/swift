@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse %s -module-name themodule -enable-source-import -I %S/../decl/enum -sdk "" -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend -typecheck %s -module-name themodule -enable-source-import -I %S/../decl/enum -sdk "" -verify -show-diagnostics-after-fatal
 
 import Swift
 import nonexistentimport  // expected-error {{no such module 'nonexistentimport'}}

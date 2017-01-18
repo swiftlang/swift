@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // NOTE: Clang used to miscompile GLKit functions on i386. rdar://problem/19184403
@@ -7,6 +7,9 @@
 // rdar://problem/26392402
 // UNSUPPORTED: CPU=i386
 // REQUIRES: objc_interop
+
+// GLKit is not available on watchOS.
+// UNSUPPORTED: OS=watchos
 
 import GLKit
 

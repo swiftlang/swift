@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,6 +31,7 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/Lexer.h"
@@ -383,18 +384,8 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
     getAsNominalTypeOrNominalTypeExtensionContext();
   if (!NTD)
     return Type();
-  Type Result;
 
-  // Walk the type tree to find the a sub-type who's convertible to the
-  // found nominal.
-  Ty.visit([&](Type T) {
-    if (!Result && (T->getAnyNominal() == NTD ||
-                    isConvertibleTo(T, NTD->getDeclaredType(),
-                                    *VD->getDeclContext()))) {
-      Result = T;
-    }
-  });
-  return Result;
+  return Ty->getRValueType()->getRValueInstanceType();
 }
 
 static void printAnnotatedDeclaration(const ValueDecl *VD,
@@ -402,8 +393,10 @@ static void printAnnotatedDeclaration(const ValueDecl *VD,
                                       raw_ostream &OS) {
   AnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
-  if (BaseTy)
-    PO.setArchetypeSelfTransformForQuickHelp(BaseTy, VD->getDeclContext());
+  if (BaseTy) {
+    PO.setBaseType(BaseTy);
+    PO.PrintAsMember = true;
+  }
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -422,8 +415,10 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
                                                       raw_ostream &OS) {
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
-  if (BaseTy)
-    PO.setArchetypeSelfTransformForQuickHelp(BaseTy, VD->getDeclContext());
+  if (BaseTy) {
+    PO.setBaseType(BaseTy);
+    PO.PrintAsMember = true;
+  }
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -438,6 +433,7 @@ void SwiftLangSupport::
 printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
                                           swift::NominalTypeDecl *Target,
                                           llvm::raw_ostream &OS) {
+  // FIXME: Mutable global variable - gross!
   static llvm::SmallDenseMap<swift::ValueDecl*,
     std::unique_ptr<swift::SynthesizedExtensionAnalyzer>> TargetToAnalyzerMap;
   FullyAnnotatedDeclarationPrinter Printer(OS);
@@ -447,8 +443,8 @@ printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
       new SynthesizedExtensionAnalyzer(Target, PO));
     TargetToAnalyzerMap.insert({Target, std::move(Analyzer)});
   }
-  auto *Analyzer = TargetToAnalyzerMap.find(Target)->getSecond().get();
-  PO.initArchetypeTransformerForSynthesizedExtensions(Target, Analyzer);
+  PO.initForSynthesizedExtension(Target);
+  PO.PrintAsMember = true;
   VD->print(Printer, PO);
 }
 
@@ -457,6 +453,9 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
   ++NamesSeen[VD->getFullName()];
   SmallVector<ValueDecl *, 8> RelatedDecls;
+
+  if (isa<ParamDecl>(VD))
+    return; // Parameters don't have interesting related declarations.
 
   // FIXME: Extract useful related declarations, overloaded functions,
   // if VD is an initializer, we should extract other initializers etc.
@@ -502,7 +501,7 @@ static StringRef getSourceToken(unsigned Offset,
   return L.getTokenAt(Loc).getText();
 }
 
-static llvm::Optional<unsigned> 
+static llvm::Optional<unsigned>
 mapOffsetToOlderSnapshot(unsigned Offset,
                          ImmutableTextSnapshotRef NewSnap,
                          ImmutableTextSnapshotRef OldSnap) {
@@ -528,7 +527,7 @@ mapOffsetToOlderSnapshot(unsigned Offset,
   return Offset;
 }
 
-static llvm::Optional<unsigned> 
+static llvm::Optional<unsigned>
 mapOffsetToNewerSnapshot(unsigned Offset,
                          ImmutableTextSnapshotRef OldSnap,
                          ImmutableTextSnapshotRef NewSnap) {
@@ -610,7 +609,7 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
 
 /// Returns true for failure to resolve.
 static bool passCursorInfoForDecl(const ValueDecl *VD,
-                                  const Module *MainModule,
+                                  const ModuleDecl *MainModule,
                                   const Type Ty,
                                   const Type ContainerTy,
                                   bool IsRef,
@@ -652,9 +651,11 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned USREnd = SS.size();
 
   unsigned TypenameBegin = SS.size();
-  if (VD->hasType()) {
+  if (VD->hasInterfaceType()) {
     llvm::raw_svector_ostream OS(SS);
-    VD->getType().print(OS);
+    PrintOptions Options;
+    Options.PrintNameAliasUnderlyingType = true;
+    VD->getInterfaceType().print(OS, Options);
   }
   unsigned TypenameEnd = SS.size();
 
@@ -666,7 +667,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned MangledTypeEnd = SS.size();
 
   unsigned MangledContainerTypeStart = SS.size();
-  if (ContainerTy) {
+  if (ContainerTy && !ContainerTy->hasArchetype()) {
     llvm::raw_svector_ostream OS(SS);
     SwiftLangSupport::printTypeUSR(ContainerTy, OS);
   }
@@ -749,8 +750,10 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
         PO.SkipIntroducerKeywords = true;
         PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
         XMLEscapingPrinter Printer(OS);
-        if (BaseType)
-          PO.setArchetypeSelfTransform(BaseType, VD->getDeclContext());
+        if (BaseType) {
+          PO.setBaseType(BaseType);
+          PO.PrintAsMember = true;
+        }
         RelatedDecl->print(Printer, PO);
       } else {
         llvm::SmallString<128> Buf;
@@ -850,91 +853,109 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   return false;
 }
 
+class CursorRangeInfoConsumer : public SwiftASTConsumer {
+protected:
+  SwiftLangSupport &Lang;
+  SwiftInvocationRef ASTInvok;
+  StringRef InputFile;
+  unsigned Offset;
+  unsigned Length;
+
+private:
+  const bool TryExistingAST;
+  SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
+
+protected:
+  ArrayRef<ImmutableTextSnapshotRef> getPreviousASTSnaps() {
+    return llvm::makeArrayRef(PreviousASTSnaps);
+  }
+
+public:
+  CursorRangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
+                          SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
+                          bool TryExistingAST)
+    : Lang(Lang), ASTInvok(ASTInvok),InputFile(InputFile), Offset(Offset),
+      Length(Length), TryExistingAST(TryExistingAST) { }
+
+  bool canUseASTWithSnapshots(ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
+    if (!TryExistingAST) {
+      LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
+      return false;
+    }
+
+    // If there is an existing AST and the offset can be mapped back to the
+    // document snapshot that was used to create it, then use that AST.
+    // The downside is that we may return stale information, but we get the
+    // benefit of increased responsiveness, since the request will not be
+    // blocked waiting on the AST to be fully typechecked.
+
+    ImmutableTextSnapshotRef InputSnap;
+    if (auto EditorDoc = Lang.getEditorDocuments().findByPath(InputFile))
+      InputSnap = EditorDoc->getLatestSnapshot();
+      if (!InputSnap)
+        return false;
+
+    auto mappedBackOffset = [&]()->llvm::Optional<unsigned> {
+      for (auto &Snap : Snapshots) {
+        if (Snap->isFromSameBuffer(InputSnap)) {
+          if (Snap->getStamp() == InputSnap->getStamp())
+            return Offset;
+
+          auto OptOffset = mapOffsetToOlderSnapshot(Offset, InputSnap, Snap);
+          if (!OptOffset.hasValue())
+            return None;
+
+          // Check that the new and old offset still point to the same token.
+          StringRef NewTok = getSourceToken(Offset, InputSnap);
+          if (NewTok.empty())
+            return None;
+          if (NewTok == getSourceToken(OptOffset.getValue(), Snap))
+            return OptOffset;
+
+          return None;
+        }
+      }
+      return None;
+    };
+
+    auto OldOffsetOpt = mappedBackOffset();
+    if (OldOffsetOpt.hasValue()) {
+      Offset = *OldOffsetOpt;
+      PreviousASTSnaps.append(Snapshots.begin(), Snapshots.end());
+      LOG_INFO_FUNC(High, "will try existing AST");
+      return true;
+    }
+
+    LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
+    return false;
+  }
+};
 static void resolveCursor(SwiftLangSupport &Lang,
                           StringRef InputFile, unsigned Offset,
+                          unsigned Length, bool Actionables,
                           SwiftInvocationRef Invok,
                           bool TryExistingAST,
                           std::function<void(const CursorInfo &)> Receiver) {
   assert(Invok);
 
-  class CursorInfoConsumer : public SwiftASTConsumer {
-    std::string InputFile;
-    unsigned Offset;
-    SwiftLangSupport &Lang;
-    SwiftInvocationRef ASTInvok;
-    const bool TryExistingAST;
+  class CursorInfoConsumer : public CursorRangeInfoConsumer {
+    bool Actionables;
     std::function<void(const CursorInfo &)> Receiver;
-    SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
 
   public:
     CursorInfoConsumer(StringRef InputFile, unsigned Offset,
+                       unsigned Length, bool Actionables,
                        SwiftLangSupport &Lang,
                        SwiftInvocationRef ASTInvok,
                        bool TryExistingAST,
                        std::function<void(const CursorInfo &)> Receiver)
-      : InputFile(InputFile), Offset(Offset),
-        Lang(Lang),
-        ASTInvok(std::move(ASTInvok)),
-        TryExistingAST(TryExistingAST),
-        Receiver(std::move(Receiver)) { }
-
-    bool canUseASTWithSnapshots(
-        ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
-      if (!TryExistingAST) {
-        LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
-        return false;
-      }
-
-      // If there is an existing AST and the offset can be mapped back to the
-      // document snapshot that was used to create it, then use that AST.
-      // The downside is that we may return stale information, but we get the
-      // benefit of increased responsiveness, since the request will not be
-      // blocked waiting on the AST to be fully typechecked.
-
-      ImmutableTextSnapshotRef InputSnap;
-      if (auto EditorDoc = Lang.getEditorDocuments().findByPath(InputFile))
-        InputSnap = EditorDoc->getLatestSnapshot();
-      if (!InputSnap)
-        return false;
-
-      auto mappedBackOffset = [&]()->llvm::Optional<unsigned> {
-        for (auto &Snap : Snapshots) {
-          if (Snap->isFromSameBuffer(InputSnap)) {
-            if (Snap->getStamp() == InputSnap->getStamp())
-              return Offset;
-
-            auto OptOffset = mapOffsetToOlderSnapshot(Offset, InputSnap, Snap);
-            if (!OptOffset.hasValue())
-              return None;
-
-            // Check that the new and old offset still point to the same token.
-            StringRef NewTok = getSourceToken(Offset, InputSnap);
-            if (NewTok.empty())
-              return None;
-            if (NewTok == getSourceToken(OptOffset.getValue(), Snap))
-              return OptOffset;
-
-            return None;
-          }
-        }
-        return None;
-      };
-
-      auto OldOffsetOpt = mappedBackOffset();
-      if (OldOffsetOpt.hasValue()) {
-        Offset = *OldOffsetOpt;
-        PreviousASTSnaps.append(Snapshots.begin(), Snapshots.end());
-        LOG_INFO_FUNC(High, "will try existing AST");
-        return true;
-      }
-
-      LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
-      return false;
-    }
+    : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
+                              TryExistingAST), Actionables(Actionables),
+      Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
-      Module *MainModule = CompIns.getMainModule();
+      ModuleDecl *MainModule = CompIns.getMainModule();
 
       unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
       SourceLoc Loc =
@@ -968,15 +989,16 @@ static void resolveCursor(SwiftLangSupport &Lang,
                                 CompInvok, Receiver);
       } else {
         ValueDecl *VD = SemaTok.CtorTyRef ? SemaTok.CtorTyRef : SemaTok.ValueD;
-        bool Failed = passCursorInfoForDecl(VD, MainModule, SemaTok.Ty,
+        bool Failed = passCursorInfoForDecl(VD, MainModule,
+                                            SemaTok.ContainerType,
                                             SemaTok.ContainerType,
                                             SemaTok.IsRef, BufferID, Lang,
-                                            CompInvok, PreviousASTSnaps,
+                                            CompInvok, getPreviousASTSnaps(),
                                             Receiver);
         if (Failed) {
-          if (!PreviousASTSnaps.empty()) {
+          if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
-            resolveCursor(Lang, InputFile, Offset, ASTInvok,
+            resolveCursor(Lang, InputFile, Offset, Length, Actionables, ASTInvok,
                           /*TryExistingAST=*/false, Receiver);
           } else {
             Receiver({});
@@ -998,15 +1020,95 @@ static void resolveCursor(SwiftLangSupport &Lang,
   };
 
   auto Consumer = std::make_shared<CursorInfoConsumer>(
-      InputFile, Offset, Lang, Invok, TryExistingAST, Receiver);
+    InputFile, Offset, Length, Actionables, Lang, Invok, TryExistingAST,
+    Receiver);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
   Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
 }
 
+static void resolveRange(SwiftLangSupport &Lang,
+                          StringRef InputFile, unsigned Offset, unsigned Length,
+                          SwiftInvocationRef Invok,
+                          bool TryExistingAST,
+                          std::function<void(const RangeInfo&)> Receiver) {
+  assert(Invok);
+
+  class RangeInfoConsumer : public CursorRangeInfoConsumer {
+    std::function<void(const RangeInfo&)> Receiver;
+
+  public:
+    RangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
+                       SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
+                       bool TryExistingAST,
+                       std::function<void(const RangeInfo&)> Receiver)
+    : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
+                              TryExistingAST), Receiver(std::move(Receiver)){ }
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      if (trace::enabled()) {
+        // FIXME: Implement tracing
+      }
+      RangeResolver Resolver(AstUnit->getPrimarySourceFile(), Offset, Length);
+      ResolvedRangeInfo Info = Resolver.resolve();
+
+      CompilerInvocation CompInvok;
+      ASTInvok->applyTo(CompInvok);
+      RangeInfo Result;
+      Result.RangeKind = Lang.getUIDForRangeKind(Info.Kind);
+      Result.RangeContent = Info.Content;
+      switch (Info.Kind) {
+      case RangeKind::SingleExpression: {
+        SmallString<64> SS;
+        llvm::raw_svector_ostream OS(SS);
+        Info.Ty.print(OS);
+        Result.ExprType = OS.str();
+        Receiver(Result);
+        return;
+      }
+      case RangeKind::SingleDecl:
+      case RangeKind::MultiStatement:
+      case RangeKind::SingleStatement: {
+        Receiver(Result);
+        return;
+      }
+      case RangeKind::Invalid:
+        if (!getPreviousASTSnaps().empty()) {
+          // Attempt again using the up-to-date AST.
+          resolveRange(Lang, InputFile, Offset, Length, ASTInvok,
+                      /*TryExistingAST=*/false, Receiver);
+        } else {
+          Receiver(Result);
+        }
+        return;
+      }
+    }
+
+    void cancelled() override {
+      RangeInfo Info;
+      Info.IsCancelled = true;
+      Receiver(Info);
+    }
+
+    void failed(StringRef Error) override {
+      LOG_WARN_FUNC("range info failed: " << Error);
+      Receiver({});
+    }
+  };
+
+  auto Consumer = std::make_shared<RangeInfoConsumer>(
+    InputFile, Offset, Length, Lang, Invok, TryExistingAST, Receiver);
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
+                                       &OncePerASTToken);
+}
+
+
 void SwiftLangSupport::getCursorInfo(
-    StringRef InputFile, unsigned Offset,
+    StringRef InputFile, unsigned Offset, unsigned Length, bool Actionables,
     ArrayRef<const char *> Args,
     std::function<void(const CursorInfo &)> Receiver) {
 
@@ -1056,7 +1158,32 @@ void SwiftLangSupport::getCursorInfo(
     return;
   }
 
-  resolveCursor(*this, InputFile, Offset, Invok, /*TryExistingAST=*/true,
+  resolveCursor(*this, InputFile, Offset, Length, Actionables, Invok,
+                /*TryExistingAST=*/true, Receiver);
+}
+
+void SwiftLangSupport::
+getRangeInfo(StringRef InputFile, unsigned Offset, unsigned Length,
+             ArrayRef<const char *> Args,
+             std::function<void(const RangeInfo&)> Receiver) {
+  if (IFaceGenContexts.get(InputFile)) {
+    // FIXME: return range info for generated interfaces.
+    Receiver(RangeInfo());
+    return;
+  }
+  std::string Error;
+  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, InputFile, Error);
+  if (!Invok) {
+    // FIXME: Report it as failed request.
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver(RangeInfo());
+    return;
+  }
+  if (Length == 0) {
+    Receiver(RangeInfo());
+    return;
+  }
+  resolveRange(*this, InputFile, Offset, Length, Invok, /*TryExistingAST=*/true,
                 Receiver);
 }
 
@@ -1103,7 +1230,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
-      Module *MainModule = CompIns.getMainModule();
+      ModuleDecl *MainModule = CompIns.getMainModule();
 
       unsigned BufferID =
           AstUnit->getPrimarySourceFile().getBufferID().getValue();
@@ -1139,8 +1266,14 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
         passCursorInfoForModule(M, Lang.getIFaceGenContexts(), CompInvok,
                                 Receiver);
       } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        auto *DC = VD->getDeclContext();
+        Type selfTy;
+        if (DC->isTypeContext()) {
+          selfTy = DC->getSelfInterfaceType();
+          selfTy = VD->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
+        }
         bool Failed =
-            passCursorInfoForDecl(VD, MainModule, VD->getType(), Type(),
+            passCursorInfoForDecl(VD, MainModule, selfTy, Type(),
                                   /*isRef=*/false, BufferID, Lang, CompInvok,
                                   PreviousASTSnaps, Receiver);
         if (Failed) {
@@ -1242,7 +1375,8 @@ private:
     return true;
   }
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T) override {
+                          TypeDecl *CtorTyRef, Type T,
+                          SemaReferenceKind Kind) override {
     if (Cancelled)
       return false;
     if (CtorTyRef)

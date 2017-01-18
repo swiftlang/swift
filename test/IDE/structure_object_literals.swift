@@ -1,4 +1,4 @@
-// RUN: %swift-ide-test -structure -source-filename %s | FileCheck %s
+// RUN: %swift-ide-test -structure -source-filename %s | %FileCheck %s
 
 struct S: _ExpressibleByColorLiteral {
   init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}

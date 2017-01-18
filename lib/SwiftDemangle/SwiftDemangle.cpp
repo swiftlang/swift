@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -16,11 +16,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/DemangleWrappers.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "swift/SwiftDemangle/SwiftDemangle.h"
 
 /// \returns true if \p MangledName starts with Swift prefix, "_T".
 static bool isSwiftPrefixed(const char *MangledName) {
-  return (MangledName[0] == '_' && MangledName[1] == 'T');
+  return MangledName[0] == '_' &&
+         (MangledName[1] == 'T' || MangledName[1] == MANGLING_PREFIX_STR[1]);
 }
 
 static size_t swift_demangle_getDemangledName_Options(const char *MangledName,

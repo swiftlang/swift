@@ -70,7 +70,7 @@ CFTestSuite.test("protocols/downcast")
                             components: [1.0, 0.5, 0.25, 1.0])
   let opaquePink: AnyObject = pink
   let downcasted = opaquePink as? SwiftProto
-  expectNotEmpty(downcasted)
+  expectNotNil(downcasted)
   expectTrue(pink === downcasted!.doTheThing())
 }
 

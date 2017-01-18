@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct FooStructConstructorA {
   init // expected-error {{expected '('}}
@@ -9,7 +9,9 @@ struct FooStructConstructorB {
 }
 
 struct FooStructConstructorC {
-  init {} // expected-error {{expected '('}}{{8-8=() }}
+  init {} // expected-error {{expected '('}}{{7-7=()}}
+  init<T> {} // expected-error {{expected '('}} {{10-10=()}}
+  init? { self.init() } // expected-error {{expected '('}} {{8-8=()}}
 }
 
 
@@ -33,7 +35,7 @@ class FooClassDeinitializerB {
   deinit { }
 }
 
-init {} // expected-error {{initializers may only be declared within a type}} expected-error {{expected '('}} {{6-6=() }}
+init {} // expected-error {{initializers may only be declared within a type}} expected-error {{expected '('}} {{5-5=()}}
 init() // expected-error {{initializers may only be declared within a type}}
 init() {} // expected-error {{initializers may only be declared within a type}}
 

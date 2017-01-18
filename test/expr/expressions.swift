@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Tests and samples.
@@ -40,7 +40,7 @@ func basictest() {
 
   //var x6 : Float = 4+5
 
-  var x7 = 4; 5 // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
+  var x7 = 4; 5 // expected-warning {{integer literal is unused}}
 
   // Test implicit conversion of integer literal to non-Int64 type.
   var x8 : Int8 = 4
@@ -51,7 +51,7 @@ func basictest() {
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
 
 
-  var x9 : Int16 = x8 + 1 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int8' and 'Int'}} expected-note {{expected an argument list of type '(Int16, Int16)'}}
+  var x9 : Int16 = x8 + 1 // expected-error {{cannot convert value of type 'Int8' to specified type 'Int16'}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -77,6 +77,31 @@ func basictest() {
 
   // Cannot call an integer.
   bind_test2() // expected-error {{cannot call value of non-function type 'Int'}}{{13-15=}}
+}
+
+// <https://bugs.swift.org/browse/SR-3522>
+func testUnusedLiterals_SR3522() {
+  42 // expected-warning {{integer literal is unused}}
+  2.71828 // expected-warning {{floating-point literal is unused}}
+  true // expected-warning {{boolean literal is unused}}
+  false // expected-warning {{boolean literal is unused}}
+  "Hello" // expected-warning {{string literal is unused}}
+  "Hello \(42)" // expected-warning {{string literal is unused}}
+  #file // expected-warning {{#file literal is unused}}
+  (#line) // expected-warning {{#line literal is unused}}
+  #column // expected-warning {{#column literal is unused}}
+  #function // expected-warning {{#function literal is unused}}
+  #dsohandle // expected-warning {{#dsohandle literal is unused}}
+  __FILE__ // expected-error {{__FILE__ has been replaced with #file in Swift 3}} expected-warning {{#file literal is unused}}
+  __LINE__ // expected-error {{__LINE__ has been replaced with #line in Swift 3}} expected-warning {{#line literal is unused}}
+  __COLUMN__ // expected-error {{__COLUMN__ has been replaced with #column in Swift 3}} expected-warning {{#column literal is unused}}
+  __FUNCTION__ // expected-error {{__FUNCTION__ has been replaced with #function in Swift 3}} expected-warning {{#function literal is unused}}
+  __DSO_HANDLE__ // expected-error {{__DSO_HANDLE__ has been replaced with #dsohandle in Swift 3}} expected-warning {{#dsohandle literal is unused}}
+
+  nil // expected-error {{'nil' requires a contextual type}}
+  #fileLiteral(resourceName: "what.txt") // expected-error {{could not infer type of file reference literal}} expected-note * {{}}
+  #imageLiteral(resourceName: "hello.png") // expected-error {{could not infer type of image literal}} expected-note * {{}}
+  #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1) // expected-error {{could not infer type of color literal}} expected-note * {{}}
 }
 
 // Infix operators and attribute lists.
@@ -115,7 +140,7 @@ func funcdecl7(_ a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
-  testfunc2({ $0 + 1 }) // expected-error {{binary operator '+' cannot be applied to operands of type '((), Int)' and 'Int'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  testfunc2({ $0 + 1 }) // expected-error {{contextual closure type '((), Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
 
   enum union1 {
     case bar
@@ -431,7 +456,7 @@ func stringliterals(_ d: [String: Int]) {
 
   // rdar://11385385
   let x = 4
-  "Hello \(x+1) world"  // expected-warning {{expression of type 'String' is unused}}
+  "Hello \(x+1) world"  // expected-warning {{string literal is unused}}
   
   "Error: \(x+1"; // expected-error {{unterminated string literal}}
   
@@ -456,11 +481,11 @@ func stringliterals(_ d: [String: Int]) {
     "something else")"
   // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}}
 
-  // FIXME: bad diagnostics.
-  // expected-warning @+1 {{initialization of variable 'x2' was never used; consider replacing with assignment to '_' or removing it}}
-  /* expected-error {{unterminated string literal}} expected-error {{expected ',' separator}} expected-error {{expected ',' separator}} expected-note {{to match this opening '('}}  */ var x2 : () = ("hello" + "
-  ; // expected-error {{expected expression in list of expressions}}
-} // expected-error {{expected ')' in expression list}}
+  // expected-warning @+2 {{variable 'x2' was never used; consider replacing with '_' or removing it}}
+  // expected-error @+1 {{unterminated string literal}}
+  var x2 : () = ("hello" + "
+  ;
+}
 
 func testSingleQuoteStringLiterals() {
   _ = 'abc' // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
@@ -645,13 +670,18 @@ func lvalue_processing() {
 
 struct Foo {
   func method() {}
+  mutating func mutatingMethod() {}
 }
 
 func test() {
   var x = Foo()
+  let y = Foo()
+
+  // FIXME: Bad diagnostics
 
   // rdar://15708430
-  (&x).method()  // expected-error {{'inout Foo' is not convertible to 'Foo'}}
+  (&x).method()  // expected-error {{type of expression is ambiguous without more context}}
+  (&x).mutatingMethod() // expected-error {{cannot use mutating member on immutable value of type 'inout Foo'}}
 }
 
 
@@ -689,13 +719,13 @@ func dictionaryLiterals() {
 func invalidDictionaryLiteral() {
   // FIXME: lots of unnecessary diagnostics.
 
-  var a = [1: ; // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{14-14=,}} {{14-14=,}} expected-error {{expected key expression in dictionary literal}} expected-error {{expected ']' in container literal expression}} expected-note {{to match this opening '['}}
-  var b = [1: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{14-14=,}} {{14-14=,}} expected-error {{expected key expression in dictionary literal}}
-  var c = [1: "one" ;] // expected-error {{expected key expression in dictionary literal}} expected-error 2{{expected ',' separator}} {{20-20=,}} {{20-20=,}}
-  var d = [1: "one", ;] // expected-error {{expected key expression in dictionary literal}} expected-error {{expected ',' separator}} {{21-21=,}}
+  var a = [1: ; // expected-error {{expected value in dictionary literal}}
+  var b = [1: ;] // expected-error {{expected value in dictionary literal}}
+  var c = [1: "one" ;] // expected-error {{expected key expression in dictionary literal}} expected-error {{expected ',' separator}} {{20-20=,}}
+  var d = [1: "one", ;] // expected-error {{expected key expression in dictionary literal}}
   var e = [1: "one", 2] // expected-error {{expected ':' in dictionary literal}}
-  var f = [1: "one", 2 ;] // expected-error 2{{expected ',' separator}} {{23-23=,}} {{23-23=,}} expected-error 1{{expected key expression in dictionary literal}} expected-error {{expected ':' in dictionary literal}}
-  var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{24-24=,}} {{24-24=,}} expected-error {{expected key expression in dictionary literal}}
+  var f = [1: "one", 2 ;] // expected-error {{expected ':' in dictionary literal}}
+  var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}}
 }
 
     
@@ -735,8 +765,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: CountableClosedRange<Int>
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'CountableClosedRange<Int>?' and 'Int'}}
-  // expected-note @-1 {{overloads for '??' exist with these partially matching parameter lists:}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{cannot convert value of type 'Int' to expected argument type 'CountableClosedRange<Int>'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
   
   
@@ -758,8 +787,8 @@ func testParenExprInTheWay() {
 
   if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
-  if !(x & 4.0) {}  // expected-error {{no '&' candidates produce the expected contextual result type 'Bool'}}
-  //expected-note @-1 {{overloads for '&' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, T, Self}}
+  if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+  //expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
 
   
   if x & x {} // expected-error {{'Int' is not convertible to 'Bool'}}
@@ -891,9 +920,5 @@ func se0101<P: Pse0101>(x: Cse0101<P>) {
   _ = sizeof(Cse0101<P>.self) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{24-30=>.size}} {{none}}
   _ = alignof(Cse0101<P>.T.self) // expected-error {{'alignof' is unavailable: use MemoryLayout<T>.alignment instead.}} {{7-15=MemoryLayout<}} {{27-33=>.alignment}} {{none}}
   _ = strideof(P.Type.self) // expected-error {{'strideof' is unavailable: use MemoryLayout<T>.stride instead.}} {{7-16=MemoryLayout<}} {{22-28=>.stride}} {{none}}
-  _ = sizeof(type(of: x)) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-26=MemoryLayout<Cse0101<P>>.size}} {{none}}/
-
-  _ = sizeofValue(x) // expected-error {{'sizeofValue' is unavailable: use MemoryLayout<T>.size instead.}} {{7-21=MemoryLayout<Cse0101<P>>.size}} {{none}}
-  _ = alignofValue(x.val) // expected-error {{'alignofValue' is unavailable: use MemoryLayout<T>.alignment instead.}} {{7-26=MemoryLayout<P>.alignment}} {{none}}
-  _ = strideofValue(x.val.getIt()) // expected-error {{'strideofValue' is unavailable: use MemoryLayout<T>.stride instead.}} {{7-35=MemoryLayout<P.Value>.stride}} {{none}}
+  _ = sizeof(type(of: x)) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-26=MemoryLayout<Cse0101<P>>.size}} {{none}}
 }

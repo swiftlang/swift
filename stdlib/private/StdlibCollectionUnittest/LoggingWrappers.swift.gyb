@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,7 +31,7 @@ extension LoggingType {
   public var log: Log.Type {
     return Log.self
   }
-  
+
   public var selfType: Any.Type {
     return type(of: self)
   }
@@ -54,16 +54,16 @@ public struct LoggingIterator<Base : IteratorProtocol>
   : IteratorProtocol, LoggingType {
 
   public typealias Log = IteratorLog
-  
+
   public init(wrapping base: Base) {
     self.base = base
   }
-  
+
   public mutating func next() -> Base.Element? {
     Log.next[selfType] += 1
     return base.next()
   }
-  
+
   public var base: Base
 }
 
@@ -82,9 +82,10 @@ public class SequenceLog {
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var forEach = TypeIndexed(0)
-  public static var first = TypeIndexed(0)
   public static var dropFirst = TypeIndexed(0)
   public static var dropLast = TypeIndexed(0)
+  public static var dropWhile = TypeIndexed(0)
+  public static var prefixWhile = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
   public static var suffixMaxLength = TypeIndexed(0)
   public static var split = TypeIndexed(0)
@@ -115,6 +116,7 @@ public class CollectionLog : SequenceLog {
   public static var isEmpty = TypeIndexed(0)
   public static var count = TypeIndexed(0)
   public static var _customIndexOfEquatableElement = TypeIndexed(0)
+  public static var first = TypeIndexed(0)
   public static var advance = TypeIndexed(0)
   public static var advanceLimit = TypeIndexed(0)
   public static var distance = TypeIndexed(0)
@@ -213,7 +215,7 @@ public struct ${Self}<
 
   public typealias Iterator = LoggingIterator<Base.Iterator>
 
-  public func makeIterator() -> LoggingIterator<Base.Iterator> {
+  public func makeIterator() -> Iterator {
     Log.makeIterator[selfType] += 1
     return LoggingIterator(wrapping: base.makeIterator())
   }
@@ -243,13 +245,6 @@ public struct ${Self}<
     Log.forEach[selfType] += 1
     try base.forEach(body)
   }
-  
-  public func first(
-    where predicate: (Base.Iterator.Element) throws -> Bool
-  ) rethrows -> Base.Iterator.Element? {
-    Log.first[selfType] += 1
-    return try base.first(where: predicate)
-  }
 
   public typealias SubSequence = Base.SubSequence
 
@@ -263,9 +258,23 @@ public struct ${Self}<
     return base.dropLast(n)
   }
 
+  public func drop(
+    while predicate: (Base.Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    Log.dropWhile[selfType] += 1
+    return try base.drop(while: predicate)
+  }
+
   public func prefix(_ maxLength: Int) -> SubSequence {
     Log.prefixMaxLength[selfType] += 1
     return base.prefix(maxLength)
+  }
+
+  public func prefix(
+    while predicate: (Base.Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    Log.prefixWhile[selfType] += 1
+    return try base.prefix(while: predicate)
   }
 
   public func suffix(_ maxLength: Int) -> SubSequence {
@@ -312,10 +321,11 @@ public struct ${Self}<
 
   /// Copy a Sequence into an array.
   public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
-  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
     Log._copyContents[selfType] += 1
-    return base._copyContents(initializing: ptr)
+    let (it,idx) = base._copyContents(initializing: buffer)
+    return (Iterator(wrapping: it),idx)
   }
 
 %     if Kind in ['Collection', 'MutableCollection', 'RangeReplaceableCollection']:
@@ -531,7 +541,6 @@ public struct ${Self}<
     return base.removeFirst()
   }
 
-  @discardableResult
   public mutating func removeFirst(_ n: Int) {
     Log.removeFirstN[selfType] += 1
     base.removeFirst(n)

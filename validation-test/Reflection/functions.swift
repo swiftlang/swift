@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/functions
-// RUN: %target-run %target-swift-reflection-test %t/functions | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/functions | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // FIXME: Should not require objc_interop -- please put Objective-C-specific
 // testcases in functions_objc.swift
@@ -164,14 +164,14 @@ class CapturingClass {
   // CHECK-64: (class functions.CapturingClass)
  
   // CHECK-64: Type info:
-  // CHECK-64: (class_instance size=16 alignment=16 stride=16
+  // CHECK-64: (class_instance size=16 alignment=1 stride=16
   
   // CHECK-32: Reflecting an object.
   // CHECK-32: Type reference:
   // CHECK-32: (class functions.CapturingClass)
   
   // CHECK-32: Type info:
-  // CHECK-32: (class_instance size=12 alignment=16 stride=16
+  // CHECK-32: (class_instance size=12 alignment=1 stride=12
   @_semantics("optimize.sil.never")
   func arity0Capture1() -> () -> () {
     let closure = {

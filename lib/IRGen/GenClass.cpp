@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -72,7 +72,7 @@ ReferenceCounting irgen::getReferenceCountingForClass(IRGenModule &IGM,
   // NOTE: if you change this, change Type::usesNativeReferenceCounting.
   // If the root class is implemented in swift, then we have a swift
   // refcount; otherwise, we have an ObjC refcount.
-  if (hasKnownSwiftImplementation(IGM, getRootClass(theClass)))
+  if (getRootClass(theClass)->hasKnownSwiftImplementation())
     return ReferenceCounting::Native;
 
   return ReferenceCounting::ObjC;
@@ -83,7 +83,7 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
                                          CanType type) {
   if (auto theClass = type->getClassOrBoundGenericClass()) {
     // We can access the isas of pure Swift classes directly.
-    if (hasKnownSwiftImplementation(IGM, getRootClass(theClass)))
+    if (getRootClass(theClass)->hasKnownSwiftImplementation())
       return IsaEncoding::Pointer;
     // For ObjC or mixed classes, we need to use object_getClass.
     return IsaEncoding::ObjC;
@@ -117,7 +117,7 @@ namespace {
       return Refcount;
     }
 
-    ~ClassTypeInfo() {
+    ~ClassTypeInfo() override {
       delete Layout;
     }
 
@@ -133,7 +133,7 @@ namespace {
       return getLayout(IGM, type).getElements();
     }
   };
-}  // end anonymous namespace.
+} // end anonymous namespace
 
 /// Return the lowered type for the class's 'self' type within its context.
 static SILType getSelfType(ClassDecl *base) {
@@ -230,22 +230,28 @@ namespace {
         assert(superclass);
 
         if (superclass->hasClangNode()) {
-          // As a special case, assume NSObject has a fixed layout.
-          if (superclass->getName() !=
-                IGM.Context.getSwiftId(KnownFoundationEntity::NSObject)) {
-            // If the superclass was imported from Objective-C, its size is
-            // not known at compile time. However, since the field offset
-            // vector only stores offsets of stored properties defined in
-            // Swift, we don't have to worry about indirect indexing of
-            // the field offset vector.
-            ClassHasFixedSize = false;
-          }
+          // If the superclass was imported from Objective-C, its size is
+          // not known at compile time. However, since the field offset
+          // vector only stores offsets of stored properties defined in
+          // Swift, we don't have to worry about indirect indexing of
+          // the field offset vector.
+          ClassHasFixedSize = false;
+
         } else if (IGM.isResilient(superclass, ResilienceExpansion::Maximal)) {
           ClassMetadataRequiresDynamicInitialization = true;
 
           // If the superclass is resilient to us, we cannot statically
           // know the layout of either its instances or its class objects.
-          ClassHasFixedFieldCount = false;
+          //
+          // FIXME: We need to implement indirect field/vtable entry access
+          // before we can enable this
+          if (IGM.Context.LangOpts.EnableClassResilience) {
+            ClassHasFixedFieldCount = false;
+          } else {
+            addFieldsForClass(superclass, superclassType);
+            NumInherited = Elements.size();
+          }
+
           ClassHasFixedSize = false;
 
           // Furthermore, if the superclass is a generic context, we have to
@@ -344,7 +350,7 @@ namespace {
       return FieldAccess::NonConstantIndirect;
     }
   };
-}
+} // end anonymous namespace
 
 void ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType) const {
   assert(!Layout && FieldLayout.AllStoredProperties.empty() &&
@@ -531,9 +537,135 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
   llvm_unreachable("bad field-access strategy");
 }
 
+Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
+        SILType ClassType,
+        SILType TailType) {
+  const ClassTypeInfo &classTI = IGF.getTypeInfo(ClassType).as<ClassTypeInfo>();
+
+  llvm::Value *Offset = nullptr;
+  auto &layout = classTI.getLayout(IGF.IGM, ClassType);
+  Alignment HeapObjAlign = IGF.IGM.TargetInfo.HeapObjectAlignment;
+  Alignment Align;
+
+  // Get the size of the class instance.
+  if (layout.isFixedLayout()) {
+    Size ClassSize = layout.getSize();
+    Offset = llvm::ConstantInt::get(IGF.IGM.SizeTy, ClassSize.getValue());
+    Align = HeapObjAlign.alignmentAtOffset(ClassSize);
+  } else {
+    llvm::Value *metadata = emitHeapMetadataRefForHeapObject(IGF, Base,
+                                                             ClassType);
+    Offset = emitClassFragileInstanceSizeAndAlignMask(IGF,
+                                        ClassType.getClassOrBoundGenericClass(),
+                                        metadata).first;
+  }
+  // Align up to the TailType.
+  assert(TailType.isObject());
+  const TypeInfo &TailTI = IGF.getTypeInfo(TailType);
+  llvm::Value *AlignMask = TailTI.getAlignmentMask(IGF, TailType);
+  Offset = IGF.Builder.CreateAdd(Offset, AlignMask);
+  llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
+  Offset = IGF.Builder.CreateAnd(Offset, InvertedMask);
+
+  llvm::Value *Addr = IGF.emitByteOffsetGEP(Base, Offset,
+                                            TailTI.getStorageType(), "tailaddr");
+
+  if (auto *OffsetConst = dyn_cast<llvm::ConstantInt>(Offset)) {
+    // Try to get an accurate alignment (only possible if the Offset is a
+    // constant).
+    Size TotalOffset(OffsetConst->getZExtValue());
+    Align = HeapObjAlign.alignmentAtOffset(TotalOffset);
+  }
+  return Address(Addr, Align);
+}
+
+/// Try to stack promote a class instance with possible tail allocated arrays.
+///
+/// Returns the alloca if successful, or nullptr otherwise.
+static llvm::Value *stackPromote(IRGenFunction &IGF,
+                      const StructLayout &ClassLayout,
+                      int &StackAllocSize,
+                      ArrayRef<std::pair<SILType, llvm::Value *>> TailArrays) {
+  if (StackAllocSize < 0)
+    return nullptr;
+  if (!ClassLayout.isFixedLayout())
+    return nullptr;
+
+  // Calculate the total size needed.
+  // The first part is the size of the class itself.
+  Alignment ClassAlign = ClassLayout.getAlignment();
+  Size TotalSize = ClassLayout.getSize();
+
+  // Add size for tail-allocated arrays.
+  for (const auto &TailArray : TailArrays) {
+    SILType ElemTy = TailArray.first;
+    llvm::Value *Count = TailArray.second;
+
+    // We can only calculate a constant size if the tail-count is constant.
+    auto *CI = dyn_cast<llvm::ConstantInt>(Count);
+    if (!CI)
+      return nullptr;
+
+    const TypeInfo &ElemTI = IGF.getTypeInfo(ElemTy);
+    if (!ElemTI.isFixedSize())
+      return nullptr;
+
+    const FixedTypeInfo &ElemFTI = ElemTI.as<FixedTypeInfo>();
+    Alignment ElemAlign = ElemFTI.getFixedAlignment();
+
+    // This should not happen - just to be save.
+    if (ElemAlign > ClassAlign)
+      return nullptr;
+
+    TotalSize = TotalSize.roundUpToAlignment(ElemAlign);
+    TotalSize += ElemFTI.getFixedStride() * CI->getValue().getZExtValue();
+  }
+  if (TotalSize > Size(StackAllocSize))
+    return nullptr;
+  StackAllocSize = TotalSize.getValue();
+
+  if (TotalSize == ClassLayout.getSize()) {
+    // No tail-allocated arrays: we can use the llvm class type for alloca.
+    llvm::Type *ClassTy = ClassLayout.getType();
+    Address Alloca = IGF.createAlloca(ClassTy, ClassAlign, "reference.raw");
+    return Alloca.getAddress();
+  }
+  // Use a byte-array as type for alloca.
+  llvm::Value *SizeVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                                TotalSize.getValue());
+  Address Alloca = IGF.createAlloca(IGF.IGM.Int8Ty, SizeVal, ClassAlign,
+                                    "reference.raw");
+  return Alloca.getAddress();
+}
+
+llvm::Value *irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
+                                                     llvm::Value *size,
+                                                     TailArraysRef TailArrays) {
+  for (const auto &TailArray : TailArrays) {
+    SILType ElemTy = TailArray.first;
+    llvm::Value *Count = TailArray.second;
+
+    const TypeInfo &ElemTI = IGF.getTypeInfo(ElemTy);
+
+    // Align up to the tail-allocated array.
+    llvm::Value *ElemStride = ElemTI.getStride(IGF, ElemTy);
+    llvm::Value *AlignMask = ElemTI.getAlignmentMask(IGF, ElemTy);
+    size = IGF.Builder.CreateAdd(size, AlignMask);
+    llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
+    size = IGF.Builder.CreateAnd(size, InvertedMask);
+
+    // Add the size of the tail allocated array.
+    llvm::Value *AllocSize = IGF.Builder.CreateMul(ElemStride, Count);
+    size = IGF.Builder.CreateAdd(size, AllocSize);
+  }
+  return size;
+}
+
+
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
-                                        bool objc, int &StackAllocSize) {
+                                        bool objc, int &StackAllocSize,
+                                        TailArraysRef TailArrays) {
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
   auto classType = selfType.getSwiftRValueType();
 
@@ -558,22 +690,16 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                                    selfType.getClassOrBoundGenericClass(),
                                    metadata);
 
-  auto &layout = classTI.getLayout(IGF.IGM, selfType);
+  const StructLayout &layout = classTI.getLayout(IGF.IGM, selfType);
   llvm::Type *destType = layout.getType()->getPointerTo();
   llvm::Value *val = nullptr;
-  if (layout.isFixedLayout() &&
-      (int)layout.getSize().getValue() < StackAllocSize) {
-    // Allocate the object on the stack.
-    auto *Ty = layout.getType();
-    auto Alloca = IGF.createAlloca(Ty, layout.getAlignment(),
-                                   "reference.raw");
-    val = Alloca.getAddress();
-    assert(val->getType() == destType);
-    val = IGF.Builder.CreateBitCast(val, IGF.IGM.RefCountedPtrTy);
+  if (llvm::Value *Promoted = stackPromote(IGF, layout, StackAllocSize,
+                                           TailArrays)) {
+    val = IGF.Builder.CreateBitCast(Promoted, IGF.IGM.RefCountedPtrTy);
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
-    StackAllocSize = layout.getSize().getValue();
   } else {
     // Allocate the object on the heap.
+    size = appendSizeForTailAllocatedArrays(IGF, size, TailArrays);
     val = IGF.emitAllocObjectCall(metadata, size, alignMask, "reference.new");
     StackAllocSize = -1;
   }
@@ -583,7 +709,8 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
 llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF, 
                                                llvm::Value *metadata,
                                                SILType selfType,
-                                               bool objc) {
+                                               bool objc,
+                                               TailArraysRef TailArrays) {
   // If we need to use Objective-C allocation, do so.
   if (objc) {
     return emitObjCAllocObjectCall(IGF, metadata, 
@@ -596,7 +723,8 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
     = emitClassResilientInstanceSizeAndAlignMask(IGF,
                                    selfType.getClassOrBoundGenericClass(),
                                    metadata);
-  
+  size = appendSizeForTailAllocatedArrays(IGF, size, TailArrays);
+
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
                                              "reference.new");
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
@@ -726,6 +854,22 @@ void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                                          llvm::Value *metadataValue) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
 
+  // Foreign classes should not be freed by sending -release.
+  // They should also probably not be freed with object_dispose(),
+  // either.
+  //
+  // However, in practice, the only time we should try to free an
+  // instance of a foreign class here is inside an initializer
+  // delegating to a factory initializer. In this case, the object
+  // was allocated with +allocWithZone:, so calling object_dispose()
+  // should be OK.
+  if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::RuntimeOnly) {
+    selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.ObjCPtrTy);
+    IGF.Builder.CreateCall(IGF.IGM.getObjectDisposeFn(),
+                           {selfValue});
+    return;
+  }
+
   llvm::Value *size, *alignMask;
   getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
                               size, alignMask);
@@ -782,7 +926,7 @@ namespace {
     ForMetaClass = true
   };
 
-  typedef std::pair<ClassDecl*, Module*> CategoryNameKey;
+  typedef std::pair<ClassDecl*, ModuleDecl*> CategoryNameKey;
   /// Used to provide unique names to ObjC categories generated by Swift
   /// extensions. The first category for a class in a module gets the module's
   /// name as its key, e.g., NSObject (MySwiftModule). Another extension of the
@@ -962,7 +1106,7 @@ namespace {
     void buildCategoryName(SmallVectorImpl<char> &s) {
       llvm::raw_svector_ostream os(s);
       // Find the module the extension is declared in.
-      Module *TheModule = TheExtension->getParentModule();
+      ModuleDecl *TheModule = TheExtension->getParentModule();
 
       os << TheModule->getName();
       
@@ -1577,8 +1721,8 @@ namespace {
     void buildPropertyAttributes(VarDecl *prop, SmallVectorImpl<char> &out) {
       llvm::raw_svector_ostream outs(out);
 
-      auto propTy = prop->getType()->getReferenceStorageReferent();
-      
+      auto propTy = prop->getInterfaceType()->getReferenceStorageReferent();
+
       // Emit the type encoding for the property.
       outs << 'T';
       
@@ -1595,7 +1739,8 @@ namespace {
       if (prop->getAttrs().hasAttribute<NSManagedAttr>())
         outs << ",D";
       
-      auto isObject = propTy->hasRetainablePointerRepresentation();
+      auto isObject = prop->getDeclContext()->mapTypeIntoContext(propTy)
+          ->hasRetainablePointerRepresentation();
       auto hasObjectEncoding = typeEnc[0] == '@';
       
       // Determine the assignment semantics.
@@ -1797,7 +1942,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit the private data (RO-data) associated with a class.
 llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
@@ -1890,7 +2035,7 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
   SwiftRootClass->computeType();
   SwiftRootClass->setIsObjC(true);
   SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
-                                                         /*implicit=*/true));
+    /*isNameImplicit=*/true));
   SwiftRootClass->setImplicit();
   SwiftRootClass->setAccessibility(Accessibility::Open);
   

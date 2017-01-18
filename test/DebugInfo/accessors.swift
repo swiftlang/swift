@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 // Verify that we generate appropriate names for accessors.
 // CHECK: !DISubprogram(name: "x.get"

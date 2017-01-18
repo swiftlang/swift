@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -55,10 +55,10 @@
 /// ========================
 ///
 /// When you need to create an instance of an option set, assign one of the
-/// type's static members to your variable or constant. Alternately, to create
-/// an option set instance with multiple members, assign an array literal with
-/// multiple static members of the option set. To create an empty instance,
-/// assign an empty array literal to your variable.
+/// type's static members to your variable or constant. Alternatively, to
+/// create an option set instance with multiple members, assign an array
+/// literal with multiple static members of the option set. To create an empty
+/// instance, assign an empty array literal to your variable.
 ///
 ///     let singleOption: ShippingOptions = .priority
 ///     let multipleOptions: ShippingOptions = [.nextDay, .secondDay, .priority]
@@ -217,7 +217,7 @@ extension OptionSet where Element == Self {
   /// Adds the given element to the option set if it is not already a member.
   ///
   /// In the following example, the `.secondDay` shipping option is added to
-  /// the `freeOptions` option set if `purchasePrice` is greating than 50. For
+  /// the `freeOptions` option set if `purchasePrice` is greater than 50.0. For
   /// the `ShippingOptions` declaration, see the `OptionSet` protocol
   /// discussion.
   ///
@@ -249,7 +249,7 @@ extension OptionSet where Element == Self {
     return result
   }
   
-  /// Removes the given element and all elements subsumed by the given element.
+  /// Removes the given element and all elements subsumed by it.
   ///
   /// In the following example, the `.priority` shipping option is removed from
   /// the `options` option set. Attempting to remove the same shipping option
@@ -277,8 +277,8 @@ extension OptionSet where Element == Self {
   ///     // Prints "true"
   ///
   /// - Parameter member: The element of the set to remove.
-  /// - Returns: The intersection of `[member]` and the set if the intersection
-  ///   was nonempty; otherwise, `nil`.
+  /// - Returns: The intersection of `[member]` and the set, if the
+  ///   intersection was nonempty; otherwise, `nil`.
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
     let r = isSuperset(of: member) ? Optional(member) : nil

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func markUsed<T>(_ t: T) {}
 
@@ -268,7 +268,7 @@ var computed_prop_with_init_1: X {
 // FIXME: Redundant error below
 var x2 { // expected-error{{computed property must have an explicit type}} expected-error{{type annotation missing in pattern}}
   get {
-    return _x
+    return _x // expected-error{{unexpected non-void return value in void function}}
   }
 }
 
@@ -1137,7 +1137,6 @@ extension rdar17391625derived {
 public protocol rdar27671033P {}
 struct rdar27671033S<Key, Value> {}
 extension rdar27671033S : rdar27671033P where Key == String { // expected-error {{extension of type 'rdar27671033S' with constraints cannot have an inheritance clause}}
-  // expected-error@-1 {{same-type requirement makes generic parameter 'Key' non-generic}}
   let d = rdar27671033S<Int, Int>() // expected-error {{extensions may not contain stored properties}}
 }
 
@@ -1154,14 +1153,14 @@ struct r19874152S2 {
 _ = r19874152S2(number:64)  // Ok, property is a var.
 _ = r19874152S2()  // Ok
 
-struct r19874152S3 { // expected-note {{'init(flavour:)' declared here}}
+struct r19874152S3 { // expected-note {{'init(flavor:)' declared here}}
   let number : Int = 42
-  let flavour : Int
+  let flavor : Int
 }
-_ = r19874152S3(number:64)  // expected-error {{incorrect argument label in call (have 'number:', expected 'flavour:')}} {{17-23=flavour}}
-_ = r19874152S3(number:64, flavour: 17)  // expected-error {{extra argument 'number' in call}}
-_ = r19874152S3(flavour: 17)  // ok
-_ = r19874152S3()  // expected-error {{missing argument for parameter 'flavour' in call}}
+_ = r19874152S3(number:64)  // expected-error {{incorrect argument label in call (have 'number:', expected 'flavor:')}} {{17-23=flavor}}
+_ = r19874152S3(number:64, flavor: 17)  // expected-error {{extra argument 'number' in call}}
+_ = r19874152S3(flavor: 17)  // ok
+_ = r19874152S3()  // expected-error {{missing argument for parameter 'flavor' in call}}
 
 struct r19874152S4 {
   let number : Int? = nil

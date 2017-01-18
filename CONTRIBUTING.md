@@ -5,6 +5,7 @@ license](https://swift.org/LICENSE.txt).
 
 ---
 
-Before submitting the pull request, please make sure you have tested your
-changes and that they follow the Swift project [guidelines for contributing
+Before submitting the pull request, please make sure you have [tested your
+changes](https://github.com/apple/swift/blob/master/docs/ContinuousIntegration.md)
+and that they follow the Swift project [guidelines for contributing
 code](https://swift.org/contributing/#contributing-code).

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -219,7 +219,7 @@
 #define SWIFT_RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
 
 // Prefix of wrappers generated for runtime functions.
-#define SWIFT_WRAPPER_PREFIX "rt_"
+#define SWIFT_WRAPPER_PREFIX "swift_rt_"
 
 #else
 
@@ -230,5 +230,31 @@
 #define SWIFT_RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
 
 #endif
+
+#if !defined(__USER_LABEL_PREFIX__)
+// MSVC doesn't define __USER_LABEL_PREFIX.
+#if defined(_MSC_VER)
+#define __USER_LABEL_PREFIX__
+#else
+#error __USER_LABEL_PREFIX__ is undefined
+#endif
+#endif
+
+// Workaround the bug of clang in Cygwin 64bit
+// https://llvm.org/bugs/show_bug.cgi?id=26744
+#if defined(__CYGWIN__) && defined(__x86_64__)
+#undef __USER_LABEL_PREFIX__
+#define __USER_LABEL_PREFIX__
+#endif
+
+#define SWIFT_GLUE_EXPANDED(a, b) a##b
+#define SWIFT_GLUE(a, b) SWIFT_GLUE_EXPANDED(a, b)
+#define SWIFT_SYMBOL_NAME(name) SWIFT_GLUE(__USER_LABEL_PREFIX__, name)
+
+#define SWIFT_QUOTE_EXPANDED(literal) #literal
+#define SWIFT_QUOTE(literal) SWIFT_QUOTE_EXPANDED(literal)
+
+#define SWIFT_QUOTED_SYMBOL_NAME(name)                                   \
+  SWIFT_QUOTE(SWIFT_SYMBOL_NAME(name))
 
 #endif // SWIFT_RUNTIME_CONFIG_H

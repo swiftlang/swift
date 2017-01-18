@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
@@ -260,4 +260,16 @@ func class_bounded_metatype<T: SomeSwiftClass>(_ t : T) {
 
 class WeakRef<T: AnyObject> {
   weak var value: T?
+}
+
+class A<T> {
+  required init() {}
+}
+
+class M<T, S: A<T>> {
+  private var s: S
+  init() {
+    // Don't crash generating the reference to 's'.
+    s = S.init()
+  }
 }

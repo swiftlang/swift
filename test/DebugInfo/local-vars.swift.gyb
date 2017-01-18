@@ -3,12 +3,12 @@
 // all. There are other tests testing liveness and representation.
 
 // RUN: %gyb %s -o %t.swift
-// RUN: %target-swift-frontend %t.swift -g -emit-ir -o - | FileCheck %t.swift
+// RUN: %target-swift-frontend %t.swift -g -emit-ir -o - | %FileCheck %t.swift
 // RUN: %target-swift-frontend %t.swift -g -c -o %t.o
-// RUN: llvm-dwarfdump --debug-dump=info %t.o \
-// RUN:   | FileCheck %t.swift --check-prefix=DWARF
+// RUN: %llvm-dwarfdump --debug-dump=info %t.o \
+// RUN:   | %FileCheck %t.swift --check-prefix=DWARF
 // RUN: %target-swift-frontend %t.swift -O -g -emit-ir -o - \
-// RUN:   | FileCheck %t.swift --check-prefix=OPTZNS
+// RUN:   | %FileCheck %t.swift --check-prefix=OPTZNS
 
 // OPTZNS-NOT: alloca{{.*}}.addr
 

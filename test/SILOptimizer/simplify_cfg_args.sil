@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all %s -late-codemotion -simplify-cfg | FileCheck %s --check-prefix=CHECK_WITH_CODEMOTION
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -late-codemotion -simplify-cfg | %FileCheck %s --check-prefix=CHECK_WITH_CODEMOTION
 
 sil_stage raw
 
@@ -451,11 +451,11 @@ public enum Numbers {
   case First, Second, Third, Fourth, Fifth
   //var hashValue: Int32 { get }
 }
-    
+
 
 // Check that one of the switch_enum instructions can be
 // converted into select_enum instructions, even though
-// the destination block is used as a target also by 
+// the destination block is used as a target also by
 // another switch_enum instruction
 
 // CHECK_WITH_CODEMOTION-LABEL: sil @FormSelectEnumFromTwoSelectSwitches

@@ -6,6 +6,7 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   # SwiftPrivatePthreadExtras makes use of Darwin/Glibc, which is part of the
   # SDK overlay. It can't be built separately from the SDK overlay.
   add_subdirectory(StdlibUnittest)
+  add_subdirectory(StdlibUnicodeUnittest)
   add_subdirectory(StdlibCollectionUnittest)
   add_subdirectory(SwiftPrivateLibcExtras)
   add_subdirectory(SwiftPrivatePthreadExtras)

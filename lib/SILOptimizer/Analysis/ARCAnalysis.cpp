@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,6 +30,19 @@
 using namespace swift;
 
 using BasicBlockRetainValue = std::pair<SILBasicBlock *, SILValue>;
+
+//===----------------------------------------------------------------------===//
+//                             Utility Analysis
+//===----------------------------------------------------------------------===//
+
+bool swift::isRetainInstruction(SILInstruction *I) {
+  return isa<StrongRetainInst>(I) || isa<RetainValueInst>(I);
+}
+
+
+bool swift::isReleaseInstruction(SILInstruction *I) {
+  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
+}
 
 //===----------------------------------------------------------------------===//
 //                             Decrement Analysis
@@ -165,6 +178,7 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   case ValueKind::TupleElementAddrInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst:
   case ValueKind::RefElementAddrInst:
+  case ValueKind::RefTailAddrInst:
   case ValueKind::UncheckedEnumDataInst:
   case ValueKind::IndexAddrInst:
   case ValueKind::IndexRawPointerInst:
@@ -608,7 +622,8 @@ findMatchingRetains(SILBasicBlock *BB) {
     // Did not find a retain in this block, try to go to its predecessors.
     if (Kind.first == FindRetainKind::None) {
       // We can not find a retain in a block with no predecessors.
-      if (R.first->getPreds().begin() == R.first->getPreds().end()) {
+      if (R.first->getPredecessorBlocks().begin() ==
+          R.first->getPredecessorBlocks().end()) {
         EpilogueRetainInsts.clear();
         return;
       }
@@ -618,11 +633,11 @@ findMatchingRetains(SILBasicBlock *BB) {
 
       // If this is a SILArgument of current basic block, we can split it up to
       // values in the predecessors.
-      SILArgument *SA = dyn_cast<SILArgument>(R.second);
+      auto *SA = dyn_cast<SILPHIArgument>(R.second);
       if (SA && SA->getParent() != R.first)
         SA = nullptr;
 
-      for (auto X : R.first->getPreds()) {
+      for (auto X : R.first->getPredecessorBlocks()) {
         if (HandledBBs.find(X) != HandledBBs.end())
           continue;
         // Try to use the predecessor edge-value.
@@ -777,6 +792,11 @@ collectMatchingReleases(SILBasicBlock *BB) {
   for (auto II = std::next(BB->rbegin()), IE = BB->rend(); II != IE; ++II) {
     // If we do not have a release_value or strong_release. We can continue
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
+
+      // We cannot match a final release if it is followed by a dealloc_ref.
+      if (isa<DeallocRefInst>(*II))
+        break;
+
       // We do not know what this instruction is, do a simple check to make sure
       // that it does not decrement the reference count of any of its operand. 
       //
@@ -794,21 +814,18 @@ collectMatchingReleases(SILBasicBlock *BB) {
     SILValue OrigOp = Target->getOperand(0);
     SILValue Op = RCFI->getRCIdentityRoot(OrigOp);
 
-    // Check whether this is a SILArgument.
-    auto *Arg = dyn_cast<SILArgument>(Op);
-    // If this is not a SILArgument, maybe it is a part of a SILArgument.
-    // This is possible after we expand release instructions in SILLowerAgg pass.
-    if (!Arg) {
-      Arg = dyn_cast<SILArgument>(stripValueProjections(OrigOp));
-    }
+    // Check whether this is a SILArgument or a part of a SILArgument. This is
+    // possible after we expand release instructions in SILLowerAgg pass.
+    auto *Arg = dyn_cast<SILFunctionArgument>(stripValueProjections(Op));
+    if (!Arg)
+      break;
 
     // If Op is not a consumed argument, we must break since this is not an Op
     // that is a part of a return sequence. We are being conservative here since
     // we could make this more general by allowing for intervening non-arg
     // releases in the sense that we do not allow for race conditions in between
     // destructors.
-    if (!Arg || !Arg->isFunctionArg() ||
-        !Arg->hasConvention(SILArgumentConvention::Direct_Owned))
+    if (!Arg->hasConvention(SILArgumentConvention::Direct_Owned))
       break;
 
     // Ok, we have a release on a SILArgument that is direct owned. Attempt to
@@ -856,7 +873,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn,
   // First populate a worklist of predecessors.
   llvm::SmallVector<SILBasicBlock *, 64> Worklist;
   for (auto *BB : LiveIn)
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
 
   // Now propagate liveness backwards until we hit the alloc_box.
@@ -868,7 +885,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn,
     if (BB == DefBB || !LiveIn.insert(BB).second)
       continue;
 
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
   }
 }
@@ -906,7 +923,7 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
   llvm::SmallPtrSet<SILBasicBlock *, 16> UseBlocks;
 
   // First attempt to get the BB where this value resides.
-  auto *DefBB = V->getParentBB();
+  auto *DefBB = V->getParentBlock();
   if (!DefBB)
     return false;
 
@@ -1117,8 +1134,7 @@ SILInstruction *swift::findReleaseToMatchUnsafeGuaranteedValue(
       RCFI.getRCIdentityRoot(UnsafeGuaranteedI->getOperand(0));
 
   // Look before the "unsafeGuaranteedEnd".
-  for (auto ReverseIt = SILBasicBlock::reverse_iterator(
-                UnsafeGuaranteedEndI->getIterator()),
+  for (auto ReverseIt = ++UnsafeGuaranteedEndI->getIterator().getReverse(),
             End = BB.rend();
        ReverseIt != End; ++ReverseIt) {
     SILInstruction &CurInst = *ReverseIt;
@@ -1157,150 +1173,3 @@ SILInstruction *swift::findReleaseToMatchUnsafeGuaranteedValue(
   return nullptr;
 }
 
-void EpilogueARCContext::initializeDataflow() {
-  for (auto &B : *F) {
-    // Find the exit blocks.
-    if (B.getTerminator()->isFunctionExiting()) {
-      ExitBlocks.insert(&B);
-    }
-    // Allocate the storage.
-    EpilogueARCBlockStates[&B] =
-              new (BPA.Allocate()) EpilogueARCBlockState();
-  }
-
-  // Split the SILargument into local arguments to each specific basic block.
-  llvm::SmallVector<SILValue, 4> ToProcess;
-  llvm::DenseSet<SILValue> Processed;
-  ToProcess.push_back(Arg);
-  while (!ToProcess.empty()) {
-    SILValue Arg = ToProcess.pop_back_val();
-    if (Processed.find(Arg) != Processed.end())
-       continue;
-    Processed.insert(Arg);
-    SILArgument *A = dyn_cast<SILArgument>(Arg);
-    if (A && !A->isFunctionArg()) {
-      // Find predecessor and break the SILArgument to predecessors.
-      for (auto X : A->getParent()->getPreds()) {
-        // Try to find the predecessor edge-value.
-        SILValue IA = A->getIncomingValue(X);
-        EpilogueARCBlockStates[X]->LocalArg = IA;
-        // Maybe the edge value is another SILArgument.
-        ToProcess.push_back(IA);
-      }
-    }
-  }
-}
-
-void EpilogueARCContext::convergeDataflow() {
-  // Keep iterating until Changed is false.
-  bool Changed = false;
-  do {
-    Changed = false;
-    // Iterate until the data flow converges.
-    for (SILBasicBlock *B : PO->getPostOrder()) {
-      auto BS = EpilogueARCBlockStates[B];
-      // Merge in all the successors.
-      bool BBSetOut = false;
-      if (!B->succ_empty()) {
-        auto Iter = B->succ_begin();
-        BBSetOut = EpilogueARCBlockStates[*Iter]->BBSetIn;
-        Iter = std::next(Iter);
-        for (auto E = B->succ_end(); Iter != E; ++Iter) {
-	   BBSetOut &= EpilogueARCBlockStates[*Iter]->BBSetIn;
-        }
-      } else if (isExitBlock(B)) {
-        // We set the BBSetOut for exit blocks.
-        BBSetOut = true;
-      }
-
-      // If an epilogue ARC instruction or blocking operating has been identified
-      // then there is no point visiting every instruction in this block.
-      if (BBSetOut) {
-        // Iterate over all instructions in the basic block and find the
-        // interested ARC instruction in the block.
-        for (auto I = B->rbegin(), E = B->rend(); I != E; ++I) {
-          // This is a transition from 1 to 0 due to an interested instruction.
-          if (isInterestedInstruction(&*I)) {
-            BBSetOut = false;
-            break;
-          }
-          // This is a transition from 1 to 0 due to a blocking instruction.
-          if (mayBlockEpilogueARC(&*I, RCFI->getRCIdentityRoot(Arg))) {
-            BBSetOut = false;
-            break;
-          }
-        }
-      }
-
-      // Update BBSetIn.
-      Changed |= (BS->BBSetIn != BBSetOut);
-      BS->BBSetIn = BBSetOut;
-    }
-  } while(Changed);
-}
-
-bool EpilogueARCContext::computeEpilogueARC() {
-  // At this point the data flow should have converged. Find the epilogue
-  // releases.
-  for (SILBasicBlock *B : PO->getPostOrder()) {
-    bool BBSetOut = false;
-    // Merge in all the successors.
-    if (!B->succ_empty()) {
-      // Make sure we've either found no ARC instructions in all the successors
-      // or we've found ARC instructions in all successors.
-      //
-      // In case we've found ARC instructions in some and not all successors,
-      // that means from this point to the end of the function, some paths will
-      // not have an epilogue ARC instruction, which means the data flow has 
-      // failed.
-      auto Iter = B->succ_begin();
-      auto Base = EpilogueARCBlockStates[*Iter]->BBSetIn;
-      Iter = std::next(Iter);
-      for (auto E = B->succ_end(); Iter != E; ++Iter) {
-        if (EpilogueARCBlockStates[*Iter]->BBSetIn != Base)
-          return false;
-      }
-      BBSetOut = Base;
-    } else if (isExitBlock(B)) {
-      // We set the BBSetOut for exit blocks.
-      BBSetOut = true;
-    }
-
-    // If an epilogue ARC instruction or blocking operating has been identified
-    // then there is no point visiting every instruction in this block.
-    if (!BBSetOut) {
-      continue;
-    }
-
-    // An epilogue ARC instruction has not been identified, maybe its in this block.
-    //
-    // Iterate over all instructions in the basic block and find the interested ARC
-    // instruction in the block.
-    for (auto I = B->rbegin(), E = B->rend(); I != E; ++I) {
-      // This is a transition from 1 to 0 due to an interested instruction.
-      if (isInterestedInstruction(&*I)) {
-        EpilogueARCInsts.push_back(&*I);
-        break;
-      }
-      // This is a transition from 1 to 0 due to a blocking instruction.
-      if (mayBlockEpilogueARC(&*I, RCFI->getRCIdentityRoot(Arg))) {
-        break;
-      }
-    }
-  }
-  return true;
-}
-
-llvm::SmallVector<SILInstruction *, 1>
-swift::computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind Kind,
-                                      SILValue Arg, SILFunction *F,
-                                      PostOrderFunctionInfo *PO, AliasAnalysis *AA,
-                                      RCIdentityFunctionInfo *RCFI) {
-  EpilogueARCContext CM(Kind, Arg, F, PO, AA, RCFI); 
-  // Initialize and run the data flow. Clear the epilogue arc instructions if the
-  // data flow is aborted in middle.
-  if (!CM.run()) {
-    CM.resetEpilogueARCInsts();
-  }
-  return CM.getEpilogueARCInsts();
-}

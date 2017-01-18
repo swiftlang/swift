@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -28,25 +28,42 @@ void CallerAnalysis::processFunctionCallSites(SILFunction *F) {
           continue;
 
         // Update the callee information for this function.
-        CallerAnalysisFunctionInfo &CallerInfo
-                               = CallInfo.FindAndConstruct(F).second;
+        FunctionInfo &CallerInfo = FuncInfos[F];
         CallerInfo.Callees.insert(CalleeFn);
         
         // Update the callsite information for the callee.
-        CallerAnalysisFunctionInfo &CalleeInfo
-                               = CallInfo.FindAndConstruct(CalleeFn).second;
+        FunctionInfo &CalleeInfo = FuncInfos[CalleeFn];
         CalleeInfo.Callers.insert(F);
-      }   
+        continue;
+      }
+      if (auto *PAI = dyn_cast<PartialApplyInst>(&II)) {
+        SILFunction *CalleeFn = PAI->getCalleeFunction();
+        if (!CalleeFn)
+          continue;
+
+        // Update the callee information for this function.
+        FunctionInfo &CallerInfo = FuncInfos[F];
+        CallerInfo.Callees.insert(CalleeFn);
+        
+        // Update the partial-apply information for the callee.
+        FunctionInfo &CalleeInfo = FuncInfos[CalleeFn];
+        int &minAppliedArgs = CalleeInfo.PartialAppliers[F];
+        int numArgs = (int)PAI->getNumArguments();
+        if (minAppliedArgs == 0 || numArgs < minAppliedArgs) {
+          minAppliedArgs = numArgs;
+        }
+        continue;
+      }
     }   
   }   
 }
 
 void CallerAnalysis::invalidateExistingCalleeRelation(SILFunction *F) {
-  CallerAnalysisFunctionInfo &CallerInfo = CallInfo.FindAndConstruct(F).second;
+  FunctionInfo &CallerInfo = FuncInfos[F];
   for (auto Callee : CallerInfo.Callees) {
-    CallerAnalysisFunctionInfo &CalleeInfo
-                                    = CallInfo.FindAndConstruct(Callee).second;
-    CalleeInfo.Callers.remove(F);
+    FunctionInfo &CalleeInfo = FuncInfos[Callee];
+    CalleeInfo.Callers.erase(F);
+    CalleeInfo.PartialAppliers.erase(F);
   }
 }
 

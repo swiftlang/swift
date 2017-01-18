@@ -2,14 +2,15 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
+#include "TestContext.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
@@ -24,78 +25,7 @@
 #include "gtest/gtest.h"
 
 using namespace swift;
-
-namespace {
-/// Helper class used to set the LangOpts target before initializing the
-/// ASTContext.
-///
-/// \see TestContext
-class TestContextBase {
-public:
-  LangOptions LangOpts;
-  SearchPathOptions SearchPathOpts;
-  SourceManager SourceMgr;
-  DiagnosticEngine Diags;
-
-  TestContextBase() : Diags(SourceMgr) {
-    LangOpts.Target = llvm::Triple(llvm::sys::getProcessTriple());
-  }
-};
-
-enum ShouldDeclareOptionalTypes : bool {
-  DoNotDeclareOptionalTypes,
-  DeclareOptionalTypes
-};
-
-/// Owns an ASTContext and the associated types.
-class TestContext : public TestContextBase {
-  SourceFile *FileForLookups;
-
-  void declareOptionalType(Identifier name) {
-    auto wrapped = new (Ctx) GenericTypeParamDecl(FileForLookups,
-                                                  Ctx.getIdentifier("Wrapped"),
-                                                  SourceLoc(), /*depth*/0,
-                                                  /*index*/0);
-    auto params = GenericParamList::create(Ctx, SourceLoc(), wrapped,
-                                           SourceLoc());
-    auto decl = new (Ctx) EnumDecl(SourceLoc(), name, SourceLoc(),
-                                   /*inherited*/{}, params, FileForLookups);
-    wrapped->setDeclContext(decl);
-    FileForLookups->Decls.push_back(decl);
-  }
-
-public:
-  ASTContext Ctx;
-
-  TestContext(ShouldDeclareOptionalTypes optionals = DoNotDeclareOptionalTypes)
-      : Ctx(LangOpts, SearchPathOpts, SourceMgr, Diags) {
-    auto stdlibID = Ctx.getIdentifier(STDLIB_NAME);
-    auto *module = ModuleDecl::create(stdlibID, Ctx);
-    Ctx.LoadedModules[stdlibID] = module;
-
-    using ImplicitModuleImportKind = SourceFile::ImplicitModuleImportKind;
-    FileForLookups = new (Ctx) SourceFile(*module, SourceFileKind::Library,
-                                          /*buffer*/None,
-                                          ImplicitModuleImportKind::None);
-    module->addFile(*FileForLookups);
-
-    if (optionals == DeclareOptionalTypes) {
-      declareOptionalType(Ctx.getIdentifier("Optional"));
-      declareOptionalType(Ctx.getIdentifier("ImplicitlyUnwrappedOptional"));
-    }
-  }
-
-  template <typename Nominal>
-  Nominal *makeNominal(StringRef name,
-                       GenericParamList *genericParams = nullptr) {
-    auto result = new (Ctx) Nominal(SourceLoc(), Ctx.getIdentifier(name),
-                                    SourceLoc(), /*inherited*/{},
-                                    genericParams, FileForLookups);
-    result->setAccessibility(Accessibility::Internal);
-    return result;
-  }
-};
-} // end anonymous namespace
+using namespace swift::unittest;
 
 TEST(Override, IdenticalTypes) {
   TestContext C;

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 protocol Fooable {
   init()
@@ -30,8 +30,8 @@ struct S: Fooable {
   // TODO: Way too many redundant r/r pairs here. Should use +0 rvalues.
   // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3foo{{.*}} : $@convention(method) (Int, @guaranteed S) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $S):
-  // CHECK-NOT:     retain_value [[SELF]]
-  // CHECK-NOT:     release_value [[SELF]]
+  // CHECK-NOT:     copy_value [[SELF]]
+  // CHECK-NOT:     destroy_value [[SELF]]
   func foo(_ x: Int) {
     self.foo(x)
   }
@@ -48,8 +48,8 @@ struct S: Fooable {
   }
   // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3bas{{.*}} : $@convention(method) (@guaranteed S) -> ()
   // CHECK:       bb0([[SELF:%.*]] : $S):
-  // CHECK-NOT:     retain_value [[SELF]]
-  // CHECK-NOT:     release_value [[SELF]]
+  // CHECK-NOT:     copy_value [[SELF]]
+  // CHECK-NOT:     destroy_value [[SELF]]
   func bas() {
     self.bas()
   }
@@ -59,7 +59,7 @@ struct S: Fooable {
   var prop2: Int {
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1Sg5prop2Si : $@convention(method) (@guaranteed S) -> Int
     // CHECK:       bb0([[SELF:%.*]] : $S):
-    // CHECK-NOT:     release_value [[SELF]]
+    // CHECK-NOT:     destroy_value [[SELF]]
     get { return 0 }
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1Ss5prop2Si : $@convention(method) (Int, @inout S) -> ()
     // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self1Sm5prop2Si : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
@@ -69,21 +69,21 @@ struct S: Fooable {
   var prop3: Int {
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1Sg5prop3Si : $@convention(method) (@guaranteed S) -> Int
     // CHECK:       bb0([[SELF:%.*]] : $S):
-    // CHECK-NOT:     release_value [[SELF]]
+    // CHECK-NOT:     destroy_value [[SELF]]
     get { return 0 }
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1Ss5prop3Si : $@convention(method) (Int, @guaranteed S) -> ()
     // CHECK:       bb0({{.*}} [[SELF:%.*]] : $S):
-    // CHECK-NOT:     release_value [[SELF]]
+    // CHECK-NOT:     destroy_value [[SELF]]
     // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self1Sm5prop3Si : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
     // CHECK:       bb0({{.*}} [[SELF:%.*]] : $S):
-    // CHECK-NOT:     release_value [[SELF]]
+    // CHECK-NOT:     destroy_value [[SELF]]
     nonmutating set { }
   }
 
   // Getter for prop1
   // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self1Sg5prop1Si : $@convention(method) (@guaranteed S) -> Int
   // CHECK:       bb0([[SELF:%.*]] : $S):
-  // CHECK-NOT:     release_value [[SELF]]
+  // CHECK-NOT:     destroy_value [[SELF]]
 
   // Setter for prop1
   // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self1Ss5prop1Si : $@convention(method) (Int, @inout S) -> ()
@@ -103,9 +103,9 @@ struct S: Fooable {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
-// CHECK:         [[SELF:%.*]] = load [[SELF_COPY]]
-// CHECK:         release_value [[SELF]]
-// CHECK-NOT:     release_value [[SELF]]
+// CHECK:         [[SELF:%.*]] = load [take] [[SELF_COPY]]
+// CHECK:         destroy_value [[SELF]]
+// CHECK-NOT:     destroy_value [[SELF]]
 // CHECK-NOT:     destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
@@ -119,19 +119,18 @@ struct S: Fooable {
 // in the implementation
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3bas{{.*}} : $@convention(witness_method) (@inout S) -> ()
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
-// CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
-// CHECK:         retain_value [[SELF]]
-// CHECK:         release_value [[SELF]]
-// CHECK-NOT:     release_value [[SELF]]
+// CHECK:         [[SELF:%.*]] = load [copy] [[SELF_ADDR]]
+// CHECK:         destroy_value [[SELF]]
+// CHECK-NOT:     destroy_value [[SELF]]
 
 // Witness thunk for prop1 getter
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_g5prop1Si : $@convention(witness_method) (@in_guaranteed S) -> Int
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
-// CHECK:         [[SELF:%.*]] = load [[SELF_COPY]]
-// CHECK:         release_value [[SELF]]
-// CHECK-NOT:     release_value [[SELF]]
+// CHECK:         [[SELF:%.*]] = load [take] [[SELF_COPY]]
+// CHECK:         destroy_value [[SELF]]
+// CHECK-NOT:     destroy_value [[SELF]]
 // CHECK-NOT:     destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
@@ -150,9 +149,9 @@ struct S: Fooable {
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
-// CHECK:         [[SELF:%.*]] = load [[SELF_COPY]]
-// CHECK:         release_value [[SELF]]
-// CHECK-NOT:     release_value [[SELF]]
+// CHECK:         [[SELF:%.*]] = load [take] [[SELF_COPY]]
+// CHECK:         destroy_value [[SELF]]
+// CHECK-NOT:     destroy_value [[SELF]]
 // CHECK-NOT:     destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
@@ -171,9 +170,9 @@ struct S: Fooable {
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
-// CHECK:         [[SELF:%.*]] = load [[SELF_COPY]]
-// CHECK:         release_value [[SELF]]
-// CHECK-NOT:     release_value [[SELF]]
+// CHECK:         [[SELF:%.*]] = load [take] [[SELF_COPY]]
+// CHECK:         destroy_value [[SELF]]
+// CHECK-NOT:     destroy_value [[SELF]]
 // CHECK-NOT:     destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
@@ -182,19 +181,18 @@ struct S: Fooable {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
-// CHECK:         [[SELF:%.*]] = load [[SELF_COPY]]
-// CHECK:         release_value [[SELF]]
-// CHECK-NOT:     release_value [[SELF]]
+// CHECK:         [[SELF:%.*]] = load [take] [[SELF_COPY]]
+// CHECK:         destroy_value [[SELF]]
+// CHECK-NOT:     destroy_value [[SELF]]
 // CHECK-NOT:     destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop3 nonmutating materializeForSet
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop3Si : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
-// CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
-// CHECK:         retain_value [[SELF]]
-// CHECK:         release_value [[SELF]]
-// CHECK-NOT:     release_value [[SELF]]
+// CHECK:         [[SELF:%.*]] = load [copy] [[SELF_ADDR]]
+// CHECK:         destroy_value [[SELF]]
+// CHECK-NOT:     destroy_value [[SELF]]
 // CHECK:       }
 
 //
@@ -250,8 +248,8 @@ struct AO<T>: Fooable {
 }
 
 // Witness for nonmutating 'foo'
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3foo{{.*}} : $@convention(witness_method) <T> (Int, @in_guaranteed AO<T>) -> ()
-// CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3foo{{.*}} : $@convention(witness_method) <τ_0_0> (Int, @in_guaranteed AO<τ_0_0>) -> ()
+// CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<τ_0_0>):
 // TODO: This copy isn't necessary.
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]] :
 // CHECK:         apply {{.*}} [[SELF_COPY]]
@@ -259,8 +257,8 @@ struct AO<T>: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness for 'bar', which is mutating in protocol but nonmutating in impl
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3bar{{.*}} : $@convention(witness_method) <T> (@inout AO<T>) -> ()
-// CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3bar{{.*}} : $@convention(witness_method) <τ_0_0> (@inout AO<τ_0_0>) -> ()
+// CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<τ_0_0>):
 // -- NB: This copy *is* necessary, unless we're willing to assume an inout
 //        parameter is not mutably aliased.
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]] :
@@ -281,33 +279,37 @@ class C: Fooable, Barrable {
   // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1Cc{{.*}} : $@convention(method) (@owned C) -> @owned C {
   // CHECK:       bb0([[SELF:%.*]] : $C):
   // CHECK:         [[MARKED_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]]
-  // CHECK-NOT:     [[SELF]]
-  // CHECK-NOT:     strong_retain [[MARKED_SELF]]
-  // CHECK-NOT:     strong_release [[MARKED_SELF]]
-  // CHECK:         return [[MARKED_SELF]]
+  // CHECK:         [[MARKED_SELF_RESULT:%.*]] = copy_value [[MARKED_SELF]]
+  // CHECK:         destroy_value [[MARKED_SELF]]
+  // CHECK:         return [[MARKED_SELF_RESULT]]
+  // CHECK:       } // end sil function '_TFC15guaranteed_self1Cc{{.*}}'
 
   // @objc thunk for initializing constructor
   // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1Cc{{.*}} : $@convention(objc_method) (@owned C) -> @owned C
   // CHECK:       bb0([[SELF:%.*]] : $C):
-  // CHECK-NOT:     retain{{.*}} [[SELF]]
+  // CHECK-NOT:     copy_value [[SELF]]
   // CHECK:         [[SELF2:%.*]] = apply {{%.*}}([[SELF]])
-  // CHECK-NOT:     release{{.*}} [[SELF]]
-  // CHECK-NOT:     release{{.*}} [[SELF2]]
+  // CHECK-NOT:     destroy_value [[SELF]]
+  // CHECK-NOT:     destroy_value [[SELF2]]
   // CHECK:         return [[SELF2]]
+  // CHECK: } // end sil function '_TToFC15guaranteed_self1Cc{{.*}}'
   @objc required init() {}
 
 
   // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1C3foo{{.*}} : $@convention(method) (Int, @guaranteed C) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
-  // CHECK-NOT:     retain
-  // CHECK-NOT:     release
+  // CHECK-NOT:     copy_value
+  // CHECK-NOT:     destroy_value
+  // CHECK:       } // end sil function '_TFC15guaranteed_self1C3foo{{.*}}'
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1C3foo{{.*}} : $@convention(objc_method) (Int, C) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
-  // CHECK:         retain{{.*}} [[SELF]]
-  // CHECK:         apply {{.*}} [[SELF]]
-  // CHECK:         release{{.*}} [[SELF]]
-  // CHECK-NOT:     release{{.*}} [[SELF]]
+  // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:         apply {{.*}}({{.*}}, [[SELF_COPY]])
+  // CHECK:         destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF]]
+  // CHECK:       } // end sil function '_TToFC15guaranteed_self1C3foo{{.*}}'
   @objc func foo(_ x: Int) {
     self.foo(x)
   }
@@ -318,19 +320,21 @@ class C: Fooable, Barrable {
     self.bas()
   }
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15guaranteed_self1Cg5prop1Si : $@convention(objc_method) (C) -> Int
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1Cg5prop1Si : $@convention(objc_method) (C) -> Int
   // CHECK:       bb0([[SELF:%.*]] : $C):
-  // CHECK:         retain{{.*}} [[SELF]]
-  // CHECK:         apply {{.*}}([[SELF]])
-  // CHECK:         release{{.*}} [[SELF]]
-  // CHECK-NOT:     release{{.*}} [[SELF]]
+  // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:         apply {{.*}}([[SELF_COPY]])
+  // CHECK:         destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF]]
+  // CHECK-NOT:     destroy_value [[SELF_COPY]]
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15guaranteed_self1Cs5prop1Si : $@convention(objc_method) (Int, C) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1Cs5prop1Si : $@convention(objc_method) (Int, C) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
-  // CHECK:         retain{{.*}} [[SELF]]
-  // CHECK:         apply {{.*}} [[SELF]]
-  // CHECK:         release{{.*}} [[SELF]]
-  // CHECK-NOT:     release{{.*}} [[SELF]]
+  // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:         apply {{.*}} [[SELF_COPY]]
+  // CHECK:         destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF]]
   // CHECK:       }
   @objc var prop1: Int = 0
   @objc var prop2: Int {
@@ -355,25 +359,24 @@ class D: C {
 
   // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1Dc{{.*}} : $@convention(method) (@owned D) -> @owned D
   // CHECK:       bb0([[SELF:%.*]] : $D):
-  // CHECK:         [[SELF_BOX:%.*]] = alloc_box $D
+  // CHECK:         [[SELF_BOX:%.*]] = alloc_box ${ var D }
   // CHECK-NEXT:    [[PB:%.*]] = project_box [[SELF_BOX]]
   // CHECK-NEXT:    [[SELF_ADDR:%.*]] = mark_uninitialized [derivedself] [[PB]]
-  // CHECK-NEXT:    store [[SELF]] to [[SELF_ADDR]]
+  // CHECK-NEXT:    store [[SELF]] to [init] [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF_ADDR]]
-  // CHECK:         [[SELF1:%.*]] = load [[SELF_ADDR]]
+  // CHECK:         [[SELF1:%.*]] = load_borrow [[SELF_ADDR]]
   // CHECK-NEXT:    [[SUPER1:%.*]] = upcast [[SELF1]]
   // CHECK-NOT:     [[SELF_ADDR]]
   // CHECK:         [[SUPER2:%.*]] = apply {{.*}}([[SUPER1]])
   // CHECK-NEXT:    [[SELF2:%.*]] = unchecked_ref_cast [[SUPER2]]
-  // CHECK-NEXT:    store [[SELF2]] to [[SELF_ADDR]]
+  // CHECK-NEXT:    store [[SELF2]] to [init] [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF1]]
   // CHECK-NOT:     [[SUPER1]]
   // CHECK-NOT:     [[SELF2]]
   // CHECK-NOT:     [[SUPER2]]
-  // CHECK:         [[SELF_FINAL:%.*]] = load [[SELF_ADDR]]
-  // CHECK-NEXT:    retain{{.*}} [[SELF_FINAL]]
-  // CHECK-NEXT:    release{{.*}} [[SELF_BOX]]
+  // CHECK:         [[SELF_FINAL:%.*]] = load [copy] [[SELF_ADDR]]
+  // CHECK-NEXT:    destroy_value [[SELF_BOX]]
   // CHECK-NEXT:    return [[SELF_FINAL]]
   required init() {
     super.init()
@@ -381,9 +384,10 @@ class D: C {
 
   // CHECK-LABEL: sil shared [transparent] [thunk] @_TTDFC15guaranteed_self1D3foo{{.*}} : $@convention(method) (Int, @guaranteed D) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]]):
-  // CHECK:         retain{{.*}} [[SELF]]
-  // CHECK:         release{{.*}} [[SELF]]
-  // CHECK-NOT:     release{{.*}} [[SELF]]
+  // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:         destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF]]
   // CHECK:       }
   dynamic override func foo(_ x: Int) {
     self.foo(x)
@@ -407,10 +411,10 @@ func AO_curryThunk<T>(_ ao: AO<T>) -> ((AO<T>) -> (Int) -> ()/*, Int -> ()*/) {
 // CHECK: bb0([[ARG0_PTR:%.*]] : $*FakeElement, [[ARG1_PTR:%.*]] : $*FakeArray):
 // CHECK: [[GUARANTEED_COPY_STACK_SLOT:%.*]] = alloc_stack $FakeArray
 // CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]
-// CHECK: [[ARG0:%.*]] = load [[ARG0_PTR]]
+// CHECK: [[ARG0:%.*]] = load [trivial] [[ARG0_PTR]]
 // CHECK: function_ref (extension in guaranteed_self):guaranteed_self.SequenceDefaults._constrainElement
 // CHECK: [[FUN:%.*]] = function_ref @_{{.*}}
-// CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[GUARANTEED_COPY_STACK_SLOT]])
+// CHECK: apply [[FUN]]<FakeArray>([[ARG0]], [[GUARANTEED_COPY_STACK_SLOT]])
 // CHECK: destroy_addr [[GUARANTEED_COPY_STACK_SLOT]]
 
 class Z {}
@@ -451,7 +455,7 @@ extension FakeArray : Sequence {
 }
 
 // -----------------------------------------------------------------------------
-// Make sure that we do not emit extra retains when accessing let fields of
+// Make sure that we do not emit extra copy_values when accessing let fields of
 // guaranteed parameters.
 // -----------------------------------------------------------------------------
 
@@ -468,27 +472,24 @@ class LetFieldClass {
   // CHECK-LABEL: sil hidden @_TFC15guaranteed_self13LetFieldClass10letkMethod{{.*}} : $@convention(method) (@guaranteed LetFieldClass) -> () {
   // CHECK: bb0([[CLS:%.*]] : $LetFieldClass):
   // CHECK: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[KRAKEN:%.*]] = load [[KRAKEN_ADDR]]
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load_borrow [[KRAKEN_ADDR]]
   // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
   // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[KRAKEN:%.*]] = load [[KRAKEN_ADDR]]
-  // CHECK-NEXT: strong_retain [[KRAKEN]]
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
-  // CHECK-NEXT: strong_retain [[KRAKEN]]
-  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN]])
-  // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box $Kraken
+  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = copy_value [[KRAKEN]]
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
+  // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[KRAKEN2:%.*]] = load [[KRAKEN_ADDR]]
-  // CHECK-NEXT: strong_retain [[KRAKEN2]]
-  // CHECK-NEXT: store [[KRAKEN2]] to [[PB]]
+  // CHECK-NEXT: [[KRAKEN2:%.*]] = load [copy] [[KRAKEN_ADDR]]
+  // CHECK-NEXT: store [[KRAKEN2]] to [init] [[PB]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
-  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [[PB]]
-  // CHECK-NEXT: strong_retain [[KRAKEN_COPY]]
+  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [copy] [[PB]]
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
-  // CHECK-NEXT: strong_release [[KRAKEN_BOX]]
-  // CHECK-NEXT: strong_release [[KRAKEN]]
+  // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
+  // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
   func letkMethod() {
@@ -505,23 +506,22 @@ class LetFieldClass {
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
   // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
   // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
-  // CHECK-NEXT: strong_release [[KRAKEN]]
+  // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
-  // CHECK-NEXT: strong_retain [[KRAKEN]]
-  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN]])
-  // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box $Kraken
+  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = copy_value [[KRAKEN]]
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
+  // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN2:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
-  // CHECK-NEXT: store [[KRAKEN2]] to [[PB]]
+  // CHECK-NEXT: store [[KRAKEN2]] to [init] [[PB]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
-  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [[PB]]
-  // CHECK-NEXT: strong_retain [[KRAKEN_COPY]]
+  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [copy] [[PB]]
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
-  // CHECK-NEXT: strong_release [[KRAKEN_BOX]]
-  // CHECK-NEXT: strong_release [[KRAKEN]]
+  // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
+  // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
   func varkMethod() {
@@ -534,7 +534,7 @@ class LetFieldClass {
 }
 
 // -----------------------------------------------------------------------------
-// Make sure that in all of the following cases find has only one retain in it.
+// Make sure that in all of the following cases find has only one copy_value in it.
 // -----------------------------------------------------------------------------
 
 class ClassIntTreeNode {
@@ -544,10 +544,10 @@ class ClassIntTreeNode {
   init() {}
 
   // CHECK-LABEL: sil hidden @_TFC15guaranteed_self16ClassIntTreeNode4find{{.*}} : $@convention(method) (Int, @guaranteed ClassIntTreeNode) -> @owned ClassIntTreeNode {
-  // CHECK-NOT: strong_release
-  // CHECK: strong_retain
-  // CHECK-NOT: strong_retain
-  // CHECK-NOT: strong_release
+  // CHECK-NOT: destroy_value
+  // CHECK: copy_value
+  // CHECK-NOT: copy_value
+  // CHECK-NOT: destroy_value
   // CHECK: return
   func find(_ v : Int) -> ClassIntTreeNode {
     if v == value { return self }

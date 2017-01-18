@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -remove-pins %s | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -remove-pins %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -185,7 +185,7 @@ bb0(%0 : $*MyArray<MyInt>):
   %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)
   %9 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 0
   %10 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 1
-  strong_unpin %9 : $Optional<Builtin.NativeObject>  
+  strong_unpin %9 : $Optional<Builtin.NativeObject>
   %11 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 1
   %12 = tuple(%10 : $Builtin.Int1, %11 : $Builtin.Int1)
   return %12 : $(Builtin.Int1, Builtin.Int1)

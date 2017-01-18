@@ -1,6 +1,6 @@
-// RUN: rm -rf %t  &&  mkdir %t
+// RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: %target-build-swift %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 protocol MyPrintable {

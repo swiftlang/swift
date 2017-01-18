@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -47,7 +47,7 @@ public struct PrefixThroughTest {
   public let position: Int
   public let expected: [Int]
   public let loc: SourceLoc
-  
+
   init(
     collection: [Int], position: Int, expected: [Int],
     file: String = #file, line: UInt = #line
@@ -153,7 +153,7 @@ public let subscriptRangeTests = [
     collection: [ 1010, 2020, 3030, 4040, 5050 ],
     bounds: 0..<2,
     count: 5),
-  
+
   // Slice an empty suffix.
   SubscriptRangeTest(
     expected: [],
@@ -332,7 +332,7 @@ public struct IndexOffsetByTest {
   public let distance: Int
   public let limit: Int?
   public let expectedOffset: Int?
-  
+
   public let loc: SourceLoc
 
   public init(
@@ -404,7 +404,7 @@ public struct IndexAfterTest {
   public init(start: Int, end: Int, file: String = #file, line: UInt = #line) {
     self.start = start
     self.end = end
-    self.loc = SourceLoc(file, line, 
+    self.loc = SourceLoc(file, line,
       comment: "index(after:) and formIndex(after:) test data")
   }
 }
@@ -468,24 +468,15 @@ internal enum _SubSequenceSubscriptOnRangeMode {
   }
 }
 
-internal func _product<C1 : Collection, C2 : Collection>(
-  _ c1: C1, _ c2: C2
-) -> [(C1.Iterator.Element, C2.Iterator.Element)] {
-  var result: [(C1.Iterator.Element, C2.Iterator.Element)] = []
-  for e1 in c1 {
-    for e2 in c2 {
-      result.append((e1, e2))
-    }
-  }
-  return result
-}
-
 %{
   from gyb_stdlib_support import collectionForTraversal
   def testConstraints(protocol):
-    return '''    
+    return '''
     C : %(protocol)s,
     CollectionWithEquatableElement : %(protocol)s,
+    CollectionWithEquatableElement.SubSequence : Collection,
+    CollectionWithEquatableElement.SubSequence.Iterator.Element
+      == CollectionWithEquatableElement.Iterator.Element,
     C.SubSequence : %(protocol)s,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
     C.SubSequence.Index == C.Index,
@@ -511,21 +502,20 @@ internal func _product<C1 : Collection, C2 : Collection>(
     wrapValueIntoEquatable: @escaping (
       MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
 
-    extractValueFromEquatable:
-      ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
-    outOfBoundsSubscriptOffset: Int = 1, 
+    outOfBoundsSubscriptOffset: Int = 1,
     collectionIsBidirectional: Bool
   '''
-  
+
   import re
   forwardTestArgs = ',\n    '.join(
     [ x.group(1) + ': ' + x.group(1)
       for x in re.finditer(r'([a-zA-Z0-9_]+):', testParams) ]
   ).replace('testNamePrefix: ', '\n    ')
-}% 
+}%
 extension TestSuite {
   public func addCollectionTests<
     C, CollectionWithEquatableElement
@@ -623,7 +613,7 @@ extension TestSuite {
         _blackHole(c[index])
       }
 
-      let tests = _product(
+      let tests = cartesianProduct(
         subscriptRangeTests,
         _SubSequenceSubscriptOnIndexMode.all)
 
@@ -722,7 +712,7 @@ extension TestSuite {
         _blackHole(c[index..<index])
       }
 
-      let tests = _product(
+      let tests = cartesianProduct(
         subscriptRangeTests,
         _SubSequenceSubscriptOnRangeMode.all)
 
@@ -899,7 +889,7 @@ extension TestSuite {
         let c = makeWrappedCollection(test.collection)
         let result = c.first
         if test.isEmpty {
-          expectEmpty(result)
+          expectNil(result)
         } else {
           expectOptionalEqual(
             test.collection[0],
@@ -1184,7 +1174,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
       let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
       var slice = c[c.startIndex..<c.startIndex]
-      expectEmpty(slice.popFirst())
+      expectNil(slice.popFirst())
     }
 
     //===------------------------------------------------------------------===//
@@ -1218,7 +1208,7 @@ extension TestSuite {
     //          index(before: of i: Index) -> Index
     //          formIndex(before: i: inout Index)
 
-    // FIXME: swift-3-indexing-model - 
+    // FIXME: swift-3-indexing-model -
     //   enhance the following for negative direction?
     //          advance(i: Index, by n: IndexDistance) -> Index
     //          advance(
@@ -1234,7 +1224,7 @@ extension TestSuite {
         let c = makeWrappedCollection(test.collection)
         let result = c.last
         if test.isEmpty {
-          expectEmpty(result)
+          expectNil(result)
         } else {
           expectOptionalEqual(
             test.collection[test.count - 1],
@@ -1391,7 +1381,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).popLast()/slice/empty/semantics") {
       let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
       var slice = c[c.startIndex..<c.startIndex]
-      expectEmpty(slice.popLast())
+      expectNil(slice.popLast())
     }
 
 
@@ -1525,7 +1515,7 @@ extension TestSuite {
     }
 
     addBidirectionalCollectionTests(${forwardTestArgs})
-    
+
     testNamePrefix += String(describing: C.Type.self)
 
     func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
@@ -1699,7 +1689,7 @@ extension TestSuite {
           expectEqual(c.nthIndex(expectedOffset), new!,
             stackTrace: SourceLocStack().with(test.loc))
         } else {
-          expectEmpty(new)
+          expectNil(new)
         }
       }
     }
@@ -1740,7 +1730,7 @@ extension TestSuite {
           expectEqual(c.nthIndex(expectedOffset), new!,
             stackTrace: SourceLocStack().with(test.loc))
         } else {
-          expectEmpty(new)
+          expectNil(new)
         }
       } else {
         expectCrashLater()

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -profile-generate %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen -profile-generate %s | %FileCheck %s
 
 // CHECK: sil hidden @[[F_EMPTY:.*empty.*]] :
 // CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_basic.swift:[[F_EMPTY]]"

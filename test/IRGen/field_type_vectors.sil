@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
 import Swift
 
-// CHECK-LABEL: @_TMnV18field_type_vectors3Foo = hidden constant 
+// CHECK-LABEL: @_TMnV18field_type_vectors3Foo = hidden constant
 // CHECK:         %swift.type** (%swift.type*)* [[FOO_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 struct Foo {
   var x: Int
@@ -38,9 +38,9 @@ struct Bas<T, U> {
 //    vector slot, with type %swift.type**
 // CHECK:         i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, i64, i8*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type**
 class Zim<T, U> {
-  var foo: Foo? = nil
-  var bar: Bar<T>? = nil
-  var bas: Bas<T, U>? = nil
+  var foo: Foo?
+  var bar: Bar<T>?
+  var bas: Bas<T, U>?
 }
 sil_vtable Zim {}
 

@@ -7,7 +7,7 @@ public enum Foo {
     case B(String)
 }
 
-// RUN: %target-swift-ide-test -print-ast-typechecked -print-interface -source-filename %s | FileCheck %s -check-prefix=CHECK1
+// RUN: %target-swift-ide-test -print-ast-typechecked -print-interface -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // CHECK1: {{^}}/// This is my enum.{{$}}
 // CHECK1: {{^}}public enum Foo {{{$}}
 // CHECK1: {{^}}    /// This is really special.{{$}}

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
@@ -69,8 +69,8 @@ if #available(OSX 10.12, *) {
 
   struct TKTokenTest {
     func f1(session: TKTokenSession, sessionDelegate: TKTokenSessionDelegate,
-            algorithm: TKTokenSessionDelegate.KeyAlgorithm,
-            parameters: TKTokenSessionDelegate.KeyExchangeParameters) throws {
+            algorithm: TKTokenKeyAlgorithm,
+            parameters: TKTokenKeyExchangeParameters) throws {
       let _: Bool = sessionDelegate.tokenSession!(session, supports: .none,
            keyObjectID: "", algorithm: algorithm)
       let _: Data = try sessionDelegate.tokenSession!(session, sign: Data(),

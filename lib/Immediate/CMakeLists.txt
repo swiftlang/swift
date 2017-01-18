@@ -7,6 +7,6 @@ add_swift_library(swiftImmediate STATIC
     swiftSILGen
     swiftSILOptimizer
     swiftIRGen
-  COMPONENT_DEPENDS
+  LLVM_COMPONENT_DEPENDS
     linker mcjit)
 

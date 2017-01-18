@@ -1,5 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=T1 | FileCheck %s -check-prefix=T1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=T2 | FileCheck %s -check-prefix=T2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=T1 | %FileCheck %s -check-prefix=T1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=T2 | %FileCheck %s -check-prefix=T2
 
 // REQUIRES: objc_interop
 

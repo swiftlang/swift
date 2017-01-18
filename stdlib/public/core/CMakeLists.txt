@@ -2,11 +2,11 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 #===----------------------------------------------------------------------===#
 
@@ -44,6 +44,8 @@ set(SWIFTLIB_ESSENTIAL
   CString.swift
   CTypes.swift
   DebuggerSupport.swift
+  DropWhile.swift.gyb
+  Dump.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
@@ -83,20 +85,23 @@ set(SWIFTLIB_ESSENTIAL
   MutableCollection.swift
   NewtypeWrapper.swift.gyb
   ObjCMirrors.swift
+  ObjectIdentifier.swift
   Optional.swift
   OptionSet.swift
   OutputStream.swift
   Pointer.swift
   Policy.swift
+  PrefixWhile.swift.gyb
   Print.swift
   RandomAccessCollection.swift
   Range.swift.gyb
   RangeReplaceableCollection.swift.gyb
-  Reflection.swift
+  ReflectionLegacy.swift
   Repeat.swift
   REPL.swift
   Reverse.swift
   Runtime.swift.gyb
+  SipHash.swift.gyb
   Sequence.swift
   SequenceAlgorithms.swift.gyb
   SequenceWrapper.swift
@@ -111,7 +116,9 @@ set(SWIFTLIB_ESSENTIAL
   String.swift
   StringBridge.swift
   StringBuffer.swift
+  StringComparable.swift
   StringCore.swift
+  StringHashable.swift
   StringInterpolation.swift.gyb
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
@@ -127,6 +134,7 @@ set(SWIFTLIB_ESSENTIAL
   Unmanaged.swift
   UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
+  UnsafeRawBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
   UnsafeRawPointer.swift.gyb
   WriteBackMutableSlice.swift
@@ -169,12 +177,15 @@ else()
   # effort has been completed.
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
-  find_package(ICU REQUIRED COMPONENTS uc i18n)
-  list(APPEND swift_core_private_link_libraries
-      ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY})
+  if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
+    list(APPEND swift_core_private_link_libraries
+      ICU_UC ICU_I18N)
+  else()
+    list(APPEND swift_core_private_link_libraries -licui18n -licuuc -licudata)
+  endif()
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
   execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
       OUTPUT_VARIABLE ENV_SYSTEMROOT)
 
@@ -201,6 +212,12 @@ if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
 
+
+set(shared_only_libs)
+if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+   list(APPEND shared_only_libs swiftImageInspectionShared)
+endif()
+
 add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
   ${SWIFTLIB_SOURCES}
   # The copy_shim_headers target dependency is required to let the
@@ -216,5 +233,6 @@ add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STD
   LINK_FLAGS ${swift_core_link_flags}
   PRIVATE_LINK_LIBRARIES ${swift_core_private_link_libraries}
   INCORPORATE_OBJECT_LIBRARIES swiftRuntime swiftStdlibStubs
+  INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY ${shared_only_libs}
   FRAMEWORK_DEPENDS ${swift_core_framework_depends}
   INSTALL_IN_COMPONENT stdlib)

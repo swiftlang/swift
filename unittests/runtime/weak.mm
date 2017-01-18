@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -102,7 +102,7 @@ TEST(WeakTest, simple_objc) {
   ASSERT_NE(o2, nullptr);
 
   DestroyedObjCCount = 0;
-  
+
   WeakReference ref1;
   swift_unknownWeakInit(&ref1, o1);
 
@@ -195,7 +195,7 @@ TEST(WeakTest, simple_swift_and_objc) {
   ASSERT_NE(o2, nullptr);
 
   DestroyedObjCCount = 0;
-  
+
   WeakReference ref1;
   swift_unknownWeakInit(&ref1, o1);
 
@@ -246,7 +246,7 @@ TEST(WeakTest, simple_objc_and_swift) {
   ASSERT_NE(o2, nullptr);
 
   DestroyedObjCCount = 0;
-  
+
   WeakReference ref1;
   swift_unknownWeakInit(&ref1, o1);
 

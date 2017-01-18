@@ -11,7 +11,9 @@
     "StringBridge.swift",
     "StringBuffer.swift",
     "StringCharacterView.swift",
+    "StringComparable.swift",
     "StringCore.swift",
+    "StringHashable.swift",
     "StringIndexConversions.swift",
     "StringInterpolation.swift",
     "StringLegacy.swift",
@@ -63,6 +65,8 @@
         "Filter.swift",
         "Reverse.swift",
         "Slice.swift",
+        "DropWhile.swift",
+        "PrefixWhile.swift",
         "SequenceWrapper.swift",
         "LazyCollection.swift",
         "LazySequence.swift"],
@@ -92,10 +96,12 @@
     "MemoryLayout.swift"
   ],
   "Reflection": [
-    "Mirrors.swift",
+    "Dump.swift",
     "Mirror.swift",
-    "Reflection.swift",
-    "ObjCMirrors.swift"
+    "Mirrors.swift",
+    "ObjCMirrors.swift",
+    "ObjectIdentifier.swift",
+    "ReflectionLegacy.swift"
   ],
   "Math": [
     "SetAlgebra.swift",
@@ -119,7 +125,8 @@
     "Pointer.swift",
     "UnsafePointer.swift",
     "UnsafeRawPointer.swift",
-    "UnsafeBufferPointer.swift"
+    "UnsafeBufferPointer.swift",
+    "UnsafeRawBufferPointer.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",
@@ -129,6 +136,7 @@
     "AnyHashable.swift",
     "Interval.swift",
     "Hashing.swift",
+    "SipHash.swift",
     "ErrorType.swift",
     "InputStream.swift",
     "LifetimeManager.swift",

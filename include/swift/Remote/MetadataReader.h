@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Unreachable.h"
 
 #include <vector>
 #include <unordered_map>
@@ -242,7 +243,7 @@ class TypeDecoder {
         if (element->getKind() != NodeKind::TupleElement)
           return BuiltType();
 
-        // If the tuple element is labelled, add its label to 'labels'.
+        // If the tuple element is labeled, add its label to 'labels'.
         unsigned typeChildIndex = 0;
         if (element->getChild(0)->getKind() == NodeKind::TupleElementName) {
           // Add spaces to terminate all the previous labels if this
@@ -312,6 +313,11 @@ class TypeDecoder {
       if (!base)
         return BuiltType();
       return Builder.createSILBoxType(base);
+    }
+    case NodeKind::SILBoxTypeWithLayout: {
+      // TODO: Implement SILBoxTypeRefs with layout. As a stopgap, specify the
+      // NativeObject type ref.
+      return Builder.createBuiltinType("Bo");
     }
     default:
       return BuiltType();
@@ -561,37 +567,28 @@ public:
   }
 
   /// Given a remote pointer to class metadata, attempt to discover its class
-  /// instance size and alignment.
-  std::tuple<bool, unsigned, unsigned>
-  readInstanceSizeAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
-    auto superMeta = readMetadata(MetadataAddress);
-    if (!superMeta || superMeta->getKind() != MetadataKind::Class)
-      return std::make_tuple(false, 0, 0);
+  /// instance size and whether fields should use the resilient layout strategy.
+  std::pair<bool, unsigned>
+  readInstanceStartAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
+    auto meta = readMetadata(MetadataAddress);
+    if (!meta || meta->getKind() != MetadataKind::Class)
+      return std::make_pair(false, 0);
 
-    auto super = cast<TargetClassMetadata<Runtime>>(superMeta);
+    // The following algorithm only works on the non-fragile Apple runtime.
 
-    // See swift_initClassMetadata_UniversalStrategy()
-    uint32_t size, align;
-    if (super->isTypeMetadata()) {
-      size = super->getInstanceSize();
-      align = super->getInstanceAlignMask() + 1;
-    } else {
-      // The following algorithm only works on the non-fragile Apple runtime.
+    // Grab the RO-data pointer.  This part is not ABI.
+    StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
+    if (!roDataPtr)
+      return std::make_pair(false, 0);
 
-      // Grab the RO-data pointer.  This part is not ABI.
-      StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
-      if (!roDataPtr)
-        return std::make_tuple(false, 0, 0);
+    // Get the address of the InstanceStart field.
+    auto address = roDataPtr + sizeof(uint32_t) * 1;
 
-      auto address = roDataPtr + sizeof(uint32_t) * 2;
+    unsigned start;
+    if (!Reader->readInteger(RemoteAddress(address), &start))
+      return std::make_pair(false, 0);
 
-      align = 16; // malloc alignment guarantee
-
-      if (!Reader->readInteger(RemoteAddress(address), &size))
-        return std::make_tuple(false, 0, 0);
-    }
-
-    return std::make_tuple(true, size, align);
+    return std::make_pair(true, start);
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
@@ -765,6 +762,8 @@ public:
       return BuiltOpaque;
     }
     }
+
+    swift_unreachable("Unhandled MetadataKind in switch");
   }
 
   BuiltType readTypeFromMangledName(const char *MangledTypeName,
@@ -931,7 +930,7 @@ protected:
     // This is ABI.
     static constexpr auto OffsetToName =
     roundUpToAlignment(size_t(12), sizeof(StoredPointer))
-    + sizeof(StoredPointer);;
+      + sizeof(StoredPointer);
 
     // Read the name pointer.
     StoredPointer namePtr;
@@ -963,15 +962,19 @@ protected:
         return _readMetadata<TargetEnumMetadata>(address);
       case MetadataKind::Existential: {
         StoredPointer numProtocolsAddress = address +
-        TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
+          TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
         StoredPointer numProtocols;
         if (!Reader->readInteger(RemoteAddress(numProtocolsAddress),
                                  &numProtocols))
           return nullptr;
 
+        // Make sure the number of protocols is reasonable
+        if (numProtocols >= 256)
+          return nullptr;
+
         auto totalSize = sizeof(TargetExistentialTypeMetadata<Runtime>)
-        + numProtocols *
-        sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
+          + numProtocols *
+          sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
 
         return _readMetadata(address, totalSize);
       }
@@ -997,13 +1000,18 @@ protected:
         return _readMetadata<TargetStructMetadata>(address);
       case MetadataKind::Tuple: {
         auto numElementsAddress = address +
-        TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
+          TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
         StoredSize numElements;
         if (!Reader->readInteger(RemoteAddress(numElementsAddress),
                                  &numElements))
           return nullptr;
         auto totalSize = sizeof(TargetTupleTypeMetadata<Runtime>)
-        + numElements * sizeof(StoredPointer);
+          + numElements * sizeof(StoredPointer);
+
+        // Make sure the number of elements is reasonable
+        if (numElements >= 256)
+          return nullptr;
+
         return _readMetadata(address, totalSize);
       }
     }
@@ -1254,4 +1262,3 @@ namespace llvm {
 }
 
 #endif // SWIFT_REFLECTION_READER_H
-

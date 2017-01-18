@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 protocol P {
   func downgrade(_ m68k: Bool) -> Self
@@ -105,12 +105,12 @@ func errorHandler(_ e: Error) throws -> Error {
 // CHECK:  try_apply [[FUNC]]<[[OPEN_TYPE]]>([[ADDR]], [[OPEN]])
 //
 // CHECK: bb1
-// CHECK:  strong_release %0 : $Error
+// CHECK:  destroy_value %0 : $Error
 // CHECK:  return [[RESULT]] : $Error
 //
 // CHECK: bb2([[FAILURE:%.*]] : $Error):
 // CHECK:  dealloc_existential_box [[RESULT]]
-// CHECK:  strong_release %0 : $Error
+// CHECK:  destroy_value %0 : $Error
 // CHECK:  throw [[FAILURE]] : $Error
 //
   return try e.returnOrThrowSelf()
@@ -124,7 +124,7 @@ class EraseDynamicSelf {
 
 // CHECK-LABEL: sil hidden @_TZFC19existential_erasure16EraseDynamicSelf7factoryfT_DS0_ : $@convention(method) (@thick EraseDynamicSelf.Type) -> @owned EraseDynamicSelf
 // CHECK:  [[ANY:%.*]] = alloc_stack $Any
-// CHECK:  init_existential_addr [[ANY]] : $*Any, $Self
+// CHECK:  init_existential_addr [[ANY]] : $*Any, $@dynamic_self EraseDynamicSelf
 //
   class func factory() -> Self {
     let instance = self.init()

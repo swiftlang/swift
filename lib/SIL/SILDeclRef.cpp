@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -112,12 +113,127 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return vd->getAttrs().hasAttribute<DynamicAttr>();
 }
 
+/// TODO: We should consult the cached LoweredLocalCaptures the SIL
+/// TypeConverter calculates, but that would require plumbing SILModule&
+/// through every SILDeclRef constructor. Since this is only used to determine
+/// "natural uncurry level", and "uncurry level" is a concept we'd like to
+/// phase out, it's not worth it.
+static bool hasLoweredLocalCaptures(AnyFunctionRef AFR,
+                                    llvm::DenseSet<AnyFunctionRef> &visited) {
+  if (!AFR.getCaptureInfo().hasLocalCaptures())
+    return false;
+  
+  // Scan for local, non-function captures.
+  bool functionCapturesToRecursivelyCheck = false;
+  auto addFunctionCapture = [&](AnyFunctionRef capture) {
+    if (visited.find(capture) == visited.end())
+      functionCapturesToRecursivelyCheck = true;
+  };
+  for (auto &capture : AFR.getCaptureInfo().getCaptures()) {
+    if (!capture.getDecl()->getDeclContext()->isLocalContext())
+      continue;
+    // We transitively capture a local function's captures.
+    if (auto func = dyn_cast<AbstractFunctionDecl>(capture.getDecl())) {
+      addFunctionCapture(func);
+      continue;
+    }
+    // We may either directly capture properties, or capture through their
+    // accessors.
+    if (auto var = dyn_cast<VarDecl>(capture.getDecl())) {
+      switch (var->getStorageKind()) {
+      case VarDecl::StoredWithTrivialAccessors:
+        llvm_unreachable("stored local variable with trivial accessors?");
+
+      case VarDecl::InheritedWithObservers:
+        llvm_unreachable("inherited local variable?");
+
+      case VarDecl::StoredWithObservers:
+      case VarDecl::Addressed:
+      case VarDecl::AddressedWithTrivialAccessors:
+      case VarDecl::AddressedWithObservers:
+      case VarDecl::ComputedWithMutableAddress:
+        // Directly capture storage if we're supposed to.
+        if (capture.isDirect())
+          return true;
+
+        // Otherwise, transitively capture the accessors.
+        SWIFT_FALLTHROUGH;
+
+      case VarDecl::Computed:
+        addFunctionCapture(var->getGetter());
+        if (auto setter = var->getSetter())
+          addFunctionCapture(setter);
+        continue;
+      
+      case VarDecl::Stored:
+        return true;
+      }
+    }
+    // Anything else is directly captured.
+    return true;
+  }
+  
+  // Recursively consider function captures, since we didn't have any direct
+  // captures.
+  auto captureHasLocalCaptures = [&](AnyFunctionRef capture) -> bool {
+    if (visited.insert(capture).second)
+      return hasLoweredLocalCaptures(capture, visited);
+    return false;
+  };
+  
+  if (functionCapturesToRecursivelyCheck) {
+    for (auto &capture : AFR.getCaptureInfo().getCaptures()) {
+      if (!capture.getDecl()->getDeclContext()->isLocalContext())
+        continue;
+      if (auto func = dyn_cast<AbstractFunctionDecl>(capture.getDecl())) {
+        if (captureHasLocalCaptures(func))
+          return true;
+        continue;
+      }
+      if (auto var = dyn_cast<VarDecl>(capture.getDecl())) {
+        switch (var->getStorageKind()) {
+        case VarDecl::StoredWithTrivialAccessors:
+          llvm_unreachable("stored local variable with trivial accessors?");
+          
+        case VarDecl::InheritedWithObservers:
+          llvm_unreachable("inherited local variable?");
+          
+        case VarDecl::StoredWithObservers:
+        case VarDecl::Addressed:
+        case VarDecl::AddressedWithTrivialAccessors:
+        case VarDecl::AddressedWithObservers:
+        case VarDecl::ComputedWithMutableAddress:
+          assert(!capture.isDirect() && "should have short circuited out");
+          // Otherwise, transitively capture the accessors.
+          SWIFT_FALLTHROUGH;
+          
+        case VarDecl::Computed:
+          if (captureHasLocalCaptures(var->getGetter()))
+            return true;
+          if (auto setter = var->getSetter())
+            if (captureHasLocalCaptures(setter))
+              return true;
+          continue;
+        
+        case VarDecl::Stored:
+          llvm_unreachable("should have short circuited out");
+        }
+      }
+      llvm_unreachable("should have short circuited out");
+    }
+  }
+  
+  return false;
+}
+
 static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
   assert(AFR.getParameterLists().size() >= 1 && "no arguments for func?!");
   unsigned Level = AFR.getParameterLists().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
   // context.
-  if (AFR.getCaptureInfo().hasLocalCaptures())
+  llvm::DenseSet<AnyFunctionRef> visited;
+  visited.insert(AFR);
+  if (hasLoweredLocalCaptures(AFR, visited))
     Level += 1;
   return Level;
 }
@@ -325,7 +441,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // Stored property initializers have hidden linkage, since they are
   // not meant to be used from outside of their module.
   if (isStoredPropertyInitializer())
-    return SILLinkage::Hidden;
+    return (forDefinition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
 
   // Declarations imported from Clang modules have shared linkage.
   const SILLinkage ClangLinkage = SILLinkage::Shared;
@@ -367,7 +483,15 @@ bool SILDeclRef::isTransparent() const {
   if (hasAutoClosureExpr())
     return true;
 
-  return hasDecl() ? getDecl()->isTransparent() : false;
+  if (hasDecl()) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(getDecl()))
+      return AFD->isTransparent();
+
+    if (auto *ASD = dyn_cast<AbstractStorageDecl>(getDecl()))
+      return ASD->isTransparent();
+  }
+
+  return false;
 }
 
 /// \brief True if the function should have its body serialized.
@@ -453,7 +577,8 @@ static void mangleClangDecl(raw_ostream &buffer,
   importer->getMangledName(buffer, clangDecl);
 }
 
-static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
+static std::string mangleConstantOld(SILDeclRef c,
+                                     SILDeclRef::ManglingKind Kind) {
   using namespace Mangle;
   Mangler mangler;
 
@@ -463,16 +588,22 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
   //   mangled-name ::= '_TTO' global   // Foreign function thunk
   //   mangled-name ::= '_TTd' global   // Direct
   StringRef introducer = "_T";
-  if (!prefix.empty()) {
-    introducer = prefix;
-  } else if (c.isForeign) {
-    assert(prefix.empty() && "can't have custom prefix on thunk");
-    introducer = "_TTo";
-  } else if (c.isDirectReference) {
-    introducer = "_TTd";
-  } else if (c.isForeignToNativeThunk()) {
-    assert(prefix.empty() && "can't have custom prefix on thunk");
-    introducer = "_TTO";
+  switch (Kind) {
+    case SILDeclRef::ManglingKind::Default:
+      if (c.isForeign) {
+        introducer = "_TTo";
+      } else if (c.isDirectReference) {
+        introducer = "_TTd";
+      } else if (c.isForeignToNativeThunk()) {
+        introducer = "_TTO";
+      }
+      break;
+    case SILDeclRef::ManglingKind::VTableMethod:
+      introducer = "_TTV";
+      break;
+    case SILDeclRef::ManglingKind::DynamicThunk:
+      introducer = "_TTD";
+      break;
   }
   
   // As a special case, Clang functions and globals don't get mangled at all.
@@ -604,9 +735,143 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
   llvm_unreachable("bad entity kind!");
 }
 
-std::string SILDeclRef::mangle(StringRef prefix) const {
-  return mangleConstant(*this, prefix);
- }
+static std::string mangleConstant(SILDeclRef c, SILDeclRef::ManglingKind Kind) {
+  using namespace NewMangling;
+  ASTMangler mangler;
+
+  // As a special case, Clang functions and globals don't get mangled at all.
+  if (c.hasDecl()) {
+    if (auto clangDecl = c.getDecl()->getClangDecl()) {
+      if (!c.isForeignToNativeThunk() && !c.isNativeToForeignThunk()
+          && !c.isCurried) {
+        if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
+          if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
+            std::string s(1, '\01');
+            s += asmLabel->getLabel();
+            return s;
+          } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>()) {
+            std::string storage;
+            llvm::raw_string_ostream SS(storage);
+            // FIXME: When we can import C++, use Clang's mangler all the time.
+            mangleClangDecl(SS, namedClangDecl,
+                            c.getDecl()->getASTContext());
+            return SS.str();
+          }
+          return namedClangDecl->getName();
+        }
+      }
+    }
+  }
+
+  ASTMangler::SymbolKind SKind = ASTMangler::SymbolKind::Default;
+  switch (Kind) {
+    case SILDeclRef::ManglingKind::Default:
+      if (c.isForeign) {
+        SKind = ASTMangler::SymbolKind::SwiftAsObjCThunk;
+      } else if (c.isDirectReference) {
+        SKind = ASTMangler::SymbolKind::DirectMethodReferenceThunk;
+      } else if (c.isForeignToNativeThunk()) {
+        SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
+      }
+      break;
+    case SILDeclRef::ManglingKind::VTableMethod:
+      SKind = ASTMangler::SymbolKind::VTableMethod;
+      break;
+    case SILDeclRef::ManglingKind::DynamicThunk:
+      SKind = ASTMangler::SymbolKind::DynamicThunk;
+      break;
+  }
+
+  switch (c.kind) {
+  case SILDeclRef::Kind::Func:
+    if (!c.hasDecl())
+      return mangler.mangleClosureEntity(c.getAbstractClosureExpr(), SKind);
+
+    // As a special case, functions can have manually mangled names.
+    // Use the SILGen name only for the original non-thunked, non-curried entry
+    // point.
+    if (auto NameA = c.getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
+      if (!c.isForeignToNativeThunk() && !c.isNativeToForeignThunk()
+          && !c.isCurried) {
+        return NameA->Name;
+      }
+      
+    // Use a given cdecl name for native-to-foreign thunks.
+    if (auto CDeclA = c.getDecl()->getAttrs().getAttribute<CDeclAttr>())
+      if (c.isNativeToForeignThunk()) {
+        return CDeclA->Name;
+      }
+
+    // Otherwise, fall through into the 'other decl' case.
+    SWIFT_FALLTHROUGH;
+
+  case SILDeclRef::Kind::EnumElement:
+    return mangler.mangleEntity(c.getDecl(), c.isCurried, SKind);
+
+  case SILDeclRef::Kind::Deallocator:
+    assert(!c.isCurried);
+    return mangler.mangleDestructorEntity(cast<DestructorDecl>(c.getDecl()),
+                                          /*isDeallocating*/ true,
+                                          SKind);
+
+  case SILDeclRef::Kind::Destroyer:
+    assert(!c.isCurried);
+    return mangler.mangleDestructorEntity(cast<DestructorDecl>(c.getDecl()),
+                                          /*isDeallocating*/ false,
+                                          SKind);
+
+  case SILDeclRef::Kind::Allocator:
+    return mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
+                                           /*allocating*/ true,
+                                           c.isCurried,
+                                           SKind);
+
+  case SILDeclRef::Kind::Initializer:
+    return mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
+                                           /*allocating*/ false,
+                                           c.isCurried,
+                                           SKind);
+
+  case SILDeclRef::Kind::IVarInitializer:
+  case SILDeclRef::Kind::IVarDestroyer:
+    assert(!c.isCurried);
+    return mangler.mangleIVarInitDestroyEntity(cast<ClassDecl>(c.getDecl()),
+                                  c.kind == SILDeclRef::Kind::IVarDestroyer,
+                                  SKind);
+
+  case SILDeclRef::Kind::GlobalAccessor:
+    assert(!c.isCurried);
+    return mangler.mangleAccessorEntity(AccessorKind::IsMutableAddressor,
+                                        AddressorKind::Unsafe,
+                                        c.getDecl(),
+                                        /*isStatic*/ false,
+                                        SKind);
+
+  case SILDeclRef::Kind::GlobalGetter:
+    assert(!c.isCurried);
+    return mangler.mangleGlobalGetterEntity(c.getDecl(), SKind);
+
+  case SILDeclRef::Kind::DefaultArgGenerator:
+    assert(!c.isCurried);
+    return mangler.mangleDefaultArgumentEntity(
+                                        cast<AbstractFunctionDecl>(c.getDecl()),
+                                        c.defaultArgIndex,
+                                        SKind);
+
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+    assert(!c.isCurried);
+    return mangler.mangleInitializerEntity(cast<VarDecl>(c.getDecl()), SKind);
+  }
+
+  llvm_unreachable("bad entity kind!");
+}
+
+std::string SILDeclRef::mangle(ManglingKind MKind) const {
+  std::string Old = mangleConstantOld(*this, MKind);
+  std::string New = mangleConstant(*this, MKind);
+
+  return NewMangling::selectMangling(Old, New);
+}
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
   if (auto overridden = getOverridden()) {

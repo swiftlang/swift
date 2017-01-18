@@ -21,11 +21,11 @@ When type theorists consider a programming language, we break it down like this:
 
 Swift has a pretty small set of types right now:
 
-* Fundamental types: currently i1, i8, i16, i32, and i64; 
+* Fundamental types: currently i1, i8, i16, i32, and i64;
   float and double; eventually maybe others.
 * Function types.
 * Tuples. Heterogeneous fixed-length products. Swift's system
-  provides two basic kinds of element: positional and labelled.
+  provides two basic kinds of element: positional and labeled.
 * Arrays. Homogeneous fixed-length aggregates.
 * Algebraic data types (ADTs), introduce by enum.  Nominal closed
   disjoint unions of heterogeneous types.
@@ -269,7 +269,7 @@ Scoping
 
 Despite the lack of grouping braces, the semantics are that the statements in
 each case-group form their own scope, and falling off the end causes control to
-resume at the end of the switch statement — i.e. "implicit break", not "implicit
+resume at the end of the switch statement -- i.e. "implicit break", not "implicit
 fallthrough".
 
 Chris seems motivated to eventually add an explicit 'fallthrough'
@@ -285,27 +285,27 @@ grouped by braces. It's natural to group the cases with braces as well. Doing
 both lets us avoid a 'case' keyword, but otherwise it leads to ugly style,
 because either the last case ends in two braces on the same line or cases have
 to further indented. Okay, it's easy enough to not require braces on the match,
-with the grammar saying that cases are just greedily consumed — there's no
+with the grammar saying that cases are just greedily consumed -- there's no
 ambiguity here because the switch statement is necessarily within braces. But
 that leaves the code without a definitive end to the cases, and the closing
 braces end up causing a lot of unnecessary vertical whitespace, like so::
 
   switch (x)
   case .foo {
-    …
+    // ...
   }
   case .bar {
-    …
+    // ...
   }
-  
+
 So instead, let's require the switch statement to have braces, and
 we'll allow the cases to be written without them::
 
   switch (x) {
   case .foo:
-    …
+    // ...
   case .bar:
-    …
+    // ...
   }
 
 That's really a lot prettier, except it breaks the rule about always grouping
@@ -350,8 +350,8 @@ Non-exhaustive switches
 .......................
 
 Since falling out of a statement is reasonable behavior in an
-imperative language — in contrast to, say, a functional language where
-you're in an expression and you need to produce a value — there's a
+imperative language -- in contrast to, say, a functional language where
+you're in an expression and you need to produce a value -- there's a
 colorable argument that non-exhaustive matches should be okay.  I
 dislike this, however, and propose that it should be an error to
 make a non-exhaustive switch; people who want non-exhaustive matches
@@ -441,7 +441,7 @@ I think this should bind looser than any binary operators except assignments;
 effectively we should have::
 
   expr-binary ::= # most of the current expr grammar
-  
+
   expr ::= expr-binary
   expr ::= expr-binary 'is' expr-primary pattern-guard?
 
@@ -527,7 +527,7 @@ major clients:
 You might think that having a "pattern" as basic as :code:`foo` mean
 something different in two different contexts would be confusing, but
 actually I don't think people will generally think of these as the
-same production — you might if you were in a functional language where
+same production -- you might if you were in a functional language where
 you really can decompose in a function signature, but we don't allow
 that, and I think that will serve to divide them in programmers' minds.
 So we can get away with some things. :)
@@ -787,8 +787,8 @@ copied into the variable, but this is less critical.
   *-pattern-tuple-element ::= *-pattern
   *-pattern-tuple-element ::= identifier '=' *-pattern
 
-Tuples are interesting because of the labelled / non-labelled
-distinction. Especially with labelled elements, it is really nice to
+Tuples are interesting because of the labeled / non-labeled
+distinction. Especially with labeled elements, it is really nice to
 be able to ignore all the elements you don't care about. This grammar
 permits some prefix or set of labels to be matched and the rest to be
 ignored.
@@ -800,7 +800,7 @@ It would be interesting to allow overloading / customization of
 pattern-matching. We may find ourselves needing to do something like this to
 support non-fragile pattern matching anyway (if there's some set of restrictions
 that make it reasonable to permit that). The obvious idea of compiling into the
-visitor pattern is a bit compelling, although control flow would be tricky —
+visitor pattern is a bit compelling, although control flow would be tricky --
 we'd probably need the generated code to throw an exception. Alternatively, we
 could let the non-fragile type convert itself into a fragile type for purposes
 of pattern matching.

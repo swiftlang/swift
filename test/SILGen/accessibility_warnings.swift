@@ -1,5 +1,5 @@
-// RUN: %target-parse-verify-swift
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // This file tests that the AST produced after fixing accessibility warnings
 // is valid according to SILGen and the verifiers.
@@ -123,7 +123,7 @@ internal class InternalClass {
   // CHECK-DAG: sil hidden{{( \[.+\])*}} @_TFC22accessibility_warnings13InternalClassg9publicVarSi
   public var publicVar = 0
 
-  // CHECK-DAG: sil hidden [transparent] @_TFC22accessibility_warnings13InternalClassg19publicVarPrivateSetSi
+  // CHECK-DAG: sil hidden @_TFC22accessibility_warnings13InternalClassg19publicVarPrivateSetSi
   public private(set) var publicVarPrivateSet = 0
 
   public public(set) var publicVarPublicSet = 0

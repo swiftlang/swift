@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -51,8 +51,11 @@ protected:
       /// The caller function.
       FunctionInfo *Caller;
 
-      /// The apply-site.
-      FullApplySite FAS;
+      /// The function apply-site.
+      /// It can be an apply instruction or an instruction,
+      /// which results in a call, e.g. strong_release results in
+      /// a destructor call.
+      SILInstruction *FAS;
 
       /// Returns false, if the caller was invalidated since this entry had been
       /// created.
@@ -62,7 +65,7 @@ protected:
       /// Used to check if the caller and its apply-site is still valid.
       int UpdateID;
 
-      CallerEntry(FunctionInfo *Caller, FullApplySite FAS, int UpdateID) :
+      CallerEntry(FunctionInfo *Caller, SILInstruction *FAS, int UpdateID) :
         Caller(Caller), FAS(FAS), UpdateID(UpdateID) { }
 
       friend class FunctionInfoBase<FunctionInfo>;
@@ -140,10 +143,14 @@ protected:
     ArrayRef<CallerEntry> getCallers() const { return Callers; }
 
     /// Adds a caller for this function.
-    void addCaller(FunctionInfo *CallerInfo, FullApplySite FAS) {
+    void addCaller(FunctionInfo *CallerInfo, SILInstruction *FAS) {
       Callers.push_back(CallerEntry(CallerInfo, FAS, CallerInfo->UpdateID));
       if (!isScheduled())
         ++CallerInfo->numUnscheduledCallees;
+    }
+
+    void addCaller(FunctionInfo *CallerInfo, FullApplySite FAS) {
+      addCaller(CallerInfo, FAS.getInstruction());
     }
   };
 

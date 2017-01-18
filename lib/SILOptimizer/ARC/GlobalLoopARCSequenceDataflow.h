@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -60,6 +60,9 @@ class LoopARCSequenceDataflowEvaluator {
   /// releasing this value one is affecting.
   RCIdentityFunctionInfo *RCFI;
 
+  /// An analysis to get the epilogue ARC instructions. 
+  EpilogueARCFunctionInfo *EAFI;
+
   /// The map from dataflow terminating decrements -> increment dataflow state.
   BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap;
 
@@ -69,16 +72,11 @@ class LoopARCSequenceDataflowEvaluator {
   /// Stashed information for each region.
   llvm::DenseMap<const LoopRegion *, ARCRegionState *> RegionStateInfo;
 
-  /// This is meant to find releases matched to consumed arguments. This is
-  /// really less interesting than keeping a stash of all of the reference
-  /// counted values that we have seen and computing their last post dominating
-  /// consumed argument. But I am going to leave this in for now.
-  ConsumedArgToEpilogueReleaseMatcher ConsumedArgToReleaseMap;
-
 public:
   LoopARCSequenceDataflowEvaluator(
       SILFunction &F, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
       SILLoopInfo *SLI, RCIdentityFunctionInfo *RCIA,
+      EpilogueARCFunctionInfo *EAFI,
       ProgramTerminationFunctionInfo *PTFI,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);

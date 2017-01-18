@@ -72,54 +72,20 @@ HashingTestSuite.test("_mixInt/GoldenValues") {
 
 HashingTestSuite.test("_squeezeHashValue/Int") {
   // Check that the function can return values that cover the whole range.
-  func checkRange(_ r: Range<Int>) {
-    var results = [Int : Void]()
-    for _ in 0..<(14 * (r.upperBound - r.lowerBound)) {
+  func checkRange(_ r: Int) {
+    var results = Set<Int>()
+    for _ in 0..<(14 * r) {
       let v = _squeezeHashValue(randInt(), r)
-      expectTrue(r ~= v)
-      if results[v] == nil {
-        results[v] = Void()
-      }
+      expectTrue(v < r)
+      results.insert(v)
     }
-    expectEqual(r.upperBound - r.lowerBound, results.count)
+    expectEqual(r, results.count)
   }
-  checkRange(Int.min..<(Int.min+10))
-  checkRange(0..<4)
-  checkRange(0..<8)
-  checkRange(-5..<5)
-  checkRange((Int.max-10)..<(Int.max-1))
-
-  // Check that we can handle ranges that span more than `Int.max`.
-#if arch(i386) || arch(arm)
-  expectEqual(-0x6e477d37, _squeezeHashValue(0, Int.min..<(Int.max - 1)))
-  expectEqual(0x38a3ea26, _squeezeHashValue(2, Int.min..<(Int.max - 1)))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  expectEqual(0x32b24f688dc4164d, _squeezeHashValue(0, Int.min..<(Int.max - 1)))
-  expectEqual(-0x6d1cc14f97aa822, _squeezeHashValue(1, Int.min..<(Int.max - 1)))
-#else
-  fatalError("unimplemented")
-#endif
-}
-
-HashingTestSuite.test("_squeezeHashValue/UInt") {
-  // Check that the function can return values that cover the whole range.
-  func checkRange(_ r: Range<UInt>) {
-    var results = [UInt : Void]()
-    let cardinality = r.upperBound - r.lowerBound
-    for _ in 0..<(10*cardinality) {
-      let v = _squeezeHashValue(randInt(), r)
-      expectTrue(r ~= v)
-      if results[v] == nil {
-        results[v] = Void()
-      }
-    }
-    expectEqual(Int(cardinality), results.count)
-  }
-  checkRange(0..<4)
-  checkRange(0..<8)
-  checkRange(0..<10)
-  checkRange(10..<20)
-  checkRange((UInt.max-10)..<(UInt.max-1))
+  checkRange(1)
+  checkRange(2)
+  checkRange(4)
+  checkRange(8)
+  checkRange(16)
 }
 
 HashingTestSuite.test("String/hashValue/topBitsSet") {

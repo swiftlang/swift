@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class C { 
   func f() {}
@@ -9,8 +9,8 @@ class D : C {
 
 class E { }
 
-protocol P { // expected-note{{requirement specified as 'Self.Assoc' : 'C' [with Self = X2]}}
-  associatedtype Assoc : C
+protocol P {
+  associatedtype Assoc : C // expected-note{{unable to infer associated type 'Assoc' for protocol 'P'}}
   func getAssoc() -> Assoc
 }
 
@@ -18,8 +18,8 @@ struct X1 : P {
   func getAssoc() -> D { return D() }
 }
 
-struct X2 : P { // expected-error{{'P' requires that 'E' inherit from 'C'}}
-  func getAssoc() -> E { return E() }
+struct X2 : P { // expected-error{{type 'X2' does not conform to protocol 'P'}}
+  func getAssoc() -> E { return E() } // expected-note{{inferred type 'E' (by matching requirement 'getAssoc()') is invalid: does not inherit from 'C'}}
 }
 
 func testP<T:P>(_ t: T) {

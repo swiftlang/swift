@@ -2,11 +2,11 @@
 Name:            AppKit
 Availability:    available
 AvailabilityMsg: ''
-Classes:         
+Classes:
   - Name:            NSCell
     Availability:    available
     AvailabilityMsg: ''
-    Methods:         
+    Methods:
       - Selector:        init
         MethodKind:      Instance
         NullabilityOfRet: U
@@ -39,7 +39,7 @@ Classes:
     AuditedForNullability: true
     Availability:    available
     AvailabilityMsg: ''
-    Methods:         
+    Methods:
       - Selector:        'addSubview:'
         MethodKind:      Instance
         Nullability:     [ N ]
@@ -58,7 +58,7 @@ Classes:
         NullabilityOfRet: N
         Availability:    available
         AvailabilityMsg: ''
-    Properties:      
+    Properties:
       - Name:            enclosingScrollView
         Nullability:     O
         Availability:    available
@@ -67,12 +67,12 @@ Classes:
         Nullability:     N
         Availability:    available
         AvailabilityMsg: ''
-Functions:       
+Functions:
   - Name:            NSAvailableWindowDepths
     NullabilityOfRet: N
     Availability:    available
     AvailabilityMsg: ''
-Globals:         
+Globals:
   - Name:            NSCalibratedWhiteColorSpace
     Nullability:     N
     Availability:    available

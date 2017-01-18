@@ -1,24 +1,24 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_1 | FileCheck %s -check-prefix=ASSIGN_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_2 | FileCheck %s -check-prefix=ASSIGN_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_3 | FileCheck %s -check-prefix=ASSIGN_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_4 | FileCheck %s -check-prefix=ASSIGN_4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_5 | FileCheck %s -check-prefix=ASSIGN_5
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_6 | FileCheck %s -check-prefix=ASSIGN_6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_1 | %FileCheck %s -check-prefix=ASSIGN_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_2 | %FileCheck %s -check-prefix=ASSIGN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_3 | %FileCheck %s -check-prefix=ASSIGN_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_4 | %FileCheck %s -check-prefix=ASSIGN_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_5 | %FileCheck %s -check-prefix=ASSIGN_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_6 | %FileCheck %s -check-prefix=ASSIGN_6
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_7 | FileCheck %s -check-prefix=ASSIGN_7
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_8 | FileCheck %s -check-prefix=ASSIGN_8
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_9 | FileCheck %s -check-prefix=ASSIGN_9
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_10 | FileCheck %s -check-prefix=ASSIGN_10
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_11 | FileCheck %s -check-prefix=ASSIGN_11
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_12 | FileCheck %s -check-prefix=ASSIGN_12
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_7 | %FileCheck %s -check-prefix=ASSIGN_7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_8 | %FileCheck %s -check-prefix=ASSIGN_8
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_9 | %FileCheck %s -check-prefix=ASSIGN_9
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_10 | %FileCheck %s -check-prefix=ASSIGN_10
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_11 | %FileCheck %s -check-prefix=ASSIGN_11
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_12 | %FileCheck %s -check-prefix=ASSIGN_12
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_13 | FileCheck %s -check-prefix=ASSIGN_13
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_14 | FileCheck %s -check-prefix=ASSIGN_14
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_15 | FileCheck %s -check-prefix=ASSIGN_15
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_16 | FileCheck %s -check-prefix=ASSIGN_16
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_17 | FileCheck %s -check-prefix=ASSIGN_17
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_18 | FileCheck %s -check-prefix=ASSIGN_18
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_19 | FileCheck %s -check-prefix=ASSIGN_19
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_13 | %FileCheck %s -check-prefix=ASSIGN_13
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_14 | %FileCheck %s -check-prefix=ASSIGN_14
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_15 | %FileCheck %s -check-prefix=ASSIGN_15
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_16 | %FileCheck %s -check-prefix=ASSIGN_16
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_17 | %FileCheck %s -check-prefix=ASSIGN_17
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_18 | %FileCheck %s -check-prefix=ASSIGN_18
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_19 | %FileCheck %s -check-prefix=ASSIGN_19
 
 class C1 {
 var I1 = 1

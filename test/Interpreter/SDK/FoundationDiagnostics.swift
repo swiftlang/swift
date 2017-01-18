@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -parse -verify
+// RUN: %target-swift-frontend %s -typecheck -verify
 
 // REQUIRES: objc_interop
 

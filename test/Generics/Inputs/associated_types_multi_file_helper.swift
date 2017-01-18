@@ -1,5 +1,5 @@
 protocol Fooable {
-  associatedtype AssocType // expected-note {{did you mean 'AssocType'?}}
+  associatedtype AssocType
   func foo(x : AssocType)
 }
 

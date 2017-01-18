@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen -module-name Swift %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen -module-name Swift %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
 
@@ -36,7 +36,7 @@ func Optionable_cases(_ x: Int) {
   // CHECK:       [[FN:%.*]] = function_ref @_TFOs10Optionable4mereFMS_FSiS_
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin Optionable.Type
   // CHECK-NEXT:  [[CTOR:%.*]] = apply [[FN]]([[METATYPE]])
-  // CHECK-NEXT:  strong_release [[CTOR]]
+  // CHECK-NEXT:  destroy_value [[CTOR]]
   _ = Optionable.mere
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin Optionable.Type
@@ -70,7 +70,7 @@ func AddressOnly_cases(_ s: S) {
   // CHECK:       [[FN:%.*]] = function_ref @_TFOs11AddressOnly4mereFMS_FPs1P_S_
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[CTOR:%.*]] = apply [[FN]]([[METATYPE]])
-  // CHECK-NEXT:  strong_release [[CTOR]]
+  // CHECK-NEXT:  destroy_value [[CTOR]]
   _ = AddressOnly.mere
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
@@ -84,7 +84,7 @@ func AddressOnly_cases(_ s: S) {
   // CHECK-NEXT:  [[MERE:%.*]] = alloc_stack $AddressOnly
   // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]
   // CHECK-NEXT:  [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[PAYLOAD]]
-  // CHECK-NEXT:  store %0 to [[PAYLOAD_ADDR]]
+  // CHECK-NEXT:  store %0 to [trivial] [[PAYLOAD_ADDR]]
   // CHECK-NEXT:  inject_enum_addr [[MERE]]
   // CHECK-NEXT:  destroy_addr [[MERE]]
   // CHECK-NEXT:  dealloc_stack [[MERE]]
@@ -95,7 +95,7 @@ func AddressOnly_cases(_ s: S) {
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[PHANTOM:%.*]] = alloc_stack $AddressOnly
   // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[PHANTOM]] : $*AddressOnly, #AddressOnly.phantom!enumelt.1
-  // CHECK-NEXT:  store %0 to [[PAYLOAD]]
+  // CHECK-NEXT:  store %0 to [trivial] [[PAYLOAD]]
   // CHECK-NEXT:  inject_enum_addr [[PHANTOM]] : $*AddressOnly, #AddressOnly.phantom!enumelt.1
   // CHECK-NEXT:  destroy_addr [[PHANTOM]]
   // CHECK-NEXT:  dealloc_stack [[PHANTOM]]
@@ -182,7 +182,7 @@ enum Foo { case A(P, String) }
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 1
 // CHECK-NEXT:    copy_addr [take] %1 to [initialization] [[LEFT]] : $*P
-// CHECK-NEXT:    store %2 to [[RIGHT]]
+// CHECK-NEXT:    store %2 to [init] [[RIGHT]]
 // CHECK-NEXT:    inject_enum_addr %0 : $*Foo, #Foo.A!enumelt.1
 // CHECK:         return
 // CHECK-NEXT:  }

@@ -1,13 +1,48 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
-prefix operator +++ {} // expected-warning {{operator should no longer be declared with body}}
-postfix operator +++ {} // expected-warning {{operator should no longer be declared with body}}
-infix operator +++ {} // expected-warning {{operator should no longer be declared with body}}
+prefix operator +++ {} // expected-warning {{operator should no longer be declared with body}} {{20-23=}}
+postfix operator +++ {} // expected-warning {{operator should no longer be declared with body}} {{21-24=}}
+infix operator +++ {} // expected-warning {{operator should no longer be declared with body}} {{19-22=}}
+infix operator +++* { // expected-warning {{operator should no longer be declared with body; use a precedence group instead}} {{none}}
+  associativity right
+}
+infix operator +++*+ : A { } // expected-warning {{operator should no longer be declared with body}} {{25-29=}}
+
+
+prefix operator +++** : A { }
+// expected-error@-1 {{only infix operators may declare a precedence}} {{23-27=}}
+// expected-warning@-2 {{operator should no longer be declared with body}} {{26-30=}}
+
+prefix operator ++*++ : A
+// expected-error@-1 {{only infix operators may declare a precedence}} {{23-26=}}
+
+postfix operator ++*+* : A { }
+// expected-error@-1 {{only infix operators may declare a precedence}} {{24-28=}}
+// expected-warning@-2 {{operator should no longer be declared with body}} {{27-31=}}
+
+postfix operator ++**+ : A
+// expected-error@-1 {{only infix operators may declare a precedence}} {{24-27=}}
+
+operator ++*** : A
+// expected-error@-1 {{operator must be declared as 'prefix', 'postfix', or 'infix'}}
+
+operator +*+++ { }
+// expected-error@-1 {{operator must be declared as 'prefix', 'postfix', or 'infix'}}
+// expected-warning@-2 {{operator should no longer be declared with body}} {{15-19=}}
+
+operator +*++* : A { }
+// expected-error@-1 {{operator must be declared as 'prefix', 'postfix', or 'infix'}}
+// expected-warning@-2 {{operator should no longer be declared with body}} {{19-23=}}
 
 prefix operator // expected-error {{expected operator name in operator declaration}}
 
 ;
 prefix operator %%+
+
+prefix operator ??
+postfix operator ?? // expected-error {{expected operator name in operator declaration}}
+prefix operator !!
+postfix operator !! // expected-error {{expected operator name in operator declaration}}
 
 infix operator +++=
 infix operator *** : A

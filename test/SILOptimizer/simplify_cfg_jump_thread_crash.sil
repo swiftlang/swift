@@ -1,13 +1,13 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 
 // CHECK-LABEL: sil @test_jump_threading
-// CHECK: bb4(%{{[0-9]+}} : $Builtin.Int64): 
+// CHECK: bb4(%{{[0-9]+}} : $Builtin.Int64):
 // CHECK-NEXT: br bb1
-sil @test_jump_threading : $@convention(thin)  (Builtin.Int1) -> () { 
+sil @test_jump_threading : $@convention(thin)  (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb2, bb3
 

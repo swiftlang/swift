@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | %FileCheck %s
 
 sil_stage raw
 import Builtin
@@ -68,15 +68,15 @@ bb0:
   %1 = mark_uninitialized [var] %0 : $*Builtin.Int64
   %2 = global_addr @f : $*@callee_owned (Builtin.Int32) -> ()
   %3 = function_ref @_TF16generic_closures24generic_curried_functionU___FT1xQ__FT1yQ0__T_ : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
-  %4 = load %1 : $*Builtin.Int64
+  %4 = load [trivial] %1 : $*Builtin.Int64
   %5 = alloc_stack $Builtin.Int64
-  store %4 to %5 : $*Builtin.Int64
+  store %4 to [trivial] %5 : $*Builtin.Int64
   // CHECK: apply %{{[0-9]+}}<{{.*}}Int64, {{.*}}Int32>(%{{.*}}) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
   %7 = apply %3<Builtin.Int64, Builtin.Int32>(%5) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
   %8 = function_ref @_TTRXFo_iBi32__dT__XFo_dBi32__dT__ : $@convention(thin) (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
   // CHECK: partial_apply %{{[0-9]+}}(%{{[0-9]+}}) : $@convention(thin) (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
   %9 = partial_apply %8(%7) : $@convention(thin) (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
-  store %9 to %2 : $*@callee_owned (Builtin.Int32) -> ()
+  store %9 to [init] %2 : $*@callee_owned (Builtin.Int32) -> ()
   dealloc_stack %5 : $*Builtin.Int64
   %12 = tuple ()
   return %12 : $()
@@ -102,7 +102,7 @@ bb0(%0 : $*I, %1 : $*Self):
   copy_addr %0 to [initialization] %2 : $*I     // id: %3
   %4 = witness_method $I, #FooProto.value!getter.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@in_guaranteed τ_0_0) -> @out τ_0_0.Assoc // user: %6
   %5 = alloc_stack $Self.Assoc                    // users: %6, %8
-  %6 = apply %4<I, Self.Assoc>(%5, %2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@in_guaranteed τ_0_0) -> @out τ_0_0.Assoc
+  %6 = apply %4<I>(%5, %2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@in_guaranteed τ_0_0) -> @out τ_0_0.Assoc
   destroy_addr %2 : $*I                         // id: %7
   dealloc_stack %5 : $*Self.Assoc // id: %8
   dealloc_stack %2 : $*I         // id: %9

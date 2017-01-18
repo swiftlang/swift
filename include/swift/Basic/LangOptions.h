@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,12 +19,14 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Version.h"
 #include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
 #include <string>
+#include <vector>
 
 namespace swift {
   /// \brief A collection of options that affect the language dialect and
@@ -41,12 +43,15 @@ namespace swift {
     /// Language features
     ///
 
+    /// \brief User-overridable language version to compile for.
+    version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
+
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
-    
-    /// Whether to warn about "needless" words in declarations.
-    bool WarnOmitNeedlessWords = false;
 
+    /// \brief Disable typo correction.
+    bool DisableTypoCorrection = false;
+    
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
@@ -95,9 +100,6 @@ namespace swift {
     /// was not compiled with -enable-testing.
     bool EnableTestableAttrRequiresTestableModule = true;
 
-    /// Whether to implement SE-0111, the removal of argument labels in types.
-    bool SuppressArgumentLabelsInTypes = false;
-
     ///
     /// Flags for developers
     ///
@@ -133,6 +135,8 @@ namespace swift {
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 33554432; /* 32 * 1024 * 1024 */
 
+    unsigned SolverBindingThreshold = 1024 * 1024;
+
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
@@ -140,19 +144,17 @@ namespace swift {
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 
-    /// \brief Enable experimental nested generic types feature.
-    bool EnableExperimentalNestedGenericTypes = false;
-
-    /// \brief Enable generalized collection casting.
-    bool EnableExperimentalCollectionCasts = true;
+    /// \brief Staging flag for class resilience, which we do not want to enable
+    /// fully until more code is in place, to allow the standard library to be
+    /// tested with value type resilience only.
+    bool EnableClassResilience = false;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
 
-    /// Should 'private' use Swift 3's lexical scoping, or the Swift 2 behavior
-    /// of 'fileprivate'?
-    bool EnableSwift3Private = true;
+    /// Should we use \c ASTScope-based resolution for unqualified name lookup?
+    bool EnableASTScopeLookup = false;
 
     /// Whether to use the import as member inference system
     ///
@@ -160,12 +162,6 @@ namespace swift {
     /// member of some type instead. This includes inits, computed properties,
     /// and methods.
     bool InferImportAsMember = false;
-
-    /// Should 'id' in Objective-C be imported as 'Any' in Swift?
-    bool EnableIdAsAny = true;
-
-    /// Enable the Swift 3 migration via Fix-Its.
-    bool Swift3Migration = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -234,20 +230,37 @@ namespace swift {
       return CustomConditionalCompilationFlags;
     }
 
+    /// Whether our effective Swift version is in the Swift 3 family
+    bool isSwiftVersion3() const {
+      return EffectiveLanguageVersion.isVersion3();
+    }
+
     /// Returns true if the 'os' platform condition argument represents
     /// a supported target operating system.
     ///
     /// Note that this also canonicalizes the OS name if the check returns
     /// true.
-    static bool checkPlatformConditionOS(StringRef &OSName);
+    ///
+    /// \param suggestions Populated with suggested replacements
+    /// if a match is not found.
+    static bool checkPlatformConditionOS(
+      StringRef &OSName, std::vector<StringRef> &suggestions);
 
     /// Returns true if the 'arch' platform condition argument represents
     /// a supported target architecture.
-    static bool isPlatformConditionArchSupported(StringRef ArchName);
+    ///
+    /// \param suggestions Populated with suggested replacements
+    /// if a match is not found.
+    static bool isPlatformConditionArchSupported(
+      StringRef ArchName, std::vector<StringRef> &suggestions);
 
     /// Returns true if the 'endian' platform condition argument represents
     /// a supported target endianness.
-    static bool isPlatformConditionEndiannessSupported(StringRef endianness);
+    ///
+    /// \param suggestions Populated with suggested replacements
+    /// if a match is not found.
+    static bool isPlatformConditionEndiannessSupported(
+      StringRef endianness, std::vector<StringRef> &suggestions);
 
   private:
     llvm::SmallVector<std::pair<std::string, std::string>, 3>

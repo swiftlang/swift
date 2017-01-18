@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -31,6 +31,7 @@ func existentialMetatypeToObject(_ x: CP.Type) -> AnyObject {
 // CHECK-LABEL: sil hidden @_TF26metatype_object_conversion23protocolToProtocolClassFT_CSo8Protocol
 func protocolToProtocolClass() -> Protocol {
   // CHECK: [[PROTO:%.*]] = objc_protocol #OP
-  // CHECK: return [[PROTO]]
+  // CHECK: [[COPIED_PROTO:%.*]] = copy_value [[PROTO]]
+  // CHECK: return [[COPIED_PROTO]]
   return OP.self
 }

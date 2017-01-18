@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | %FileCheck %s
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-sil -verify
 
 // REQUIRES: objc_interop
@@ -68,8 +68,8 @@ protocol Proto {
 
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Fooc
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foo10objcMethod
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foog8objcPropSi
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foos8objcPropSi
+// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog8objcPropSi
+// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos8objcPropSi
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog9subscriptFT4objcPs9AnyObject__Si
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos9subscriptFT4objcPs9AnyObject__Si
 
@@ -81,8 +81,8 @@ protocol Proto {
 
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Fooc
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foo13dynamicMethod
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foog11dynamicPropSi
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foos11dynamicPropSi
+// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog11dynamicPropSi
+// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos11dynamicPropSi
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog9subscriptFT7dynamicSi_Si
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos9subscriptFT7dynamicSi_Si
 
@@ -424,16 +424,22 @@ public class Base {
 
 public class Sub : Base {
   // CHECK-LABEL: sil hidden @_TFC7dynamic3Subg1xSb : $@convention(method) (@guaranteed Sub) -> Bool {
-  // CHECK: [[AUTOCLOSURE:%.*]] = function_ref @_TFFC7dynamic3Subg1xSbu_KzT_Sb : $@convention(thin) (@owned Sub) -> (Bool, @error Error)
-  // CHECK: = partial_apply [[AUTOCLOSURE]](%0)
-  // CHECK: return {{%.*}} : $Bool
-  // CHECK: }
+  // CHECK: bb0([[SELF:%.*]] : $Sub):
+  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @_TFFC7dynamic3Subg1xSbu_KzT_Sb : $@convention(thin) (@owned Sub) -> (Bool, @error Error)
+  // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:     = partial_apply [[AUTOCLOSURE]]([[SELF_COPY]])
+  // CHECK:     return {{%.*}} : $Bool
+  // CHECK: } // end sil function '_TFC7dynamic3Subg1xSb'
 
   // CHECK-LABEL: sil shared [transparent] @_TFFC7dynamic3Subg1xSbu_KzT_Sb : $@convention(thin) (@owned Sub) -> (Bool, @error Error) {
-  // CHECK: [[SUPER:%.*]] = super_method [volatile] %0 : $Sub, #Base.x!getter.1.foreign : (Base) -> () -> Bool , $@convention(objc_method) (Base) -> ObjCBool
-  // CHECK: = apply [[SUPER]]({{%.*}})
-  // CHECK: return {{%.*}} : $Bool
-  // CHECK: }
+  // CHECK: bb0([[VALUE:%.*]] : $Sub):
+  // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
+  // CHECK:     [[CASTED_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
+  // CHECK:     [[SUPER:%.*]] = super_method [volatile] [[VALUE_COPY]] : $Sub, #Base.x!getter.1.foreign : (Base) -> () -> Bool , $@convention(objc_method) (Base) -> ObjCBool
+  // CHECK:     = apply [[SUPER]]([[CASTED_VALUE_COPY]])
+  // CHECK:     destroy_value [[VALUE_COPY]]
+  // CHECK:     destroy_value [[VALUE]]
+  // CHECK: } // end sil function '_TFFC7dynamic3Subg1xSbu_KzT_Sb'
   override var x: Bool { return false || super.x }
 }
 
@@ -462,6 +468,6 @@ public class Sub : Base {
 
 // Vtable uses a dynamic thunk for dynamic overrides
 // CHECK-LABEL: sil_vtable Subclass {
-// CHECK-LABEL:   #Foo.overriddenByDynamic!1: _TTDFC7dynamic8Subclass19overriddenByDynamic
+// CHECK-LABEL:   #Foo.overriddenByDynamic!1: public _TTDFC7dynamic8Subclass19overriddenByDynamic
 
 

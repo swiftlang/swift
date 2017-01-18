@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule -module-name resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule -module-name resilient_class %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library -I %t %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
 
@@ -32,16 +32,26 @@ public class Parent {
 }
 
 public class Child : Parent {
-  // CHECK-LABEL: sil @_TFC5super5Childg8propertySS
-  // CHECK:         [[CASTED_SELF:%[0-9]+]] = upcast %0 : $Child to $Parent
+  // CHECK-LABEL: sil @_TFC5super5Childg8propertySS : $@convention(method) (@guaranteed Child) -> @owned String {
+  // CHECK:       bb0([[SELF:%.*]] : $Child):
+  // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $Child to $Parent
   // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @_TFC5super6Parentg8propertySS : $@convention(method) (@guaranteed Parent) -> @owned String
+  // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
+  // CHECK:         destroy_value [[CASTED_SELF_COPY]]
+  // CHECK:         return [[RESULT]]
   public override var property: String {
     return super.property
   }
 
-  // CHECK-LABEL: sil @_TFC5super5Childg13otherPropertySS
-  // CHECK:         [[CASTED_SELF:%[0-9]+]] = upcast %0 : $Child to $Parent
+  // CHECK-LABEL: sil @_TFC5super5Childg13otherPropertySS : $@convention(method) (@guaranteed Child) -> @owned String {
+  // CHECK:       bb0([[SELF:%.*]] : $Child):
+  // CHECK:         [[COPIED_SELF:%.*]] = copy_value [[SELF]]
+  // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[COPIED_SELF]] : $Child to $Parent
   // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @_TFC5super6Parentg13finalPropertySS
+  // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
+  // CHECK:         destroy_value [[CASTED_SELF_COPY]]
+  // CHECK:         return [[RESULT]]
   public var otherProperty: String {
     return super.finalProperty
   }

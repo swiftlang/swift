@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Deduction of generic arguments
@@ -81,7 +81,7 @@ func passFunction(_ f: (Int) -> Float, x: Int, y: Float) {
 func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note {{in call to function 'returnTuple'}}
 
 func testReturnTuple(_ x: Int, y: Float) {
-  returnTuple(x) // expected-error{{generic parameter 'T' could not be inferred}}
+  returnTuple(x) // expected-error{{generic parameter 'U' could not be inferred}}
   
   var _ : (Int, Float) = returnTuple(x)
   var _ : (Float, Float) = returnTuple(y)
@@ -212,8 +212,30 @@ func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefor
 
 func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.makeIterator())
-  rangeOfIsBefore(da.makeIterator()) // expected-error{{ambiguous reference to member 'makeIterator()'}}
+  rangeOfIsBefore(da.makeIterator()) // expected-error{{type 'Double' does not conform to protocol 'IsBefore'}}
 }
+
+func testEqualIterElementTypes<A: IteratorProtocol, B: IteratorProtocol>(_ a: A, _ b: B) where A.Element == B.Element {}
+// expected-note@-1 {{requirement specified as 'B.Element' == 'A.Element' [with A = IndexingIterator<[Int]>, B = IndexingIterator<[Double]>]}}
+func compareIterators() {
+  var a: [Int] = []
+  var b: [Double] = []
+  testEqualIterElementTypes(a.makeIterator(), b.makeIterator()) // expected-error {{'<A, B where A : IteratorProtocol, B : IteratorProtocol, B.Element == A.Element> (A, B) -> ()' requires the types 'Double' and 'Int' be equivalent}}
+}
+
+protocol P_GI {
+  associatedtype Y
+}
+
+class C_GI : P_GI {
+  typealias Y = Double
+}
+
+class GI_Diff {}
+func genericInheritsA<T>(_ x: T) where T : P_GI, T.Y : GI_Diff {}
+// expected-note@-1 {{requirement specified as 'T.Y' : 'GI_Diff' [with T = C_GI]}}
+genericInheritsA(C_GI()) // expected-error {{<T where T : P_GI, T.Y : GI_Diff> (T) -> ()' requires that 'C_GI.Y' (aka 'Double') inherit from 'GI_Diff'}}
+
 
 //===----------------------------------------------------------------------===//
 // Deduction for member operators

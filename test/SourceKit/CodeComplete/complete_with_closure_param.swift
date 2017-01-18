@@ -1,4 +1,4 @@
-typealias MyFnTy = Int ->Int
+typealias MyFnTy = Int -> Int
 class C {
   func foo(_ x: Int ->Int) {}
   func foo2(_ x: MyFnTy) {}
@@ -6,7 +6,7 @@ class C {
 
 C().
 
-// RUN: %sourcekitd-test -req=complete -pos=7:5 %s -- %s | FileCheck %s
+// RUN: %sourcekitd-test -req=complete -pos=7:5 %s -- %s | %FileCheck %s
 
 // CHECK:      key.kind: source.lang.swift.decl.function.method.instance,
 // CHECK-NEXT: key.name: "foo(:)",
@@ -16,5 +16,5 @@ C().
 
 // CHECK:      key.kind: source.lang.swift.decl.function.method.instance,
 // CHECK-NEXT: key.name: "foo2(:)",
-// CHECK-NEXT: key.sourcetext: "foo2(<#T##x: MyFnTy##MyFnTy##(Int) -> Int#>)",
-// CHECK-NEXT: key.description: "foo2(x: MyFnTy)",
+// CHECK-NEXT: key.sourcetext: "foo2(<#T##x: (Int) -> Int##(Int) -> Int#>)",
+// CHECK-NEXT: key.description: "foo2(x: (Int) -> Int)",

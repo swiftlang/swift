@@ -346,7 +346,7 @@ if #available(iOS 8.0, *) {
     let sceneData = sceneDescription.data(
       using: .utf8,
       allowLossyConversion: true)!
-    let sceneSource = SCNSceneSource(data: sceneData as Data, options: [:])!
+    let sceneSource = SCNSceneSource(data: sceneData as Data, options: nil)!
 
     do {
       var unarchivedPlaneGeometry =
@@ -354,10 +354,10 @@ if #available(iOS 8.0, *) {
       var unarchivedPlaneNode_nil =
         sceneSource.entryWithIdentifier("plane-node", withClass: SCNNode.self)
 
-      expectNotEmpty(unarchivedPlaneGeometry)
+      expectNotNil(unarchivedPlaneGeometry)
       expectType(Optional<SCNGeometry>.self, &unarchivedPlaneGeometry)
 
-      expectEmpty(unarchivedPlaneNode_nil)
+      expectNil(unarchivedPlaneNode_nil)
     }
 
     do {
@@ -366,10 +366,10 @@ if #available(iOS 8.0, *) {
       var unarchivedBoxGeometry_nil =
         sceneSource.entryWithIdentifier("box-node", withClass: SCNGeometry.self)
 
-      expectNotEmpty(unarchivedBoxGeometry)
+      expectNotNil(unarchivedBoxGeometry)
       expectType(Optional<SCNGeometry>.self, &unarchivedBoxGeometry)
 
-      expectEmpty(unarchivedBoxGeometry_nil)
+      expectNil(unarchivedBoxGeometry_nil)
     }
 
     do {
@@ -378,10 +378,10 @@ if #available(iOS 8.0, *) {
       var unarchivedBoxNode_nil =
         sceneSource.entryWithIdentifier("box", withClass: SCNNode.self)
 
-      expectNotEmpty(unarchivedBoxNode)
+      expectNotNil(unarchivedBoxNode)
       expectType(Optional<SCNNode>.self, &unarchivedBoxNode)
 
-      expectEmpty(unarchivedBoxNode_nil)
+      expectNil(unarchivedBoxNode_nil)
     }
   }
 

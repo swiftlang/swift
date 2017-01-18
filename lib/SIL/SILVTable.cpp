@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -24,50 +24,53 @@
 using namespace swift;
 
 SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class,
-                             ArrayRef<Pair> Entries) {
+                             ArrayRef<Entry> Entries) {
   // SILVTable contains one element declared in Entries.  We must allocate
   // space for it, because its default ctor will write to it.
   unsigned NumTailElements = std::max((unsigned)Entries.size(), 1U)-1;
-  void *buf = M.allocate(sizeof(SILVTable) + sizeof(Pair) * NumTailElements,
+  void *buf = M.allocate(sizeof(SILVTable) + sizeof(Entry) * NumTailElements,
                          alignof(SILVTable));
   SILVTable *vt = ::new (buf) SILVTable(Class, Entries);
   M.vtables.push_back(vt);
   M.VTableMap[Class] = vt;
+  // Update the Module's cache with new vtable + vtable entries:
+  for (const Entry &entry : Entries) {
+    M.VTableEntryCache.insert({{vt, entry.Method}, entry.Implementation});
+  }
   return vt;
 }
 
 SILFunction *
 SILVTable::getImplementation(SILModule &M, SILDeclRef method) const {
-  // FIXME: We should build a sidetable cache in the module. Linear lookup here
-  // is lame.
-  
-  for (auto &entry : getEntries()) {
-    // Check whether this mapping matches either the given decl directly or
-    // one of its overridden decl.
-    SILDeclRef m = method;
-    do {
-      if (entry.first == m)
-        return entry.second;
-    } while ((m = m.getOverridden()));
-  }
-  
+  SILDeclRef m = method;
+  do {
+    auto entryIter = M.VTableEntryCache.find({this, m});
+    if (entryIter != M.VTableEntryCache.end()) {
+      return (*entryIter).second;
+    }
+  } while ((m = m.getOverridden()));
   return nullptr;
 }
 
-SILVTable::SILVTable(ClassDecl *c, ArrayRef<Pair> entries)
+void SILVTable::removeFromVTableCache(Entry &entry) {
+  SILModule &M = entry.Implementation->getModule();
+  M.VTableEntryCache.erase({this, entry.Method});
+}
+
+SILVTable::SILVTable(ClassDecl *c, ArrayRef<Entry> entries)
   : Class(c), NumEntries(entries.size())
 {
-  memcpy(Entries, entries.begin(), sizeof(Pair) * NumEntries);
+  memcpy(Entries, entries.begin(), sizeof(Entry) * NumEntries);
   
   // Bump the reference count of functions referenced by this table.
-  for (auto entry : getEntries()) {
-    entry.second->incrementRefCount();
+  for (const Entry &entry : getEntries()) {
+    entry.Implementation->incrementRefCount();
   }
 }
 
 SILVTable::~SILVTable() {
   // Drop the reference count of functions referenced by this table.
-  for (auto entry : getEntries()) {
-    entry.second->decrementRefCount();
+  for (const Entry &entry : getEntries()) {
+    entry.Implementation->decrementRefCount();
   }
 }

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -global-property-opt %s | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -global-property-opt %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -157,7 +157,7 @@ bb0:
   %f2 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %r1 = apply %f2(%a2) : $@convention(method) (@guaranteed Array<X>) -> Bool
   return %r1 : $Bool
-} 
+}
 
 // CHECK-LABEL: sil @test_tuple_unknown_member
 // CHECK: [[F:%[0-9]+]] = function_ref @_is_native_X_no_type_check
@@ -172,7 +172,7 @@ bb0(%0 : $Array<X>):
   %f2 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %r1 = apply %f2(%a2) : $@convention(method) (@guaranteed Array<X>) -> Bool
   return %r1 : $Bool
-} 
+}
 
 // CHECK-LABEL: sil @test_unknown_tuple
 // CHECK: [[F:%[0-9]+]] = function_ref @_is_native_X_no_type_check
@@ -187,7 +187,7 @@ bb0:
   %f2 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %r1 = apply %f2(%a2) : $@convention(method) (@guaranteed Array<X>) -> Bool
   return %r1 : $Bool
-} 
+}
 
 // CHECK-LABEL: sil @test_tuple_member_escapes
 // CHECK: [[F:%[0-9]+]] = function_ref @_is_native_X_no_type_check
@@ -206,7 +206,7 @@ bb0:
   %r1 = apply %f2(%a2) : $@convention(method) (@guaranteed Array<X>) -> Bool
   dealloc_stack %s1 : $*(Array<X>, Builtin.Int64)
   return %r1 : $Bool
-} 
+}
 
 // CHECK-LABEL: sil @test_tuple_phi
 // CHECK: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
@@ -442,7 +442,7 @@ bb3(%a1 : $Array<X>):
   %f1 = function_ref @_take_struct : $@convention(thin) (@owned DepStruct) -> ()
   %s1 = struct $DepStruct (%i3 : $Array<X>, %a1 : $Array<X>)
   %s2 = apply %f1(%s1) : $@convention(thin) (@owned DepStruct) -> ()
- 
+
   %f2 = function_ref @_provide_struct : $@convention(thin) () -> @owned DepStruct
   %s3 = apply %f2() : $@convention(thin) () -> @owned DepStruct
 

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,17 +16,46 @@
 
 private let ε: CGFloat = 2.22045e-16
 
-extension AffineTransform : ReferenceConvertible, Hashable, CustomStringConvertible {
+public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConvertible {
+    public var m11, m12, m21, m22, tX, tY: CGFloat
+    
     public typealias ReferenceType = NSAffineTransform
-
-    private init(reference: NSAffineTransform) {
-        self = reference.transformStruct
+    
+    /**
+     Creates an affine transformation.
+    */
+    public init(m11: CGFloat, m12: CGFloat, m21: CGFloat, m22: CGFloat, tX: CGFloat, tY: CGFloat) {
+        self.m11 = m11
+        self.m12 = m12
+        self.m21 = m21
+        self.m22 = m22
+        self.tX = tX
+        self.tY = tY
     }
     
-    private var reference : NSAffineTransform {
+    fileprivate init(reference: NSAffineTransform) {
+        m11 = reference.transformStruct.m11
+        m12 = reference.transformStruct.m12
+        m21 = reference.transformStruct.m21
+        m22 = reference.transformStruct.m22
+        tX = reference.transformStruct.tX
+        tY = reference.transformStruct.tY
+    }
+    
+    fileprivate var reference : NSAffineTransform {
         let ref = NSAffineTransform()
-        ref.transformStruct = self
+        ref.transformStruct = NSAffineTransformStruct(m11: m11, m12: m12, m21: m21, m22: m22, tX: tX, tY: tY)
         return ref
+    }
+    
+    /**
+     Creates an affine transformation matrix with identity values.
+     - seealso: identity
+    */
+    public init() {
+        self.init(m11: CGFloat(1.0), m12: CGFloat(0.0),
+                  m21: CGFloat(0.0), m22: CGFloat(1.0),
+                  tX: CGFloat(0.0), tY: CGFloat(0.0))
     }
     
     /**
@@ -95,8 +124,8 @@ extension AffineTransform : ReferenceConvertible, Hashable, CustomStringConverti
          [    0       0    1 ]
      */
     public init(rotationByDegrees angle: CGFloat) {
-        let α = Double(angle) * M_PI / 180.0
-        self.init(rotationByRadians: CGFloat(α))
+        let α = angle * .pi / 180.0
+        self.init(rotationByRadians: α)
     }
     
     /**
@@ -124,8 +153,8 @@ extension AffineTransform : ReferenceConvertible, Hashable, CustomStringConverti
          [    0       0    1 ]
      */
     public mutating func rotate(byDegrees angle: CGFloat) {
-        let α = Double(angle) * M_PI / 180.0
-        return rotate(byRadians: CGFloat(α))
+        let α = angle * .pi / 180.0
+        return rotate(byRadians: α)
     }
     
     /**
@@ -270,9 +299,7 @@ extension AffineTransform : _ObjectiveCBridgeable {
     
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSAffineTransform {
-        let t = NSAffineTransform()
-        t.transformStruct = self
-        return t
+        return self.reference
     }
     
     public static func _forceBridgeFromObjectiveC(_ x: NSAffineTransform, result: inout AffineTransform?) {
@@ -282,7 +309,7 @@ extension AffineTransform : _ObjectiveCBridgeable {
     }
     
     public static func _conditionallyBridgeFromObjectiveC(_ x: NSAffineTransform, result: inout AffineTransform?) -> Bool {
-        result = x.transformStruct
+        result = AffineTransform(reference: x)
         return true // Can't fail
     }
 

@@ -1,0 +1,277 @@
+{
+  "kind": "Root",
+  "name": "TopLevel",
+  "printedName": "TopLevel",
+  "children": [
+    {
+      "kind": "TypeDecl",
+      "name": "S1",
+      "printedName": "S1",
+      "declKind": "Struct",
+      "usr": "s:V4cake2S1",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "Function",
+          "name": "foo1",
+          "printedName": "foo1()",
+          "declKind": "Func",
+          "usr": "s:ZFV4cake2S14foo1FT_T_",
+          "location": "",
+          "moduleName": "cake",
+          "static": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "foo2",
+          "printedName": "foo2()",
+          "declKind": "Func",
+          "usr": "s:FV4cake2S14foo2FT_T_",
+          "location": "",
+          "moduleName": "cake",
+          "mutating": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "foo6",
+          "printedName": "foo6()",
+          "declKind": "Func",
+          "usr": "s:FV4cake2S14foo6FT_T_",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNameAlias",
+              "name": "Void",
+              "printedName": "Void",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "declKind": "Constructor",
+          "usr": "s:FV4cake2S1cFT_S0_",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "S1",
+              "printedName": "S1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "C1",
+      "printedName": "C1",
+      "declKind": "Class",
+      "usr": "s:C4cake2C1",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "Function",
+          "name": "foo1",
+          "printedName": "foo1()",
+          "declKind": "Func",
+          "usr": "s:ZFC4cake2C14foo1FT_T_",
+          "location": "",
+          "moduleName": "cake",
+          "static": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ]
+        },
+        {
+          "kind": "Var",
+          "name": "Ins",
+          "printedName": "Ins",
+          "declKind": "Var",
+          "usr": "s:vC4cake2C13InsXwGSqS0__",
+          "location": "",
+          "moduleName": "cake",
+          "ownership": 1,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "WeakStorage",
+              "printedName": "C1?"
+            },
+            {
+              "kind": "Getter",
+              "name": "_",
+              "printedName": "_()",
+              "declKind": "Func",
+              "usr": "s:FC4cake2C1g3InsXwGSqS0__",
+              "location": "",
+              "moduleName": "cake",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Optional",
+                  "printedName": "C1?",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "C1",
+                      "printedName": "C1"
+                    }
+                  ]
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "C1",
+                  "printedName": "C1"
+                }
+              ]
+            },
+            {
+              "kind": "Setter",
+              "name": "_",
+              "printedName": "_()",
+              "declKind": "Func",
+              "usr": "s:FC4cake2C1s3InsXwGSqS0__",
+              "location": "",
+              "moduleName": "cake",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "C1",
+                  "printedName": "C1"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Optional",
+                  "printedName": "C1?",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "C1",
+                      "printedName": "C1"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Var",
+          "name": "Ins2",
+          "printedName": "Ins2",
+          "declKind": "Var",
+          "usr": "s:vC4cake2C14Ins2XoS0_",
+          "location": "",
+          "moduleName": "cake",
+          "ownership": 2,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "UnownedStorage",
+              "printedName": "C1"
+            },
+            {
+              "kind": "Getter",
+              "name": "_",
+              "printedName": "_()",
+              "declKind": "Func",
+              "usr": "s:FC4cake2C1g4Ins2XoS0_",
+              "location": "",
+              "moduleName": "cake",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "C1",
+                  "printedName": "C1"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "C1",
+                  "printedName": "C1"
+                }
+              ]
+            },
+            {
+              "kind": "Setter",
+              "name": "_",
+              "printedName": "_()",
+              "declKind": "Func",
+              "usr": "s:FC4cake2C1s4Ins2XoS0_",
+              "location": "",
+              "moduleName": "cake",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "C1",
+                  "printedName": "C1"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "C1",
+                  "printedName": "C1"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "declKind": "Constructor",
+          "usr": "s:FC4cake2C1cFT_S0_",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "C1",
+              "printedName": "C1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

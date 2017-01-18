@@ -16,12 +16,12 @@ aren't so complicated:
       initializers, and (b) all properties have initial values.
 
     | Convenience initializers delegate.
-    | Convenience initializers are inherited if all of the superclass's 
+    | Convenience initializers are inherited if all of the superclass's
       designated initializers are present.
 
-    | If you want to call an initializer on a dynamic type, it must be marked 
+    | If you want to call an initializer on a dynamic type, it must be marked
       required.
-    | Protocols are one way to do this, so initializers that satisfy protocol 
+    | Protocols are one way to do this, so initializers that satisfy protocol
       requirements must be required.
     | If your superclass has a required initializer, you must provide it
       somehow.
@@ -42,11 +42,11 @@ With all our rules, we actually rule out some important use cases, like this one
     ``initWithContentsOfURL:ofType:error:``. If you perform initializations that
     must be done when creating new documents but not when opening existing
     documents, override ``initWithType:error:``. If you have any initializations
-    that apply only to documents that are opened, override 
-    ``initWithContentsOfURL:ofType:error:``. If you have general 
+    that apply only to documents that are opened, override
+    ``initWithContentsOfURL:ofType:error:``. If you have general
     initializations, override ``init``. In all three cases, be sure to invoke
     the superclass implementation as the first action.
-    
+
     -- `Document-Based App Programming Guide for Mac`__
 
 __ https://developer.apple.com/library/mac/documentation/DataManagement/Conceptual/DocBasedAppProgrammingGuideForOSX/ManagingLifecycle/ManagingLifecycle.html#//apple_ref/doc/uid/TP40011179-CH4-SW11
@@ -60,7 +60,7 @@ Problem 3: Factory Initializers
 ===============================
 
 Finally, we try to standardize on initializers for object creation in Swift,
-even going as far as to import Objective-C factory methods as initializers…but
+even going as far as to import Objective-C factory methods as initializers...but
 there are some patterns that cannot be written in Swift, such as this one::
 
     class AnyGenerator<Element> : GeneratorType {
@@ -73,7 +73,7 @@ there are some patterns that cannot be written in Swift, such as this one::
       }
       // other generator stuff
     }
-    
+
     class AnyGeneratorImpl<WrappedGenerator: GeneratorType> :
         AnyGenerator<WrappedGenerator.Element> {
       var wrapped: WrappedGenerator
@@ -95,11 +95,11 @@ We've had a number of ideas for improving the state of the world, including
 - Allow designated initializers to delegate to other designated initializers
   (using static dispatch). This makes convenience initializers a niche feature.
 
-- Add the concept of factory initializers, which don't promise to return 
+- Add the concept of factory initializers, which don't promise to return
   ``Self``. These are either never inherited or must always be overridden in a
   subclass.
 
-- Allow convenience initializers to chain to superclass convenience 
+- Allow convenience initializers to chain to superclass convenience
   initializers. This isn't strictly safe, but it permits the NSDocument idiom.
 
 None of these solve all the initializer problems listed above on their own, and

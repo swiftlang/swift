@@ -3,11 +3,11 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 from __future__ import print_function
 
@@ -47,8 +47,6 @@ VALIDATION_TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'validation-test')
 
 LIT_BIN_DEFAULT = os.path.join(SWIFT_SOURCE_ROOT, 'llvm',
                                'utils', 'lit', 'lit.py')
-PROFDATA_MERGE = os.path.join(SWIFT_SOURCE_DIR,
-                              'utils', 'profdata_merge', 'main.py')
 host_target = StdlibDeploymentTarget.host_target().name
 
 
@@ -130,18 +128,11 @@ def main():
                              "`subset`. Accept multiple.")
     parser.add_argument("--result-dir", type=os.path.realpath, metavar="PATH",
                         help="directory to store test results (default: none)")
-    parser.add_argument("--merge-coverage",
-                        action=arguments.action.optional_bool,
-                        help="set to merge coverage profile")
     parser.add_argument("--lit", default=LIT_BIN_DEFAULT, metavar="PATH",
                         help="lit.py executable path "
                              "(default: ${LLVM_SOURCE_DIR}/utils/lit/lit.py)")
 
     args = parser.parse_args()
-
-    if args.merge_coverage:
-        if args.result_dir is None:
-            error_exit('Coverage needs --result-dir')
 
     targets = args.targets
     if targets is None:
@@ -244,27 +235,14 @@ def main():
         test_args += ['--param', param]
 
     if args.result_dir:
-        test_args += ['--xunit-xml-output=%s' % os.path.join(args.result_dir,
+        test_args += ['--param', 'swift_test_results_dir=%s' % args.result_dir,
+                      '--xunit-xml-output=%s' % os.path.join(args.result_dir,
                                                              'lit-tests.xml')]
 
     test_cmd = [sys.executable, args.lit] + test_args + paths
 
-    # Start merge worker
-    if args.merge_coverage:
-        merge_log = os.path.join(args.result_dir, 'profdata_merge.log')
-        profdata_merge_start = [sys.executable, PROFDATA_MERGE,
-                                '-l', merge_log,
-                                'start',
-                                '-o', args.result_dir]
-        shell.call(profdata_merge_start, echo=False)
-
     # Do execute test
     shell.call(test_cmd)
-
-    # Stop merge worker
-    if args.merge_coverage:
-        profdata_merge_start = [sys.executable, PROFDATA_MERGE, 'stop']
-        shell.call(shell.call, echo=False)
 
 if __name__ == "__main__":
     main()

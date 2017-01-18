@@ -1,8 +1,12 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
-// RUN: FileCheck %s < %t.swiftdeps
-// RUN: FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
+// RUN: %FileCheck %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
+
+// Check that the output is deterministic.
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
+// RUN: diff %t.swiftdeps %t-2.swiftdeps
 
 // CHECK-LABEL: {{^provides-top-level:$}}
 // CHECK-NEXT: "IntWrapper"
@@ -93,7 +97,7 @@ func <(lhs: IntWrapper, rhs: IntWrapper) -> Bool {
 prefix func ***(lhs: IntWrapper) {}
 
 // This is provided as an operator but not implemented here.
-prefix operator ^^^ {}
+prefix operator ^^^
 
 // CHECK-DAG: "ClassFromOtherFile"
 class Subclass : ClassFromOtherFile {}
@@ -126,9 +130,9 @@ protocol ExpressibleByExtraFloatLiteral
 private protocol ExpressibleByExtraCharLiteral : ExpressibleByUnicodeScalarLiteral {
 }
 
-prefix operator ~~~ {}
+prefix operator ~~~
 protocol ThreeTilde {
-  prefix func ~~~(lhs: Self)
+  prefix static func ~~~(lhs: Self)
 }
 
 private struct ThreeTildeTypeImpl : ThreeTilde {
@@ -141,7 +145,7 @@ func overloadedOnProto<T: ThreeTilde>(_: T) {}
 private prefix func ~~~(_: ThreeTildeTypeImpl) {}
 
 // CHECK-DAG: - "~~~~"
-prefix operator ~~~~ {}
+prefix operator ~~~~
 protocol FourTilde {
   prefix static func ~~~~(arg: Self)
 }
@@ -405,13 +409,9 @@ struct Sentinel2 {}
 // CHECK-DAG: - ["Ps25ExpressibleByFloatLiteral", ""]
 // CHECK-DAG: - !private ["Ps33ExpressibleByUnicodeScalarLiteral", ""]
 // CHECK-DAG: - !private ["Ps10Strideable", "Stride"]
-// CHECK-DAG: - !private ["Sa", "Element"]
 // CHECK-DAG: - !private ["Sa", "reduce"]
 // CHECK-DAG: - !private ["Sb", "_getBuiltinLogicValue"]
 // CHECK-DAG: - ["Sb", "InnerToBool"]
-// CHECK-DAG: - !private ["Vs10Dictionary", "Key"]
-// CHECK-DAG: - !private ["Vs10Dictionary", "Value"]
-// CHECK-DAG: - !private ["V4main17OtherFileIntArray", "Iterator"]
 // CHECK-DAG: - !private ["V4main17OtherFileIntArray", "deinit"]
 // CHECK-DAG: - !private ["V4main18OtherFileOuterType", "InnerType"]
 // CHECK-DAG: - !private ["VV4main18OtherFileOuterType9InnerType", "init"]
@@ -419,10 +419,7 @@ struct Sentinel2 {}
 // CHECK-DAG: - !private ["VV4main26OtherFileSecretTypeWrapper10SecretType", "constant"]
 // CHECK-DAG: - !private ["V4main25OtherFileProtoImplementor", "deinit"]
 // CHECK-DAG: - !private ["V4main26OtherFileProtoImplementor2", "deinit"]
-// CHECK-DAG: - !private ["V4main28OtherFileProtoNonImplementor", "deinit"]
-// CHECK-DAG: - !private ["Vs13EmptyIterator", "Element"]
 // CHECK-DAG: - !private ["Vs13EmptyIterator", "init"]
-// CHECK-DAG: - !private ["Vs16IndexingIterator", "Element"]
 // CHECK-DAG: - ["O4main13OtherFileEnum", "Value"]
 // CHECK-DAG: - !private ["V4main20OtherFileEnumWrapper", "Enum"]
 
@@ -443,47 +440,40 @@ struct Sentinel2 {}
 // CHECK-DAG: - !private ["P4main13PrivateProto3", ""]
 
 // CHECK-LABEL: {{^depends-nominal:$}}
-// CHECK-DAG: - "V4main10IntWrapper"
-// CHECK-DAG: - "Ps10Comparable"
-// CHECK-DAG: - "C4main18ClassFromOtherFile"
-// CHECK-DAG: !private "Si"
-// CHECK-DAG: - "Ps25ExpressibleByFloatLiteral"
-// CHECK-DAG: !private "Ps33ExpressibleByUnicodeScalarLiteral"
-// CHECK-DAG: !private "Ps10Strideable"
-// CHECK-DAG: !private "Sa"
-// CHECK-DAG: - "Sb"
-// CHECK-DAG: !private "Vs10Dictionary"
-// CHECK-DAG: !private "V4main17OtherFileIntArray"
-// CHECK-DAG: !private "V4main18OtherFileOuterType"
-// CHECK-DAG: !private "VV4main18OtherFileOuterType9InnerType"
-// CHECK-DAG: !private "VV4main26OtherFileSecretTypeWrapper10SecretType"
-// CHECK-DAG: !private "V4main25OtherFileProtoImplementor"
-// CHECK-DAG: !private "V4main26OtherFileProtoImplementor2"
-// CHECK-DAG: !private "V4main28OtherFileProtoNonImplementor"
-// CHECK-DAG: !private "Vs13EmptyIterator"
-// CHECK-DAG: !private "Vs16IndexingIterator"
-// CHECK-DAG: - "O4main13OtherFileEnum"
-// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
-// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
-// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
-
-// CHECK-DAG: - "V4main23TopLevelForMemberLookup"
-
-// CHECK-DAG: - "V4main14TopLevelStruct"
-// CHECK-DAG: - "V4main15TopLevelStruct2"
-// CHECK-DAG: - "V4main15TopLevelStruct3"
-// CHECK-DAG: - "V4main15TopLevelStruct4"
-// CHECK-DAG: - "V4main15TopLevelStruct5"
-// CHECK-DAG: !private "V4main21PrivateTopLevelStruct"
-// CHECK-DAG: !private "V4main22PrivateTopLevelStruct2"
-// CHECK-DAG: !private "V4main22PrivateTopLevelStruct3"
-// CHECK-DAG: !private "V4main22PrivateTopLevelStruct4"
-
-// CHECK-DAG: - "P4main14TopLevelProto1"
-// CHECK-DAG: - "P4main14TopLevelProto2"
-// CHECK-DAG: !private "P4main13PrivateProto1"
-// CHECK-DAG: !private "P4main13PrivateProto2"
-// CHECK-DAG: !private "P4main13PrivateProto3"
+// We're checking order here to make sure the names are sorted.
+// CHECK: - !private "Sa"
+// CHECK: - "Sb"
+// CHECK: - "C4main18ClassFromOtherFile"
+// CHECK: - "Ps10Comparable"
+// CHECK: - !private "Vs13EmptyIterator"
+// CHECK: - "Ps25ExpressibleByFloatLiteral"
+// CHECK: - !private "Ps33ExpressibleByUnicodeScalarLiteral"
+// CHECK: - !private "VV4main18OtherFileOuterType9InnerType"
+// CHECK: - !private "Si"
+// CHECK: - "V4main10IntWrapper"
+// CHECK: - "O4main13OtherFileEnum"
+// CHECK: - !private "V4main20OtherFileEnumWrapper"
+// CHECK: - !private "V4main17OtherFileIntArray"
+// CHECK: - !private "V4main18OtherFileOuterType"
+// CHECK: - !private "V4main25OtherFileProtoImplementor"
+// CHECK: - !private "V4main26OtherFileProtoImplementor2"
+// CHECK: - !private "P4main13PrivateProto1"
+// CHECK: - !private "P4main13PrivateProto2"
+// CHECK: - !private "P4main13PrivateProto3"
+// CHECK: - !private "V4main21PrivateTopLevelStruct"
+// CHECK: - !private "V4main22PrivateTopLevelStruct2"
+// CHECK: - !private "V4main22PrivateTopLevelStruct3"
+// CHECK: - !private "V4main22PrivateTopLevelStruct4"
+// CHECK: - !private "VV4main26OtherFileSecretTypeWrapper10SecretType"
+// CHECK: - !private "Ps10Strideable"
+// CHECK: - "V4main23TopLevelForMemberLookup"
+// CHECK: - "P4main14TopLevelProto1"
+// CHECK: - "P4main14TopLevelProto2"
+// CHECK: - "V4main14TopLevelStruct"
+// CHECK: - "V4main15TopLevelStruct2"
+// CHECK: - "V4main15TopLevelStruct3"
+// CHECK: - "V4main15TopLevelStruct4"
+// CHECK: - "V4main15TopLevelStruct5"
 
 // String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: "String"

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,9 +15,12 @@
 /// In most cases, it's best to ignore this protocol and use the
 /// `MutableCollection` protocol instead, because it has a more complete
 /// interface.
-public protocol MutableIndexable : Indexable {
-  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'MutableCollection' instead")
+public typealias MutableIndexable = _MutableIndexable
+public protocol _MutableIndexable : _Indexable {
+  // FIXME(ABI)#52 (Recursive Protocol Constraints): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
+  // rdar://problem/20531108
   //
   // This protocol is almost an implementation detail of the standard
   // library; it is used to deduce things like the `SubSequence` and
@@ -214,8 +217,8 @@ public protocol MutableIndexable : Indexable {
 ///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x
-public protocol MutableCollection : MutableIndexable, Collection {
-  // FIXME: should be constrained to MutableCollection
+public protocol MutableCollection : _MutableIndexable, Collection {
+  // FIXME(ABI)#181: should be constrained to MutableCollection
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
   /// A collection that represents a contiguous subrange of the collection's
@@ -302,7 +305,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(n)
+  /// - Complexity: O(*n*)
   mutating func partition(
     by belongsInSecondPartition: (Iterator.Element) throws -> Bool
   ) rethrows -> Index
@@ -320,7 +323,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R?
-  // FIXME(ABI)(compiler limitation): the signature should use
+  // FIXME(ABI)#53 (Type Checker): the signature should use
   // UnsafeMutableBufferPointer, but the compiler can't handle that.
   //
   // <rdar://problem/21933004> Restore the signature of

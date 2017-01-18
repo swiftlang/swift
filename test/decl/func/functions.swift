@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 infix operator ====
 infix operator <<<<
@@ -13,20 +13,20 @@ func <><><T>(x: T, y: T) {}
 
 //===--- Check that we recover when the parameter tuple is missing.
 
-func recover_missing_parameter_tuple_1 { // expected-error {{expected '(' in argument list of function declaration}}
+func recover_missing_parameter_tuple_1 { // expected-error {{expected '(' in argument list of function declaration}} {{39-39=()}}
 }
 
-func recover_missing_parameter_tuple_1a // expected-error {{expected '(' in argument list of function declaration}}
+func recover_missing_parameter_tuple_1a // expected-error {{expected '(' in argument list of function declaration}} {{40-40=()}}
 {
 }
 
-func recover_missing_parameter_tuple_2<T> { // expected-error {{expected '(' in argument list of function declaration}} expected-error {{generic parameter 'T' is not used in function signature}}
+func recover_missing_parameter_tuple_2<T> { // expected-error {{expected '(' in argument list of function declaration}} {{42-42=()}} expected-error {{generic parameter 'T' is not used in function signature}}
 }
 
-func recover_missing_parameter_tuple_3 -> Int { // expected-error {{expected '(' in argument list of function declaration}}
+func recover_missing_parameter_tuple_3 -> Int { // expected-error {{expected '(' in argument list of function declaration}} {{39-39=()}}
 }
 
-func recover_missing_parameter_tuple_4<T> -> Int { // expected-error {{expected '(' in argument list of function declaration}} expected-error {{generic parameter 'T' is not used in function signature}}
+func recover_missing_parameter_tuple_4<T> -> Int { // expected-error {{expected '(' in argument list of function declaration}} {{42-42=()}} expected-error {{generic parameter 'T' is not used in function signature}}
 }
 
 //===--- Check that we recover when the function return type is missing.
@@ -39,7 +39,7 @@ func recover_missing_return_type_1() -> // expected-error {{expected type for fu
 func recover_missing_return_type_2() -> // expected-error {{expected type for function result}} expected-error{{expected '{' in body of function declaration}}
 
 // Note: Don't move braces to a different line here.
-func recover_missing_return_type_3 -> // expected-error {{expected '(' in argument list of function declaration}} expected-error {{expected type for function result}}
+func recover_missing_return_type_3 -> // expected-error {{expected '(' in argument list of function declaration}} {{35-35=()}} expected-error {{expected type for function result}}
 {
 }
 
@@ -49,6 +49,9 @@ func recover_colon_arrow_1() : Int { } // expected-error {{expected '->' after f
 func recover_colon_arrow_2() : { }     // expected-error {{expected '->' after function parameter tuple}} {{30-31=->}} expected-error {{expected type for function result}}
 func recover_colon_arrow_3 : Int { }   // expected-error {{expected '->' after function parameter tuple}} {{28-29=->}} expected-error {{expected '(' in argument list of function declaration}}
 func recover_colon_arrow_4 : { }       // expected-error {{expected '->' after function parameter tuple}} {{28-29=->}} expected-error {{expected '(' in argument list of function declaration}} expected-error {{expected type for function result}}
+func recover_colon_arrow_5():Int { }   // expected-error {{expected '->' after function parameter tuple}} {{29-30= -> }}
+func recover_colon_arrow_6(): Int { }  // expected-error {{expected '->' after function parameter tuple}} {{29-30= ->}}
+func recover_colon_arrow_7() :Int { }  // expected-error {{expected '->' after function parameter tuple}} {{30-31=-> }}
 
 //===--- Check that we recover if the function does not have a body, but the
 //===--- context requires the function to have a body.
@@ -79,7 +82,7 @@ func parseError3(_ a: unknown_type, b: ) {} // expected-error {{use of undeclare
 
 func parseError4(_ a: , b: ) {} // expected-error 2{{expected parameter type following ':'}}
 
-func parseError5(_ a: b: ) {} // expected-error {{use of undeclared type 'b'}}  expected-error 2 {{expected ',' separator}} {{24-24=,}} {{24-24=,}} expected-error {{expected parameter name followed by ':'}}
+func parseError5(_ a: b: ) {} // expected-error {{use of undeclared type 'b'}}  expected-error {{expected ',' separator}} {{24-24=,}} expected-error {{expected parameter name followed by ':'}}
 
 func parseError6(_ a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}}
 
@@ -87,7 +90,7 @@ func parseError7(_ a: Int, goo b: unknown_type) {} // expected-error {{use of un
 
 public func foo(_ a: Bool = true) -> (b: Bar, c: Bar) {} // expected-error {{use of undeclared type 'Bar'}}
 
-func parenPatternInArg((a): Int) -> Int { // expected-error {{expected parameter name followed by ':'}} expected-error {{expected ',' separator}}
+func parenPatternInArg((a): Int) -> Int { // expected-error {{expected parameter name followed by ':'}}
   return a  // expected-error {{use of unresolved identifier 'a'}}
 }
 parenPatternInArg(0)  // expected-error {{argument passed to call that takes no arguments}}
@@ -141,6 +144,12 @@ func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not
 
 // Unnamed parameters require the name "_":
 func unnamed(Int) { } // expected-error{{unnamed parameters must be written with the empty name '_'}}{{14-14=_: }}
+
+func typeAttrBeforeParamDecl(@convention(c) _: () -> Void) {} // expected-error{{attribute can only be applied to types, not declarations}}
+
+// FIXME: Bad diagnostics
+func bareTypeWithAttr(@convention(c) () -> Void) {} // expected-error{{attribute can only be applied to types, not declarations}}
+// expected-error @-1 {{unnamed parameters must be written with the empty name '_'}} {{38-38=_: }}
 
 // Test fixits on curried functions.
 func testCurryFixits() {

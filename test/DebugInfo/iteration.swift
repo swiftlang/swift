@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o %t.ll
-// RUN: FileCheck %s < %t.ll
+// RUN: %FileCheck %s < %t.ll
 
 func markUsed<T>(_ t: T) {}
 
@@ -29,7 +29,7 @@ func count() {
 count()
 
 // End-to-end test:
-// RUN: llc %t.ll -filetype=obj -o - | llvm-dwarfdump - | FileCheck %s --check-prefix DWARF-CHECK
+// RUN: llc %t.ll -filetype=obj -o - | %llvm-dwarfdump - | %FileCheck %s --check-prefix DWARF-CHECK
 // DWARF-CHECK:  DW_TAG_variable
 // DWARF-CHECK:  DW_AT_name {{.*}} "letter"
 //

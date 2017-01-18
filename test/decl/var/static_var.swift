@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 // See also rdar://15626843.
 static var gvu1: Int // expected-error {{static properties may only be declared on a type}}{{1-8=}}
@@ -92,7 +92,7 @@ struct InMemberFunc {
   }
 }
 
-struct S { // expected-note 3{{extended type declared here}}
+struct S { // expected-note 3{{extended type declared here}} expected-note{{did you mean 'S'?}}
   static var v1: Int = 0
   class var v2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 
@@ -116,7 +116,7 @@ extension S {
   class let el2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 }
 
-enum E { // expected-note 3{{extended type declared here}}
+enum E { // expected-note 3{{extended type declared here}} expected-note{{did you mean 'E'?}}
   static var v1: Int = 0
   class var v2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 
@@ -141,7 +141,7 @@ extension E {
   class let el2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 }
 
-class C {
+class C { // expected-note{{did you mean 'C'?}}
   static var v1: Int = 0
   class final var v3: Int = 0 // expected-error {{class stored properties not supported}}
   class var v4: Int = 0 // expected-error {{class stored properties not supported}}
@@ -171,7 +171,7 @@ extension C {
   static final let el4: Int = 0 // expected-error {{static declarations are already final}} {{10-16=}}
 }
 
-protocol P {
+protocol P {  // expected-note{{did you mean 'P'?}}
   // Both `static` and `class` property requirements are equivalent in protocols rdar://problem/17198298
   static var v1: Int { get }
   class var v2: Int { get } // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
@@ -256,11 +256,11 @@ protocol ProtosEvilTwin {
 extension ProtoAdopter : ProtosEvilTwin {}
 
 // rdar://18990358
-public struct Foo { // expected-note {{in declaration of 'Foo'}}
+public struct Foo { // expected-note {{to match this opening '{'}}}
   public static let S { a // expected-error{{computed property must have an explicit type}}
     // expected-error@-1{{type annotation missing in pattern}}
     // expected-error@-2{{'let' declarations cannot be computed properties}}
     // expected-error@-3{{use of unresolved identifier 'a'}}
 }
 
-// expected-error@+1 {{expected declaration}}
+// expected-error@+1 {{expected '}' in struct}}

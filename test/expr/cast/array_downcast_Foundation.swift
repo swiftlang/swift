@@ -1,12 +1,12 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
 // FIXME: END -enable-source-import hackaround
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -dump-ast -verify 2>&1 | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -typecheck %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -dump-ast -verify 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -58,3 +58,11 @@ func testDowncastOptionalObjectConditional(obj: AnyObject?!) -> [String]?? {
   return obj as? [String]?
 }
 
+// Do not crash examining the casted-to (or tested) type if it is
+// invalid (null or error_type).
+class rdar28583595 : NSObject {
+  public func test(i: Int) {
+    if i is Array {} // expected-error {{generic parameter 'Element' could not be inferred}}
+    // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+  }
+}

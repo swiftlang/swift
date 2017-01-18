@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -verify | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -verify | %FileCheck %s
 
 import Foundation
 
@@ -44,7 +44,7 @@ func convProtocolMetatypeToObject(_ f: @escaping () -> NSBurrito.Protocol) {
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dXMtP24function_conversion_objc9NSBurrito__XFo__oCSo8Protocol_ : $@convention(thin) (@owned @callee_owned () -> @thin NSBurrito.Protocol) -> @owned Protocol
 // CHECK:         apply %0() : $@callee_owned () -> @thin NSBurrito.Protocol
 // CHECK:         objc_protocol #NSBurrito : $Protocol
-// CHECK:         strong_retain
+// CHECK:         copy_value
 // CHECK:         return
 
 // ==== Representation conversions
@@ -60,8 +60,9 @@ func funcToBlock(_ x: @escaping () -> ()) -> @convention(block) () -> () {
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc11blockToFuncFbT_T_FT_T_ : $@convention(thin) (@owned @convention(block) () -> ()) -> @owned @callee_owned () -> ()
 // CHECK:         [[COPIED:%.*]] = copy_block %0
+// CHECK:         [[COPIED_2:%.*]] = copy_value [[COPIED]]
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb___XFo___
-// CHECK:         [[FUNC:%.*]] = partial_apply [[THUNK]]([[COPIED]])
+// CHECK:         [[FUNC:%.*]] = partial_apply [[THUNK]]([[COPIED_2]])
 // CHECK:         return [[FUNC]]
 func blockToFunc(_ x: @escaping @convention(block) () -> ()) -> () -> () {
   return x

@@ -27,7 +27,7 @@ private func baz() -> Int { return 2 }
 // RUN: %sourcekitd-test -req=format -line=14 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=15 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=16 -length=1 %s >>%t.response
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "    if abc == 1 {"
 // CHECK: key.sourcetext: "        abc = 2"

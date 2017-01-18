@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 /* block comments */
 /* /* nested too */ */
@@ -30,8 +30,8 @@ func funcdecl5(_ a: Int, y: Int) {
   if (x != 0) {
     if (x != 0 || f3() != 0) {
       // while with and without a space after it.
-      while(true) { 4; 2; 1 } // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
-      while (true) { 4; 2; 1 } // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
+      while(true) { 4; 2; 1 } // expected-warning 3 {{integer literal is unused}}
+      while (true) { 4; 2; 1 } // expected-warning 3 {{integer literal is unused}}
     }
   }
 
@@ -159,7 +159,7 @@ func missing_semicolons() {
   var w = 321
   func g() {}
   g() w += 1             // expected-error{{consecutive statements}} {{6-6=;}}
-  var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}} expected-warning {{expression of type 'String' is unused}}
+  var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}} expected-warning {{string literal is unused}}
   class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   func j() {}func k() {}  // expected-error{{consecutive statements}} {{14-14=;}}
@@ -346,6 +346,13 @@ class SomeTestClass {
   }
 }
 
+class SomeDerivedClass: SomeTestClass {
+  override init() {
+    defer {
+      super.init() // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    }
+  }
+}
 
 func test_guard(_ x : Int, y : Int??, cond : Bool) {
   
@@ -427,11 +434,12 @@ func f21080671() {
 // <rdar://problem/24467411> QoI: Using "&& #available" should fixit to comma
 // https://twitter.com/radexp/status/694561060230184960
 func f(_ x : Int, y : Int) {
-  if x == y && #available(iOS 52, *) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{13-15=,}}
-  if #available(iOS 52, *) && x == y {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{28-30=,}}
+  if x == y && #available(iOS 52, *) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{12-15=,}}
+  if #available(iOS 52, *) && x == y {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{27-30=,}}
 
   // https://twitter.com/radexp/status/694790631881883648
-  if x == y && let _ = Optional(y) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{13-15=,}}
+  if x == y && let _ = Optional(y) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{12-15=,}}
+  if x == y&&let _ = Optional(y) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{12-14=,}}
 }
 
 
@@ -467,7 +475,34 @@ func r25178926(_ a : Type) {
   }
 }
 
+do {
+  guard 1 == 2 else {
+    break // expected-error {{unlabeled 'break' is only allowed inside a loop or switch, a labeled break is required to exit an if or do}}
+  }
+}
 
+func fn(a: Int) {
+  guard a < 1 else {
+    break // expected-error {{'break' is only allowed inside a loop, if, do, or switch}}
+  }
+}
+
+func fn(x: Int) {
+  if x >= 0 {
+    guard x < 1 else {
+      guard x < 2 else {
+        break // expected-error {{unlabeled 'break' is only allowed inside a loop or switch, a labeled break is required to exit an if or do}}
+      }
+      return
+    }
+  }
+}
+
+func bad_if() {
+  if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
+  if (x: false) {} // expected-error {{'(x: Bool)' is not convertible to 'Bool'}}
+  if (x: 1) {} // expected-error {{'(x: Int)' is not convertible to 'Bool'}}
+}
 
 // Errors in case syntax
 class

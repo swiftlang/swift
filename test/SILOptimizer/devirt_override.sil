@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -devirtualizer | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -devirtualizer | %FileCheck %s
 
 sil_stage canonical
 
@@ -51,7 +51,7 @@ bb0:
   %0 = alloc_ref $MD5
   %11 = upcast %0 : $MD5 to $Hash
   %21 = unchecked_ref_cast %11 : $Hash to $MD5
-  %61 = upcast %21 : $MD5 to $Hash 
+  %61 = upcast %21 : $MD5 to $Hash
   // CHECK: function_ref @_TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_ : $@convention(method) (@guaranteed Hash) -> ()
   // CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@guaranteed Hash) -> ()
   %62 = class_method %61 : $Hash, #Hash.update!1 : (Hash) -> () -> () , $@convention(method) (@guaranteed Hash) -> ()

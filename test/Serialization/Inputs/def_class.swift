@@ -1,6 +1,5 @@
 open class Empty {}
 
-@swift3_migration(renamed: "DosInts", message: "because I can")
 open class TwoInts {
   open var x, y : Int
   
@@ -11,7 +10,6 @@ open class TwoInts {
 }
 
 open class ComputedProperty {
-  @swift3_migration(renamed: "theValue", message: "because I can")
   open var value : Int {
     get {
       var result = 0
@@ -22,7 +20,6 @@ open class ComputedProperty {
     }
   }
 
-  @swift3_migration(message: "something else")
   open var readOnly : Int {
     return 42
   }

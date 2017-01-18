@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -24,6 +24,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "clang/Basic/VersionTuple.h"
 #include <string>
 
 namespace swift {
@@ -65,13 +66,15 @@ public:
 
   /// Return a string to be used as an internal preprocessor define.
   ///
-  /// Assuming the project version is at most X.Y.Z.a.b, the integral constant
-  /// representing the version is:
+  /// The components of the version are multiplied element-wise by
+  /// \p componentWeights, then added together (a dot product operation).
+  /// If either array is longer than the other, the missing elements are
+  /// treated as zero.
   ///
-  /// X*1000*1000*1000 + Z*1000*1000 + a*1000 + b
-  ///
-  /// The second version component is not used.
-  std::string preprocessorDefinition() const;
+  /// The resulting string will have the form "-DMACRO_NAME=XYYZZ".
+  /// The combined value must fit in a uint64_t.
+  std::string preprocessorDefinition(StringRef macroName,
+                                     ArrayRef<uint64_t> componentWeights) const;
 
   /// Return the ith version component.
   unsigned operator[](size_t i) const {
@@ -86,6 +89,22 @@ public:
   bool empty() const {
     return Components.empty();
   }
+
+  /// Convert to a (maximum-4-element) clang::VersionTuple, truncating
+  /// away any 5th component that might be in this version.
+  operator clang::VersionTuple() const;
+
+  /// Return whether this version is a valid Swift language version number
+  /// to set the compiler to using -swift-version; this is not the same as
+  /// the set of Swift versions that have ever existed, just those that we
+  /// are attempting to maintain backward-compatibility support for.
+  bool isValidEffectiveLanguageVersion() const;
+
+  /// Whether this version is in the Swift 3 family
+  bool isVersion3() const { return !empty() && Components[0] == 3; }
+
+  /// Return this Version struct with minor and sub-minor components stripped
+  Version asMajorVersion() const;
 
   /// Parse a version in the form used by the _compiler_version \#if condition.
   static Version parseCompilerVersionString(StringRef VersionString,
@@ -108,9 +127,16 @@ public:
   /// Returns a version from the currently defined SWIFT_VERSION_MAJOR and
   /// SWIFT_VERSION_MINOR.
   static Version getCurrentLanguageVersion();
+
+  // Whitelist of backward-compatibility versions that we permit passing as
+  // -swift-version <vers>
+  static std::array<StringRef, 2> getValidEffectiveVersions() {
+    return {{"3", "4"}};
+  };
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);
+bool operator==(const Version &lhs, const Version &rhs);
 
 raw_ostream &operator<<(raw_ostream &os, const Version &version);
 
@@ -118,8 +144,14 @@ raw_ostream &operator<<(raw_ostream &os, const Version &version);
 std::pair<unsigned, unsigned> getSwiftNumericVersion();
 
 /// Retrieves a string representing the complete Swift version, which includes
-/// the Swift version number, the repository version, and the vendor tag.
-std::string getSwiftFullVersion();
+/// the Swift supported and effective version numbers, the repository version,
+/// and the vendor tag.
+std::string getSwiftFullVersion(Version effectiveLanguageVersion =
+                                Version::getCurrentLanguageVersion());
+
+/// Retrieves the repository revision number (or identifier) from which
+/// this Swift was built.
+std::string getSwiftRevision();
 
 } // end namespace version
 } // end namespace swift

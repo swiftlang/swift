@@ -1,5 +1,5 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNICODE_1 > %t.unicode.txt
-// RUN: FileCheck %s -check-prefix=UNICODE_1 < %t.unicode.txt
+// RUN: %FileCheck %s -check-prefix=UNICODE_1 < %t.unicode.txt
 
 struct Unicode1 {
   func Идентификаторы_с_кириллицей_допустимы() {}

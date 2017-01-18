@@ -1,7 +1,20 @@
 #ifndef __MACTYPES__
 #define __MACTYPES__
 
-#include "ctypes.h"
+#define STDLIB_TEST(TYPE, NAME) extern NAME NAME##_test
+#define STDLIB_TYPEDEF(TYPE, NAME) \
+  typedef TYPE NAME; \
+  STDLIB_TEST(TYPE, NAME)
+
+STDLIB_TYPEDEF(__INT8_TYPE__, SInt8);
+STDLIB_TYPEDEF(__INT16_TYPE__, SInt16);
+STDLIB_TYPEDEF(__INT32_TYPE__, SInt32);
+
+STDLIB_TYPEDEF(__UINT8_TYPE__, UInt8);
+STDLIB_TYPEDEF(__UINT16_TYPE__, UInt16);
+STDLIB_TYPEDEF(__UINT32_TYPE__, UInt32);
+
+#include <stdint.h>
 
 typedef SInt32                          Fixed;
 typedef Fixed *                         FixedPtr;

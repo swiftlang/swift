@@ -14,7 +14,7 @@ import Foo
 // RUN:   == -async -dont-print-request -req=cursor -pos=60:15 \
 // RUN:   == -async -dont-print-request -req=cursor -pos=60:15 \
 // RUN:   == -async -dont-print-request -req=cursor -pos=60:15 \
-// RUN:   == -async -dont-print-request -req=cursor -pos=60:15 | FileCheck %s -check-prefix=CHECK-FOO
+// RUN:   == -async -dont-print-request -req=cursor -pos=60:15 | %FileCheck %s -check-prefix=CHECK-FOO
 
 // CHECK-FOO: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooRuncingOptions
 // CHECK-FOO: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooRuncingOptions

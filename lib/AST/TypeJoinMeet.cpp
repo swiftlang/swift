@@ -1,17 +1,17 @@
-//===--- TypeJoinMeet.cpp - Swift Type "Join" and "Meet"  -----------------===//
+//===--- TypeJoinMeet.cpp - Swift Type "join" and "meet"  -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements the "meet" operation for types (and, eventually,
-//  "join").
+//  This file implements the "join" operation for types (and, eventually,
+//  "meet").
 //
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ASTContext.h"
@@ -20,15 +20,15 @@
 #include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
 
-Type Type::meet(Type type1, Type type2) {
+Type Type::join(Type type1, Type type2) {
   assert(!type1->hasTypeVariable() && !type2->hasTypeVariable() &&
-         "Cannot compute meet of types involving type variables");
+         "Cannot compute join of types involving type variables");
 
   // FIXME: This algorithm is woefully incomplete, and is only currently used
   // for optimizing away extra exploratory work in the constraint solver. It
   // should eventually encompass all of the subtyping rules of the language.
 
-  // If the types are equivalent, the meet is obvious.
+  // If the types are equivalent, the join is obvious.
   if (type1->isEqual(type2))
     return type1;
 
@@ -64,7 +64,21 @@ Type Type::meet(Type type1, Type type2) {
     return nullptr;
   }
 
-  // The meet can only be an existential.
+  // If one or both of the types are optional types, look at the underlying
+  // object type.
+  OptionalTypeKind otk1, otk2;
+  Type objectType1 = type1->getAnyOptionalObjectType(otk1);
+  Type objectType2 = type2->getAnyOptionalObjectType(otk2);
+  if (otk1 == OTK_Optional || otk2 == OTK_Optional) {
+    // Compute the join of the unwrapped type. If there is none, we're done.
+    Type unwrappedJoin = join(objectType1 ? objectType1 : type1,
+                              objectType2 ? objectType2 : type2);
+    if (!unwrappedJoin) return nullptr;
+
+    return OptionalType::get(unwrappedJoin);
+  }
+
+  // The join can only be an existential.
   return nullptr;
 }
 

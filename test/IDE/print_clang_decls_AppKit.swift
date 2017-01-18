@@ -13,7 +13,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=AppKit -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
 
 // APPKIT-LABEL: {{^}}extension NSString {{{$}}
 

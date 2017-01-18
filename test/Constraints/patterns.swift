@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Leaf expression patterns are matched to corresponding pieces of a switch
 // subject (TODO: or ~= expression) using ~= overload resolution.
@@ -146,8 +146,8 @@ func SR2066(x: Int?) {
 // Test x???? patterns.
 switch (nil as Int???) {
 case let x???: print(x, terminator: "")
-case let x??: print(x, terminator: "")
-case let x?: print(x, terminator: "")
+case let x??: print(x as Any, terminator: "")
+case let x?: print(x as Any, terminator: "")
 case 4???: break
 case nil??: break
 case nil?: break
@@ -162,7 +162,7 @@ default: break
 
 
 // Test some value patterns.
-let x : Int? = nil
+let x : Int?
 
 extension Int {
   func method() -> Int { return 42 }
@@ -245,6 +245,12 @@ enum SR2057 {
   case foo
 }
 
-let sr2057: SR2057? = nil
+let sr2057: SR2057?
 if case .foo = sr2057 { } // expected-error{{enum case 'foo' not found in type 'SR2057?'}}
 
+
+// Invalid 'is' pattern
+class SomeClass {}
+if case let doesNotExist as SomeClass:AlsoDoesNotExist {}
+// expected-error@-1 {{use of undeclared type 'AlsoDoesNotExist'}}
+// expected-error@-2 {{variable binding in a condition requires an initializer}}

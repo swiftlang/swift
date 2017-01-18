@@ -360,21 +360,21 @@ about 10 times.
 
 ::
 
-  /// --------------- 
+  /// ---------------
   /// Framework.swift
 
   public protocol Pingable { func ping() -> Self }
   public protocol Playable { func play() }
-   
+
   extension Int : Pingable {
     public func ping() -> Int { return self + 1 }
   }
-   
+
   public class Game<T : Pingable> : Playable {
     var t : T
-   
+
     public init (_ v : T) {t = v}
-   
+
     @_specialize(Int)
     public func play() {
       for _ in 0...100_000_000 { t = t.ping() }
@@ -599,7 +599,7 @@ Footnotes
 
 .. [#] i.e. a direct load of a class's field or a direct call to a function.
 
-.. [#] An optimization technique in which a copy will be made if and only if 
+.. [#] An optimization technique in which a copy will be made if and only if
         a modification happens to the original copy, otherwise a pointer will be given.
 
 .. [#] In certain cases the optimizer is able to via inlining and ARC

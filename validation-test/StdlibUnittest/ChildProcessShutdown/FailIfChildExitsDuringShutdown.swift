@@ -1,8 +1,8 @@
-// RUN: %target-run-simple-swift 2>&1 | FileCheck %s
+// RUN: %target-run-simple-swift 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 
 import StdlibUnittest
-#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Windows)
 import Glibc
 #else
 import Darwin

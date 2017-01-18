@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -23,20 +23,12 @@ FUNC_DECL(ArrayForceCast, "_arrayForceCast")
 FUNC_DECL(ArrayConditionalCast, "_arrayConditionalCast")
 
 FUNC_DECL(DictionaryUpCast, "_dictionaryUpCast")
-FUNC_DECL(DictionaryBridgeToObjectiveC, "_dictionaryBridgeToObjectiveC")
 FUNC_DECL(DictionaryDownCast, "_dictionaryDownCast")
 FUNC_DECL(DictionaryDownCastConditional, "_dictionaryDownCastConditional")
-FUNC_DECL(DictionaryBridgeFromObjectiveC, 
-          "_dictionaryBridgeFromObjectiveC")
-FUNC_DECL(DictionaryBridgeFromObjectiveCConditional, 
-          "_dictionaryBridgeFromObjectiveCConditional")
 
 FUNC_DECL(SetUpCast, "_setUpCast")
-FUNC_DECL(SetBridgeToObjectiveC, "_setBridgeToObjectiveC")
 FUNC_DECL(SetDownCast, "_setDownCast")
 FUNC_DECL(SetDownCastConditional, "_setDownCastConditional")
-FUNC_DECL(SetBridgeFromObjectiveC, "_setBridgeFromObjectiveC")
-FUNC_DECL(SetBridgeFromObjectiveCConditional, "_setBridgeFromObjectiveCConditional")
 
 FUNC_DECL(ConvertPointerToPointerArgument,
           "_convertPointerToPointerArgument")
@@ -67,12 +59,15 @@ FUNC_DECL(ConditionallyBridgeFromObjectiveCBridgeable,
 
 FUNC_DECL(BridgeAnythingToObjectiveC,
           "_bridgeAnythingToObjectiveC")
+FUNC_DECL(BridgeAnyObjectToAny,
+          "_bridgeAnyObjectToAny")
 
 FUNC_DECL(ConvertToAnyHashable, "_convertToAnyHashable")
 
-FUNC_DECL(DidEnterMain, "_stdlib_didEnterMain")
 FUNC_DECL(DiagnoseUnexpectedNilOptional, "_diagnoseUnexpectedNilOptional")
 
 FUNC_DECL(GetErrorEmbeddedNSError, "_stdlib_getErrorEmbeddedNSError")
+
+FUNC_DECL(UnsafeBitCast, "unsafeBitCast")
 
 #undef FUNC_DECL

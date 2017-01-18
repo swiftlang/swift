@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -code-sinking | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -code-sinking | %FileCheck %s
 
 sil_stage canonical
 
@@ -20,11 +20,11 @@ class Y : X
 }
 
 
-sil @_TFC14devirt_access21X4pingfS0_FT_Si : $@convention(method) (@guaranteed X) -> Int 
-sil @_TFC14devirt_access21XcfMS0_FT_S0_ : $@convention(method) (@owned X) -> @owned X 
-sil @_TFC14devirt_access21XCfMS0_FT_S0_ : $@convention(thin) (@thick X.Type) -> @owned X 
-sil @_TFC14devirt_access21YcfMS0_FT_S0_ : $@convention(method) (@owned Y) -> @owned Y 
-sil @_TFC14devirt_access21YCfMS0_FT_S0_ : $@convention(thin) (@thick Y.Type) -> @owned Y 
+sil @_TFC14devirt_access21X4pingfS0_FT_Si : $@convention(method) (@guaranteed X) -> Int
+sil @_TFC14devirt_access21XcfMS0_FT_S0_ : $@convention(method) (@owned X) -> @owned X
+sil @_TFC14devirt_access21XCfMS0_FT_S0_ : $@convention(thin) (@thick X.Type) -> @owned X
+sil @_TFC14devirt_access21YcfMS0_FT_S0_ : $@convention(method) (@owned Y) -> @owned Y
+sil @_TFC14devirt_access21YCfMS0_FT_S0_ : $@convention(thin) (@thick Y.Type) -> @owned Y
 
 
 //CHECK-LABEL: sil @trivial_sink

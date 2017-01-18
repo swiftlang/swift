@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_closures %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_closures %s | %FileCheck %s
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_closures.bar
 func bar(arr: [(Int32) -> Int32]) {
@@ -25,6 +25,12 @@ func foo() {
   // CHECK: [[@LINE+2]]:6 -> [[@LINE+2]]:48 : 5
   // CHECK: [[@LINE+1]]:36 -> [[@LINE+1]]:46 : 6
   f1 { left, right in left == 0 || right == 1 }
+}
+
+// SR-2615: Implicit constructor decl has no body, and shouldn't be mapped
+struct C1 {
+// CHECK-NOT: sil_coverage_map{{.*}}errors
+  private var errors = [String]()
 }
 
 bar(arr: [{ x in x }])

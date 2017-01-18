@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -basic-callee-printer -o /dev/null | FileCheck --check-prefix=CHECK --check-prefix=CHECK-NOWMO %s
-// RUN: %target-sil-opt -enable-sil-verify-all %s -wmo -basic-callee-printer -o /dev/null | FileCheck --check-prefix=CHECK --check-prefix=CHECK-WMO %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -basic-callee-printer -o /dev/null | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NOWMO %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -wmo -basic-callee-printer -o /dev/null | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-WMO %s
 
 sil_stage canonical
 
@@ -596,4 +596,72 @@ sil_witness_table private private_proto_public_class: private_proto_3 module wit
 
 sil_witness_table private private_proto_public_class_private_method: private_proto_4 module witness {
   method #private_proto_4.theMethod!1: @private_proto_4_public_class_private_method_witness
+}
+
+// Test initializer vs allocator
+
+struct InitVal { }
+
+class SomeItem {
+  required init(ivalreq: InitVal)
+  convenience init(ival: InitVal)
+  deinit
+}
+
+class SomeChildItem : SomeItem {
+  deinit
+  required init(ivalreq: InitVal)
+}
+
+sil @test_call_of_allocator_and_initializer : $@convention(thin) (@thick SomeItem.Type, InitVal) -> @owned SomeItem {
+bb0(%0 : $@thick SomeItem.Type, %1: $InitVal):
+
+// CHECK: Function call site:
+// CHECK:   %2 = class_method %0 : $@thick SomeItem.Type, #SomeItem.init!allocator.1 : (SomeItem.Type) -> (InitVal) -> SomeItem , $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
+// CHECK:   %3 = apply %2(%1, %0) : $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
+// CHECK-NOWMO: Incomplete callee list? : Yes
+// CHECK-WMO: Incomplete callee list? : No
+// CHECK: Known callees:
+// CHECK: SomeChildItem_allocator
+// CHECK: SomeItem_allocator
+
+  %2 = class_method %0 : $@thick SomeItem.Type, #SomeItem.init!allocator.1 : (SomeItem.Type) -> (InitVal) -> SomeItem , $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
+  %3 = apply %2(%1, %0) : $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
+
+// CHECK: Function call site:
+// CHECK:   %4 = class_method %3 : $SomeItem, #SomeItem.init!initializer.1 : (SomeItem.Type) -> (InitVal) -> SomeItem , $@convention(method) (InitVal, @owned SomeItem) -> @owned SomeItem
+// CHECK:   %5 = apply %4(%1, %3) : $@convention(method) (InitVal, @owned SomeItem) -> @owned SomeItem
+// CHECK-NOWMO: Incomplete callee list? : Yes
+// CHECK-WMO: Incomplete callee list? : No
+// CHECK: Known callees:
+// CHECK: SomeChildItem_initializer
+// CHECK: SomeItem_initializer
+
+  %4 = class_method %3 : $SomeItem, #SomeItem.init!initializer.1 : (SomeItem.Type) -> (InitVal) -> SomeItem , $@convention(method) (InitVal, @owned SomeItem) -> @owned SomeItem
+  %5 = apply %4(%1, %3) : $@convention(method) (InitVal, @owned SomeItem) -> @owned SomeItem
+  return %5 : $SomeItem
+}
+
+sil @SomeItem_allocator : $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
+
+sil @SomeItem_initializer : $@convention(method) (InitVal, @owned SomeItem) -> @owned SomeItem
+
+sil @SomeItem_destructor : $@convention(method) (@owned SomeItem) -> ()
+
+sil @SomeChildItem_allocator : $@convention(method) (InitVal, @thick SomeChildItem.Type) -> @owned SomeChildItem
+
+sil @SomeChildItem_initializer : $@convention(method) (InitVal, @owned SomeChildItem) -> @owned SomeChildItem
+
+sil @SomeChildItem_destructor : $@convention(method) (@owned SomeChildItem) -> ()
+
+sil_vtable SomeItem {
+  #SomeItem.init!allocator.1: SomeItem_allocator
+  #SomeItem.init!initializer.1: SomeItem_initializer
+  #SomeItem.deinit!deallocator: SomeItem_destructor
+}
+
+sil_vtable SomeChildItem {
+  #SomeItem.init!allocator.1: SomeChildItem_allocator
+  #SomeItem.init!initializer.1: SomeChildItem_initializer
+  #SomeChildItem.deinit!deallocator: SomeChildItem_destructor
 }

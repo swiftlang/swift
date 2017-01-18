@@ -52,7 +52,7 @@ for developers to want to handle errors from different operations in
 the same basic way, either by reporting the error to the user or
 passing the error back to their own clients.
 
-These errors will be the focus on this proposal.
+These errors will be the focus of this proposal.
 
 The final two classes of error are outside the scope of this proposal.
 A **universal error** is theoretically recoverable, but by its nature
@@ -78,16 +78,16 @@ convention:
 
 - Methods default to *not* producing errors unless they are explicitly
   marked.
-  
+
 - The control flow within a function is still mostly explicit: a
   maintainer can tell exactly which statements can produce an error,
   and a simple inspection reveals how the function reacts to the
   error.
-  
+
 - Throwing an error provides similar performance to allocating an
   error and returning it -- it isn't an expensive, table-based stack
   unwinding process.
-  
+
 - Cocoa APIs using standard ``NSError`` patterns can be imported into
   this world automatically.  Other common patterns (e.g. ``CFError``,
   ``errno``) can be added to the model in future versions of Swift.
@@ -180,7 +180,7 @@ allowed to throw is rejected by the compiler.
 It isn't possible to overload functions solely based on whether the
 functions throw.  That is, this is not legal::
 
-  func foo() { 
+  func foo() {
   func foo() throws {
 
 A throwing method cannot override a non-throwing method or satisfy a
@@ -299,13 +299,13 @@ generalized ``do`` statement::
     // a conditionally-executed catch clause
 
   } catch _ {
-    // a catch-all clause.  
+    // a catch-all clause.
   }
 
 As with ``switch`` statements, Swift makes an effort to understand
 whether catch clauses are exhaustive.  If it can determine it is, then
 the compiler considers the error to be handled.  If not, the error
-automatically propagates out out of scope, either to a lexically
+automatically propagates out of scope, either to a lexically
 enclosing ``catch`` clause or out of the containing function (which must
 be marked ``throws``).
 
@@ -691,7 +691,7 @@ can throw, and so it must also be marked with ``try``::
   }
 
 This marking feels redundant.  We want functions like
-``autoreleasepool`` to feel like statements, but marks inside builtin
+``autoreleasepool`` to feel like statements, but marks inside built-in
 statements like ``if`` don't require the outer statement to be marked.
 It would be better if the compiler didn't require the outer ``try``.
 

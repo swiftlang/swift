@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 protocol Fooable {
   func foo(_ x: Int) -> Int?
@@ -31,7 +31,7 @@ class GenericSub<U: AnyObject>: GenericSuper<U>, Barrable {
 }
 
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWuRxs9AnyObjectrGC33vtable_thunks_reabstraction_final10GenericSubx_S0_8BarrableS0_FS2_3foofwx3BarGSqwxS3__
-// CHECK:         class_method {{%.*}} : $GenericSub<U>, #GenericSub.foo!1 {{.*}}, $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (@in τ_0_0, @guaranteed GenericSub<τ_0_0>) -> @out Optional<τ_0_0>
+// CHECK:         class_method {{%.*}} : $GenericSub<τ_0_0>, #GenericSub.foo!1 {{.*}}, $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (@in τ_0_0, @guaranteed GenericSub<τ_0_0>) -> @out Optional<τ_0_0>
 
 class C {}
 

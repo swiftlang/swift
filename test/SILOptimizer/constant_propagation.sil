@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-constant-propagation | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
 
 import Builtin
 
@@ -17,6 +17,36 @@ struct Int64 {
 }
 struct UInt64 {
   var value: Builtin.Int64
+}
+
+sil @count_leading_zeros_corner_case : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+ %zero64 = integer_literal $Builtin.Int64, 0
+ %zero1 = integer_literal $Builtin.Int1, 0
+ %ctlz = builtin "int_ctlz_Int64"(%zero64 : $Builtin.Int64, %zero1 : $Builtin.Int1) : $Builtin.Int64
+ return %ctlz : $Builtin.Int64
+
+// CHECK-LABEL: sil @count_leading_zeros_corner_case
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: integer_literal $Builtin.Int1, 0
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 64
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}
+
+sil @count_leading_zeros : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+ %zero64 = integer_literal $Builtin.Int64, 2
+ %zero1 = integer_literal $Builtin.Int1, 0
+ %ctlz = builtin "int_ctlz_Int64"(%zero64 : $Builtin.Int64, %zero1 : $Builtin.Int1) : $Builtin.Int64
+ return %ctlz : $Builtin.Int64
+
+// CHECK-LABEL: sil @count_leading_zeros
+// CHECK-NOT: integer_literal $Builtin.Int64, 2
+// CHECK-NOT: integer_literal $Builtin.Int1, 0
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 62
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
 }
 
 // Compute an expression using a chain of arithmetic with overflow instructions: 2 * (2 + 3) - 3
@@ -175,6 +205,26 @@ bb0:
 // CHECK-NEXT: }
 }
 
+sil @testFoldingNonNegativeSignedInt : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %zero  = integer_literal $Builtin.Int64, 0
+  %non_neg = builtin "assumeNonNegative_Int64"(%0 : $Builtin.Int64) : $Builtin.Int64
+  %compare_slt = builtin "cmp_slt_Int64"(%non_neg : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+  %compare_sgt = builtin "cmp_sgt_Int64"(%zero : $Builtin.Int64, %non_neg : $Builtin.Int64) : $Builtin.Int1
+  %compare_sge = builtin "cmp_sge_Int64"(%non_neg : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+  %compare_sle = builtin "cmp_sle_Int64"(%zero : $Builtin.Int64, %non_neg : $Builtin.Int64) : $Builtin.Int1
+  %5 = tuple ()
+  return %5 : $()
+// CHECK-LABEL: sil @testFoldingNonNegativeSignedInt
+// CHECK: bb
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+}
+
 sil @testFoldingIntBinaryPredicates : $@convention(thin) () -> () {
 bb0:
   %1 = integer_literal $Builtin.Int1, 1
@@ -184,7 +234,7 @@ bb0:
   %12 = integer_literal $Builtin.Int32, 12
   %14 = builtin "cmp_ne_Int32"(%11 : $Builtin.Int32, %12 : $Builtin.Int32) : $Builtin.Int1
   %16 = builtin "cmp_sgt_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
-  %18 = builtin "cmp_ult_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
+  %17 = builtin "cmp_ult_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
   %5 = tuple ()
   return %5 : $()
 // CHECK-LABEL: sil @testFoldingIntBinaryPredicates
@@ -193,6 +243,31 @@ bb0:
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+}
+
+sil @testFoldingUnsignedIntComparisons : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int32, 0
+  // unsigned value is never less then 0
+  %18 = builtin "cmp_ult_Int32"(%0 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+  // unsigned value is always >= 0
+  %19 = builtin "cmp_uge_Int32"(%0 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+  // 0 is always <= an unsigned value
+  %20 = builtin "cmp_ule_Int32"(%3 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  // 0 is never greater than an unsigned value
+  %21 = builtin "cmp_ugt_Int32"(%3 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  %5 = tuple ()
+  return %5 : $()
+// CHECK-LABEL: sil @testFoldingUnsignedIntComparisons
+// CHECK: bb0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 }

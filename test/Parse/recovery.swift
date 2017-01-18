@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 //===--- Helper types used in this file.
 
@@ -9,13 +9,13 @@ protocol FooProtocol {}
 func garbage() -> () {
   var a : Int
   ] this line is invalid, but we will stop at the keyword below... // expected-error{{expected expression}}
-  return a + "a" // expected-error{{no '+' candidates produce the expected contextual result type '()'}} expected-note {{overloads for '+' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double}}
+  return a + "a" // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 }
 
 func moreGarbage() -> () {
   ) this line is invalid, but we will stop at the declaration... // expected-error{{expected expression}}
   func a() -> Int { return 4 }
-  return a() + "a" // expected-error{{no '+' candidates produce the expected contextual result type '()'}} expected-note {{overloads for '+' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double}}
+  return a() + "a" // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 }
 
 
@@ -88,10 +88,10 @@ func missingControllingExprInIf() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-warning {{boolean literal is unused}}
   }
 
-  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>
@@ -110,10 +110,10 @@ func missingControllingExprInWhile() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-warning {{boolean literal is unused}}
   }
 
-  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>
@@ -286,7 +286,7 @@ struct ErrorTypeInVarDecl8 {
 }
 
 struct ErrorTypeInVarDecl9 {
-  var v1 : protocol // expected-error {{expected identifier for type name}}
+  var v1 : protocol // expected-error {{expected type}}
   var v2 : Int
 }
 
@@ -481,19 +481,15 @@ Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of t
 
 // <rdar://problem/18634543> Parser hangs at swift::Parser::parseType
 public enum TestA {
-  // expected-error @+2 {{expected ',' separator}}
   // expected-error @+1{{expected '{' in body of function declaration}}
   public static func convertFromExtenndition( // expected-error {{expected parameter name followed by ':'}}
-    // expected-error@+2 {{expected ',' separator}}
     // expected-error@+1{{expected parameter name followed by ':'}}
     s._core.count != 0, "Can't form a Character from an empty String")
 }
 
 public enum TestB {
-  // expected-error@+2 {{expected ',' separator}}
   // expected-error@+1{{expected '{' in body of function declaration}}
   public static func convertFromExtenndition( // expected-error {{expected parameter name followed by ':'}}
-    // expected-error@+2 {{expected ',' separator}}
     // expected-error@+1 {{expected parameter name followed by ':'}}
     s._core.count ?= 0, "Can't form a Character from an empty String")
 }
@@ -527,10 +523,9 @@ case let (jeb):
 // rdar://19605164
 // expected-error@+2{{use of undeclared type 'S'}}
 struct Foo19605164 {
-func a(s: S[{{g) -> Int {}  // expected-note {{to match this opening '('}}
-// expected-error@+3 {{expected parameter name followed by ':'}}
-// expected-error@+2 2 {{expected ',' separator}}
-// expected-error@+1 {{expected ')' in parameter}}
+func a(s: S[{{g) -> Int {}
+// expected-error@+2 {{expected parameter name followed by ':'}}
+// expected-error@+1 {{expected ',' separator}}
 }}}
 #endif
   
@@ -558,7 +553,7 @@ func f1() {
 
 // <rdar://problem/20489838> QoI: Nonsensical error and fixit if "let" is missing between 'if let ... where' clauses
 func testMultiPatternConditionRecovery(x: Int?) {
-  // expected-error@+1 {{expected ',' joining parts of a multi-clause condition}} {{16-21=,}}
+  // expected-error@+1 {{expected ',' joining parts of a multi-clause condition}} {{15-21=,}}
   if let y = x where y == 0, let z = x {
     _ = y
     _ = z
@@ -603,7 +598,7 @@ let ￼tryx  = 123        // expected-error 2 {{invalid character in source file
 
 
 // <rdar://problem/21369926> Malformed Swift Enums crash playground service
-enum Rank: Int {
+enum Rank: Int {  // expected-error {{'Rank' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
   case Ace = 1
   case Two = 2.1  // expected-error {{cannot convert value of type 'Double' to raw type 'Int'}}
 }
@@ -626,6 +621,11 @@ func r22387625() {
   let _= 5 // expected-error{{'=' must have consistent whitespace on both sides}} {{8-8= }}
   let _ =5 // expected-error{{'=' must have consistent whitespace on both sides}} {{10-10= }}
 }
+// <https://bugs.swift.org/browse/SR-3135>
+func SR3135() {
+  let _: Int= 5 // expected-error{{'=' must have consistent whitespace on both sides}} {{13-13= }}
+  let _: Array<Int>= [] // expected-error{{'=' must have consistent whitespace on both sides}} {{20-20= }}
+}
 
 
 // <rdar://problem/23086402> Swift compiler crash in CSDiag
@@ -645,8 +645,7 @@ func test23086402(a: A23086402) {
 // <rdar://problem/23719432> [practicalswift] Compiler crashes on &(Int:_)
 func test23719432() {
   var x = 42
-  &(Int:x)  // expected-error {{'&' can only appear immediately in a call argument list}}
-  // expected-warning @-1 {{expression of type 'inout (Int: Int)' is unused}}
+  &(Int:x)  // expected-error {{expression type 'inout _' is ambiguous without more context}}
 }
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator
@@ -659,7 +658,7 @@ func r21712891(s : String) -> String {
   let a = s.startIndex..<s.startIndex
   _ = a
   // The specific errors produced don't actually matter, but we need to reject this.
-  return "\(s[a)"  // expected-error 3 {{}}
+  return "\(s[a)"  // expected-error {{expected ']' in expression list}} expected-note {{to match this opening '['}}
 }
 
 

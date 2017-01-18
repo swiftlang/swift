@@ -76,7 +76,7 @@ func foo3() {
 // RUN: %sourcekitd-test -req=format -line=41 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=42 -length=1 %s >>%t.response
 
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "    switch (test) {"
 // CHECK: key.sourcetext: "    case 0:"

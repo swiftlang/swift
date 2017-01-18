@@ -12,13 +12,13 @@ import Foo
 // RUN:     -req=complete -pos=2:1 %s -- %s -F %S/../Inputs/libIDE-mock-sdk > %t.completions2
 
 // Sanity check the results
-// RUN: FileCheck %s < %t.completions1
-// RUN: FileCheck %s < %t.completions2
+// RUN: %FileCheck %s < %t.completions1
+// RUN: %FileCheck %s < %t.completions2
 // CHECK: key.name: "FooStruct
 
-// RUN: %complete-test -raw -tok=VOID_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=VOID_1
-// RUN: %complete-test -raw -tok=VOID_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=VOID_1
-// RUN: %complete-test -raw -tok=VOID_3 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=VOID_3
+// RUN: %complete-test -raw -tok=VOID_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=VOID_1
+// RUN: %complete-test -raw -tok=VOID_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=VOID_1
+// RUN: %complete-test -raw -tok=VOID_3 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=VOID_3
 func test1() {
   _ = #^VOID_1,fooFunc^#
 }

@@ -60,8 +60,7 @@ function(add_swift_unittest test_dirname)
   endif()
 
   if(SWIFT_RUNTIME_USE_SANITIZERS)
-    list(FIND SWIFT_RUNTIME_USE_SANITIZERS "Thread" THREAD_INDEX)
-    if(NOT THREAD_INDEX EQUAL -1)
+    if("Thread" IN_LIST SWIFT_RUNTIME_USE_SANITIZERS)
       set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY COMPILE_FLAGS
         " -fsanitize=thread")
       set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY

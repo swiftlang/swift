@@ -6,35 +6,35 @@
 // Note: this test checks both module import case and file import case.
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=MODULE_QUALIFIED_1 < %t.compl.txt
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %S/Inputs -enable-source-import -code-completion-token=MODULE_QUALIFIED_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=MODULE_QUALIFIED_1 < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_2 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_2 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=MODULE_QUALIFIED_2 < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_3 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_3 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=MODULE_QUALIFIED_3 < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_4 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_4 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=MODULE_QUALIFIED_4 < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_5 | FileCheck %s -check-prefix=ERROR_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_5 | %FileCheck %s -check-prefix=ERROR_COMMON
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=POSTFIX_OPERATOR_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=POSTFIX_OPERATOR_1 < %t.compl.txt
-// RUN: FileCheck %s -check-prefix=NEGATIVE_POSTFIX_OPERATOR_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=POSTFIX_OPERATOR_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE_POSTFIX_OPERATOR_1 < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=TOP_LEVEL_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
 // rdar://15305873 Code completion: implement proper shadowing of declarations represented by cached results
-// FIXME: FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
+// FIXME: %FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %S/Inputs -enable-source-import -code-completion-token=TOP_LEVEL_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
 // rdar://15305873 Code completion: implement proper shadowing of declarations represented by cached results
-// FIXME: FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
+// FIXME: %FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -72,8 +72,8 @@ func testCompleteModuleQualified4() {
   foo_swift_module.BarGenericSwiftStruct2#^MODULE_QUALIFIED_4^#
 }
 // MODULE_QUALIFIED_4: Begin completions
-// MODULE_QUALIFIED_4-NEXT: Decl[Constructor]/CurrNominal:    ({#t: T#}, {#u: U#})[#BarGenericSwiftStruct2<T, U>#]
-// MODULE_QUALIFIED_4-NEXT: Decl[InstanceMethod]/CurrNominal: .bar2InstanceFunc({#self: BarGenericSwiftStruct2<T, U>#})[#() -> Void#]
+// MODULE_QUALIFIED_4-NEXT: Decl[Constructor]/CurrNominal:    ({#t: BarProtocol#}, {#u: U#})[#BarGenericSwiftStruct2<BarProtocol, U>#]
+// MODULE_QUALIFIED_4-NEXT: Decl[InstanceMethod]/CurrNominal: .bar2InstanceFunc({#self: BarGenericSwiftStruct2<BarProtocol, U>#})[#() -> Void#]
 // MODULE_QUALIFIED_4: Decl[InfixOperatorFunction]/OtherModule[Swift]: != {#Any.Type?#}[#Bool#];
 // MODULE_QUALIFIED_4-NEXT: End completions
 

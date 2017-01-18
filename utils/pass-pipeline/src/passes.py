@@ -27,7 +27,6 @@ GlobalARCOpts = Pass('GlobalARCOpts')
 GlobalLoadStoreOpts = Pass('GlobalLoadStoreOpts')
 GlobalOpt = Pass('GlobalOpt')
 IVInfoPrinter = Pass('IVInfoPrinter')
-InOutDeshadowing = Pass('InOutDeshadowing')
 InstCount = Pass('InstCount')
 LICM = Pass('LICM')
 LateInliner = Pass('LateInliner')
@@ -76,7 +75,6 @@ PASSES = [
     GlobalLoadStoreOpts,
     GlobalOpt,
     IVInfoPrinter,
-    InOutDeshadowing,
     InstCount,
     LICM,
     LateInliner,

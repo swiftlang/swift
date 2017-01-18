@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// Disabled because of a crash with a debug stdlib - rdar://problem/27226313
-// REQUIRES: optimized_stdlib
-
 // REQUIRES: objc_interop
 
 import StdlibUnittest

@@ -103,6 +103,28 @@ extension Int : _ObjectiveCBridgeable {
   }
 }
 
+extension Bool: _ObjectiveCBridgeable {
+  public func _bridgeToObjectiveC() -> NSNumber {
+    return NSNumber()
+  }
+  public static func _forceBridgeFromObjectiveC(
+    _ x: NSNumber, 
+    result: inout Bool?
+  ) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSNumber,
+    result: inout Bool?
+  ) -> Bool {
+    return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ x: NSNumber?
+  ) -> Bool {
+    return false
+  }
+}
+
 extension Array : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSArray {
     return NSArray()

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -234,11 +234,14 @@ struct SILDeclRef {
   
   SILLocation getAsRegularLocation() const;
 
+  enum class ManglingKind {
+    Default,
+    VTableMethod,
+    DynamicThunk,
+  };
+
   /// Produce a mangled form of this constant.
-  ///
-  /// If 'prefix' is non-empty, it will be used in place of the standard '_T'
-  /// prefix.
-  std::string mangle(StringRef prefix = {}) const;
+  std::string mangle(ManglingKind MKind = ManglingKind::Default) const;
 
   /// True if the SILDeclRef references a function.
   bool isFunc() const {

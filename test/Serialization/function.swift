@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_func.swift
-// RUN: llvm-bcanalyzer %t/def_func.swiftmodule | FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -I %t %s | FileCheck %s -check-prefix=SIL
+// RUN: llvm-bcanalyzer %t/def_func.swiftmodule | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -I %t %s | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: FALL_BACK_TO_TRANSLATION_UNIT
 // CHECK-NOT: UnknownCode
@@ -17,7 +17,7 @@ func useEq<T: EqualOperator>(_ x: T, y: T) -> Bool {
 // SIL:   [[RAW:%.+]] = global_addr @_Tv8function3rawSi : $*Int
 // SIL:   [[ZERO:%.+]] = function_ref @_TF8def_func7getZeroFT_Si : $@convention(thin) () -> Int
 // SIL:   [[RESULT:%.+]] = apply [[ZERO]]() : $@convention(thin) () -> Int
-// SIL:   store [[RESULT]] to [[RAW]] : $*Int
+// SIL:   store [[RESULT]] to [trivial] [[RAW]] : $*Int
 var raw = getZero()
 
 // Check that 'raw' is an Int
@@ -81,7 +81,7 @@ struct IntWrapper2 : Wrapped {
   func getValue() -> Int { return 2 }
 }
 
-// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_TF8def_func16differentWrapped{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_0.Value : Equatable, τ_0_0.Value == τ_0_1.Value> (@in τ_0_0, @in τ_0_1) -> Bool
+// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_TF8def_func16differentWrapped{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_1.Value == τ_0_0.Value> (@in τ_0_0, @in τ_0_1) -> Bool
 
 _ = differentWrapped(a: IntWrapper1(), b: IntWrapper2())
 

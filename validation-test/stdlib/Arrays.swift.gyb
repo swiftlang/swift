@@ -87,9 +87,9 @@ var ArrayTestSuite = TestSuite("Array")
 ArrayTestSuite.test("sizeof") {
   var a = [ 10, 20, 30 ]
 #if arch(i386) || arch(arm)
-  expectEqual(4, MemoryLayout._ofInstance(a).size)
+  expectEqual(4, MemoryLayout.size(ofValue: a))
 #else
-  expectEqual(8, MemoryLayout._ofInstance(a).size)
+  expectEqual(8, MemoryLayout.size(ofValue: a))
 #endif
 }
 
@@ -233,6 +233,18 @@ ArrayTestSuite.test("${array_type}/appendNonUnique") {
   }
 }
 
+ArrayTestSuite.test("${array_type}/appendUndercountedCollection") {
+  // test that the array safely handles a
+  // collection that understates its count
+  var i = 0
+  let l = repeatElement(42, count: 10_000).lazy
+         // capture i by reference and change behavior 
+         // between first pass (for count) and second
+         .filter { _ in i += 1; return i > 10_000 }
+  var a: ${array_type}<Int> = []
+  a.append(contentsOf: l)
+}
+
 ArrayTestSuite.test("${array_type}/emptyAllocation") {
   let arr0 = ${array_type}<Int>()
   let arr1 = ${array_type}<LifetimeTracked>(repeating: LifetimeTracked(0), count: 0)
@@ -359,7 +371,7 @@ ArrayTestSuite.test("${Kind}/popLast") {
   do {
     var a = ${Kind}<Int>()
     let popped = a.popLast()
-    expectEmpty(popped)
+    expectNil(popped)
     expectTrue(a.isEmpty)
   }
 
@@ -492,6 +504,21 @@ ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported/Re
   }
 }
 
+//===----------------------------------------------------------------------===//
+// withUnsafeMutableBytes
+//===----------------------------------------------------------------------===//
+
+// Test the uniqueness of the raw buffer.
+ArrayTestSuite.test("${array_type}/withUnsafeMutableBytes") {
+  var a = getFresh${array_type}([UInt8](repeating: 10, count: 1))
+  let b = a
+  a.withUnsafeMutableBytes { bytes in
+    bytes[0] = 42
+  }
+  expectEqual(42, a[0])
+  expectEqual(10, b[0])
+}
+
 //===---
 // Check that iterators traverse a snapshot of the collection.
 //===---
@@ -556,7 +583,7 @@ final class EvilCollection : Collection {
   func index(after i: Int) -> Int {
     return i + 1
   }
-  
+
   init(_ growth: Int, boundsChecked: Bool) {
     self.growth = growth
     self.boundsChecked = boundsChecked

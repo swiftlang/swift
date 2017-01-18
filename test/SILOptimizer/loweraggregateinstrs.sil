@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -lower-aggregate-instrs | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -lower-aggregate-instrs | %FileCheck %s
 
 sil_stage canonical
 
@@ -55,8 +55,8 @@ struct S3 {
 
 // CHECK-LABEL: sil @expand_destroy_addr_trivial
 // CHECK: bb0
-// CHECK-NEXT: tuple ()
-// CHECK-NEXT: return
+// CHECK: tuple ()
+// CHECK: return
 sil @expand_destroy_addr_trivial : $@convention(thin) (@inout Builtin.Int64) -> () {
 bb0(%0 : $*Builtin.Int64):
   destroy_addr %0 : $*Builtin.Int64
@@ -66,16 +66,16 @@ bb0(%0 : $*Builtin.Int64):
 
 // CHECK-LABEL: sil @expand_destroy_addr_aggstructnontrivial
 // CHECK: bb0([[INPTR:%[0-9]+]] : $*S):
-// CHECK-NEXT: [[IN:%[0-9]+]] = load [[INPTR]] : $*S
-// CHECK-NEXT: [[cls:%[0-9]+]] = struct_extract [[IN]] : $S, #S.cls
-// CHECK-NEXT: strong_release [[cls]] : $C3
-// CHECK-NEXT: [[innerstruct:%[0-9]+]] = struct_extract [[IN]] : $S, #S.inner_struct
-// CHECK-NEXT: [[innerstruct_cls1:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_release [[innerstruct_cls1]] : $C1
-// CHECK-NEXT: [[innerstruct_cls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_release [[innerstruct_cls2]] : $C2
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: [[IN:%[0-9]+]] = load [[INPTR]] : $*S
+// CHECK: [[cls:%[0-9]+]] = struct_extract [[IN]] : $S, #S.cls
+// CHECK: strong_release [[cls]] : $C3
+// CHECK: [[innerstruct:%[0-9]+]] = struct_extract [[IN]] : $S, #S.inner_struct
+// CHECK: [[innerstruct_cls1:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_release [[innerstruct_cls1]] : $C1
+// CHECK: [[innerstruct_cls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_release [[innerstruct_cls2]] : $C2
+// CHECK: tuple
+// CHECK: return
 sil @expand_destroy_addr_aggstructnontrivial : $@convention(thin) (@inout S) -> () {
 bb0(%0 : $*S):
   destroy_addr %0 : $*S
@@ -85,24 +85,24 @@ bb0(%0 : $*S):
 
 // CHECK-LABEL: sil @expand_destroy_addr_aggtuplenontrivial
 // CHECK: bb0([[INPTR:%[0-9]+]] : $*(S, S2, C1)):
-// CHECK-NEXT: [[IN:%[0-9]+]] = load [[INPTR]] : $*(S, S2, C1)
-// CHECK-NEXT: [[ELT0:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1), 0
-// CHECK-NEXT: [[ELT0cls:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.cls
-// CHECK-NEXT: strong_release [[ELT0cls]] : $C3
-// CHECK-NEXT: [[ELT0innerstruct:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.inner_struct
-// CHECK-NEXT: [[ELT0innerstructcls1:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_release [[ELT0innerstructcls1]] : $C1
-// CHECK-NEXT: [[ELT0innerstructcls2:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_release [[ELT0innerstructcls2]]
-// CHECK-NEXT: [[ELT1:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1), 1
-// CHECK-NEXT: [[ELT1cls1:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_release [[ELT1cls1]] : $C1
-// CHECK-NEXT: [[ELT1cls2:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_release [[ELT1cls2]] : $C2
-// CHECK-NEXT: [[ELT2:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1), 2
-// CHECK-NEXT: strong_release [[ELT2]]
-// CHECK-NEXT: tuple ()
-// CHECK-NEXT: return
+// CHECK: [[IN:%[0-9]+]] = load [[INPTR]] : $*(S, S2, C1)
+// CHECK: [[ELT0:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1), 0
+// CHECK: [[ELT0cls:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.cls
+// CHECK: strong_release [[ELT0cls]] : $C3
+// CHECK: [[ELT0innerstruct:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.inner_struct
+// CHECK: [[ELT0innerstructcls1:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_release [[ELT0innerstructcls1]] : $C1
+// CHECK: [[ELT0innerstructcls2:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_release [[ELT0innerstructcls2]]
+// CHECK: [[ELT1:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1), 1
+// CHECK: [[ELT1cls1:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #S2.cls1
+// CHECK: strong_release [[ELT1cls1]] : $C1
+// CHECK: [[ELT1cls2:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #S2.cls2
+// CHECK: strong_release [[ELT1cls2]] : $C2
+// CHECK: [[ELT2:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1), 2
+// CHECK: strong_release [[ELT2]]
+// CHECK: tuple ()
+// CHECK: return
 sil @expand_destroy_addr_aggtuplenontrivial : $@convention(thin) (@inout (S, S2, C1)) -> () {
 bb0(%0 : $*(S, S2, C1)):
   destroy_addr %0 : $*(S, S2, C1)
@@ -122,10 +122,10 @@ bb0(%0 : $*T):
 
 // CHECK-LABEL: sil @expand_destroy_addr_reference
 // CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: load
+// CHECK: strong_release
+// CHECK: tuple
+// CHECK: return
 sil @expand_destroy_addr_reference : $@convention(thin) (@inout C1) -> () {
 bb0(%0 : $*C1):
   destroy_addr %0 : $*C1
@@ -135,10 +135,10 @@ bb0(%0 : $*C1):
 
 // CHECK-LABEL: sil @expand_destroy_addr_enum
 // CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: release_value
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: load
+// CHECK: release_value
+// CHECK: tuple
+// CHECK: return
 sil @expand_destroy_addr_enum : $@convention(thin) (@inout E) -> () {
 bb0(%0 : $*E):
   destroy_addr %0 : $*E
@@ -152,10 +152,10 @@ bb0(%0 : $*E):
 
 // CHECK-LABEL: sil @expand_copy_addr_takeinit
 // CHECK: bb0([[IN1:%[0-9]+]] : $*S, [[IN2:%[0-9]+]] : $*S):
-// CHECK-NEXT: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*S
-// CHECK-NEXT: store [[LOAD1]] to [[IN2]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*S
+// CHECK: store [[LOAD1]] to [[IN2]]
+// CHECK: tuple
+// CHECK: return
 sil @expand_copy_addr_takeinit : $@convention(thin) (@inout S, @inout S) -> () {
 bb0(%0 : $*S, %1 : $*S):
   copy_addr [take] %0 to [initialization] %1 : $*S
@@ -165,19 +165,19 @@ bb0(%0 : $*S, %1 : $*S):
 
 // CHECK-LABEL: sil @expand_copy_addr_init
 // CHECK: bb0([[IN1PTR:%[0-9]+]] : $*S, [[IN2PTR:%[0-9]+]] : $*S):
-// CHECK-NEXT: [[IN1:%[0-9]+]] = load [[IN1PTR]] : $*S
-// CHECK-NEXT: [[IN1trivial:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.trivial
-// CHECK-NEXT: [[IN1cls:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.cls
-// CHECK-NEXT: strong_retain [[IN1cls]] : $C3
-// CHECK-NEXT: [[innerstruct:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.inner_struct
-// CHECK-NEXT: [[innerstructIN11:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_retain [[innerstructIN11]] : $C1
-// CHECK-NEXT: [[innerstructIN12:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_retain [[innerstructIN12]] : $C2
-// CHECK-NEXT: [[innerstructtrivial:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.trivial
-// CHECK-NEXT: store [[IN1]] to [[IN2PTR]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: [[IN1:%[0-9]+]] = load [[IN1PTR]] : $*S
+// CHECK: [[IN1trivial:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.trivial
+// CHECK: [[IN1cls:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.cls
+// CHECK: strong_retain [[IN1cls]] : $C3
+// CHECK: [[innerstruct:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.inner_struct
+// CHECK: [[innerstructIN11:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_retain [[innerstructIN11]] : $C1
+// CHECK: [[innerstructIN12:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_retain [[innerstructIN12]] : $C2
+// CHECK: [[innerstructtrivial:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.trivial
+// CHECK: store [[IN1]] to [[IN2PTR]]
+// CHECK: tuple
+// CHECK: return
 sil @expand_copy_addr_init : $@convention(thin) (@inout S, @inout S) -> () {
 bb0(%0 : $*S, %1 : $*S):
   copy_addr %0 to [initialization] %1 : $*S
@@ -187,18 +187,18 @@ bb0(%0 : $*S, %1 : $*S):
 
 // CHECK-LABEL: sil @expand_copy_addr_take
 // CHECK: bb0([[IN1PTR:%[0-9]+]] : $*S, [[IN2PTR:%[0-9]+]] : $*S):
-// CHECK-NEXT: [[IN1:%[0-9]+]] = load [[IN1PTR]] : $*S
-// CHECK-NEXT: [[IN2:%[0-9]+]] = load [[IN2PTR]] : $*S
-// CHECK-NEXT: [[cls:%[0-9]+]] = struct_extract [[IN2]] : $S, #S.cls
-// CHECK-NEXT: strong_release [[cls]] : $C3
-// CHECK-NEXT: [[innerstruct:%[0-9]+]] = struct_extract [[IN2]] : $S, #S.inner_struct
-// CHECK-NEXT: [[innerstructcls1:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_release [[innerstructcls1]] : $C1
-// CHECK-NEXT: [[innerstructcls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_release [[innerstructcls2]]
-// CHECK-NEXT: store [[IN1]] to [[IN2PTR]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: [[IN1:%[0-9]+]] = load [[IN1PTR]] : $*S
+// CHECK: [[IN2:%[0-9]+]] = load [[IN2PTR]] : $*S
+// CHECK: [[cls:%[0-9]+]] = struct_extract [[IN2]] : $S, #S.cls
+// CHECK: strong_release [[cls]] : $C3
+// CHECK: [[innerstruct:%[0-9]+]] = struct_extract [[IN2]] : $S, #S.inner_struct
+// CHECK: [[innerstructcls1:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_release [[innerstructcls1]] : $C1
+// CHECK: [[innerstructcls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_release [[innerstructcls2]]
+// CHECK: store [[IN1]] to [[IN2PTR]]
+// CHECK: tuple
+// CHECK: return
 sil @expand_copy_addr_take : $@convention(thin) (@inout S, @inout S) -> () {
 bb0(%0 : $*S, %1 : $*S):
   copy_addr [take] %0 to %1 : $*S
@@ -211,10 +211,10 @@ bb0(%0 : $*S, %1 : $*S):
 
 // CHECK-LABEL: sil @expand_copy_addr_trivial
 // CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: store
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: load
+// CHECK: store
+// CHECK: tuple
+// CHECK: return
 sil @expand_copy_addr_trivial : $@convention(thin) (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
 bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
   copy_addr %0 to %1 : $*Builtin.Int64
@@ -224,27 +224,27 @@ bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
 
 // CHECK-LABEL: sil @expand_copy_addr_aggstructnontrivial
 // CHECK: bb0([[IN1PTR:%[0-9]+]] : $*S, [[IN2PTR:%[0-9]+]] : $*S):
-// CHECK-NEXT: [[IN1:%[0-9]+]] = load [[IN1PTR]] : $*S
-// CHECK-NEXT: [[IN2:%[0-9]+]] = load [[IN2PTR]] : $*S
-// CHECK-NEXT: [[IN1trivial:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.trivial
-// CHECK-NEXT: [[IN1cls:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.cls
-// CHECK-NEXT: strong_retain [[IN1cls]] : $C3
-// CHECK-NEXT: [[IN1innerstruct:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.inner_struct
-// CHECK-NEXT: [[IN1innerstructcls1:%[0-9]+]] = struct_extract [[IN1innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_retain [[IN1innerstructcls1]] : $C1
-// CHECK-NEXT: [[IN1innerstructcls2:%[0-9]+]] = struct_extract [[IN1innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_retain [[IN1innerstructcls2]] : $C2
-// CHECK-NEXT: [[IN1innerstructtrivial:%[0-9]+]] = struct_extract [[IN1innerstruct]] : $S2, #S2.trivial
-// CHECK-NEXT: [[IN2cls:%[0-9]+]] = struct_extract [[IN2]] : $S, #S.cls
-// CHECK-NEXT: strong_release [[IN2cls]] : $C3
-// CHECK-NEXT: [[IN2innerstruct:%[0-9]+]] = struct_extract [[IN2]] : $S, #S.inner_struct
-// CHECK-NEXT: [[IN2innerstructcls1:%[0-9]+]] = struct_extract [[IN2innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_release [[IN2innerstructcls1]] : $C1
-// CHECK-NEXT: [[IN2innerstructcls2:%[0-9]+]] = struct_extract [[IN2innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_release [[IN2innerstructcls2]]
-// CHECK-NEXT: store [[IN1]] to [[IN2PTR]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: [[IN1:%[0-9]+]] = load [[IN1PTR]] : $*S
+// CHECK: [[IN2:%[0-9]+]] = load [[IN2PTR]] : $*S
+// CHECK: [[IN1trivial:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.trivial
+// CHECK: [[IN1cls:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.cls
+// CHECK: strong_retain [[IN1cls]] : $C3
+// CHECK: [[IN1innerstruct:%[0-9]+]] = struct_extract [[IN1]] : $S, #S.inner_struct
+// CHECK: [[IN1innerstructcls1:%[0-9]+]] = struct_extract [[IN1innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_retain [[IN1innerstructcls1]] : $C1
+// CHECK: [[IN1innerstructcls2:%[0-9]+]] = struct_extract [[IN1innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_retain [[IN1innerstructcls2]] : $C2
+// CHECK: [[IN1innerstructtrivial:%[0-9]+]] = struct_extract [[IN1innerstruct]] : $S2, #S2.trivial
+// CHECK: [[IN2cls:%[0-9]+]] = struct_extract [[IN2]] : $S, #S.cls
+// CHECK: strong_release [[IN2cls]] : $C3
+// CHECK: [[IN2innerstruct:%[0-9]+]] = struct_extract [[IN2]] : $S, #S.inner_struct
+// CHECK: [[IN2innerstructcls1:%[0-9]+]] = struct_extract [[IN2innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_release [[IN2innerstructcls1]] : $C1
+// CHECK: [[IN2innerstructcls2:%[0-9]+]] = struct_extract [[IN2innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_release [[IN2innerstructcls2]]
+// CHECK: store [[IN1]] to [[IN2PTR]]
+// CHECK: tuple
+// CHECK: return
 sil @expand_copy_addr_aggstructnontrivial : $@convention(thin) (@inout S, @inout S) -> () {
 bb0(%0 : $*S, %1 : $*S):
   copy_addr %0 to %1 : $*S
@@ -254,48 +254,48 @@ bb0(%0 : $*S, %1 : $*S):
 
 // CHECK-LABEL: sil @expand_copy_addr_aggtuplenontrivial
 // CHECK: bb0([[IN1PTR:%[0-9]+]] : $*(S, S2, C1, E), [[IN2PTR:%[0-9]+]] : $*(S, S2, C1, E)):
-// CHECK-NEXT: [[IN1:%[0-9]+]] = load [[IN1PTR]] : $*(S, S2, C1, E)
-// CHECK-NEXT: [[IN2:%[0-9]+]] = load [[IN2PTR]] : $*(S, S2, C1, E)
-// CHECK-NEXT: [[IN1ELT0:%[0-9]+]] = tuple_extract [[IN1]] : $(S, S2, C1, E), 0
-// CHECK-NEXT: [[IN1ELT0trivial:%[0-9]+]] = struct_extract [[IN1ELT0]] : $S, #S.trivial
-// CHECK-NEXT: [[IN1ELT0cls:%[0-9]+]] = struct_extract [[IN1ELT0]] : $S, #S.cls
-// CHECK-NEXT: strong_retain [[IN1ELT0cls]] : $C3
-// CHECK-NEXT: [[IN1ELT0innerstruct:%[0-9]+]] = struct_extract [[IN1ELT0]] : $S, #S.inner_struct
-// CHECK-NEXT: [[IN1ELT0innerstructcls1:%[0-9]+]] = struct_extract [[IN1ELT0innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_retain [[IN1ELT0innerstructcls1]] : $C1
-// CHECK-NEXT: [[IN1ELT0innerstructcls2:%[0-9]+]] = struct_extract [[IN1ELT0innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_retain [[IN1ELT0innerstructcls2]]
-// CHECK-NEXT: [[IN1ELT0innerstructtrivial:%[0-9]+]] = struct_extract [[IN1ELT0innerstruct]] : $S2, #S2.trivial
-// CHECK-NEXT: [[IN1ELT1:%[0-9]+]] = tuple_extract [[IN1]] : $(S, S2, C1, E), 1
-// CHECK-NEXT: [[IN1ELT1cls1:%[0-9]+]] = struct_extract [[IN1ELT1]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_retain [[IN1ELT1cls1]] : $C1
-// CHECK-NEXT: [[IN1ELT1cls2:%[0-9]+]] = struct_extract [[IN1ELT1]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_retain [[IN1ELT1cls2]] : $C2
-// CHECK-NEXT: [[IN1ELT1trivial:%[0-9]+]] = struct_extract [[IN1ELT1]] : $S2, #S2.trivial
-// CHECK-NEXT: [[IN1ELT2:%[0-9]+]] = tuple_extract [[IN1]] : $(S, S2, C1, E), 2
-// CHECK-NEXT: strong_retain [[IN1ELT2]]
-// CHECK-NEXT: [[IN1ELT3:%[0-9]+]] = tuple_extract [[IN1]] : $(S, S2, C1, E), 3
-// CHECK-NEXT: retain_value [[IN1ELT3]] : $E
-// CHECK-NEXT: [[IN2ELT0:%[0-9]+]] = tuple_extract [[IN2]] : $(S, S2, C1, E), 0
-// CHECK-NEXT: [[IN2ELT0cls:%[0-9]+]] = struct_extract [[IN2ELT0]] : $S, #S.cls
-// CHECK-NEXT: strong_release [[IN2ELT0cls]] : $C3
-// CHECK-NEXT: [[IN2ELT0innerstruct:%[0-9]+]] = struct_extract [[IN2ELT0]] : $S, #S.inner_struct
-// CHECK-NEXT: [[IN2ELT0innerstructcls1:%[0-9]+]] = struct_extract [[IN2ELT0innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_release [[IN2ELT0innerstructcls1]] : $C1
-// CHECK-NEXT: [[IN2ELT0innerstructcls2:%[0-9]+]] = struct_extract [[IN2ELT0innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_release [[IN2ELT0innerstructcls2]]
-// CHECK-NEXT: [[IN2ELT1:%[0-9]+]] = tuple_extract [[IN2]] : $(S, S2, C1, E), 1
-// CHECK-NEXT: [[IN2ELT1cls1:%[0-9]+]] = struct_extract [[IN2ELT1]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_release [[IN2ELT1cls1]] : $C1
-// CHECK-NEXT: [[IN2ELT1cls2:%[0-9]+]] = struct_extract [[IN2ELT1]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_release [[IN2ELT1cls2]] : $C2
-// CHECK-NEXT: [[IN2ELT2:%[0-9]+]] = tuple_extract [[IN2]] : $(S, S2, C1, E), 2
-// CHECK-NEXT: strong_release [[IN2ELT2]]
-// CHECK-NEXT: [[IN2ELT3:%[0-9]+]] = tuple_extract [[IN2]] : $(S, S2, C1, E), 3
-// CHECK-NEXT: release_value [[IN2ELT3]] : $E
-// CHECK-NEXT: store [[IN1]] to [[IN2PTR]] : $*(S, S2, C1, E)
-// CHECK-NEXT: tuple ()
-// CHECK-NEXT: return
+// CHECK: [[IN1:%[0-9]+]] = load [[IN1PTR]] : $*(S, S2, C1, E)
+// CHECK: [[IN2:%[0-9]+]] = load [[IN2PTR]] : $*(S, S2, C1, E)
+// CHECK: [[IN1ELT0:%[0-9]+]] = tuple_extract [[IN1]] : $(S, S2, C1, E), 0
+// CHECK: [[IN1ELT0trivial:%[0-9]+]] = struct_extract [[IN1ELT0]] : $S, #S.trivial
+// CHECK: [[IN1ELT0cls:%[0-9]+]] = struct_extract [[IN1ELT0]] : $S, #S.cls
+// CHECK: strong_retain [[IN1ELT0cls]] : $C3
+// CHECK: [[IN1ELT0innerstruct:%[0-9]+]] = struct_extract [[IN1ELT0]] : $S, #S.inner_struct
+// CHECK: [[IN1ELT0innerstructcls1:%[0-9]+]] = struct_extract [[IN1ELT0innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_retain [[IN1ELT0innerstructcls1]] : $C1
+// CHECK: [[IN1ELT0innerstructcls2:%[0-9]+]] = struct_extract [[IN1ELT0innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_retain [[IN1ELT0innerstructcls2]]
+// CHECK: [[IN1ELT0innerstructtrivial:%[0-9]+]] = struct_extract [[IN1ELT0innerstruct]] : $S2, #S2.trivial
+// CHECK: [[IN1ELT1:%[0-9]+]] = tuple_extract [[IN1]] : $(S, S2, C1, E), 1
+// CHECK: [[IN1ELT1cls1:%[0-9]+]] = struct_extract [[IN1ELT1]] : $S2, #S2.cls1
+// CHECK: strong_retain [[IN1ELT1cls1]] : $C1
+// CHECK: [[IN1ELT1cls2:%[0-9]+]] = struct_extract [[IN1ELT1]] : $S2, #S2.cls2
+// CHECK: strong_retain [[IN1ELT1cls2]] : $C2
+// CHECK: [[IN1ELT1trivial:%[0-9]+]] = struct_extract [[IN1ELT1]] : $S2, #S2.trivial
+// CHECK: [[IN1ELT2:%[0-9]+]] = tuple_extract [[IN1]] : $(S, S2, C1, E), 2
+// CHECK: strong_retain [[IN1ELT2]]
+// CHECK: [[IN1ELT3:%[0-9]+]] = tuple_extract [[IN1]] : $(S, S2, C1, E), 3
+// CHECK: retain_value [[IN1ELT3]] : $E
+// CHECK: [[IN2ELT0:%[0-9]+]] = tuple_extract [[IN2]] : $(S, S2, C1, E), 0
+// CHECK: [[IN2ELT0cls:%[0-9]+]] = struct_extract [[IN2ELT0]] : $S, #S.cls
+// CHECK: strong_release [[IN2ELT0cls]] : $C3
+// CHECK: [[IN2ELT0innerstruct:%[0-9]+]] = struct_extract [[IN2ELT0]] : $S, #S.inner_struct
+// CHECK: [[IN2ELT0innerstructcls1:%[0-9]+]] = struct_extract [[IN2ELT0innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_release [[IN2ELT0innerstructcls1]] : $C1
+// CHECK: [[IN2ELT0innerstructcls2:%[0-9]+]] = struct_extract [[IN2ELT0innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_release [[IN2ELT0innerstructcls2]]
+// CHECK: [[IN2ELT1:%[0-9]+]] = tuple_extract [[IN2]] : $(S, S2, C1, E), 1
+// CHECK: [[IN2ELT1cls1:%[0-9]+]] = struct_extract [[IN2ELT1]] : $S2, #S2.cls1
+// CHECK: strong_release [[IN2ELT1cls1]] : $C1
+// CHECK: [[IN2ELT1cls2:%[0-9]+]] = struct_extract [[IN2ELT1]] : $S2, #S2.cls2
+// CHECK: strong_release [[IN2ELT1cls2]] : $C2
+// CHECK: [[IN2ELT2:%[0-9]+]] = tuple_extract [[IN2]] : $(S, S2, C1, E), 2
+// CHECK: strong_release [[IN2ELT2]]
+// CHECK: [[IN2ELT3:%[0-9]+]] = tuple_extract [[IN2]] : $(S, S2, C1, E), 3
+// CHECK: release_value [[IN2ELT3]] : $E
+// CHECK: store [[IN1]] to [[IN2PTR]] : $*(S, S2, C1, E)
+// CHECK: tuple ()
+// CHECK: return
 
 
 sil @expand_copy_addr_aggtuplenontrivial : $@convention(thin) (@inout (S, S2, C1, E), @inout (S, S2, C1, E)) -> () {
@@ -318,13 +318,13 @@ bb0(%0 : $*T):
 // Just turn into a load + strong_release.
 // CHECK-LABEL: sil @expand_copy_addr_reference
 // CHECK: bb0([[IN1:%[0-9]+]] : $*C1, [[IN2:%[0-9]+]] : $*C1):
-// CHECK-NEXT: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*C1
-// CHECK-NEXT: [[LOAD2:%[0-9]+]] = load [[IN2]] : $*C1
-// CHECK-NEXT: strong_retain [[LOAD1]]
-// CHECK-NEXT: strong_release [[LOAD2]]
-// CHECK-NEXT: store [[LOAD1]] to [[IN2]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*C1
+// CHECK: [[LOAD2:%[0-9]+]] = load [[IN2]] : $*C1
+// CHECK: strong_retain [[LOAD1]]
+// CHECK: strong_release [[LOAD2]]
+// CHECK: store [[LOAD1]] to [[IN2]]
+// CHECK: tuple
+// CHECK: return
 sil @expand_copy_addr_reference : $@convention(thin) (@inout C1, @inout C1) -> () {
 bb0(%0 : $*C1, %1 : $*C1):
   copy_addr %0 to %1 : $*C1
@@ -334,13 +334,13 @@ bb0(%0 : $*C1, %1 : $*C1):
 
 // CHECK-LABEL: sil @expand_copy_addr_enum
 // CHECK: bb0([[IN1:%[0-9]+]] : $*E, [[IN2:%[0-9]+]] : $*E):
-// CHECK-NEXT: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*E
-// CHECK-NEXT: [[LOAD2:%[0-9]+]] = load [[IN2]] : $*E
-// CHECK-NEXT: retain_value [[LOAD1]]
-// CHECK-NEXT: release_value [[LOAD2]]
-// CHECK-NEXT: store [[LOAD1]] to [[IN2]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*E
+// CHECK: [[LOAD2:%[0-9]+]] = load [[IN2]] : $*E
+// CHECK: retain_value [[LOAD1]]
+// CHECK: release_value [[LOAD2]]
+// CHECK: store [[LOAD1]] to [[IN2]]
+// CHECK: tuple
+// CHECK: return
 sil @expand_copy_addr_enum : $@convention(thin) (@inout E, @inout E) -> () {
 bb0(%0 : $*E, %1 : $*E):
   copy_addr %0 to %1 : $*E
@@ -357,8 +357,8 @@ bb0(%0 : $*E, %1 : $*E):
 
 // CHECK-LABEL: sil @expand_release_value_trivial
 // CHECK: bb0
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: tuple
+// CHECK: return
 sil @expand_release_value_trivial : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
   release_value %0 : $Builtin.Int64
@@ -368,13 +368,13 @@ bb0(%0 : $Builtin.Int64):
 
 // CHECK-LABEL: sil @expand_release_value_aggstructnontrivial
 // CHECK: bb0([[IN:%[0-9]+]] : $S):
-// CHECK-NEXT: [[cls:%[0-9]+]] = struct_extract [[IN]] : $S, #S.cls
-// CHECK-NEXT: strong_release [[cls]] : $C3
-// CHECK-NEXT: [[innerstruct:%[0-9]+]] = struct_extract [[IN]] : $S, #S.inner_struct
-// CHECK-NEXT: [[innerstructcls1:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_release [[innerstructcls1]] : $C1
-// CHECK-NEXT: [[innerstructcls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_release [[innerstructcls2]]
+// CHECK: [[cls:%[0-9]+]] = struct_extract [[IN]] : $S, #S.cls
+// CHECK: strong_release [[cls]] : $C3
+// CHECK: [[innerstruct:%[0-9]+]] = struct_extract [[IN]] : $S, #S.inner_struct
+// CHECK: [[innerstructcls1:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_release [[innerstructcls1]] : $C1
+// CHECK: [[innerstructcls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_release [[innerstructcls2]]
 sil @expand_release_value_aggstructnontrivial : $@convention(thin) (S) -> () {
 bb0(%0 : $S):
   release_value %0 : $S
@@ -384,25 +384,25 @@ bb0(%0 : $S):
 
 // CHECK-LABEL: sil @expand_release_value_aggtuplenontrivial
 // CHECK: bb0([[IN:%[0-9]+]] : $(S, S2, C1, E)):
-// CHECK-NEXT: [[ELT0:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 0
-// CHECK-NEXT: [[ELT0cls:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.cls
-// CHECK-NEXT: strong_release [[ELT0cls]] : $C3
-// CHECK-NEXT: [[ELT0innerstruct:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.inner_struct
-// CHECK-NEXT: [[ELT0innerstructcls1:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_release [[ELT0innerstructcls1]] : $C1
-// CHECK-NEXT: [[ELT0innerstructcls2:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_release [[ELT0innerstructcls2]]
-// CHECK-NEXT: [[ELT1:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 1
-// CHECK-NEXT: [[ELT1cls1:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_release [[ELT1cls1]] : $C1
-// CHECK-NEXT: [[ELT1cls2:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_release [[ELT1cls2]] : $C2
-// CHECK-NEXT: [[ELT2:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 2
-// CHECK-NEXT: strong_release [[ELT2]]
-// CHECK-NEXT: [[ELT3:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 3
-// CHECK-NEXT: release_value [[ELT3]] : $E
-// CHECK-NEXT: tuple ()
-// CHECK-NEXT: return
+// CHECK: [[ELT0:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 0
+// CHECK: [[ELT0cls:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.cls
+// CHECK: strong_release [[ELT0cls]] : $C3
+// CHECK: [[ELT0innerstruct:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.inner_struct
+// CHECK: [[ELT0innerstructcls1:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_release [[ELT0innerstructcls1]] : $C1
+// CHECK: [[ELT0innerstructcls2:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_release [[ELT0innerstructcls2]]
+// CHECK: [[ELT1:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 1
+// CHECK: [[ELT1cls1:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #S2.cls1
+// CHECK: strong_release [[ELT1cls1]] : $C1
+// CHECK: [[ELT1cls2:%[0-9]+]] = struct_extract [[ELT1]] : $S2, #S2.cls2
+// CHECK: strong_release [[ELT1cls2]] : $C2
+// CHECK: [[ELT2:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 2
+// CHECK: strong_release [[ELT2]]
+// CHECK: [[ELT3:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 3
+// CHECK: release_value [[ELT3]] : $E
+// CHECK: tuple ()
+// CHECK: return
 sil @expand_release_value_aggtuplenontrivial : $@convention(thin) ((S, S2, C1, E)) -> () {
 bb0(%0 : $(S, S2, C1, E)):
   release_value %0 : $(S, S2, C1, E)
@@ -413,9 +413,9 @@ bb0(%0 : $(S, S2, C1, E)):
 // Just turn into a load + strong_release.
 // CHECK-LABEL: sil @expand_release_value_reference
 // CHECK: bb0([[IN:%[0-9]+]] : $C1):
-// CHECK-NEXT: strong_release [[IN]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: strong_release [[IN]]
+// CHECK: tuple
+// CHECK: return
 sil @expand_release_value_reference : $@convention(thin) (C1) -> () {
 bb0(%0 : $C1):
   release_value %0 : $C1
@@ -425,9 +425,9 @@ bb0(%0 : $C1):
 
 // CHECK-LABEL: sil @expand_release_value_enum
 // CHECK: bb0([[IN1:%[0-9]+]] : $E):
-// CHECK-NEXT: release_value
-// CHECK-NEXT: tuple ()
-// CHECK-NEXT: return
+// CHECK: release_value
+// CHECK: tuple ()
+// CHECK: return
 sil @expand_release_value_enum : $@convention(thin) (E) -> () {
 bb0(%0 : $E):
   release_value %0 : $E
@@ -445,7 +445,7 @@ bb0(%0 : $E):
 
 // CHECK-LABEL: sil @expand_retain_value_trivial
 // CHECK: bb0
-// CHECK-NEXT: return
+// CHECK: return
 sil @expand_retain_value_trivial : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $Builtin.Int64):
   retain_value %0 : $Builtin.Int64
@@ -454,22 +454,22 @@ bb0(%0 : $Builtin.Int64):
 
 // CHECK-LABEL: sil @expand_retain_value_aggstructnontrivial
 // CHECK: bb0([[IN:%[0-9]+]] : $S3):
-// CHECK-NEXT: [[trivial:%[0-9]+]] = struct_extract [[IN]] : $S3, #S3.trivial1
-// CHECK-NEXT: [[cls:%[0-9]+]] = struct_extract [[IN]] : $S3, #S3.cls
-// CHECK-NEXT: [[clstrivial:%[0-9]+]] = struct_extract [[cls]] : $S, #S.trivial
-// CHECK-NEXT: [[clscls:%[0-9]+]] = struct_extract [[cls]] : $S, #S.cls
-// CHECK-NEXT: strong_retain [[clscls]] : $C3
-// CHECK-NEXT: [[innerstruct:%[0-9]+]] = struct_extract [[cls]] : $S, #S.inner_struct
-// CHECK-NEXT: [[innerstructcls1:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_retain [[innerstructcls1]] : $C1
-// CHECK-NEXT: [[innerstructcls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_retain [[innerstructcls2]] : $C2
-// CHECK-NEXT: [[innerstructtrivial:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.trivial
-// CHECK-NEXT: [[trivial2:%[0-9]+]] = struct_extract [[IN]] : $S3, #S3.trivial2
-// CHECK-NEXT: [[enum:%[0-9]+]] = struct_extract [[IN]] : $S3, #S3.e
-// CHECK-NEXT: retain_value [[enum]] : $E
-// CHECK-NEXT: [[trivial3:%[0-9]+]] = struct_extract [[IN]] : $S3, #S3.trivial3
-// CHECK-NEXT: return [[IN]] : $S3
+// CHECK: [[trivial:%[0-9]+]] = struct_extract [[IN]] : $S3, #S3.trivial1
+// CHECK: [[cls:%[0-9]+]] = struct_extract [[IN]] : $S3, #S3.cls
+// CHECK: [[clstrivial:%[0-9]+]] = struct_extract [[cls]] : $S, #S.trivial
+// CHECK: [[clscls:%[0-9]+]] = struct_extract [[cls]] : $S, #S.cls
+// CHECK: strong_retain [[clscls]] : $C3
+// CHECK: [[innerstruct:%[0-9]+]] = struct_extract [[cls]] : $S, #S.inner_struct
+// CHECK: [[innerstructcls1:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_retain [[innerstructcls1]] : $C1
+// CHECK: [[innerstructcls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_retain [[innerstructcls2]] : $C2
+// CHECK: [[innerstructtrivial:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.trivial
+// CHECK: [[trivial2:%[0-9]+]] = struct_extract [[IN]] : $S3, #S3.trivial2
+// CHECK: [[enum:%[0-9]+]] = struct_extract [[IN]] : $S3, #S3.e
+// CHECK: retain_value [[enum]] : $E
+// CHECK: [[trivial3:%[0-9]+]] = struct_extract [[IN]] : $S3, #S3.trivial3
+// CHECK: return [[IN]] : $S3
 sil @expand_retain_value_aggstructnontrivial : $@convention(thin) (S3) -> (S3) {
 bb0(%0 : $S3):
   retain_value %0 : $S3
@@ -478,29 +478,29 @@ bb0(%0 : $S3):
 
 // CHECK-LABEL: sil @expand_retain_value_aggtuplenontrivial
 // CHECK: bb0([[IN:%[0-9]+]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E)):
-// CHECK-NEXT: [[ELT0:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 0
-// CHECK-NEXT: [[ELT0trivial:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.trivial
-// CHECK-NEXT: [[ELT0cls:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.cls
-// CHECK-NEXT: strong_retain [[ELT0cls]] : $C3
-// CHECK-NEXT: [[ELT0innerstruct:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.inner_struct
-// CHECK-NEXT: [[ELT0innerstructcls1:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_retain [[ELT0innerstructcls1]] : $C1
-// CHECK-NEXT: [[ELT0innerstructcls2:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_retain [[ELT0innerstructcls2]]
-// CHECK-NEXT: [[ELT0innerstructtrivial:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.trivial
-// CHECK-NEXT: [[ELT1:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 1
-// CHECK-NEXT: [[ELT2:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 2
-// CHECK-NEXT: [[ELT2cls1:%[0-9]+]] = struct_extract [[ELT2]] : $S2, #S2.cls1
-// CHECK-NEXT: strong_retain [[ELT2cls1]] : $C1
-// CHECK-NEXT: [[ELT2cls2:%[0-9]+]] = struct_extract [[ELT2]] : $S2, #S2.cls2
-// CHECK-NEXT: strong_retain [[ELT2cls2]] : $C2
-// CHECK-NEXT: [[ELT2trivial:%[0-9]+]] = struct_extract [[ELT2]] : $S2, #S2.trivial
-// CHECK-NEXT: [[ELT3:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 3
-// CHECK-NEXT: strong_retain [[ELT3]]
-// CHECK-NEXT: [[ELT4:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 4
-// CHECK-NEXT: [[ELT5:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 5
-// CHECK-NEXT: retain_value [[ELT5]] : $E
-// CHECK-NEXT: return [[IN]]
+// CHECK: [[ELT0:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 0
+// CHECK: [[ELT0trivial:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.trivial
+// CHECK: [[ELT0cls:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.cls
+// CHECK: strong_retain [[ELT0cls]] : $C3
+// CHECK: [[ELT0innerstruct:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.inner_struct
+// CHECK: [[ELT0innerstructcls1:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls1
+// CHECK: strong_retain [[ELT0innerstructcls1]] : $C1
+// CHECK: [[ELT0innerstructcls2:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.cls2
+// CHECK: strong_retain [[ELT0innerstructcls2]]
+// CHECK: [[ELT0innerstructtrivial:%[0-9]+]] = struct_extract [[ELT0innerstruct]] : $S2, #S2.trivial
+// CHECK: [[ELT1:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 1
+// CHECK: [[ELT2:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 2
+// CHECK: [[ELT2cls1:%[0-9]+]] = struct_extract [[ELT2]] : $S2, #S2.cls1
+// CHECK: strong_retain [[ELT2cls1]] : $C1
+// CHECK: [[ELT2cls2:%[0-9]+]] = struct_extract [[ELT2]] : $S2, #S2.cls2
+// CHECK: strong_retain [[ELT2cls2]] : $C2
+// CHECK: [[ELT2trivial:%[0-9]+]] = struct_extract [[ELT2]] : $S2, #S2.trivial
+// CHECK: [[ELT3:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 3
+// CHECK: strong_retain [[ELT3]]
+// CHECK: [[ELT4:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 4
+// CHECK: [[ELT5:%[0-9]+]] = tuple_extract [[IN]] : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E), 5
+// CHECK: retain_value [[ELT5]] : $E
+// CHECK: return [[IN]]
 
 sil @expand_retain_value_aggtuplenontrivial : $@convention(thin) ((S, Builtin.Int64, S2, C1, Builtin.Int64, E)) -> ((S, Builtin.Int64, S2, C1, Builtin.Int64, E)) {
 bb0(%0 : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E)):
@@ -510,8 +510,8 @@ bb0(%0 : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E)):
 
 // CHECK-LABEL: sil @expand_retain_value_reference
 // CHECK: bb0([[IN:%[0-9]+]] : $C1):
-// CHECK-NEXT: strong_retain [[IN]]
-// CHECK-NEXT: return
+// CHECK: strong_retain [[IN]]
+// CHECK: return
 sil @expand_retain_value_reference : $@convention(thin) (C1) -> (C1) {
 bb0(%0 : $C1):
   retain_value %0 : $C1
@@ -520,8 +520,8 @@ bb0(%0 : $C1):
 
 // CHECK-LABEL: sil @expand_retain_value_enum
 // CHECK: bb0([[IN1:%[0-9]+]] : $E):
-// CHECK-NEXT: retain_value
-// CHECK-NEXT: return
+// CHECK: retain_value
+// CHECK: return
 sil @expand_retain_value_enum : $@convention(thin) (E) -> (E) {
 bb0(%0 : $E):
   retain_value %0 : $E

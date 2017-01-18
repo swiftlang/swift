@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -18,6 +18,7 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
+#include "swift/Basic/Unreachable.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
@@ -92,17 +93,14 @@ public:
         // Figure out where the stored properties of this class begin
         // by looking at the size of the superclass
         bool valid;
-        unsigned size, align;
-        auto super =
-            this->readSuperClassFromClassMetadata(MetadataAddress);
-        if (super) {
-          std::tie(valid, size, align) =
-              this->readInstanceSizeAndAlignmentFromClassMetadata(super);
+        unsigned start;
+        std::tie(valid, start) =
+            this->readInstanceStartAndAlignmentFromClassMetadata(MetadataAddress);
 
-          // Perform layout
-          if (valid)
-            TI = TC.getClassInstanceTypeInfo(TR, size, align);
-        }
+        // Perform layout
+        if (valid)
+          TI = TC.getClassInstanceTypeInfo(TR, start);
+
         break;
       }
       default:
@@ -455,6 +453,8 @@ private:
     case MetadataSourceKind::SelfWitnessTable:
       return true;
     }
+
+    swift_unreachable("Unhandled MetadataSourceKind in switch.");
   }
 
   /// Read metadata for a captured generic type from a closure context.

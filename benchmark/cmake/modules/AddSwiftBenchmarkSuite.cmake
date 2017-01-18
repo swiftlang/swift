@@ -165,6 +165,16 @@ function (swift_benchmark_compile_archopts)
       set(swiftmodule "${objdir}/${module_name}.swiftmodule")
       set(source "${srcdir}/${module_name_path}.swift")
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
+
+      if ("${bench_flags}" MATCHES "-whole-module.*")
+        set(output_option "-o" "${objfile}")
+      else()
+        set(json "{\n  \"${source}\": { \"object\": \"${objfile}\" },\n}")
+        file(WRITE "${objdir}/${module_name}-outputmap.json" ${json})
+        set(output_option "-output-file-map"
+                          "${objdir}/${module_name}-outputmap.json")
+      endif()
+
       add_custom_command(
           OUTPUT "${objfile}"
           DEPENDS
@@ -176,9 +186,9 @@ function (swift_benchmark_compile_archopts)
           "-parse-as-library"
           ${bench_flags}
           "-module-name" "${module_name}"
-          "-emit-module" "-emit-module-path" "${swiftmodule}"
+          "-emit-module-path" "${swiftmodule}"
           "-I" "${objdir}"
-          "-o" "${objfile}"
+          ${output_option}
           "${source}")
       if (SWIFT_BENCHMARK_EMIT_SIB)
         set(sibfile "${objdir}/${module_name}.sib")
@@ -257,6 +267,7 @@ function (swift_benchmark_compile_archopts)
           ${common_options}
           ${bench_flags}
           "-parse-as-library"
+          "-emit-module-path" "${objdir}/${module_name}.swiftmodule"
           "-module-name" "${module_name}"
           "-I" "${objdir}"
           "-output-file-map" "${objdir}/${module_name}/outputmap.json"
@@ -382,11 +393,11 @@ function(swift_benchmark_compile)
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "O" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
-                  "--iterations" "3"
+                  "--iterations" "${SWIFT_BENCHMARK_NUM_O_ITERATIONS}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "Onone" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
-                  "--iterations" "3"
+                  "--iterations" "${SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "compare"
                   "--log-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"

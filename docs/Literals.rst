@@ -42,7 +42,7 @@ library's CompilerProtocols.swift::
   // Conforming types can be initialized with arbitrary string literals.
   public protocol ExpressibleByStringLiteral
     : ExpressibleByExtendedGraphemeClusterLiteral {
-    
+
     typealias StringLiteralType : _ExpressibleByBuiltinStringLiteral
     // Create an instance initialized to `value`.
     init(stringLiteral value: StringLiteralType)
@@ -82,7 +82,7 @@ data from the literal, and the arguments describe that raw data.
 So, the general runtime behavior is now clear:
 
 1. The compiler generates raw string data.
-2. Some type conforming to _ExpressibleByBuiltinStringLiteral is constructed from 
+2. Some type conforming to _ExpressibleByBuiltinStringLiteral is constructed from
    the raw string data. This will be a standard library type.
 3. Some type conforming to ExpressibleByStringLiteral is constructed from the
    object constructed in step 2. This may be a user-defined type. This is the
@@ -100,11 +100,11 @@ types.
 This algorithm can go forwards or backwards, since it's actually defined in
 terms of constraints, but it's easiest to understand as a linear process.
 
-1. Filter the types provided by the context to only include those that are 
+1. Filter the types provided by the context to only include those that are
    ExpressibleByStringLiteral.
 2. Using the associated StringLiteralType, find the appropriate
    ``_convertFromBuiltinStringLiteral``.
-3. Using the type from step 1, find the appropriate 
+3. Using the type from step 1, find the appropriate
    ``convertFromStringLiteral``.
 4. Build an expression tree with the appropriate calls.
 
@@ -138,6 +138,6 @@ literal type is always Dictionary.
 
 String interpolations are a bit different: they try to individually convert
 each element of the interpolation to the type that adopts
-ExpressibleByStringInterpolation, then calls the variadic
+_ExpressibleByStringInterpolation, then calls the variadic
 ``convertFromStringInterpolation`` to put them all together. The default type
 for an interpolated literal without context is also ``StringLiteralType``.

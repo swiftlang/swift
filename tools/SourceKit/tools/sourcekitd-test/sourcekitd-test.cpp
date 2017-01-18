@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,7 @@
 #include "TestOptions.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -42,6 +43,8 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            TestOptions *InitOpts);
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef Filename,
                             llvm::raw_ostream &OS);
+static void printRangeInfo(sourcekitd_variant_t Info, StringRef Filename,
+                           llvm::raw_ostream &OS);
 static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename);
 static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII);
 static void printSemanticInfo();
@@ -88,12 +91,14 @@ static sourcekitd_uid_t KeyOffset;
 static sourcekitd_uid_t KeySourceFile;
 static sourcekitd_uid_t KeyModuleName;
 static sourcekitd_uid_t KeyGroupName;
+static sourcekitd_uid_t KeyActionName;
 static sourcekitd_uid_t KeySynthesizedExtension;
 static sourcekitd_uid_t KeyName;
 static sourcekitd_uid_t KeyNames;
 static sourcekitd_uid_t KeyFilePath;
 static sourcekitd_uid_t KeyModuleInterfaceName;
 static sourcekitd_uid_t KeyLength;
+static sourcekitd_uid_t KeyActionable;
 static sourcekitd_uid_t KeySourceText;
 static sourcekitd_uid_t KeyUSR;
 static sourcekitd_uid_t KeyOriginalUSR;
@@ -126,6 +131,7 @@ static sourcekitd_uid_t KeyTypeUsr;
 static sourcekitd_uid_t KeyContainerTypeUsr;
 static sourcekitd_uid_t KeyModuleGroups;
 static sourcekitd_uid_t KeySimplified;
+static sourcekitd_uid_t KeyRangeContent;
 
 static sourcekitd_uid_t RequestProtocolVersion;
 static sourcekitd_uid_t RequestDemangle;
@@ -138,6 +144,7 @@ static sourcekitd_uid_t RequestCodeCompleteUpdate;
 static sourcekitd_uid_t RequestCodeCompleteCacheOnDisk;
 static sourcekitd_uid_t RequestCodeCompleteSetPopularAPI;
 static sourcekitd_uid_t RequestCursorInfo;
+static sourcekitd_uid_t RequestRangeInfo;
 static sourcekitd_uid_t RequestRelatedIdents;
 static sourcekitd_uid_t RequestEditorOpen;
 static sourcekitd_uid_t RequestEditorOpenInterface;
@@ -185,7 +192,7 @@ int main(int argc, const char **argv) {
 }
 
 static int skt_main(int argc, const char **argv) {
-  llvm::sys::PrintStackTraceOnErrorSignal();
+  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
 
   sourcekitd_initialize();
 
@@ -199,12 +206,14 @@ static int skt_main(int argc, const char **argv) {
   KeySourceFile = sourcekitd_uid_get_from_cstr("key.sourcefile");
   KeyModuleName = sourcekitd_uid_get_from_cstr("key.modulename");
   KeyGroupName = sourcekitd_uid_get_from_cstr("key.groupname");
+  KeyActionName = sourcekitd_uid_get_from_cstr("key.actionname");
   KeySynthesizedExtension = sourcekitd_uid_get_from_cstr("key.synthesizedextensions");
   KeyName = sourcekitd_uid_get_from_cstr("key.name");
   KeyNames = sourcekitd_uid_get_from_cstr("key.names");
   KeyFilePath = sourcekitd_uid_get_from_cstr("key.filepath");
   KeyModuleInterfaceName = sourcekitd_uid_get_from_cstr("key.module_interface_name");
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
+  KeyActionable = sourcekitd_uid_get_from_cstr("key.actionable");
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyUSR = sourcekitd_uid_get_from_cstr("key.usr");
   KeyOriginalUSR = sourcekitd_uid_get_from_cstr("key.original_usr");
@@ -239,6 +248,7 @@ static int skt_main(int argc, const char **argv) {
   KeyContainerTypeUsr = sourcekitd_uid_get_from_cstr("key.containertypeusr");
   KeyModuleGroups = sourcekitd_uid_get_from_cstr("key.modulegroups");
   KeySimplified = sourcekitd_uid_get_from_cstr("key.simplified");
+  KeyRangeContent = sourcekitd_uid_get_from_cstr("key.rangecontent");
 
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
@@ -255,6 +265,7 @@ static int skt_main(int argc, const char **argv) {
   RequestCodeCompleteCacheOnDisk = sourcekitd_uid_get_from_cstr("source.request.codecomplete.cache.ondisk");
   RequestCodeCompleteSetPopularAPI = sourcekitd_uid_get_from_cstr("source.request.codecomplete.setpopularapi");
   RequestCursorInfo = sourcekitd_uid_get_from_cstr("source.request.cursorinfo");
+  RequestRangeInfo = sourcekitd_uid_get_from_cstr("source.request.rangeinfo");
   RequestRelatedIdents = sourcekitd_uid_get_from_cstr("source.request.relatedidents");
   RequestEditorOpen = sourcekitd_uid_get_from_cstr("source.request.editor.open");
   RequestEditorOpenInterface = sourcekitd_uid_get_from_cstr("source.request.editor.open.interface");
@@ -537,7 +548,17 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     }
     break;
-
+  case SourceKitRequest::RangeInfo: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestRangeInfo);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    auto Length = Opts.Length;
+    if (Opts.Length == 0 && Opts.EndLine > 0) {
+      auto EndOff = resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceFile);
+      Length = EndOff - ByteOffset;
+    }
+    sourcekitd_request_dictionary_set_int64(Req, KeyLength, Length);
+    break;
+  }
   case SourceKitRequest::RelatedIdents:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestRelatedIdents);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
@@ -799,6 +820,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 
     case SourceKitRequest::CursorInfo:
       printCursorInfo(Info, SourceFile, llvm::outs());
+      break;
+
+    case SourceKitRequest::RangeInfo:
+      printRangeInfo(Info, SourceFile, llvm::outs());
       break;
 
     case SourceKitRequest::DocInfo:
@@ -1078,6 +1103,17 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                                              KeyAnnotatedDecl));
   }
 
+  std::vector<const char *> AvailableActions;
+  sourcekitd_variant_t ActionsObj =
+  sourcekitd_variant_dictionary_get_value(Info, KeyActionable);
+  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(ActionsObj);
+       i != e; ++i) {
+    sourcekitd_variant_t Entry =
+    sourcekitd_variant_array_get_value(ActionsObj, i);
+    AvailableActions.push_back(sourcekitd_variant_dictionary_get_string(Entry,
+                                                                KeyActionName));
+  }
+
   OS << Kind << " (";
   if (Offset.hasValue()) {
     if (Filename != FilePath)
@@ -1127,8 +1163,45 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   for (auto Group : GroupNames)
     OS << Group << '\n';
   OS << "MODULE GROUPS END\n";
+  OS << "ACTIONS BEGIN\n";
+  for (auto Action : AvailableActions)
+    OS << Action << '\n';
+  OS << "ACTIONS END\n";
 }
 
+static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
+                            llvm::raw_ostream &OS) {
+  sourcekitd_uid_t KindUID = sourcekitd_variant_dictionary_get_uid(Info,
+                                      sourcekitd_uid_get_from_cstr("key.kind"));
+  if (KindUID == nullptr) {
+    OS << "<empty range info>\n";
+    return;
+  }
+
+  std::string Filename = FilenameIn;
+  char full_path[MAXPATHLEN];
+  if (const char *path = realpath(Filename.c_str(), full_path))
+    Filename = path;
+
+  sourcekitd_variant_t OffsetObj =
+    sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
+  llvm::Optional<int64_t> Offset;
+  unsigned Length = 0;
+  if (sourcekitd_variant_get_type(OffsetObj) != SOURCEKITD_VARIANT_TYPE_NULL) {
+    Offset = sourcekitd_variant_int64_get_value(OffsetObj);
+    Length = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
+  }
+  const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
+  const char *Typename = sourcekitd_variant_dictionary_get_string(Info,
+                                                                  KeyTypename);
+
+  const char *RangeContent = sourcekitd_variant_dictionary_get_string(Info,
+                                                              KeyRangeContent);
+  OS << "<kind>" << Kind << "</kind>\n";
+  OS << "<content>" <<RangeContent << "</content>\n";
+  if (Typename)
+    OS << "<type>" <<Typename << "</type>\n";
+}
 static void printFoundInterface(sourcekitd_variant_t Info,
                                 llvm::raw_ostream &OS) {
   const char *Name = sourcekitd_variant_dictionary_get_string(Info,
@@ -1291,7 +1364,7 @@ static void prepareDemangleRequest(sourcekitd_object_t Req,
     llvm::StringRef inputContents = input.get()->getBuffer();
 
     // This doesn't handle Unicode symbols, but maybe that's okay.
-    llvm::Regex maybeSymbol("_T[_a-zA-Z0-9$]+");
+    llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       addName(matches.front());
@@ -1420,8 +1493,10 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
                                                                    nullptr, 0);
     sourcekitd_request_dictionary_set_uid(Exp, KeyRequest,
                                           RequestEditorExpandPlaceholder);
-    sourcekitd_request_dictionary_set_string(Exp, KeyName,
-                                             SourceBuf->getBufferIdentifier());
+    auto SourceBufID = SourceBuf->getBufferIdentifier();
+    sourcekitd_request_dictionary_set_stringbuf(Exp, KeyName,
+                                                SourceBufID.data(),
+                                                SourceBufID.size());
     sourcekitd_request_dictionary_set_string(Exp, KeySourceText, "");
     sourcekitd_request_dictionary_set_int64(Exp, KeyOffset, Offset);
     sourcekitd_request_dictionary_set_int64(Exp, KeyLength, Length);

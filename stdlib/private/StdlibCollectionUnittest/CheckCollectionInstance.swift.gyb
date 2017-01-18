@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -40,8 +40,8 @@ public struct CollectionMisuseResiliencyChecks {
 }
 
 % for inc, protocol, direction, end in (
-%  ('inc', 'Indexable', 'after', 'end'),
-%  ('dec', 'BidirectionalIndexable', 'before', 'start')):
+%  ('inc', '_Indexable', 'after', 'end'),
+%  ('dec', '_BidirectionalIndexable', 'before', 'start')):
 
 /// Test that the elements of `instances` satisfy
 /// ${'some of ' if inc == 'dec' else ''}the semantic
@@ -61,7 +61,7 @@ public func check${inc.capitalize()}rementable<Instances, BaseCollection>(
   Instances : Collection,
   BaseCollection : ${protocol},
   Instances.Iterator.Element == BaseCollection.Index,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#83 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index {
 
@@ -91,9 +91,9 @@ internal func _checkIncrementalAdvance<Instances, BaseCollection>(
   ${TRACE}
 ) where
   Instances : Collection,
-  BaseCollection : Indexable,
+  BaseCollection : _Indexable,
   Instances.Iterator.Element == BaseCollection.Index,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#84 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index {
   for i in instances {
@@ -128,9 +128,9 @@ public func checkForwardIndex<Instances, BaseCollection>(
   endIndex: Instances.Iterator.Element, ${TRACE}
 ) where
   Instances : Collection,
-  BaseCollection : Indexable,
+  BaseCollection : _Indexable,
   Instances.Iterator.Element == BaseCollection.Index,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#85 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index {
 
@@ -158,9 +158,9 @@ public func checkBidirectionalIndex<Instances, BaseCollection>(
   ${TRACE}
 ) where
   Instances: Collection,
-  BaseCollection : BidirectionalIndexable,
+  BaseCollection : _BidirectionalIndexable,
   Instances.Iterator.Element == BaseCollection.Index,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#86 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index {
 
@@ -197,10 +197,10 @@ public func checkRandomAccessIndex<Instances, Distances, BaseCollection>(
 ) where
   Instances : Collection,
   Distances : Collection,
-  BaseCollection : RandomAccessIndexable,
+  BaseCollection : _RandomAccessIndexable,
   Instances.Iterator.Element == BaseCollection.Index,
   Distances.Iterator.Element == BaseCollection.IndexDistance,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#87 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index,
   Distances.Indices.Iterator.Element == Distances.Index {
@@ -230,10 +230,10 @@ public func checkAdvancesAndDistances<Instances, Distances, BaseCollection>(
 ) where
   Instances : Collection,
   Distances : Collection,
-  BaseCollection : Indexable,
+  BaseCollection : _Indexable,
   Instances.Iterator.Element == BaseCollection.Index,
   Distances.Iterator.Element == BaseCollection.IndexDistance,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#88 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index,
   Distances.Indices.Iterator.Element == Distances.Index {

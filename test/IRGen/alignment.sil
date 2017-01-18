@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 import Swift
 
@@ -49,9 +49,9 @@ entry:
   %x = load %c : $*Empty
   store %x to %c : $*Empty
 
-  // CHECK: load i2{{.*}}, align 16
+  // CHECK: load i8{{.*}}, align 16
   %w = load %d : $*NoPayload
-  // CHECK: store i2{{.*}}, align 16
+  // CHECK: store i8{{.*}}, align 16
   store %w to %d : $*NoPayload
 
   // CHECK: load i32{{.*}}, align 16
@@ -62,10 +62,10 @@ entry:
   store %v to %e : $*SinglePayload
 
   // CHECK: load i32{{.*}}, align 16
-  // CHECK: load i2{{.*}}, align 4
+  // CHECK: load i8{{.*}}, align 4
   %u = load %f : $*MultiPayload
   // CHECK: store i32{{.*}}, align 16
-  // CHECK: store i2{{.*}}, align 4
+  // CHECK: store i8{{.*}}, align 4
   store %u to %f : $*MultiPayload
 
   dealloc_stack %f : $*MultiPayload

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
  %{
@@ -67,7 +67,7 @@ infix operator &>>= : AssignmentPrecedence
 //===----------------------------------------------------------------------===//
 
 
-//FIXME(integers): This should go in the stdlib separately, probably.
+// FIXME(integers): This should go in the stdlib separately, probably.
 extension ExpressibleByIntegerLiteral
   where Self : _ExpressibleByBuiltinIntegerLiteral {
   /// Create an instance initialized to `value`.
@@ -81,23 +81,23 @@ extension ExpressibleByIntegerLiteral
 //===--- Arithmetic -------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// Declares methods backing binary arithmetic operators—such as `+`, `-` and
-/// `*`—and their mutating counterparts.
-/// 
+/// Declares methods backing binary arithmetic operators--such as `+`, `-` and
+/// `*`--and their mutating counterparts.
+///
 /// It provides a suitable basis for arithmetic on scalars such as integers and
 /// floating point numbers.
-/// 
+///
 /// Both mutating and non-mutating operations are declared in the protocol,
 /// however only the mutating ones are required, as default implementations of
 /// the non-mutating ones are provided by a protocol extension.
-/// 
+///
 /// The `Magnitude` associated type is able to hold the absolute value of any
 /// possible value of `Self`. Concrete types do not have to provide a typealias
 /// for it, as it can be inferred from the `magnitude` property. This property
 /// can be useful in operations that are simpler to implement in terms of
 /// unsigned values, for example, printing a value of an integer, which is just
 /// printing a '-' character in front of an absolute value.
-/// 
+///
 /// Please note that for ordinary work, the `magnitude` property **should not**
 /// be preferred to the `abs(_)` function, whose return value is of the same
 /// type as its argument.
@@ -105,7 +105,7 @@ public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
   // FIXME(integers): implement
   //init?<T : BinaryInteger>(exactly source: T)
 
-  // FIXME(ABI): should be just Arithmetic
+  // FIXME(ABI)#44 (Recursive Protocol Constraints): should be just Arithmetic
   associatedtype Magnitude : Equatable, ExpressibleByIntegerLiteral
 
   var magnitude: Magnitude { get }

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -20,34 +20,106 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
-  class Operand;
-  class ValueBaseUseIterator;
-  class ValueUseIterator;
-  class SILBasicBlock;
-  class SILInstruction;
-  class SILLocation;
-  class DominanceInfo;
 
-  enum class ValueKind {
+class DominanceInfo;
+class Operand;
+class SILBasicBlock;
+class SILFunction;
+class SILInstruction;
+class SILLocation;
+class SILModule;
+class ValueBaseUseIterator;
+class ValueUseIterator;
+
+enum class ValueKind {
 #define VALUE(Id, Parent) Id,
-#define VALUE_RANGE(Id, FirstId, LastId) \
-    First_##Id = FirstId, Last_##Id = LastId,
+#define VALUE_RANGE(Id, FirstId, LastId)                                       \
+  First_##Id = FirstId, Last_##Id = LastId,
 #include "swift/SIL/SILNodes.def"
-  };
+};
 
-  /// ValueKind hashes to its underlying integer representation.
-  static inline llvm::hash_code hash_value(ValueKind K) {
-    return llvm::hash_value(size_t(K));
-  }
+/// ValueKind hashes to its underlying integer representation.
+static inline llvm::hash_code hash_value(ValueKind K) {
+  return llvm::hash_value(size_t(K));
+}
 
-/// ValueBase - This is the base class of the SIL value hierarchy, which
-/// represents a runtime computed value.  Things like SILInstruction derive
-/// from this.
+/// A value representing the specific ownership semantics that a SILValue may
+/// have.
+struct ValueOwnershipKind {
+  enum innerty : uint8_t {
+    /// A SILValue with Trivial ownership kind is an independent value that can
+    /// not be owned. Ownership does not place any constraints on how a SILValue
+    /// with Trivial ownership kind can be used. Other side effects (e.g. Memory
+    /// dependencies) must still be respected. A SILValue with Trivial ownership
+    /// kind must be of Trivial SILType (i.e. SILType::isTrivial(SILModule &)
+    /// must
+    /// return true).
+    ///
+    /// Some examples of SIL types with Trivial ownership are: Builtin.Int32,
+    /// Builtin.RawPointer, aggregates containing all trivial types.
+    Trivial,
+
+    /// A SILValue with `Unowned` ownership kind is an independent value that
+    /// has
+    /// a lifetime that is only guaranteed to last until the next program
+    /// visible
+    /// side-effect. To maintain the lifetime of an unowned value, it must be
+    /// converted to an owned representation via a copy_value.
+    ///
+    /// Unowned ownership kind occurs mainly along method/function boundaries in
+    /// between Swift and Objective-C code.
+    Unowned,
+
+    /// A SILValue with `Owned` ownership kind is an independent value that has
+    /// an
+    /// ownership independent of any other ownership imbued within it. The
+    /// SILValue must be paired with a consuming operation that ends the SSA
+    /// value's lifetime exactly once along all paths through the program.
+    Owned,
+
+    /// A SILValue with `Guaranteed` ownership kind is an independent value that
+    /// is guaranteed to be live over a specific region of the program. This
+    /// region can come in several forms:
+    ///
+    /// 1. @guaranteed function argument. This guarantees that a value will
+    /// outlive a function.
+    ///
+    /// 2. A shared borrow region. This is a region denoted by a
+    /// begin_borrow/load_borrow instruction and an end_borrow instruction. The
+    /// SSA value must not be destroyed or taken inside the borrowed region.
+    ///
+    /// Any value with guaranteed ownership must be paired with an end_borrow
+    /// instruction exactly once along any path through the program.
+    Guaranteed,
+
+    /// A SILValue with undefined ownership. It can pair with /Any/ ownership
+    /// kinds . This means that it could take on /any/ ownership semantics. This
+    /// is meant only to model SILUndef and to express certain situations where
+    /// we
+    /// use unqualified ownership. Expected to tighten over time.
+    Any,
+  } Value;
+
+  ValueOwnershipKind(innerty NewValue) : Value(NewValue) {}
+  ValueOwnershipKind(unsigned NewValue) : Value(innerty(NewValue)) {}
+  ValueOwnershipKind(SILModule &M, SILType Type,
+                     SILArgumentConvention Convention);
+
+  operator innerty() const { return Value; }
+
+  Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ValueOwnershipKind Kind);
+
+/// This is the base class of the SIL value hierarchy, which represents a
+/// runtime computed value. Things like SILInstruction derive from this.
 class alignas(8) ValueBase : public SILAllocated<ValueBase> {
   SILType Type;
   Operand *FirstUse = nullptr;
@@ -118,7 +190,15 @@ public:
 
   /// If this is a SILArgument or a SILInstruction get its parent basic block,
   /// otherwise return null.
-  SILBasicBlock *getParentBB();
+  SILBasicBlock *getParentBlock() const;
+
+  /// If this is a SILArgument or a SILInstruction get its parent function,
+  /// otherwise return null.
+  SILFunction *getFunction() const;
+
+  /// If this is a SILArgument or a SILInstruction get its parent module,
+  /// otherwise return null.
+  SILModule *getModule() const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
@@ -126,9 +206,11 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   V.print(OS);
   return OS;
 }
-}  // end namespace swift
+
+} // end namespace swift
 
 namespace llvm {
+
 /// ValueBase * is always at least eight-byte aligned; make the three tag bits
 /// available through PointerLikeTypeTraits.
 template<>
@@ -142,6 +224,7 @@ public:
   }
   enum { NumLowBitsAvailable = 3 };
 };
+
 } // end namespace llvm
 
 namespace swift {
@@ -185,6 +268,17 @@ public:
     llvm::PointerLikeTypeTraits<ValueBase *>::
           NumLowBitsAvailable
   };
+
+  /// Returns the ValueOwnershipKind that describes this SILValue's ownership
+  /// semantics if the SILValue has ownership semantics. Returns is a value
+  /// without any Ownership Semantics.
+  ///
+  /// An example of a SILValue without ownership semantics is a
+  /// struct_element_addr.
+  ValueOwnershipKind getOwnershipKind() const;
+
+  /// Verify that this SILValue and its uses respects ownership invariants.
+  void verifyOwnership(SILModule &Mod) const;
 };
 
 /// A formal SIL reference to a value, suitable for use as a stored
@@ -291,9 +385,11 @@ public:
     : Operands(operands) {}
 
   /// A simple iterator adapter.
-  class iterator {
+  class iterator : public std::iterator<std::forward_iterator_tag,
+                                        SILValue, ptrdiff_t> {
     const Operand *Ptr;
   public:
+    iterator() = default;
     iterator(const Operand *ptr) : Ptr(ptr) {}
     SILValue operator*() const { assert(Ptr); return Ptr->get(); }
     SILValue operator->() const { return operator*(); }
@@ -679,6 +775,6 @@ namespace llvm {
     enum { NumLowBitsAvailable = swift::SILValue::NumLowBitsAvailable };
   };
 
-}  // end namespace llvm
+} // end namespace llvm
 
 #endif

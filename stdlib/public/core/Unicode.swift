@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,6 +22,7 @@ import SwiftShims
 /// of a decoding error.
 /// 
 /// - SeeAlso: `UnicodeCodec.decode(next:)`
+@_fixed_layout
 public enum UnicodeDecodingResult : Equatable {
   /// A decoded Unicode scalar value.
   case scalarValue(UnicodeScalar)
@@ -137,7 +138,8 @@ public protocol UnicodeCodec {
   /// Searches for the first occurrence of a `CodeUnit` that is equal to 0.
   ///
   /// Is an equivalent of `strlen` for C-strings.
-  /// - Complexity: O(n)
+  ///
+  /// - Complexity: O(*n*)
   static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int
 }
 
@@ -217,7 +219,7 @@ public struct UTF8 : UnicodeCodec {
       // Non-ASCII, proceed to buffering mode.
       _decodeBuffer = UInt32(codeUnit)
       _bitsInBuffer = 8
-    } else if (_decodeBuffer & 0x80 == 0) {
+    } else if _decodeBuffer & 0x80 == 0 {
       // ASCII in buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
       let codeUnit = _decodeBuffer & 0xff
@@ -278,7 +280,7 @@ public struct UTF8 : UnicodeCodec {
   static func _decodeOne(_ buffer: UInt32) -> (result: UInt32?, length: UInt8) {
     // Note the buffer is read least significant byte first: [ #3 #2 #1 #0 ].
 
-    if buffer & 0x80 == 0 { // 1-byte sequence (ASCII), buffer: [ … … … CU0 ].
+    if buffer & 0x80 == 0 { // 1-byte sequence (ASCII), buffer: [ ... ... ... CU0 ].
       let value = buffer & 0xff
       return (value, 1)
     }
@@ -302,7 +304,7 @@ public struct UTF8 : UnicodeCodec {
     let bit1 = (lut1 >> index) & 1
 
     switch (bit1, bit0) {
-    case (0, 0): // 2-byte sequence, buffer: [ … … CU1 CU0 ].
+    case (0, 0): // 2-byte sequence, buffer: [ ... ... CU1 CU0 ].
       // Require 10xx xxxx  110x xxxx.
       if _slowPath(buffer & 0xc0e0 != 0x80c0) { return (nil, 1) }
       // Disallow xxxx xxxx  xxx0 000x (<= 7 bits case).
@@ -312,7 +314,7 @@ public struct UTF8 : UnicodeCodec {
                 | (buffer & 0x001f) << 6
       return (value, 2)
 
-    case (0, 1): // 3-byte sequence, buffer: [ … CU2 CU1 CU0 ].
+    case (0, 1): // 3-byte sequence, buffer: [ ... CU2 CU1 CU0 ].
       // Disallow xxxx xxxx  xx0x xxxx  xxxx 0000 (<= 11 bits case).
       if _slowPath(buffer & 0x00200f == 0x000000) { return (nil, 1) }
       // Disallow xxxx xxxx  xx1x xxxx  xxxx 1101 (surrogate code points).
@@ -426,13 +428,15 @@ public struct UTF8 : UnicodeCodec {
     return byte & 0b11_00__0000 == 0b10_00__0000
   }
 
-  public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
-    // Relying on a permissive memory model in C.
-    let cstr = unsafeBitCast(input, to: UnsafePointer<CChar>.self)
-    return Int(_swift_stdlib_strlen(cstr))
+  public static func _nullCodeUnitOffset(
+    in input: UnsafePointer<CodeUnit>
+  ) -> Int {
+    return Int(_swift_stdlib_strlen_unsigned(input))
   }
   // Support parsing C strings as-if they are UTF8 strings.
-  public static func _nullCodeUnitOffset(in input: UnsafePointer<CChar>) -> Int {
+  public static func _nullCodeUnitOffset(
+    in input: UnsafePointer<CChar>
+  ) -> Int {
     return Int(_swift_stdlib_strlen(input))
   }
 }
@@ -839,7 +843,7 @@ internal func _transcodeSomeUTF16AsUTF8<Input>(
     nextIndex = input.index(nextIndex, offsetBy: utf16Length)
   }
   // FIXME: Annoying check, courtesy of <rdar://problem/16740169>
-  if utf8Count < MemoryLayout._ofInstance(result).size {
+  if utf8Count < MemoryLayout.size(ofValue: result) {
     result |= ~0 << numericCast(utf8Count * 8)
   }
   return (nextIndex, result)
@@ -1139,6 +1143,16 @@ extension UnicodeCodec {
 @available(*, unavailable, renamed: "UnicodeCodec")
 public typealias UnicodeCodecType = UnicodeCodec
 
+extension UnicodeCodec {
+  @available(*, unavailable, renamed: "encode(_:into:)")
+  public static func encode(
+    _ input: UnicodeScalar,
+    output put: (CodeUnit) -> Void
+  ) {
+    Builtin.unreachable()
+  }
+}
+
 @available(*, unavailable, message: "use 'transcode(_:from:to:stoppingOnError:into:)'")
 public func transcode<Input, InputEncoding, OutputEncoding>(
   _ inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
@@ -1165,3 +1179,7 @@ extension UTF16 {
     Builtin.unreachable()
   }
 }
+
+/// A namespace for Unicode utilities.
+internal enum _Unicode {}
+

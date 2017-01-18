@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
@@ -118,25 +119,17 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
-                         SourceFile *SF,
-                         llvm::LLVMContext &LLVMContext,
-                         StringRef ModuleName,
-                         StringRef OutputFilename)
-  : IRGen(irgen),
-    Context(irgen.SIL.getASTContext()),
-    ClangCodeGen(createClangCodeGenerator(Context, LLVMContext,
-                                          irgen.Opts, ModuleName)),
-    Module(*ClangCodeGen->GetModule()),
-    LLVMContext(Module.getContext()),
-    DataLayout(target->createDataLayout()),
-    Triple(Context.LangOpts.Target),
-    TargetMachine(std::move(target)),
-    OutputFilename(OutputFilename),
-    TargetInfo(SwiftTargetInfo::get(*this)),
-    DebugInfo(0), ModuleHash(nullptr),
-    ObjCInterop(Context.LangOpts.EnableObjCInterop),
-    Types(*new TypeConverter(*this))
-{
+                         SourceFile *SF, llvm::LLVMContext &LLVMContext,
+                         StringRef ModuleName, StringRef OutputFilename)
+    : IRGen(irgen), Context(irgen.SIL.getASTContext()),
+      ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
+                                            ModuleName)),
+      Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
+      DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
+      TargetMachine(std::move(target)), OutputFilename(OutputFilename),
+      TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
+      ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
 
   auto &opts = irgen.Opts;
@@ -378,6 +371,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   // Only use the new calling conventions on platforms that support it.
   auto Arch = Triple.getArch();
+  (void)Arch;
   if (SWIFT_RT_USE_RegisterPreservingCC &&
       Arch == llvm::Triple::ArchType::aarch64)
     RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
@@ -409,7 +403,7 @@ namespace RuntimeConstants {
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
-}
+} // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
 // RuntimeFunctions.def FUNCTION macro. Instead, special case the one attribute
@@ -522,9 +516,9 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
     auto fnTy = fun->getFunctionType();
     auto fnPtrTy = llvm::PointerType::getUnqual(fnTy);
 
-    auto *globalFnPtr =
-        new llvm::GlobalVariable(Module, fnPtrTy, false,
-                                 llvm::GlobalValue::ExternalLinkage, 0, symbol);
+    auto *globalFnPtr = new llvm::GlobalVariable(
+        Module, fnPtrTy, false, llvm::GlobalValue::ExternalLinkage, nullptr,
+        symbol);
     if (llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF())
       globalFnPtr->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
@@ -623,7 +617,7 @@ IRGenModule::createStringConstant(StringRef Str,
   // unnamed_addr to prevent it from going into the cstrings section and getting
   // coalesced.
   if (!willBeRelativelyAddressed)
-    global->setUnnamedAddr(true);
+    global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
   if (!sectionName.empty())
     global->setSection(sectionName);
@@ -641,8 +635,9 @@ llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
   if (EmptyTupleMetadata)
     return EmptyTupleMetadata;
 
-  EmptyTupleMetadata =
-      Module.getOrInsertGlobal("_TMT_", FullTypeMetadataStructTy);
+  EmptyTupleMetadata = Module.getOrInsertGlobal(
+                          MANGLE_AS_STRING(METADATA_SYM(EMPTY_TUPLE_MANGLING)),
+                          FullTypeMetadataStructTy);
   if (Triple.isOSBinFormatCOFF())
     cast<llvm::GlobalVariable>(EmptyTupleMetadata)
         ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
@@ -865,7 +860,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
 
     if (!Module.getGlobalVariable(buf.str())) {
       auto ref = new llvm::GlobalVariable(Module, symbolAddr->getType(),
-                                          /*constant=*/true,
+                                          /*isConstant=*/true,
                                           llvm::GlobalValue::WeakAnyLinkage,
                                           symbolAddr, buf.str());
       ref->setVisibility(llvm::GlobalValue::HiddenVisibility);
@@ -970,7 +965,7 @@ void IRGenModule::emitAutolinkInfo() {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
     auto symbol =
-        new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/false,
+        new llvm::GlobalVariable(Module, Int1Ty, /*isConstant=*/false,
                                  llvm::GlobalValue::CommonLinkage,
                                  llvm::Constant::getNullValue(Int1Ty),
                                  buf.str());
@@ -989,7 +984,7 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
   // image info.
   // Using "Objective-C Garbage Collection" as the key here is a hack,
   // but LLVM's object-file emission isn't general enough to collect
-  // arbitrary keys to put in the
+  // arbitrary keys to put in the image info.
 
   const char *ObjectiveCGarbageCollection = "Objective-C Garbage Collection";
   if (Module.getModuleFlag(ObjectiveCGarbageCollection)) {

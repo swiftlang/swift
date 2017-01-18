@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -29,6 +29,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 
 using namespace swift;
+using namespace importer;
 
 Optional<clang::Module *>
 ClangImporter::Implementation::getClangSubmoduleForMacro(
@@ -64,6 +65,7 @@ parseNumericLiteral(ClangImporter::Implementation &impl,
   return nullptr;
 }
 
+// FIXME: Duplicated from ImportDecl.cpp.
 static bool isInSystemModule(DeclContext *D) {
   if (cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule())
     return true;
@@ -251,7 +253,7 @@ static ValueDecl *importNil(ClangImporter::Implementation &Impl,
   auto type = TupleType::getEmpty(Impl.SwiftContext);
   return Impl.createUnavailableDecl(name, DC, type,
                                     "use 'nil' instead of this imported macro",
-                                    /*static=*/false, clangN);
+                                    /*isStatic=*/false, clangN);
 }
 
 static bool isSignToken(const clang::Token &tok) {
@@ -448,7 +450,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                           clangTy->isUnsignedIntegerType() };
       return createMacroConstant(impl, macro, name, DC, type,
                                  clang::APValue(value),
-                                 ConstantConvertKind::Coerce, /*static=*/false,
+                                 ConstantConvertKind::Coerce, /*isStatic=*/false,
                                  ClangN);
     // Check for an expression of the form (FLAG1 | FLAG2), (FLAG1 & FLAG2),
     // (FLAG1 || FLAG2), or (FLAG1 || FLAG2)
@@ -462,6 +464,12 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         auto firstMacroInfo = impl.getClangPreprocessor().getMacroInfo(firstID);
         auto secondMacroInfo = impl.getClangPreprocessor().getMacroInfo(
                                                                       secondID);
+        auto firstIdentifier =
+            impl.getNameImporter().importMacroName(firstID, firstMacroInfo);
+        auto secondIdentifier =
+            impl.getNameImporter().importMacroName(secondID, secondMacroInfo);
+        impl.importMacro(firstIdentifier, firstMacroInfo);
+        impl.importMacro(secondIdentifier, secondMacroInfo);
         auto firstIterator = impl.ImportedMacroConstants.find(firstMacroInfo);
         if (firstIterator == impl.ImportedMacroConstants.end()) {
           return nullptr;
@@ -526,7 +534,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         return createMacroConstant(impl, macro, name, DC, type,
                                    value,
                                    ConstantConvertKind::Coerce,
-                                   /*static=*/false, ClangN);
+                                   /*isStatic=*/false, ClangN);
       }
     }
     break;

@@ -1,6 +1,9 @@
-// RUN: %target-swift-frontend -Ounchecked %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -Ounchecked %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
+
+// FIXME: https://bugs.swift.org/browse/SR-2808
+// XFAIL: resilient_stdlib
 
 // We were missing target transform info and not vectorizing the loop below.
 

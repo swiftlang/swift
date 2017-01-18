@@ -42,10 +42,10 @@ Consider::
 
 What do we do with this?  Since ``+=`` has an ``inout`` first
 argument, we detect this situation statically (hopefully one day we'll
-have a better error message): 
+have a better error message):
 
-::
-   
+.. code-block:: swift-console
+
  <REPL Input>:1:9: error: expression does not type-check
  w.title += " (parenthesized remark)"
  ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -106,7 +106,7 @@ The implicit ``self`` parameter of a struct or enum method is semantically an
 objects.
 
 A program that applies the ``mutating`` to a method of a
-class—or of a protocol attributed with ``@class_protocol``—is
+class--or of a protocol attributed with ``@class_protocol``--is
 ill-formed.  [Note: it is logically consistent to think of all methods
 of classes as read-only, even though they may in fact modify instance
 variables, because they never "write back" onto the source reference.]
@@ -126,7 +126,7 @@ implicitly:
 
     var x = Number(42)
     x.increment()         // mutating operation
-  
+
 * passing it to a function attributed with ``@assignment``::
 
     var y = 31
@@ -162,7 +162,7 @@ A subscript or property access expression is an rvalue if
   value type
 
 For example, consider this extension to our ``Number`` struct:
-  
+
 .. parsed-literal::
 
   extension Number {
@@ -223,9 +223,9 @@ The Big Rule
 
 .. Error:: A program that applies a mutating operation to an rvalue is ill-formed
    :class: warning
-        
+
 For example:
-                
+
 .. parsed-literal::
 
    clay = 43           // OK; a var is always assignable

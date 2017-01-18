@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -primary-file %s | %FileCheck %s
 
 struct B {
   var i : Int, j : Float
@@ -28,7 +28,7 @@ struct D {
 
 
 // CHECK-LABEL: sil hidden @_TFV19default_constructor1DC{{.*}} : $@convention(method) (@thin D.Type) -> D
-// CHECK: [[THISBOX:%[0-9]+]] = alloc_box $D
+// CHECK: [[THISBOX:%[0-9]+]] = alloc_box ${ var D }
 // CHECK: [[THIS:%[0-9]+]] = mark_uninit
 // CHECK: [[INIT:%[0-9]+]] = function_ref @_TIvV19default_constructor1D1iSii
 // CHECK: [[RESULT:%[0-9]+]] = apply [[INIT]]()
@@ -56,26 +56,28 @@ class E {
 // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[INIT]]() : $@convention(thin) () -> Int64
 // CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[SELF]] : $E, #E.i
 // CHECK-NEXT: assign [[VALUE]] to [[IREF]] : $*Int64
-// CHECK-NEXT: return [[SELF]] : $E
+// CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]]
+// CHECK-NEXT: destroy_value [[SELF]]
+// CHECK-NEXT: return [[SELF_COPY]] : $E
 
 class F : E { }
 
 // CHECK-LABEL: sil hidden @_TFC19default_constructor1Fc{{.*}} : $@convention(method) (@owned F) -> @owned F
 // CHECK: bb0([[ORIGSELF:%[0-9]+]] : $F)
-// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $F
+// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var F }
 // CHECK-NEXT: project_box [[SELF_BOX]]
 // CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself]
-// CHECK-NEXT: store [[ORIGSELF]] to [[SELF]] : $*F
-// CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
+// CHECK-NEXT: store [[ORIGSELF]] to [init] [[SELF]] : $*F
+// SEMANTIC ARC TODO: This is incorrect. Why are we doing a +0 produce and passing off to a +1 consumer. This should be a copy. Or a mutable borrow perhaps?
+// CHECK-NEXT: [[SELFP:%[0-9]+]] = load_borrow [[SELF]] : $*F
 // CHECK-NEXT: [[E:%[0-9]]] = upcast [[SELFP]] : $F to $E
 // CHECK: [[E_CTOR:%[0-9]+]] = function_ref @_TFC19default_constructor1EcfT_S0_ : $@convention(method) (@owned E) -> @owned E
 // CHECK-NEXT: [[ESELF:%[0-9]]] = apply [[E_CTOR]]([[E]]) : $@convention(method) (@owned E) -> @owned E
 
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
-// CHECK-NEXT: store [[ESELFW]] to [[SELF]] : $*F
-// CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
-// CHECK-NEXT: strong_retain [[SELFP]] : $F
-// CHECK-NEXT: strong_release [[SELF_BOX]] : $@box F
+// CHECK-NEXT: store [[ESELFW]] to [init] [[SELF]] : $*F
+// CHECK-NEXT: [[SELFP:%[0-9]+]] = load [copy] [[SELF]] : $*F
+// CHECK-NEXT: destroy_value [[SELF_BOX]] : ${ var F }
 // CHECK-NEXT: return [[SELFP]] : $F
 
 
@@ -91,3 +93,26 @@ struct G {
 // CHECK-LABEL: default_constructor.G.init (bar : Swift.Optional<Swift.Int32>)
 // CHECK-NEXT: sil hidden @_TFV19default_constructor1GC
 // CHECK-NOT: default_constructor.G.init ()
+
+struct H<T> {
+  var opt: T?
+
+  // CHECK-LABEL: sil hidden @_TFV19default_constructor1HCurfqd__GS0_x_ : $@convention(method) <T><U> (@in U, @thin H<T>.Type) -> @out H<T> {
+  // CHECK: [[INIT_FN:%[0-9]+]] = function_ref @_TIvV19default_constructor1H3optGSqx_i : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  // CHECK-NEXT: [[OPT_T:%[0-9]+]] = alloc_stack $Optional<T>
+  // CHECK-NEXT: apply [[INIT_FN]]<T>([[OPT_T]]) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  init<U>(_: U) { }
+}
+
+// <rdar://problem/29605388> Member initializer for non-generic type with generic constructor doesn't compile
+
+struct I {
+  var x: Int = 0
+
+  // CHECK-LABEL: sil hidden @_TFV19default_constructor1ICurfxS0_ : $@convention(method) <T> (@in T, @thin I.Type) -> I {
+  // CHECK: [[INIT_FN:%[0-9]+]] = function_ref @_TIvV19default_constructor1I1xSii : $@convention(thin) () -> Int
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[INIT_FN]]() : $@convention(thin) () -> Int
+  // CHECK: [[X_ADDR:%[0-9]+]] = struct_element_addr {{.*}} : $*I, #I.x
+  // CHECK: assign [[RESULT]] to [[X_ADDR]] : $*Int
+  init<T>(_: T) {}
+}

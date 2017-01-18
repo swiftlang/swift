@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name=test -Onone -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -module-name=test -Onone -emit-ir %s | %FileCheck %s
 
 // CHECK-DAG: define linkonce_odr hidden void @shared_external_test()
 // CHECK-DAG: declare void @public_external_test()

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct X { } // expected-note * {{did you mean 'X'?}}
 
@@ -224,7 +224,27 @@ struct tuple_index {
   }
 }
 
+struct MutableComputedGetter {
+  var value: Int
+  subscript(index: Int) -> Int {
+    value = 5 // expected-error{{cannot assign to property: 'self' is immutable}}
+    return 5
+  }
+  var getValue : Int {
+    value = 5 // expected-error {{cannot assign to property: 'self' is immutable}}
+    return 5
+  }
+}
 
+struct MutableSubscriptInGetter {
+  var value: Int
+  subscript(index: Int) -> Int {
+    get { // expected-note {{mark accessor 'mutating' to make 'self' mutable}}
+      value = 5 // expected-error{{cannot assign to property: 'self' is immutable}}
+      return 5
+    }
+  }
+}
 
 struct SubscriptTest1 {
   subscript(keyword:String) -> Bool { return true }  // expected-note 2 {{found this candidate}}
@@ -254,6 +274,9 @@ func testSubscript1(_ s2 : SubscriptTest2) {
   
   
   let b = s2[1, "foo"] // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+
+  // rdar://problem/27449208
+  let v: (Int?, [Int]?) = (nil [17]) // expected-error {{cannot subscript a nil literal value}}
 }
 
 // sr-114 & rdar://22007370

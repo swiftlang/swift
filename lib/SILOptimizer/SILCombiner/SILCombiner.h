@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -231,6 +231,13 @@ public:
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);
 
+  // Optimize the "trunc_N1_M2" builtin. if N1 is a result of "zext_M1_*" and
+  // the following holds true: N1 > M1 and M2>= M1
+  SILInstruction *optimizeBuiltinTruncOrBitCast(BuiltinInst *I);
+
+  // Optimize the "zext_M2_M3" builtin. if M2 is a result of "zext_M1_M2"
+  SILInstruction *optimizeBuiltinZextOrBitCast(BuiltinInst *I);
+
   // Optimize the "cmp_eq_XXX" builtin. If \p NegateResult is true then negate
   // the result bit.
   SILInstruction *optimizeBuiltinCompareEq(BuiltinInst *AI, bool NegateResult);
@@ -254,7 +261,7 @@ private:
                                                CanType ConcreteType,
                                                SILValue ConcreteTypeDef,
                                                ProtocolConformanceRef Conformance,
-                                               CanType OpenedArchetype);
+                                               ArchetypeType *OpenedArchetype);
   SILInstruction *
   propagateConcreteTypeOfInitExistential(FullApplySite AI,
       ProtocolDecl *Protocol,
@@ -280,7 +287,8 @@ private:
 
   /// Erases an apply instruction including all it's uses \p.
   /// Inserts release/destroy instructions for all owner and in-parameters.
-  void eraseApply(FullApplySite FAS, const UserListTy &Users);
+  /// \return Returns true if successful.
+  bool eraseApply(FullApplySite FAS, const UserListTy &Users);
 
   /// Returns true if the results of a try_apply are not used.
   static bool isTryApplyResultNotUsed(UserListTy &AcceptedUses,

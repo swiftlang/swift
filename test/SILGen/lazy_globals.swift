@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | %FileCheck %s
 
 // CHECK: sil private @globalinit_[[T:.*]]_func0 : $@convention(thin) () -> () {
 // CHECK:   alloc_global @_Tv12lazy_globals1xSi
 // CHECK:   [[XADDR:%.*]] = global_addr @_Tv12lazy_globals1xSi : $*Int
-// CHECK:   store {{%.*}} to [[XADDR]] : $*Int
+// CHECK:   store {{%.*}} to [trivial] [[XADDR]] : $*Int
 
 // CHECK: sil hidden [global_init] @_TF12lazy_globalsau1xSi : $@convention(thin) () -> Builtin.RawPointer {
 // CHECK:   [[TOKEN_ADDR:%.*]] = global_addr @globalinit_[[T]]_token0 : $*Builtin.Word
@@ -19,7 +19,7 @@ var x: Int = 0
 // CHECK: sil private @globalinit_[[T:.*]]_func1 : $@convention(thin) () -> () {
 // CHECK:   alloc_global @_TZvV12lazy_globals3Foo3fooSi
 // CHECK:   [[XADDR:%.*]] = global_addr @_TZvV12lazy_globals3Foo3fooSi : $*Int
-// CHECK:   store {{.*}} to [[XADDR]] : $*Int
+// CHECK:   store {{.*}} to [trivial] [[XADDR]] : $*Int
 // CHECK:   return
 
 struct Foo {
@@ -43,7 +43,7 @@ struct Foo {
 // CHECK: sil private @globalinit_[[T:.*]]_func3 : $@convention(thin) () -> () {
 // CHECK:   alloc_global @_TZvO12lazy_globals3Bar3barSi
 // CHECK:   [[XADDR:%.*]] = global_addr @_TZvO12lazy_globals3Bar3barSi : $*Int
-// CHECK:   store {{.*}} to [[XADDR]] : $*Int
+// CHECK:   store {{.*}} to [trivial] [[XADDR]] : $*Int
 // CHECK:   return
 
 enum Bar {

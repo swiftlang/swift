@@ -2,15 +2,15 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-/// Creates a sequence of pairs built out of two underyling sequences.
+/// Creates a sequence of pairs built out of two underlying sequences.
 ///
 /// In the `Zip2Sequence` instance returned by this function, the elements of
 /// the *i*th pair are the *i*th elements of each underlying sequence. The
@@ -138,4 +138,11 @@ public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
 
   internal let _sequence1: Sequence1
   internal let _sequence2: Sequence2
+}
+
+extension Zip2Sequence {
+  @available(*, unavailable, message: "use zip(_:_:) free function instead")
+  public init(_ sequence1: Sequence1, _ sequence2: Sequence2) {
+    Builtin.unreachable()
+  }
 }

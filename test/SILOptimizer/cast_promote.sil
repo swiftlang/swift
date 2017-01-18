@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 sil_stage canonical
 
@@ -82,13 +82,13 @@ bb0(%0 : $*NativeProto, %1 : $AnyObject):
 
 class B {}
 
-// CHECK-LABEL: sil @load_unchecked_addr_cast_to_unchecked_ref_cast_load : $@convention(thin) (@inout Optional<B>) -> (Builtin.NativeObject, Optional<Builtin.NativeObject>) {
+// CHECK-LABEL: sil @load_uncheckedaddrcast_to_uncheckedrefcast_load : $@convention(thin) (@inout Optional<B>) -> (Builtin.NativeObject, Optional<Builtin.NativeObject>) {
 // CHECK-NOT: unchecked_addr_cast
 // CHECK: unchecked_ref_cast
 // CHECK-NOT: unchecked_addr_cast
 // CHECK: unchecked_ref_cast
 // CHECK-NOT: unchecked_addr_cast
-sil @load_unchecked_addr_cast_to_unchecked_ref_cast_load : $@convention(thin) (@inout Optional<B>) -> (Builtin.NativeObject, Optional<Builtin.NativeObject>) {
+sil @load_uncheckedaddrcast_to_uncheckedrefcast_load : $@convention(thin) (@inout Optional<B>) -> (Builtin.NativeObject, Optional<Builtin.NativeObject>) {
 bb0(%0 : $*Optional<B>):
   %1 = unchecked_addr_cast %0 : $*Optional<B> to $*Builtin.NativeObject
   %2 = unchecked_addr_cast %0 : $*Optional<B> to $*Optional<Builtin.NativeObject>

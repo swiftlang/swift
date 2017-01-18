@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -90,7 +90,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   // Turn this also into an index_addr. We generate this pattern after switching
   // the Word type to an explicit Int32 or Int64 in the stdlib.
   //
-  // %101 = builtin "strideof_nonzero"<Int>(%84 : $@thick Int.Type) :
+  // %101 = builtin "strideof"<Int>(%84 : $@thick Int.Type) :
   //         $Builtin.Word
   // %102 = builtin "zextOrBitCast_Word_Int64"(%101 : $Builtin.Word) :
   //         $Builtin.Int64
@@ -119,13 +119,13 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                 m_ApplyInst(
                     BuiltinValueKind::SMulOver, m_SILValue(Distance),
                     m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                m_ApplyInst(BuiltinValueKind::StrideofNonZero,
+                                m_ApplyInst(BuiltinValueKind::Strideof,
                                             m_MetatypeInst(Metatype))))) ||
           match(StrideMul,
                 m_ApplyInst(
                     BuiltinValueKind::SMulOver,
                     m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                m_ApplyInst(BuiltinValueKind::StrideofNonZero,
+                                m_ApplyInst(BuiltinValueKind::Strideof,
                                             m_MetatypeInst(Metatype))),
                     m_SILValue(Distance)))) {
         SILType InstanceType =
@@ -166,10 +166,6 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                                      0)))) {
     if (match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
                                  m_ApplyInst(BuiltinValueKind::Strideof,
-                                             m_MetatypeInst(Metatype)),
-                                 m_ValueBase())) ||
-        match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
-                                 m_ApplyInst(BuiltinValueKind::StrideofNonZero,
                                              m_MetatypeInst(Metatype)),
                                  m_ValueBase()))) {
       SILType InstanceType =
@@ -261,7 +257,8 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     UI++;
 
     // Insert a new load from our source and bitcast that as appropriate.
-    LoadInst *NewLoad = Builder.createLoad(Loc, Op);
+    LoadInst *NewLoad =
+        Builder.createLoad(Loc, Op, LoadOwnershipQualifier::Unqualified);
     auto *BitCast = Builder.createUncheckedBitCast(Loc, NewLoad,
                                                     OutputTy.getObjectType());
     // Replace all uses of the old load with the new bitcasted result and erase
@@ -325,11 +322,13 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
  
   SILLocation Loc = URCI->getLoc();
   Builder.setCurrentDebugScope(URCI->getDebugScope());
-  LoadInst *load = Builder.createLoad(Loc, URCI->getSrc());
+  LoadInst *load = Builder.createLoad(Loc, URCI->getSrc(),
+                                      LoadOwnershipQualifier::Unqualified);
   auto *cast = Builder.tryCreateUncheckedRefCast(Loc, load,
                                                  DestTy.getObjectType());
   assert(cast && "SILBuilder cannot handle reference-castable types");
-  Builder.createStore(Loc, cast, URCI->getDest());
+  Builder.createStore(Loc, cast, URCI->getDest(),
+                      StoreOwnershipQualifier::Unqualified);
 
   return eraseInstFromFunction(*URCI);
 }

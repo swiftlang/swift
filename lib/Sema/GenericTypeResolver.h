@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -26,6 +26,7 @@ namespace swift {
 class ArchetypeBuilder;
 class AssociatedTypeDecl;
 class Identifier;
+class ParamDecl;
 class TypeChecker;
 class TypeDecl;
 
@@ -46,7 +47,7 @@ public:
   /// \returns The resolved generic type parameter type, which may be \c gp.
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp) = 0;
 
-  /// Resolve a reference to a member within a dependent type.
+  /// Resolve a qualified reference to a type member within a dependent type.
   ///
   /// \param baseTy The base of the member access.
   /// \param baseRange The source range covering the base type.
@@ -59,7 +60,7 @@ public:
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref) = 0;
 
-  /// Resolve a reference to an associated type within the 'Self' type
+  /// Resolve an unqualified reference to an associated type of the 'Self' type
   /// of a protocol.
   ///
   /// \param selfTy The base of the member access.
@@ -68,10 +69,9 @@ public:
   /// \returns A type that refers to the dependent member type, or an error
   /// type if such a reference is ill-formed.
   virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         DeclContext *DC,
                                          AssociatedTypeDecl *assocType) = 0;
 
-  /// Retrieve the type when referring to the given context.
+  /// Resolve the self type within the given context.
   ///
   /// \param dc A context in which type checking occurs, which must be a type
   /// context (i.e., nominal type or extension thereof).
@@ -86,6 +86,9 @@ public:
   ///
   /// \returns the type of the declaration in context..
   virtual Type resolveTypeOfDecl(TypeDecl *decl) = 0;
+
+  /// Set the contextual type or the interface type of the parameter.
+  virtual void recordParamType(ParamDecl *decl, Type ty) = 0;
 };
 
 /// Generic type resolver that leaves all generic types dependent.
@@ -107,12 +110,13 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         DeclContext *DC,
                                          AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that maps a generic type parameter type to its
@@ -121,36 +125,14 @@ public:
 /// This generic type resolver replaces generic type parameter types with their
 /// corresponding archetypes, eliminating all dependent types in the process.
 class GenericTypeToArchetypeResolver : public GenericTypeResolver {
-  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
-
-  virtual Type resolveDependentMemberType(Type baseTy,
-                                          DeclContext *DC,
-                                          SourceRange baseRange,
-                                          ComponentIdentTypeRepr *ref);
-
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         DeclContext *DC,
-                                         AssociatedTypeDecl *assocType);
-
-  virtual Type resolveTypeOfContext(DeclContext *dc);
-
-  virtual Type resolveTypeOfDecl(TypeDecl *decl);
-};
-
-/// Generic type resolver that maps any generic type parameter type that
-/// has an underlying archetype to its corresponding archetype.
-///
-/// This generic type resolver replaces generic type parameter types that
-/// have archetypes with their archetypes, and leaves all other generic
-/// type parameter types unchanged. It is used for the initial type-checks of
-/// generic functions (and other generic declarations).
-///
-/// FIXME: This is not a long-term solution.
-class PartialGenericTypeToArchetypeResolver : public GenericTypeResolver {
-  TypeChecker &TC;
+  GenericEnvironment *GenericEnv;
 
 public:
-  PartialGenericTypeToArchetypeResolver(TypeChecker &tc) : TC(tc) { }
+  explicit GenericTypeToArchetypeResolver(GenericEnvironment *env)
+      : GenericEnv(env) { }
+
+  explicit GenericTypeToArchetypeResolver(DeclContext *dc)
+      : GenericEnv(dc->getGenericEnvironmentOfContext()) { }
 
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
@@ -160,12 +142,13 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         DeclContext *DC,
                                          AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that performs complete resolution of dependent
@@ -191,12 +174,13 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         DeclContext *DC,
                                          AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 } // end namespace swift

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_MSC_VER)
+#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_WIN32)
 #  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
 #else
 #  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
@@ -24,12 +24,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #include <io.h>
 #else
 #include <unistd.h>
 #endif
 #include <stdarg.h>
+#include "ImageInspection.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Basic/Demangle.h"
@@ -38,14 +39,11 @@
 #if !defined(_MSC_VER)
 #include <cxxabi.h>
 #endif
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 // execinfo.h is not available on Android. Checks in this file ensure that
 // fatalError behaves as expected, but without stack traces.
 #include <execinfo.h>
-// We are only using dlfcn.h in code that is invoked on non cygwin/android
-// platforms. So I am putting it here.
-#include <dlfcn.h>
 #endif
 
 #ifdef __APPLE__
@@ -62,29 +60,26 @@ using namespace swift;
 
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 
-static bool getSymbolNameAddr(llvm::StringRef libraryName, Dl_info dlinfo,
+static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
 
   // If we failed to find a symbol and thus dlinfo->dli_sname is nullptr, we
   // need to use the hex address.
-  bool hasUnavailableAddress = dlinfo.dli_sname == nullptr;
+  bool hasUnavailableAddress = syminfo.symbolName == nullptr;
 
-  // If the address is unavailable, just use <unavailable> as the symbol
-  // name. We do not set addrOut, since addrOut will be set to our ptr address.
   if (hasUnavailableAddress) {
-    symbolName += "<unavailable>";
     return false;
   }
 
   // Ok, now we know that we have some sort of "real" name. Set the outAddr.
-  addrOut = uintptr_t(dlinfo.dli_saddr);
+  addrOut = uintptr_t(syminfo.symbolAddress);
 
   // First lets try to demangle using cxxabi. If this fails, we will try to
   // demangle with swift. We are taking advantage of __cxa_demangle actually
   // providing failure status instead of just returning the original string like
   // swift demangle.
   int status;
-  char *demangled = abi::__cxa_demangle(dlinfo.dli_sname, 0, 0, &status);
+  char *demangled = abi::__cxa_demangle(syminfo.symbolName, 0, 0, &status);
   if (status == 0) {
     assert(demangled != nullptr && "If __cxa_demangle succeeds, demangled "
                                    "should never be nullptr");
@@ -98,7 +93,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, Dl_info dlinfo,
   // Otherwise, try to demangle with swift. If swift fails to demangle, it will
   // just pass through the original output.
   symbolName = demangleSymbolAsString(
-      dlinfo.dli_sname, strlen(dlinfo.dli_sname),
+      syminfo.symbolName, strlen(syminfo.symbolName),
       Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
   return true;
 }
@@ -106,19 +101,16 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, Dl_info dlinfo,
 /// This function dumps one line of a stack trace. It is assumed that \p address
 /// is the address of the stack frame at index \p index.
 static void dumpStackTraceEntry(unsigned index, void *framePC) {
-  Dl_info dlinfo;
+  SymbolInfo syminfo;
 
-  // 0 is failure for dladdr. We do not use nullptr since it is an int
-  // argument. This violates normal unix patterns. See man page for dladdr on OS
-  // X.
-  if (0 == dladdr(framePC, &dlinfo)) {
+  // 0 is failure for lookupSymbol
+  if (0 == lookupSymbol(framePC, &syminfo)) {
     return;
   }
 
-  // According to the man page of dladdr, if dladdr returns non-zero, then we
-  // know that it must have fname, fbase set. Thus, we find the library name
-  // here.
-  StringRef libraryName = StringRef(dlinfo.dli_fname).rsplit('/').second;
+  // If lookupSymbol succeeded then fileName is non-null. Thus, we find the
+  // library name here.
+  StringRef libraryName = StringRef(syminfo.fileName).rsplit('/').second;
 
   // Next we get the symbol name that we are going to use in our backtrace.
   std::string symbolName;
@@ -127,17 +119,26 @@ static void dumpStackTraceEntry(unsigned index, void *framePC) {
   // we just get HexAddr + 0.
   uintptr_t symbolAddr = uintptr_t(framePC);
   bool foundSymbol =
-      getSymbolNameAddr(libraryName, dlinfo, symbolName, symbolAddr);
+      getSymbolNameAddr(libraryName, syminfo, symbolName, symbolAddr);
 
   // We do not use %p here for our pointers since the format is implementation
   // defined. This makes it logically impossible to check the output. Forcing
   // hexadecimal solves this issue.
-  static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx %s + %td\n";
-
-  // Then dump the backtrace.
-  fprintf(stderr, backtraceEntryFormat, index, libraryName.data(),
-          foundSymbol ? symbolAddr : uintptr_t(framePC), symbolName.c_str(),
-          ptrdiff_t(uintptr_t(framePC) - symbolAddr));
+  // If the symbol is not available, we print out <unavailable> + offset
+  // from the base address of where the image containing framePC is mapped.
+  // This gives enough info to reconstruct identical debugging target after
+  // this process terminates.
+  if (foundSymbol) {
+    static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx %s + %td\n";
+    fprintf(stderr, backtraceEntryFormat, index, libraryName.data(), symbolAddr,
+            symbolName.c_str(), ptrdiff_t(uintptr_t(framePC) - symbolAddr));
+  } else {
+    static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx "
+                                              "<unavailable> + %td\n";
+    fprintf(stderr, backtraceEntryFormat, index, libraryName.data(),
+            uintptr_t(framePC),
+            ptrdiff_t(uintptr_t(framePC) - uintptr_t(syminfo.baseAddress)));
+  }
 }
 
 #endif
@@ -197,14 +198,14 @@ reportOnCrash(uint32_t flags, const char *message)
 static void
 reportNow(uint32_t flags, const char *message)
 {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, message, strlen(message));
 #else
   write(STDERR_FILENO, message, strlen(message));
 #endif
 #ifdef __APPLE__
-  asl_log(NULL, NULL, ASL_LEVEL_ERR, "%s", message);
+  asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #endif
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   if (flags & FatalErrorFlags::ReportBacktrace) {
@@ -229,14 +230,14 @@ void swift::swift_reportError(uint32_t flags,
 }
 
 static int swift_vasprintf(char **strp, const char *fmt, va_list ap) {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   int len = _vscprintf(fmt, ap);
   if (len < 0)
     return -1;
   char *buffer = reinterpret_cast<char *>(malloc(len + 1));
   if (!buffer)
     return -1;
-  int result = vsprintf(*strp, fmt, ap);
+  int result = vsprintf(buffer, fmt, ap);
   if (result < 0) {
     free(buffer);
     return -1;

@@ -26,3 +26,11 @@
 
 @implementation APPManufacturerInfo
 @end
+
+@implementation APPBroken
+
+- (id _Nonnull)thing {
+  return (id _Nonnull)nil;
+}
+
+@end

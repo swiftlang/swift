@@ -1,32 +1,32 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=SWIFT_COMPLETIONS | FileCheck %s -check-prefix=SWIFT_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=SWIFT_COMPLETIONS | %FileCheck %s -check-prefix=SWIFT_COMPLETIONS
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FW_UNQUAL_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_FOO_HELPER < %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_FOO_HELPER_SUB < %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_BOTH_FOO_BAR < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_FOO_HELPER < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_FOO_HELPER_SUB < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_BOTH_FOO_BAR < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_FOO_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_QUAL_FOO_NEGATIVE < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_QUAL_FOO_NEGATIVE < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_BAR_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_QUAL_BAR_1 < %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_QUAL_BAR_NEGATIVE < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_QUAL_BAR_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_QUAL_BAR_NEGATIVE < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_FOO_2 | FileCheck %s -check-prefix=CLANG_QUAL_FOO_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_FOO_2 | %FileCheck %s -check-prefix=CLANG_QUAL_FOO_2
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FUNCTION_CALL_1 | FileCheck %s -check-prefix=FUNCTION_CALL_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FUNCTION_CALL_2 | FileCheck %s -check-prefix=FUNCTION_CALL_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FUNCTION_CALL_1 | %FileCheck %s -check-prefix=FUNCTION_CALL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FUNCTION_CALL_2 | %FileCheck %s -check-prefix=FUNCTION_CALL_2
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_STRUCT_MEMBERS_1 | FileCheck %s -check-prefix=CLANG_STRUCT_MEMBERS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_CLASS_MEMBERS_1 | FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_CLASS_MEMBERS_2 | FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_INSTANCE_MEMBERS_1 | FileCheck %s -check-prefix=CLANG_INSTANCE_MEMBERS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_STRUCT_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_STRUCT_MEMBERS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_CLASS_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_CLASS_MEMBERS_2 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_INSTANCE_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_INSTANCE_MEMBERS_1
 
 // XFAIL: linux
 
@@ -123,7 +123,7 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_BAR: End completions
 
 // CLANG_BOTH_FOO_BAR: Begin completions
-// CLANG_BOTH_FOO_BAR-DAG: Decl[FreeFunction]/OtherModule[Bar]: redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_BOTH_FOO_BAR-DAG: Decl[FreeFunction]/OtherModule[{{(Foo|Bar)}}]: redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_BOTH_FOO_BAR: End completions
 
 // CLANG_QUAL_FOO_NEGATIVE-NOT: bar
@@ -131,7 +131,7 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_QUAL_FOO_NEGATIVE-NOT: BAR
 
 // CLANG_QUAL_BAR_NEGATIVE-NOT: foo
-// CLANG_QUAL_BAR_NEGATIVE-NOT: Foo
+// CLANG_QUAL_BAR_NEGATIVE-NOT: :{{.*}}Foo
 // CLANG_QUAL_BAR_NEGATIVE-NOT: FOO
 
 func testClangModule() {
@@ -169,7 +169,7 @@ func testCompleteModuleQualifiedFoo2() {
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[FooHelper]: .fooHelperFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[FooHelper.FooHelperSub]: .fooHelperSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo.FooSub]: .fooSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Bar]: .redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[{{(Foo|Bar)}}]: .redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .theLastDeclInFoo()[#Void#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_1[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_2[#Int32#]{{; name=.+$}}

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -23,37 +23,42 @@
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
-#endif
+#include "swift/Runtime/Metadata.h"
 
-// SwiftValue is an Objective-C class, but we shouldn't interface with it
+// _SwiftValue is an Objective-C class, but we shouldn't interface with it
 // directly as such. Keep the type opaque.
 #if __OBJC__
-@class SwiftValue;
+@class _SwiftValue;
 #else
-typedef struct SwiftValue SwiftValue;
+typedef struct _SwiftValue _SwiftValue;
 #endif
 
 namespace swift {
 
-/// Bridge a Swift value to an Objective-C object by boxing it as a SwiftValue.
-SwiftValue *bridgeAnythingToSwiftValueObject(OpaqueValue *src,
-                                             const Metadata *srcType,
-                                             bool consume);
+/// Bridge a Swift value to an Objective-C object by boxing it as a _SwiftValue.
+_SwiftValue *bridgeAnythingToSwiftValueObject(OpaqueValue *src,
+                                              const Metadata *srcType,
+                                              bool consume);
 
 /// Get the type metadata for a value in a Swift box.
-const Metadata *getSwiftValueTypeMetadata(SwiftValue *v);
+const Metadata *getSwiftValueTypeMetadata(_SwiftValue *v);
 
 /// Get the value out of a Swift box along with its type metadata. The value
 /// inside the box is immutable and must not be modified or taken from the box.
 std::pair<const Metadata *, const OpaqueValue *>
-getValueFromSwiftValue(SwiftValue *v);
+getValueFromSwiftValue(_SwiftValue *v);
 
-#if SWIFT_OBJC_INTEROP
-/// Return the object reference as a SwiftValue* if it is a SwiftValue instance,
+/// Return the object reference as a _SwiftValue* if it is a _SwiftValue instance,
 /// or nil if it is not.
-SwiftValue *getAsSwiftValue(id object);
-#endif
+_SwiftValue *getAsSwiftValue(id object);
 
-}
+/// Find conformances for SwiftValue to the given list of protocols.
+///
+/// Returns true if SwiftValue does conform to all the protocols.
+bool findSwiftValueConformances(const ProtocolDescriptorList &protocols,
+                                const WitnessTable **tablesBuffer);
+
+} // namespace swift
+#endif
 
 #endif

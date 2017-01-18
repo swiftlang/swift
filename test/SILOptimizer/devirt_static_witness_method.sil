@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -18,7 +18,7 @@ struct S<T> : CanAdd {
 func +<T>(lhs: S<T>, rhs: S<T>) -> S<T>
 
 
-sil hidden [transparent] [thunk] @operator_plus_static_non_generic_witness_for_S : $@convention(thin) <T where T : CanAdd> (@in S<T>, @in S<T>, @thick S<T>.Type) -> @out S<T> {
+sil hidden [transparent] [thunk] @operator_plus_static_non_generic_witness_for_S : $@convention(witness_method) <T> (@in S<T>, @in S<T>, @thick S<T>.Type) -> @out S<T> {
 bb0(%0 : $*S<T>, %1 : $*S<T>, %2 : $*S<T>, %3 : $@thick S<T>.Type) :
   %17 = tuple ()
   return %17 : $()
@@ -54,21 +54,21 @@ bb0:
 
 // Test that this partial application of witness_method can be devirtualized.
 // CHECK-LABEL: sil hidden @test_devirt_of_partial_apply_of_witness_method
-// CHECK-NOT: witness_method $S<Int64>, #CanAdd."+"!1 
+// CHECK-NOT: witness_method $S<Int64>, #CanAdd."+"!1
 // CHECK: function_ref @operator_plus_static_non_generic_witness_for_S
 // CHECK: partial_apply
 // CHECK: return
 sil hidden @test_devirt_of_partial_apply_of_witness_method : $@convention(thin) () -> @callee_owned (@in S<Int64>, @in S<Int64>) -> @out S<Int64> {
 bb0:
   %1 = metatype $@thick S<Int64>.Type
-  %2 = witness_method $S<Int64>, #CanAdd."+"!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : CanAdd> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0 
+  %2 = witness_method $S<Int64>, #CanAdd."+"!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : CanAdd> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
   %3 = partial_apply %2<S<Int64>>(%1) : $@convention(witness_method) <τ_0_0 where τ_0_0 : CanAdd> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
   return %3 : $@callee_owned (@in S<Int64>, @in S<Int64>) -> @out S<Int64>
 }
 
 // Test that this application of witness_method can be devirtualized.
 // CHECK-LABEL: sil hidden @test_devirt_of_apply_of_witness_method
-// CHECK-NOT: witness_method $S<Int64>, #CanAdd."+"!1 
+// CHECK-NOT: witness_method $S<Int64>, #CanAdd."+"!1
 // CHECK: function_ref @operator_plus_static_non_generic_witness_for_S
 // CHECK: apply
 // CHECK: return

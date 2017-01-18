@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -440,8 +440,8 @@ private:
   /// order of the given function.
   PostOrderFunctionInfo *PO;
 
-  /// The epilogue release matcher we are using.
-  ConsumedArgToEpilogueReleaseMatcher& ERM;
+  /// Epilogue release analysis.
+  EpilogueARCFunctionInfo *EAFI;
 
   /// Keeps all the locations for the current function. The BitVector in each
   /// BlockState is then laid on top of it to keep track of which LSLocation
@@ -480,7 +480,7 @@ private:
 public:
   RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
              TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-             ConsumedArgToEpilogueReleaseMatcher &ERM);
+             EpilogueARCFunctionInfo *EAFI);
 
   RLEContext(const RLEContext &) = delete;
   RLEContext(RLEContext &&) = default;
@@ -488,8 +488,6 @@ public:
 
   /// Entry point to redundant load elimination.
   bool run();
-
-  ConsumedArgToEpilogueReleaseMatcher &getERM() const { return ERM; };
 
   /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
@@ -516,6 +514,9 @@ public:
 
   /// Returns the current type expansion analysis we are .
   TypeExpansionAnalysis *getTE() const { return TE; }
+
+  /// Returns current epilogue release function info we are using.
+  EpilogueARCFunctionInfo *getEAFI() const { return EAFI; }
 
   /// Returns the SILValue base to bit index.
   LSLocationBaseMap &getBM() { return BaseToLocIndex; }
@@ -584,7 +585,7 @@ void BlockState::mergePredecessorsAvailSetMax(RLEContext &Ctx) {
 
 void BlockState::mergePredecessorAvailSet(RLEContext &Ctx) {
   // Clear the state if the basic block has no predecessor.
-  if (BB->getPreds().begin() == BB->getPreds().end()) {
+  if (BB->getPredecessorBlocks().begin() == BB->getPredecessorBlocks().end()) {
     ForwardSetIn.reset();
     return;
   }
@@ -599,7 +600,7 @@ void BlockState::mergePredecessorAvailSet(RLEContext &Ctx) {
 
 void BlockState::mergePredecessorAvailSetAndValue(RLEContext &Ctx) {
   // Clear the state if the basic block has no predecessor.
-  if (BB->getPreds().begin() == BB->getPreds().end()) {
+  if (BB->getPredecessorBlocks().begin() == BB->getPredecessorBlocks().end()) {
     ForwardSetIn.reset();
     ForwardValIn.clear();
     return;
@@ -968,7 +969,7 @@ void BlockState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I,
                                          RLEKind Kind) {
   // If this is a release on a guaranteed parameter, it can not call deinit,
   // which might read or write memory.
-  if (isIntermediateRelease(I, Ctx.getERM()))
+  if (isIntermediateRelease(I, Ctx.getEAFI()))
     return;
 
   // Are we computing the genset and killset ?
@@ -1095,7 +1096,7 @@ getProcessFunctionKind(unsigned LoadCount, unsigned StoreCount) {
   llvm::DenseSet<SILBasicBlock *> HandledBBs;
   for (SILBasicBlock *B : PO->getReversePostOrder()) {
     ++BBCount;
-    for (auto X : B->getPreds()) {
+    for (auto X : B->getPredecessorBlocks()) {
       if (HandledBBs.find(X) == HandledBBs.end()) {
         RunOneIteration = false;
         break;
@@ -1126,8 +1127,8 @@ getProcessFunctionKind(unsigned LoadCount, unsigned StoreCount) {
 
 RLEContext::RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
                        TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-                       ConsumedArgToEpilogueReleaseMatcher &ERM)
-    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), ERM(ERM) {
+                       EpilogueARCFunctionInfo *EAFI)
+    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI) {
 }
 
 LSLocation &RLEContext::getLocation(const unsigned index) {
@@ -1198,7 +1199,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
   llvm::SmallVector<SILBasicBlock *, 8> WorkList;
 
   // Push in all the predecessors to get started.
-  for (auto Pred : BB->getPreds()) {
+  for (auto Pred : BB->getPredecessorBlocks()) {
     WorkList.push_back(Pred);
   }
 
@@ -1229,7 +1230,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     // This BlockState does not contain concrete value for any of the expanded
     // locations, collect in this block's predecessors.
     if (Forwarder.isCoverValues(*this, L)) {
-      for (auto Pred : CurBB->getPreds()) {
+      for (auto Pred : CurBB->getPredecessorBlocks()) {
         if (HandledBBs.find(Pred) != HandledBBs.end())
           continue;
         WorkList.push_back(Pred);
@@ -1543,11 +1544,9 @@ class RedundantLoadElimination : public SILFunctionTransform {
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
-    auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
+    auto *EAFI = PM->getAnalysis<EpilogueARCAnalysis>()->get(F);
 
-    ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F);
-
-    RLEContext RLE(F, PM, AA, TE, PO, ERM);
+    RLEContext RLE(F, PM, AA, TE, PO, EAFI);
     if (RLE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

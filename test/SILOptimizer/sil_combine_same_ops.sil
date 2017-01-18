@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // Test optimization of various builtins which receive the same value in their first and second operand.
 
@@ -7,7 +7,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
-// CHECK-LABEL: sil @tst_ssub 
+// CHECK-LABEL: sil @tst_ssub
 // CHECK: %1 = integer_literal $Builtin.Int32, 0
 // CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
@@ -23,7 +23,7 @@ bb0(%0 : $Int32):
   return %7 : $Int32
 }
 
-// CHECK-LABEL: sil @tst_usub 
+// CHECK-LABEL: sil @tst_usub
 // CHECK: %1 = integer_literal $Builtin.Int32, 0
 // CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
 // CHECK: return %2
@@ -39,7 +39,7 @@ bb0(%0 : $UInt32):
   return %7 : $UInt32
 }
 
-// CHECK-LABEL: sil @tst_sdiv 
+// CHECK-LABEL: sil @tst_sdiv
 // CHECK: %1 = integer_literal $Builtin.Int32, 1
 // CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
@@ -52,7 +52,7 @@ bb0(%0 : $Int32):
   return %4 : $Int32
 }
 
-// CHECK-LABEL: sil @tst_udiv 
+// CHECK-LABEL: sil @tst_udiv
 // CHECK: %1 = integer_literal $Builtin.Int32, 1
 // CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
 // CHECK: return %2
@@ -65,7 +65,7 @@ bb0(%0 : $UInt32):
   return %4 : $UInt32
 }
 
-// CHECK-LABEL: sil @tst_srem 
+// CHECK-LABEL: sil @tst_srem
 // CHECK: %1 = integer_literal $Builtin.Int32, 0
 // CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
@@ -78,7 +78,7 @@ bb0(%0 : $Int32):
   return %4 : $Int32
 }
 
-// CHECK-LABEL: sil @tst_urem 
+// CHECK-LABEL: sil @tst_urem
 // CHECK: %1 = integer_literal $Builtin.Int32, 0
 // CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
 // CHECK: return %2
@@ -91,7 +91,7 @@ bb0(%0 : $UInt32):
   return %4 : $UInt32
 }
 
-// CHECK-LABEL: sil @tst_and 
+// CHECK-LABEL: sil @tst_and
 // CHECK: return %0
 sil @tst_and : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
@@ -101,7 +101,7 @@ bb0(%0 : $Int32):
   return %3 : $Int32
 }
 
-// CHECK-LABEL: sil @tst_or 
+// CHECK-LABEL: sil @tst_or
 // CHECK: return %0
 sil @tst_or : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
@@ -111,7 +111,7 @@ bb0(%0 : $Int32):
   return %3 : $Int32
 }
 
-// CHECK-LABEL: sil @tst_xor 
+// CHECK-LABEL: sil @tst_xor
 // CHECK: %1 = integer_literal $Builtin.Int32, 0
 // CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
@@ -123,7 +123,7 @@ bb0(%0 : $Int32):
   return %3 : $Int32
 }
 
-// CHECK-LABEL: sil @tst_icmp_eq 
+// CHECK-LABEL: sil @tst_icmp_eq
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -135,7 +135,7 @@ bb0(%0 : $Int32):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_icmp_ne 
+// CHECK-LABEL: sil @tst_icmp_ne
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -147,7 +147,7 @@ bb0(%0 : $Int32):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_icmp_sle 
+// CHECK-LABEL: sil @tst_icmp_sle
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -159,7 +159,7 @@ bb0(%0 : $Int32):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_icmp_sge 
+// CHECK-LABEL: sil @tst_icmp_sge
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -171,7 +171,7 @@ bb0(%0 : $Int32):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_icmp_slt 
+// CHECK-LABEL: sil @tst_icmp_slt
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -183,7 +183,7 @@ bb0(%0 : $Int32):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_icmp_sgt 
+// CHECK-LABEL: sil @tst_icmp_sgt
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -195,7 +195,7 @@ bb0(%0 : $Int32):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_icmp_ule 
+// CHECK-LABEL: sil @tst_icmp_ule
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -207,7 +207,7 @@ bb0(%0 : $UInt32):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_icmp_uge 
+// CHECK-LABEL: sil @tst_icmp_uge
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -219,7 +219,7 @@ bb0(%0 : $UInt32):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_icmp_ult 
+// CHECK-LABEL: sil @tst_icmp_ult
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -231,7 +231,7 @@ bb0(%0 : $UInt32):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_icmp_ugt 
+// CHECK-LABEL: sil @tst_icmp_ugt
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -243,7 +243,7 @@ bb0(%0 : $UInt32):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_fcmp_ueq 
+// CHECK-LABEL: sil @tst_fcmp_ueq
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -255,7 +255,7 @@ bb0(%0 : $Float):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_fcmp_one 
+// CHECK-LABEL: sil @tst_fcmp_one
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -267,7 +267,7 @@ bb0(%0 : $Float):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_fcmp_ule 
+// CHECK-LABEL: sil @tst_fcmp_ule
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
@@ -279,7 +279,7 @@ bb0(%0 : $Float):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @tst_fcmp_uge 
+// CHECK-LABEL: sil @tst_fcmp_uge
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2

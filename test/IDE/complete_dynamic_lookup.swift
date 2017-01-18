@@ -6,60 +6,60 @@
 // RUN: cp %S/Inputs/AnyObject/module.map %t
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_PARAM_NO_DOT_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_PARAM_DOT_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_VAR_NO_DOT_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_VAR_DOT_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_RETURN_VAL_NO_DOT_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_RETURN_VAL_DOT_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CALL_RETURN_VAL_NO_DOT_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=TLOC_MEMBERS_NO_DOT < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=TLOC_MEMBERS_NO_DOT < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CALL_RETURN_VAL_DOT_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=TLOC_MEMBERS_DOT < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=TLOC_MEMBERS_DOT < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_NAME_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_FUNC_NAME_1 < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_FUNC_NAME_1 < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_NAME_PAREN_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_FUNC_NAME_PAREN_1 < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_FUNC_NAME_PAREN_1 < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_NAME_DOT_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_FUNC_NAME_DOT_1 < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_FUNC_NAME_DOT_1 < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_NAME_BANG_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_FUNC_NAME_BANG_1 < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_FUNC_NAME_BANG_1 < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CLASS_NO_DOT_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_CLASS_NO_DOT < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_CLASS_NO_DOT < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CLASS_DOT_1 > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_CLASS_DOT < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=DL_CLASS_DOT < %t.dl.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
 // REQUIRES: objc_interop
 
@@ -208,7 +208,7 @@ protocol Bar { func bar() }
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[baz_clang_module]:   baz_Class_ClassFunc1()[#Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Class_InstanceFunc1({#self: Baz_Class#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[baz_clang_module]:   baz_Protocol_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Protocol_InstanceFunc1({#self: AnyObject.Type#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Protocol_InstanceFunc1({#self: Self#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   foo_Nested1_ObjcClassFunc1()[#Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_Nested1_ObjcInstanceFunc1({#self: Foo_ContainerForNestedClass1.Foo_Nested1#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   foo_Nested2_ObjcClassFunc1()[#Void#]{{; name=.+$}}
@@ -218,7 +218,7 @@ protocol Bar { func bar() }
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   foo_TopLevelObjcClass_ClassFunc1()[#Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_TopLevelObjcClass_InstanceFunc1({#self: Foo_TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   foo_TopLevelObjcProtocol_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_TopLevelObjcProtocol_InstanceFunc1({#self: AnyObject.Type#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_TopLevelObjcProtocol_InstanceFunc1({#self: Self#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     nested1_ObjcClassFunc1()[#Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   nested1_ObjcInstanceFunc1({#self: ContainerForNestedClass1.Nested1#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     nested2_ObjcClassFunc1()[#Void#]{{; name=.+$}}
@@ -229,7 +229,7 @@ protocol Bar { func bar() }
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     topLevelObjcClass_ClassFunc1()[#Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelObjcClass_InstanceFunc1({#self: TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     topLevelObjcProtocol_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelObjcProtocol_InstanceFunc1({#self: AnyObject.Type#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelObjcProtocol_InstanceFunc1({#self: Self#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT: End completions
 
 // TLOC_MEMBERS_NO_DOT: Begin completions

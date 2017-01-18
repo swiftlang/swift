@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -43,10 +43,6 @@ internal protocol _ArrayProtocol
   /// - Complexity: O(`self.count`).
   mutating func reserveCapacity(_ minimumCapacity: Int)
 
-  /// Operator form of `append(contentsOf:)`.
-  static func += <S : Sequence>(lhs: inout Self, rhs: S)
-    where S.Iterator.Element == Iterator.Element
-
   /// Insert `newElement` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
@@ -60,7 +56,7 @@ internal protocol _ArrayProtocol
   ///
   /// - returns: The removed element.
   ///
-  /// - Complexity: Worst case O(N).
+  /// - Complexity: Worst case O(*n*).
   ///
   /// - Precondition: `count > index`.
   @discardableResult

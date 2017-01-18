@@ -2,15 +2,15 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftShims
+import _SwiftDispatchOverlayShims
 
 public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public typealias Iterator = DispatchDataIterator
@@ -31,8 +31,8 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 
 		fileprivate var _deallocator: (DispatchQueue?, @convention(block) () -> Void) {
 			switch self {
-			case .free: return (nil, _dispatch_data_destructor_free())
-			case .unmap: return (nil, _dispatch_data_destructor_munmap())
+			case .free: return (nil, _swift_dispatch_data_destructor_free())
+			case .unmap: return (nil, _swift_dispatch_data_destructor_munmap())
 			case .custom(let q, let b): return (q, b)
 			}
 		}
@@ -46,7 +46,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter count: The number of bytes to copy.
 	public init(bytes buffer: UnsafeBufferPointer<UInt8>) {
 		__wrapped = _swift_dispatch_data_create(
-			buffer.baseAddress!, buffer.count, nil, _dispatch_data_destructor_default()) as! __DispatchData
+			buffer.baseAddress!, buffer.count, nil, _swift_dispatch_data_destructor_default()) as! __DispatchData
 	}
 
 	/// Initialize a `Data` without copying the bytes.
@@ -72,7 +72,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public func withUnsafeBytes<Result, ContentType>(
 		body: (UnsafePointer<ContentType>) throws -> Result) rethrows -> Result
 	{
-		var ptr: UnsafeRawPointer? = nil
+		var ptr: UnsafeRawPointer?
 		var size = 0
 		let data = __dispatch_data_create_map(__wrapped, &ptr, &size)
         let contentPtr = ptr!.bindMemory(
@@ -82,7 +82,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	}
 
 	public func enumerateBytes(
-		block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Int, _ stop: inout Bool) -> Void) 
+		block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Int, _ stop: inout Bool) -> Void)
 	{
 		_swift_dispatch_data_apply(__wrapped) { (_, offset: Int, ptr: UnsafeRawPointer, size: Int) in
             let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: size)
@@ -98,7 +98,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter bytes: A pointer to the bytes to copy in to the data.
 	/// - parameter count: The number of bytes to copy.
 	public mutating func append(_ bytes: UnsafePointer<UInt8>, count: Int) {
-		let data = _swift_dispatch_data_create(bytes, count, nil, _dispatch_data_destructor_default()) as! __DispatchData
+		let data = _swift_dispatch_data_create(bytes, count, nil, _swift_dispatch_data_destructor_default()) as! __DispatchData
 		self.append(DispatchData(data: data))
 	}
 
@@ -121,7 +121,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 
 	private func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: CountableRange<Index>) {
 		var copiedCount = 0
-		__dispatch_data_apply(__wrapped) { (data: __DispatchData, offset: Int, ptr: UnsafeRawPointer, size: Int) in
+		__dispatch_data_apply(__wrapped) { (_, _, ptr: UnsafeRawPointer, size: Int) in
 			let limit = Swift.min((range.endIndex - range.startIndex) - copiedCount, size)
 			memcpy(pointer + copiedCount, ptr, limit)
 			copiedCount += limit
@@ -137,7 +137,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, count: Int) {
 		_copyBytesHelper(to: pointer, from: 0..<count)
 	}
-		
+
 	/// Copy a subset of the contents of the data to a pointer.
 	///
 	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into.
@@ -146,7 +146,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, from range: CountableRange<Index>) {
 		_copyBytesHelper(to: pointer, from: range)
 	}
-	
+
 	/// Copy the contents of the data into a buffer.
 	///
 	/// This function copies the bytes in `range` from the data into the buffer. If the count of the `range` is greater than `MemoryLayout<DestinationType>.stride * buffer.count` then the first N bytes will be copied into the buffer.
@@ -157,23 +157,23 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public func copyBytes<DestinationType>(to buffer: UnsafeMutableBufferPointer<DestinationType>, from range: CountableRange<Index>? = nil) -> Int {
 		let cnt = count
 		guard cnt > 0 else { return 0 }
-		
+
 		let copyRange : CountableRange<Index>
 		if let r = range {
 			guard !r.isEmpty else { return 0 }
 			precondition(r.startIndex >= 0)
 			precondition(r.startIndex < cnt, "The range is outside the bounds of the data")
-			
+
 			precondition(r.endIndex >= 0)
 			precondition(r.endIndex <= cnt, "The range is outside the bounds of the data")
-			
+
 			copyRange = r.startIndex..<(r.startIndex + Swift.min(buffer.count * MemoryLayout<DestinationType>.stride, r.count))
 		} else {
 			copyRange = 0..<Swift.min(buffer.count * MemoryLayout<DestinationType>.stride, cnt)
 		}
-		
+
 		guard !copyRange.isEmpty else { return 0 }
-		
+
 		_copyBytesHelper(to: buffer.baseAddress!, from: copyRange)
 		return copyRange.count
 	}
@@ -183,7 +183,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 		var offset = 0
 		let subdata = __dispatch_data_copy_region(__wrapped, index, &offset)
 
-		var ptr: UnsafeRawPointer? = nil
+		var ptr: UnsafeRawPointer?
 		var size = 0
 		let map = __dispatch_data_create_map(subdata, &ptr, &size)
 		defer { _fixLifetime(map) }
@@ -280,21 +280,8 @@ extension DispatchData {
 	}
 
 	public static func _unconditionallyBridgeFromObjectiveC(_ source: __DispatchData?) -> DispatchData {
-		var result: DispatchData? = nil
+		var result: DispatchData?
 		_forceBridgeFromObjectiveC(source!, result: &result)
 		return result!
 	}
 }
-
-@_silgen_name("_swift_dispatch_data_empty")
-internal func _swift_dispatch_data_empty() -> __DispatchData
-
-@_silgen_name("_swift_dispatch_data_destructor_free")
-internal func _dispatch_data_destructor_free() -> _DispatchBlock
-
-@_silgen_name("_swift_dispatch_data_destructor_munmap")
-internal func _dispatch_data_destructor_munmap() -> _DispatchBlock
-
-@_silgen_name("_swift_dispatch_data_destructor_default")
-internal func _dispatch_data_destructor_default() -> _DispatchBlock
-

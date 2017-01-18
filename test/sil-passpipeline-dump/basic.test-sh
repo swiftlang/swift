@@ -1,0 +1,15 @@
+// RUN: %sil-passpipeline-dumper -Onone | %FileCheck %s
+// RUN: %sil-passpipeline-dumper -Onone | python -c 'import json; import sys; json.load(sys.stdin)'
+
+// CHECK: [
+// CHECK:     [
+// CHECK:         "Prespecialization",
+// CHECK-NEXT:         ["UsePrespecialized","use-prespecialized"]
+// CHECK:     ],
+// CHECK:     [
+// CHECK:         "Rest of Onone",
+// CHECK-NEXT:         ["ExternalDefsToDecls","external-defs-to-decls"],
+// CHECK-NEXT:         ["AssumeSingleThreaded","sil-assume-single-threaded"],
+// CHECK-NEXT:         ["SILDebugInfoGenerator","sil-debuginfo-gen"]
+// CHECK:     ]
+// CHECK: ]

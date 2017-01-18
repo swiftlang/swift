@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O %s -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend -O %s -emit-sil | %FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances.
@@ -173,7 +173,7 @@ public func testCompareEquals() -> Bool {
 
 
 
-// Check that  acall of inherited Simple.== can be devirtualized.
+// Check that a call of inherited Simple.== can be devirtualized.
 // CHECK-LABEL: sil @_TF28devirt_inherited_conformance20testCompareMinMinMinFT_Sb : $@convention(thin) () -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1

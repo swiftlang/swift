@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 class B { }
 class D : B { }
@@ -70,7 +70,7 @@ struct S : P {}
 // CHECK:   checked_cast_addr_br take_always P in [[COPY]] : $*P to S in [[TMP]] : $*S, bb1, bb2
 //   Success block.
 // CHECK: bb1:
-// CHECK:   [[T0:%.*]] = load [[TMP]] : $*S
+// CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*S
 // CHECK:   [[T1:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, [[T0]] : $S
 // CHECK:   dealloc_stack [[TMP]]
 // CHECK:   br bb3([[T1]] : $Optional<S>)

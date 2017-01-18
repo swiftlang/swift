@@ -1,6 +1,6 @@
-// RUN: rm -rf %t  &&  mkdir %t
+// RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: %target-build-swift %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 enum Singleton {
@@ -440,7 +440,7 @@ struct OptionalTuple<T> {
   }
 }
 func test_optional_generic_tuple<T>(_ a: OptionalTuple<T>) -> T {
-  print("optional pair is same size as pair: \(MemoryLayout._ofInstance(a).size == MemoryLayout<T>.size*2)")
+  print("optional pair is same size as pair: \(MemoryLayout.size(ofValue: a) == MemoryLayout<T>.size*2)")
   return a.value!.0
 }
 print("Int result: \(test_optional_generic_tuple(OptionalTuple<Int>((5, 6))))")
@@ -467,13 +467,13 @@ print((NoPayload.x as NoPayload?) == NoPayload.y)
 class Foo {}
 
 struct Oof {
-  weak var foo: Foo? = nil
+  weak var foo: Foo?
 }
 
 protocol Boo {}
 
 struct Goof {
-  var boo: Boo? = nil
+  var boo: Boo?
 }
 
 let oofs = [Oof()]

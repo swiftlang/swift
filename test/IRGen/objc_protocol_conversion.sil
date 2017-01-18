@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -I %t %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -29,7 +29,8 @@ entry:
 // CHECK-LABEL: define{{( protected)?}} %swift.type* @protocol_metatype()
 sil @protocol_metatype : $@convention(thin) () -> @thick Protocol.Type {
 entry:
-  // CHECK: call %swift.type* @swift_getForeignTypeMetadata
+  // CHECK: call %objc_class* @objc_lookUpClass
+  // CHECK: call %swift.type* @swift_getObjCClassMetadata
   %t = metatype $@thick Protocol.Type
   return %t : $@thick Protocol.Type
 }

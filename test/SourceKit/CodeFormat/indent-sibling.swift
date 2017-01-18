@@ -99,7 +99,7 @@ class Foo2 {
 // RUN: %sourcekitd-test -req=format -line=65 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=67 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=69 -length=1 %s >>%t.response
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 //                        "  func foo(Value1 : Int,"
 // CHECK: key.sourcetext: "           Value2 : Int) {"

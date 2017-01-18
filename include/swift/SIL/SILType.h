@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -67,7 +67,7 @@ enum class ExistentialRepresentation {
 };
 
 /// The value category.
-enum class SILValueCategory {
+enum class SILValueCategory : uint8_t {
   /// An object is a value of the type.
   Object,
 
@@ -126,14 +126,9 @@ public:
     return SILType(T, SILValueCategory::Address);
   }
 
-  ///  Apply a substitution to the type to produce another lowered SIL type.
-  static SILType substType(SILModule &silModule, ModuleDecl *astModule,
-                           TypeSubstitutionMap &subs, SILType SrcTy);
-
   ///  Apply a substitution to the function type.
   static CanSILFunctionType substFuncType(SILModule &silModule,
-                                          ModuleDecl *astModule,
-                                          TypeSubstitutionMap &subs,
+                                          const SubstitutionMap &subs,
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics);
 
@@ -385,18 +380,15 @@ public:
   static bool canRefCast(SILType operTy, SILType resultTy, SILModule &M);
 
   /// True if the type is block-pointer-compatible, meaning it either is a block
-  /// or is an Optional or ImplicitlyUnwrappedOptional with a block payload.
+  /// or is an Optional with a block payload.
   bool isBlockPointerCompatible() const {
-    CanType ty = getSwiftRValueType();
-    if (auto optPayload = ty->getAnyOptionalObjectType()) {
-      // The object type of Optional<T> is an unlowered AST type.
-      auto fTy = optPayload->getAs<FunctionType>();
-      if (!fTy)
-        return false;
-      return fTy->getRepresentation() == FunctionType::Representation::Block;
+    // Look through one level of optionality.
+    SILType ty = *this;
+    if (auto optPayload = ty.getAnyOptionalObjectType()) {
+      ty = optPayload;
     }
       
-    auto fTy = dyn_cast<SILFunctionType>(ty);
+    auto fTy = ty.getAs<SILFunctionType>();
     if (!fTy)
       return false;
     return fTy->getRepresentation() == SILFunctionType::Representation::Block;
@@ -450,8 +442,7 @@ public:
   SILType substGenericArgs(SILModule &M,
                            ArrayRef<Substitution> Subs) const;
 
-  SILType subst(SILModule &silModule, ModuleDecl *astModule,
-                TypeSubstitutionMap &subs) const;
+  SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
 
   /// If this is a specialized generic type, return all substitutions used to
   /// generate it.
@@ -474,27 +465,21 @@ public:
   /// meaning it cannot be fully destructured in SIL.
   bool aggregateHasUnreferenceableStorage() const;
 
-  /// Returns the lowered type for T if this type is Optional<T> or
-  /// ImplicitlyUnwrappedOptional<T>; otherwise, return the null type.
-  SILType getAnyOptionalObjectType(SILModule &SILMod,
-                                   OptionalTypeKind &OTK) const;
+  /// Returns the lowered type for T if this type is Optional<T>;
+  /// otherwise, return the null type.
+  SILType getAnyOptionalObjectType() const;
 
   /// Unwraps one level of optional type.
-  /// Returns the lowered T if the given type is Optional<T> or IUO<T>.
+  /// Returns the lowered T if the given type is Optional<T>.
   /// Otherwise directly returns the given type.
-  static SILType unwrapAnyOptionalType(SILType Ty, SILModule &SILMod,
-                                       OptionalTypeKind &OTK) {
-    if (auto unwrappedTy = Ty.getAnyOptionalObjectType(SILMod, OTK))
-      return unwrappedTy;
-
-    return Ty;
-  };
-
-  /// Classify this type as an optional type.
-  OptionalTypeKind getOptionalTypeKind() const;
+  SILType unwrapAnyOptionalType() const;
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }
+
+  /// Returns the underlying referent SILType of an @sil_unowned or @sil_weak
+  /// Type.
+  SILType getReferentType(SILModule &M) const;
 
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {
@@ -553,7 +538,6 @@ template<> Can##ID##Type SILType::getAs<ID##Type>() const = delete;  \
 template<> Can##ID##Type SILType::castTo<ID##Type>() const = delete; \
 template<> bool SILType::is<ID##Type>() const = delete;
 NON_SIL_TYPE(Function)
-NON_SIL_TYPE(PolymorphicFunction)
 NON_SIL_TYPE(AnyFunction)
 NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE
@@ -561,6 +545,7 @@ NON_SIL_TYPE(LValue)
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                         Lowering::AbstractionPattern orig,
                         CanAnyFunctionType substInterface,
+                        Optional<SILDeclRef> constant = None,
                         SILDeclRef::Kind kind = SILDeclRef::Kind::Func);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
@@ -601,15 +586,22 @@ inline SILType SILBlockStorageType::getCaptureAddressType() const {
   return SILType::getPrimitiveAddressType(getCaptureType());
 }
 
-inline SILType SILBoxType::getBoxedAddressType() const {
-  return SILType::getPrimitiveAddressType(getBoxedType());
-}
-
 /// The hash of a SILType is the hash of its opaque value.
 static inline llvm::hash_code hash_value(SILType V) {
   return llvm::hash_value(V.getOpaqueValue());
 }
-  
+
+inline SILType SILBoxType::getFieldType(SILModule &M, unsigned index) const {
+  return SILType::getPrimitiveAddressType(getFieldLoweredType(M, index));
+}
+
+inline SILType SILField::getAddressType() const {
+  return SILType::getPrimitiveAddressType(getLoweredType());
+}
+inline SILType SILField::getObjectType() const {
+  return SILType::getPrimitiveObjectType(getLoweredType());
+}
+
 } // end swift namespace
 
 namespace llvm {

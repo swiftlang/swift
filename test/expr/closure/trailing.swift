@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 @discardableResult
 func takeFunc(_ f: (Int) -> Int) -> Int {}
@@ -84,7 +84,7 @@ func labeledArgumentAndTrailingClosure() {
 
   // Trailing closure binds to last parameter, always.
  takeTwoFuncsWithDefaults { "Hello, " + $0 }
-  takeTwoFuncsWithDefaults { $0 + 1 } // expected-error {{cannot convert value of type '(_) -> Int' to expected argument type '((String) -> String)?'}} 
+  takeTwoFuncsWithDefaults { $0 + 1 } // expected-error {{cannot convert value of type '(Int) -> Int' to expected argument type '((String) -> String)?'}} 
   takeTwoFuncsWithDefaults(f1: {$0 + 1 })
 }
 
@@ -179,4 +179,72 @@ func r23036383(foo: Foo23036383?, obj: Foo23036383) {
   if let _ = maybeInt { 1 }, retBool { 1 } { }
   // expected-error@-1 {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{28-28=)}} 
   // expected-error@-2 {{trailing closure requires parentheses for disambiguation in this context}} {{37-38=(x: }} {{43-43=)}} 
+}
+
+func overloadOnLabel(a: () -> Void) {}
+func overloadOnLabel(b: () -> Void) {}
+func overloadOnLabel(c: () -> Void) {}
+
+func overloadOnLabel2(a: () -> Void) {}
+func overloadOnLabel2(_: () -> Void) {}
+
+func overloadOnLabelArgs(_: Int, a: () -> Void) {}
+func overloadOnLabelArgs(_: Int, b: () -> Void) {}
+
+func overloadOnLabelArgs2(_: Int, a: () -> Void) {}
+func overloadOnLabelArgs2(_: Int, _: () -> Void) {}
+
+func overloadOnLabelDefaultArgs(x: Int = 0, a: () -> Void) {}
+func overloadOnLabelDefaultArgs(x: Int = 1, b: () -> Void) {}
+
+func overloadOnLabelSomeDefaultArgs(_: Int, x: Int = 0, a: () -> Void) {}
+func overloadOnLabelSomeDefaultArgs(_: Int, x: Int = 1, b: () -> Void) {}
+
+func overloadOnDefaultArgsOnly(x: Int = 0, a: () -> Void) {} // expected-note 2 {{found this candidate}}
+func overloadOnDefaultArgsOnly(y: Int = 1, a: () -> Void) {} // expected-note 2 {{found this candidate}}
+
+func overloadOnDefaultArgsOnly2(x: Int = 0, a: () -> Void) {} // expected-note 2 {{found this candidate}}
+func overloadOnDefaultArgsOnly2(y: Bool = true, a: () -> Void) {} // expected-note 2 {{found this candidate}}
+
+func overloadOnDefaultArgsOnly3(x: Int = 0, a: () -> Void) {} // expected-note 2 {{found this candidate}}
+func overloadOnDefaultArgsOnly3(x: Bool = true, a: () -> Void) {} // expected-note 2 {{found this candidate}}
+
+func overloadOnSomeDefaultArgsOnly(_: Int, x: Int = 0, a: () -> Void) {} // expected-note {{found this candidate}}
+func overloadOnSomeDefaultArgsOnly(_: Int, y: Int = 1, a: () -> Void) {} // expected-note {{found this candidate}}
+
+func overloadOnSomeDefaultArgsOnly2(_: Int, x: Int = 0, a: () -> Void) {} // expected-note {{found this candidate}}
+func overloadOnSomeDefaultArgsOnly2(_: Int, y: Bool = true, a: () -> Void) {} // expected-note {{found this candidate}}
+
+func overloadOnSomeDefaultArgsOnly3(_: Int, x: Int = 0, a: () -> Void) {} // expected-note {{found this candidate}}
+func overloadOnSomeDefaultArgsOnly3(_: Int, x: Bool = true, a: () -> Void) {} // expected-note {{found this candidate}}
+
+func testOverloadAmbiguity() {
+  overloadOnLabel {} // expected-error {{ambiguous use of 'overloadOnLabel'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabel(a:)'}} {{18-19=(a: }} {{21-21=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabel(b:)'}} {{18-19=(b: }} {{21-21=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabel(c:)'}} {{18-19=(c: }} {{21-21=)}}
+  overloadOnLabel() {} // expected-error {{ambiguous use of 'overloadOnLabel'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabel(a:)'}} {{19-21=a: }} {{23-23=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabel(b:)'}} {{19-21=b: }} {{23-23=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabel(c:)'}} {{19-21=c: }} {{23-23=)}}
+  overloadOnLabel2 {} // expected-error {{ambiguous use of 'overloadOnLabel2'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabel2(a:)'}} {{19-20=(a: }} {{22-22=)}} expected-note {{avoid using a trailing closure to call 'overloadOnLabel2'}} {{19-20=(}} {{22-22=)}}
+  overloadOnLabel2() {} // expected-error {{ambiguous use of 'overloadOnLabel2'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabel2(a:)'}} {{20-22=a: }} {{24-24=)}} expected-note {{avoid using a trailing closure to call 'overloadOnLabel2'}} {{20-22=}} {{24-24=)}}
+  overloadOnLabelArgs(1) {} // expected-error {{ambiguous use of 'overloadOnLabelArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelArgs(_:a:)'}} {{24-26=, a: }} {{28-28=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelArgs(_:b:)'}} {{24-26=, b: }} {{28-28=)}}
+  overloadOnLabelArgs2(1) {} // expected-error {{ambiguous use of 'overloadOnLabelArgs2'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelArgs2(_:a:)'}} {{25-27=, a: }} {{29-29=)}} expected-note {{avoid using a trailing closure to call 'overloadOnLabelArgs2'}} {{25-27=, }} {{29-29=)}}
+  overloadOnLabelDefaultArgs {} // expected-error {{ambiguous use of 'overloadOnLabelDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelDefaultArgs(x:a:)'}} {{29-30=(a: }} {{32-32=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelDefaultArgs(x:b:)'}} {{29-30=(b: }} {{32-32=)}}
+  overloadOnLabelDefaultArgs() {} // expected-error {{ambiguous use of 'overloadOnLabelDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelDefaultArgs(x:a:)'}} {{30-32=a: }} {{34-34=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelDefaultArgs(x:b:)'}} {{30-32=b: }} {{34-34=)}}
+  overloadOnLabelDefaultArgs(x: 2) {} // expected-error {{ambiguous use of 'overloadOnLabelDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelDefaultArgs(x:a:)'}} {{34-36=, a: }} {{38-38=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelDefaultArgs(x:b:)'}} {{34-36=, b: }} {{38-38=)}}
+  overloadOnLabelSomeDefaultArgs(1) {} // expected-error {{ambiguous use of 'overloadOnLabelSomeDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:a:)'}} {{35-37=, a: }} {{39-39=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:b:)'}} {{35-37=, b: }} {{39-39=)}}
+  overloadOnLabelSomeDefaultArgs(1, x: 2) {} // expected-error {{ambiguous use of 'overloadOnLabelSomeDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:a:)'}} {{41-43=, a: }} {{45-45=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:b:)'}} {{41-43=, b: }} {{45-45=)}}
+
+  overloadOnLabelSomeDefaultArgs( // expected-error {{ambiguous use of 'overloadOnLabelSomeDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:a:)'}} {{12-5=, a: }} {{4-4=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:b:)'}} {{12-5=, b: }} {{4-4=)}}
+    1, x: 2
+  ) {
+    // some
+  }
+
+  overloadOnDefaultArgsOnly {} // expected-error {{ambiguous use of 'overloadOnDefaultArgsOnly'}}
+  overloadOnDefaultArgsOnly() {} // expected-error {{ambiguous use of 'overloadOnDefaultArgsOnly'}}
+  overloadOnDefaultArgsOnly2 {} // expected-error {{ambiguous use of 'overloadOnDefaultArgsOnly2'}}
+  overloadOnDefaultArgsOnly2() {} // expected-error {{ambiguous use of 'overloadOnDefaultArgsOnly2'}}
+  overloadOnDefaultArgsOnly3 {} // expected-error {{ambiguous use of 'overloadOnDefaultArgsOnly3(x:a:)'}}
+  overloadOnDefaultArgsOnly3() {} // expected-error {{ambiguous use of 'overloadOnDefaultArgsOnly3(x:a:)'}}
+
+  overloadOnSomeDefaultArgsOnly(1) {} // expected-error {{ambiguous use of 'overloadOnSomeDefaultArgsOnly'}}
+  overloadOnSomeDefaultArgsOnly2(1) {} // expected-error {{ambiguous use of 'overloadOnSomeDefaultArgsOnly2'}}
+  overloadOnSomeDefaultArgsOnly3(1) {} // expected-error {{ambiguous use of 'overloadOnSomeDefaultArgsOnly3(_:x:a:)'}}
 }

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
@@ -14,6 +14,7 @@
 
 import Swift
 import StdlibUnittest
+import StdlibUnicodeUnittest
 import StdlibCollectionUnittest
 
 #if _runtime(_ObjC)
@@ -188,7 +189,7 @@ tests.test("index-mapping/utf16-to-utf8") {
       } ?? []
     }, sameValue: ==)
 
-  expectNotEmpty(winter.utf16.endIndex.samePosition(in: winter.utf8))
+  expectNotNil(winter.utf16.endIndex.samePosition(in: winter.utf8))
   expectEqual(
     winter.utf8.endIndex,
     winter.utf16.endIndex.samePosition(in: winter.utf8)!)
@@ -200,7 +201,7 @@ tests.test("index-mapping/utf16-to-utf8") {
     }
   )
   
-  expectNotEmpty(summer.utf16.endIndex.samePosition(in: summer.utf8))
+  expectNotNil(summer.utf16.endIndex.samePosition(in: summer.utf8))
   expectEqual(
     summer.utf8.endIndex,
     summer.utf16.endIndex.samePosition(in: summer.utf8)!)
@@ -228,7 +229,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
     }, sameValue: ==
   )
 
-  expectNotEmpty(winter.utf8.endIndex.samePosition(in: winter.unicodeScalars))
+  expectNotNil(winter.utf8.endIndex.samePosition(in: winter.unicodeScalars))
   expectEqual(
     winter.unicodeScalars.endIndex,
     winter.utf8.endIndex.samePosition(in: winter.unicodeScalars)!)
@@ -242,7 +243,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
     }, sameValue: ==
   )
 
-  expectNotEmpty(summer.utf8.endIndex.samePosition(in: summer.unicodeScalars))
+  expectNotNil(summer.utf8.endIndex.samePosition(in: summer.unicodeScalars))
   expectEqual(
     summer.unicodeScalars.endIndex,
     summer.utf8.endIndex.samePosition(in: summer.unicodeScalars)!)
@@ -268,7 +269,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
     }, sameValue: ==
   )
 
-  expectNotEmpty(winter.utf16.endIndex.samePosition(in: winter.unicodeScalars))
+  expectNotNil(winter.utf16.endIndex.samePosition(in: winter.unicodeScalars))
   expectEqual(
     winter.unicodeScalars.endIndex,
     winter.utf16.endIndex.samePosition(in: winter.unicodeScalars)!)
@@ -282,7 +283,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
     }, sameValue: ==
   )
 
-  expectNotEmpty(summer.utf16.endIndex.samePosition(in: summer.unicodeScalars))
+  expectNotNil(summer.utf16.endIndex.samePosition(in: summer.unicodeScalars))
   expectEqual(
     summer.unicodeScalars.endIndex,
     summer.utf16.endIndex.samePosition(in: summer.unicodeScalars)!)
@@ -375,7 +376,7 @@ tests.test("index-mapping/utf8-to-utf16") {
       }
     }, sameValue: ==)
 
-  expectNotEmpty(winter.utf8.endIndex.samePosition(in: winter.utf16))
+  expectNotNil(winter.utf8.endIndex.samePosition(in: winter.utf16))
   expectEqual(
     winter.utf16.endIndex,
     winter.utf8.endIndex.samePosition(in: winter.utf16)!)
@@ -385,7 +386,7 @@ tests.test("index-mapping/utf8-to-utf16") {
     summer.utf8.indices.map { summer.utf16[$0.samePosition(in: summer.utf16)!] }
   )
   
-  expectNotEmpty(summer.utf8.endIndex.samePosition(in: summer.utf16))
+  expectNotNil(summer.utf8.endIndex.samePosition(in: summer.utf16))
   expectEqual(
     summer.utf16.endIndex,
     summer.utf8.endIndex.samePosition(in: summer.utf16)!)
@@ -445,7 +446,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
       }
     }, sameValue: ==)
 
-  expectNotEmpty(winter.utf8.endIndex.samePosition(in: winter.unicodeScalars))
+  expectNotNil(winter.utf8.endIndex.samePosition(in: winter.unicodeScalars))
   expectEqual(
     winter.unicodeScalars.endIndex,
     winter.utf8.endIndex.samePosition(in: winter.unicodeScalars)!)
@@ -458,7 +459,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
       }
     }, sameValue: ==)
 
-  expectNotEmpty(summer.utf8.endIndex.samePosition(in: summer.unicodeScalars))
+  expectNotNil(summer.utf8.endIndex.samePosition(in: summer.unicodeScalars))
   expectEqual(
     summer.unicodeScalars.endIndex,
     summer.utf8.endIndex.samePosition(in: summer.unicodeScalars)!)
@@ -484,7 +485,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
       }
     }, sameValue: ==)
 
-  expectNotEmpty(winter.utf16.endIndex.samePosition(in: winter.unicodeScalars))
+  expectNotNil(winter.utf16.endIndex.samePosition(in: winter.unicodeScalars))
   expectEqual(
     winter.unicodeScalars.endIndex,
     winter.utf16.endIndex.samePosition(in: winter.unicodeScalars)!)
@@ -497,7 +498,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
       }
     }, sameValue: ==)
 
-  expectNotEmpty(summer.utf16.endIndex.samePosition(in: summer.unicodeScalars))
+  expectNotNil(summer.utf16.endIndex.samePosition(in: summer.unicodeScalars))
   expectEqual(
     summer.unicodeScalars.endIndex,
     summer.utf16.endIndex.samePosition(in: summer.unicodeScalars)!)
@@ -554,7 +555,7 @@ tests.test("index-mapping/utf8-to-character") {
       }
     }, sameValue: ==)
 
-  expectNotEmpty(winter.utf8.endIndex.samePosition(in: winter))
+  expectNotNil(winter.utf8.endIndex.samePosition(in: winter))
   expectEqual(
     winter.endIndex,
     winter.utf8.endIndex.samePosition(in: winter)!)
@@ -564,7 +565,7 @@ tests.test("index-mapping/utf8-to-character") {
     summer.utf8.indices.map { summer[$0.samePosition(in: summer)!] }
   )
 
-  expectNotEmpty(summer.utf8.endIndex.samePosition(in: summer))
+  expectNotNil(summer.utf8.endIndex.samePosition(in: summer))
   expectEqual(
     summer.endIndex,
     summer.utf8.endIndex.samePosition(in: summer)!)
@@ -584,7 +585,7 @@ tests.test("index-mapping/utf16-to-character") {
       }
     }, sameValue: ==)
 
-  expectNotEmpty(winter.utf16.endIndex.samePosition(in: winter))
+  expectNotNil(winter.utf16.endIndex.samePosition(in: winter))
   expectEqual(
     winter.endIndex,
     winter.utf16.endIndex.samePosition(in: winter)!)
@@ -596,7 +597,7 @@ tests.test("index-mapping/utf16-to-character") {
     }
   )
 
-  expectNotEmpty(summer.utf16.endIndex.samePosition(in: summer))
+  expectNotNil(summer.utf16.endIndex.samePosition(in: summer))
   expectEqual(
     summer.endIndex,
     summer.utf16.endIndex.samePosition(in: summer)!)
@@ -659,13 +660,13 @@ tests.test("UTF8 indexes") {
             // We only have well-formed UTF16 in this string, so the
             // successor points to a trailing surrogate of a pair and
             // thus shouldn't convert to a UTF8 position
-            expectEmpty(u16.index(after: u16i0a).samePosition(in: u8))
+            expectNil(u16.index(after: u16i0a).samePosition(in: u8))
           }
           
           dsa = dsa.advanced(by: 1) // we're moving off the beginning of a new Unicode scalar
         }
         else {
-          expectEmpty(u8i0a.samePosition(in: u16))
+          expectNil(u8i0a.samePosition(in: u16))
         }
         u8i0a = u8.index(u8i0a, offsetBy: 1)
       }
@@ -707,7 +708,7 @@ tests.test("UTF16->String") {
           continue
         }
       }
-      expectEmpty(String(v[i..<j]))
+      expectNil(String(v[i..<j]))
     }
   }
 }
@@ -723,7 +724,7 @@ tests.test("UTF8->String") {
           continue
         }
       }
-      expectEmpty(String(v[i..<j]))
+      expectNil(String(v[i..<j]))
     }
   }
 }
@@ -741,76 +742,9 @@ tests.test("UnicodeScalars->String") {
   }
 }
 
-struct StringViewTest {
-  var string: String
-  var utf8: [UInt8]
-  var utf16: [UInt16]
-  var unicodeScalars: [UnicodeScalar]
-
-  init(string: String, utf8: [UInt8], utf16: [UInt16], utf32: [UInt32]) {
-    self.string = string
-    self.utf8 = utf8
-    self.utf16 = utf16
-    self.unicodeScalars = utf32.map { UnicodeScalar($0)! }
-  }
-}
-
-var stringViewTests: [StringViewTest] = [
-  StringViewTest(
-    string: "",
-    utf8: [],
-    utf16: [],
-    utf32: []),
-  StringViewTest(
-    string: "\u{0000}",
-    utf8: [0x00],
-    utf16: [0x00],
-    utf32: [0x00]),
-  StringViewTest(
-    string: "a",
-    utf8: [0x61],
-    utf16: [0x61],
-    utf32: [0x61]),
-  StringViewTest(
-    string: "aa",
-    utf8: [0x61, 0x61],
-    utf16: [0x61, 0x61],
-    utf32: [0x61, 0x61]),
-  StringViewTest(
-    string: "ab",
-    utf8: [0x61, 0x62],
-    utf16: [0x61, 0x62],
-    utf32: [0x61, 0x62]),
-  StringViewTest(
-    string: "abc",
-    utf8: [0x61, 0x62, 0x63],
-    utf16: [0x61, 0x62, 0x63],
-    utf32: [0x61, 0x62, 0x63]),
-  StringViewTest(
-    string: "\u{007f}",
-    utf8: [0x7f],
-    utf16: [0x7f],
-    utf32: [0x7f]),
-  StringViewTest(
-    string: "\u{0430}",
-    utf8: [0xd0, 0xb0],
-    utf16: [0x0430],
-    utf32: [0x0430]),
-  StringViewTest(
-    string: "\u{0430}\u{0431}\u{0432}",
-    utf8: [0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2],
-    utf16: [0x0430, 0x0431, 0x0432],
-    utf32: [0x0430, 0x0431, 0x0432]),
-  StringViewTest(
-    string: "\u{1f425}",
-    utf8: [0xf0, 0x9f, 0x90, 0xa5],
-    utf16: [0xd83d, 0xdc25],
-    utf32: [0x1f425]),
-]
-
 #if _runtime(_ObjC)
 tests.test("String.UTF16View.Index/Strideable")
-  .forEach(in: stringViewTests) {
+  .forEach(in: utfTests) {
   test in
 
   func allIndices<C : Collection>(of c: C) -> [C.Index]
@@ -829,23 +763,23 @@ tests.test("String.UTF16View.Index/Strideable")
 #endif
 
 tests.test("String.UTF8View/Collection")
-  .forEach(in: stringViewTests) {
+  .forEach(in: utfTests) {
   test in
 
-  // FIXME(ABI): should be `checkBidirectionalCollection`.
+  // FIXME(ABI)#72 : should be `checkBidirectionalCollection`.
   checkForwardCollection(test.utf8, test.string.utf8) { $0 == $1 }
 }
 
 #if _runtime(_Native)
 tests.test("String.UTF16View/BidirectionalCollection")
-  .forEach(in: stringViewTests) {
+  .forEach(in: utfTests) {
   test in
 
   checkBidirectionalCollection(test.utf16, test.string.utf16) { $0 == $1 }
 }
 #else
 tests.test("String.UTF16View/RandomAccessCollection")
-  .forEach(in: stringViewTests) {
+  .forEach(in: utfTests) {
   test in
 
   checkRandomAccessCollection(test.utf16, test.string.utf16) { $0 == $1 }
@@ -853,7 +787,7 @@ tests.test("String.UTF16View/RandomAccessCollection")
 #endif
 
 tests.test("String.UTF32View/BidirectionalCollection")
-  .forEach(in: stringViewTests) {
+  .forEach(in: utfTests) {
   test in
 
   checkBidirectionalCollection(

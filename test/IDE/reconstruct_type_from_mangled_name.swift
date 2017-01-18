@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s -implicit-check-not="FAILURE"
+// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | %FileCheck %s -implicit-check-not="FAILURE"
 
 struct Mystruct1 {
 // CHECK: decl: struct Mystruct1
@@ -87,11 +87,11 @@ class Myclass2 {
 }
 
 struct MyGenStruct1<T, U: ExpressibleByStringLiteral, V: Sequence> {
-// CHECK: decl: struct MyGenStruct1<T, U : ExpressibleByStringLiteral, V : Sequence>
+// CHECK: decl: struct MyGenStruct1<T, U, V> where U : ExpressibleByStringLiteral, V : Sequence
 // FIXME: why are these references to the base type?
-// CHECK: decl: struct MyGenStruct1<{{.*}}> for 'T' usr=s:tV14swift_ide_test12MyGenStruct11TMx
-// CHECK: decl: struct MyGenStruct1<{{.*}}> for 'U' usr=s:tV14swift_ide_test12MyGenStruct11UMq_
-// CHECK: decl: struct MyGenStruct1<{{.*}}> for 'V' usr=s:tV14swift_ide_test12MyGenStruct11VMq0_
+// CHECK: decl: struct MyGenStruct1<{{.*}}> where {{.*}} for 'T' usr=s:tV14swift_ide_test12MyGenStruct11TMx
+// CHECK: decl: struct MyGenStruct1<{{.*}}> where {{.*}} for 'U' usr=s:tV14swift_ide_test12MyGenStruct11UMq_
+// CHECK: decl: struct MyGenStruct1<{{.*}}> where {{.*}} for 'V' usr=s:tV14swift_ide_test12MyGenStruct11VMq0_
 
   let x: T
 // CHECK: decl: let x: T
@@ -129,3 +129,9 @@ func test001() {
   _ = genstruct2.z
 // CHECK: type: Dictionary<Int, Int>
 }
+
+protocol P1 {}
+func foo1(p : P1) {}
+// CHECK: decl: protocol P1  for 'P1' usr=s:P14swift_ide_test2P1
+// CHECK: decl: func foo1(p: P1)  for 'foo1' usr=s:F14swift_ide_test4foo1FT1pPS_2P1__T_
+// CHECK: decl: let p: P1 for 'p' usr=s:vF14swift_ide_test4foo1FT1pPS_2P1__T_L_1pPS0__

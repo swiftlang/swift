@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 // CHECK: !DILocalVariable(name: "_0", arg: 1
 // CHECK: !DILocalVariable(name: "_1", arg: 2

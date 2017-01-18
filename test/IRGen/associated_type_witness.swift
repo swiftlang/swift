@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir > %t.ll
-// RUN: FileCheck %s -check-prefix=GLOBAL < %t.ll
-// RUN: FileCheck %s < %t.ll
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir > %t.ll
+// RUN: %FileCheck %s -check-prefix=GLOBAL < %t.ll
+// RUN: %FileCheck %s < %t.ll
 // REQUIRES: CPU=x86_64
 
 protocol P {}
@@ -118,7 +118,7 @@ struct Computed<T, U> : Assocked {
 //   Witness table instantiation function for Computed : Assocked.
 // CHECK-LABEL: define hidden i8** @_TWauRx23associated_type_witness1PrGVS_15GenericComputedx_S_22DerivedFromSimpleAssocS_(%swift.type*)
 // CHECK:         entry:
-// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_22DerivedFromSimpleAssocS_, %swift.type* %0, i8** null)
+// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @swift_rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_22DerivedFromSimpleAssocS_, %swift.type* %0, i8** null)
 // CHECK-NEXT:     ret i8** [[WTABLE]]
 
 
@@ -158,7 +158,7 @@ struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
 //   Witness table instantiation function for GenericComputed : HasSimpleAssoc..
 // CHECK-LABEL: define hidden i8** @_TWauRx23associated_type_witness1PrGVS_15GenericComputedx_S_14HasSimpleAssocS_(%swift.type*)
 // CHECK-NEXT:   entry:
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_14HasSimpleAssocS_, %swift.type* %0, i8** null)
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_14HasSimpleAssocS_, %swift.type* %0, i8** null)
 // CHECK-NEXT:    ret i8** %1
 
 

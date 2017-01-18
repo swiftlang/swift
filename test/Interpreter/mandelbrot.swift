@@ -1,4 +1,4 @@
-// RUN: %target-jit-run -I %S -enable-source-import %s | FileCheck %s
+// RUN: %target-jit-run -I %S -enable-source-import %s | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: swift_interpreter
 

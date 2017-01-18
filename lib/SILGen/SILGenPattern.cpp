@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -222,6 +222,8 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Var:
     return isWildcardPattern(p->getSemanticsProvidingPattern());
   }
+
+  llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
 /// Check to see if the given pattern is a specializing pattern,
@@ -284,6 +286,8 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
   case PatternKind::Typed:
     llvm_unreachable("not semantic");
   }
+
+  llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
 namespace {
@@ -863,7 +867,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 /// Return the dispatchable length of the given column.
 static unsigned getConstructorPrefix(const ClauseMatrix &matrix,
@@ -1384,7 +1388,8 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     if (tupleSILTy.isAddress()) {
       member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
       if (!fieldTL.isAddressOnly())
-        member = SGF.B.createLoad(loc, member);
+        member =
+            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
     } else {
       member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
     }
@@ -1454,8 +1459,9 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
     // Okay, if all we need to do is drop the value in an address,
     // this is easy.
     if (!hasAbstraction) {
-      SGF.B.createStore(loc, src.getFinalManagedValue().forward(SGF),
-                        init->getAddress());
+      SGF.B.emitStoreValueOperation(
+          loc, src.getFinalManagedValue().forward(SGF), init->getAddress(),
+          StoreOwnershipQualifier::Init);
       init->finishInitialization(SGF);
       ConsumableManagedValue result =
         { init->getManagedAddress(), src.getFinalConsumption() };
@@ -1544,6 +1550,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
   struct CaseInfo {
+    EnumElementDecl *FormalElement;
     Pattern *FirstMatcher;
     bool Irrefutable = false;
     SmallVector<SpecializedRow, 2> SpecializedRows;
@@ -1566,16 +1573,17 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
     // Create destination blocks for all the cases.
     llvm::DenseMap<EnumElementDecl*, unsigned> caseToIndex;
     for (auto &row : rows) {    
-      EnumElementDecl *elt;
+      EnumElementDecl *formalElt;
       Pattern *subPattern = nullptr;
       if (auto eep = dyn_cast<EnumElementPattern>(row.Pattern)) {
-        elt = eep->getElementDecl();
+        formalElt = eep->getElementDecl();
         subPattern = eep->getSubPattern();
       } else {
         auto *osp = cast<OptionalSomePattern>(row.Pattern);
-        elt = osp->getElementDecl();
+        formalElt = osp->getElementDecl();
         subPattern = osp->getSubPattern();
       }
+      auto elt = SGF.SGM.getLoweredEnumElementDecl(formalElt);
 
       unsigned index = caseInfos.size();
       auto insertionResult = caseToIndex.insert({elt, index});
@@ -1585,6 +1593,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
         curBB = SGF.createBasicBlock(curBB);
         caseBBs.push_back({elt, curBB});
         caseInfos.resize(caseInfos.size() + 1);
+        caseInfos.back().FormalElement = formalElt;
         caseInfos.back().FirstMatcher = row.Pattern;
       }
       assert(caseToIndex[elt] == index);
@@ -1612,6 +1621,12 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
     // switch is not exhaustive.
     bool exhaustive = false;
     auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
+
+    // The SIL values will range over Optional, so count against
+    // Optional's cases.
+    if (enumDecl == SGF.getASTContext().getImplicitlyUnwrappedOptionalDecl()) {
+      enumDecl = SGF.getASTContext().getOptionalDecl();
+    }
 
     // FIXME: Get expansion from SILFunction
     if (enumDecl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
@@ -1675,6 +1690,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
     auto &specializedRows = caseInfo.SpecializedRows;
 
     EnumElementDecl *elt = caseBBs[i].first;
+    EnumElementDecl *formalElt = caseInfos[i].FormalElement;
     SILBasicBlock *caseBB = caseBBs[i].second;
     SGF.B.setInsertionPoint(caseBB);
 
@@ -1762,9 +1778,10 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
         
         // Load a loadable data value.
         if (eltTL->isLoadable())
-          eltValue = SGF.B.createLoad(loc, eltValue);
+          eltValue = eltTL->emitLoad(SGF.B, loc, eltValue,
+                                     LoadOwnershipQualifier::Take);
       } else {
-        eltValue = new (SGF.F.getModule()) SILArgument(caseBB, eltTy);
+        eltValue = caseBB->createPHIArgument(eltTy, ValueOwnershipKind::Owned);
       }
 
       origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);
@@ -1773,10 +1790,10 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       // If the payload is boxed, project it.
 
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
-        SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue());
+        SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue->getType());
         if (eltTL->isLoadable())
-          boxedValue = SGF.B.createLoad(loc, boxedValue);
+          boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
 
         // The boxed value may be shared, so we always have to copy it.
         eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
@@ -1787,13 +1804,17 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
 
       CanType substEltTy =
         sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                    elt, nullptr,
-                                    elt->getArgumentInterfaceType())
+                                    formalElt, nullptr,
+                                    formalElt->getArgumentInterfaceType())
                   ->getCanonicalType();
 
+      AbstractionPattern origEltTy =
+        (elt->getParentEnum()->classifyAsOptionalType()
+           ? AbstractionPattern(substEltTy)
+           : SGF.SGM.M.Types.getAbstractionPattern(elt));
+
       eltCMV = emitReabstractedSubobject(SGF, loc, eltCMV, *eltTL,
-                            SGF.SGM.M.Types.getAbstractionPattern(elt),
-                            substEltTy);
+                                         origEltTy, substEltTy);
     }
 
     const FailureHandler *innerFailure = &outerFailure;
@@ -1951,7 +1972,8 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
       pattern->forEachVariable([&](VarDecl *V) {
         if (!V->hasName())
           return;
-        block->createBBArg(SGF.VarLocs[V].value->getType(), V);
+        block->createPHIArgument(SGF.VarLocs[V].value->getType(),
+                                 ValueOwnershipKind::Owned, V);
       });
     }
   }
@@ -1972,7 +1994,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     // predecessor.  We rely on the SIL CFG here, because unemitted shared case
     // blocks might fallthrough into this one.
     if (!hasFallthroughTo && caseBlock->getCaseLabelItems().size() == 1) {
-      SILBasicBlock *predBB = caseBB->getSinglePredecessor();
+      SILBasicBlock *predBB = caseBB->getSinglePredecessorBlock();
       assert(predBB && "Should only have 1 predecessor because it isn't shared");
       assert(isa<BranchInst>(predBB->getTerminator()) &&
              "Should have uncond branch to shared block");
@@ -2007,7 +2029,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
           return;
         if (V->isLet()) {
           // Just emit a let with cleanup.
-          SGF.VarLocs[V].value = caseBB->getBBArg(argIndex++);
+          SGF.VarLocs[V].value = caseBB->getArgument(argIndex++);
           SGF.emitInitializationForVarDecl(V)->finishInitialization(SGF);
         } else {
           // The pattern variables were all emitted as lets and one got passed in,
@@ -2015,7 +2037,8 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
           SGF.VarLocs.erase(V);
           auto newVar = SGF.emitInitializationForVarDecl(V);
           auto loc = SGF.CurrentSILLoc;
-          auto value = ManagedValue::forUnmanaged(caseBB->getBBArg(argIndex++));
+          auto value =
+              ManagedValue::forUnmanaged(caseBB->getArgument(argIndex++));
           auto formalType = V->getType()->getCanonicalType();
           RValue(SGF, loc, formalType, value).forwardInto(SGF, loc, newVar.get());
         }
@@ -2057,7 +2080,7 @@ namespace {
     bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   };
-}
+} // end anonymous namespace
 
 
 static bool containsFallthrough(Stmt *S) {
@@ -2162,14 +2185,14 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         for (auto var : Vars) {
           if (var->hasName() && var->getName() == expected->getName()) {
             auto value = VarLocs[var].value;
-            args.push_back(value);
             
             for (auto cmv : argArray) {
               if (cmv.getValue() == value) {
-                B.createRetainValue(CurrentSILLoc, value, Atomicity::Atomic);
+                value = B.emitCopyValueOperation(CurrentSILLoc, value);
                 break;
               }
             }
+            args.push_back(value);
             break;
           }
         }

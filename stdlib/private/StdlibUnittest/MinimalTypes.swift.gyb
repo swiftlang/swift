@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -103,14 +103,14 @@ public func < (
   return MinimalComparableValue.lessImpl.value(lhs.value, rhs.value)
 }
 
-% for kind in [ 'Value', 'Class' ]:
+% for (kind, decl_keyword) in [ ('Value', 'struct'), ('Class', 'class') ]:
 %   Self = 'MinimalHashable%s' % kind
 
 /// A type that conforms only to `Equatable` and `Hashable`.
 ///
 /// This type can be used to check that generic functions don't rely on any
 /// other conformances.
-public struct ${Self} : Equatable, Hashable {
+public ${decl_keyword} ${Self} : Equatable, Hashable {
   public static var timesEqualEqualWasCalled: Int = 0
   public static var timesHashValueWasCalled: Int = 0
 
@@ -148,7 +148,7 @@ public func == (
 
 % end
 
-% for kind in [ 'Value', 'Class' ]:
+% for (kind, decl_keyword) in [ ('Value', 'struct'), ('Class', 'class') ]:
 %   Self = 'GenericMinimalHashable%s' % kind
 
 public var ${Self}_timesEqualEqualWasCalled: Int = 0
@@ -163,7 +163,7 @@ public var ${Self}_hashValueImpl = ResettableValue<(Any) -> Int>(
 ///
 /// This type can be used to check that generic functions don't rely on any
 /// other conformances.
-public struct ${Self}<Wrapped> : Equatable, Hashable {
+public ${decl_keyword} ${Self}<Wrapped> : Equatable, Hashable {
   public var value: Wrapped
   public var identity: Int
 

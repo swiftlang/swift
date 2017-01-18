@@ -2,17 +2,17 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 // dispatch/queue.h
 
-import SwiftShims
+import _SwiftDispatchOverlayShims
 
 public final class DispatchSpecificKey<T> {
 	public init() {}
@@ -34,7 +34,7 @@ public extension DispatchQueue {
 		public static let initiallyInactive = Attributes(rawValue: 1<<2)
 
 		fileprivate func _attr() -> __OS_dispatch_queue_attr? {
-			var attr: __OS_dispatch_queue_attr? = nil
+			var attr: __OS_dispatch_queue_attr?
 
 			if self.contains(.concurrent) {
 				attr = _swift_dispatch_queue_concurrent()
@@ -95,7 +95,7 @@ public extension DispatchQueue {
 		internal func _attr(attr: __OS_dispatch_queue_attr?) -> __OS_dispatch_queue_attr? {
 			if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
 				switch self {
-				case .inherit: 
+				case .inherit:
 					// DISPATCH_AUTORELEASE_FREQUENCY_INHERIT
 					return __dispatch_queue_attr_make_with_autorelease_frequency(attr, __dispatch_autorelease_frequency_t(0))
 				case .workItem:
@@ -142,7 +142,7 @@ public extension DispatchQueue {
 		}
 		return nil
 	}
-	
+
 	public convenience init(
 		label: String,
 		qos: DispatchQoS = .unspecified,
@@ -151,8 +151,8 @@ public extension DispatchQueue {
 		target: DispatchQueue? = nil)
 	{
 		var attr = attributes._attr()
-		if autoreleaseFrequency != .inherit { 
-			attr = autoreleaseFrequency._attr(attr: attr) 
+		if autoreleaseFrequency != .inherit {
+			attr = autoreleaseFrequency._attr(attr: attr)
 		}
 		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified {
 			attr = __dispatch_queue_attr_make_with_qos_class(attr, qos.qosClass.rawValue, Int32(qos.relativePriority))
@@ -179,23 +179,23 @@ public extension DispatchQueue {
 
 	@available(OSX 10.10, iOS 8.0, *)
 	public func async(execute workItem: DispatchWorkItem) {
-		// _swift_dispatch_async preserves the @convention(block) 
+		// _swift_dispatch_async preserves the @convention(block)
 		// for work item blocks.
 		_swift_dispatch_async(self, workItem._block)
 	}
 
 	@available(OSX 10.10, iOS 8.0, *)
 	public func async(group: DispatchGroup, execute workItem: DispatchWorkItem) {
-		// _swift_dispatch_group_async preserves the @convention(block) 
+		// _swift_dispatch_group_async preserves the @convention(block)
 		// for work item blocks.
 		_swift_dispatch_group_async(group, self, workItem._block)
 	}
 
 	public func async(
-		group: DispatchGroup? = nil, 
-		qos: DispatchQoS = .unspecified, 
-		flags: DispatchWorkItemFlags = [], 
-		execute work: @escaping @convention(block) () -> Void) 
+		group: DispatchGroup? = nil,
+		qos: DispatchQoS = .unspecified,
+		flags: DispatchWorkItemFlags = [],
+		execute work: @escaping @convention(block) () -> Void)
 	{
 		if group == nil && qos == .unspecified {
 			// Fast-path route for the most common API usage
@@ -221,14 +221,14 @@ public extension DispatchQueue {
 		}
 	}
 
-	private func _syncBarrier(block: () -> ()) {
+	private func _syncBarrier(block: () -> Void) {
 		__dispatch_barrier_sync(self, block)
 	}
 
 	private func _syncHelper<T>(
-		fn: (() -> ()) -> (), 
-		execute work: () throws -> T, 
-		rescue: ((Error) throws -> (T))) rethrows -> T 
+		fn: (() -> Void) -> Void,
+		execute work: () throws -> T,
+		rescue: ((Error) throws -> (T))) rethrows -> T
 	{
 		var result: T?
 		var error: Error?
@@ -248,10 +248,10 @@ public extension DispatchQueue {
 
 	@available(OSX 10.10, iOS 8.0, *)
 	private func _syncHelper<T>(
-		fn: (DispatchWorkItem) -> (), 
+		fn: (DispatchWorkItem) -> Void,
 		flags: DispatchWorkItemFlags,
 		execute work: () throws -> T,
-		rescue: ((Error) throws -> (T))) rethrows -> T 
+		rescue: ((Error) throws -> (T))) rethrows -> T
 	{
 		var result: T?
 		var error: Error?
@@ -259,7 +259,7 @@ public extension DispatchQueue {
 			do {
 				result = try work()
 			} catch let e {
-				error = e 
+				error = e
 			}
 		})
 		fn(workItem)
@@ -285,10 +285,10 @@ public extension DispatchQueue {
 	}
 
 	public func asyncAfter(
-		deadline: DispatchTime, 
-		qos: DispatchQoS = .unspecified, 
-		flags: DispatchWorkItemFlags = [], 
-		execute work: @escaping @convention(block) () -> Void) 
+		deadline: DispatchTime,
+		qos: DispatchQoS = .unspecified,
+		flags: DispatchWorkItemFlags = [],
+		execute work: @escaping @convention(block) () -> Void)
 	{
 		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)
@@ -300,9 +300,9 @@ public extension DispatchQueue {
 
 	public func asyncAfter(
 		wallDeadline: DispatchWallTime,
-		qos: DispatchQoS = .unspecified, 
-		flags: DispatchWorkItemFlags = [], 
-		execute work: @escaping @convention(block) () -> Void) 
+		qos: DispatchQoS = .unspecified,
+		flags: DispatchWorkItemFlags = [],
+		execute work: @escaping @convention(block) () -> Void)
 	{
 		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)
@@ -353,9 +353,3 @@ private func _destructDispatchSpecificValue(ptr: UnsafeMutableRawPointer?) {
 		Unmanaged<AnyObject>.fromOpaque(p).release()
 	}
 }
-
-@_silgen_name("_swift_dispatch_queue_concurrent")
-internal func _swift_dispatch_queue_concurrent() -> __OS_dispatch_queue_attr
-
-@_silgen_name("_swift_dispatch_get_main_queue")
-internal func _swift_dispatch_get_main_queue() -> DispatchQueue

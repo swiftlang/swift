@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct X {
   var i : Int, j : Int
@@ -57,7 +57,7 @@ acceptString("\(hello), \(world) #\(i)!")
 Optional<Int>(1) // expected-warning{{unused}}
 Optional(1) // expected-warning{{unused}}
 _ = .none as Optional<Int>
-Optional(.none) // expected-error{{generic parameter 'T' could not be inferred}}
+Optional(.none) // expected-error{{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<Any>}}
 
 // Interpolation
 _ = "\(hello), \(world) #\(i)!"

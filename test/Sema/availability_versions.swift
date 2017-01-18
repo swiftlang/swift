@@ -1,8 +1,8 @@
-// RUN: %target-parse-verify-swift -target x86_64-apple-macosx10.50 -disable-objc-attr-requires-foundation-module
-// RUN: not %target-swift-frontend -target x86_64-apple-macosx10.50 -disable-objc-attr-requires-foundation-module -parse %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: %target-typecheck-verify-swift -target x86_64-apple-macosx10.50 -disable-objc-attr-requires-foundation-module
+// RUN: not %target-swift-frontend -target x86_64-apple-macosx10.50 -disable-objc-attr-requires-foundation-module -typecheck %s 2>&1 | %FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // Make sure we do not emit availability errors or warnings when -disable-availability-checking is passed
-// RUN: not %target-swift-frontend -target x86_64-apple-macosx10.50 -parse -disable-objc-attr-requires-foundation-module -disable-availability-checking %s 2>&1 | FileCheck %s '--implicit-check-not=error:' '--implicit-check-not=warning:'
+// RUN: not %target-swift-frontend -target x86_64-apple-macosx10.50 -typecheck -disable-objc-attr-requires-foundation-module -disable-availability-checking %s 2>&1 | %FileCheck %s '--implicit-check-not=error:' '--implicit-check-not=warning:'
 
 // REQUIRES: OS=macosx
 
@@ -1068,15 +1068,12 @@ func functionWithUnavailableInDeadBranch() {
 
     localFuncAvailableOn10_51() // no-warning
 
-    // We still want to error on references to explicitly unavailable symbols
-    // CHECK:error: 'explicitlyUnavailable()' is unavailable
     explicitlyUnavailable() // expected-error {{'explicitlyUnavailable()' is unavailable}}
   }
 
   guard #available(iOS 8.0, *) else {
     _ = globalFuncAvailableOn10_51() // no-warning
 
-    // CHECK:error: 'explicitlyUnavailable()' is unavailable
     explicitlyUnavailable() // expected-error {{'explicitlyUnavailable()' is unavailable}}
   }
 }
@@ -1624,6 +1621,5 @@ func useShortFormAvailable() {
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
 
-    // CHECK:error: 'unavailableWins()' is unavailable
   unavailableWins() // expected-error {{'unavailableWins()' is unavailable}}
 }

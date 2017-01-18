@@ -1,110 +1,126 @@
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
-// RUN: %target-swift-frontend -parse -verify -disable-objc-attr-requires-foundation-module %t_no_errors.swift
+// RUN: %target-swift-frontend -typecheck -verify -disable-objc-attr-requires-foundation-module %t_no_errors.swift
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_PA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA_EXT_1 -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_PA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA_EXT_2 -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_PA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PB -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_PB < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PB < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_PB < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PB < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA_PB -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_PA_PB < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PB < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_PA_PB < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PB < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_BA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_BA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_BA < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_BA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA_EXT1 -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_BA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA_EXT2 -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_BA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PB -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_BA_PB < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PB < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_BA_PB < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_BA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PB < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BB -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_BB < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_BB < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_BB < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_BB < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_BE < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_BE < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_BE < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_BE_PA < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_BE_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_BE < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_BE < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE_EXT1 -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_BE < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE_EXT2 -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_BE < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PEI_PE -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=CLASS_PEI_PE < %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_PEI < %t.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_PEI_PE < %t.txt
+// RUN: %FileCheck %s -check-prefix=WITH_PEI < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=NESTED_NOMINAL < %t.txt
+// RUN: %FileCheck %s -check-prefix=NESTED_NOMINAL < %t.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE_1 -code-completion-keywords=false | FileCheck %s -check-prefix=NESTED_CLOSURE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE_2 -code-completion-keywords=false | FileCheck %s -check-prefix=NESTED_CLOSURE_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=NESTED_CLOSURE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE_2 -code-completion-keywords=false | %FileCheck %s -check-prefix=NESTED_CLOSURE_2
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD1 -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=OMIT_KEYWORD1< %t.txt
+// RUN: %FileCheck %s -check-prefix=OMIT_KEYWORD1< %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD2 -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=OMIT_KEYWORD2< %t.txt
+// RUN: %FileCheck %s -check-prefix=OMIT_KEYWORD2< %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD3 -code-completion-keywords=false > %t.txt
-// RUN: FileCheck %s -check-prefix=OMIT_KEYWORD3< %t.txt
+// RUN: %FileCheck %s -check-prefix=OMIT_KEYWORD3< %t.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD4 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD5 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD6 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD7 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD8 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD9 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD10 -code-completion-keywords=false | FileCheck %s -check-prefix=WITH_PA_NO_PROTOFUNCA
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD4 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD5 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD6 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD7 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD8 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD9 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD10 -code-completion-keywords=false | %FileCheck %s -check-prefix=WITH_PA_NO_PROTOFUNCA
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAS_THROWING -code-completion-keywords=false | FileCheck %s -check-prefix=HAS_THROWING
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_TYPE1 -code-completion-keywords=false | FileCheck %s -check-prefix=ASSOC_TYPE1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAS_THROWING -code-completion-keywords=false | %FileCheck %s -check-prefix=HAS_THROWING
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_TYPE1 -code-completion-keywords=false | %FileCheck %s -check-prefix=ASSOC_TYPE1
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 -code-completion-keywords=false | FileCheck %s -check-prefix=DEPRECATED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=DEPRECATED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ESCAPING_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=ESCAPING_1
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MODIFIER1 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MODIFIER2 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MODIFIER3 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MODIFIER4 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MODIFIER5 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MODIFIER6 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MODIFIER7 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MODIFIER8 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER8
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MODIFIER9 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER9
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MODIFIER10 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER6
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOINIT_NORM -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_NORM
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOINIT_FINAL -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_FINAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOINIT_STRUCT -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_STRUCT
 
 @objc
 class TagPA {}
@@ -121,7 +137,7 @@ protocol ProtocolA {
   var protoAVarRO: Int { get }
 }
 // WITH_PA: Begin completions
-// WITH_PA-DAG: Decl[Constructor]/Super:    init(fromProtocolA: Int) {|}{{; name=.+$}}
+// WITH_PA-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: Int) {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional() {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: Int{{; name=.+$}}
@@ -129,7 +145,7 @@ protocol ProtocolA {
 // WITH_PA: End completions
 
 // WITH_PA_NO_PROTOFUNCA: Begin completions
-// WITH_PA_NO_PROTOFUNCA-DAG: Decl[Constructor]/Super:    init(fromProtocolA: Int) {|}{{; name=.+$}}
+// WITH_PA_NO_PROTOFUNCA-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: Int) {|}{{; name=.+$}}
 // WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional() {|}{{; name=.+$}}
 // WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: Int{{; name=.+$}}
 // WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: Int{{; name=.+$}}
@@ -147,7 +163,7 @@ protocol ProtocolB : ProtocolA {
   var protoBVarRO: Int { get }
 }
 // WITH_PB: Begin completions
-// WITH_PB-DAG: Decl[Constructor]/Super:    init(fromProtocolA: Int) {|}{{; name=.+$}}
+// WITH_PB-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: Int) {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoBFunc() {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceVar]/Super:    var protoBVarRW: Int{{; name=.+$}}
@@ -166,7 +182,7 @@ protocol ProtocolE {
   var protoEVarRO: Int { get }
 }
 // WITH_PE: Begin completions
-// WITH_PE-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{; name=.+$}}
+// WITH_PE-DAG: Decl[Constructor]/Super:    required init(fromProtocolE: Int) {|}{{; name=.+$}}
 // WITH_PE-DAG: Decl[InstanceMethod]/Super: func protoEFunc() {|}{{; name=.+$}}
 // WITH_PE-DAG: Decl[InstanceVar]/Super:    var protoEVarRW: Int{{; name=.+$}}
 // WITH_PE-DAG: Decl[InstanceVar]/Super:    var protoEVarRO: Int{{; name=.+$}}
@@ -186,8 +202,8 @@ class BaseA {
   var baseAVarRO: Int { return 0 }
 }
 // WITH_BA: Begin completions
-// WITH_BA-DAG: Decl[Constructor]/Super:    init(fromBaseA: Int) {|}{{; name=.+$}}
-// WITH_BA-DAG: Decl[Constructor]/Super:    init(fromBaseAWithParamName foo: Int, withOther bar: Double) {|}{{; name=.+$}}
+// WITH_BA-DAG: Decl[Constructor]/Super:    override init(fromBaseA: Int) {|}{{; name=.+$}}
+// WITH_BA-DAG: Decl[Constructor]/Super:    override init(fromBaseAWithParamName foo: Int, withOther bar: Double) {|}{{; name=.+$}}
 // WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc(foo x: Int) {|}{{; name=.+$}}
 // WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc2(foo x: Int) {|}{{; name=.+$}}
 // WITH_BA-DAG: Decl[InstanceVar]/Super:    override var baseAVarRW: Int{{; name=.+$}}
@@ -210,7 +226,7 @@ class BaseB : BaseA {
 // WITH_BB: Begin completions
 // WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseAFunc(foo x: Int) {|}{{; name=.+$}}
 // WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseAFunc2(foo x: Int) {|}{{; name=.+$}}
-// WITH_BB-DAG: Decl[Constructor]/Super:    init(fromBaseB: Int) {|}{{; name=.+$}}
+// WITH_BB-DAG: Decl[Constructor]/Super:    override init(fromBaseB: Int) {|}{{; name=.+$}}
 // WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseBFunc() {|}{{; name=.+$}}
 // WITH_BB-DAG: Decl[InstanceVar]/Super:    override var baseAVarRW: Int{{; name=.+$}}
 // WITH_BB-DAG: Decl[InstanceVar]/Super:    override var baseAVarRO: Int{{; name=.+$}}
@@ -236,9 +252,9 @@ class BaseE : ProtocolE {
   var baseEVarRO: Int { return 0 }
 }
 // WITH_BE: Begin completions
-// WITH_BE-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{; name=.+$}}
+// WITH_BE-DAG: Decl[Constructor]/Super:    required init(fromProtocolE: Int) {|}{{; name=.+$}}
 // WITH_BE-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{; name=.+$}}
-// WITH_BE-DAG: Decl[Constructor]/Super:    init(fromBaseE: Int) {|}{{; name=.+$}}
+// WITH_BE-DAG: Decl[Constructor]/Super:    override init(fromBaseE: Int) {|}{{; name=.+$}}
 // WITH_BE-DAG: Decl[InstanceMethod]/Super: override func baseEFunc() {|}{{; name=.+$}}
 // WITH_BE-DAG: Decl[InstanceVar]/Super:    override var protoEVarRW: Int{{; name=.+$}}
 // WITH_BE-DAG: Decl[InstanceVar]/Super:    override var protoEVarRO: Int{{; name=.+$}}
@@ -257,7 +273,7 @@ class ProtocolEImpl /* : ProtocolE but does not implement the protocol */ {
   var protoEVarRO: Int { return 0 }
 }
 // WITH_PEI: Begin completions
-// WITH_PEI-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{; name=.+$}}
+// WITH_PEI-DAG: Decl[Constructor]/Super:    override init(fromProtocolE: Int) {|}{{; name=.+$}}
 // WITH_PEI-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{; name=.+$}}
 // WITH_PEI-DAG: Decl[InstanceVar]/Super:    override var protoEVarRW: Int{{; name=.+$}}
 // WITH_PEI-DAG: Decl[InstanceVar]/Super:    override var protoEVarRO: Int{{; name=.+$}}
@@ -463,14 +479,14 @@ class TestClassWithThrows : HasThrowing, HasThrowingProtocol {
 // HAS_THROWING: Begin completions
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         func foo() throws {|}; name=foo() throws
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func bar() throws {|}; name=bar() throws
-// FIXME: SR-2214 make the below require printing @escaping 
-// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func baz(x: {{(@escaping )?}}() throws -> ()) rethrows {|}; name=baz(x: {{(@escaping )?}}() throws -> ()) rethrows
-// HAS_THROWING-DAG: Decl[Constructor]/Super:            init() throws {|}; name=init() throws
+// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func baz(x: @escaping () throws -> ()) rethrows {|}; name=baz(x: {{(@escaping )?}}() throws -> ()) rethrows
+// HAS_THROWING-DAG: Decl[Constructor]/Super:            override init() throws {|}; name=init() throws
 // HAS_THROWING: End completions
 
+protocol P0
 protocol P1 {
   associatedtype T1 = Int
-  associatedtype T2
+  associatedtype T2 : P0
   associatedtype T3
 }
 class C1 : P1 {
@@ -490,3 +506,137 @@ class Deprecated2 : Deprecated1 {
   override func #^DEPRECATED_1^#
 }
 // DEPRECATED_1: Decl[InstanceMethod]/Super/NotRecommended: deprecated() {|};
+
+class EscapingBase {
+  func method(_ x: @escaping (@escaping ()->()) -> (()->())) -> (@escaping (@escaping ()->() )->()) { }
+}
+class Escaping : EscapingBase {
+  override func #^ESCAPING_1^#
+}
+// ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (() -> ())) -> ((@escaping () -> ()) -> ()) {|};
+
+class OverrideBase {
+  init(x: Int) {}
+  convenience init(y: Int) { self.init(x: y) }
+  required init(a: Int) {}
+  required convenience init(b: Int) {}
+  func defaultMethod() {}
+  final func finalMethod() {}
+  var varDecl: Int = 0
+  open func openMethod() {}
+}
+protocol OverrideP {
+  associatedtype Assoc : OverrideP
+  init(p: Int)
+}
+
+class Override1 : OverrideBase, OverrideP {
+  #^MODIFIER1^#
+}
+class Override2 : OverrideBase, OverrideP {
+  final #^MODIFIER2^#
+}
+class Override3 : OverrideBase, OverrideP {
+  open #^MODIFIER3^#
+  // Same as MODIFIER2.
+}
+class Override4 : OverrideBase, OverrideP {
+  required #^MODIFIER4^#
+}
+class Override5 : OverrideBase, OverrideP {
+  convenience #^MODIFIER5^#
+}
+class Override6 : OverrideBase, OverrideP {
+  typealias #^MODIFIER6^#
+}
+class Override7 : OverrideBase, OverrideP {
+  override #^MODIFIER7^#
+}
+class Override8 : OverrideBase, OverrideP {
+  // Note: This *does* emit functions. It will result invalid decl, but fix-it
+  // will do the job.
+  convenience func #^MODIFIER8^#
+}
+class Override9 : OverrideBase, OverrideP {
+  // Ditto.
+  required var #^MODIFIER9^#
+}
+class Override10 : OverrideBase, OverrideP {
+  // Ditto.
+  final typealias #^MODIFIER10^#
+  // Same as MODIFIER6.
+}
+
+// MODIFIER1: Begin completions, 7 items
+// MODIFIER1-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=required init(p: Int)
+// MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
+// MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func openMethod() {|}; name=openMethod()
+// MODIFIER1-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl: Int
+// MODIFIER1-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x: Int)
+// MODIFIER1-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=required init(a: Int)
+// MODIFIER1-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#}; name=Assoc = Type
+// MODIFIER1: End completions
+
+// MODIFIER2: Begin completions, 3 items
+// MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
+// MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func openMethod() {|}; name=openMethod()
+// MODIFIER2-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl: Int
+// MODIFIER2: End completions
+
+// MODIFIER4: Begin completions, 3 items
+// MODIFIER4-DAG: Decl[Constructor]/Super:            init(p: Int) {|}; name=init(p: Int)
+// MODIFIER4-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x: Int)
+// MODIFIER4-DAG: Decl[Constructor]/Super:            init(a: Int) {|}; name=init(a: Int)
+// MODIFIER4: End completions
+
+// MODIFIER5: Begin completions, 3 items
+// MODIFIER5-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=required init(p: Int)
+// MODIFIER5-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x: Int)
+// MODIFIER5-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=required init(a: Int)
+// MODIFIER5: End completions
+
+// MODIFIER6: Begin completions, 1 items
+// MODIFIER6-DAG: Decl[AssociatedType]/Super:         Assoc = {#(Type)#}; name=Assoc = Type
+// MODIFIER6: End completions
+
+// MODIFIER7: Begin completions, 5 items
+// MODIFIER7-DAG: Decl[InstanceMethod]/Super:         func defaultMethod() {|}; name=defaultMethod()
+// MODIFIER7-DAG: Decl[InstanceVar]/Super:            var varDecl: Int; name=varDecl: Int
+// MODIFIER7-DAG: Decl[InstanceMethod]/Super:         func openMethod() {|}; name=openMethod()
+// MODIFIER7-DAG: Decl[Constructor]/Super:            init(x: Int) {|}; name=init(x: Int)
+// MODIFIER7-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=required init(a: Int)
+// MODIFIER7: End completions
+
+// MODIFIER8: Begin completions, 2 items
+// MODIFIER8-DAG: Decl[InstanceMethod]/Super:         defaultMethod() {|}; name=defaultMethod()
+// MODIFIER8-DAG: Decl[InstanceMethod]/Super:         openMethod() {|}; name=openMethod()
+// MODIFIER8: End completions
+
+// MODIFIER9: Begin completions, 1 items
+// MODIFIER9-DAG: Decl[InstanceVar]/Super:            varDecl: Int; name=varDecl: Int
+// MODIFIER9: End completions
+
+protocol RequiredP {
+  init(p: Int)
+}
+class RequiredClass : RequiredP {
+  #^PROTOINIT_NORM^#
+}
+final class RequiredFinal : RequiredP {
+  #^PROTOINIT_FINAL^#
+}
+struct RequiredS : RequiredP {
+  #^PROTOINIT_STRUCT^#
+}
+
+// PROTOINIT_NORM: Begin completions, 1 items
+// PROTOINIT_NORM-DAG: required init(p: Int) {|}; name=required init(p: Int)
+// PROTOINIT_NORM: End completions
+
+// PROTOINIT_FINAL: Begin completions, 1 items
+// PROTOINIT_FINAL-DAG: init(p: Int) {|}; name=init(p: Int)
+// PROTOINIT_FINAL: End completions
+
+// PROTOINIT_STRUCT: Begin completions, 1 items
+// PROTOINIT_STRUCT-DAG: init(p: Int) {|}; name=init(p: Int)
+// PROTOINIT_STRUCT: End completions

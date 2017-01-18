@@ -33,10 +33,10 @@ of its subclasses.  This leads to a soundness problem:
   @interface Subclass : Superclass
   - (void)subclassMethod
   @end
-    
+
   @implementation Subclass : Superclass
   char\* **name**\ ;                      // never initialized
-    
+
   - (void)print { printf(\ **name**\ ); } // oops
   @end
 
@@ -132,7 +132,7 @@ Here are the proposed rules:
   default, part of the public interface of a subclass defined in
   Objective-C.
 
-* ``self.init(…)`` calls in Swift never dispatch virtually.  We have a
+* ``self.init(...)`` calls in Swift never dispatch virtually.  We have a
   safe model for "virtual initialization:" ``init`` methods can call
   overridable methods after all instance variables and superclasses
   are initialized.  Allowing *virtual* constructor delegation would
@@ -150,7 +150,7 @@ Here are the proposed rules:
      It allows superclasses to break their subclasses by adding
      ``init`` methods.
 
-     
+
 Summary
 =======
 

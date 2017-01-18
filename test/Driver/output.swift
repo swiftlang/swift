@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: mkdir %t/sub
+// RUN: mkdir -p %t/sub
 // RUN: cd %t
 
 // RUN: %target-swift-frontend -emit-bc %s
@@ -11,8 +11,8 @@
 // RUN: %target-swift-frontend -emit-bc %s -o %t/explicit2.llvmbc -module-name explicit2
 // RUN: echo | %target-swift-frontend -emit-bc - -o %t/sub -module-name stdin
 
-// RUN: ls -1 %t | FileCheck %s
-// RUN: ls -1 %t/sub/ | FileCheck %s -check-prefix=SUB
+// RUN: ls -1 %t | %FileCheck %s
+// RUN: ls -1 %t/sub/ | %FileCheck %s -check-prefix=SUB
 
 // CHECK: explicit.bc
 // CHECK-NEXT: explicit.llvmbc

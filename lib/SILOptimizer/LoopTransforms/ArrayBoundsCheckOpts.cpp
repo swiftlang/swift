@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -203,8 +203,8 @@ static bool isIdentifiedUnderlyingArrayObject(SILValue V) {
     return true;
 
   // Function arguments are safe.
-  if (auto Arg = dyn_cast<SILArgument>(V))
-    return Arg->isFunctionArg();
+  if (isa<SILFunctionArgument>(V))
+    return true;
 
   return false;
 }
@@ -213,7 +213,7 @@ static bool isIdentifiedUnderlyingArrayObject(SILValue V) {
 /// eliminate if there exists an earlier bounds check that covers the same
 /// index.
 ///
-/// We analyse a region of code for instructions that mayModify the size of an
+/// We analyze a region of code for instructions that mayModify the size of an
 /// array whenever we encounter an instruction that mayModify a specific array
 /// or all arrays we clear the safe arrays (either a specific array or all of
 /// them).
@@ -259,19 +259,19 @@ public:
   /// If an instruction is encountered that might modify any array this method
   /// stops further analysis and returns false. Otherwise, true is returned and
   /// the safe arrays can be queried.
-  void analyseBlock(SILBasicBlock *BB) {
+  void analyzeBlock(SILBasicBlock *BB) {
     for (auto &Inst : *BB)
-      analyseInstruction(&Inst);
+      analyzeInstruction(&Inst);
   }
 
   /// Returns false if the instruction may change the size of any array. All
   /// redundant safe array accesses seen up to the instruction can be removed.
-  void analyse(SILInstruction *I) {
+  void analyze(SILInstruction *I) {
     assert(!LoopMode &&
            "This function can only be used in on cfg without loops");
     (void)LoopMode;
 
-    analyseInstruction(I);
+    analyzeInstruction(I);
   }
 
   /// Returns true if the Array is unsafe.
@@ -288,8 +288,8 @@ public:
   }
 
 private:
-  /// Analyse one instruction wrt. the instructions we have seen so far.
-  void analyseInstruction(SILInstruction *Inst) {
+  /// Analyze one instruction wrt. the instructions we have seen so far.
+  void analyzeInstruction(SILInstruction *Inst) {
     SILValue Array;
     ArrayCallKind K;
     auto BoundsEffect =
@@ -357,7 +357,7 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
     auto Inst = &*Iter;
     ++Iter;
 
-    ABC.analyse(Inst);
+    ABC.analyze(Inst);
 
     if (ABC.clearArraysUnsafeFlag()) {
       // Any array may be modified -> forget everything. This is just a
@@ -668,7 +668,7 @@ static bool isRangeChecked(SILValue Start, SILValue End,
     return true;
 
   // Look for a branch on EQ around the Preheader.
-  auto *PreheaderPred = Preheader->getSinglePredecessor();
+  auto *PreheaderPred = Preheader->getSinglePredecessorBlock();
   if (!PreheaderPred)
     return false;
   auto *CondBr = dyn_cast<CondBranchInst>(PreheaderPred->getTerminator());
@@ -689,7 +689,7 @@ static bool isRangeChecked(SILValue Start, SILValue End,
 }
 
 static bool dominates(DominanceInfo *DT, SILValue V, SILBasicBlock *B) {
-  if (auto ValueBB = V->getParentBB())
+  if (auto ValueBB = V->getParentBlock())
     return DT->dominates(ValueBB, B);
   return false;
 }
@@ -762,7 +762,7 @@ struct InductionInfo {
   }
 };
 
-/// Analyse canonical induction variables in a loop to find their start and end
+/// Analyze canonical induction variables in a loop to find their start and end
 /// values.
 /// At the moment we only handle very simple induction variables that increment
 /// by one and use equality comparison.
@@ -788,9 +788,9 @@ public:
   InductionAnalysis(const InductionAnalysis &) = delete;
   InductionAnalysis &operator=(const InductionAnalysis &) = delete;
 
-  bool analyse() {
+  bool analyze() {
     bool FoundIndVar = false;
-    for (auto *Arg : Header->getBBArgs()) {
+    for (auto *Arg : Header->getArguments()) {
       // Look for induction variables.
       IVInfo::IVDesc IV;
       if (!(IV = IVs.getInductionDesc(Arg))) {
@@ -799,8 +799,8 @@ public:
       }
 
       InductionInfo *Info;
-      if (!(Info = analyseIndVar(Arg, IV.Inc, IV.IncVal))) {
-        DEBUG(llvm::dbgs() << " could not analyse the induction on: " << *Arg);
+      if (!(Info = analyzeIndVar(Arg, IV.Inc, IV.IncVal))) {
+        DEBUG(llvm::dbgs() << " could not analyze the induction on: " << *Arg);
         continue;
       }
 
@@ -820,8 +820,8 @@ public:
 
 private:
 
-  /// Analyse one potential induction variable starting at Arg.
-  InductionInfo *analyseIndVar(SILArgument *HeaderVal, BuiltinInst *Inc,
+  /// Analyze one potential induction variable starting at Arg.
+  InductionInfo *analyzeIndVar(SILArgument *HeaderVal, BuiltinInst *Inc,
                                IntegerLiteralInst *IncVal) {
     if (IncVal->getValue() != 1)
       return nullptr;
@@ -1010,6 +1010,10 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
     if (!ArrayIndex)
       continue;
 
+    // Make sure we know how-to hoist the array call.
+    if (!ArrayCall.canHoist(Preheader->getTerminator(), DT))
+      continue;
+
     // Invariant check.
     if (blockAlwaysExecutes && dominates(DT, ArrayIndex, Preheader)) {
       assert(ArrayCall.canHoist(Preheader->getTerminator(), DT) &&
@@ -1093,7 +1097,39 @@ static bool isComparisonKnownTrue(BuiltinInst *Builtin, InductionInfo &IndVar) {
                                     m_Specific(IndVar.End)));
 }
 
-/// Analyse the loop for arrays that are not modified and perform dominator tree
+/// Based on the induction variable information this comparison is known to be
+/// false.
+static bool isComparisonKnownFalse(BuiltinInst *Builtin,
+                                   InductionInfo &IndVar) {
+  if (!IndVar.IsOverflowCheckInserted ||
+      IndVar.Cmp != BuiltinValueKind::ICMP_EQ)
+    return false;
+
+  // Pattern match a false condition patterns that we can detect and optimize:
+  // Iteration count < 0 (start)
+  // Iteration count + 1 <= 0 (start)
+  // Iteration count + 1 < 0 (start)
+  // Iteration count + 1 == 0 (start)
+  auto MatchIndVarHeader = m_Specific(IndVar.HeaderVal);
+  auto MatchIncrementIndVar = m_TupleExtractInst(
+      m_ApplyInst(BuiltinValueKind::SAddOver, MatchIndVarHeader, m_One()), 0);
+  auto MatchIndVarStart = m_Specific(IndVar.Start);
+
+  if (match(Builtin,
+            m_ApplyInst(BuiltinValueKind::ICMP_SLT,
+                        m_CombineOr(MatchIndVarHeader, MatchIncrementIndVar),
+                        MatchIndVarStart)) ||
+      match(Builtin, m_ApplyInst(BuiltinValueKind::ICMP_EQ,
+                                 MatchIncrementIndVar, MatchIndVarStart)) ||
+      match(Builtin, m_ApplyInst(BuiltinValueKind::ICMP_SLE,
+                                 MatchIncrementIndVar, MatchIndVarStart))) {
+    return true;
+  }
+
+  return false;
+}
+
+/// Analyze the loop for arrays that are not modified and perform dominator tree
 /// based redundant bounds check removal.
 static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
                               IVInfo &IVs, ArraySet &Arrays,
@@ -1118,7 +1154,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   // could mutate their size in the loop.
   ABCAnalysis ABC(true, Arrays, RCIA);
   for (auto *BB : Loop->getBlocks()) {
-    ABC.analyseBlock(BB);
+    ABC.analyzeBlock(BB);
   }
 
   // Remove redundant checks down the dominator tree inside the loop,
@@ -1146,9 +1182,9 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
       return Changed;
 
     // Look back a split edge.
-    if (!Loop->isLoopExiting(Latch) && Latch->getSinglePredecessor() &&
-        Loop->isLoopExiting(Latch->getSinglePredecessor()))
-      Latch = Latch->getSinglePredecessor();
+    if (!Loop->isLoopExiting(Latch) && Latch->getSinglePredecessorBlock() &&
+        Loop->isLoopExiting(Latch->getSinglePredecessorBlock()))
+      Latch = Latch->getSinglePredecessorBlock();
     if (Loop->isLoopExiting(Latch) && Latch->getSuccessors().size() == 2) {
       ExitingBlk = Latch;
       ExitBlk = Loop->contains(Latch->getSuccessors()[0])
@@ -1162,7 +1198,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   // Find canonical induction variables.
   InductionAnalysis IndVars(DT, IVs, Preheader, Header, ExitingBlk, ExitBlk);
-  bool IVarsFound = IndVars.analyse();
+  bool IVarsFound = IndVars.analyze();
   if (!IVarsFound) {
     DEBUG(llvm::dbgs() << "No induction variables found\n");
   }
@@ -1172,7 +1208,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   if (IVarsFound) {
     SILValue TrueVal;
     SILValue FalseVal;
-    for (auto *Arg: Header->getBBArgs()) {
+    for (auto *Arg : Header->getArguments()) {
       if (auto *IV = IndVars[Arg]) {
         SILBuilderWithScope B(Preheader->getTerminator(), IV->getInstruction());
 
@@ -1193,6 +1229,15 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
                 TrueVal = SILValue(B.createIntegerLiteral(
                     Builtin->getLoc(), Builtin->getType(), -1));
               Builtin->replaceAllUsesWith(TrueVal);
+              Changed = true;
+              continue;
+            }
+            if (isComparisonKnownFalse(Builtin, *IV)) {
+              if (!FalseVal) {
+                FalseVal = SILValue(B.createIntegerLiteral(
+                    Builtin->getLoc(), Builtin->getType(), 0));
+              }
+              Builtin->replaceAllUsesWith(FalseVal);
               Changed = true;
               continue;
             }
@@ -1352,7 +1397,7 @@ public:
     }
   }
 };
-}
+} // end anonymous namespace
 
 SILTransform *swift::createABCOpt() {
   return new ABCOpt();

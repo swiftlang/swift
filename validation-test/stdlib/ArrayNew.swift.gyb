@@ -273,7 +273,7 @@ class CustomImmutableNSArray : NSArray {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>?, count: Int) {
     super.init(objects: objects, count: count)
   }
 
@@ -731,9 +731,9 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
   // Bridge back to native array.
-  var native: [TestObjCValueTy] = 
+  var native: [TestObjCValueTy] =
     getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3) as! Array
-  
+
   let identity1 = unsafeBitCast(native, to: UInt.self)
 
   // Mutate elements, but don't change count.

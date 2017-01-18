@@ -2,15 +2,16 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 /// Buffer type for `ArraySlice<Element>`.
+@_versioned
 internal struct _SliceBuffer<Element>
   : _ArrayBufferProtocol,
     RandomAccessCollection
@@ -50,7 +51,7 @@ internal struct _SliceBuffer<Element>
 
   internal func _invariantCheck() {
     let isNative = _hasNativeBuffer
-    let isNativeStorage: Bool = (owner as? _ContiguousArrayStorageBase) != nil
+    let isNativeStorage: Bool = owner is _ContiguousArrayStorageBase
     _sanityCheck(isNativeStorage == isNative)
     if isNative {
       _sanityCheck(count <= nativeBuffer.count)
@@ -78,8 +79,8 @@ internal struct _SliceBuffer<Element>
   /// - Precondition: This buffer is backed by a uniquely-referenced
   ///   `_ContiguousArrayBuffer` and
   ///   `insertCount <= numericCast(newValues.count)`.
-  internal mutating func replace<C>(
-    subRange: Range<Int>,
+  internal mutating func replaceSubrange<C>(
+    _ subrange: Range<Int>,
     with insertCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Iterator.Element == Element {
@@ -89,7 +90,7 @@ internal struct _SliceBuffer<Element>
 
     _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
 
-    let eraseCount = subRange.count
+    let eraseCount = subrange.count
     let growth = insertCount - eraseCount
     let oldCount = count
 
@@ -98,10 +99,10 @@ internal struct _SliceBuffer<Element>
 
     _sanityCheck(native.count + growth <= native.capacity)
 
-    let start = subRange.lowerBound - startIndex + hiddenElementCount
-    let end = subRange.upperBound - startIndex + hiddenElementCount
-    native.replace(
-      subRange: start..<end,
+    let start = subrange.lowerBound - startIndex + hiddenElementCount
+    let end = subrange.upperBound - startIndex + hiddenElementCount
+    native.replaceSubrange(
+      start..<end,
       with: insertCount,
       elementsOf: newValues)
 
@@ -121,6 +122,7 @@ internal struct _SliceBuffer<Element>
   internal var owner: AnyObject
   internal let subscriptBaseAddress: UnsafeMutablePointer<Element>
 
+  @_versioned
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
     return subscriptBaseAddress + startIndex
   }
@@ -151,8 +153,8 @@ internal struct _SliceBuffer<Element>
         let myCount = count
 
         if _slowPath(backingCount > myCount + offset) {
-          native.replace(
-            subRange: (myCount+offset)..<backingCount,
+          native.replaceSubrange(
+            (myCount+offset)..<backingCount,
             with: 0,
             elementsOf: EmptyCollection())
         }
@@ -245,8 +247,8 @@ internal struct _SliceBuffer<Element>
 
   @_versioned
   internal func getElement(_ i: Int) -> Element {
-    _sanityCheck(i >= startIndex, "negative slice index is out of range")
-    _sanityCheck(i < endIndex, "slice index out of range")
+    _sanityCheck(i >= startIndex, "slice index is out of range (before startIndex)")
+    _sanityCheck(i < endIndex, "slice index is out of range")
     return subscriptBaseAddress[i]
   }
 
@@ -259,8 +261,8 @@ internal struct _SliceBuffer<Element>
       return getElement(position)
     }
     nonmutating set {
-      _sanityCheck(position >= startIndex, "negative slice index is out of range")
-      _sanityCheck(position < endIndex, "slice index out of range")
+      _sanityCheck(position >= startIndex, "slice index is out of range (before startIndex)")
+      _sanityCheck(position < endIndex, "slice index is out of range")
       subscriptBaseAddress[position] = newValue
     }
   }

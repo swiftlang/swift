@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
@@ -53,36 +54,51 @@ static VarDecl *getFirstParamDecl(FuncDecl *fn) {
 
 
 static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
-                               StringRef name, Type type, bool isLet) {
+                                StringRef name,
+                                Type type,
+                                Type interfaceType,
+                                bool isLet) {
   auto &context = DC->getASTContext();
   auto *param = new (context) ParamDecl(isLet, SourceLoc(), SourceLoc(),
                                         Identifier(), loc,
-                                        context.getIdentifier(name),Type(), DC);
+                                        context.getIdentifier(name),
+                                        type, DC);
   param->setImplicit();
-  param->getTypeLoc().setType(type);
+  param->setInterfaceType(interfaceType);
   return param;
 }
 
 static ParamDecl *buildLetArgument(SourceLoc loc, DeclContext *DC,
-                                   StringRef name, Type type) {
-  return buildArgument(loc, DC, name, type, /*isLet*/ true);
+                                   StringRef name,
+                                   Type type,
+                                   Type interfaceType) {
+  return buildArgument(loc, DC, name, type, interfaceType, /*isLet*/ true);
 }
 
 static ParamDecl *buildInOutArgument(SourceLoc loc, DeclContext *DC,
-                                     StringRef name, Type type) {
-  return buildArgument(loc, DC, name, InOutType::get(type), /*isLet*/ false);
+                                     StringRef name,
+                                     Type type,
+                                     Type interfaceType) {
+  return buildArgument(
+      loc, DC, name,
+      InOutType::get(type),
+      InOutType::get(interfaceType),
+      /*isLet*/ false);
 }
 
 static Type getTypeOfStorage(AbstractStorageDecl *storage,
-                             TypeChecker &TC) {
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    return TC.getTypeOfRValue(var, /*want interface type*/ false);
-  } else {
-    // None of the transformations done by getTypeOfRValue are
-    // necessary for subscripts.
-    auto subscript = cast<SubscriptDecl>(storage);
-    return subscript->getElementType();
-  }
+                             TypeChecker &TC,
+                             bool wantInterfaceType) {
+  if (auto var = dyn_cast<VarDecl>(storage))
+    return TC.getTypeOfRValue(var, wantInterfaceType);
+
+  // None of the transformations done by getTypeOfRValue are
+  // necessary for subscripts.
+  auto subscript = cast<SubscriptDecl>(storage);
+  auto type = subscript->getElementInterfaceType();
+  if (!wantInterfaceType)
+    type = storage->getDeclContext()->mapTypeIntoContext(type);
+  return type;
 }
 
 /// Build a parameter list which can forward the formal index parameters of a
@@ -125,7 +141,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   // The implicit 'self' argument if in a type context.
   if (storage->getDeclContext()->isTypeContext())
-    getterParams.push_back(ParameterList::createUnboundSelf(loc,
+    getterParams.push_back(ParameterList::createSelf(loc,
                                                      storage->getDeclContext(),
                                                      /*isStatic*/false));
     
@@ -138,13 +154,13 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
       staticLoc = var->getLoc();
   }
 
-  auto storageType = getTypeOfStorage(storage, TC);
+  auto storageInterfaceType = getTypeOfStorage(storage, TC, true);
 
   auto getter = FuncDecl::create(
       TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
-      getterParams, Type(), TypeLoc::withoutLoc(storageType),
+      getterParams, TypeLoc::withoutLoc(storageInterfaceType),
       storage->getDeclContext());
   getter->setImplicit();
 
@@ -169,18 +185,24 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   // Create the parameter list for the setter.
   SmallVector<ParameterList*, 2> params;
 
+  bool isStatic = storage->isStatic();
+  bool isMutating = !storage->isSetterNonMutating();
+
   // The implicit 'self' argument if in a type context.
   if (storage->getDeclContext()->isTypeContext()) {
-    params.push_back(ParameterList::createUnboundSelf(loc,
+    params.push_back(ParameterList::createSelf(loc,
                                                storage->getDeclContext(),
-                                               /*isStatic*/false));
+                                               /*isStatic*/isStatic,
+                                               /*isInOut*/isMutating));
   }
   
   // Add a "(value : T, indices...)" argument list.
-  auto storageType = getTypeOfStorage(storage, TC);
+  auto storageType = getTypeOfStorage(storage, TC, false);
+  auto storageInterfaceType = getTypeOfStorage(storage, TC, true);
   valueDecl = buildLetArgument(storage->getLoc(),
                                storage->getDeclContext(), "value",
-                               storageType);
+                               storageType,
+                               storageInterfaceType);
   params.push_back(buildIndexForwardingParamList(storage, valueDecl));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
@@ -188,19 +210,19 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
       TC.Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
       Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
-      params, Type(), TypeLoc::withoutLoc(setterRetTy),
+      params, TypeLoc::withoutLoc(setterRetTy),
       storage->getDeclContext());
   setter->setImplicit();
 
-  if (!storage->isSetterNonMutating())
+  if (isMutating)
     setter->setMutating();
+
+  if (isStatic)
+    setter->setStatic();
 
   // If the var is marked final, then so is the getter.
   if (storage->isFinal())
     makeFinal(TC.Context, setter);
-
-  if (storage->isStatic())
-    setter->setStatic();
 
   return setter;
 }
@@ -226,7 +248,30 @@ bool needsToBeRegisteredAsExternalDecl(AbstractStorageDecl *storage) {
   return nominal->hasClangNode();
 }
 
+/// Mark the accessor as transparent if we can.
+///
+/// If the storage is inside a fixed-layout nominal type, we can mark the
+/// accessor as transparent, since in this case we just want it for abstraction
+/// purposes (i.e., to make access to the variable uniform and to be able to
+/// put the getter in a vtable).
+///
+/// If the storage is for a global stored property or a stored property of a
+/// resilient type, we are synthesizing accessors to present a resilient
+/// interface to the storage and they should not be transparent.
+static void maybeMarkTransparent(FuncDecl *accessor,
+                                 AbstractStorageDecl *storage,
+                                 TypeChecker &TC) {
+  auto *DC = storage->getDeclContext();
+  if (isa<ProtocolDecl>(DC) || isa<ClassDecl>(DC))
+    return;
+
+  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (nominal && nominal->hasFixedLayout())
+    accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
+}
+
 static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
+                                                  FuncDecl *setter,
                                                   TypeChecker &TC) {
   auto &ctx = storage->getASTContext();
   SourceLoc loc = storage->getLoc();
@@ -237,14 +282,18 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   //  - The implicit 'self' argument if in a type context.
   auto DC = storage->getDeclContext();
   if (DC->isTypeContext())
-    params.push_back(ParameterList::createUnboundSelf(loc, DC, /*isStatic*/false));
+    params.push_back(ParameterList::createSelf(loc, DC, /*isStatic*/false));
 
   //  - The buffer parameter, (buffer: Builtin.RawPointer,
   //                           inout storage: Builtin.UnsafeValueBuffer,
   //                           indices...).
   ParamDecl *bufferElements[] = {
-    buildLetArgument(loc, DC, "buffer", ctx.TheRawPointerType),
-    buildInOutArgument(loc, DC, "callbackStorage", ctx.TheUnsafeValueBufferType)
+    buildLetArgument(loc, DC, "buffer",
+                     ctx.TheRawPointerType,
+                     ctx.TheRawPointerType),
+    buildInOutArgument(loc, DC, "callbackStorage",
+                       ctx.TheUnsafeValueBufferType,
+                       ctx.TheUnsafeValueBufferType)
   };
   params.push_back(buildIndexForwardingParamList(storage, bufferElements));
 
@@ -262,22 +311,21 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
       ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
       Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
-      params, Type(), TypeLoc::withoutLoc(retTy), DC);
+      params, TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   
-  // materializeForSet is mutating and static if the setter is.
-  auto setter = storage->getSetter();
+  bool isStatic = storage->isStatic();
 
   // Open-code the setMutating() calculation since we might run before
   // the setter has been type checked. Also as a hack, always mark the
   // setter mutating if we're inside a protocol, because it seems some
   // things break otherwise -- the root cause should be fixed eventually.
   materializeForSet->setMutating(
-      setter->getDeclContext()->getAsProtocolOrProtocolExtensionContext() ||
+      storage->getDeclContext()->getAsProtocolOrProtocolExtensionContext() ||
       (!setter->getAttrs().hasAttribute<NonMutatingAttr>() &&
        !storage->isSetterNonMutating()));
 
-  materializeForSet->setStatic(setter->isStatic());
+  materializeForSet->setStatic(isStatic);
 
   // materializeForSet is final if the storage is.
   if (storage->isFinal())
@@ -301,6 +349,8 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
     asAvailableAs.push_back(setter);
   }
 
+  maybeMarkTransparent(materializeForSet, storage, TC);
+
   AvailabilityInference::applyInferredAvailableAttrs(materializeForSet,
                                                         asAvailableAs, ctx);
 
@@ -312,19 +362,15 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   return materializeForSet;
 }
 
-void swift::convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
+static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   auto *Get = createGetterPrototype(VD, TC);
   
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(VD->getLoc(), Get, nullptr, nullptr, VD->getLoc());
+  VD->makeComputed(SourceLoc(), Get, nullptr, nullptr, SourceLoc());
   
   // We've added some members to our containing class, add them to the members
   // list.
   addMemberToContextIfNeeded(Get, VD->getDeclContext());
-
-  // Type check the getter declaration.
-  TC.typeCheckDecl(VD->getGetter(), true);
-  TC.typeCheckDecl(VD->getGetter(), false);
 }
 
 
@@ -346,8 +392,8 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
       return nullptr;
     
     Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
-    if (param->getType()->is<InOutType>())
-      ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*implicit=*/true);
+    if (param->getInterfaceType()->is<InOutType>())
+      ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*isImplicit=*/true);
     args.push_back(ref);
     
     labels.push_back(param->getArgumentName());
@@ -363,9 +409,6 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
   return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
                            SourceLoc(), false, IsImplicit);
 }
-
-
-
 
 
 /// Build a reference to the subscript index variables for this subscript
@@ -438,7 +481,7 @@ namespace {
     FuncDecl *Accessor;
   public:
     AccessorStorageReferenceContext(FuncDecl *accessor) : Accessor(accessor) {}
-    virtual ~AccessorStorageReferenceContext() = default;
+    ~AccessorStorageReferenceContext() override = default;
 
     VarDecl *getSelfDecl() const override {
       return Accessor->getImplicitSelfDecl();
@@ -448,7 +491,7 @@ namespace {
       return buildSubscriptIndexReference(ctx, Accessor);
     }
   };
-}
+} // end anonymous namespace
 
 /// Build an l-value for the storage of a declaration.
 static Expr *buildStorageReference(
@@ -522,7 +565,7 @@ static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
   DC->lookupQualified(ModuleType::get(foundation),
                       ctx.getSwiftId(KnownFoundationEntity::NSCopying),
                       NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                      /*resolver=*/nullptr,
+                      /*typeResolver=*/nullptr,
                       results);
 
   if (results.size() != 1)
@@ -629,25 +672,6 @@ static void createPropertyStoreOrCallSuperclassSetter(FuncDecl *accessor,
                                              IsImplicit));
 }
 
-/// Mark the accessor as transparent if we can.
-///
-/// If the storage is inside a fixed-layout nominal type, we can mark the
-/// accessor as transparent, since in this case we just want it for abstraction
-/// purposes (i.e., to make access to the variable uniform and to be able to
-/// put the getter in a vtable).
-///
-/// If the storage is for a global stored property or a stored property of a
-/// resilient type, we are synthesizing accessors to present a resilient
-/// interface to the storage and they should not be transparent.
-static void maybeMarkTransparent(FuncDecl *accessor,
-                                 AbstractStorageDecl *storage,
-                                 TypeChecker &TC) {
-  auto *nominal = storage->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (nominal && nominal->hasFixedLayout())
-    accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
-}
-
 /// Synthesize the body of a trivial getter.  For a non-member vardecl or one
 /// which is not an override of a base class property, it performs a direct
 /// storage load.  For an override of a base member property, it chains up to
@@ -675,8 +699,6 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
                                     AbstractStorageDecl *storage,
                                     VarDecl *valueVar,
                                     TypeChecker &TC) {
-  if (storage->isInvalid()) return;
-
   auto &ctx = TC.Context;
   SourceLoc loc = storage->getLoc();
 
@@ -721,79 +743,50 @@ static bool doesStorageNeedSetter(AbstractStorageDecl *storage) {
   llvm_unreachable("bad storage kind");
 }
 
-/// Add a materializeForSet accessor to the given declaration.
-static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
-                                      TypeChecker &TC) {
-  auto materializeForSet = createMaterializeForSetPrototype(storage, TC);
-  addMemberToContextIfNeeded(materializeForSet, storage->getDeclContext(),
-                             storage->getSetter());
-  storage->setMaterializeForSetFunc(materializeForSet);
-
-  TC.computeAccessibility(materializeForSet);
-
-  TC.validateDecl(materializeForSet);
-
-  return materializeForSet;
-}
-
 /// Add trivial accessors to a Stored or Addressed property.
-void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
+static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
                                          TypeChecker &TC) {
   assert(!storage->hasAccessorFunctions() && "already has accessors?");
+  auto *DC = storage->getDeclContext();
 
   // Create the getter.
   auto *getter = createGetterPrototype(storage, TC);
-  if (storage->hasAccessorFunctions()) return;
 
   // Create the setter.
   FuncDecl *setter = nullptr;
   ParamDecl *setterValueParam = nullptr;
-  if (doesStorageNeedSetter(storage)) {
+  if (doesStorageNeedSetter(storage))
     setter = createSetterPrototype(storage, setterValueParam, TC);
-    if (storage->hasAccessorFunctions()) return;
-  }
-  
+
+  FuncDecl *materializeForSet = nullptr;
+  if (setter && DC->getAsNominalTypeOrNominalTypeExtensionContext())
+    materializeForSet = createMaterializeForSetPrototype(storage, setter, TC);
+
   // Okay, we have both the getter and setter.  Set them in VD.
-  storage->addTrivialAccessors(getter, setter, nullptr);
+  storage->addTrivialAccessors(getter, setter, materializeForSet);
 
   bool isDynamic = (storage->isDynamic() && storage->isObjC());
   if (isDynamic)
     getter->getAttrs().add(new (TC.Context) DynamicAttr(IsImplicit));
 
-  // Synthesize and type-check the body of the getter.
+  // Synthesize the body of the getter.
   synthesizeTrivialGetter(getter, storage, TC);
-  TC.typeCheckDecl(getter, true);
-  TC.typeCheckDecl(getter, false);
 
   if (setter) {
     if (isDynamic)
       setter->getAttrs().add(new (TC.Context) DynamicAttr(IsImplicit));
 
-    // Synthesize and type-check the body of the setter.
+    // Synthesize the body of the setter.
     synthesizeTrivialSetter(setter, storage, setterValueParam, TC);
-    TC.typeCheckDecl(setter, true);
-    TC.typeCheckDecl(setter, false);
   }
-
-  auto *DC = storage->getDeclContext();
 
   // We've added some members to our containing context, add them to
   // the right list.
   addMemberToContextIfNeeded(getter, DC);
   if (setter)
     addMemberToContextIfNeeded(setter, DC);
-
-  // If we're creating trivial accessors for a stored property of a
-  // nominal type, the stored property is either witnessing a
-  // protocol requirement or the nominal type is resilient. In both
-  // cases, we need to expose a materializeForSet.
-  //
-  // Global stored properties don't get a materializeForSet.
-  if (setter && DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
-    FuncDecl *materializeForSet = addMaterializeForSet(storage, TC);
-    synthesizeMaterializeForSet(materializeForSet, storage, TC);
-    TC.typeCheckDecl(materializeForSet, false);
-  }
+  if (materializeForSet)
+    addMemberToContextIfNeeded(materializeForSet, DC);
 }
 
 /// Add a trivial setter and materializeForSet to a
@@ -807,56 +800,73 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
   assert(storage->getStorageKind() ==
            AbstractStorageDecl::ComputedWithMutableAddress);
 
-  // Synthesize and type-check the body of the setter.
+  // Synthesize the body of the setter.
   VarDecl *valueParamDecl = getFirstParamDecl(setter);
   synthesizeTrivialSetter(setter, storage, valueParamDecl, TC);
-  TC.typeCheckDecl(setter, true);
-  TC.typeCheckDecl(setter, false);
 }
 
-void TypeChecker::synthesizeAccessorsForStorage(AbstractStorageDecl *storage,
-                                                bool wantMaterializeForSet) {
-  // If the decl is stored, convert it to StoredWithTrivialAccessors
-  // by synthesizing the full set of accessors.
-  if (!storage->hasAccessorFunctions()) {
-    addTrivialAccessorsToStorage(storage, *this);
-    return;
-  }
+/// Add a materializeForSet accessor to the given declaration.
+static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
+                                      TypeChecker &TC) {
+  auto materializeForSet = createMaterializeForSetPrototype(
+      storage, storage->getSetter(), TC);
+  addMemberToContextIfNeeded(materializeForSet, storage->getDeclContext(),
+                             storage->getSetter());
+  storage->setMaterializeForSetFunc(materializeForSet);
 
-  // If we want wantMaterializeForSet, create it now.
-  if (wantMaterializeForSet && !storage->getMaterializeForSetFunc()) {
-    FuncDecl *materializeForSet = addMaterializeForSet(storage, *this);
-    synthesizeMaterializeForSet(materializeForSet, storage, *this);
-    typeCheckDecl(materializeForSet, false);
-  }
+  return materializeForSet;
+}
+
+static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
+  assert(VD->getStorageKind() == AbstractStorageDecl::Stored);
+
+  // Create the getter.
+  auto *Get = createGetterPrototype(VD, TC);
+
+  // Create the setter.
+  ParamDecl *SetValueDecl = nullptr;
+  auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
+
+  // Okay, we have both the getter and setter.  Set them in VD.
+  VD->makeComputed(SourceLoc(), Get, Set, nullptr, SourceLoc());
+
+  // We've added some members to our containing class/extension, add them to
+  // the members list.
+  addMemberToContextIfNeeded(Get, VD->getDeclContext());
+  addMemberToContextIfNeeded(Set, VD->getDeclContext());
 }
 
 /// The specified AbstractStorageDecl was just found to satisfy a
 /// protocol property requirement.  Ensure that it has the full
-/// complement of accessors.
+/// complement of accessors, and validate them.
 void TypeChecker::synthesizeWitnessAccessorsForStorage(
                                              AbstractStorageDecl *requirement,
                                              AbstractStorageDecl *storage) {
+  // If the decl is stored, convert it to StoredWithTrivialAccessors
+  // by synthesizing the full set of accessors.
+  if (!storage->hasAccessorFunctions()) {
+    if (storage->getAttrs().hasAttribute<NSManagedAttr>())
+      convertNSManagedStoredVarToComputed(cast<VarDecl>(storage), *this);
+    else
+      addTrivialAccessorsToStorage(storage, *this);
+
+    if (auto getter = storage->getGetter())
+      validateDecl(getter);
+    if (auto setter = storage->getSetter())
+      validateDecl(setter);
+  }
+
   // @objc protocols don't need a materializeForSet since ObjC doesn't
   // have that concept.
   bool wantMaterializeForSet =
     !requirement->isObjC() && requirement->getSetter();
 
-  synthesizeAccessorsForStorage(storage, wantMaterializeForSet);
-}
+  // If we want wantMaterializeForSet, create it now.
+  if (wantMaterializeForSet && !storage->getMaterializeForSetFunc())
+    addMaterializeForSet(storage, *this);
 
-void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
-                                        AbstractStorageDecl *storage,
-                                        TypeChecker &TC) {
-  // The body is actually emitted by SILGen
-
-  maybeMarkTransparent(materializeForSet, storage, TC);
-
-  TC.typeCheckDecl(materializeForSet, true);
-  
-  // Register the accessor as an external decl if the storage was imported.
-  if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addExternalDecl(materializeForSet);
+  if (auto materializeForSet = storage->getMaterializeForSetFunc())
+    validateDecl(materializeForSet);
 }
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
@@ -893,10 +903,10 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   if (VD->getDidSetFunc()) {
     Expr *OldValueExpr
       = createPropertyLoadOrCallSuperclassGetter(Set, VD, TC);
-    
-    OldValue = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/ true,
-                                 SourceLoc(), Ctx.getIdentifier("tmp"),
-                                 Type(), Set);
+
+    OldValue = new (Ctx) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                 /*IsCaptureList*/false, SourceLoc(),
+                                 Ctx.getIdentifier("tmp"), Type(), Set);
     OldValue->setImplicit();
     auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
     auto tmpPBD = PatternBindingDecl::create(Ctx, SourceLoc(),
@@ -907,7 +917,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     SetterBody.push_back(tmpPBD);
     SetterBody.push_back(OldValue);
   }
-  
+
   // Create:
   //   (call_expr (dot_syntax_call_expr (decl_ref_expr(willSet)),
   //                                    (decl_ref_expr(self))),
@@ -961,36 +971,6 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   }
 
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc, true));
-
-  // Type check the body of the getter and setter.
-  TC.typeCheckDecl(Get, true);
-  TC.typeCheckDecl(Get, false);
-  TC.typeCheckDecl(Set, true);
-  TC.typeCheckDecl(Set, false);
-}
-
-static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
-  assert(VD->getStorageKind() == AbstractStorageDecl::Stored);
-
-  // Create the getter.
-  auto *Get = createGetterPrototype(VD, TC);
-  if (VD->hasAccessorFunctions()) return;
-
-  // Create the setter.
-  ParamDecl *SetValueDecl = nullptr;
-  auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
-  if (VD->hasAccessorFunctions()) return;
-
-  // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(VD->getLoc(), Get, Set, nullptr, VD->getLoc());
-
-  TC.validateDecl(Get);
-  TC.validateDecl(Set);
-
-  // We've added some members to our containing class/extension, add them to
-  // the members list.
-  addMemberToContextIfNeeded(Get, VD->getDeclContext());
-  addMemberToContextIfNeeded(Set, VD->getDeclContext());
 }
 
 namespace {
@@ -1023,7 +1003,7 @@ namespace {
     bool walkToDeclPre(Decl *) override { return false; }
     std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override { return {false,S}; }
   };
-}
+} // end anonymous namespace
 
 /// Synthesize the getter for a lazy property with the specified storage
 /// vardecl.
@@ -1043,12 +1023,12 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   //     return tmp2
   //   }
   auto *Get = VD->getGetter();
-  TC.validateDecl(Get);
 
   SmallVector<ASTNode, 6> Body;
 
   // Load the existing storage and store it into the 'tmp1' temporary.
-  auto *Tmp1VD = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/true,SourceLoc(),
+  auto *Tmp1VD = new (Ctx) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                   /*IsCaptureList*/false, SourceLoc(),
                                    Ctx.getIdentifier("tmp1"), Type(), Get);
   Tmp1VD->setImplicit();
 
@@ -1079,15 +1059,16 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
                                    constraints::ConstraintSystemOptions());
   constraints::Solution solution(cs, constraints::Score());
   auto HasValueExpr = solution.convertOptionalToBool(Tmp1DRE, nullptr);
-  
+
   Body.push_back(new (Ctx) IfStmt(SourceLoc(), HasValueExpr, Return,
                                   /*elseloc*/SourceLoc(), /*else*/nullptr,
                                   /*implicit*/ true, Ctx));
 
 
-  auto *Tmp2VD = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/true,
-                                   SourceLoc(), Ctx.getIdentifier("tmp2"),
-                                   VD->getType(), Get);
+  auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                   /*IsCaptureList*/false, SourceLoc(),
+                                   Ctx.getIdentifier("tmp2"), VD->getType(),
+                                   Get);
   Tmp2VD->setImplicit();
 
 
@@ -1149,26 +1130,22 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   // Substitute the storage type into the conforming context.
   auto sig = BehaviorConformance->getProtocol()->getGenericSignatureOfContext();
 
-  TypeSubstitutionMap interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
-  auto SubstStorageInterfaceTy = StorageTy.subst(VD->getModuleContext(),
-                                        interfaceMap, SubstOptions());
+  auto interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
+  auto SubstStorageInterfaceTy = StorageTy.subst(interfaceMap, SubstOptions());
   assert(SubstStorageInterfaceTy && "storage type substitution failed?!");
 
-  TypeSubstitutionMap contextMap = sig->getSubstitutionMap(SelfContextSubs);
-  auto SubstStorageContextTy = StorageTy.subst(VD->getModuleContext(),
-                                               contextMap, SubstOptions());
+  auto contextMap = sig->getSubstitutionMap(SelfContextSubs);
+  auto SubstStorageContextTy = StorageTy.subst(contextMap, SubstOptions());
   assert(SubstStorageContextTy && "storage type substitution failed?!");
 
   auto DC = VD->getDeclContext();
   SmallString<64> NameBuf = VD->getName().str();
   NameBuf += ".storage";
   auto StorageName = Context.getIdentifier(NameBuf);
-  auto *Storage = new (Context) VarDecl(VD->isStatic(),
-                                       /*let*/ !BehaviorStorage->isSettable(DC),
-                                       VD->getLoc(),
-                                       StorageName,
-                                       SubstStorageContextTy,
-                                       DC);
+  auto *Storage = new (Context) VarDecl(
+      /*IsStatic*/VD->isStatic(), /*IsLet*/!BehaviorStorage->isSettable(DC),
+      /*IsCaptureList*/false, VD->getLoc(), StorageName, SubstStorageContextTy,
+      DC);
   Storage->setInterfaceType(SubstStorageInterfaceTy);
   Storage->setUserAccessible(false);
   // Mark the vardecl to be final, implicit, and private.  In a class, this
@@ -1268,21 +1245,17 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   // Add accessors to the storage, since we'll need them to satisfy the
   // conformance requirements.
   addTrivialAccessorsToStorage(Storage, *this);
-  
+
+  // FIXME: Hack to eliminate spurious diagnostics.
+  if (BehaviorStorage->isStatic() != Storage->isStatic()) return;
+
   // Add the witnesses to the conformance.
-  ArrayRef<Substitution> MemberSubs;
-  if (DC->isGenericContext()) {
-    MemberSubs = DC->getGenericParamsOfContext()
-                   ->getForwardingSubstitutions(Context);
-  }
-  
-  BehaviorConformance->setWitness(BehaviorStorage,
-                                 ConcreteDeclRef(Context, Storage, MemberSubs));
-  BehaviorConformance->setWitness(BehaviorStorage->getGetter(),
-                    ConcreteDeclRef(Context, Storage->getGetter(), MemberSubs));
+  recordKnownWitness(BehaviorConformance, BehaviorStorage, Storage);
+  recordKnownWitness(BehaviorConformance, BehaviorStorage->getGetter(),
+                     Storage->getGetter());
   if (BehaviorStorage->isSettable(DC))
-    BehaviorConformance->setWitness(BehaviorStorage->getSetter(),
-                    ConcreteDeclRef(Context, Storage->getSetter(), MemberSubs));
+    recordKnownWitness(BehaviorConformance, BehaviorStorage->getSetter(),
+                       Storage->getSetter());
 }
 
 void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
@@ -1303,50 +1276,36 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     ->getResult();
 
   GenericSignature *genericSig = nullptr;
+  GenericEnvironment *genericEnv = nullptr;
 
-  TypeSubstitutionMap interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
-  auto SubstInterfaceTy = ParameterTy.subst(VD->getModuleContext(),
-                                            interfaceMap, SubstOptions());
+  auto interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
+  auto SubstInterfaceTy = ParameterTy.subst(interfaceMap, SubstOptions());
   assert(SubstInterfaceTy && "storage type substitution failed?!");
   
-  TypeSubstitutionMap contextMap = sig->getSubstitutionMap(SelfContextSubs);
-  auto SubstContextTy = ParameterTy.subst(VD->getModuleContext(),
-                                                 contextMap, SubstOptions());
-  assert(SubstContextTy && "storage type substitution failed?!");
+  auto contextMap = sig->getSubstitutionMap(SelfContextSubs);
 
-  auto SubstBodyResultTy = SubstContextTy->castTo<AnyFunctionType>()
+  auto SubstBodyResultTy = SubstInterfaceTy->castTo<AnyFunctionType>()
     ->getResult();
   
   // Add the Self type back to the interface and context types.
   if (DC->isTypeContext()) {
     if (DC->isGenericContext()) {
       genericSig = DC->getGenericSignatureOfContext();
+      genericEnv = DC->getGenericEnvironmentOfContext();
       SubstInterfaceTy = GenericFunctionType::get(genericSig,
                                                   DC->getSelfInterfaceType(),
                                                   SubstInterfaceTy,
                                                   AnyFunctionType::ExtInfo());
-      auto genericParams = DC->getGenericParamsOfContext();
-      SubstContextTy = PolymorphicFunctionType::get(DC->getSelfTypeInContext(),
-                                                    SubstContextTy,
-                                                    genericParams);
     } else {
       SubstInterfaceTy = FunctionType::get(DC->getSelfInterfaceType(),
                                            SubstInterfaceTy);
-      SubstContextTy = FunctionType::get(DC->getSelfTypeInContext(),
-                                         SubstContextTy);
     }
   }
   
   // Borrow the parameters from the requirement declaration.
   SmallVector<ParameterList *, 2> ParamLists;
   if (DC->isTypeContext()) {
-    auto self = new (Context) ParamDecl(/*let*/ true, SourceLoc(), SourceLoc(),
-                                        Identifier(), SourceLoc(),
-                                        Context.Id_self,
-                                        DC->getSelfTypeInContext(), DC);
-    self->setInterfaceType(DC->getSelfInterfaceType());
-    self->setImplicit();
-    
+    auto self = ParamDecl::createSelf(SourceLoc(), DC);    
     ParamLists.push_back(ParameterList::create(Context, SourceLoc(),
                                                self, SourceLoc()));
     ParamLists.back()->get(0)->setImplicit();
@@ -1360,12 +1319,9 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   for (unsigned i : indices(*DeclaredParams)) {
     auto declaredParam = DeclaredParams->get(i);
     auto declaredParamTy = declaredParam->getInterfaceType();
-    auto interfaceTy = declaredParamTy.subst(DC->getParentModule(),
-                                             interfaceMap,
-                                             SubstOptions());
+    auto interfaceTy = declaredParamTy.subst(interfaceMap, SubstOptions());
     assert(interfaceTy);
-    auto contextTy = declaredParamTy.subst(DC->getParentModule(),
-                                           contextMap, SubstOptions());
+    auto contextTy = declaredParamTy.subst(contextMap, SubstOptions());
     assert(contextTy);
 
     SmallString<64> ParamNameBuf;
@@ -1393,11 +1349,10 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, ParamLists,
-                     SubstContextTy,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
   Parameter->setInterfaceType(SubstInterfaceTy);
-  Parameter->setGenericSignature(genericSig);
+  Parameter->setGenericEnvironment(genericEnv);
 
   // Mark the method to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
@@ -1405,8 +1360,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     makeFinal(Context, Parameter);
   Parameter->setImplicit();
   Parameter->setAccessibility(Accessibility::Private);
-  Parameter->setIsBeingTypeChecked();
-  Parameter->setBodyResultType(SubstBodyResultTy);
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the parameter function.
@@ -1433,29 +1386,22 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                 SourceLoc(), /*implicit*/ true);
   Parameter->setBody(Body);
   
-  Parameter->setIsBeingTypeChecked(false);
   typeCheckDecl(Parameter, true);
   typeCheckDecl(Parameter, false);
   addMemberToContextIfNeeded(Parameter, DC);
 
   // Add the witnesses to the conformance.
-  ArrayRef<Substitution> MemberSubs;
-  if (DC->isGenericContext()) {
-    MemberSubs = DC->getGenericParamsOfContext()
-    ->getForwardingSubstitutions(Context);
-  }
-
-  BehaviorConformance->setWitness(BehaviorParameter,
-                               ConcreteDeclRef(Context, Parameter, MemberSubs));
+  recordKnownWitness(BehaviorConformance, BehaviorParameter, Parameter);
 }
 
 void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        VarDecl *ValueImpl,
+                                       Type valueTy,
                                        ArrayRef<Substitution> SelfInterfaceSubs,
                                        ArrayRef<Substitution> SelfContextSubs) {
   auto selfTy = SelfContextSubs[0].getReplacement();
-  auto valueTy = SelfContextSubs[1].getReplacement();
-  
+  auto selfIfaceTy = SelfInterfaceSubs[0].getReplacement();
+
   SmallVector<ASTNode, 3> bodyStmts;
   
   auto makeSelfExpr = [&](FuncDecl *fromAccessor,
@@ -1480,10 +1426,12 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
     if (!fromMutating
         && toAccessor->getImplicitSelfDecl()->isSettable(toAccessor)) {
       selfExpr->setType(selfTy);
-      auto var = new (Context) VarDecl(/*static*/false, /*let*/false,
-                                       SourceLoc(),
+      auto var = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/false,
+                                       /*IsCaptureList*/false, SourceLoc(),
                                        Context.getIdentifier("tempSelf"),
                                        selfTy, fromAccessor);
+      var->setInterfaceType(selfIfaceTy);
+
       auto varPat = new (Context) NamedPattern(var);
       auto pbd = PatternBindingDecl::create(Context, SourceLoc(),
                                             StaticSpellingKind::None,
@@ -1515,8 +1463,7 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
   {
     auto getter = VD->getGetter();
     assert(getter);
-    validateDecl(getter);
-    
+
     Expr *selfExpr = makeSelfExpr(getter, ValueImpl->getGetter());
     
     auto implRef = ConcreteDeclRef(Context, ValueImpl, SelfContextSubs);
@@ -1549,8 +1496,6 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
   bodyStmts.clear();
   
   if (auto setter = VD->getSetter()) {
-    validateDecl(setter);
-
     Expr *selfExpr = makeSelfExpr(setter, ValueImpl->getSetter());
     auto implRef = ConcreteDeclRef(Context, ValueImpl, SelfContextSubs);
     auto implMemberExpr = new (Context) MemberRefExpr(selfExpr,
@@ -1585,8 +1530,6 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
          "variable not validated yet");
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
 
-  maybeAddMaterializeForSet(VD, *this);
-
   // Create the storage property as an optional of VD's type.
   SmallString<64> NameBuf = VD->getName().str();
   NameBuf += ".storage";
@@ -1594,8 +1537,9 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   auto StorageTy = OptionalType::get(VD->getType());
   auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());
 
-  auto *Storage = new (Context) VarDecl(/*isStatic*/false, /*isLet*/false,
-                                        VD->getLoc(), StorageName, StorageTy,
+  auto *Storage = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/false,
+                                        /*IsCaptureList*/false, VD->getLoc(),
+                                        StorageName, StorageTy,
                                         VD->getDeclContext());
   Storage->setInterfaceType(StorageInterfaceTy);
   Storage->setUserAccessible(false);
@@ -1616,13 +1560,11 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   addMemberToContextIfNeeded(PBD, VD->getDeclContext());
 
   // Now that we've got the storage squared away, synthesize the getter.
-  auto *Get = completeLazyPropertyGetter(VD, Storage, *this);
-  validateDecl(Get);
+  completeLazyPropertyGetter(VD, Storage, *this);
 
   // The setter just forwards on to storage without materializing the initial
   // value.
   auto *Set = VD->getSetter();
-  validateDecl(Set);
   VarDecl *SetValueDecl = getFirstParamDecl(Set);
   // FIXME: This is wrong for observed properties.
   synthesizeTrivialSetter(Set, Storage, SetValueDecl, *this);
@@ -1638,7 +1580,6 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   Storage->setSetterAccessibility(Accessibility::Private);
 }
 
-
 /// Consider add a materializeForSet accessor to the given storage
 /// decl (which has accessors).
 void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
@@ -1651,9 +1592,6 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
 
   // Never add materializeForSet to readonly declarations.
   if (!storage->getSetter()) return;
-
-  // Don't bother if the declaration is invalid.
-  if (storage->isInvalid()) return;
 
   // We only need materializeForSet in type contexts.
   NominalTypeDecl *container = storage->getDeclContext()
@@ -1671,13 +1609,18 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
     if (container->hasClangNode()) return;
   }
 
+  // @NSManaged properties don't need this.
+  if (storage->getAttrs().hasAttribute<NSManagedAttr>()) return;
+
   addMaterializeForSet(storage, TC);
 }
 
+void TypeChecker::introduceLazyVarAccessors(VarDecl *var) {
+  maybeAddAccessorsToVariable(var, *this);
+}
+
 void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
-  // If we've already synthesized accessors or are currently in the process
-  // of doing so, don't proceed.
-  if (var->getGetter() || var->isBeingTypeChecked())
+  if (var->getGetter())
     return;
 
   auto *dc = var->getDeclContext();
@@ -1693,8 +1636,6 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       assert(!var->hasStorage() && "behavior var was not made computed");
     };
     
-    var->setIsBeingTypeChecked();
-
     auto behavior = var->getMutableBehavior();
     NormalProtocolConformance *conformance = nullptr;
     VarDecl *valueProp = nullptr;
@@ -1734,12 +1675,11 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
         setter->setAccessibility(var->getFormalAccess());
       }
       
-      var->makeComputed(var->getLoc(), getter, setter, nullptr, var->getLoc());
+      var->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
       
       // Save the conformance and 'value' decl for later type checking.
       behavior->Conformance = conformance;
       behavior->ValueDecl = valueProp;
-      var->setIsBeingTypeChecked(false);
 
       addMemberToContextIfNeeded(getter, dc);
       if (setter)
@@ -1809,8 +1749,8 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       Type behaviorSelf;
       Type behaviorInterfaceSelf;
       if (dc->isTypeContext()) {
-        behaviorSelf = dc->getSelfTypeInContext();
         behaviorInterfaceSelf = dc->getSelfInterfaceType();
+        behaviorSelf = dc->mapTypeIntoContext(behaviorInterfaceSelf);
         assert(behaviorSelf && "type context doesn't have self type?!");
         if (var->isStatic())
           behaviorSelf = MetatypeType::get(behaviorSelf);
@@ -1829,8 +1769,6 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
   // Lazy properties require special handling.
   if (var->getAttrs().hasAttribute<LazyAttr>()) {
-    var->setIsBeingTypeChecked();
-
     auto *getter = createGetterPrototype(var, TC);
     // lazy getters are mutating on an enclosing value type.
     if (!dc->getAsClassOrClassExtensionContext())
@@ -1839,15 +1777,17 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
     ParamDecl *newValueParam = nullptr;
     auto *setter = createSetterPrototype(var, newValueParam, TC);
-    var->makeComputed(var->getLoc(), getter, setter, nullptr,
-                      var->getLoc());
-    var->setIsBeingTypeChecked(false);
 
-    TC.validateDecl(getter);
-    TC.validateDecl(setter);
+    FuncDecl *materializeForSet = nullptr;
+    if (dc->getAsNominalTypeOrNominalTypeExtensionContext())
+      materializeForSet = createMaterializeForSetPrototype(var, setter, TC);
+
+    var->makeComputed(SourceLoc(), getter, setter, materializeForSet, SourceLoc());
 
     addMemberToContextIfNeeded(getter, dc);
     addMemberToContextIfNeeded(setter, dc);
+    if (materializeForSet)
+      addMemberToContextIfNeeded(materializeForSet, dc);
     return;
   }
 
@@ -1875,18 +1815,14 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       else
         TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
 
-      var->setIsBeingTypeChecked();
       convertStoredVarInProtocolToComputed(var, TC);
-      var->setIsBeingTypeChecked(false);
     }
     return;
 
   // NSManaged properties on classes require special handling.
   } else if (dc->getAsClassOrClassExtensionContext()) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
-      var->setIsBeingTypeChecked();
       convertNSManagedStoredVarToComputed(var, TC);
-      var->setIsBeingTypeChecked(false);
       return;
     }
 
@@ -1902,9 +1838,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       return;
 
   // Everything else gets accessors.
-  var->setIsBeingTypeChecked();
   addTrivialAccessorsToStorage(var, TC);
-  var->setIsBeingTypeChecked(false);
 }
 
 /// \brief Create an implicit struct or class constructor.
@@ -1942,20 +1876,24 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
-      auto varType = tc.getTypeOfRValue(var);
+      auto varType = tc.getTypeOfRValue(var, false);
+      auto varInterfaceType = tc.getTypeOfRValue(var, true);
 
       // If var is a lazy property, its value is provided for the underlying
       // storage.  We thus take an optional of the properties type.  We only
       // need to do this because the implicit constructor is added before all
       // the properties are type checked.  Perhaps init() synth should be moved
       // later.
-      if (var->getAttrs().hasAttribute<LazyAttr>())
+      if (var->getAttrs().hasAttribute<LazyAttr>()) {
         varType = OptionalType::get(varType);
+        varInterfaceType = OptionalType::get(varInterfaceType);
+      }
 
       // Create the parameter.
       auto *arg = new (context) ParamDecl(/*IsLet*/true, SourceLoc(), 
                                           Loc, var->getName(),
                                           Loc, var->getName(), varType, decl);
+      arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
       params.push_back(arg);
@@ -1966,7 +1904,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   
   // Create the constructor.
   DeclName name(context, context.Id_init, paramList);
-  auto *selfParam = ParamDecl::createUnboundSelf(Loc, decl,
+  auto *selfParam = ParamDecl::createSelf(Loc, decl,
                                           /*static*/false, /*inout*/true);
   auto *ctor =
     new (context) ConstructorDecl(name, Loc,
@@ -1987,7 +1925,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   // 'override' attribute.
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->getSuperclass())
-      ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*implicit=*/true));
+      ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*IsImplicit=*/true));
   }
 
   // Type-check the constructor declaration.
@@ -2005,7 +1943,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 /// Create a stub body that emits a fatal error message.
 static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   auto unimplementedInitDecl = tc.Context.getUnimplementedInitializerDecl(&tc);
-  auto classDecl = ctor->getExtensionType()->getClassOrBoundGenericClass();
+  auto classDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
   if (!unimplementedInitDecl) {
     tc.diagnose(classDecl->getLoc(), diag::missing_unimplemented_init_runtime);
     return;
@@ -2030,7 +1968,7 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(call),
                                   SourceLoc(),
-                                  /*Implicit=*/true));
+                                  /*implicit=*/true));
 
   // Note that this is a stub implementation.
   ctor->setStubImplementation(true);
@@ -2055,8 +1993,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // immediate superclass.
   Type superclassTyInCtor = superclassCtor->getDeclContext()->getDeclaredTypeOfContext();
   Type superclassTy = classDecl->getSuperclass();
-  Type superclassTyInContext = ArchetypeBuilder::mapTypeIntoContext(
-      classDecl, superclassTy);
+  Type superclassTyInContext = classDecl->mapTypeIntoContext(superclassTy);
   NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
   if (superclassTyInCtor->getAnyNominal() != superclassDecl) {
     return nullptr;
@@ -2066,7 +2003,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   auto &ctx = tc.Context;
 
   // Create the 'self' declaration and patterns.
-  auto *selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), classDecl);
+  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), classDecl);
 
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
@@ -2078,29 +2015,28 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   //
   // We might have to apply substitutions, if for example we have a declaration
   // like 'class A : B<Int>'.
-  if (superclassDecl->isGenericContext()) {
-    if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
-      auto *moduleDecl = classDecl->getParentModule();
-      auto subs = superclassTyInContext->gatherAllSubstitutions(
-          moduleDecl, nullptr, nullptr);
-      auto subsMap = superclassSig->getSubstitutionMap(subs);
+  if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
+    auto *moduleDecl = classDecl->getParentModule();
+    auto subs = superclassTyInContext->gatherAllSubstitutions(
+        moduleDecl, nullptr, nullptr);
+    auto subsMap = superclassSig->getSubstitutionMap(subs);
 
-      for (auto *decl : *bodyParams) {
-        // Map the parameter type to an interface type written in terms of
-        // the superclass generic signature.
-        auto paramTy = ArchetypeBuilder::mapTypeOutOfContext(
-            superclassDecl, decl->getType());
+    for (auto *decl : *bodyParams) {
+      auto paramTy = decl->getInterfaceType();
 
-        // Apply the superclass substitutions to produce a contextual
-        // type in terms of the derived class archetypes.
-        auto paramSubstTy = paramTy.subst(moduleDecl, subsMap, SubstOptions());
-        decl->overwriteType(paramSubstTy);
+      // Apply the superclass substitutions to produce a contextual
+      // type in terms of the derived class archetypes.
+      auto paramSubstTy = paramTy.subst(subsMap, SubstOptions());
+      decl->setType(paramSubstTy);
 
-        // Map it to an interface type in terms of the derived class
-        // generic signature.
-        decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
-            classDecl, paramSubstTy));
-      }
+      // Map it to an interface type in terms of the derived class
+      // generic signature.
+      decl->setInterfaceType(classDecl->mapTypeOutOfContext(paramSubstTy));
+    }
+  } else {
+    for (auto *decl : *bodyParams) {
+      if (!decl->hasType())
+        decl->setType(classDecl->mapTypeIntoContext(decl->getInterfaceType()));
     }
   }
 
@@ -2127,15 +2063,9 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // constructor.
   AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
 
-  // Configure 'self'.
-  auto selfType = configureImplicitSelf(tc, ctor);
-
   // Set the interface type of the initializer.
-  ctor->setGenericSignature(classDecl->getGenericSignatureOfContext());
-  tc.configureInterfaceType(ctor);
-
-  // Set the contextual type of the initializer. This will go away one day.
-  configureConstructorType(ctor, selfType, bodyParams->getType(ctx));
+  ctor->setGenericEnvironment(classDecl->getGenericEnvironmentOfContext());
+  tc.configureInterfaceType(ctor, ctor->getGenericSignature());
 
   if (superclassCtor->isObjC()) {
     // Inherit the @objc name from the superclass initializer, if it
@@ -2153,10 +2083,10 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
   }
   if (superclassCtor->isRequired())
-    ctor->getAttrs().add(new (tc.Context) RequiredAttr(/*implicit=*/true));
+    ctor->getAttrs().add(new (tc.Context) RequiredAttr(/*IsImplicit=*/true));
 
   // Wire up the overrides.
-  ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*Implicit=*/true));
+  ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*IsImplicit=*/true));
   ctor->setOverriddenDecl(superclassCtor);
 
   if (kind == DesignatedInitKind::Stub) {
@@ -2196,12 +2126,12 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                      /*hasTrailingClosure=*/false, /*implicit=*/true);
   if (superclassCtor->hasThrows()) {
     superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
-                                  /*Implicit=*/true);
+                                  /*implicit=*/true);
   }
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(superCall),
                                   SourceLoc(),
-                                  /*Implicit=*/true));
+                                  /*implicit=*/true));
 
   return ctor;
 }
@@ -2210,7 +2140,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   if (CD->hasDestructor() || CD->isInvalid())
     return;
 
-  auto *selfDecl = ParamDecl::createUnboundSelf(CD->getLoc(), CD);
+  auto *selfDecl = ParamDecl::createSelf(CD->getLoc(), CD);
 
   auto *DD = new (Context) DestructorDecl(Context.Id_deinit, CD->getLoc(),
                                           selfDecl, CD);

@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -127,7 +127,7 @@ puts(s)
 //
 
 var unsorted = [3, 14, 15, 9, 2, 6, 5]
-qsort(&unsorted, unsorted.count, MemoryLayout._ofInstance(unsorted[0]).size) { a, b in
+qsort(&unsorted, unsorted.count, MemoryLayout.size(ofValue: unsorted[0])) { a, b in
   return Int32(a!.load(as: Int.self) - b!.load(as: Int.self))
 }
 // CHECK-NEXT: [2, 3, 5, 6, 9, 14, 15]

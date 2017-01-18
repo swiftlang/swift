@@ -12,5 +12,6 @@ add_swift_library(swiftParse STATIC
   Scope.cpp
   LINK_LIBRARIES
     swiftSIL
-    swiftAST)
+    swiftAST
+)
 

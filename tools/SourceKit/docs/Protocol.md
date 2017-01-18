@@ -23,6 +23,7 @@ The protocol is documented in the following format:
 | [Code Completion](#code-completion) | source.request.codecomplete |
 | [Cursor Info](#cursor-info) | source.request.cursorinfo |
 | [Demangling](#demangling) | source.request.demangle |
+| [Mangling](#simple-class-mangling) | source.request.mangle_simple_class |
 | [Documentation](#documentation) | source.request.docinfo |
 | [Module interface generation](#module-interface-generation) | source.request.editor.open.interface |
 | [Indexing](#indexing) | source.request.indexsource  |
@@ -38,6 +39,11 @@ must be given either the path to a file (`key.sourcefile`), or some text
 (`key.sourcetext`). `key.sourcefile` is ignored when `key.sourcetext` is also
 provided.
 
+| Request Name | Request Key | Description |
+| -------------:|:------------|:------------|
+| `codecomplete` | `codecomplete` | Returns a list of completions. |
+| `open` | `codecomplete.open` | Given a file will open a code-completion session which can be filtered using `codecomplete.update`. Each session must be closed using `codecomplete.close`. |
+
 ### Request
 
 ```
@@ -46,6 +52,22 @@ provided.
     [opt] <key.sourcetext>: (string)   // Source contents.
     [opt] <key.sourcefile>: (string)   // Absolute path to the file.
     <key.offset>:           (int64)    // Byte offset of code-completion point inside the source contents.
+    [opt] <key.compilerargs> [string*] // Array of zero or more strings for the compiler arguments,
+                                       // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
+                                       // these must include the path to that file.
+    [opt] <key.not_recommended> [bool] // True if this result is to be avoided, e.g. because
+                                       // the declaration is unavailable.
+}
+```
+
+`codecomplete.open`
+```
+{
+    <key.request>:          (UID) <source.request.codecomplete.open>
+    [opt] <key.sourcetext>: (string)   // Source contents.
+    [opt] <key.sourcefile>: (string)   // Absolute path to the file.
+    <key.offset>:           (int64)    // Byte offset of code-completion point inside the source contents.
+    [opt] <key.codecomplete.options>:    (dict)     // An options dictionary containing keys.
     [opt] <key.compilerargs> [string*] // Array of zero or more strings for the compiler arguments,
                                        // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
                                        // these must include the path to that file.
@@ -72,6 +94,24 @@ completion-result ::=
   <key.doc.brief>:      (string)    // Brief documentation comment attached to the entity.
   <key.context>:        (UID)       // Semantic context of the code completion result.
   <key.num_bytes_to_erase>: (int64) // Number of bytes to the left of the cursor that should be erased before inserting this completion result.
+}
+```
+
+```
+completion.open-result ::=
+{
+  <key.kind>:           (UID)         // UID for the declaration kind (function, class, etc.).
+  <key.name>:           (string)      // Name of the word being completed
+  <key.sourcetext>:     (string)      // Text to be inserted in source.
+  <key.description>:    (string)      // Text to be displayed in code-completion window.
+  <key.typename>:       (string)      // Text describing the type of the result.
+  <key.context>:        (UID)         // Semantic context of the code completion result.
+  <key.num_bytes_to_erase>: (int64)   // Number of bytes to the left of the cursor that should be erased before inserting this completion result.
+  <key.substructure>:   (dictionary)  // Contains an array of dictionaries representing ranges of structural elements in the result description, such as the parameters of a function
+      - <key.nameoffset>  (int64)     // The offset location of the given parameter
+      - <key.namelength>  (int64)     // The length of the given parameter
+      - <key.bodyoffset>  (int64)     // The `nameoffset` + the indentation inside the body of the file
+      - <key.bodylength>  (int64)     // The `namelength` + the indentation inside the body of the file
 }
 ```
 
@@ -467,6 +507,77 @@ Welcome to SourceKit.  Type ':help' for assistance.
 }
 ```
 
+## Simple Class Mangling
+
+SourceKit is capable of "mangling" Swift class names. In other words,
+it's capable of taking the human-readable `UIKit.ViewController` as input and returning the symbol `_TtC5UIKit14ViewController`.
+
+### Request
+
+```
+{
+    <key.request>: (UID) <source.request.mangle_simple_class>,
+    <key.names>:   [mangle-request*] // An array of requests to mangle.
+}
+```
+
+```
+mangle-request ::=
+{
+    <key.modulename>: (string)  // The Swift module name
+    <key.name>: (string)        // The class name
+}
+```
+
+### Response
+
+```
+{
+    <key.results>: (array) [mangle-result+]   // The results for each
+                                              // mangling, in the order in
+                                              // which they were requested.
+}
+```
+
+```
+mangle-result ::=
+{
+    <key.name>: (string) // The mangled name.
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=mangle [<names>]
+```
+
+For example, to mangle the name `UIKit.ViewController`:
+
+```
+$ sourcekitd-test -req=mangle UIKit.ViewController
+```
+
+Note that when using `sourcekitd-test`, the output is output in an ad hoc text
+format, not JSON.
+
+You could also issue the following request in the `sourcekitd-repl`, which
+produces JSON:
+
+```
+$ sourcekitd-repl
+Welcome to SourceKit.  Type ':help' for assistance.
+(SourceKit) {
+    key.request: source.request.mangle_simple_class,
+    key.names: [
+      {
+          key.modulename: "UIKit",
+          key.name: "ViewController"
+      }
+    ]
+}
+```
+
 ## Protocol Version
 
 SourceKit can provide information about the version of the protocol that is being used.
@@ -475,7 +586,7 @@ SourceKit can provide information about the version of the protocol that is bein
 
 ```
 {
-	<key.request>: (UID) <source.request.protocol_version>
+    <key.request>: (UID) <source.request.protocol_version>
 }
 ```
 
@@ -483,8 +594,8 @@ SourceKit can provide information about the version of the protocol that is bein
 
 ```
 {
-	<key.version_major>: (int64) // The major version number in a version string
-	<key.version_minor>: (int64) // The minor version number in a version string
+    <key.version_major>: (int64) // The major version number in a version string
+    <key.version_minor>: (int64) // The minor version number in a version string
 }
 ```
 
@@ -500,7 +611,7 @@ or
 $ sourcekitd-repl
 Welcome to SourceKit.  Type ':help' for assistance.
 (SourceKit) {
-	key.request: source.request.protocol_version
+    key.request: source.request.protocol_version
 }
 ```
 
@@ -514,14 +625,14 @@ To gather documentation, SourceKit must be given either the name of a module (ke
 
 ```
 {
-	<key.request>:            (UID)     <source.request.cursorinfo>,
-	[opt] <key.sourcetext>:   (string)  // Source contents.
-	[opt] <key.sourcefile>:   (string)  // Absolute path to the file.
-	                                    // **Require**: key.sourcetext or key.sourcefile
-	[opt] <key.offset>:       (int64)   // Byte offset of code point inside the source contents.
-	[opt] <key.usr>:          (string)  // USR string for the entity.
-	                                    // **Require**: key.offset or key.usr
-	[opt] <key.compilerargs>: [string*] // Array of zero or more strings for the compiler arguments,
+    <key.request>:            (UID)     <source.request.cursorinfo>,
+    [opt] <key.sourcetext>:   (string)  // Source contents.
+    [opt] <key.sourcefile>:   (string)  // Absolute path to the file.
+                                        // **Require**: key.sourcetext or key.sourcefile
+    [opt] <key.offset>:       (int64)   // Byte offset of code point inside the source contents.
+    [opt] <key.usr>:          (string)  // USR string for the entity.
+                                        // **Require**: key.offset or key.usr
+    [opt] <key.compilerargs>: [string*] // Array of zero or more strings for the compiler arguments,
                                         // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
                                         // these must include the path to that file.
 }
@@ -535,7 +646,7 @@ To gather documentation, SourceKit must be given either the name of a module (ke
     <key.name>:                  (string) // Displayed name for the token.
     <key.usr>:                   (string) // USR string for the token.
     <key.filepath>:              (string) // Path to the file.
-    <key.offset>:                (int64)  // Byte offset of the token inside the souce contents.
+    <key.offset>:                (int64)  // Byte offset of the token inside the source contents.
     <key.length>:                (ist64)  // Length of the token.
     <key.typename>:              (string) // Text describing the type of the result.
     <key.annotated_decl>:        (string) // XML representing how the token was declared.
@@ -578,7 +689,7 @@ Welcome to SourceKit.  Type ':help' for assistance.
   key.request: source.request.cursorinfo,
   key.sourcefile: "/path/to/file.swift",
   key.offset: 7,
-  key.compilerargs: [ "/path/to/file.swift" ]
+  key.compilerargs: ["/path/to/file.swift"]
 }
 ```
 

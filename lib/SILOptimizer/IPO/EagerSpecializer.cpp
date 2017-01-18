@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -68,10 +68,10 @@ static bool isTrivialReturnBlock(SILBasicBlock *RetBB) {
   if (&*RetBB->begin() != RetInst)
     return false;
 
-  if (RetBB->bbarg_size() != 1)
+  if (RetBB->args_size() != 1)
     return false;
 
-  return (RetOperand == RetBB->getBBArg(0));
+  return (RetOperand == RetBB->getArgument(0));
 }
 
 /// Adds a CFG edge from the unterminated NewRetBB to a merged "return" or
@@ -106,23 +106,25 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
         TupleI = TupleI->clone(RetInst);
         RetInst->setOperand(0, TupleI);
       }
-      MergedBB = RetBB->splitBasicBlock(TupleI->getIterator());
+      MergedBB = RetBB->split(TupleI->getIterator());
       Builder.setInsertionPoint(RetBB);
       Builder.createBranch(Loc, MergedBB);
     } else {
       // Forward the existing return argument to a new BBArg.
-      MergedBB = RetBB->splitBasicBlock(RetInst->getIterator());
+      MergedBB = RetBB->split(RetInst->getIterator());
       SILValue OldRetVal = RetInst->getOperand(0);
-      RetInst->setOperand(0, MergedBB->createBBArg(OldRetVal->getType()));
+      RetInst->setOperand(
+          0, MergedBB->createPHIArgument(OldRetVal->getType(),
+                                         ValueOwnershipKind::Owned));
       Builder.setInsertionPoint(RetBB);
       Builder.createBranch(Loc, MergedBB, {OldRetVal});
     }
   }
   // Create a CFG edge from NewRetBB to MergedBB.
   Builder.setInsertionPoint(NewRetBB);
-  ArrayRef<SILValue> BBArgs;
+  SmallVector<SILValue, 1> BBArgs;
   if (!NewRetVal->getType().isVoid())
-    BBArgs = {NewRetVal};
+    BBArgs.push_back(NewRetVal);
   Builder.createBranch(Loc, MergedBB, BBArgs);
 }
 
@@ -164,8 +166,8 @@ emitApplyWithRethrow(SILBuilder &Builder,
   {
     // Emit the rethrow logic.
     Builder.emitBlock(ErrorBB);
-    SILValue Error =
-      ErrorBB->createBBArg(CanSILFuncTy->getErrorResult().getSILType());
+    SILValue Error = ErrorBB->createPHIArgument(
+        CanSILFuncTy->getErrorResult().getSILType(), ValueOwnershipKind::Owned);
 
     Builder.createBuiltin(Loc,
                           Builder.getASTContext().getIdentifier("willThrow"),
@@ -180,7 +182,8 @@ emitApplyWithRethrow(SILBuilder &Builder,
   // result value.
   Builder.clearInsertionPoint();
   Builder.emitBlock(NormalBB);
-  return Builder.getInsertionBB()->createBBArg(CanSILFuncTy->getSILResult());
+  return Builder.getInsertionBB()->createPHIArgument(
+      CanSILFuncTy->getSILResult(), ValueOwnershipKind::Owned);
 }
 
 /// Emits code to invoke the specified nonpolymorphic CalleeFunc using the
@@ -240,11 +243,11 @@ protected:
   void emitTypeCheck(SILBasicBlock *FailedTypeCheckBB,
                      SubstitutableType *ParamTy, Type SubTy);
 
-  SILValue emitArgumentCast(SILArgument *OrigArg, unsigned Idx);
-  
+  SILValue emitArgumentCast(SILFunctionArgument *OrigArg, unsigned Idx);
+
   SILValue emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs);
 };
-}
+} // end anonymous namespace
 
 /// Inserts type checks in the original generic function for dispatching to the
 /// given specialized function. Converts call arguments. Emits an invocation of
@@ -255,7 +258,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
 
   // First split the entry BB, moving all instructions to the FailedTypeCheckBB.
   auto &EntryBB = GenericFunc->front();
-  SILBasicBlock *FailedTypeCheckBB = EntryBB.splitBasicBlock(EntryBB.begin());
+  SILBasicBlock *FailedTypeCheckBB = EntryBB.split(EntryBB.begin());
   Builder.setInsertionPoint(&EntryBB, EntryBB.begin());
 
   // Iterate over all dependent types in the generic signature, which will match
@@ -292,7 +295,8 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   auto VoidTy = Builder.getModule().Types.getEmptyTupleType();
   if (StoreResultTo) {
     // Store the direct result to the original result address.
-    Builder.createStore(Loc, Result, StoreResultTo);
+    Builder.createStore(Loc, Result, StoreResultTo,
+                        StoreOwnershipQualifier::Unqualified);
     // And return Void.
     Result = Builder.createTuple(Loc, VoidTy, { });
   }
@@ -357,7 +361,8 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
 }
 
 /// Cast a generic argument to its specialized type.
-SILValue EagerDispatch::emitArgumentCast(SILArgument *OrigArg, unsigned Idx) {
+SILValue EagerDispatch::emitArgumentCast(SILFunctionArgument *OrigArg,
+                                         unsigned Idx) {
 
   auto CastTy = ReInfo.getSubstitutedType()->getSILArgumentType(Idx);
   assert(CastTy.isAddress() ==
@@ -379,7 +384,7 @@ SILValue EagerDispatch::emitArgumentCast(SILArgument *OrigArg, unsigned Idx) {
 /// has a direct result.
 SILValue EagerDispatch::
 emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
-  auto OrigArgs = GenericFunc->getArguments();
+  auto OrigArgs = GenericFunc->begin()->getFunctionArguments();
   assert(OrigArgs.size() == ReInfo.getNumArguments() && "signature mismatch");
   
   CallArgs.reserve(OrigArgs.size());
@@ -399,7 +404,8 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
       } else {
         // An argument is converted from indirect to direct. Instead of the
         // address we pass the loaded value.
-        SILValue Val = Builder.createLoad(Loc, CastArg);
+        SILValue Val = Builder.createLoad(Loc, CastArg,
+                                          LoadOwnershipQualifier::Unqualified);
         CallArgs.push_back(Val);
       }
     } else {
@@ -420,7 +426,7 @@ public:
 
   StringRef getName() override { return "Eager Specializer"; }
 };
-}
+} // end anonymous namespace
 
 /// Specializes a generic function for a concrete type list.
 static SILFunction *eagerSpecialize(SILFunction *GenericFunc,

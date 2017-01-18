@@ -2,15 +2,16 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
@@ -72,7 +73,7 @@ bool SILType::isReferenceCounted(SILModule &M) const {
 
 bool SILType::isNoReturnFunction() const {
   if (auto funcTy = dyn_cast<SILFunctionType>(getSwiftRValueType()))
-    return funcTy->getSILResult().getSwiftRValueType()->isNever();
+    return funcTy->getSILResult().getSwiftRValueType()->isUninhabited();
 
   return false;
 }
@@ -190,7 +191,8 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   }
   // If toType has more elements, it may be larger.
   auto fromElements = fromEnum->getAllElements();
-  if (numToElements > std::distance(fromElements.begin(), fromElements.end()))
+  if (static_cast<ptrdiff_t>(numToElements) >
+      std::distance(fromElements.begin(), fromElements.end()))
     return false;
 
   if (toElementTy.isNull())
@@ -280,9 +282,8 @@ bool SILType::canUnsafeCastValue(SILType fromType, SILType toType,
 // TODO: handle casting to a loadable existential by generating
 // init_existential_ref. Until then, only promote to a heap object dest.
 bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
-  OptionalTypeKind otk;
-  auto fromTy = unwrapAnyOptionalType(operTy, M, otk);
-  auto toTy = unwrapAnyOptionalType(resultTy, M, otk);
+  auto fromTy = operTy.unwrapAnyOptionalType();
+  auto toTy = resultTy.unwrapAnyOptionalType();
   return (fromTy.isHeapObjectReferenceType() || fromTy.isClassExistentialType())
     && toTy.isHeapObjectReferenceType();
 }
@@ -309,6 +310,12 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
   assert(elt->hasArgumentType());
+
+  if (auto objectType = getSwiftRValueType().getAnyOptionalObjectType()) {
+    assert(elt == M.getASTContext().getOptionalSomeDecl());
+    return SILType(objectType, getCategory());
+  }
+
   auto substEltTy =
     getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
                                           elt, nullptr,
@@ -341,8 +348,7 @@ SILType SILType::substGenericArgs(SILModule &M,
   }
   assert(fnTy->isPolymorphic() && "Can only subst interface generic args on "
          "polymorphic function types.");
-  CanSILFunctionType canFnTy =
-    fnTy->substGenericArgs(M, M.getSwiftModule(), Subs);
+  CanSILFunctionType canFnTy = fnTy->substGenericArgs(M, Subs);
   return SILType::getPrimitiveObjectType(canFnTy);
 }
 
@@ -434,23 +440,20 @@ bool SILType::aggregateHasUnreferenceableStorage() const {
   return false;
 }
 
-OptionalTypeKind SILType::getOptionalTypeKind() const {
-  OptionalTypeKind result;
-  getSwiftRValueType()->getAnyOptionalObjectType(result);
-  return result;
-}
-
-SILType SILType::getAnyOptionalObjectType(SILModule &M,
-                                          OptionalTypeKind &OTK) const {
-  if (auto objectTy = getSwiftRValueType()->getAnyOptionalObjectType(OTK)) {
-    auto loweredTy
-      = M.Types.getLoweredType(AbstractionPattern::getOpaque(), objectTy);
-    
-    return SILType(loweredTy.getSwiftRValueType(), getCategory());
+SILType SILType::getAnyOptionalObjectType() const {
+  if (auto objectTy = getSwiftRValueType().getAnyOptionalObjectType()) {
+    return SILType(objectTy, getCategory());
   }
 
-  OTK = OTK_None;
   return SILType();
+}
+
+SILType SILType::unwrapAnyOptionalType() const {
+  if (auto objectTy = getAnyOptionalObjectType()) {
+    return objectTy;
+  }
+
+  return *this;
 }
 
 /// True if the given type value is nonnull, and the represented type is NSError
@@ -547,4 +550,62 @@ SILType::canUseExistentialRepresentation(SILModule &M,
   case ExistentialRepresentation::Metatype:
     return is<ExistentialMetatypeType>();
   }
+
+  llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
+}
+
+SILType SILType::getReferentType(SILModule &M) const {
+  ReferenceStorageType *Ty =
+      getSwiftRValueType()->castTo<ReferenceStorageType>();
+  return M.Types.getLoweredType(Ty->getReferentType()->getCanonicalType());
+}
+
+CanType
+SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
+  auto fieldTy = getLayout()->getFields()[index].getLoweredType();
+  
+  // Apply generic arguments if the layout is generic.
+  if (!getGenericArgs().empty()) {
+    // FIXME: Map the field type into the layout's generic context because
+    // SIL TypeLowering currently expects to lower abstract generic parameters
+    // with a generic context pushed, but nested generic contexts are not
+    // supported by TypeLowering. If TypeLowering were properly
+    // de-contextualized and plumbed through the generic signature, this could
+    // be avoided.
+    auto *env = getLayout()->getGenericSignature()
+      .getGenericEnvironment(*M.getSwiftModule());
+    auto substMap =
+      env->getSubstitutionMap(M.getSwiftModule(), getGenericArgs());
+    fieldTy = env->mapTypeIntoContext(M.getSwiftModule(), fieldTy)
+      ->getCanonicalType();
+    
+    fieldTy = SILType::getPrimitiveObjectType(fieldTy)
+      .subst(M, substMap)
+      .getSwiftRValueType();
+  }
+  return fieldTy;
+}
+
+ValueOwnershipKind
+SILResultInfo::getOwnershipKind(SILModule &M,
+                                CanGenericSignature signature) const {
+  if (signature)
+    M.Types.pushGenericContext(signature);
+  bool IsTrivial = getSILType().isTrivial(M);
+  if (signature)
+    M.Types.popGenericContext(signature);
+  switch (getConvention()) {
+  case ResultConvention::Indirect:
+    return ValueOwnershipKind::Trivial; // Should this be an Any?
+  case ResultConvention::Autoreleased:
+  case ResultConvention::Owned:
+    return ValueOwnershipKind::Owned;
+  case ResultConvention::Unowned:
+  case ResultConvention::UnownedInnerPointer:
+    if (IsTrivial)
+      return ValueOwnershipKind::Trivial;
+    return ValueOwnershipKind::Unowned;
+  }
+
+  llvm_unreachable("Unhandled ResultConvention in switch.");
 }

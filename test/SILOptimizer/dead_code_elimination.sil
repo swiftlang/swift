@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -dce %s | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -dce %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -185,7 +185,7 @@ bb9:
 // CHECK: bb10:
 bb10:
   %90 = tuple ()
-// CHECK: return 
+// CHECK: return
   return %90 : $()
 }
 

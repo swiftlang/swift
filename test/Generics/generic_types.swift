@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol MyFormattedPrintable {
   func myFormat() -> String
@@ -162,7 +162,7 @@ struct SequenceY : Sequence, IteratorProtocol {
 
 func useRangeOfPrintables(_ roi : RangeOfPrintables<[Int]>) {
   var rop : RangeOfPrintables<X> // expected-error{{type 'X' does not conform to protocol 'Sequence'}}
-  var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'Element' (aka 'Y') does not conform to protocol 'MyFormattedPrintable'}}
+  var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'SequenceY.Element' (aka 'Y') does not conform to protocol 'MyFormattedPrintable'}}
 }
 
 var dfail : Dictionary<Int> // expected-error{{generic type 'Dictionary' specialized with too few type parameters (got 1, but expected 2)}}
@@ -220,13 +220,15 @@ struct X4 : P, Q {
   typealias AssocQ = String
 }
 
-struct X5<T, U> where T: P, T: Q, T.AssocP == T.AssocQ { } // expected-note{{requirement specified as 'T.AssocP' == 'T.AssocQ' [with T = X4]}}
+struct X5<T, U> where T: P, T: Q, T.AssocP == T.AssocQ { } // expected-note{{requirement specified as 'T.AssocQ' == 'T.AssocP' [with T = X4]}}
 
-var y: X5<X4, Int> // expected-error{{'X5' requires the types 'AssocP' (aka 'Int') and 'AssocQ' (aka 'String') be equivalent}}
+var y: X5<X4, Int> // expected-error{{'X5' requires the types 'X4.AssocQ' (aka 'String') and 'X4.AssocP' (aka 'Int') be equivalent}}
 
 // Recursive generic signature validation.
 class Top {}
-class Bottom<T : Bottom<Top>> {} // expected-error {{type may not reference itself as a requirement}}
+class Bottom<T : Bottom<Top>> {}
+// expected-error@-1 {{generic class 'Bottom' references itself}}
+// expected-note@-2 {{type declared here}}
 
 // Invalid inheritance clause
 
@@ -237,4 +239,4 @@ struct UnsolvableInheritance2<T : U.A, U : T.A> {}
 // expected-error@-1 {{inheritance from non-protocol, non-class type 'U.A'}}
 // expected-error@-2 {{inheritance from non-protocol, non-class type 'T.A'}}
 
-enum X7<T> where X7.X : G { case X } // expected-error{{'X' is not a member type of 'X7<T>'}}
+enum X7<T> where X7.X : G { case X } // expected-error{{enum element 'X' is not a member type of 'X7<T>'}}

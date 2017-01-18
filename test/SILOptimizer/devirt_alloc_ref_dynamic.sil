@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -devirtualizer -dce | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -devirtualizer -dce | %FileCheck %s
 
 sil_stage canonical
 
@@ -10,7 +10,7 @@ class A {
   init(m: Int)
   convenience init(n: Int)
   func foo() -> Int32
-   deinit 
+   deinit
 }
 
 // test.A.foo (test.A)() -> Swift.Int32

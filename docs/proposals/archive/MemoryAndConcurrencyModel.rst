@@ -7,7 +7,7 @@ Swift Memory and Concurrency Model
 ==================================
 
 .. warning:: This is a very early design document discussing the features of
-  a possible Swift concurrency model. It should not be taken as a plan of 
+  a possible Swift concurrency model. It should not be taken as a plan of
   record.
 
 The goal of this writeup is to provide a safe and efficient way to model,
@@ -118,14 +118,14 @@ definition. These kinds are:
      func do_mandelbrot(_ x : float, y : float) -> int {
        // details elided
      }
-     
+
      actor MandelbrotCalculator {
        func compute(_ x : float, y : float, Driver D) {
          var num_iters = do_mandelbrot(x, y)
          D.collect_point(x, y, num_iters)
        }
      }
-     
+
      actor Driver {
        var result : image; // result and numpoints are mutable per-actor data.
        var numpoints : int;
@@ -140,7 +140,7 @@ definition. These kinds are:
            }
          }
        }
-     
+
        func collect_point(_ x : float, y : float, num_iters : int) {
          result.setPoint(x, y, Color(num_iters, num_iters, num_iters))
          if (--numpoints == 0)
@@ -177,16 +177,16 @@ With the basic approach above, you can only perform actions on actors that are
 built into the actor. For example, if you had an actor with two methods::
 
   actor MyActor {
-    func foo() {…}
-    func bar() {…}
-    func getvalue() -> double {… }
+    func foo() {...}
+    func bar() {...}
+    func getvalue() -> double {... }
   }
 
 Then there is no way to perform a composite operation that needs to "atomically"
 perform foo() and bar() without any other operations getting in between. If you
 had code like this::
 
-  var a : MyActor = …
+  var a : MyActor = ...
   a.foo()
   a.bar()
 
@@ -196,7 +196,7 @@ wouldn't be run in between them. To handle this, the async block structure can
 be used to submit a sequence of code that is atomically run in the actor's
 context, e.g.::
 
-  var a : MyActor = …
+  var a : MyActor = ...
   async a {
     a.foo()
     a.bar()
@@ -206,7 +206,7 @@ This conceptually submits a closure to run in the context of the actor. If you
 look at it this way, an async message send is conceptually equivalent to an
 async block. As such, the original example was equivalent to::
 
-  var a : MyActor = …
+  var a : MyActor = ...
   async a { a.foo() }
   async a { a.bar() }
 
@@ -310,7 +310,7 @@ to access the ivar. Silly example::
     var title : string; // string is an immutable by-ref type.
     ...
   }
-  
+
   ...
   var x = new Window;
   print(x.title) // ok, all stores will be atomic, an (recursively) immutable data is valid in all actors, so this is fine to load.

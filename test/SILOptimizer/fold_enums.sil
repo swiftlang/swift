@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -emit-sil %s | %FileCheck %s
 
 // Check that the optimizer can detect when an enum (e.g. Optional) is being deconstructed
 // and then recreated in the same form. It should replace it with the original value in
@@ -20,7 +20,7 @@ public enum E {
 // CHECK-LABEL: sil @_TF10fold_enums18recreate_optional1FGSqVs5Int32_GSqS0__
 // CHECK: bb0(%0 : $Optional<Int32>)
 // CHECK-NOT: bb1
-// CHECK: return %0 : $Optional<Int32> 
+// CHECK: return %0 : $Optional<Int32>
 sil @_TF10fold_enums18recreate_optional1FGSqVs5Int32_GSqS0__ : $@convention(thin) (Optional<Int32>) -> Optional<Int32> {
 bb0(%0 : $Optional<Int32>):
   debug_value %0 : $Optional<Int32>, let, name "x" // id: %1
@@ -54,7 +54,7 @@ bb0(%0 : $Optional<Int32>, %1 : $Int32):
 bb1(%3 : $Int32):
   debug_value %3 : $Int32
 
-  // The operand is not %3 (= the argument of this block).	
+  // The operand is not %3 (= the argument of this block).
   %5 = enum $Optional<Int32>, #Optional.some!enumelt.1, %1 : $Int32
   br bb3(%5 : $Optional<Int32>)
 
@@ -68,7 +68,7 @@ bb3(%8 : $Optional<Int32>):
 // CHECK-LABEL: sil @_TF10fold_enums18recreate_optional2FGSqVs5Int32_GSqS0__
 // CHECK: bb0(%0 : $Optional<Int32>)
 // CHECK-NOT: bb1
-// CHECK: return %0 : $Optional<Int32> 
+// CHECK: return %0 : $Optional<Int32>
 sil @_TF10fold_enums18recreate_optional2FGSqVs5Int32_GSqS0__ : $@convention(thin) (Optional<Int32>) -> Optional<Int32> {
 bb0(%0 : $Optional<Int32>):
   debug_value %0 : $Optional<Int32>, let, name "x" // id: %1
@@ -95,7 +95,7 @@ bb3(%13 : $Optional<Int32>):                      // Preds: bb1 bb2
 // CHECK-LABEL: sil @_TF10fold_enums13recreate_enumFOS_1ES0_
 // CHECK: bb0(%0 : $E)
 // CHECK-NOT: bb1
-// CHECK: return %0 : $E 
+// CHECK: return %0 : $E
 sil @_TF10fold_enums13recreate_enumFOS_1ES0_ : $@convention(thin) (E) -> E {
 bb0(%0 : $E):
   debug_value %0 : $E, let, name "e" // id: %1

@@ -65,12 +65,16 @@ extension Array where Element == String {
 
 This is a highly-requested feature that fits into the existing syntax and semantics. Note that one could imagine introducing new syntax, e.g., extending `Array<String>`, which gets into new-feature territory: see the section on "Parameterized extensions".
 
+This feature is tracked by [SR-1009](https://bugs.swift.org/browse/SR-1009) and work has been completed. This feature is planned for release with Swift 3.1.
+
 
 ## Parameterizing other declarations
 
 There are a number of Swift declarations that currently cannot have generic parameters; some of those have fairly natural extensions to generic forms that maintain their current syntax and semantics, but become more powerful when made generic.
 
 ### Generic typealiases
+
+*Accepted in [SE-0048](https://github.com/apple/swift-evolution/blob/master/proposals/0048-generic-typealias.md), implemented in Swift 3*
 
 Typealiases could be allowed to carry generic parameters. They would still be aliases (i.e., they would not introduce new types). For example:
 
@@ -200,7 +204,7 @@ protocol Sequence {
 }
 ```
 
-### Default generic arguments 
+### Default generic arguments
 
 Generic parameters could be given the ability to provide default arguments, which would be used in cases where the type argument is not specified and type inference could not determine the type argument. For example:
 
@@ -248,7 +252,7 @@ extension P {
 }
 
 class C : P {
-  // gets the protocol extension's 
+  // gets the protocol extension's
 }
 
 class D : C {
@@ -323,7 +327,7 @@ Variadic generics would allow us to abstract over a set of generic parameters. T
 public struct ZipIterator<... Iterators : IteratorProtocol> : Iterator {  // zero or more type parameters, each of which conforms to IteratorProtocol
   public typealias Element = (Iterators.Element...)                       // a tuple containing the element types of each iterator in Iterators
 
-  var (...iterators): (Iterators...)    // zero or more stored properties, one for each type in Iterators 
+  var (...iterators): (Iterators...)    // zero or more stored properties, one for each type in Iterators
   var reachedEnd = false
 
   public mutating func next() -> Element? {
@@ -341,7 +345,7 @@ public struct ZipIterator<... Iterators : IteratorProtocol> : Iterator {  // zer
 public struct ZipSequence<...Sequences : Sequence> : Sequence {
   public typealias Iterator = ZipIterator<Sequences.Iterator...>   // get the zip iterator with the iterator types of our Sequences
 
-  var (...sequences): (Sequences...)    // zero or more stored properties, one for each type in Sequences 
+  var (...sequences): (Sequences...)    // zero or more stored properties, one for each type in Sequences
 
   // details ...
 }
@@ -350,7 +354,7 @@ public struct ZipSequence<...Sequences : Sequence> : Sequence {
 Such a design could also work for function parameters, so we can pack together multiple function arguments with different types, e.g.,
 
 ```Swift
-public func zip<... Sequences : SequenceType>(... sequences: Sequences...) 
+public func zip<... Sequences : SequenceType>(... sequences: Sequences...)
             -> ZipSequence<Sequences...> {
   return ZipSequence(sequences...)
 }
@@ -367,7 +371,7 @@ func apply<... Args, Result>(fn: (Args...) -> Result,    // function taking some
 
 ### Extensions of structural types
 
-Currently, only nominal types (classes, structs, enums, protocols) can be extended. One could imagine extending structural types—particularly tuple types—to allow them to, e.g., conform to protocols. For example, pulling together variadic generics, parameterized extensions, and conditional conformances, one could express "a tuple type is `Equatable` if all of its element types are `Equatable`":
+Currently, only nominal types (classes, structs, enums, protocols) can be extended. One could imagine extending structural types--particularly tuple types--to allow them to, e.g., conform to protocols. For example, pulling together variadic generics, parameterized extensions, and conditional conformances, one could express "a tuple type is `Equatable` if all of its element types are `Equatable`":
 
 ```Swift
 extension<...Elements : Equatable> (Elements...) : Equatable {   // extending the tuple type "(Elements...)" to be Equatable
@@ -440,20 +444,24 @@ extension Bag {
 
 ### Moving the `where` clause outside of the angle brackets (*)
 
+*Accepted in [SE-0081](https://github.com/apple/swift-evolution/blob/master/proposals/0081-move-where-expression.md), implemented in Swift 3*
+
 The `where` clause of generic functions comes very early in the declaration, although it is generally of much less concern to the client than the function parameters and result type that follow it. This is one of the things that contributes to "angle bracket blindness". For example, consider the `containsAll` signature above:
 
 ```Swift
 func containsAll<S: Sequence where Sequence.Iterator.Element == Element>(elements: S) -> Bool
 ```
 
-One could move the `where` clause to the end of the signature, so that the most important parts—name, generic parameter, parameters, result type—precede it:
+One could move the `where` clause to the end of the signature, so that the most important parts--name, generic parameter, parameters, result type--precede it:
 
 ```Swift
-func containsAll<S: Sequence>(elements: S) -> Bool 
+func containsAll<S: Sequence>(elements: S) -> Bool
        where Sequence.Iterator.Element == Element
 ```
 
 ### Renaming `protocol<...>` to `Any<...>` (*)
+
+*Accepted in [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md) as "Replace `protocol<P1,P2>` syntax with `P1 & P2` syntax", implemented in Swift 3*
 
 The `protocol<...>` syntax is a bit of an oddity in Swift. It is used to compose protocols together, mostly to create values of existential type, e.g.,
 
@@ -610,7 +618,7 @@ The actual requested feature here is the ability to say "Any type that conforms 
 
 More importantly, modeling `Sequence` with generic parameters rather than associated types is tantalizing but wrong: you don't want a type conforming to `Sequence` in multiple ways, or (among other things) your `for..in` loops stop working, and you lose the ability to dynamically cast down to an existential `Sequence` without binding the `Element` type (again, see "Generalized existentials"). Use cases similar to the `ConstructibleFromValue` protocol above seem too few to justify the potential for confusion between associated types and generic parameters of protocols; we're better off not having the latter.
 
-### Private conformances 
+### Private conformances
 
 Right now, a protocol conformance can be no less visible than the minimum of the conforming type's access and the protocol's access. Therefore, a public type conforming to a public protocol must provide the conformance publicly. One could imagine removing that restriction, so that one could introduce a private conformance:
 
@@ -630,7 +638,7 @@ func foo(value: Any) {
 foo(X())
 ```
 
-Under what circumstances should it print "P"? If `foo()` is defined within the same module as the conformance of `X` to `P`? If the call is defined within the same module as the conformance of `X` to `P`? Never? Either of the first two answers requires significant complications in the dynamic casting infrastructure to take into account the module in which a particular dynamic cast occurred (the first option) or where an existential was formed (the second option), while the third answer breaks the link between the static and dynamic type systems—none of which is an acceptable result.
+Under what circumstances should it print "P"? If `foo()` is defined within the same module as the conformance of `X` to `P`? If the call is defined within the same module as the conformance of `X` to `P`? Never? Either of the first two answers requires significant complications in the dynamic casting infrastructure to take into account the module in which a particular dynamic cast occurred (the first option) or where an existential was formed (the second option), while the third answer breaks the link between the static and dynamic type systems--none of which is an acceptable result.
 
 ### Conditional conformances via protocol extensions
 
@@ -687,7 +695,7 @@ Associated type inference is a useful feature. It's used throughout the standard
 
 ## Existentials
 
-Existentials aren't really generics per se, but the two systems are closely intertwined due to their mutable dependence on protocols.
+Existentials aren't really generics per se, but the two systems are closely intertwined due to their mutual dependence on protocols.
 
 ### Generalized existentials
 

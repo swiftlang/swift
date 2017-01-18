@@ -1,7 +1,19 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing Mach error codes.
 @objc public enum MachErrorCode : Int32 {
-  case success                   = 0
+  case success                  = 0
 
   /// Specified address is not currently valid.
   case invalidAddress           = 1
@@ -19,7 +31,7 @@
   case invalidArgument          = 4
 
   /// The function could not be performed.  A catch-all.
-  case failure                   = 5
+  case failure                  = 5
 
   /// A system resource could not be allocated to fulfill this
   /// request.  This failure may not be permanent.
@@ -68,7 +80,7 @@
   case invalidValue             = 18
 
   /// Operation would overflow limit on user-references.
-  case userReferencesOverflow            = 19
+  case userReferencesOverflow   = 19
 
   /// The supplied (port) capability is improper.
   case invalidCapability        = 20

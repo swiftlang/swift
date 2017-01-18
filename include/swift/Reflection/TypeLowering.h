@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,6 +19,7 @@
 #define SWIFT_REFLECTION_TYPELOWERING_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Casting.h"
 
 #include <iostream>
@@ -116,7 +117,9 @@ public:
            unsigned Size, unsigned Alignment,
            unsigned Stride, unsigned NumExtraInhabitants)
     : Kind(Kind), Size(Size), Alignment(Alignment), Stride(Stride),
-      NumExtraInhabitants(NumExtraInhabitants) {}
+      NumExtraInhabitants(NumExtraInhabitants) {
+    assert(Alignment > 0);
+  }
 
   TypeInfoKind getKind() const { return Kind; }
 
@@ -206,6 +209,7 @@ class TypeConverter {
   TypeRefBuilder &Builder;
   std::vector<std::unique_ptr<const TypeInfo>> Pool;
   llvm::DenseMap<const TypeRef *, const TypeInfo *> Cache;
+  llvm::DenseSet<const TypeRef *> RecursionCheck;
   llvm::DenseMap<std::pair<unsigned, unsigned>,
                  const ReferenceTypeInfo *> ReferenceCache;
 
@@ -242,8 +246,7 @@ public:
   ///
   /// Not cached.
   const TypeInfo *getClassInstanceTypeInfo(const TypeRef *TR,
-                                           unsigned start,
-                                           unsigned align);
+                                           unsigned start);
 
 private:
   friend class swift::reflection::LowerType;

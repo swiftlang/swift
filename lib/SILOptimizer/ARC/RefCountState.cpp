@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -142,6 +142,8 @@ bool BottomUpRefCountState::isRefCountStateModified() const {
   case LatticeState::MightBeUsed:
     return false;
   }
+
+  llvm_unreachable("Unhandled TermKind in switch.");
 }
 
 /// Returns true if given the current lattice state, do we care if the value
@@ -155,6 +157,8 @@ bool BottomUpRefCountState::valueCanBeDecrementedGivenLatticeState() const {
   case LatticeState::Decremented:
     return false;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 /// If advance the state's sequence appropriately for a decrement. If we do
@@ -169,6 +173,8 @@ bool BottomUpRefCountState::handleDecrement() {
   case LatticeState::Decremented:
     return false;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 /// Returns true if given the current lattice state, do we care if the value we
@@ -182,6 +188,8 @@ bool BottomUpRefCountState::valueCanBeUsedGivenLatticeState() const {
   case LatticeState::MightBeUsed:
     return false;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 /// Given the current lattice state, if we have seen a use, advance the
@@ -202,6 +210,8 @@ bool BottomUpRefCountState::handleUser(
   case LatticeState::None:
     return false;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 /// Returns true if given the current lattice state, do we care if the value
@@ -216,6 +226,8 @@ valueCanBeGuaranteedUsedGivenLatticeState() const {
   case LatticeState::MightBeUsed:
     return true;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 /// Given the current lattice state, if we have seen a use, advance the
@@ -242,6 +254,8 @@ bool BottomUpRefCountState::handleGuaranteedUser(
   case LatticeState::None:
     return false;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 // Returns true if the passed in ref count inst matches the ref count inst
@@ -279,6 +293,8 @@ handleRefCountInstMatch(SILInstruction *RefCountInst) {
   case LatticeState::MightBeDecremented:
     return true;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
@@ -539,7 +555,7 @@ bool TopDownRefCountState::initWithMutatorInst(
 }
 
 /// Initialize this ref count state with the @owned Arg at +1.
-void TopDownRefCountState::initWithArg(SILArgument *Arg) {
+void TopDownRefCountState::initWithArg(SILFunctionArgument *Arg) {
   LatState = LatticeState::Incremented;
   Transition = RCStateTransition(Arg);
   assert(Transition.getKind() == RCStateTransitionKind::StrongEntrance &&
@@ -577,6 +593,8 @@ bool TopDownRefCountState::isRefCountStateModified() const {
   case LatticeState::MightBeUsed:
     return false;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 /// Returns true if given the current lattice state, do we care if the value
@@ -590,6 +608,8 @@ bool TopDownRefCountState::valueCanBeDecrementedGivenLatticeState() const {
   case LatticeState::MightBeUsed:
     return false;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 /// If advance the state's sequence appropriately for a decrement. If we do
@@ -606,6 +626,8 @@ bool TopDownRefCountState::handleDecrement(
   case LatticeState::MightBeUsed:
     return false;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 /// Returns true if given the current lattice state, do we care if the value
@@ -619,6 +641,8 @@ bool TopDownRefCountState::valueCanBeUsedGivenLatticeState() const {
   case LatticeState::MightBeUsed:
     return false;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 /// Given the current lattice state, if we have seen a use, advance the
@@ -639,6 +663,8 @@ bool TopDownRefCountState::handleUser(SILInstruction *PotentialUser,
   case LatticeState::MightBeUsed:
     return false;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 /// Returns true if given the current lattice state, do we care if the value
@@ -654,6 +680,8 @@ valueCanBeGuaranteedUsedGivenLatticeState() const {
   case LatticeState::MightBeDecremented:
     return true;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 /// Given the current lattice state, if we have seen a use, advance the
@@ -680,6 +708,8 @@ bool TopDownRefCountState::handleGuaranteedUser(
   case LatticeState::None:
     return false;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 // Returns true if the passed in ref count inst matches the ref count inst
@@ -713,6 +743,8 @@ handleRefCountInstMatch(SILInstruction *RefCountInst) {
   case LatticeState::MightBeUsed:
     return true;
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
@@ -908,6 +940,8 @@ raw_ostream &operator<<(raw_ostream &OS,
   case LatticeState::MightBeDecremented:
     return OS << "MightBeDecremented";
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
@@ -923,6 +957,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   case LatticeState::MightBeDecremented:
     return OS << "MightBeDecremented";
   }
+
+  llvm_unreachable("Unhandled LatticeState in switch.");
 }
 
 } // end namespace llvm

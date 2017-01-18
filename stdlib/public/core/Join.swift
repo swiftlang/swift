@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -37,7 +37,7 @@ public struct JoinedIterator<Base : IteratorProtocol> : IteratorProtocol
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Base.Element.Iterator.Element? {
-    repeat {
+    while true {
       switch _state {
       case .start:
         if let nextSubSequence = _base.next() {
@@ -75,7 +75,6 @@ public struct JoinedIterator<Base : IteratorProtocol> : IteratorProtocol
 
       }
     }
-    while true
   }
 
   internal var _base: Base

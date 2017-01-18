@@ -220,8 +220,8 @@ func docCommentWithGybLineNumber() {}
 func unterminatedBlockDocComment() {}
 
 // RUN: %target-swift-ide-test -print-comments -source-filename %s > %t.txt
-// RUN: FileCheck %s -check-prefix=WRONG < %t.txt
-// RUN: FileCheck %s < %t.txt
+// RUN: %FileCheck %s -check-prefix=WRONG < %t.txt
+// RUN: %FileCheck %s < %t.txt
 
 // Some comments are not attached to anything.
 // WRONG-NOT: IS_DOC_NOT_ATTACHED

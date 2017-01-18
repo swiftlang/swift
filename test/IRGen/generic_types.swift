@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -88,7 +88,7 @@ import Swift
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
 // CHECK-native: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* null)
 // CHECK-objc:   [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_SwiftObject"
-// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
+// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
 // CHECK-objc:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 10
@@ -102,7 +102,7 @@ import Swift
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
 // CHECK-native: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* null)
 // CHECK-objc:   [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_SwiftObject"
-// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
+// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
 // CHECK-objc:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 10

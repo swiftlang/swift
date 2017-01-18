@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -147,14 +147,15 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
     extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags);
     return false;
   } else if (auto *Archive = llvm::dyn_cast<llvm::object::Archive>(Bin)) {
-    for (const auto &Child : Archive->children()) {
-      auto ChildBinary = Child->getAsBinary();
+    llvm::Error Error = llvm::Error::success();
+    for (const auto &Child : Archive->children(Error)) {
+      auto ChildBinary = Child.getAsBinary();
       // FIXME: BinaryFileName below should instead be ld-style names for
       // object files in archives, e.g. "foo.a(bar.o)".
       if (!ChildBinary) {
         Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
                                      BinaryFileName,
-                                     ChildBinary.getError().message());
+                                     llvm::toString(ChildBinary.takeError()));
         return true;
       }
       if (extractLinkerFlags(ChildBinary->get(), Instance, BinaryFileName,
@@ -162,7 +163,7 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
         return true;
       }
     }
-    return false;
+    return bool(Error);
   } else {
     Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
                                  BinaryFileName,
@@ -194,9 +195,14 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
   for (const auto &BinaryFileName : Invocation.getInputFilenames()) {
     auto BinaryOwner = llvm::object::createBinary(BinaryFileName);
     if (!BinaryOwner) {
+      std::string message;
+      {
+        llvm::raw_string_ostream os(message);
+        logAllUnhandledErrors(BinaryOwner.takeError(), os, "");
+      }
+
       Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
-                                   BinaryFileName,
-                                   BinaryOwner.getError().message());
+                                   BinaryFileName, message);
       return 1;
     }
 

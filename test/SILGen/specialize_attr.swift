@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | %FileCheck %s
 
 // CHECK-LABEL: @_specialize(Int, Float)
 // CHECK-NEXT: func specializeThis<T, U>(_ t: T, u: U)
@@ -21,9 +21,9 @@ public struct SS : QQ {
 
 public struct GG<T : PP> {}
 
-// CHECK-LABEL: public class CC<T : PP> {
+// CHECK-LABEL: public class CC<T> where T : PP {
 // CHECK-NEXT: @_specialize(RR, SS)
-// CHECK-NEXT: @inline(never) public func foo<U : QQ>(_ u: U, g: GG<T>) -> (U, GG<T>)
+// CHECK-NEXT: @inline(never) public func foo<U>(_ u: U, g: GG<T>) -> (U, GG<T>) where U : QQ
 public class CC<T : PP> {
   @inline(never)
   @_specialize(RR, SS)
@@ -34,7 +34,7 @@ public class CC<T : PP> {
 
 // CHECK-LABEL: sil hidden [_specialize <Int, Float>] @_TF15specialize_attr14specializeThisu0_rFTx1uq__T_ : $@convention(thin) <T, U> (@in T, @in U) -> () {
 
-// CHECK-LABEL: sil [noinline] [_specialize <RR, Float, SS, Int>] @_TFC15specialize_attr2CC3foouRd__S_2QQrfTqd__1gGVS_2GGx__Tqd__GS2_x__ : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
+// CHECK-LABEL: sil [noinline] [_specialize <RR, SS>] @_TFC15specialize_attr2CC3foouRd__S_2QQrfTqd__1gGVS_2GGx__Tqd__GS2_x__ : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
 
 // -----------------------------------------------------------------------------
 // Test user-specialized subscript accessors.
@@ -70,7 +70,7 @@ public class ASubscriptable<Element> : TestSubscriptable {
 // CHECK-LABEL: sil [_specialize <Int>] @_TFC15specialize_attr14ASubscriptables9subscriptFSix : $@convention(method) <Element> (@in Element, Int, @guaranteed ASubscriptable<Element>) -> () {
 
 // ASubscriptable.subscript.materializeForSet with no attribute
-// CHECK-LABEL: sil [transparent] [fragile] @_TFC15specialize_attr14ASubscriptablem9subscriptFSix : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed ASubscriptable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil @_TFC15specialize_attr14ASubscriptablem9subscriptFSix : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed ASubscriptable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 
 public class Addressable<Element> : TestSubscriptable {
   var storage: UnsafeMutablePointer<Element>
@@ -99,10 +99,10 @@ public class Addressable<Element> : TestSubscriptable {
 
 
 // Addressable.subscript.getter with no attribute
-// CHECK-LABEL: sil [transparent] [fragile] @_TFC15specialize_attr11Addressableg9subscriptFSix : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> @out Element {
+// CHECK-LABEL: sil @_TFC15specialize_attr11Addressableg9subscriptFSix : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> @out Element {
 
 // Addressable.subscript.setter with no attribute
-// CHECK-LABEL: sil [transparent] [fragile] @_TFC15specialize_attr11Addressables9subscriptFSix : $@convention(method) <Element> (@in Element, Int, @guaranteed Addressable<Element>) -> () {
+// CHECK-LABEL: sil @_TFC15specialize_attr11Addressables9subscriptFSix : $@convention(method) <Element> (@in Element, Int, @guaranteed Addressable<Element>) -> () {
 
 // Addressable.subscript.materializeForSet with no attribute
-// CHECK-LABEL: sil [transparent] [fragile] @_TFC15specialize_attr11Addressablem9subscriptFSix : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed Addressable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil @_TFC15specialize_attr11Addressablem9subscriptFSix : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed Addressable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {

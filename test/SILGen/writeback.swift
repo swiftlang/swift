@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 struct Foo {
   mutating           // used to test writeback.
@@ -47,9 +47,9 @@ x.foo()
 // CHECK: [[X_TEMP:%.*]] = alloc_stack $Foo
 // CHECK: [[GET_X:%.*]] = function_ref @_TF9writebackg1xVS_3Foo : $@convention(thin) () -> Foo
 // CHECK: [[X:%.*]] = apply [[GET_X]]() : $@convention(thin) () -> Foo
-// CHECK: store [[X]] to [[X_TEMP]]
+// CHECK: store [[X]] to [trivial] [[X_TEMP]]
 // CHECK: apply [[FOO]]([[X_TEMP]]) : $@convention(method) (@inout Foo) -> ()
-// CHECK: [[X1:%.*]] = load [[X_TEMP]] : $*Foo
+// CHECK: [[X1:%.*]] = load [trivial] [[X_TEMP]] : $*Foo
 // CHECK: [[SET_X:%.*]] = function_ref @_TF9writebacks1xVS_3Foo : $@convention(thin) (Foo) -> ()
 // CHECK: apply [[SET_X]]([[X1]]) : $@convention(thin) (Foo) -> ()
 // CHECK: dealloc_stack [[X_TEMP]] : $*Foo
@@ -60,9 +60,9 @@ bar(x: &x)
 // CHECK: [[X_TEMP:%.*]] = alloc_stack $Foo
 // CHECK: [[GET_X:%.*]] = function_ref @_TF9writebackg1xVS_3Foo : $@convention(thin) () -> Foo
 // CHECK: [[X:%.*]] = apply [[GET_X]]() : $@convention(thin) () -> Foo
-// CHECK: store [[X]] to [[X_TEMP]] : $*Foo
+// CHECK: store [[X]] to [trivial] [[X_TEMP]] : $*Foo
 // CHECK: apply [[BAR]]([[X_TEMP]]) : $@convention(thin) (@inout Foo) -> ()
-// CHECK: [[X1:%.*]] = load [[X_TEMP]] : $*Foo
+// CHECK: [[X1:%.*]] = load [trivial] [[X_TEMP]] : $*Foo
 // CHECK: [[SET_X:%.*]] = function_ref @_TF9writebacks1xVS_3Foo : $@convention(thin) (Foo) -> ()
 // CHECK: apply [[SET_X]]([[X1]]) : $@convention(thin) (Foo) -> ()
 // CHECK: dealloc_stack [[X_TEMP]] : $*Foo

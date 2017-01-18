@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Reflection/TypeLowering.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
 
@@ -29,12 +30,6 @@
 #else
   #define DEBUG(expr)
 #endif
-
-[[noreturn]]
-static void unreachable(const char *Message) {
-  std::cerr << "fatal error: " << Message << "\n";
-  std::abort();
-}
 
 namespace swift {
 namespace reflection {
@@ -191,11 +186,11 @@ public:
     }
     }
 
-    unreachable("Bad TypeInfo kind");
+    swift_unreachable("Bad TypeInfo kind");
   }
 };
 
-}
+} // end anonymous namespace
 
 void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
   PrintTypeInfo(OS, Indent).print(*this);
@@ -378,6 +373,8 @@ public:
 unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
                                          unsigned fieldAlignment,
                                          unsigned numExtraInhabitants) {
+  assert(fieldAlignment > 0);
+
   // Align the current size appropriately
   Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
 
@@ -421,6 +418,8 @@ const RecordTypeInfo *RecordTypeInfoBuilder::build() {
 
   // Calculate the stride
   unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+  if (Stride == 0)
+    Stride = 1;
 
   return TC.makeTypeInfo<RecordTypeInfo>(
       Size, Alignment, Stride,
@@ -528,7 +527,7 @@ const TypeInfo *TypeConverter::getEmptyTypeInfo() {
   if (EmptyTI != nullptr)
     return EmptyTI;
 
-  EmptyTI = makeTypeInfo<TypeInfo>(TypeInfoKind::Builtin, 0, 1, 0, 0);
+  EmptyTI = makeTypeInfo<TypeInfo>(TypeInfoKind::Builtin, 0, 1, 1, 0);
   return EmptyTI;
 }
 
@@ -776,13 +775,13 @@ public:
 
   MetatypeRepresentation
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
     return MetatypeRepresentation::Unknown;
   }
 
   MetatypeRepresentation
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
     return MetatypeRepresentation::Unknown;
   }
 
@@ -871,7 +870,7 @@ class EnumTypeInfoBuilder {
 
 public:
   EnumTypeInfoBuilder(TypeConverter &TC)
-    : TC(TC), Size(0), Alignment(0), NumExtraInhabitants(0),
+    : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
       Kind(RecordKind::Invalid), Invalid(false) {}
 
   const TypeInfo *build(const TypeRef *TR, const FieldDescriptor *FD) {
@@ -891,7 +890,7 @@ public:
     // NoPayloadEnumImplStrategy
     if (PayloadCases.empty()) {
       Kind = RecordKind::NoPayloadEnum;
-      Size += getNumTagBytes(/*payloadSize=*/0,
+      Size += getNumTagBytes(/*size=*/0,
                              NoPayloadCases,
                              /*payloadCases=*/0);
 
@@ -908,19 +907,23 @@ public:
       Kind = RecordKind::SinglePayloadEnum;
       addCase(PayloadCases[0].Name, CaseTR, CaseTI);
 
-      // Below logic should match the runtime function
-      // swift_initEnumValueWitnessTableSinglePayload().
-      NumExtraInhabitants = CaseTI->getNumExtraInhabitants();
-      if (NumExtraInhabitants >= NoPayloadCases) {
-        // Extra inhabitants can encode all no-payload cases.
-        NumExtraInhabitants -= NoPayloadCases;
-      } else {
-        // Not enough extra inhabitants for all cases. We have to add an
-        // extra tag field.
-        NumExtraInhabitants = 0;
-        Size += getNumTagBytes(Size,
-                               NoPayloadCases - NumExtraInhabitants,
-                               /*payloadCases=*/1);
+      // If we were unable to lower the payload type, do not proceed
+      // further.
+      if (CaseTI != nullptr) {
+        // Below logic should match the runtime function
+        // swift_initEnumValueWitnessTableSinglePayload().
+        NumExtraInhabitants = CaseTI->getNumExtraInhabitants();
+        if (NumExtraInhabitants >= NoPayloadCases) {
+          // Extra inhabitants can encode all no-payload cases.
+          NumExtraInhabitants -= NoPayloadCases;
+        } else {
+          // Not enough extra inhabitants for all cases. We have to add an
+          // extra tag field.
+          NumExtraInhabitants = 0;
+          Size += getNumTagBytes(Size,
+                                 NoPayloadCases - NumExtraInhabitants,
+                                 /*payloadCases=*/1);
+        }
       }
 
     // MultiPayloadEnumImplStrategy
@@ -958,6 +961,8 @@ public:
 
     // Calculate the stride
     unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+    if (Stride == 0)
+      Stride = 1;
 
     return TC.makeTypeInfo<RecordTypeInfo>(
         Size, Alignment, Stride,
@@ -1037,6 +1042,8 @@ public:
       DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
       return nullptr;
     }
+
+    swift_unreachable("Unhandled FieldDescriptorKind in switch.");
   }
 
   const TypeInfo *visitNominalTypeRef(const NominalTypeRef *N) {
@@ -1066,6 +1073,8 @@ public:
     case FunctionMetadataConvention::CFunctionPointer:
       return TC.getTypeInfo(TC.getThinFunctionTypeRef());
     }
+
+    swift_unreachable("Unhandled FunctionMetadataConvention in switch.");
   }
 
   const TypeInfo *visitProtocolTypeRef(const ProtocolTypeRef *P) {
@@ -1092,6 +1101,8 @@ public:
     case MetatypeRepresentation::Thick:
       return TC.getTypeInfo(TC.getAnyMetatypeTypeRef());
     }
+
+    swift_unreachable("Unhandled MetatypeRepresentation in switch.");
   }
 
   const TypeInfo *
@@ -1114,13 +1125,13 @@ public:
 
   const TypeInfo *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
     return nullptr;
   }
 
   const TypeInfo *
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
     return nullptr;
   }
 
@@ -1213,34 +1224,35 @@ public:
   }
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
-    unreachable("Can't lower opaque TypeRef");
+    DEBUG(std::cerr << "Can't lower opaque TypeRef");
     return nullptr;
   }
 };
 
 const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
+  // See if we already computed the result
   auto found = Cache.find(TR);
-  if (found != Cache.end()) {
-    auto *TI = found->second;
-    assert(TI != nullptr && "TypeRef recursion detected");
-    return TI;
+  if (found != Cache.end())
+    return found->second;
+
+  // Detect invalid recursive value types (IRGen should not emit
+  // them in the first place, but there might be bugs)
+  if (!RecursionCheck.insert(TR).second) {
+    DEBUG(std::cerr << "TypeRef recursion detected");
+    return nullptr;
   }
 
-  // Detect recursion
-  Cache[TR] = nullptr;
-
+  // Compute the result and cache it
   auto *TI = LowerType(*this).visit(TR);
+  Cache[TR] = TI;
 
-  // Cache the result
-  if (TI != nullptr)
-    Cache[TR] = TI;
+  RecursionCheck.erase(TR);
 
   return TI;
 }
 
 const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
-                                                        unsigned start,
-                                                        unsigned align) {
+                                                        unsigned start) {
   const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
   if (FD == nullptr) {
     DEBUG(std::cerr << "No field descriptor: "; TR->dump());
@@ -1254,9 +1266,9 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
     // TypeRef to make field types concrete.
     RecordTypeInfoBuilder builder(*this, RecordKind::ClassInstance);
 
-    // Start layout from the given instance start offset.
-    // Extra inhabitants do not matter for a class instance payload.
-    builder.addField(start, align, /*numExtraInhabitants=*/0);
+    // Start layout from the given instance start offset. This should
+    // be the superclass instance size.
+    builder.addField(start, 1, /*numExtraInhabitants=*/0);
 
     for (auto Field : getBuilder().getFieldTypeRefs(TR, FD))
       builder.addField(Field.Name, Field.TR);
@@ -1272,7 +1284,9 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
     DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
     return nullptr;
   }
+
+  swift_unreachable("Unhandled FieldDescriptorKind in switch.");
 }
 
-}  // namespace reflection
-}  // namespace swift
+} // namespace reflection
+} // namespace swift

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Initializer.h"
 
 using namespace swift;
 
@@ -210,6 +211,13 @@ public:
     } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
       recurse = asImpl().checkApply(apply);
     }
+    // Error handling validation (via checkTopLevelErrorHandling) happens after
+    // type checking. If an unchecked expression is still around, the code was
+    // invalid.
+#define UNCHECKED_EXPR(KIND, BASE) \
+    else if (isa<KIND##Expr>(E)) return {false, nullptr};
+#include "swift/AST/ExprNodes.def"
+
     return {bool(recurse), E};
   }
 
@@ -392,7 +400,7 @@ public:
   Classification classifyApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
-    if (!E->getType() || E->getType()->is<ErrorType>())
+    if (!E->getType() || E->getType()->hasError())
       return Classification::forInvalidCode();
     auto type = E->getFn()->getType();
     if (!type) return Classification::forInvalidCode();
@@ -405,6 +413,12 @@ public:
     // Decompose the application.
     SmallVector<Expr*, 4> args;
     auto fnRef = AbstractFunction::decomposeApply(E, args);
+
+    // If any of the arguments didn't type check, fail.
+    for (auto arg : args) {
+      if (!arg->getType() || arg->getType()->hasError())
+        return Classification::forInvalidCode();
+    }
 
     // If we're applying more arguments than the natural argument
     // count, then this is a call to the opaque value returned from
@@ -784,7 +798,7 @@ private:
   /// 'rethrows' function to throw.
   static Classification classifyArgumentByType(Type paramType,
                                                PotentialReason reason) {
-    if (!paramType || paramType->is<ErrorType>())
+    if (!paramType || paramType->hasError())
       return Classification::forInvalidCode();
     if (auto fnType = paramType->getAs<AnyFunctionType>()) {
       if (fnType->throws()) {
@@ -880,7 +894,7 @@ public:
       return result;
     }
     return Context(getKindForFunctionBody(
-        D->getType(), D->getNumParameterLists()));
+        D->getInterfaceType(), D->getNumParameterLists()));
   }
 
   static Context forInitializer(Initializer *init) {
@@ -1383,7 +1397,14 @@ private:
                    classification.getResult() == ThrowingKind::Throws);
     }
 
-    return ShouldRecurse;
+    // If current apply expression did not type-check, don't attempt
+    // walking inside of it. This accounts for the fact that we don't
+    // erase types without type variables to enable better code complication,
+    // so DeclRefExpr(s) or ApplyExpr with DeclRefExpr as function contained
+    // inside would have their types preserved, which makes classification
+    // incorrect.
+    auto type = E->getType();
+    return !type || type->hasError() ? ShouldNotRecurse : ShouldRecurse;
   }
 
   ShouldRecurse_t checkIfConfig(IfConfigStmt *S) {
@@ -1515,7 +1536,7 @@ private:
   }
 };
 
-} // end anonymous namespace 
+} // end anonymous namespace
 
 void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
   CheckErrorCoverage checker(*this, Context::forTopLevelCode(code));

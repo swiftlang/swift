@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 infix operator %%%
 infix operator %%%%
@@ -19,7 +19,7 @@ precedencegroup ReallyHighPrecedence {
   associativity: left
 }
 
-infix func fn_binary(_ lhs: Int, rhs: Int) {}  // expected-error {{'infix' requires a function with an operator identifier}}
+infix func fn_binary(_ lhs: Int, rhs: Int) {}  // expected-error {{'infix' modifier is not required or allowed on func declarations}}
 
 
 func ++++(lhs: X, rhs: X) -> X {}
@@ -142,12 +142,14 @@ func test_14705150() {
 
 }
 
-prefix postfix func ++(x: Int) {} // expected-error {{attribute 'prefix' cannot be combined with this attribute}}
-postfix prefix func ++(x: Int) {} // expected-error {{attribute 'postfix' cannot be combined with this attribute}}
+prefix postfix func ++(x: Int) {} // expected-error {{'postfix' contradicts previous modifier 'prefix'}} {{8-16=}}
+postfix prefix func ++(x: Float) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}}
+postfix prefix infix func ++(x: Double) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}} expected-error {{'infix' contradicts previous modifier 'postfix'}} {{16-22=}}
+infix prefix func +-+(x: Int, y: Int) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-error{{'prefix' contradicts previous modifier 'infix'}} {{7-14=}}
 
 // Don't allow one to define a postfix '!'; it's built into the
-// language.
-postfix operator!  // expected-error {{cannot declare a custom postfix '!' operator}}
+// language. Also illegal to have any postfix operator starting with '!'.
+postfix operator !  // expected-error {{cannot declare a custom postfix '!' operator}} expected-error {{expected operator name in operator declaration}}
 prefix operator &  // expected-error {{cannot declare a custom prefix '&' operator}}
 
 // <rdar://problem/14607026> Restrict use of '<' and '>' as prefix/postfix operator names
@@ -214,29 +216,142 @@ extension S0 {
 }
 
 struct S1 {
-  func %%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
+  func %%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
 }
 
 extension S1 {
-  func %%%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
+  func %%%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
 }
 
 class C0 {
-  static func %%%(lhs: S0, rhs: S0) -> S0 { return lhs }
+  static func %%%(lhs: C0, rhs: C0) -> C0 { return lhs }
 }
 
 class C1 {
-  final func %%%(lhs: S0, rhs: S0) -> S0 { return lhs }
+  final func %%%(lhs: C1, rhs: C1) -> C1 { return lhs }
 }
 
 final class C2 {
-  class func %%%(lhs: S0, rhs: S0) -> S0 { return lhs }
+  class func %%%(lhs: C2, rhs: C2) -> C2 { return lhs }
 }
 
 class C3 {
-  class func %%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%' declared in non-final class 'C3' must be 'final'}}{{3-3=final }}
+  class func %%%(lhs: C3, rhs: C3) -> C3 { return lhs } // expected-error{{operator '%%%' declared in non-final class 'C3' must be 'final'}}{{3-3=final }}
 }
 
 class C4 {
-  func %%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%' declared in type 'C4' must be 'static'}}{{3-3=static }}
+  func %%%(lhs: C4, rhs: C4) -> C4 { return lhs } // expected-error{{operator '%%%' declared in type 'C4' must be 'static'}}{{3-3=static }}
+}
+
+struct Unrelated { }
+
+struct S2 {
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated { }
+  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}}
+
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> S2 { }
+  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}}
+
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> S2.Type { }
+  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}}
+
+  // Okay: refers to S2
+  static func %%%(lhs: S2, rhs: Unrelated) -> Unrelated { }
+  static func %%%(lhs: inout S2, rhs: Unrelated) -> Unrelated { }
+  static func %%%(lhs: S2.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%(lhs: inout S2.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%(lhs: Unrelated, rhs: S2) -> Unrelated { }
+  static func %%%(lhs: Unrelated, rhs: inout S2) -> Unrelated { }
+  static func %%%(lhs: Unrelated, rhs: S2.Type) -> Unrelated { }
+  static func %%%(lhs: Unrelated, rhs: inout S2.Type) -> Unrelated { }
+}
+
+extension S2 {
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated { }
+  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}}
+
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> S2 { }
+  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}}
+
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> S2.Type { }
+  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}}
+
+  // Okay: refers to S2
+  static func %%%%(lhs: S2, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: inout S2, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: S2.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: inout S2.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: S2) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: inout S2) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: S2.Type) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: inout S2.Type) -> Unrelated { }
+}
+
+protocol P2 {
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated
+  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> Self
+  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> Self.Type
+  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  // Okay: refers to Self
+  static func %%%(lhs: Self, rhs: Unrelated) -> Unrelated
+  static func %%%(lhs: inout Self, rhs: Unrelated) -> Unrelated
+  static func %%%(lhs: Self.Type, rhs: Unrelated) -> Unrelated
+  static func %%%(lhs: inout Self.Type, rhs: Unrelated) -> Unrelated
+  static func %%%(lhs: Unrelated, rhs: Self) -> Unrelated
+  static func %%%(lhs: Unrelated, rhs: inout Self) -> Unrelated
+  static func %%%(lhs: Unrelated, rhs: Self.Type) -> Unrelated
+  static func %%%(lhs: Unrelated, rhs: inout Self.Type) -> Unrelated
+}
+
+extension P2 {
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated { }
+  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Self { }
+  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Self.Type { }
+  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  // Okay: refers to Self
+  static func %%%%(lhs: Self, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: inout Self, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: Self.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: inout Self.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: Self) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: inout Self) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: Self.Type) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: inout Self.Type) -> Unrelated { }
+}
+
+protocol P3 {
+  // Okay: refers to P3
+  static func %%%(lhs: P3, rhs: Unrelated) -> Unrelated
+}
+
+extension P3 {
+  // Okay: refers to P3
+  static func %%%%(lhs: P3, rhs: Unrelated) -> Unrelated { }
+}
+
+// rdar://problem/27940842 - recovery with a non-static '=='.
+class C5 {
+  func == (lhs: C5, rhs: C5) -> Bool { return false } // expected-error{{operator '==' declared in type 'C5' must be 'static'}}
+
+  func test1(x: C5) {
+    _ = x == x
+  }
+}
+
+class C6 {
+  static func == (lhs: C6, rhs: C6) -> Bool { return false }
+
+  func test1(x: C6) {
+    if x == x && x = x { } // expected-error{{cannot assign to value: '&&' returns immutable value}}
+  }
 }

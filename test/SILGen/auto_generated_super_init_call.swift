@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // Test that we emit a call to super.init at the end of the initializer, when none has been previously added.
 
@@ -14,12 +14,12 @@ class SomeDerivedClass : Parent {
     y = 42
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (@owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: integer_literal $Builtin.Int2048, 42
-// CHECK: [[SELFLOAD:%[0-9]+]] = load [[SELF:%[0-9]+]] : $*SomeDerivedClass
+// CHECK: [[SELFLOAD:%[0-9]+]] = load_borrow [[SELF:%[0-9]+]] : $*SomeDerivedClass
 // CHECK-NEXT: [[PARENT:%[0-9]+]] = upcast [[SELFLOAD]] : $SomeDerivedClass to $Parent
 // CHECK: [[INITCALL1:%[0-9]+]] = function_ref @_TFC30auto_generated_super_init_call6ParentcfT_S0_ : $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NEXT: [[RES1:%[0-9]+]] = apply [[INITCALL1]]([[PARENT]])
 // CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unchecked_ref_cast [[RES1]] : $Parent to $SomeDerivedClass
-// CHECK-NEXT: store [[DOWNCAST]] to [[SELF]] : $*SomeDerivedClass 
+// CHECK-NEXT: store [[DOWNCAST]] to [init] [[SELF]] : $*SomeDerivedClass 
   }
   
   init(x: Int) {
@@ -40,16 +40,18 @@ class SomeDerivedClass : Parent {
     
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
 // CHECK: bb4:
-// CHECK: [[SELFLOAD:%[0-9]+]] = load [[SELF:%[0-9]+]] : $*SomeDerivedClass
-// CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfT_S0_ : $@convention(method) (@owned Parent) -> @owned Parent,
-// CHECK-NEXT: apply
-// CHECK-NEXT: unchecked_ref_cast
-// CHECK-NEXT: store
-// CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: return
+// SEMANTIC ARC TODO: Another case of needing a mutable load_borrow.
+// CHECK: [[SELFLOAD:%[0-9]+]] = load_borrow [[SELF:%[0-9]+]] : $*SomeDerivedClass
+// CHECK: [[SELFLOAD_PARENT_CAST:%.*]] = upcast [[SELFLOAD]]
+// CHECK: [[PARENT_INIT:%.*]] = function_ref @_TFC30auto_generated_super_init_call6ParentcfT_S0_ : $@convention(method) (@owned Parent) -> @owned Parent,
+// CHECK: [[PARENT:%.*]] = apply [[PARENT_INIT]]([[SELFLOAD_PARENT_CAST]])
+// CHECK: [[SELFAGAIN:%.*]] = unchecked_ref_cast [[PARENT]]
+// CHECK: store [[SELFAGAIN]] to [init] [[SELF]]
+// CHECK: [[SELFLOAD:%.*]] = load [copy] [[SELF]]
+// CHECK: destroy_value
+// CHECK: return [[SELFLOAD]]
   }
+// CHECK: } // end sil function '_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}}'
 
   // One init has a call to super init. Make sure we don't insert more than one.
   init(b: Bool, i: Int) {

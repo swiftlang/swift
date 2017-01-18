@@ -41,6 +41,12 @@ struct BigStruct {
 
 @interface Gadget : NSObject
 - (BOOL) negate:(BOOL) b;
+- (_Bool) invert:(_Bool) b;
+
+- (BOOL) negateThrowing:(BOOL) b error:(NSError **) error;
+
+// This one is not imported as a 'throws' function in Swift
+- (_Bool) invertThrowing:(_Bool) b error:(NSError **) error;
 @end
 
 @protocol Pasta
@@ -86,3 +92,16 @@ static inline NSNumber *giveMeANumber(void) {
 static inline Class giveMeAMetaclass(void) {
   return [NSString class];
 }
+
+typedef struct FiveByteStruct {
+    BOOL first;
+    BOOL second;
+    BOOL third;
+    BOOL fourth;
+    BOOL fifth;
+} FiveByteStruct;
+
+
+@interface MyClass : NSObject
++ (void)mymethod:(FiveByteStruct)param;
+@end

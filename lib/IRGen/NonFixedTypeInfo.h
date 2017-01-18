@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -23,6 +23,7 @@
 #ifndef SWIFT_IRGEN_NONFIXEDTYPEINFO_H
 #define SWIFT_IRGEN_NONFIXEDTYPEINFO_H
 
+#include "Address.h"
 #include "GenOpaque.h"
 #include "IndirectTypeInfo.h"
 
@@ -57,28 +58,30 @@ public:
   // This is useful for metaprogramming.
   static bool isFixed() { return false; }
 
-  ContainedAddress allocateStack(IRGenFunction &IGF,
+  StackAddress allocateStack(IRGenFunction &IGF,
                                  SILType T,
+                                 bool isInEntryBlock,
                                  const llvm::Twine &name) const override {
-    // Make a fixed-size buffer.
-    Address buffer = IGF.createFixedSizeBufferAlloca(name);
-    IGF.Builder.CreateLifetimeStart(buffer, getFixedBufferSize(IGF.IGM));
-
-    // Allocate an object of the appropriate type within it.
-    llvm::Value *address = emitAllocateBufferCall(IGF, T, buffer);
-    return { buffer, getAsBitCastAddress(IGF, address) };
+    // Allocate memory on the stack.
+    auto alloca = emitDynamicAlloca(IGF, T, isInEntryBlock);
+    assert((isInEntryBlock && alloca.SavedSP == nullptr) ||
+           (!isInEntryBlock && alloca.SavedSP != nullptr) &&
+               "stacksave/restore operations can only be skipped in the entry "
+               "block");
+    IGF.Builder.CreateLifetimeStart(alloca.Alloca);
+    return { getAsBitCastAddress(IGF, alloca.Alloca), alloca.SavedSP };
   }
 
-  void deallocateStack(IRGenFunction &IGF, Address buffer,
+  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
                        SILType T) const override {
-    emitDeallocateBufferCall(IGF, T, buffer);
-    IGF.Builder.CreateLifetimeEnd(buffer, getFixedBufferSize(IGF.IGM));
+    IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
+    emitDeallocateDynamicAlloca(IGF, stackAddress);
   }
 
-  void destroyStack(IRGenFunction &IGF, Address buffer,
+  void destroyStack(IRGenFunction &IGF, StackAddress stackAddress,
                     SILType T) const override {
-    emitDestroyBufferCall(IGF, T, buffer);
-    IGF.Builder.CreateLifetimeEnd(buffer, getFixedBufferSize(IGF.IGM));
+    emitDestroyCall(IGF, T, stackAddress.getAddress());
+    deallocateStack(IGF, stackAddress, T);
   }
 
   llvm::Value *getValueWitnessTable(IRGenFunction &IGF, SILType T) const {

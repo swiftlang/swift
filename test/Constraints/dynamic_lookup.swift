@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module %S/Inputs/PrivateObjC.swift -o %t
-// RUN: %target-parse-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -I %t
 
 // REQUIRES: objc_interop
 import Foundation
@@ -222,6 +222,11 @@ uopt.internalFoo!() // expected-error{{'internalFoo' is inaccessible due to 'int
 
 let anyValue: Any = X()
 _ = anyValue.bar() // expected-error {{value of type 'Any' has no member 'bar'}}
-// expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{5-13=(anyValue as AnyObject)}}
+// expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{5-5=(}}{{13-13= as AnyObject)}}
 _ = (anyValue as AnyObject).bar()
 _ = (anyValue as! X).bar()
+
+var anyDict: [String : Any] = Dictionary<String, Any>()
+anyDict["test"] = anyValue
+_ = anyDict["test"]!.bar() // expected-error {{value of type 'Any' has no member 'bar'}}
+// expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{5-5=(}}{{21-21= as AnyObject)}}

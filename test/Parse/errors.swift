@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 enum MSV : Error {
   case Foo, Bar, Baz
@@ -120,6 +120,13 @@ func postRethrows(_ f: () throws -> Int) -> Int rethrows { // expected-error{{'r
 
 func postRethrows2(_ f: () throws -> Int) -> rethrows Int { // expected-error{{'rethrows' may only occur before '->'}}{{43-45=rethrows}}{{46-54=->}}
   return try f()
+}
+
+func incompleteThrowType() {
+  // FIXME: Bad recovery for incomplete function type.
+  let _: () throws
+  // expected-error @-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error @-2 {{expected expression}}
 }
 
 // rdar://21328447

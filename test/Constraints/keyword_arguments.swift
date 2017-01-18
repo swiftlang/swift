@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Single extraneous keyword argument (tuple-to-scalar)
 func f1(_ a: Int) { }

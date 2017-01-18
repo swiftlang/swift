@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Test "near misses" where a member of a class or extension thereof
 // nearly matches an optional requirement, but does not exactly match.
@@ -119,3 +119,37 @@ class C7a : P7 {
   // expected-note@-4{{make 'method(foo:)' private to silence this warning}}
 }
 
+// Don't complain about near misses that satisfy other protocol
+// requirements.
+@objc protocol P8 {
+  @objc optional func foo(exactMatch: Int)
+}
+
+@objc protocol P9 : P8 {
+  @objc optional func foo(nearMatch: Int)
+}
+
+class C8Super : P8 { }
+
+class C9Sub : C8Super, P9 {
+  func foo(exactMatch: Int) { }
+}
+
+// Don't complain about overriding methods that are near misses;
+// the user cannot make it satisfy the protocol requirement.
+class C10Super {
+  func foo(nearMatch: Int) { }
+}
+
+class C10Sub : C10Super, P8 {
+  override func foo(nearMatch: Int) { }
+}
+
+// Be more strict about near misses than we had previously.
+@objc protocol P11 {
+  @objc optional func foo(wibble: Int)
+}
+
+class C11 : P11 {
+  func f(waggle: Int) { } // no warning
+}

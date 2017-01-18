@@ -28,7 +28,7 @@ func Foo1() {
 // RUN: %sourcekitd-test -req=format -line=9 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=16 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=22 -length=1 %s >>%t.response
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "    if xyz == 2 {"
 // CHECK: key.sourcetext: "        xyz = 1"

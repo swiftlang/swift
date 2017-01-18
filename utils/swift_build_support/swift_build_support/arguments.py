@@ -2,11 +2,11 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ----------------------------------------------------------------------------
 """
@@ -102,6 +102,26 @@ def type_clang_compiler_version(string):
         "'MAJOR.MINOR.PATCH.PATCH'" % string)
 
 _register(type, 'clang_compiler_version', type_clang_compiler_version)
+
+
+def type_swift_compiler_version(string):
+    """
+    Parse version string and split into a tuple of strings
+    (major, minor, patch)
+
+    Supports "MAJOR.MINOR" and "MAJOR.MINOR.PATCH" formats.
+    """
+    m = re.match(r'^([0-9]+)\.([0-9]+)(\.([0-9]+))?$', string)
+    if m is not None:
+        return CompilerVersion(
+            string_representation=string,
+            components=m.group(1, 2, 4))
+    raise argparse.ArgumentTypeError(
+        "%r is an invalid version value, "
+        "must be 'MAJOR.MINOR' or "
+        "'MAJOR.MINOR.PATCH'" % string)
+
+_register(type, 'swift_compiler_version', type_swift_compiler_version)
 
 
 def type_executable(string):

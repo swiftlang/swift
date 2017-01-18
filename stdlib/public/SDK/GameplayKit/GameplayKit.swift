@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -72,10 +72,11 @@ extension GKEntity {
   }
 }
 
-@_silgen_name("GK_Swift_GKStateMachine_stateForClass")
-internal func GK_Swift_GKStateMachine_stateForClass(
-  _ self_: AnyObject,
-  _ stateClass: AnyObject) -> AnyObject?
+@objc
+internal protocol _SwiftGKStateMachineLike {
+  @objc(stateForClass:)
+  func state(forClass: AnyClass) -> AnyObject?
+}
 
 @available(iOS, introduced: 9.0)
 @available(OSX, introduced: 10.11)
@@ -85,8 +86,9 @@ extension GKStateMachine {
   /// - Parameter forClass: the type of the state you want to get
   public func state<StateType : GKState>(
     forClass stateClass: StateType.Type) -> StateType? {
-    return GK_Swift_GKStateMachine_stateForClass(
-      self, stateClass) as! StateType?
+    // FIXME: GameplayKit marked state(forClass:) unavailable, which means we
+    // can't use it from SwiftPrivate. Bounce through perform(_:with:) instead.
+    return self.perform(#selector(_SwiftGKStateMachineLike.state(forClass:)), with: stateClass)?.takeUnretainedValue() as! StateType?
   }
 }
 

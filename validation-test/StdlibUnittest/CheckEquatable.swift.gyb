@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swiftgyb > %t.stdout 2>&1
-// RUN: FileCheck %s < %t.stdout
+// RUN: %FileCheck %s < %t.stdout
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -77,6 +77,10 @@ AssertionsTestSuite.test("checkEquatable/BrokenTransitivity/1") {
     checkEquatable(
       xs, oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) })
   }
+  checkEquatable(
+    xs,
+    oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) },
+    allowBrokenTransitivity: true)
 }
 // CHECK: stdout>>> bad oracle: broken transitivity at indices 1, 2, 0
 // CHECK: [        OK ] Assertions.checkEquatable/BrokenTransitivity/1
@@ -98,6 +102,10 @@ AssertionsTestSuite.test("checkEquatable/BrokenTransitivity/2") {
     checkEquatable(
       xs, oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) })
   }
+  checkEquatable(
+    xs,
+    oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) },
+    allowBrokenTransitivity: true)
 }
 // CHECK: stdout>>> bad oracle: broken transitivity at indices 4, 7, 1
 // CHECK: [        OK ] Assertions.checkEquatable/BrokenTransitivity/2
@@ -117,6 +125,10 @@ AssertionsTestSuite.test("checkEquatable/BrokenTransitivity/3") {
     checkEquatable(
       xs, oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) })
   }
+  checkEquatable(
+    xs,
+    oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) },
+    allowBrokenTransitivity: true)
 }
 // CHECK: stdout>>> bad oracle: broken transitivity at indices 0, 7, 1
 // CHECK: [        OK ] Assertions.checkEquatable/BrokenTransitivity/3

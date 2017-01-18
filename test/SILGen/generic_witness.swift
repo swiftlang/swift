@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s
 
 protocol Runcible {
   func runce<A>(_ x: A)
@@ -15,10 +16,41 @@ func foo<B : Runcible>(_ x: B) {
 // CHECK-LABEL: sil hidden @_TF15generic_witness3bar{{.*}} : $@convention(thin) (@in Runcible) -> ()
 func bar(_ x: Runcible) {
   var x = x
-  // CHECK: [[BOX:%.*]] = alloc_box $Runcible
+  // CHECK: [[BOX:%.*]] = alloc_box ${ var Runcible }
   // CHECK: [[TEMP:%.*]] = alloc_stack $Runcible
   // CHECK: [[EXIST:%.*]] = open_existential_addr [[TEMP]] : $*Runcible to $*[[OPENED:@opened(.*) Runcible]]
   // CHECK: [[METHOD:%.*]] = witness_method $[[OPENED]], #Runcible.runce!1
   // CHECK: apply [[METHOD]]<[[OPENED]], Int>
   x.runce(5)
 }
+
+protocol Color {}
+
+protocol Ink {
+    associatedtype Paint
+}
+
+protocol Pen {}
+
+protocol Pencil : Pen {
+    associatedtype Stroke : Pen
+}
+
+protocol Medium {
+    associatedtype Texture : Ink
+
+    func draw<P : Pencil>(paint: Texture.Paint, pencil: P) where P.Stroke == Texture.Paint
+}
+
+struct Canvas<I : Ink> where I.Paint : Pen {
+    typealias Texture = I
+
+    func draw<P : Pencil>(paint: I.Paint, pencil: P) where P.Stroke == Texture.Paint { }
+}
+
+extension Canvas : Medium {}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWuRx15generic_witness3Inkwx5PaintS_3PenrGVS_6Canvasx_S_6MediumS_FS4_4drawuRd__S_6Pencilwd__6StrokezWx7TextureS1__rfT5paintWxS7_S1__6pencilqd___T_ : $@convention(witness_method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_1_0.Stroke == τ_0_0.Paint> (@in τ_0_0.Paint, @in τ_1_0, @in_guaranteed Canvas<τ_0_0>) -> ()
+// CHECK: [[FN:%.*]] = function_ref @_TFV15generic_witness6Canvas4drawuRd__S_6Pencilwd__6Strokezwx5PaintrfT5paintwxS3_6pencilqd___T_ : $@convention(method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_1_0.Stroke == τ_0_0.Paint> (@in τ_0_0.Paint, @in τ_1_0, Canvas<τ_0_0>) -> ()
+// CHECK: apply [[FN]]<τ_0_0, τ_1_0>({{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_1_0.Stroke == τ_0_0.Paint> (@in τ_0_0.Paint, @in τ_1_0, Canvas<τ_0_0>) -> ()
+// CHECK: }

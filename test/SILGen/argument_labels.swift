@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -suppress-argument-labels-in-types %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 public struct X { }
 public struct Y { }

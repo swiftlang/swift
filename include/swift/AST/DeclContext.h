@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -35,6 +35,7 @@ namespace llvm {
 
 namespace swift {
   class AbstractFunctionDecl;
+  class GenericEnvironment;
   class ASTContext;
   class ASTWalker;
   class CanType;
@@ -197,7 +198,11 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   friend struct ::llvm::cast_convert_val;
   
   static DeclContext *castDeclToDeclContext(const Decl *D);
-  
+
+  /// If this DeclContext is a GenericType declaration or an
+  /// extension thereof, return the GenericTypeDecl.
+  GenericTypeDecl *getAsTypeOrTypeExtensionContext() const;
+
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
     : ParentAndKind(Parent, Kind) {
@@ -231,19 +236,12 @@ public:
 
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
-  bool isTypeContext() const {
-    return getContextKind() == DeclContextKind::GenericTypeDecl ||
-           getContextKind() == DeclContextKind::ExtensionDecl;
-  }
+  bool isTypeContext() const;
 
   /// \brief Determine whether this is an extension context.
   bool isExtensionContext() const {
     return getContextKind() == DeclContextKind::ExtensionDecl;
   }
-
-  /// If this DeclContext is a GenericType declaration or an
-  /// extension thereof, return the GenericTypeDecl.
-  GenericTypeDecl *getAsGenericTypeOrGenericTypeExtensionContext() const;
 
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.
@@ -268,31 +266,58 @@ public:
   /// protocol extension.
   ///
   /// Only valid if \c getAsProtocolOrProtocolExtensionContext().
-  GenericTypeParamDecl *getProtocolSelf() const;
+  GenericTypeParamType *getProtocolSelfType() const;
 
-  /// getDeclaredTypeOfContext - For a type context, retrieves the declared
-  /// type of the context. Returns a null type for non-type contexts.
+  /// Gets the type being declared by this context.
+  ///
+  /// - Generic types returns an unbound generic type.
+  /// - Non-type contexts returns a null type.
   Type getDeclaredTypeOfContext() const;
 
-  /// getDeclaredTypeInContext - For a type context, retrieves the declared
-  /// type of the context as visible from within the context. Returns a null
-  /// type for non-type contexts.
+  /// Gets the type being declared by this context.
+  ///
+  /// - Generic types return a bound generic type using archetypes.
+  /// - Non-type contexts return a null type.
   Type getDeclaredTypeInContext() const;
   
-  /// getDeclaredInterfaceType - For a type context, retrieves the interface
-  /// type of the context as seen from outside the context. Returns a null
-  /// type for non-type contexts.
+  /// Gets the type being declared by this context.
+  ///
+  /// - Generic types return a bound generic type using interface types.
+  /// - Non-type contexts return a null type.
   Type getDeclaredInterfaceType() const;
 
-  /// \brief Retrieve the innermost generic parameters introduced by this
-  /// context or one of its parent contexts, or null if this context is not
-  /// directly dependent on any generic parameters.
+  /// Get the type of `self` in this context.
+  ///
+  /// - Protocol types return the `Self` archetype.
+  /// - Everything else falls back on getDeclaredTypeInContext().
+  Type getSelfTypeInContext() const;
+
+  /// Get the type of `self` in this context.
+  ///
+  /// - Protocol types return the `Self` interface type.
+  /// - Everything else falls back on getDeclaredInterfaceType().
+  Type getSelfInterfaceType() const;
+
+  /// \brief Retrieve the innermost generic parameters of this context or any
+  /// of its parents.
+  ///
+  /// FIXME: Remove this
   GenericParamList *getGenericParamsOfContext() const;
 
-  /// \brief Retrieve the interface generic type parameters and requirements
-  /// exposed by this context.
+  /// \brief Retrieve the innermost generic signature of this context or any
+  /// of its parents.
   GenericSignature *getGenericSignatureOfContext() const;
-  
+
+  /// \brief Retrieve the innermost archetypes of this context or any
+  /// of its parents.
+  GenericEnvironment *getGenericEnvironmentOfContext() const;
+
+  /// Map an interface type to a contextual type within this context.
+  Type mapTypeIntoContext(Type type) const;
+
+  /// Map a type within this context to an interface type.
+  Type mapTypeOutOfContext(Type type) const;
+
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
   DeclContext *getLocalContext();
@@ -467,14 +492,7 @@ public:
 
   void dumpContext() const;
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0) const;
-  
-  /// Get the type of `self` in this declaration context, if there is a
-  /// `self`.
-  Type getSelfTypeInContext() const;
-  /// Get the interface type of `self` in this declaration context, if there is
-  /// a `self`.
-  Type getSelfInterfaceType() const;
-  
+
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(DeclContext));
@@ -488,16 +506,19 @@ public:
 /// deserialization.
 class SerializedLocalDeclContext : public DeclContext {
 private:
-  const LocalDeclContextKind LocalKind;
+  unsigned LocalKind : 3;
+
+protected:
+  unsigned SpareBits : 29;
 
 public:
   SerializedLocalDeclContext(LocalDeclContextKind LocalKind,
                              DeclContext *Parent)
     : DeclContext(DeclContextKind::SerializedLocal, Parent),
-      LocalKind(LocalKind) {}
+      LocalKind(static_cast<unsigned>(LocalKind)) {}
 
   LocalDeclContextKind getLocalDeclContextKind() const {
-    return LocalKind;
+    return static_cast<LocalDeclContextKind>(LocalKind);
   }
 
   static bool classof(const DeclContext *DC) {
@@ -555,26 +576,22 @@ enum class IterableDeclContextKind : uint8_t {
 /// Note that an iterable declaration context must inherit from both
 /// \c IterableDeclContext and \c DeclContext.
 class IterableDeclContext {
-  /// The first declaration in this context.
-  mutable Decl *FirstDecl = nullptr;
+  /// The first declaration in this context along with a bit indicating whether
+  /// the members of this context will be lazily produced.
+  mutable llvm::PointerIntPair<Decl *, 1, bool> FirstDeclAndLazyMembers;
 
   /// The last declaration in this context, used for efficient insertion,
   /// along with the kind of iterable declaration context.
   mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind> 
     LastDeclAndKind;
 
-  /// Lazy member loader, if any.
-  ///
-  /// FIXME: Can we collapse this storage into something?
-  mutable LazyMemberLoader *LazyLoader = nullptr;
-
-  /// Lazy member loader context data.
-  uint64_t LazyLoaderContextData = 0;
-
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
 
   static IterableDeclContext *castDeclToIterableDeclContext(const Decl *D);
+
+  /// Retrieve the \c ASTContext in which this iterable context occurs.
+  ASTContext &getASTContext() const;
 
 public:
   IterableDeclContext(IterableDeclContextKind kind)
@@ -592,25 +609,13 @@ public:
   /// is inserted immediately after the hint.
   void addMember(Decl *member, Decl *hint = nullptr);
 
-  /// Retrieve the lazy member loader.
-  LazyMemberLoader *getLoader() const {
-    assert(isLazy());
-    return LazyLoader;
-  }
-
-  /// Retrieve the context data for the lazy member loader.
-  uint64_t getLoaderContextData() const {
-    assert(isLazy());
-    return LazyLoaderContextData;
-  }
-
   /// Check whether there are lazily-loaded members.
-  bool isLazy() const {
-    return LazyLoader != nullptr;
+  bool hasLazyMembers() const {
+    return FirstDeclAndLazyMembers.getInt();
   }  
 
-  /// Set the loader for lazily-loaded members.
-  void setLoader(LazyMemberLoader *loader, uint64_t contextData);
+  /// Setup the loader for lazily-loaded members.
+  void setMemberLoader(LazyMemberLoader *loader, uint64_t contextData);
 
   /// Load all of the members of this context.
   void loadAllMembers() const;

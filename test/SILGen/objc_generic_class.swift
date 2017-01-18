@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -18,8 +18,9 @@ class Generic<T>: NSObject {
   // CHECK:       bb0({{%.*}} : $Generic<T>):
   // CHECK-LABEL: sil hidden [thunk] @_TToFC18objc_generic_class7GenericD : $@convention(objc_method) <T> (Generic<T>) -> () {
   // CHECK:       bb0([[SELF:%.*]] : $Generic<T>):
+  // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC18objc_generic_class7GenericD
-  // CHECK:         apply [[NATIVE]]<T>([[SELF]])
+  // CHECK:         apply [[NATIVE]]<T>([[SELF_COPY]])
   deinit {
     // Don't blow up when 'self' is referenced inside an @objc deinit method
     // of a generic class. <rdar://problem/16325525>

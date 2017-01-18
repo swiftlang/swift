@@ -1,4 +1,11 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -typecheck -disable-typo-correction %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
+// RUN: not %target-swift-frontend -typecheck -DIMPORT_FAIL %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
+// DISABLED-NOT: did you mean
+
+#if IMPORT_FAIL
+import NoSuchModule
+#endif
 
 // This is close enough to get typo-correction.
 func test_short_and_close() {
@@ -68,4 +75,12 @@ func test_too_many_but_some_better() {
   let match5 = 0
   let match6 = 0
   let x = mtch // expected-error {{use of unresolved identifier 'mtch'}}
+}
+
+// rdar://problem/28387684
+// Don't crash performing typo correction on bound generic types with
+// type variables.
+_ = [Any]().withUnsafeBufferPointer { (buf) -> [Any] in
+  guard let base = buf.baseAddress else { return [] }
+  return (base ..< base + buf.count).m // expected-error {{value of type 'CountableRange<_>' has no member 'm'}}
 }

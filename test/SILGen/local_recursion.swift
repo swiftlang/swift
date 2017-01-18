@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend  -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-astscope-lookup  -parse-as-library -emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_TF15local_recursion15local_recursionFTSi1ySi_T_ : $@convention(thin) (Int, Int) -> () {
 // CHECK:       bb0([[X:%0]] : $Int, [[Y:%1]] : $Int):
@@ -14,8 +15,9 @@ func local_recursion(_ x: Int, y: Int) {
 
   // CHECK: [[SELF_RECURSIVE_REF:%.*]] = function_ref [[SELF_RECURSIVE]]
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[SELF_RECURSIVE_REF]]([[X]])
+  // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[CLOSURE]]
   let sr = self_recursive
-  // CHECK: apply [[CLOSURE]]([[Y]])
+  // CHECK: apply [[CLOSURE_COPY]]([[Y]])
   sr(y)
 
   func mutually_recursive_1(_ a: Int) {
@@ -45,8 +47,9 @@ func local_recursion(_ x: Int, y: Int) {
 
   // CHECK: [[TRANS_CAPTURE_REF:%.*]] = function_ref [[TRANS_CAPTURE]]
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[TRANS_CAPTURE_REF]]([[X]], [[Y]])
+  // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[CLOSURE]]
   let tc = transitive_capture_2
-  // CHECK: apply [[CLOSURE]]([[X]])
+  // CHECK: apply [[CLOSURE_COPY]]([[X]])
   tc(x)
 
   // CHECK: [[CLOSURE_REF:%.*]] = function_ref @_TFF15local_recursion15local_recursionFTSi1ySi_T_U_FSiT_
@@ -58,7 +61,8 @@ func local_recursion(_ x: Int, y: Int) {
 
   // CHECK: [[CLOSURE_REF:%.*]] = function_ref @_TFF15local_recursion15local_recursionFTSi1ySi_T_U0_FSiT_
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[CLOSURE_REF]]([[X]], [[Y]])
-  // CHECK: apply [[CLOSURE]]([[X]])
+  // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[CLOSURE]]
+  // CHECK: apply [[CLOSURE_COPY]]([[X]])
   let f: (Int) -> () = {
     self_recursive($0)
     transitive_capture_2($0)

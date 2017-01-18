@@ -1,0 +1,23 @@
+// RUN: %scale-test -O --threshold 0.2 --begin 20 --end 25 --step 1 --select computeMethodCallees %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+class C0<T:Integer> {
+    func foo() {
+        return
+    }
+}
+
+%for i in range(1, int(N)):
+class C${i}<T:Integer> {
+    func foo() {
+        let c : C${i-1}<T> = C${i-1}()
+        c.foo()
+    }
+}
+%end
+
+public func bar() {
+    let c : C${int(N)-1}<Int> = C${int(N)-1}()
+    c.foo()
+}

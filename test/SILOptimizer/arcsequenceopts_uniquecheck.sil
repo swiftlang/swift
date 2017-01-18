@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -39,7 +39,7 @@ bb2:
   store %318 to %319 : $*Array<UInt32>
   dealloc_stack %319 : $*Array<UInt32>
   %179 = is_unique %314 : $*Array<UInt32>
-  cond_br %179, bb4, bb5 
+  cond_br %179, bb4, bb5
 
 // CHECK: bb3
 // CHECK-NEXT: strong_release

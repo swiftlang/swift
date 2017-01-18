@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O %s -disable-llvm-optzns -emit-sil -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -O %s -disable-llvm-optzns -emit-sil -g -o - | %FileCheck %s
 
 // CHECK: sil shared [noinline] @_TTSg5V14specialization7AddableS0_S_5ProtoS____TF14specialization3sumuRxS_5ProtorFTxx_x
 // CHECK-SAME: $@convention(thin) (Addable, Addable) -> Addable {

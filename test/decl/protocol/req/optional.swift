@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // -----------------------------------------------------------------------
 // Declaring optional requirements
@@ -6,11 +6,11 @@
 @objc class ObjCClass { }
 
 @objc protocol P1 {
-  @objc optional func method(_ x: Int) // expected-note 2{{requirement 'method' declared here}}
+  @objc optional func method(_ x: Int) // expected-note {{requirement 'method' declared here}}
 
-  @objc optional var prop: Int { get } // expected-note{{requirement 'prop' declared here}}
+  @objc optional var prop: Int { get }
 
-  @objc optional subscript (i: Int) -> ObjCClass? { get } // expected-note{{requirement 'subscript' declared here}}
+  @objc optional subscript (i: Int) -> ObjCClass? { get }
 }
 
 @objc protocol P2 {
@@ -38,10 +38,6 @@ class C2 : P1 {
     set {}
   }
 }
-
-// -----------------------------------------------------------------------
-// "Near" matches.
-// -----------------------------------------------------------------------
 
 class C3 : P1 {
   func method(_ x: Int) { } 
@@ -71,20 +67,18 @@ extension C4 : P1 {
   }
 }
 
+// -----------------------------------------------------------------------
+// Okay to match via extensions.
+// -----------------------------------------------------------------------
+
 class C5 : P1 { }
 
 extension C5 {
   func method(_ x: Int) { } 
-  // expected-warning@-1{{non-'@objc' method 'method' does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
-  // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
 
   var prop: Int { return 5 }
-  // expected-warning@-1{{non-'@objc' property 'prop' does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
-  // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
 
   subscript (i: Int) -> ObjCClass? {
-    // expected-warning@-1{{non-'@objc' subscript does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
-    // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
     get {
       return nil
     }
@@ -92,7 +86,7 @@ extension C5 {
   }
 }
 
-// Note: @nonobjc suppresses warnings
+// Note: @nonobjc suppresses witness match.
 class C6 { }
 
 extension C6 : P1 {
@@ -107,6 +101,10 @@ extension C6 : P1 {
     set {}
   }
 }
+
+// -----------------------------------------------------------------------
+// "Near" matches.
+// -----------------------------------------------------------------------
 
 // Note: warn about selector matches where the Swift names didn't match.
 @objc class C7 : P1 { // expected-note{{class 'C7' declares conformance to protocol 'P1' here}}
@@ -206,18 +204,18 @@ func optionalSubscriptExistential(_ t: P1) {
 // -----------------------------------------------------------------------
 
 // optional cannot be used on non-protocol declarations
-optional var optError: Int = 10 // expected-error{{'optional' can only be applied to protocol members}}
+optional var optError: Int = 10 // expected-error{{'optional' can only be applied to protocol members}} {{1-10=}}
 
 optional struct optErrorStruct { // expected-error{{'optional' modifier cannot be applied to this declaration}} {{1-10=}}
-  optional var ivar: Int // expected-error{{'optional' can only be applied to protocol members}}
-  optional func foo() { } // expected-error{{'optional' can only be applied to protocol members}}
+  optional var ivar: Int // expected-error{{'optional' can only be applied to protocol members}} {{3-12=}}
+  optional func foo() { } // expected-error{{'optional' can only be applied to protocol members}} {{3-12=}}
 }
 
 optional class optErrorClass { // expected-error{{'optional' modifier cannot be applied to this declaration}} {{1-10=}}
-  optional var ivar: Int = 0 // expected-error{{'optional' can only be applied to protocol members}}
-  optional func foo() { } // expected-error{{'optional' can only be applied to protocol members}}
+  optional var ivar: Int = 0 // expected-error{{'optional' can only be applied to protocol members}} {{3-12=}}
+  optional func foo() { } // expected-error{{'optional' can only be applied to protocol members}} {{3-12=}}
 }
-  
+
 protocol optErrorProtocol {
   optional func foo(_ x: Int) // expected-error{{'optional' can only be applied to members of an @objc protocol}}
 }

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -89,9 +89,9 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   // Clear argument map and map ApplyInst arguments to the arguments of the
   // callee's entry block.
   ValueMap.clear();
-  assert(CalleeEntryBB->bbarg_size() == Args.size() &&
+  assert(CalleeEntryBB->args_size() == Args.size() &&
          "Unexpected number of arguments to entry block of function?");
-  auto BAI = CalleeEntryBB->bbarg_begin();
+  auto BAI = CalleeEntryBB->args_begin();
   for (auto AI = Args.begin(), AE = Args.end(); AI != AE; ++AI, ++BAI)
     ValueMap.insert(std::make_pair(*BAI, *AI));
 
@@ -127,7 +127,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     SILBasicBlock *CallerBB = AI.getParent();
     // Split the BB and do NOT create a branch between the old and new
     // BBs; we will create the appropriate terminator manually later.
-    ReturnToBB = CallerBB->splitBasicBlock(InsertPoint);
+    ReturnToBB = CallerBB->split(InsertPoint);
     // Place the return-to BB after all the other mapped BBs.
     if (InsertBeforeBB)
       F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB), F.getBlocks(),
@@ -137,8 +137,8 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
                            SILFunction::iterator(ReturnToBB));
 
     // Create an argument on the return-to BB representing the returned value.
-    auto *RetArg = new (F.getModule()) SILArgument(ReturnToBB,
-                                            AI.getInstruction()->getType());
+    auto *RetArg = ReturnToBB->createPHIArgument(AI.getInstruction()->getType(),
+                                                 ValueOwnershipKind::Owned);
     // Replace all uses of the ApplyInst with the new argument.
     AI.getInstruction()->replaceAllUsesWith(RetArg);
   }
@@ -226,6 +226,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DebugValueAddrInst:
     case ValueKind::StringLiteralInst:
     case ValueKind::FixLifetimeInst:
+    case ValueKind::EndBorrowInst:
+    case ValueKind::BeginBorrowInst:
     case ValueKind::MarkDependenceInst:
     case ValueKind::FunctionRefInst:
     case ValueKind::AllocGlobalInst:
@@ -324,6 +326,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::CopyBlockInst:
     case ValueKind::CopyAddrInst:
     case ValueKind::RetainValueInst:
+    case ValueKind::CopyValueInst:
+    case ValueKind::CopyUnownedValueInst:
     case ValueKind::DeallocBoxInst:
     case ValueKind::DeallocExistentialBoxInst:
     case ValueKind::DeallocRefInst:
@@ -336,11 +340,13 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::ProjectBoxInst:
     case ValueKind::ProjectExistentialBoxInst:
     case ValueKind::ReleaseValueInst:
+    case ValueKind::DestroyValueInst:
     case ValueKind::AutoreleaseValueInst:
     case ValueKind::DynamicMethodBranchInst:
     case ValueKind::DynamicMethodInst:
     case ValueKind::EnumInst:
     case ValueKind::IndexAddrInst:
+    case ValueKind::TailAddrInst:
     case ValueKind::IndexRawPointerInst:
     case ValueKind::InitEnumDataAddrInst:
     case ValueKind::InitExistentialAddrInst:
@@ -349,6 +355,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::InjectEnumAddrInst:
     case ValueKind::IsNonnullInst:
     case ValueKind::LoadInst:
+    case ValueKind::LoadBorrowInst:
     case ValueKind::LoadUnownedInst:
     case ValueKind::LoadWeakInst:
     case ValueKind::OpenExistentialAddrInst:
@@ -358,9 +365,11 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::PartialApplyInst:
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::RefTailAddrInst:
     case ValueKind::RefToUnmanagedInst:
     case ValueKind::RefToUnownedInst:
     case ValueKind::StoreInst:
+    case ValueKind::StoreBorrowInst:
     case ValueKind::StoreUnownedInst:
     case ValueKind::StoreWeakInst:
     case ValueKind::StrongPinInst:
@@ -399,7 +408,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 
       return InlineCost::Expensive;
     }
-    case ValueKind::SILArgument:
+    case ValueKind::SILPHIArgument:
+    case ValueKind::SILFunctionArgument:
     case ValueKind::SILUndef:
       llvm_unreachable("Only instructions should be passed into this "
                        "function.");
@@ -408,4 +418,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::MarkUninitializedBehaviorInst:
       llvm_unreachable("not valid in canonical sil");
   }
+
+  llvm_unreachable("Unhandled ValueKind in switch.");
 }

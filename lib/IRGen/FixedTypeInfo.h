@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -76,10 +76,10 @@ public:
     return (isFixedSize(expansion) && StorageSize.isZero());
   }
 
-  ContainedAddress allocateStack(IRGenFunction &IGF, SILType T,
-                                 const llvm::Twine &name) const override;
-  void deallocateStack(IRGenFunction &IGF, Address addr, SILType T) const override;
-  void destroyStack(IRGenFunction &IGF, Address addr, SILType T) const override;
+  StackAddress allocateStack(IRGenFunction &IGF, SILType T, bool isEntryBlock,
+                             const llvm::Twine &name) const override;
+  void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
+  void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
 
   // We can give these reasonable default implementations.
 
@@ -120,8 +120,13 @@ public:
   /// object.  The stride is the storage size rounded up to the
   /// alignment; its practical use is that, in an array, it is the
   /// offset from the size of one element to the offset of the next.
+  /// The stride is at least one, even for zero-sized types, like the empty
+  /// tuple.
   Size getFixedStride() const {
-    return StorageSize.roundUpToAlignment(getFixedAlignment());
+    Size s = StorageSize.roundUpToAlignment(getFixedAlignment());
+    if (s.isZero())
+      s = Size(1);
+    return s;
   }
   
   /// Returns the fixed number of "extra inhabitants" (that is, bit

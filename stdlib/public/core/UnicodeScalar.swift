@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // UnicodeScalar Type
@@ -36,6 +36,7 @@ public struct UnicodeScalar :
   _ExpressibleByBuiltinUnicodeScalarLiteral,
   ExpressibleByUnicodeScalarLiteral {
 
+  @_versioned
   var _value: UInt32
 
   /// A numeric representation of the Unicode scalar.
@@ -127,11 +128,7 @@ public struct UnicodeScalar :
   ///       // Do something else
   ///     }
   public init?(_ v: UInt16) {
-    if let us = UnicodeScalar(UInt32(v)) {
-      self = us
-    } else {
-      return nil
-    }
+    self.init(UInt32(v))
   }
 
   /// Creates a Unicode scalar with the specified numeric value.
@@ -350,16 +347,12 @@ extension UInt8 {
 }
 extension UInt32 {
   /// Construct with value `v.value`.
-  ///
-  /// - Precondition: `v.value` can be represented as UInt32.
   public init(_ v: UnicodeScalar) {
     self = v.value
   }
 }
 extension UInt64 {
   /// Construct with value `v.value`.
-  ///
-  /// - Precondition: `v.value` can be represented as UInt64.
   public init(_ v: UnicodeScalar) {
     self = UInt64(v.value)
   }
@@ -378,21 +371,21 @@ extension UnicodeScalar : Comparable {
 }
 
 extension UnicodeScalar {
-  struct UTF16View {
-    var value: UnicodeScalar
+  public struct UTF16View {
+    internal var value: UnicodeScalar
   }
 
-  var utf16: UTF16View {
+  public var utf16: UTF16View {
     return UTF16View(value: self)
   }
 }
 
 extension UnicodeScalar.UTF16View : RandomAccessCollection {
 
-  typealias Indices = CountableRange<Int>
+  public typealias Indices = CountableRange<Int>
 
   /// The position of the first code unit.
-  var startIndex: Int {
+  public var startIndex: Int {
     return 0
   }
 
@@ -400,7 +393,7 @@ extension UnicodeScalar.UTF16View : RandomAccessCollection {
   /// greater than the last valid subscript argument.
   ///
   /// If the collection is empty, `endIndex` is equal to `startIndex`.
-  var endIndex: Int {
+  public var endIndex: Int {
     return 0 + UTF16.width(value)
   }
 
@@ -409,7 +402,7 @@ extension UnicodeScalar.UTF16View : RandomAccessCollection {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
-  subscript(position: Int) -> UTF16.CodeUnit {
+  public subscript(position: Int) -> UTF16.CodeUnit {
     return position == 0 ? (
       endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
     ) : UTF16.trailSurrogate(value)

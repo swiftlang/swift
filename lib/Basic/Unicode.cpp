@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,14 +22,15 @@ StringRef swift::unicode::extractFirstExtendedGraphemeCluster(StringRef S) {
   if (S.empty())
     return StringRef();
 
-  const UTF8 *SourceStart = reinterpret_cast<const UTF8 *>(S.data());
+  const llvm::UTF8 *SourceStart =
+    reinterpret_cast<const llvm::UTF8 *>(S.data());
 
-  const UTF8 *SourceNext = SourceStart;
-  UTF32 C[2];
-  UTF32 *TargetStart = C;
+  const llvm::UTF8 *SourceNext = SourceStart;
+  llvm::UTF32 C[2];
+  llvm::UTF32 *TargetStart = C;
 
   ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart, C + 1,
-                     lenientConversion);
+                     llvm::lenientConversion);
   if (TargetStart == C) {
     // The source string contains an ill-formed subsequence at the end.
     return S;
@@ -42,7 +43,7 @@ StringRef swift::unicode::extractFirstExtendedGraphemeCluster(StringRef S) {
 
     size_t C1Offset = SourceNext - SourceStart;
     ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart, C + 2,
-                       lenientConversion);
+                       llvm::lenientConversion);
 
     if (TargetStart == C + 1) {
       // End of source string or the source string contains an ill-formed
@@ -65,14 +66,15 @@ static bool extractFirstUnicodeScalarImpl(StringRef S, unsigned &Scalar) {
   if (S.empty())
     return false;
 
-  const UTF8 *SourceStart = reinterpret_cast<const UTF8 *>(S.data());
+  const llvm::UTF8 *SourceStart =
+    reinterpret_cast<const llvm::UTF8 *>(S.data());
 
-  const UTF8 *SourceNext = SourceStart;
-  UTF32 C;
-  UTF32 *TargetStart = &C;
+  const llvm::UTF8 *SourceNext = SourceStart;
+  llvm::UTF32 C;
+  llvm::UTF32 *TargetStart = &C;
 
   ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart,
-                     TargetStart + 1, lenientConversion);
+                     TargetStart + 1, llvm::lenientConversion);
   if (TargetStart == &C) {
     // The source string contains an ill-formed subsequence at the end.
     return false;
@@ -98,13 +100,14 @@ unsigned swift::unicode::extractFirstUnicodeScalar(StringRef S) {
 uint64_t swift::unicode::getUTF16Length(StringRef Str) {
   uint64_t Length;
   // Transcode the string to UTF-16 to get its length.
-  SmallVector<UTF16, 128> buffer(Str.size() + 1); // +1 for ending nulls.
-  const UTF8 *fromPtr = (const UTF8 *) Str.data();
-  UTF16 *toPtr = &buffer[0];
-  ConversionResult Result = ConvertUTF8toUTF16(&fromPtr, fromPtr + Str.size(),
-                                               &toPtr, toPtr + Str.size(),
-                                               strictConversion);
-  assert(Result == conversionOK &&
+  SmallVector<llvm::UTF16, 128> buffer(Str.size() + 1); // +1 for ending nulls.
+  const llvm::UTF8 *fromPtr = (const llvm::UTF8 *) Str.data();
+  llvm::UTF16 *toPtr = &buffer[0];
+  llvm::ConversionResult Result =
+    ConvertUTF8toUTF16(&fromPtr, fromPtr + Str.size(),
+                       &toPtr, toPtr + Str.size(),
+                       llvm::strictConversion);
+  assert(Result == llvm::conversionOK &&
          "UTF-8 encoded string cannot be converted into UTF-16 encoding");
   (void)Result;
 

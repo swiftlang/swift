@@ -339,7 +339,7 @@ class r20097963MyClass {
 func die() -> Never { die() }
 
 func testGuard(_ a : Int) {
-  guard case 4 = a else {  }  // expected-error {{'guard' body may not fall through, consider using 'return' or 'break'}}
+  guard case 4 = a else {  }  // expected-error {{'guard' body may not fall through, consider using a 'return' or 'throw'}}
 
   guard case 4 = a else { return }  // ok
   guard case 4 = a else { die() }  // ok

@@ -21,7 +21,7 @@ class Foo {}
 // RUN: %sourcekitd-test -req=format -line=12 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=38 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=39 -length=1 %s >>%t.response
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "/**"
 // CHECK: key.sourcetext: " * Foo Comment"

@@ -12,8 +12,8 @@
 :Date: 2013-03-15
 
 **Abstract:** We propose a system that offers first-class support for
-both value and reference semantics.  By allowing—but not
-requiring—(instance) variables, function parameters, and generic
+both value and reference semantics.  By allowing--but not
+requiring--(instance) variables, function parameters, and generic
 constraints to be declared as ``val`` or ``ref``, we offer users the
 ability to nail down semantics to the desired degree without
 compromising ease of use.
@@ -220,7 +220,7 @@ and has value semantics::
     case Cons(car:T, cdr:List<T>)
   }
 
-  // A list node with reference semantics—copying the node creates a node
+  // A list node with reference semantics--copying the node creates a node
   // that shares structure with the tail of the list
   union Node<T> {
     case Nil()
@@ -473,7 +473,7 @@ __ https://doc.rust-lang.org/book/box-syntax-and-patterns.html
 ==============================================
 
 It is *possible* to build a struct with reference semantics. For
-example, 
+example,
 
 ..parsed-literal::
 
@@ -556,7 +556,7 @@ example:
 * ``var`` is only one character different from ``val``.  Is that too
   confusable?  Syntax highlighting can help, but it might not be enough.
 
-  * What about ``let`` as a replacement for ``var``?  
+  * What about ``let`` as a replacement for ``var``?
     There's always the dreaded ``auto``.
 
   * Should we drop ``let``\ /``var``\ /``auto`` for ivars, because it

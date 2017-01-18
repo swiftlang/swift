@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 #if swift(>=1.0)
   let w = 1
@@ -31,7 +31,7 @@
 
 #if !swift(>=1.0)
   // This shouldn't emit any diagnostics.
-  $#%^*&
+  %#^*&
 #endif
 
 #if swift(">=7.1") // expected-error {{unexpected platform condition argument: expected a unary comparison, such as '>=2.2'}}
@@ -43,8 +43,7 @@
 #if swift("") // expected-error {{unexpected platform condition argument: expected a unary comparison, such as '>=2.2'}}
 #endif
 
-// We won't expect three version components to work for now.
-#if swift(>=2.2.1) // expected-error {{expected named member of numeric literal}}
+#if swift(>=2.2.1)
 #endif
 
 #if swift(>=2.0, *) // expected-error {{expected only one argument to platform condition}}
@@ -62,7 +61,7 @@ protocol P {
 
   // There should be no error here.
   adsf asdf asdf
-  $#%^*&
+  %#^*&
   func foo(sdfsdfdsf adsf adsf asdf adsf adsf)
 #endif
 }

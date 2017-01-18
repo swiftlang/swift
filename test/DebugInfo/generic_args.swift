@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -verify -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -verify -g -o - | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -45,7 +45,7 @@ struct Wrapper<T: AProtocol> {
   }
 }
 
-// CHECK-DAG: ![[FNTY:.*]] = !DICompositeType({{.*}}identifier: "_TtFQq_F12generic_args5applyu0_rFTx1fFxq__q_Qq0_F12generic_args5applyu0_rFTx1fFxq__q_"
+// CHECK-DAG: ![[FNTY:.*]] = !DICompositeType({{.*}}identifier: "_TtXFo_iQq_F12generic_args5applyu0_rFTx1fFxq__q__iQq0_F12generic_args5applyu0_rFTx1fFxq__q__"
 // CHECK-DAG: !DILocalVariable(name: "f", {{.*}}, line: [[@LINE+1]], type: ![[FNTY]])
 func apply<T, U> (_ x: T, f: (T) -> (U)) -> U {
   return f(x)

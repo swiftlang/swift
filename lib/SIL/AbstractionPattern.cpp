@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -40,9 +40,12 @@ AbstractionPattern TypeConverter::getAbstractionPattern(AbstractStorageDecl *dec
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(SubscriptDecl *decl) {
-  // TODO: honor the declared type?
-  // TODO: use interface types
-  return AbstractionPattern(decl->getElementType());
+  CanGenericSignature genericSig;
+  if (auto sig = decl->getGenericSignatureOfContext())
+    genericSig = sig->getCanonicalSignature();
+  return AbstractionPattern(genericSig,
+                            decl->getElementInterfaceType()
+                                ->getCanonicalType());
 }
 
 AbstractionPattern
@@ -65,30 +68,36 @@ static const clang::Type *getClangType(const clang::Decl *decl) {
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(VarDecl *var) {
-  CanType swiftType = var->getType()->getCanonicalType();
-  if (auto inout = dyn_cast<InOutType>(swiftType)) {
+  CanGenericSignature genericSig;
+  if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
+    genericSig = sig->getCanonicalSignature();
+
+  CanType swiftType = var->getInterfaceType()->getCanonicalType();
+  if (auto inout = dyn_cast<InOutType>(swiftType))
     swiftType = inout.getObjectType();
-  }
 
   if (auto clangDecl = var->getClangDecl()) {
-    CanGenericSignature genericSig;
-    if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
-      genericSig = sig->getCanonicalSignature();
     auto clangType = getClangType(clangDecl);
-    swiftType = getLoweredBridgedType(AbstractionPattern(genericSig, swiftType, clangType),
-                                      swiftType,
-                               SILFunctionTypeRepresentation::CFunctionPointer,
-                                      TypeConverter::ForMemory)
-      ->getCanonicalType();
+    auto contextType = var->getDeclContext()->mapTypeIntoContext(swiftType);
+    swiftType = getLoweredBridgedType(
+        AbstractionPattern(genericSig, swiftType, clangType),
+        contextType,
+        SILFunctionTypeRepresentation::CFunctionPointer,
+        TypeConverter::ForMemory)->getCanonicalType();
     return AbstractionPattern(genericSig, swiftType, clangType);
-  } else {
-    return AbstractionPattern(swiftType);
   }
+
+  return AbstractionPattern(genericSig, swiftType);
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
   assert(decl->hasArgumentType());
   assert(!decl->hasClangNode());
+
+  // This cannot be implemented correctly for Optional.Some.
+  assert(decl->getParentEnum()->classifyAsOptionalType() == OTK_None &&
+         "Optional.Some does not have a unique abstraction pattern because "
+         "optionals are re-abstracted");
 
   CanGenericSignature genericSig;
   if (auto sig = decl->getParentEnum()->getGenericSignatureOfContext())
@@ -294,7 +303,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
       if (errorInfo.isErrorParameterReplacedWithVoid()) {
         if (paramIndex == errorParamIndex) {
           assert(isVoidLike(swiftEltType));
-          (void) isVoidLike;
+          (void)&isVoidLike;
           return AbstractionPattern(swiftEltType);
         }
       } else {
@@ -717,10 +726,48 @@ AbstractionPattern AbstractionPattern::getFunctionInputType() const {
   llvm_unreachable("bad kind");
 }
 
+static CanType getAnyOptionalObjectType(CanType type) {
+  auto objectType = type.getAnyOptionalObjectType();
+  assert(objectType && "type was not optional");
+  return objectType;
+}
+
 AbstractionPattern AbstractionPattern::getAnyOptionalObjectType() const {
-  // Currently, the abstraction pattern corresponding to an optional object
-  // is always opaque.  Eventually we'll allow optionals to carry abstraction.
-  return getOpaque();
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::ClangFunctionParamTupleType:
+  case Kind::ObjCMethodParamTupleType:
+  case Kind::ObjCMethodFormalParamTupleType:
+  case Kind::ObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::Tuple:
+  case Kind::CFunctionAsMethodFormalParamTupleType:
+    llvm_unreachable("pattern for function or tuple cannot be for optional");
+
+  case Kind::Opaque:
+    return *this;
+
+  case Kind::Type:
+    if (isTypeParameter())
+      return AbstractionPattern::getOpaque();
+    return AbstractionPattern(getGenericSignature(),
+                              ::getAnyOptionalObjectType(getType()));
+
+  case Kind::Discard:
+    return AbstractionPattern::getDiscard(getGenericSignature(),
+                                        ::getAnyOptionalObjectType(getType()));
+
+  case Kind::ClangType:
+    // This is not reflected in clang types.
+    return AbstractionPattern(getGenericSignature(),
+                              ::getAnyOptionalObjectType(getType()),
+                              getClangType());
+  }
+  llvm_unreachable("bad kind");
 }
 
 AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {

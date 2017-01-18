@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -147,15 +147,18 @@ extension String {
     if prefixCount == 0 {
       return true
     }
-    if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
-      if selfCore.isASCII && prefixCore.isASCII {
-        // Prefix longer than self.
-        if prefixCount > selfCore.count {
-          return false
-        }
-        return Int(_swift_stdlib_memcmp(
-          selfCore.startASCII, prefixCore.startASCII, prefixCount)) == 0
+    if let selfASCIIBuffer = selfCore.asciiBuffer,
+       let prefixASCIIBuffer = prefixCore.asciiBuffer {
+      if prefixASCIIBuffer.count > selfASCIIBuffer.count {
+        // Prefix is longer than self.
+        return false
       }
+      return Int(_swift_stdlib_memcmp(
+        selfASCIIBuffer.baseAddress!,
+        prefixASCIIBuffer.baseAddress!,
+        prefixASCIIBuffer.count)) == 0
+    }
+    if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
       let lhsStr = _NSContiguousString(selfCore)
       let rhsStr = _NSContiguousString(prefixCore)
       return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
@@ -202,17 +205,19 @@ extension String {
     if suffixCount == 0 {
       return true
     }
-    if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
-      if selfCore.isASCII && suffixCore.isASCII {
-        // Suffix longer than self.
-        let selfCount = selfCore.count
-        if suffixCount > selfCount {
-          return false
-        }
-        return Int(_swift_stdlib_memcmp(
-                   selfCore.startASCII + (selfCount - suffixCount),
-                   suffixCore.startASCII, suffixCount)) == 0
+    if let selfASCIIBuffer = selfCore.asciiBuffer,
+       let suffixASCIIBuffer = suffixCore.asciiBuffer {
+      if suffixASCIIBuffer.count > selfASCIIBuffer.count {
+        // Suffix is longer than self.
+        return false
       }
+      return Int(_swift_stdlib_memcmp(
+        selfASCIIBuffer.baseAddress!
+          + (selfASCIIBuffer.count - suffixASCIIBuffer.count),
+        suffixASCIIBuffer.baseAddress!,
+        suffixASCIIBuffer.count)) == 0
+    }
+    if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
       let lhsStr = _NSContiguousString(selfCore)
       let rhsStr = _NSContiguousString(suffixCore)
       return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
@@ -230,11 +235,8 @@ extension String {
 
 // Conversions to string from other types.
 extension String {
-
-  // FIXME: can't just use a default arg for radix below; instead we
-  // need these single-arg overloads <rdar://problem/17775455>
-  
-  /// Creates a string representing the given value in base 10.
+  /// Creates a string representing the given value in base 10, or some other
+  /// specified base.
   ///
   /// The following example converts the maximal `Int` value to a string and
   /// prints its length:
@@ -242,23 +244,6 @@ extension String {
   ///     let max = String(Int.max)
   ///     print("\(max) has \(max.utf16.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
-  public init<T : _SignedInteger>(_ v: T) {
-    self = _int64ToString(v.toIntMax())
-  }
-  
-  /// Creates a string representing the given value in base 10.
-  ///
-  /// The following example converts the maximal `UInt` value to a string and
-  /// prints its length:
-  ///
-  ///     let max = String(UInt.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
-  ///     // Prints "18446744073709551615 has 20 digits."
-  public init<T : UnsignedInteger>(_ v: T) {
-    self = _uint64ToString(v.toUIntMax())
-  }
-
-  /// Creates a string representing the given value in the specified base.
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
   /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
@@ -275,19 +260,27 @@ extension String {
   /// - Parameters:
   ///   - value: The value to convert to a string.
   ///   - radix: The base to use for the string representation. `radix` must be
-  ///     at least 2 and at most 36.
+  ///     at least 2 and at most 36. The default is 10.
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
   public init<T : _SignedInteger>(
-    _ value: T, radix: Int, uppercase: Bool = false
+    _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
     self = _int64ToString(
       value.toIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
   
-  /// Creates a string representing the given value in the specified base.
+  /// Creates a string representing the given value in base 10, or some other
+  /// specified base.
+  ///
+  /// The following example converts the maximal `Int` value to a string and
+  /// prints its length:
+  ///
+  ///     let max = String(Int.max)
+  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
   /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
@@ -304,12 +297,12 @@ extension String {
   /// - Parameters:
   ///   - value: The value to convert to a string.
   ///   - radix: The base to use for the string representation. `radix` must be
-  ///     at least 2 and at most 36.
+  ///     at least 2 and at most 36. The default is 10.
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
   public init<T : UnsignedInteger>(
-    _ value: T, radix: Int, uppercase: Bool = false
+    _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
     self = _uint64ToString(

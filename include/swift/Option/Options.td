@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -28,6 +28,9 @@ def AutolinkExtractOption : OptionFlag;
 
 // The option should be accepted by swift -modulewrap
 def ModuleWrapOption : OptionFlag;
+
+// The option should be accepted by swift-format
+def SwiftFormatOption : OptionFlag;
 
 // The option should not be accepted by the driver.
 def NoDriverOption : OptionFlag;
@@ -99,14 +102,14 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 
 def help : Flag<["-", "--"], "help">,
-  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption]>,
+  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption, SwiftFormatOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Display available options, including hidden options">;
 
-def v : Flag<["-"], "v">,
+def v : Flag<["-"], "v">, Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Show commands to run and use verbose output">;
 def version : Flag<["-", "--"], "version">,
   HelpText<"Print version information and exit">;
@@ -121,7 +124,7 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         NoInteractiveOption]>,
+         NoInteractiveOption, SwiftFormatOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -129,6 +132,14 @@ def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
 
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
+
+def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption]>,
+  HelpText<"Interpret input according to a specific Swift language version number">,
+  MetaVarName<"<vers>">;
+
+def tools_directory : Separate<["-"], "tools-directory">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Look for external executables (ld, clang, binutils) in <directory>">, MetaVarName<"<directory>">;
 
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
@@ -164,8 +175,12 @@ def output_file_map : Separate<["-"], "output-file-map">,
 def output_file_map_EQ : Joined<["-"], "output-file-map=">,
   Alias<output_file_map>;
 
-def save_temps : Flag<["-"], "save-temps">, Flags<[NoInteractiveOption]>,
+def save_temps : Flag<["-"], "save-temps">,
+  Flags<[NoInteractiveOption,DoesNotAffectIncrementalBuild]>,
   HelpText<"Save intermediate compilation results">;
+def driver_time_compilation : Flag<["-"], "driver-time-compilation">,
+  Flags<[NoInteractiveOption,DoesNotAffectIncrementalBuild]>,
+  HelpText<"Prints the total time it took to execute all compilation tasks">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -216,20 +231,32 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
 
 def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;   
+  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
 
 def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable using the swift bridge attribute">;
 
+def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
+  Flags<[HelpHidden]>,
+  HelpText<"Enable automatic generation of bridging PCH files">;
+
+def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
+  Flags<[HelpHidden]>,
+  HelpText<"Disable automatic generation of bridging PCH files">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[FrontendOption]>,
   HelpText<"Suppress all warnings">;
 
 def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[FrontendOption]>,
   HelpText<"Treat warnings as errors">;
+
+def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Continue building, even after errors are encountered">;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
@@ -259,10 +286,17 @@ def no_link_objc_runtime : Flag<["-"], "no-link-objc-runtime">,
   HelpText<"Don't link in additions to the Objective-C runtime">;
 
 def static_stdlib: Flag<["-"], "static-stdlib">,
+  Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Statically link the Swift standard library">;
 def no_static_stdlib: Flag<["-"], "no-static-stdlib">,
-  Flags<[HelpHidden]>,
+  Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't statically link the Swift standard library">;
+
+def static_executable : Flag<["-"], "static-executable">,
+  HelpText<"Statically link the executable">;
+def no_static_executable : Flag<["-"], "no-static-executable">,
+  Flags<[HelpHidden]>,
+  HelpText<"Don't statically link the executable">;
 
 def use_ld : Joined<["-"], "use-ld=">,
   Flags<[DoesNotAffectIncrementalBuild]>,
@@ -287,6 +321,10 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
+def AssumeSingleThreaded : Flag<["-"], "assume-single-threaded">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Assume that code will be executed in a single-threaded "
+           "environment">;
 
 // Debug info options
 
@@ -309,6 +347,36 @@ def AssertConfig : Separate<["-"], "assert-config">,
   Flags<[FrontendOption]>,
   HelpText<"Specify the assert_configuration replacement. "
            "Possible values are Debug, Release, Unchecked, DisableReplacement.">;
+
+// Code formatting options
+
+def code_formatting_Group : OptionGroup<"<code formatting options>">;
+
+def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  HelpText<"Use tabs for indentation.">;
+
+def indent_switch_case : Flag<["-"], "indent-switch-case">,
+  Group<code_formatting_Group>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  HelpText<"Indent cases in switch statements.">;
+
+def in_place : Flag<["-"], "in-place">, Group<code_formatting_Group>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  HelpText<"Overwrite input file with formatted file.">;
+
+def tab_width : Separate<["-"], "tab-width">, Group<code_formatting_Group>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  HelpText<"Width of tab character.">, MetaVarName<"<n>">;
+
+def indent_width : Separate<["-"], "indent-width">, Group<code_formatting_Group>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  HelpText<"Number of characters to indent.">, MetaVarName<"<n>">;
+
+def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
+           "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
 // File types
 
@@ -375,14 +443,22 @@ def fixit_all : Flag<["-"], "fixit-all">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 // No Output Modes
-def parse : Flag<["-"], "parse">,
+def parse: Flag<["-"], "parse">,
   HelpText<"Parse input file(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def typecheck : Flag<["-"], "typecheck">,
+  HelpText<"Parse and type-check input file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_parse : Flag<["-"], "dump-parse">,
   HelpText<"Parse input file(s) and dump AST(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_ast : Flag<["-"], "dump-ast">,
   HelpText<"Parse and type-check input file(s) and dump AST(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
+  HelpText<"Parse and type-check input file(s) and dump the scope map(s)">,
+  MetaVarName<"<expanded-or-list-of-line:column>">,
+  ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_type_refinement_contexts :
   Flag<["-"], "dump-type-refinement-contexts">,

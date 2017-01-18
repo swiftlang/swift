@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir -enable-swift-newtype | FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir -enable-swift-newtype -O | FileCheck %s -check-prefix=OPT
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir -O | %FileCheck %s -check-prefix=OPT
 import CoreFoundation
 import Foundation
 import Newtype
@@ -129,4 +129,32 @@ public func compareInits() -> Bool {
 // OPT-LABEL: anchor
 public func anchor() -> Bool {
   return false
+}
+
+class ObjCTest {
+  // CHECK-LABEL: define hidden %0* @_TToFC7newtype8ObjCTest19optionalPassThroughfGSqVSC11ErrorDomain_GSqS1__
+  // CHECK: [[CASTED:%.+]] = ptrtoint %0* %2 to i{{32|64}}
+  // CHECK: [[RESULT:%.+]] = call i{{32|64}} @_TFC7newtype8ObjCTest19optionalPassThroughfGSqVSC11ErrorDomain_GSqS1__(i{{32|64}} [[CASTED]], %C7newtype8ObjCTest* {{%.+}})
+  // CHECK: [[OPAQUE_RESULT:%.+]] = inttoptr i{{32|64}} [[RESULT]] to %0*
+  // CHECK: ret %0* [[OPAQUE_RESULT]]
+  // CHECK: {{^}$}}
+
+  // OPT-LABEL: define hidden %0* @_TToFC7newtype8ObjCTest19optionalPassThroughfGSqVSC11ErrorDomain_GSqS1__
+  // OPT: ret %0* %2
+  // OPT: {{^}$}}
+  @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
+    return ed
+  }
+
+  // CHECK-LABEL: define hidden i32 @_TToFC7newtype8ObjCTest18integerPassThroughfVSC5MyIntS1_
+  // CHECK: [[RESULT:%.+]] = call i32 @_TFC7newtype8ObjCTest18integerPassThroughfVSC5MyIntS1_(i32 %2, %C7newtype8ObjCTest* {{%.+}})
+  // CHECK: ret i32 [[RESULT]]
+  // CHECK: {{^}$}}
+
+  // OPT-LABEL: define hidden i32 @_TToFC7newtype8ObjCTest18integerPassThroughfVSC5MyIntS1_
+  // OPT: ret i32 %2
+  // OPT: {{^}$}}
+  @objc func integerPassThrough(_ num: MyInt) -> MyInt {
+    return num
+  }
 }

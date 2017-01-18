@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 // CHECK: ![[OUTER:.*]] = distinct !DISubprogram(name: "outer",
 // CHECK-SAME:                                   line: [[@LINE+1]]

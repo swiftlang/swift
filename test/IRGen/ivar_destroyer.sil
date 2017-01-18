@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -8,7 +8,7 @@
 // CHECK: [[TYPE:%swift.type]] = type
 
 //   CHECK: @_TMfC14ivar_destroyer17NonTrivialDerived = internal global <{ {{.*}} }> <{
-// \ CHECK:   i8* null, 
+// \ CHECK:   i8* null,
 // \ CHECK:   i8** @_TWVBo,
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC14ivar_destroyer17NonTrivialDerived to i64),
 // \ CHECK:   [[TYPE]]* bitcast (i64* getelementptr inbounds (<{ {{.*}} }>, <{ {{.*}} }>* @_TMfC14ivar_destroyer11TrivialBase, i32 0, i32 2) to [[TYPE]]*),

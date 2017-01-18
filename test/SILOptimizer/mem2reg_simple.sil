@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -mem2reg | %FileCheck %s
 
 sil_stage canonical
 
@@ -152,7 +152,7 @@ bb3:                                              // Preds: bb1
 //CHECK-NOT: dealloc_stack
 //CHECK: return
 sil @high_nest : $@convention(thin) (Int64) -> Int64 {
-bb0(%0 : $Int64): 
+bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %114, %2
   store %0 to %1 : $*Int64                      // id: %2
   %3 = alloc_stack $Int64, var, name "x"               // users: %94, %113, %6, %112

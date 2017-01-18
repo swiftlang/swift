@@ -30,7 +30,7 @@ enum ThreadID {
   case Secondary
 }
 
-var barrierVar: UnsafeMutablePointer<_stdlib_pthread_barrier_t>? = nil
+var barrierVar: UnsafeMutablePointer<_stdlib_pthread_barrier_t>?
 var sharedString: String = ""
 var secondaryString: String = ""
 

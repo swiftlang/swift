@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,6 +22,27 @@
 //
 
 import SwiftShims
+
+public // @testable
+struct _Hashing {
+  // FIXME(ABI)#41 : make this an actual public API.
+  public // SPI
+  static var secretKey: (UInt64, UInt64) {
+    get {
+      // The variable itself is defined in C++ code so that it is initialized
+      // during static construction.  Almost every Swift program uses hash
+      // tables, so initializing the secret key during the startup seems to be
+      // the right trade-off.
+      return (
+        _swift_stdlib_Hashing_secretKey.key0,
+        _swift_stdlib_Hashing_secretKey.key1)
+    }
+    set {
+      (_swift_stdlib_Hashing_secretKey.key0,
+       _swift_stdlib_Hashing_secretKey.key1) = newValue
+    }
+  }
+}
 
 public // @testable
 struct _HashingDetail {
@@ -126,51 +147,31 @@ func _mixInt(_ value: Int) -> Int {
 #endif
 }
 
-/// Given a hash value, returns an integer value within the given range that
-/// corresponds to a hash value.
+/// Given a hash value, returns an integer value in the range of
+/// 0..<`upperBound` that corresponds to a hash value.
+///
+/// The `upperBound` must be positive and a power of 2.
 ///
 /// This function is superior to computing the remainder of `hashValue` by
 /// the range length.  Some types have bad hash functions; sometimes simple
 /// patterns in data sets create patterns in hash values and applying the
 /// remainder operation just throws away even more information and invites
-/// even more hash collisions.  This effect is especially bad if the length
-/// of the required range is a power of two -- applying the remainder
-/// operation just throws away high bits of the hash (which would not be
-/// a problem if the hash was known to be good).  This function mixes the
-/// bits in the hash value to compensate for such cases.
+/// even more hash collisions.  This effect is especially bad because the
+/// range is a power of two, which means to throws away high bits of the hash
+/// (which would not be a problem if the hash was known to be good). This
+/// function mixes the bits in the hash value to compensate for such cases.
 ///
 /// Of course, this function is a compressing function, and applying it to a
 /// hash value does not change anything fundamentally: collisions are still
 /// possible, and it does not prevent malicious users from constructing data
 /// sets that will exhibit pathological collisions.
 public // @testable
-func _squeezeHashValue(_ hashValue: Int, _ resultRange: Range<Int>) -> Int {
-  // Length of a Range<Int> does not fit into an Int, but fits into an UInt.
-  // An efficient way to compute the length is to rely on two's complement
-  // arithmetic.
-  let resultCardinality =
-    UInt(bitPattern: resultRange.upperBound &- resultRange.lowerBound)
+func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
+  _sanityCheck(_isPowerOf2(upperBound))
+  let mixedHashValue = _mixInt(hashValue)
 
-  // Calculate the result as `UInt` to handle the case when
-  // `resultCardinality >= Int.max`.
-  let unsignedResult =
-    _squeezeHashValue(hashValue, UInt(0)..<resultCardinality)
-
-  // We perform the unchecked arithmetic on `UInt` (instead of doing
-  // straightforward computations on `Int`) in order to handle the following
-  // tricky case: `startIndex` is negative, and `resultCardinality >= Int.max`.
-  // We cannot convert the latter to `Int`.
-  return
-    Int(bitPattern:
-      UInt(bitPattern: resultRange.lowerBound) &+ unsignedResult)
+  // As `upperBound` is a power of two we can do a bitwise-and to calculate
+  // mixedHashValue % upperBound.
+  return mixedHashValue & (upperBound &- 1)
 }
 
-public // @testable
-func _squeezeHashValue(_ hashValue: Int, _ resultRange: Range<UInt>) -> UInt {
-  let mixedHashValue = UInt(bitPattern: _mixInt(hashValue))
-  let resultCardinality: UInt = resultRange.upperBound - resultRange.lowerBound
-  if _isPowerOf2(resultCardinality) {
-    return mixedHashValue & (resultCardinality - 1)
-  }
-  return resultRange.lowerBound + (mixedHashValue % resultCardinality)
-}

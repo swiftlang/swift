@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -57,6 +57,7 @@ public:
   IGNORED_ATTR(FixedLayout)
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Inline)
+  IGNORED_ATTR(Inlineable)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
   IGNORED_ATTR(NonObjC)
@@ -72,7 +73,6 @@ public:
   IGNORED_ATTR(Rethrows)
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(Specialize)
-  IGNORED_ATTR(Swift3Migration)
   IGNORED_ATTR(SwiftNativeObjCRuntimeBase)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
@@ -156,15 +156,6 @@ public:
     TC.checkNoEscapeAttr(cast<ParamDecl>(D), attr);
   }
 
-  void visitEscapingAttr(EscapingAttr *attr) {
-    auto *PD = cast<ParamDecl>(D);
-    auto *FTy = PD->getType()->getAs<FunctionType>();
-    if (FTy == 0) {
-      TC.diagnose(attr->getLocation(), diag::escaping_function_type);
-      attr->setInvalid();
-    }
-  }
-
   void visitTransparentAttr(TransparentAttr *attr);
   void visitMutationAttr(DeclAttribute *attr);
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
@@ -229,15 +220,6 @@ public:
 } // end anonymous namespace
 
 void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
-    const NominalTypeDecl *ExtendedNominal = ExtendedTy->getAnyNominal();
-    // Only Struct and Enum extensions can be transparent.
-    if (!isa<StructDecl>(ExtendedNominal) && !isa<EnumDecl>(ExtendedNominal))
-      return diagnoseAndRemoveAttr(attr,diag::transparent_on_invalid_extension);
-    return;
-  }
-  
   DeclContext *Ctx = D->getDeclContext();
   // Protocol declarations cannot be transparent.
   if (isa<ProtocolDecl>(Ctx))
@@ -265,7 +247,7 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
 void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   FuncDecl *FD = cast<FuncDecl>(D);
 
-  auto contextTy = FD->getDeclContext()->getDeclaredTypeInContext();
+  auto contextTy = FD->getDeclContext()->getDeclaredInterfaceType();
   if (!contextTy)
     return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope);
 
@@ -286,8 +268,8 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
 
 void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Only instance members of classes can be dynamic.
-  auto contextTy = D->getDeclContext()->getDeclaredTypeInContext();
-  if (!contextTy || !contextTy->getClassOrBoundGenericClass())
+  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl)
     return diagnoseAndRemoveAttr(attr, diag::dynamic_not_in_class);
     
   // Members cannot be both dynamic and final.
@@ -307,8 +289,8 @@ void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    CanType extendedTy = ED->getExtendedType()->getCanonicalType();
-    if (!isa<ClassDecl>(extendedTy->getAnyNominal()))
+    NominalTypeDecl *extendedType = ED->getExtendedType()->getAnyNominal();
+    if (extendedType && !isa<ClassDecl>(extendedType))
       return diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
   }
 }
@@ -335,15 +317,16 @@ void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
   auto *VD = cast<VarDecl>(D);
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     return;
-  auto ctx = VD->getDeclContext()->getDeclaredTypeInContext();
-  if (ctx && ctx->getStructOrBoundGenericStruct())
+  auto nominalDecl = VD->getDeclContext()
+      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (nominalDecl && isa<StructDecl>(nominalDecl))
     return;
   return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute_simple);
 }
 
 static Optional<Diag<bool,Type>>
 isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
-  if (type->isObjCExistentialType())
+  if (type->isObjCExistentialType() || type->isAny())
     return None; // @objc existential types are okay
 
   auto nominal = type->getAnyNominal();
@@ -681,7 +664,7 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
     }
 
     if (!OnlyKind.empty())
-      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
                                     attr, OnlyKind);
     else if (attr->isDeclModifier())
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr);
@@ -707,18 +690,18 @@ public:
 
     IGNORED_ATTR(AutoClosure)
     IGNORED_ATTR(Alignment)
-    IGNORED_ATTR(SILGenName)
-    IGNORED_ATTR(Dynamic)
-    IGNORED_ATTR(Exported)
     IGNORED_ATTR(Convenience)
+    IGNORED_ATTR(Dynamic)
+    IGNORED_ATTR(Effects)
+    IGNORED_ATTR(Exported)
+    IGNORED_ATTR(FixedLayout)
     IGNORED_ATTR(GKInspectable)
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
-    IGNORED_ATTR(Effects)
-    IGNORED_ATTR(FixedLayout)
+    IGNORED_ATTR(Inlineable)
     IGNORED_ATTR(Lazy)      // checked early.
     IGNORED_ATTR(LLDBDebuggerFunction)
     IGNORED_ATTR(Mutating)
@@ -735,19 +718,14 @@ public:
     IGNORED_ATTR(Override)
     IGNORED_ATTR(RawDocComment)
     IGNORED_ATTR(Semantics)
+    IGNORED_ATTR(SILGenName)
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(SynthesizedProtocol)
     IGNORED_ATTR(RequiresStoredPropertyInits)
     IGNORED_ATTR(SILStored)
-    IGNORED_ATTR(Swift3Migration)
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
-    IGNORED_ATTR(DiscardableResult)
-    IGNORED_ATTR(Escaping)
-
-    // FIXME: We actually do have things to enforce for versioned API.
-    IGNORED_ATTR(Versioned)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -782,6 +760,10 @@ public:
   void visitPrefixAttr(PrefixAttr *attr) { checkOperatorAttribute(attr); }
 
   void visitSpecializeAttr(SpecializeAttr *attr);
+
+  void visitVersionedAttr(VersionedAttr *attr);
+  
+  void visitDiscardableResultAttr(DiscardableResultAttr *attr);
 };
 } // end anonymous namespace
 
@@ -800,8 +782,8 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
         .highlight(param->getSourceRange());
       return true;
     }
-  } else if (ty->isObjCExistentialType()) {
-    // @objc existential types are okay
+  } else if (ty->isObjCExistentialType() || ty->isAny()) {
+    // @objc existential types are okay, as is Any.
     // Nothing to do.
   } else {
     // No other types are permitted.
@@ -829,7 +811,7 @@ static bool isRelaxedIBAction(TypeChecker &TC) {
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   // IBActions instance methods must have type Class -> (...) -> ().
   auto *FD = cast<FuncDecl>(D);
-  Type CurriedTy = FD->getType()->castTo<AnyFunctionType>()->getResult();
+  Type CurriedTy = FD->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
   Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
   if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context))) {
     TC.diagnose(D, diag::invalid_ibaction_result, ResultTy);
@@ -1087,14 +1069,6 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
     return;
   }
 
-  // Infix operator is only allowed on operator declarations, not on func.
-  if (isa<InfixAttr>(attr)) {
-    TC.diagnose(attr->getLocation(), diag::invalid_infix_on_func)
-      .fixItRemove(attr->getLocation());
-    attr->setInvalid();
-    return;
-  }
-
   // Otherwise, must be unary.
   if (!FD->isUnaryOperator()) {
     TC.diagnose(attr->getLocation(), diag::attribute_requires_single_argument,
@@ -1109,10 +1083,8 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   auto *VD = cast<VarDecl>(D);
 
   // It may only be used on class members.
-  auto typeContext = D->getDeclContext()->getDeclaredTypeInContext();
-  auto contextTypeDecl =
-  typeContext ? typeContext->getNominalOrBoundGenericNominal() : nullptr;
-  if (!contextTypeDecl || !isa<ClassDecl>(contextTypeDecl)) {
+  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl) {
     TC.diagnose(attr->getLocation(), diag::nscopying_only_on_class_properties);
     attr->setInvalid();
     return;
@@ -1180,14 +1152,13 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   ProtocolDecl *ApplicationDelegateProto = nullptr;
   if (KitModule) {
     auto lookupOptions = defaultUnqualifiedLookupOptions;
-    lookupOptions |= NameLookupFlags::OnlyTypes;
     lookupOptions |= NameLookupFlags::KnownPrivate;
 
-    auto lookup = TC.lookupUnqualified(KitModule, Id_ApplicationDelegate,
-                                       SourceLoc(),
-                                       lookupOptions);
-    ApplicationDelegateProto = dyn_cast_or_null<ProtocolDecl>(
-                                   lookup.getSingleTypeResult());
+    auto lookup = TC.lookupUnqualifiedType(KitModule, Id_ApplicationDelegate,
+                                           SourceLoc(),
+                                           lookupOptions);
+    if (lookup.size() == 1)
+      ApplicationDelegateProto = dyn_cast<ProtocolDecl>(lookup[0]);
   }
 
   if (!ApplicationDelegateProto ||
@@ -1277,7 +1248,7 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
 void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
   // The required attribute only applies to constructors.
   auto ctor = cast<ConstructorDecl>(D);
-  auto parentTy = ctor->getExtensionType();
+  auto parentTy = ctor->getDeclContext()->getDeclaredInterfaceType();
   if (!parentTy) {
     // Constructor outside of nominal type context; we've already complained
     // elsewhere.
@@ -1297,7 +1268,7 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
       return;
     }
   } else {
-    if (!parentTy->is<ErrorType>()) {
+    if (!parentTy->hasError()) {
       TC.diagnose(ctor, diag::required_initializer_nonclass, parentTy)
         .highlight(attr->getLocation());
     }
@@ -1322,7 +1293,7 @@ static bool hasThrowingFunctionParameter(CanType type) {
   }
 
   // Suppress diagnostics in the presence of errors.
-  if (isa<ErrorType>(type)) {
+  if (type->hasError()) {
     return true;
   }
 
@@ -1335,7 +1306,9 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   auto fn = cast<AbstractFunctionDecl>(D);
   for (auto paramList : fn->getParameterLists()) {
     for (auto param : *paramList)
-      if (hasThrowingFunctionParameter(param->getType()->lookThroughAllAnyOptionalTypes()->getCanonicalType()))
+      if (hasThrowingFunctionParameter(param->getType()
+              ->lookThroughAllAnyOptionalTypes()
+              ->getCanonicalType()))
         return;
   }
 
@@ -1368,11 +1341,6 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
     TC.computeDefaultAccessibility(extension);
     Accessibility maxAccess = extension->getMaxAccessibility();
     if (std::min(attr->getAccess(), Accessibility::Public) > maxAccess) {
-      if (maxAccess == Accessibility::FilePrivate &&
-          !TC.Context.LangOpts.EnableSwift3Private) {
-        maxAccess = Accessibility::Private;
-      }
-
       // FIXME: It would be nice to say what part of the requirements actually
       // end up being problematic.
       auto diag =
@@ -1440,124 +1408,132 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   auto *FD = cast<AbstractFunctionDecl>(D);
   auto *genericSig = FD->getGenericSignature();
 
-  unsigned numTypes = genericSig->getGenericParams().size();
+  unsigned numTypes = 0;
+  if (genericSig)
+    numTypes = genericSig->getGenericParams().size();
   if (numTypes != attr->getTypeLocs().size()) {
     TC.diagnose(attr->getLocation(), diag::type_parameter_count_mismatch,
                 FD->getName(), numTypes, attr->getTypeLocs().size(),
                 numTypes > attr->getTypeLocs().size());
+    attr->setInvalid();
     return;
   }
   // Initialize each TypeLoc in this attribute with a concrete type,
   // and populate a substitution map from GenericTypeParamType to concrete Type.
-  TypeSubstitutionMap subMap;
+  SubstitutionMap subMap;
   for (unsigned paramIdx = 0; paramIdx < numTypes; ++paramIdx) {
 
     auto *genericTypeParamTy = genericSig->getGenericParams()[paramIdx];
     auto &tl = attr->getTypeLocs()[paramIdx];
 
     auto ty = TC.resolveType(tl.getTypeRepr(), DC, None);
-    if (ty && !ty->is<ErrorType>()) {
-      if (ty->getCanonicalType()->hasArchetype()) {
-        TC.diagnose(attr->getLocation(),
-                    diag::cannot_partially_specialize_generic_function);
-        return;
-      }
-      tl.setType(ty, /*validated=*/true);
-      subMap[genericTypeParamTy->getCanonicalType().getPointer()] = ty;
+    if (!ty || ty->hasError()) {
+      attr->setInvalid();
+      return;
     }
+
+    if (ty->hasArchetype()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::cannot_partially_specialize_generic_function);
+      attr->setInvalid();
+      return;
+    }
+
+    tl.setType(ty, /*validated=*/true);
+    subMap.addSubstitution(
+        cast<GenericTypeParamType>(genericTypeParamTy->getCanonicalType()), ty);
   }
-  // Build a list of Substitutions.
-  //
-  // This walks the generic signature's requirements, similar to
-  // Solution::computeSubstitutions but with several differences:
-  // - It does not operate within the type constraint system.
-  // - This is the first point at which diagnostics must be emitted for
-  //   bad conformances. Self and super requirements must also be
-  //   checked and diagnosed.
-  // - This does not make use of Archetypes since it is directly substituting
-  //   in place of GenericTypeParams.
-  SmallVector<Substitution, 4> substitutions;
-  auto currentModule = FD->getParentModule();
-  Type currentFromTy;
-  Type currentReplacement;
-  SmallVector<ProtocolConformanceRef, 4> currentConformances;
+
+  // Capture the conformances needed for the substitution map.
   for (const auto &req : genericSig->getRequirements()) {
-
     switch (req.getKind()) {
-    case RequirementKind::WitnessMarker:
-      // Flush the current conformances.
-      if (currentFromTy) {
-        substitutions.push_back({
-          currentReplacement,
-          DC->getASTContext().AllocateCopy(currentConformances)
-        });
-        currentConformances.clear();
-      }
-      // Each witness marker starts a new substitution.
-      currentFromTy = req.getFirstType();
-      currentReplacement = currentFromTy.subst(currentModule, subMap, None);
-      break;
-
     case RequirementKind::Conformance: {
-      assert(currentFromTy->getCanonicalType()
-             == req.getFirstType()->getCanonicalType() && "bad WitnessMarker");
       // Get the conformance and record it.
+      auto origType = req.getFirstType()->getCanonicalType();
+      auto firstType = req.getFirstType().subst(subMap);
       auto protoType = req.getSecondType()->castTo<ProtocolType>();
-      ProtocolConformance *conformance = nullptr;
-      bool conforms =
-        TC.conformsToProtocol(currentReplacement,
+      auto conformance =
+        TC.conformsToProtocol(firstType,
                               protoType->getDecl(),
                               DC,
                               (ConformanceCheckFlags::InExpression|
-                               ConformanceCheckFlags::Used),
-                              &conformance);
-      if (!conforms || !conformance) {
+                               ConformanceCheckFlags::Used));
+      if (!conformance) {
         TC.diagnose(attr->getLocation(),
                     diag::cannot_convert_argument_value_protocol,
-                    currentReplacement, protoType);
-        // leaks prior conformances
+                    firstType, protoType);
+        attr->setInvalid();
         return;
       }
-      currentConformances.push_back(
-        ProtocolConformanceRef(protoType->getDecl(), conformance));
+
+      subMap.addConformance(origType, *conformance);
       break;
     }
     case RequirementKind::Superclass: {
       // Superclass requirements aren't recorded in substitutions.
-      auto firstTy = req.getFirstType().subst(currentModule, subMap, None);
-      auto superTy = req.getSecondType().subst(currentModule, subMap, None);
+      auto firstTy = req.getFirstType().subst(subMap);
+      auto superTy = req.getSecondType().subst(subMap);
       if (!TC.isSubtypeOf(firstTy, superTy, DC)) {
         TC.diagnose(attr->getLocation(), diag::type_does_not_inherit,
-                    FD->getType(), firstTy, superTy);
+                    FD->getInterfaceType(), firstTy, superTy);
+        attr->setInvalid();
+        return;
       }
       break;
     }
     case RequirementKind::SameType: {
       // Same-type requirements are type checked but not recorded in
       // substitutions.
-      auto firstTy = req.getFirstType().subst(currentModule, subMap, None);
-      auto sameTy = req.getSecondType().subst(currentModule, subMap, None);
+      auto firstTy = req.getFirstType().subst(subMap);
+      auto sameTy = req.getSecondType().subst(subMap);
       if (!firstTy->isEqual(sameTy)) {
-        TC.diagnose(attr->getLocation(), diag::types_not_equal, FD->getType(),
-                    firstTy, sameTy);
-
+        TC.diagnose(attr->getLocation(), diag::types_not_equal,
+                    FD->getInterfaceType(), firstTy, sameTy);
+        attr->setInvalid();
         return;
       }
       break;
     }
+    case RequirementKind::Layout: {
+      llvm_unreachable("Layout constraints not supported yet");
+    }
     }
   }
-  // Flush the final conformances.
-  if (currentFromTy) {
-    substitutions.push_back({
-      currentReplacement,
-      DC->getASTContext().AllocateCopy(currentConformances),
-    });
-    currentConformances.clear();
-  }
+
+  // Compute the substitutions.
+  SmallVector<Substitution, 4> substitutions;
+  genericSig->getSubstitutions(subMap, substitutions);
+
   // Package the Substitution list in the SpecializeAttr's ConcreteDeclRef.
   attr->setConcreteDecl(
     ConcreteDeclRef(DC->getASTContext(), FD, substitutions));
+}
+
+void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
+  auto *VD = cast<ValueDecl>(D);
+
+  if (VD->getFormalAccess() != Accessibility::Internal) {
+    TC.diagnose(attr->getLocation(),
+                diag::versioned_attr_with_explicit_accessibility,
+                VD->getName(),
+                VD->getFormalAccess())
+        .fixItRemove(attr->getRangeWithAt());
+    attr->setInvalid();
+  }
+}
+
+void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
+  if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    if (auto result = FD->getResultInterfaceType()) {
+      auto resultIsVoid = result->isVoid();
+      if (resultIsVoid || result->isUninhabited()) {
+        auto warn = diag::discardable_result_on_void_never_function;
+        auto diagnostic = TC.diagnose(D->getStartLoc(), warn, resultIsVoid);
+        diagnostic.fixItRemove(attr->getRangeWithAt());
+        attr->setInvalid();
+      }
+    }
+  }
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
@@ -1577,7 +1553,7 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
       checkAutoClosureAttr(pd, attr);
     else {
       AttributeEarlyChecker Checker(*this, var);
-      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
                                     attr, "parameter");
     }
   }
@@ -1586,7 +1562,7 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
       checkNoEscapeAttr(pd, attr);
     else {
       AttributeEarlyChecker Checker(*this, var);
-      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
                                     attr, "parameter");
     }
   }
@@ -1598,7 +1574,7 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
   // The paramdecl should have function type, and we restrict it to functions
   // taking ().
   auto *FTy = PD->getType()->getAs<FunctionType>();
-  if (FTy == 0) {
+  if (!FTy) {
     diagnose(attr->getLocation(), diag::autoclosure_function_type);
     attr->setInvalid();
     return;
@@ -1623,8 +1599,13 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
   }
 
   // Change the type to include the autoclosure bit.
-  PD->overwriteType(FunctionType::get(FuncTyInput, FTy->getResult(),
-                                    FTy->getExtInfo().withIsAutoClosure(true)));
+  PD->setType(
+      FTy->withExtInfo(FTy->getExtInfo().withIsAutoClosure(true)));
+
+  // And the interface type.
+  auto *IfaceFTy = PD->getInterfaceType()->getAs<FunctionType>();
+  PD->setInterfaceType(
+      IfaceFTy->withExtInfo(IfaceFTy->getExtInfo().withIsAutoClosure(true)));
 
   // Autoclosure may imply noescape, so add a noescape attribute if this is a
   // function parameter.
@@ -1647,7 +1628,7 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
 void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   // The paramdecl should have function type.
   auto *FTy = PD->getType()->getAs<FunctionType>();
-  if (FTy == 0) {
+  if (FTy == nullptr) {
     diagnose(attr->getLocation(), diag::noescape_function_type);
     attr->setInvalid();
     return;
@@ -1673,13 +1654,14 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
     return;
 
   // Change the type to include the noescape bit.
-  PD->overwriteType(FunctionType::get(FTy->getInput(), FTy->getResult(),
-                                      FTy->getExtInfo().withNoEscape(true)));
+  PD->setType(FunctionType::get(FTy->getInput(), FTy->getResult(),
+                                FTy->getExtInfo().withNoEscape(true)));
 }
 
 
 void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   Type type = var->getType();
+  Type interfaceType = var->getInterfaceType();
 
   // Just stop if we've already processed this declaration.
   if (type->is<ReferenceStorageType>())
@@ -1738,7 +1720,10 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   }
 
   // Change the type to the appropriate reference storage type.
-  var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
+  var->setType(ReferenceStorageType::get(
+      type, ownershipKind, Context));
+  var->setInterfaceType(ReferenceStorageType::get(
+      interfaceType, ownershipKind, Context));
 }
 
 Optional<Diag<>>

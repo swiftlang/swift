@@ -21,11 +21,11 @@ future, ``public`` may be used for both API and SPI, at which point we may
 design additional annotations to distinguish the two.
 
 By default, most entities in a source file have ``internal`` access.
-This optimizes for the most common case—a single-target application
-project—while not accidentally revealing entities to clients of a framework
+This optimizes for the most common case--a single-target application
+project--while not accidentally revealing entities to clients of a framework
 module.
 
-.. warning:: This document has not yet been updated for SE-0117, which adds the 
+.. warning:: This document has not yet been updated for SE-0117, which adds the
   "open" level of access.
 
 
@@ -220,7 +220,7 @@ functionality beyond ``private``, ``fileprivate``, ``internal``, and ``public``.
   limited with regards to extensions. Beyond that, however, a "class-only"
   limit forces code to be declared within the class that might otherwise
   naturally be a top-level helper or an extension method on another type.
-  
+
   ``private`` and ``fileprivate`` serve the use case of limiting access to the
   implementation details of a class (even from the rest of the module!) while
   not tying access to the notion of type.
@@ -232,7 +232,7 @@ functionality beyond ``private``, ``fileprivate``, ``internal``, and ``public``.
   plans for resilient APIs. Additionally, it increases the complexity of the
   access control model for both the compiler and for developers, and like
   "class-only" it is not immediately clear how it interacts with extensions.
-  
+
   Though it is not compiler-enforced, members that might be considered
   "protected" are effectively publicly accessible, and thus should be marked
   ``public`` in Swift. They can still be documented as intended for overriding

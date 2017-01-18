@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -50,7 +50,7 @@
 ///   - terminator: The string to print after all items have been printed. The
 ///     default is a newline (`"\n"`).
 ///
-/// - SeeAlso: `debugPrint(_:separator:terminator:)`, `Streamable`,
+/// - SeeAlso: `debugPrint(_:separator:terminator:)`, `TextOutputStreamable`,
 ///   `CustomStringConvertible`, `CustomDebugStringConvertible`
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -113,7 +113,7 @@ public func print(
 ///   - terminator: The string to print after all items have been printed. The
 ///     default is a newline (`"\n"`).
 ///
-/// - SeeAlso: `print(_:separator:terminator:)`, `Streamable`,
+/// - SeeAlso: `print(_:separator:terminator:)`, `TextOutputStreamable`,
 ///   `CustomStringConvertible`, `CustomDebugStringConvertible`
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -173,8 +173,9 @@ public func debugPrint(
 ///     item.
 ///
 /// - SeeAlso: `print(_:separator:terminator:)`,
-///   `debugPrint(_:separator:terminator:to:)`, `TextOutputStream`,
-///   `Streamable`, `CustomStringConvertible`, `CustomDebugStringConvertible`
+///   `debugPrint(_:separator:terminator:to:)`,
+///   `TextOutputStream`, `TextOutputStreamable`,
+///   `CustomStringConvertible`, `CustomDebugStringConvertible`
 @inline(__always)
 public func print<Target : TextOutputStream>(
   _ items: Any...,
@@ -225,7 +226,8 @@ public func print<Target : TextOutputStream>(
 ///     item.
 ///
 /// - SeeAlso: `debugPrint(_:separator:terminator:)`,
-///   `print(_:separator:terminator:to:)`, `TextOutputStream`, `Streamable`,
+///   `print(_:separator:terminator:to:)`,
+///   `TextOutputStream`, `TextOutputStreamable`,
 ///   `CustomStringConvertible`, `CustomDebugStringConvertible`
 @inline(__always)
 public func debugPrint<Target : TextOutputStream>(
@@ -281,13 +283,27 @@ internal func _debugPrint<Target : TextOutputStream>(
 //===----------------------------------------------------------------------===//
 //===--- Migration Aids ---------------------------------------------------===//
 
+@available(*, unavailable, renamed: "print(_:separator:terminator:to:)")
+public func print<Target : TextOutputStream>(
+  _ items: Any...,
+  separator: String = "",
+  terminator: String = "",
+  toStream output: inout Target
+) {}
+
+@available(*, unavailable, renamed: "debugPrint(_:separator:terminator:to:)")
+public func debugPrint<Target : TextOutputStream>(
+  _ items: Any...,
+  separator: String = "",
+  terminator: String = "",
+  toStream output: inout Target
+) {}
+
 @available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false': 'print((...), terminator: \"\")'")
 public func print<T>(_: T, appendNewline: Bool = true) {}
 @available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false': 'debugPrint((...), terminator: \"\")'")
 public func debugPrint<T>(_: T, appendNewline: Bool = true) {}
 
-
-//===--- FIXME: Not working due to <rdar://22101775> ----------------------===//
 @available(*, unavailable, message: "Please use the 'to' label for the target stream: 'print((...), to: &...)'")
 public func print<T>(_: T, _: inout TextOutputStream) {}
 @available(*, unavailable, message: "Please use the 'to' label for the target stream: 'debugPrint((...), to: &...))'")

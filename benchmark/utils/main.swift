@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -36,6 +36,8 @@ import BitCount
 import ByteSwap
 import Calculator
 import CaptureProp
+import CharacterLiteralsLarge
+import CharacterLiteralsSmall
 import Chars
 import ClassArrayGetter
 import DeadArray
@@ -68,6 +70,10 @@ import ObjectAllocation
 import ObjectiveCBridging
 import ObjectiveCBridgingStubs
 import ObjectiveCNoBridgingStubs
+import ObserverClosure
+import ObserverForwarderStruct
+import ObserverPartiallyAppliedMethod
+import ObserverUnappliedMethod
 import OpenClose
 import Phonebook
 import PolymorphicCalls
@@ -80,6 +86,7 @@ import RC4
 import RGBHistogram
 import RangeAssignment
 import RecursiveOwnedParameter
+import ReversedCollections
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -105,13 +112,26 @@ precommitTests = [
   "AnyHashableWithAClass": run_AnyHashableWithAClass,
   "Array2D": run_Array2D,
   "ArrayAppend": run_ArrayAppend,
+  "ArrayAppendArrayOfInt": run_ArrayAppendArrayOfInt,
+  "ArrayAppendFromGeneric": run_ArrayAppendFromGeneric,
+  "ArrayAppendGenericStructs": run_ArrayAppendGenericStructs,
+  "ArrayAppendLazyMap": run_ArrayAppendLazyMap,
+  "ArrayAppendOptionals": run_ArrayAppendOptionals,
+  "ArrayAppendRepeatCol": run_ArrayAppendRepeatCol,
   "ArrayAppendReserved": run_ArrayAppendReserved,
+  "ArrayAppendSequence": run_ArrayAppendSequence,
+  "ArrayAppendStrings": run_ArrayAppendStrings,
+  "ArrayAppendToFromGeneric": run_ArrayAppendToFromGeneric,
+  "ArrayAppendToGeneric": run_ArrayAppendToGeneric,
+  "ArrayPlusEqualSingleElementCollection": run_ArrayPlusEqualSingleElementCollection,
+  "ArrayPlusEqualFiveElementCollection": run_ArrayPlusEqualFiveElementCollection,
   "ArrayInClass": run_ArrayInClass,
   "ArrayLiteral": run_ArrayLiteral,
   "ArrayOfGenericPOD": run_ArrayOfGenericPOD,
   "ArrayOfGenericRef": run_ArrayOfGenericRef,
   "ArrayOfPOD": run_ArrayOfPOD,
   "ArrayOfRef": run_ArrayOfRef,
+  "ArrayPlusEqualArrayOfInt": run_ArrayPlusEqualArrayOfInt,
   "ArraySubscript": run_ArraySubscript,
   "ArrayValueProp": run_ArrayValueProp,
   "ArrayValueProp2": run_ArrayValueProp2,
@@ -121,17 +141,19 @@ precommitTests = [
   "ByteSwap": run_ByteSwap,
   "Calculator": run_Calculator,
   "CaptureProp": run_CaptureProp,
+  "CharacterLiteralsLarge": run_CharacterLiteralsLarge,
+  "CharacterLiteralsSmall": run_CharacterLiteralsSmall,
   "Chars": run_Chars,
   "ClassArrayGetter": run_ClassArrayGetter,
   "DeadArray": run_DeadArray,
   "Dictionary": run_Dictionary,
-  "DictionaryOfObjects": run_DictionaryOfObjects,
   "Dictionary2": run_Dictionary2,
   "Dictionary2OfObjects": run_Dictionary2OfObjects,
   "Dictionary3": run_Dictionary3,
   "Dictionary3OfObjects": run_Dictionary3OfObjects,
   "DictionaryBridge": run_DictionaryBridge,
   "DictionaryLiteral": run_DictionaryLiteral,
+  "DictionaryOfObjects": run_DictionaryOfObjects,
   "DictionaryRemove": run_DictionaryRemove,
   "DictionaryRemoveOfObjects": run_DictionaryRemoveOfObjects,
   "DictionarySwap": run_DictionarySwap,
@@ -154,42 +176,46 @@ precommitTests = [
   "NSStringConversion": run_NSStringConversion,
   "NopDeinit": run_NopDeinit,
   "ObjectAllocation": run_ObjectAllocation,
-  "ObjectiveCBridgeFromNSString": run_ObjectiveCBridgeFromNSString,
-  "ObjectiveCBridgeFromNSStringForced": run_ObjectiveCBridgeFromNSStringForced,
-  "ObjectiveCBridgeToNSString": run_ObjectiveCBridgeToNSString,
   "ObjectiveCBridgeFromNSArrayAnyObject": run_ObjectiveCBridgeFromNSArrayAnyObject,
   "ObjectiveCBridgeFromNSArrayAnyObjectForced": run_ObjectiveCBridgeFromNSArrayAnyObjectForced,
-  "ObjectiveCBridgeToNSArray": run_ObjectiveCBridgeToNSArray,
   "ObjectiveCBridgeFromNSArrayAnyObjectToString": run_ObjectiveCBridgeFromNSArrayAnyObjectToString,
   "ObjectiveCBridgeFromNSArrayAnyObjectToStringForced": run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced,
   "ObjectiveCBridgeFromNSDictionaryAnyObject": run_ObjectiveCBridgeFromNSDictionaryAnyObject,
   "ObjectiveCBridgeFromNSDictionaryAnyObjectForced": run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced,
   "ObjectiveCBridgeFromNSDictionaryAnyObjectToString": run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString,
   "ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced": run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced,
-  "ObjectiveCBridgeToNSDictionary": run_ObjectiveCBridgeToNSDictionary,
   "ObjectiveCBridgeFromNSSetAnyObject": run_ObjectiveCBridgeFromNSSetAnyObject,
   "ObjectiveCBridgeFromNSSetAnyObjectForced": run_ObjectiveCBridgeFromNSSetAnyObjectForced,
   "ObjectiveCBridgeFromNSSetAnyObjectToString": run_ObjectiveCBridgeFromNSSetAnyObjectToString,
   "ObjectiveCBridgeFromNSSetAnyObjectToStringForced": run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced,
-  "ObjectiveCBridgeToNSSet": run_ObjectiveCBridgeToNSSet,
-  "ObjectiveCBridgeStubFromNSString": run_ObjectiveCBridgeStubFromNSString,
-  "ObjectiveCBridgeStubFromNSStringRef": run_ObjectiveCBridgeStubFromNSStringRef,
-  "ObjectiveCBridgeStubToNSString": run_ObjectiveCBridgeStubToNSString,
-  "ObjectiveCBridgeStubToNSStringRef": run_ObjectiveCBridgeStubToNSStringRef,
+  "ObjectiveCBridgeFromNSString": run_ObjectiveCBridgeFromNSString,
+  "ObjectiveCBridgeFromNSStringForced": run_ObjectiveCBridgeFromNSStringForced,
+  "ObjectiveCBridgeStubDataAppend": run_ObjectiveCBridgeStubDataAppend,
+  "ObjectiveCBridgeStubDateAccess": run_ObjectiveCBridgeStubDateAccess,
+  "ObjectiveCBridgeStubDateMutation": run_ObjectiveCBridgeStubDateMutation,
   "ObjectiveCBridgeStubFromArrayOfNSString": run_ObjectiveCBridgeStubFromArrayOfNSString,
-  "ObjectiveCBridgeStubToArrayOfNSString": run_ObjectiveCBridgeStubToArrayOfNSString,
   "ObjectiveCBridgeStubFromNSDate": run_ObjectiveCBridgeStubFromNSDate,
   "ObjectiveCBridgeStubFromNSDateRef": run_ObjectiveCBridgeStubFromNSDateRef,
+  "ObjectiveCBridgeStubFromNSString": run_ObjectiveCBridgeStubFromNSString,
+  "ObjectiveCBridgeStubFromNSStringRef": run_ObjectiveCBridgeStubFromNSStringRef,
+  "ObjectiveCBridgeStubNSDataAppend": run_ObjectiveCBridgeStubNSDataAppend,
+  "ObjectiveCBridgeStubNSDateMutationRef": run_ObjectiveCBridgeStubNSDateMutationRef,
+  "ObjectiveCBridgeStubNSDateRefAccess": run_ObjectiveCBridgeStubNSDateRefAccess,
+  "ObjectiveCBridgeStubToArrayOfNSString": run_ObjectiveCBridgeStubToArrayOfNSString,
   "ObjectiveCBridgeStubToNSDate": run_ObjectiveCBridgeStubToNSDate,
   "ObjectiveCBridgeStubToNSDateRef": run_ObjectiveCBridgeStubToNSDateRef,
-  "ObjectiveCBridgeStubDateAccess": run_ObjectiveCBridgeStubDateAccess,
-  "ObjectiveCBridgeStubNSDateRefAccess": run_ObjectiveCBridgeStubNSDateRefAccess,
-  "ObjectiveCBridgeStubDateMutation": run_ObjectiveCBridgeStubDateMutation,
-  "ObjectiveCBridgeStubNSDateMutationRef": run_ObjectiveCBridgeStubNSDateMutationRef,
+  "ObjectiveCBridgeStubToNSString": run_ObjectiveCBridgeStubToNSString,
+  "ObjectiveCBridgeStubToNSStringRef": run_ObjectiveCBridgeStubToNSStringRef,
   "ObjectiveCBridgeStubURLAppendPath": run_ObjectiveCBridgeStubURLAppendPath,
   "ObjectiveCBridgeStubURLAppendPathRef": run_ObjectiveCBridgeStubURLAppendPathRef,
-  "ObjectiveCBridgeStubDataAppend": run_ObjectiveCBridgeStubDataAppend,
-  "ObjectiveCBridgeStubNSDataAppend": run_ObjectiveCBridgeStubNSDataAppend,
+  "ObjectiveCBridgeToNSArray": run_ObjectiveCBridgeToNSArray,
+  "ObjectiveCBridgeToNSDictionary": run_ObjectiveCBridgeToNSDictionary,
+  "ObjectiveCBridgeToNSSet": run_ObjectiveCBridgeToNSSet,
+  "ObjectiveCBridgeToNSString": run_ObjectiveCBridgeToNSString,
+  "ObserverClosure": run_ObserverClosure,
+  "ObserverForwarderStruct": run_ObserverForwarderStruct,
+  "ObserverPartiallyAppliedMethod": run_ObserverPartiallyAppliedMethod,
+  "ObserverUnappliedMethod": run_ObserverUnappliedMethod,
   "OpenClose": run_OpenClose,
   "Phonebook": run_Phonebook,
   "PolymorphicCalls": run_PolymorphicCalls,
@@ -204,17 +230,21 @@ precommitTests = [
   "RGBHistogramOfObjects": run_RGBHistogramOfObjects,
   "RangeAssignment": run_RangeAssignment,
   "RecursiveOwnedParameter": run_RecursiveOwnedParameter,
+  "ReversedArray": run_ReversedArray,
+  "ReversedBidirectional": run_ReversedBidirectional,
+  "ReversedDictionary": run_ReversedDictionary,
   "SetExclusiveOr": run_SetExclusiveOr,
-  "SetIntersect": run_SetIntersect,
-  "SetIsSubsetOf": run_SetIsSubsetOf,
-  "SetUnion": run_SetUnion,
   "SetExclusiveOr_OfObjects": run_SetExclusiveOr_OfObjects,
+  "SetIntersect": run_SetIntersect,
   "SetIntersect_OfObjects": run_SetIntersect_OfObjects,
+  "SetIsSubsetOf": run_SetIsSubsetOf,
   "SetIsSubsetOf_OfObjects": run_SetIsSubsetOf_OfObjects,
+  "SetUnion": run_SetUnion,
   "SetUnion_OfObjects": run_SetUnion_OfObjects,
   "SevenBoom": run_SevenBoom,
   "Sim2DArray": run_Sim2DArray,
   "SortLettersInPlace": run_SortLettersInPlace,
+  "SortSortedStrings": run_SortSortedStrings,
   "SortStrings": run_SortStrings,
   "SortStringsUnicode": run_SortStringsUnicode,
   "StackPromo": run_StackPromo,
@@ -223,11 +253,11 @@ precommitTests = [
   "StrToInt": run_StrToInt,
   "StringBuilder": run_StringBuilder,
   "StringEqualPointerComparison": run_StringEqualPointerComparison,
-  "StringInterpolation": run_StringInterpolation,
   "StringHasPrefix": run_StringHasPrefix,
   "StringHasPrefixUnicode": run_StringHasPrefixUnicode,
   "StringHasSuffix": run_StringHasSuffix,
   "StringHasSuffixUnicode": run_StringHasSuffixUnicode,
+  "StringInterpolation": run_StringInterpolation,
   "StringWalk": run_StringWalk,
   "StringWithCString": run_StringWithCString,
   "SuperChars": run_SuperChars,

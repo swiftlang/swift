@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all %s -early-codemotion -retain-sinking -disable-with-critical-edge=1 | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name Swift -enable-sil-verify-all %s -early-codemotion -retain-sinking -disable-with-critical-edge=1 | %FileCheck %s
 
 import Builtin
 
@@ -183,7 +183,7 @@ bb3(%6 : $Builtin.Int32):
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: switch_enum
 // CHECK: bb1({{.*}}):
-// CHECK-NEXT: retain_value
+// CHECK: strong_retain
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value
@@ -382,7 +382,7 @@ bb3:
 // CHECK-NEXT: select_enum
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: retain_value
+// CHECK: strong_retain
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value
@@ -800,9 +800,9 @@ bb3:
 //
 // CHECK-LABEL: sil @enum_simplification_test6b : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 // CHECK: bb1:
-// CHECK: retain_value
+// CHECK: strong_retain
 // CHECK: bb2:
-// CHECK: retain_value
+// CHECK: strong_retain
 // CHECK: bb3:
 // CHECK-NOT: retain_value
 sil @enum_simplification_test6b : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
@@ -882,7 +882,7 @@ bb4:
 // CHECK-LABEL: sil @enum_simplification_test9 : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $Optional<Builtin.NativeObject>):
 // CHECK: bb1:
-// CHECK-NEXT: retain_value [[INPUT]]
+// CHECK: strong_retain
 // CHECK: bb2:
 // CHECK-NOT: retain
 // CHECK: bb3:
@@ -911,7 +911,7 @@ bb3:
 // CHECK-LABEL: sil @enum_simplification_test9_enums : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $Optional<Builtin.NativeObject>):
 // CHECK: bb1:
-// CHECK-NEXT: retain_value
+// CHECK: strong_retain
 // CHECK: bb2:
 // CHECK-NOT: retain
 // CHECK: bb3:
@@ -1219,7 +1219,7 @@ bb2:
 // CHECK-NOT: retain_value
 // CHECK: br bb3
 // CHECK: bb3:
-// CHECK: strong_retain 
+// CHECK: strong_retain
 sil @sink_retain_over_switch_enum_cast : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   retain_value %0 : $Builtin.NativeObject
@@ -1481,26 +1481,26 @@ bb0(%0 : $Boo, %1 : $Boo):
   debug_value %0 : $Boo, let, name "self" // id: %4
   switch_enum %0 : $Boo, case #Boo.one!enumelt: bb1, case #Boo.two!enumelt: bb3 // id: %5
 
-bb1:                                              // Preds: bb0 
+bb1:                                              // Preds: bb0
   %6 = alloc_ref $fuzz                            // users: %7, %8
   debug_value %6 : $fuzz, let, name "self" // id: %7
   br bb2(%6 : $fuzz)                              // id: %8
 
-bb3:                                              // Preds: bb0 
-  %15 = alloc_ref $fuzz                           // users: %16, %17 
-  debug_value %15 : $fuzz, let, name "self" // id: %16 
-  br bb2(%15 : $fuzz)                             // id: %17 
+bb3:                                              // Preds: bb0
+  %15 = alloc_ref $fuzz                           // users: %16, %17
+  debug_value %15 : $fuzz, let, name "self" // id: %16
+  br bb2(%15 : $fuzz)                             // id: %17
 
 bb2(%9 : $fuzz):
   // Make sure we have a single alloc_ref instruction and not two.
   // CHECK: alloc_ref
   // CHECK-NOT: alloc_ref
   // CHECK: return
-  debug_value %9 : $fuzz, let, name "lhs" // id: %10 
-  %11 = integer_literal $Builtin.Int1, -1         // user: %12 
-  %12 = struct $Bool (%11 : $Builtin.Int1)        // user: %14 
-  strong_release %9 : $fuzz                       // id: %13 
-  return %12 : $Bool                              // id: %14 
+  debug_value %9 : $fuzz, let, name "lhs" // id: %10
+  %11 = integer_literal $Builtin.Int1, -1         // user: %12
+  %12 = struct $Bool (%11 : $Builtin.Int1)        // user: %14
+  strong_release %9 : $fuzz                       // id: %13
+  return %12 : $Bool                              // id: %14
 }
 
 // Make sure retain instruction is not sunk across copy_addr inst, as copy_addr
@@ -1508,7 +1508,7 @@ bb2(%9 : $fuzz):
 //
 // CHECK-LABEL: retain_blocked_by_copyaddr
 // CHECK: bb0
-// CHECK-NEXT: strong_retain 
+// CHECK-NEXT: retain_value
 sil hidden @retain_blocked_by_copyaddr : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
   retain_value %2 : $B
@@ -1522,8 +1522,8 @@ bb0(%0 : $*T, %1 : $*T, %2 : $B):
 //
 // CHECK-LABEL: retain_not_blocked_by_copyaddrinit
 // CHECK: bb0
-// CHECK-NEXT: copy_addr 
-// CHECK-NEXT: tuple 
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: tuple
 // CHECK-NEXT: strong_retain
 sil hidden @retain_not_blocked_by_copyaddrinit : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
@@ -1538,8 +1538,8 @@ bb0(%0 : $*T, %1 : $*T, %2 : $B):
 //
 // CHECK-LABEL: retain_not_blocked_by_copyaddr_notake_init
 // CHECK: bb0
-// CHECK-NEXT: copy_addr 
-// CHECK-NEXT: tuple 
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: tuple
 // CHECK-NEXT: strong_retain
 sil hidden @retain_not_blocked_by_copyaddr_notake_init : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Bad containers and ranges
 struct BadContainer1 {
@@ -27,7 +27,7 @@ func bad_containers_3(bc: BadContainer3) {
 struct BadIterator1 {}
 
 struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}}
-  typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
+  typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'BadContainer4.Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> BadIterator1 { }
 }
 
@@ -70,7 +70,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }
 
-  for (i, _) : (Int, Int) in gtr { sum = sum + i } // expected-error{{'Element' (aka '(Int, Float)') is not convertible to '(Int, Int)'}}
+  for (i, _) : (Int, Int) in gtr { sum = sum + i } // expected-error{{'GoodTupleIterator.Element' (aka '(Int, Float)') is not convertible to '(Int, Int)'}}
 
   for (i, f) in gtr {}
 }
@@ -167,7 +167,7 @@ func testMatchingPatterns() {
 
 // <rdar://problem/21662365> QoI: diagnostic for for-each over an optional sequence isn't great
 func testOptionalSequence() {
-  let array : [Int]? = nil
+  let array : [Int]?
   for x in array {  // expected-error {{value of optional type '[Int]?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
   }
 }

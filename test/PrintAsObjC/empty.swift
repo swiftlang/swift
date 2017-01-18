@@ -1,10 +1,10 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -parse -emit-objc-header-path %t/empty.h
-// RUN: FileCheck %s < %t/empty.h
+// RUN: mkdir -p %t
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -emit-objc-header-path %t/empty.h
+// RUN: %FileCheck %s < %t/empty.h
 // RUN: %check-in-clang -std=c99 %t/empty.h
 // RUN: %check-in-clang -std=c99 -fno-modules -Qunused-arguments %t/empty.h
-// RUN: not %check-in-clang -I %S/Inputs/clang-headers %t/empty.h 2>&1 | FileCheck %s --check-prefix=CUSTOM-OBJC-PROLOGUE
+// RUN: not %check-in-clang -I %S/Inputs/clang-headers %t/empty.h 2>&1 | %FileCheck %s --check-prefix=CUSTOM-OBJC-PROLOGUE
 
 // Make sure we can handle two bridging headers. rdar://problem/22702104
 // RUN: %check-in-clang -include %t/empty.h -std=c99 -fno-modules -Qunused-arguments %t/empty.h

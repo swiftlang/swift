@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,13 +24,14 @@
 using namespace swift;
 
 static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
-  auto *Preheader = new (Header->getModule())
-      SILBasicBlock(Header->getParent(), &*std::prev(Header->getIterator()));
+  auto *Preheader =
+      Header->getParent()->createBasicBlock(&*std::prev(Header->getIterator()));
 
   // Clone the arguments from header into the pre-header.
   llvm::SmallVector<SILValue, 8> Args;
-  for (auto *HeaderArg : Header->getBBArgs()) {
-    Args.push_back(Preheader->createBBArg(HeaderArg->getType(), nullptr));
+  for (auto *HeaderArg : Header->getArguments()) {
+    Args.push_back(Preheader->createPHIArgument(HeaderArg->getType(),
+                                                ValueOwnershipKind::Owned));
   }
 
   // Create the branch to the header.
@@ -48,7 +49,7 @@ static SILBasicBlock *insertPreheader(SILLoop *L, DominanceInfo *DT,
 
   // Before we create the preheader, gather all of the original preds of header.
   llvm::SmallVector<SILBasicBlock *, 8> Preds;
-  for (auto *Pred : Header->getPreds()) {
+  for (auto *Pred : Header->getPredecessorBlocks()) {
     if (!L->contains(Pred)) {
       Preds.push_back(Pred);
     }
@@ -104,7 +105,7 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
 
   // Figure out which basic blocks contain back-edges to the loop header.
   SmallVector<SILBasicBlock*, 4> BackedgeBlocks;
-  for (auto *Pred : Header->getPreds()) {
+  for (auto *Pred : Header->getPredecessorBlocks()) {
     if (Pred == Preheader)
       continue;
     // Branches can be handled trivially and CondBranch edges can be split.
@@ -116,8 +117,7 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   }
 
   // Create and insert the new backedge block...
-  SILBasicBlock *BEBlock =
-    new (F->getModule()) SILBasicBlock(F, BackedgeBlocks.back());
+  SILBasicBlock *BEBlock = F->createBasicBlock(BackedgeBlocks.back());
 
   DEBUG(llvm::dbgs() << "  Inserting unique backedge block " << *BEBlock
         << "\n");
@@ -125,8 +125,9 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   // Now that the block has been inserted into the function, create PHI nodes in
   // the backedge block which correspond to any PHI nodes in the header block.
   SmallVector<SILValue, 6> BBArgs;
-  for (auto *BBArg : Header->getBBArgs()) {
-    BBArgs.push_back(BEBlock->createBBArg(BBArg->getType(), /*Decl=*/nullptr));
+  for (auto *BBArg : Header->getArguments()) {
+    BBArgs.push_back(BEBlock->createPHIArgument(BBArg->getType(),
+                                                ValueOwnershipKind::Owned));
   }
 
   // Arbitrarily pick one of the predecessor's branch locations.

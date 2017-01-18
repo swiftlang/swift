@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -28,6 +28,16 @@ entry(%p : $*SameSizeStride, %i: $Builtin.Word):
 sil @different_size_stride : $@convention(thin) (@in DifferentSizeStride, Builtin.Word) -> () {
 entry(%p : $*DifferentSizeStride, %i: $Builtin.Word):
   %q = index_addr %p : $*DifferentSizeStride, %i : $Builtin.Word
+  return undef : $()
+}
+
+// CHECK:      define{{( protected)?}} void @zero_size(%swift.opaque* noalias nocapture, i64) {{.*}} {
+// CHECK:        %2 = bitcast %swift.opaque* %0 to i8*
+// CHECK-NEXT:   %3 = mul nsw i64 %1, 1
+// CHECK-NEXT:   %4 = getelementptr inbounds i8, i8* %2, i64 %3
+sil @zero_size : $@convention(thin) (@in (), Builtin.Word) -> () {
+entry(%p : $*(), %i: $Builtin.Word):
+  %q = index_addr %p : $*(), %i : $Builtin.Word
   return undef : $()
 }
 

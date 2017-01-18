@@ -1,5 +1,6 @@
-// RUN: %target-swift-remoteast-test -sdk %S/../IRGen/Inputs %s | FileCheck %s
+// RUN: %target-swift-remoteast-test -sdk %S/../IRGen/Inputs %s | %FileCheck %s
 
+// REQUIRES: swift-remoteast-test
 // REQUIRES: objc_interop
 
 import CoreCooling

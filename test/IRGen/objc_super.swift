@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -11,6 +11,7 @@ import gizmo
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[HOOZIT:%C10objc_super6Hoozit]] = type
 // CHECK: [[NSRECT:%VSC6NSRect]] = type
+// CHECK: [[PARTIAL_APPLY_CLASS:%C10objc_super12PartialApply]] = type
 // CHECK: [[SUPER:%objc_super]] = type
 // CHECK: [[OBJC:%objc_object]] = type
 // CHECK: [[GIZMO:%CSo5Gizmo]] = type
@@ -65,5 +66,22 @@ class Hoozit : Gizmo {
     // CHECK: ret
     super.init(bellsOn:y)
   }
+  // CHECK: }
+}
+
+func acceptFn(_ fn: () -> Void) { }
+
+class PartialApply : Gizmo {
+  // CHECK: define hidden void @_TFC10objc_super12PartialApply4frobfT_T_([[PARTIAL_APPLY_CLASS]]*) {{.*}} {
+  override func frob() {
+    // CHECK: call void @_TF10objc_super8acceptFnFFT_T_T_(i8* bitcast (void (%swift.refcounted*)* [[PARTIAL_FORWARDING_THUNK:@[A-Za-z0-9_]+]] to i8*), %swift.refcounted* %3)
+    acceptFn(super.frob)
+  }
+  // CHECK: }
+
+  // CHECK: define internal void [[PARTIAL_FORWARDING_THUNK]](%swift.refcounted*) #0 {
+  // CHECK: call %swift.type* @_TMaC10objc_super12PartialApply()
+  // CHECK: @"\01L_selector(frob)"
+  // CHECK: call void bitcast (void ()* @objc_msgSendSuper2
   // CHECK: }
 }

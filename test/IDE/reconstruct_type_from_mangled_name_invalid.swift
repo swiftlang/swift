@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s -implicit-check-not="FAILURE"
+// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | %FileCheck %s -implicit-check-not="FAILURE"
 
 struct GS<T> {
 // CHECK: decl: struct GS<T> for 'GS'
@@ -20,11 +20,11 @@ let global3 = GS<Int>(a: 1, b: 2).b
 
 protocol P {
 // FIXME: missing protocol entries?
-// CHECK: decl: FAILURE for 'P'
+// CHECK: decl: protocol P for 'P' usr=s:P14swift_ide_test1P
   associatedtype T
-// CHECK: decl: FAILURE for 'T'
+// CHECK: decl: protocol P for 'T' usr=s:P14swift_ide_test1P1T
   func foo() -> T
-// CHECK: decl: FAILURE for 'foo'
+// CHECK: decl: func foo() -> Self.T	for 'foo' usr=s:FP14swift_ide_test1P3fooFT_wx1T
 }
 struct SP: P {
 // CHECK: decl: struct SP : P for 'SP'

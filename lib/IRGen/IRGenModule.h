@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -133,25 +133,30 @@ class IRGenModule;
 
 /// A type descriptor for a field type accessor.
 class FieldTypeInfo {
-  llvm::PointerIntPair<CanType, 1, unsigned> Info;
+  llvm::PointerIntPair<CanType, 2, unsigned> Info;
   /// Bits in the "int" part of the Info pair.
   enum : unsigned {
     /// Flag indicates that the case is indirectly stored in a box.
     Indirect = 1,
+    /// Indicates a weak optional reference
+    Weak = 2,
   };
 
-  static unsigned getFlags(bool indirect) {
-    return (indirect ? Indirect : 0);
+  static unsigned getFlags(bool indirect, bool weak) {
+    return (indirect ? Indirect : 0)
+         | (weak ? Weak : 0);
     //   | (blah ? Blah : 0) ...
   }
 
 public:
-  FieldTypeInfo(CanType type, bool indirect)
-    : Info(type, getFlags(indirect))
+  FieldTypeInfo(CanType type, bool indirect, bool weak)
+    : Info(type, getFlags(indirect, weak))
   {}
 
   CanType getType() const { return Info.getPointer(); }
   bool isIndirect() const { return Info.getInt() & Indirect; }
+  bool isWeak() const { return Info.getInt() & Weak; }
+  bool hasFlags() const { return Info.getInt() != 0; }
 };
 
 /// The principal singleton which manages all of IR generation.
@@ -269,6 +274,13 @@ public:
 
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
+
+  /// Emit reflection metadata records for builtin and imported types referenced
+  /// from this module.
+  void emitBuiltinReflectionMetadata();
+
+  /// Emit a symbol identifying the reflection metadata version.
+  void emitReflectionMetadataVersion();
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
@@ -493,6 +505,8 @@ public:
     case ReferenceCounting::Error:
       llvm_unreachable("unowned references to this type are not supported");
     }
+
+    llvm_unreachable("Not a valid ReferenceCounting.");
   }
   
   /// Return the spare bit mask to use for types that comprise heap object
@@ -716,6 +730,14 @@ private:
 
 //--- Remote reflection metadata --------------------------------------------
 public:
+  /// Section names.
+  std::string FieldTypeSection;
+  std::string BuiltinTypeSection;
+  std::string AssociatedTypeSection;
+  std::string CaptureDescriptorSection;
+  std::string ReflectionStringsSection;
+  std::string ReflectionTypeRefSection;
+
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
@@ -742,14 +764,32 @@ public:
 
   void emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance);
   void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
+
+  /// Emit a reflection metadata record for a builtin type referenced
+  /// from this module.
+  void emitBuiltinTypeMetadataRecord(CanType builtinType);
+
+  /// Emit a reflection metadata record for an imported type referenced
+  /// from this module.
+  void emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
+
+  /// Some nominal type declarations require us to emit a fixed-size type
+  /// descriptor, because they have special layout considerations.
+  bool shouldEmitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
+
+  /// Emit reflection metadata records for builtin and imported types referenced
+  /// from this module.
   void emitBuiltinReflectionMetadata();
+
+  /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
-  std::string getBuiltinTypeMetadataSectionName();
-  std::string getFieldTypeMetadataSectionName();
-  std::string getAssociatedTypeMetadataSectionName();
-  std::string getCaptureDescriptorMetadataSectionName();
-  std::string getReflectionStringsSectionName();
-  std::string getReflectionTypeRefSectionName();
+
+  const char *getBuiltinTypeMetadataSectionName();
+  const char *getFieldTypeMetadataSectionName();
+  const char *getAssociatedTypeMetadataSectionName();
+  const char *getCaptureDescriptorMetadataSectionName();
+  const char *getReflectionStringsSectionName();
+  const char *getReflectionTypeRefSectionName();
 
 //--- Runtime ---------------------------------------------------------------
 public:
@@ -920,9 +960,10 @@ public:
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
  
-  // Get the ArchetypeBuilder for the currently active generic context. Crashes
-  // if there is no generic context.
-  ArchetypeBuilder &getContextArchetypes();
+  /// Retrieve the generic environment for the current generic context.
+  ///
+  /// Fails if there is no generic context.
+  GenericEnvironment *getGenericEnvironment();
 
   ConstantReference
   getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,

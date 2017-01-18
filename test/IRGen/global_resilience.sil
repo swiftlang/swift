@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | FileCheck %s
-// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
@@ -73,7 +73,7 @@ bb0:
 // CHECK-LABEL: define{{( protected)?}} void @testLargeGlobal()
 sil @testLargeGlobal : $@convention(thin) () -> () {
 bb0:
-  // CHECK: [[ALLOC:%.*]] = call noalias i8* @rt_swift_slowAlloc([[INT]] 32, [[INT]] 7)
+  // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc([[INT]] 32, [[INT]] 7)
   // CHECK: store i8* [[ALLOC]], i8** bitcast ([[BUFFER]]* @largeGlobal to i8**), align 1
   alloc_global @largeGlobal
 

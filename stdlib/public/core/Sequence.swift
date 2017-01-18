@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -179,10 +179,10 @@ public protocol IteratorProtocol {
   associatedtype Element
 
   /// Advances to the next element and returns it, or `nil` if no next element
-  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
+  /// exists.
   ///
   /// Repeatedly calling this method returns, in order, all the elements of the
-  /// underlying sequence.  As soon as the sequence has run out of elements, all
+  /// underlying sequence. As soon as the sequence has run out of elements, all
   /// subsequent calls return `nil`.
   ///
   /// You must not call this method if any other copy of this iterator has been
@@ -203,16 +203,16 @@ public protocol IteratorProtocol {
   ///     // Prints "5"
   ///     // Prints "7"
   ///
-  /// - Returns: The next element in the underlying sequence if a next element
+  /// - Returns: The next element in the underlying sequence, if a next element
   ///   exists; otherwise, `nil`.
   mutating func next() -> Element?
 }
 
 /// A type that provides sequential, iterated access to its elements.
 ///
-/// Sequences are lists of values that let you step over their values
-/// one at a time. The most common way to iterate over the elements of a
-/// sequence is to use a `for`-`in` loop:
+/// A sequence is a list of values that you can step through one at a time. The
+/// most common way to iterate over the elements of a sequence is to use a
+/// `for`-`in` loop:
 ///
 ///     let oneTwoThree = 1...3
 ///     for number in oneTwoThree {
@@ -253,38 +253,38 @@ public protocol IteratorProtocol {
 ///     }
 ///     // Prints "Whew, no mosquitos!"
 ///
-/// Repeated Access 
+/// Repeated Access
 /// ===============
 ///
 /// The `Sequence` protocol makes no requirement on conforming types regarding
-/// whether they will be destructively "consumed" by iteration. As a
+/// whether they will be destructively consumed by iteration. As a
 /// consequence, don't assume that multiple `for`-`in` loops on a sequence
-/// will either "resume" iteration or restart from the beginning:
+/// will either resume iteration or restart from the beginning:
 ///
 ///     for element in sequence {
 ///         if ... some condition { break }
 ///     }
-/// 
+///
 ///     for element in sequence {
 ///         // No defined behavior
 ///     }
 ///
-/// In this case, you cannot assume that a sequence will either be
-/// "consumable" and will resume iteration, or that a sequence is a
-/// collection and will restart iteration from the first element. A
-/// conforming sequence that is not a collection is allowed to produce an
-/// arbitrary sequence of elements in the second `for`-`in` loop.
+/// In this case, you cannot assume either that a sequence will be consumable
+/// and will resume iteration, or that a sequence is a collection and will
+/// restart iteration from the first element. A conforming sequence that is
+/// not a collection is allowed to produce an arbitrary sequence of elements
+/// in the second `for`-`in` loop.
 ///
-/// To establish that a type you've created supports nondestructive
-/// iteration, add conformance to the `Collection` protocol.
+/// To establish that a type you've created supports nondestructive iteration,
+/// add conformance to the `Collection` protocol.
 ///
-/// Conforming to the Sequence Protocol 
+/// Conforming to the Sequence Protocol
 /// ===================================
 ///
 /// Making your own custom types conform to `Sequence` enables many useful
 /// operations, like `for`-`in` looping and the `contains` method, without
-/// much effort. To add `Sequence` conformance to your own custom type, add
-/// a `makeIterator()` method that returns an iterator.
+/// much effort. To add `Sequence` conformance to your own custom type, add a
+/// `makeIterator()` method that returns an iterator.
 ///
 /// Alternatively, if your type can act as its own iterator, implementing the
 /// requirements of the `IteratorProtocol` protocol and declaring conformance
@@ -296,7 +296,7 @@ public protocol IteratorProtocol {
 ///
 ///     struct Countdown: Sequence, IteratorProtocol {
 ///         var count: Int
-/// 
+///
 ///         mutating func next() -> Int? {
 ///             if count == 0 {
 ///                 return nil
@@ -306,7 +306,7 @@ public protocol IteratorProtocol {
 ///             }
 ///         }
 ///     }
-/// 
+///
 ///     let threeToGo = Countdown(count: 3)
 ///     for i in threeToGo {
 ///         print(i)
@@ -315,7 +315,7 @@ public protocol IteratorProtocol {
 ///     // Prints "2"
 ///     // Prints "1"
 ///
-/// Expected Performance 
+/// Expected Performance
 /// ====================
 ///
 /// A sequence should provide its iterator in O(1). The `Sequence` protocol
@@ -334,7 +334,8 @@ public protocol Sequence {
 
   /// A type that represents a subsequence of some of the sequence's elements.
   associatedtype SubSequence
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#104 (Recursive Protocol Constraints):
+  // FIXME(ABI)#105 (Associated Types with where clauses):
   // associatedtype SubSequence : Sequence
   //   where
   //   Iterator.Element == SubSequence.Iterator.Element,
@@ -471,6 +472,18 @@ public protocol Sequence {
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   func dropLast(_ n: Int) -> SubSequence
 
+  /// Returns a subsequence by skipping elements while `predicate` returns
+  /// `true` and returning the remaining elements.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element is a match.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  func drop(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence
+
   /// Returns a subsequence, up to the specified maximum length, containing
   /// the initial elements of the sequence.
   ///
@@ -488,6 +501,32 @@ public protocol Sequence {
   /// - Returns: A subsequence starting at the beginning of this sequence
   ///   with at most `maxLength` elements.
   func prefix(_ maxLength: Int) -> SubSequence
+  
+  /// Returns a subsequence containing the initial, consecutive elements that
+  /// satisfy the given predicate.
+  ///
+  /// The following example uses the `prefix(while:)` method to find the
+  /// positive numbers at the beginning of the `numbers` array. Every element
+  /// of `numbers` up to, but not including, the first negative value is
+  /// included in the result.
+  ///
+  ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
+  ///     let positivePrefix = numbers.prefix(while: { $0 > 0 })
+  ///     // positivePrefix == [3, 7, 4]
+  ///
+  /// If `predicate` matches every element in the sequence, the resulting
+  /// sequence contains every element of the sequence.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence as
+  ///   its argument and returns a Boolean value indicating whether the
+  ///   element should be included in the result.
+  /// - Returns: A subsequence of the initial, consecutive elements that
+  ///   satisfy `predicate`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  func prefix(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence
 
   /// Returns a subsequence, up to the given maximum length, containing the
   /// final elements of the sequence.
@@ -566,17 +605,6 @@ public protocol Sequence {
     whereSeparator isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
-  /// Returns the first element of the sequence that satisfies the given
-  /// predicate or nil if no such element is found.
-  ///
-  /// - Parameter predicate: A closure that takes an element of the
-  ///   sequence as its argument and returns a Boolean value indicating
-  ///   whether the element is a match.
-  /// - Returns: The first match or `nil` if there was no match.
-  func first(
-    where predicate: (Iterator.Element) throws -> Bool
-  ) rethrows -> Iterator.Element?
-
   func _customContainsEquatableElement(
     _ element: Iterator.Element
   ) -> Bool?
@@ -591,11 +619,11 @@ public protocol Sequence {
   /// in the same order.
   func _copyToContiguousArray() -> ContiguousArray<Iterator.Element>
 
-  /// Copy a Sequence into an array, returning one past the last
-  /// element initialized.
-  @discardableResult
-  func _copyContents(initializing ptr: UnsafeMutablePointer<Iterator.Element>)
-    -> UnsafeMutablePointer<Iterator.Element>
+  /// Copy `self` into an unsafe buffer, returning a partially-consumed 
+  /// iterator with any elements that didn't fit remaining.
+  func _copyContents(
+    initializing ptr: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index)
 }
 
 /// A default makeIterator() function for `IteratorProtocol` instances that
@@ -697,6 +725,65 @@ internal class _PrefixSequence<Base : IteratorProtocol>
         maxLength: Swift.min(maxLength, self._maxLength),
         taken: _taken))
   }
+  
+  internal func drop(
+    while predicate: (Base.Element) throws -> Bool
+  ) rethrows -> AnySequence<Base.Element> {
+    return try AnySequence(
+      _DropWhileSequence(
+        iterator: _iterator, nextElement: nil, predicate: predicate))
+  }
+}
+
+/// A sequence that lazily consumes and drops `n` elements from an underlying
+/// `Base` iterator before possibly returning the first available element.
+///
+/// The underlying iterator's sequence may be infinite.
+///
+/// This is a class - we require reference semantics to keep track
+/// of how many elements we've already dropped from the underlying sequence.
+internal class _DropWhileSequence<Base : IteratorProtocol>
+    : Sequence, IteratorProtocol {
+
+  internal var _iterator: Base
+  internal var _nextElement: Base.Element?
+
+  internal init(
+    iterator: Base,
+    nextElement: Base.Element?,
+    predicate: (Base.Element) throws -> Bool
+  ) rethrows {
+    self._iterator = iterator
+    self._nextElement = nextElement ?? _iterator.next()
+    
+    while try _nextElement.flatMap(predicate) == true {
+      _nextElement = _iterator.next()
+    }
+  }
+
+  internal func makeIterator() -> _DropWhileSequence<Base> {
+    return self
+  }
+
+  internal func next() -> Base.Element? {
+    guard _nextElement != nil else {
+      return _iterator.next()
+    }
+    
+    let next = _nextElement
+    _nextElement = nil
+    return next
+  }
+
+  internal func drop(
+    while predicate: (Base.Element) throws -> Bool
+  ) rethrows -> AnySequence<Base.Element> {
+    // If this is already a _DropWhileSequence, avoid multiple
+    // layers of wrapping and keep the same iterator.
+    return try AnySequence(
+      _DropWhileSequence(
+        iterator: _iterator, nextElement: _nextElement, predicate: predicate))
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -752,7 +839,7 @@ extension Sequence {
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
-  /// - Parameter shouldInclude: A closure that takes an element of the
+  /// - Parameter isIncluded: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
@@ -807,13 +894,15 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i = ringBuffer.index(after: i) % maxLength
+        i += 1
+        i %= maxLength
       }
     }
 
     if i != ringBuffer.startIndex {
-      return AnySequence(
-        [ringBuffer[i..<ringBuffer.endIndex], ringBuffer[0..<i]].joined())
+      let s0 = ringBuffer[i..<ringBuffer.endIndex]
+      let s1 = ringBuffer[0..<i]
+      return AnySequence([s0, s1].joined())
     }
     return AnySequence(ringBuffer)
   }
@@ -915,7 +1004,7 @@ extension Sequence {
   /// Returns a value less than or equal to the number of elements in
   /// the sequence, nondestructively.
   ///
-  /// - Complexity: O(N).
+  /// - Complexity: O(*n*)
   public var underestimatedCount: Int {
     return 0
   }
@@ -976,16 +1065,26 @@ internal enum _StopIteration : Error {
 
 extension Sequence {
   /// Returns the first element of the sequence that satisfies the given
-  /// predicate or nil if no such element is found.
+  /// predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
-  ///   sequence as its argument and returns a Boolean value indicating
-  ///   whether the element is a match.
-  /// - Returns: The first match or `nil` if there was no match.
+  /// The following example uses the `first(where:)` method to find the first
+  /// negative number in an array of integers:
+  ///
+  ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
+  ///     if let firstNegative = numbers.first(where: { $0 < 0 }) {
+  ///         print("The first negative number is \(firstNegative).")
+  ///     }
+  ///     // Prints "The first negative number is -2."
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence as
+  ///   its argument and returns a Boolean value indicating whether the
+  ///   element is a match.
+  /// - Returns: The first element of the sequence that satisfies `predicate`,
+  ///   or `nil` if there is no element that satisfies `predicate`.
   public func first(
     where predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
-    var foundElement: Iterator.Element? = nil
+    var foundElement: Iterator.Element?
     do {
       try self.forEach {
         if try predicate($0) {
@@ -1128,6 +1227,37 @@ extension Sequence where
     }
     return AnySequence(result)
   }
+  
+  /// Returns a subsequence by skipping the initial, consecutive elements that
+  /// satisfy the given predicate.
+  ///
+  /// The following example uses the `drop(while:)` method to skip over the
+  /// positive numbers at the beginning of the `numbers` array. The result
+  /// begins with the first element of `numbers` that does not satisfy
+  /// `predicate`.
+  ///
+  ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
+  ///     let startingWithNegative = numbers.drop(while: { $0 > 0 })
+  ///     // startingWithNegative == [-2, 9, -6, 10, 1]
+  ///
+  /// If `predicate` matches every element in the sequence, the result is an
+  /// empty sequence.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence as
+  ///   its argument and returns a Boolean value indicating whether the
+  ///   element should be included in the result.
+  /// - Returns: A subsequence starting after the initial, consecutive elements
+  ///   that satisfy `predicate`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - SeeAlso: `prefix(while:)`
+  public func drop(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> AnySequence<Iterator.Element> {
+    return try AnySequence(
+      _DropWhileSequence(
+        iterator: makeIterator(), nextElement: nil, predicate: predicate))
+  }
 
   /// Returns a subsequence, up to the specified maximum length, containing the
   /// initial elements of the sequence.
@@ -1154,6 +1284,43 @@ extension Sequence where
     }
     return AnySequence(
       _PrefixSequence(_iterator: makeIterator(), maxLength: maxLength))
+  }
+  
+  /// Returns a subsequence containing the initial, consecutive elements that
+  /// satisfy the given predicate.
+  ///
+  /// The following example uses the `prefix(while:)` method to find the
+  /// positive numbers at the beginning of the `numbers` array. Every element
+  /// of `numbers` up to, but not including, the first negative value is
+  /// included in the result.
+  ///
+  ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
+  ///     let positivePrefix = numbers.prefix(while: { $0 > 0 })
+  ///     // positivePrefix == [3, 7, 4]
+  ///
+  /// If `predicate` matches every element in the sequence, the resulting
+  /// sequence contains every element of the sequence.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence as
+  ///   its argument and returns a Boolean value indicating whether the
+  ///   element should be included in the result.
+  /// - Returns: A subsequence of the initial, consecutive elements that
+  ///   satisfy `predicate`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - SeeAlso: `drop(while:)`
+  public func prefix(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> AnySequence<Iterator.Element> {
+    var result: [Iterator.Element] = []
+
+    for element in self {
+      guard try predicate(element) else {
+        break
+      }
+      result.append(element)
+    }
+    return AnySequence(result)
   }
 }
 
@@ -1182,8 +1349,7 @@ extension Sequence {
   /// Returns a subsequence containing all but the last element of the
   /// sequence.
   ///
-  /// The sequence must be finite. If the sequence has no elements, the result
-  /// is an empty subsequence.
+  /// The sequence must be finite. 
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
   ///     print(numbers.dropLast())
@@ -1202,19 +1368,30 @@ extension Sequence {
 }
 
 extension Sequence {
-  @discardableResult
+  /// Copies `self` into the supplied buffer.
+  ///
+  /// - Precondition: The memory in `self` is uninitialized. The buffer must
+  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
+  ///
+  /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
+  ///   initialized.
   public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Iterator.Element>
-  ) -> UnsafeMutablePointer<Iterator.Element> {
-    var p = UnsafeMutablePointer<Iterator.Element>(ptr)
-    for x in IteratorSequence(self.makeIterator()) {
-      p.initialize(to: x)
-      p += 1
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+      var it = self.makeIterator()
+      guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
+      for idx in buffer.startIndex..<buffer.count {
+        guard let x = it.next() else {
+          return (it, idx)
+        }
+        ptr.initialize(to: x)
+        ptr += 1
+      }
+      return (it,buffer.endIndex)
     }
-    return p
-  }
 }
 
+// FIXME(ABI)#182
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,
 // pass an IteratorProtocol through IteratorSequence to give it "Sequence-ness"
 /// A sequence built around an iterator of type `Base`.
@@ -1257,12 +1434,12 @@ extension Sequence {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, message: "it became a property 'underestimatedCount'")
+  @available(*, unavailable, renamed: "getter:underestimatedCount()")
   public func underestimateCount() -> Int {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, message: "call 'split(maxSplits:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  @available(*, unavailable, message: "call 'split(maxSplits:omittingEmptySubsequences:whereSeparator:)' and invert the 'allowEmptySlices' argument")
   public func split(_ maxSplit: Int, allowEmptySlices: Bool,
     isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {

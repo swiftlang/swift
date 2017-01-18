@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // C Primitive Types
@@ -43,10 +43,18 @@ public typealias CShort = Int16
 public typealias CInt = Int32
 
 /// The C 'long' type.
+#if os(Windows) && !CYGWIN && arch(x86_64)
+public typealias CLong = Int32
+#else
 public typealias CLong = Int
+#endif
 
 /// The C 'long long' type.
+#if os(Windows) && !CYGWIN && arch(x86_64)
+public typealias CLongLong = Int
+#else
 public typealias CLongLong = Int64
+#endif
 
 /// The C 'float' type.
 public typealias CFloat = Float
@@ -78,6 +86,7 @@ public typealias CBool = Bool
 /// cannot be represented in Swift, such as incomplete struct types.
 @_fixed_layout
 public struct OpaquePointer : Hashable {
+  @_versioned
   internal var _rawValue: Builtin.RawPointer
 
   @_versioned

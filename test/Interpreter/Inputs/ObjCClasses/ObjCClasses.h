@@ -98,6 +98,11 @@ NS_ASSUME_NONNULL_BEGIN
 + (unsigned) count;
 @end
 
+@interface TestingBool : NSObject
+- (void) shouldBeTrueObjCBool: (BOOL)value;
+- (void) shouldBeTrueCBool: (_Bool)value;
+@end
+
 NS_ASSUME_NONNULL_END
 
 #endif

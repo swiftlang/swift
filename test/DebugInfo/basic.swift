@@ -2,29 +2,29 @@
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info by default.
 // RUN: %target-swift-frontend %s -emit-ir -o - \
-// RUN:   | FileCheck %s --check-prefix NDEBUG
+// RUN:   | %FileCheck %s --check-prefix NDEBUG
 // NDEBUG-NOT: !dbg
 // NDEBUG-NOT: DW_TAG
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info with -gnone.
 // RUN: %target-swift-frontend %s -emit-ir -gnone -o - \
-// RUN:   | FileCheck %s --check-prefix NDEBUG
+// RUN:   | %FileCheck %s --check-prefix NDEBUG
 // --------------------------------------------------------------------
 // Verify that we don't emit any type info with -gline-tables-only.
 // RUN: %target-swift-frontend %s -emit-ir -gline-tables-only -o - \
-// RUN:   | FileCheck %s --check-prefix CHECK-LINETABLES
+// RUN:   | %FileCheck %s --check-prefix CHECK-LINETABLES
 // CHECK: !dbg
 // CHECK-LINETABLES-NOT: DW_TAG_{{.*}}variable
 // CHECK-LINETABLES-NOT: DW_TAG_structure_type
 // CHECK-LINETABLES-NOT: DW_TAG_basic_type
 // --------------------------------------------------------------------
 // Now check that we do generate line+scope info with -g.
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend %s -emit-ir -g -o - -disable-sil-linking \
-// RUN:   | FileCheck %s --check-prefix=CHECK-NOSIL
+// RUN:   | %FileCheck %s --check-prefix=CHECK-NOSIL
 // --------------------------------------------------------------------
 // Currently -gdwarf-types should give the same results as -g.
-// RUN: %target-swift-frontend %s -emit-ir -gdwarf-types -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -gdwarf-types -o - | %FileCheck %s
 // --------------------------------------------------------------------
 //
 // CHECK: foo
@@ -81,7 +81,7 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
 // CHECK-DAG: ![[MAINMODULE]] = !DIModule({{.*}}, name: "basic"
 
 // DWARF Version
-// CHECK-DAG:  i32 2, !"Dwarf Version", i32 3}
+// CHECK-DAG:  i32 2, !"Dwarf Version", i32 4}
 
 // Debug Info Version
 // CHECK-DAG:  i32 2, !"Debug Info Version", i32

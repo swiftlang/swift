@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class C : Hashable {
 	var x = 0
@@ -32,9 +32,7 @@ setD = setC as! Set<D>
 if let setD = setC as? Set<D> { }
 
 // Test set downcasts to unrelated types.
-setC as! Set<U> // expected-error{{'U' is not a subtype of 'C'}}
-// expected-note @-1 {{in cast from type 'Set<C>' to 'Set<U>'}}
+_ = setC as! Set<U> // expected-warning{{cast from 'Set<C>' to unrelated type 'Set<U>' always fails}}
 
 // Test set conditional downcasts to unrelated types
-if let setU = setC as? Set<U> { } // expected-error{{'U' is not a subtype of 'C'}}
-// expected-note @-1 {{in cast from type 'Set<C>' to 'Set<U>'}}
+if let setU = setC as? Set<U> { } // expected-warning{{cast from 'Set<C>' to unrelated type 'Set<U>' always fails}}

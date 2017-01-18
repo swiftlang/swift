@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialize %s | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -closure-specialize %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -229,7 +229,7 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %12 = partial_apply %10(%9) : $@convention(thin) (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
   %13 = partial_apply %10(%1, %9) : $@convention(thin) (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
   %14 = partial_apply %10(%9, %1, %9) : $@convention(thin) (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
-  
+
   %16 = function_ref @indirect_parameter_partial_apply_caller1 : $@convention(thin) (@callee_owned (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1) -> ()
   %17 = function_ref @indirect_parameter_partial_apply_caller2 : $@convention(thin) (@callee_owned (@in Builtin.Int1, Builtin.Int1) -> @out Builtin.Int1) -> ()
   %18 = function_ref @indirect_parameter_partial_apply_caller3 : $@convention(thin) (@callee_owned (@in Builtin.Int1) -> @out Builtin.Int1) -> ()

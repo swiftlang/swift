@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -module-name test -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -module-name test -g -o - | %FileCheck %s
 // REQUIRES: CPU=x86_64
 sil_stage canonical
 

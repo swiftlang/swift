@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -97,7 +97,7 @@ public struct EnumerateTest {
 public struct FilterTest {
   public let expected: [Int]
   public let sequence: [Int]
-  public let includeElement: @escaping (Int) -> Bool
+  public let includeElement: (Int) -> Bool
   public let loc: SourceLoc
 
   public init(
@@ -136,10 +136,54 @@ public struct FindTest {
   }
 }
 
+public struct CollectionBinaryOperationTest {
+  public let expected: [MinimalEquatableValue]
+  public let lhs: [MinimalEquatableValue]
+  public let rhs: [MinimalEquatableValue]
+  public let loc: SourceLoc
+
+  public init(
+    expected: [Int], lhs: [Int], rhs: [Int],
+    file: String = #file, line: UInt = #line
+  ) {
+    self.expected = expected.enumerated().map {
+      return MinimalEquatableValue($1, identity: $0) 
+    }
+    self.lhs = lhs.map {
+      return MinimalEquatableValue($0, identity: $0) 
+    }
+    self.rhs = rhs.map {
+      return MinimalEquatableValue($0, identity: $0) 
+    }
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+public struct CollectionPredicateTest {
+  public let expected: Bool
+  public let lhs: [MinimalEquatableValue]
+  public let rhs: [MinimalEquatableValue]
+  public let loc: SourceLoc
+
+  public init(
+    expected: Bool, lhs: [Int], rhs: [Int],
+    file: String = #file, line: UInt = #line
+  ) {
+    self.expected = expected
+    self.lhs = lhs.enumerated().map {
+      return MinimalEquatableValue($1, identity: $0) 
+    }
+    self.rhs = rhs.enumerated().map {
+      return MinimalEquatableValue($1, identity: $0) 
+    }
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
 public struct FlatMapTest {
   public let expected: [Int32]
   public let sequence: [Int]
-  public let transform: @escaping (Int) -> [Int32]
+  public let transform: (Int) -> [Int32]
   public let loc: SourceLoc
 
   public init(
@@ -158,7 +202,7 @@ public struct FlatMapTest {
 public struct FlatMapToOptionalTest {
   public let expected: [Int32]
   public let sequence: [Int]
-  public let transform: @escaping (Int) -> Int32?
+  public let transform: (Int) -> Int32?
   public let loc: SourceLoc
 
   public init(
@@ -224,7 +268,7 @@ public struct LexicographicallyPrecedesTest {
 public struct MapTest {
   public let expected: [Int32]
   public let sequence: [Int]
-  public let transform: @escaping (Int) -> Int32
+  public let transform: (Int) -> Int32
   public let loc: SourceLoc
 
   public init(
@@ -416,11 +460,11 @@ public let enumerateTests = [
 public let filterTests = [
   FilterTest(
     [], [],
-    { (x: Int) -> Bool in expectUnreachable(); return true }),
+    { _ -> Bool in expectUnreachable(); return true }),
 
-  FilterTest([], [ 0, 30, 10, 90 ], { (x: Int) -> Bool in false }),
+  FilterTest([], [ 0, 30, 10, 90 ], { _ -> Bool in false }),
   FilterTest(
-    [ 0, 30, 10, 90 ], [ 0, 30, 10, 90 ], { (x: Int) -> Bool in true }
+    [ 0, 30, 10, 90 ], [ 0, 30, 10, 90 ], { _ -> Bool in true }
   ),
   FilterTest(
     [ 0, 30, 90 ], [ 0, 30, 10, 90 ], { (x: Int) -> Bool in x % 3 == 0 }
@@ -489,6 +533,32 @@ public let findTests = [
     expectedLeftoverSequence: [ 3030, 2020, 4040 ]),
 ]
 
+public let unionTests = [
+  CollectionBinaryOperationTest(expected: [1, 2, 3, 4, 5], lhs: [1, 3, 5], rhs: [2, 4]),
+  CollectionBinaryOperationTest(expected: [3, 5], lhs: [3], rhs: [5])
+]
+
+public let intersectionTests = [
+  CollectionBinaryOperationTest(expected: [1, 5], lhs: [1, 3, 5], rhs: [1, 2, 5])
+]
+
+public let symmetricDifferenceTests = [
+  CollectionBinaryOperationTest(expected: [1, 3, 5], lhs: [1, 2, 3, 4], rhs: [2, 4, 5])
+]
+
+public let subtractTests = [
+  CollectionBinaryOperationTest(expected: [1, 3], lhs: [1, 2, 3, 4], rhs: [2, 4, 5])
+]
+
+public let subtractingTests = [
+  CollectionBinaryOperationTest(expected: [1, 3, 4], lhs: [1, 2, 3, 4, 5], rhs: [2, 5, 6, 7])
+]
+
+public let strictSupersetTests = [
+  CollectionPredicateTest(expected: true, lhs: [1, 2, 3, 4, 5, 6], rhs: [1, 2, 3, 4]),
+  CollectionPredicateTest(expected: false, lhs: [1, 2], rhs: [1, 2, 4])
+]
+
 /// For a number of form `NNN_MMM`, returns an array of `NNN` numbers that all
 /// have `MMM` as their last three digits.
 func flatMapTransformation(_ x: Int) -> [Int32] {
@@ -502,7 +572,7 @@ public let flatMapTests = [
   FlatMapTest(
     expected: [],
     sequence: [],
-    transform: { (x: Int) -> [Int32] in
+    transform: { _ -> [Int32] in
       expectUnreachable()
       return [ 0xffff ]
     }),
@@ -510,15 +580,15 @@ public let flatMapTests = [
   FlatMapTest(
     expected: [],
     sequence: [ 1 ],
-    transform: { (x: Int) -> [Int32] in [] }),
+    transform: { _ -> [Int32] in [] }),
   FlatMapTest(
     expected: [],
     sequence: [ 1, 2 ],
-    transform: { (x: Int) -> [Int32] in [] }),
+    transform: { _ -> [Int32] in [] }),
   FlatMapTest(
     expected: [],
     sequence: [ 1, 2, 3 ],
-    transform: { (x: Int) -> [Int32] in [] }),
+    transform: { _ -> [Int32] in [] }),
 
   FlatMapTest(
     expected: [ 101 ],
@@ -589,11 +659,11 @@ public let flatMapTests = [
 public let flatMapToOptionalTests = [
   FlatMapToOptionalTest(
     [], [],
-    { (x: Int) -> Int32? in expectUnreachable(); return 0xffff }),
+    { _ -> Int32? in expectUnreachable(); return 0xffff }),
 
-  FlatMapToOptionalTest([], [ 1 ], { (x: Int) -> Int32? in nil }),
-  FlatMapToOptionalTest([], [ 1, 2 ], { (x: Int) -> Int32? in nil }),
-  FlatMapToOptionalTest([], [ 1, 2, 3 ], { (x: Int) -> Int32? in nil }),
+  FlatMapToOptionalTest([], [ 1 ], { _ -> Int32? in nil }),
+  FlatMapToOptionalTest([], [ 1, 2 ], { _ -> Int32? in nil }),
+  FlatMapToOptionalTest([], [ 1, 2, 3 ], { _ -> Int32? in nil }),
 
   FlatMapToOptionalTest(
     [ 1 ], [ 1 ],
@@ -718,7 +788,7 @@ public let lexicographicallyPrecedesTests = [
 public let mapTests = [
   MapTest(
     [], [],
-    { (x: Int) -> Int32 in expectUnreachable(); return 0xffff }),
+    { _ -> Int32 in expectUnreachable(); return 0xffff }),
 
   MapTest([ 101 ], [ 1 ], { (x: Int) -> Int32 in x + 100 }),
   MapTest([ 101, 102 ], [ 1, 2 ], { (x: Int) -> Int32 in x + 100 }),
@@ -1458,11 +1528,14 @@ extension TestSuite {
 
     makeSequenceOfEquatable: @escaping ([SequenceWithEquatableElement.Iterator.Element]) -> SequenceWithEquatableElement,
     wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> SequenceWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) where
     SequenceWithEquatableElement.Iterator.Element : Equatable,
+    SequenceWithEquatableElement.SubSequence : Sequence,
+    SequenceWithEquatableElement.SubSequence.Iterator.Element
+      == SequenceWithEquatableElement.Iterator.Element,
     S.SubSequence : Sequence,
     S.SubSequence.Iterator.Element == S.Iterator.Element,
     S.SubSequence.SubSequence == S.SubSequence {
@@ -1616,6 +1689,25 @@ self.test("\(testNamePrefix).dropLast/semantics/negative") {
 }
 
 //===----------------------------------------------------------------------===//
+// drop(while:)
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).drop(while:)/semantics").forEach(in: findTests) {
+  test in
+  let s = makeWrappedSequenceWithEquatableElement(test.sequence)
+  let closureLifetimeTracker = LifetimeTracked(0)
+  let remainingSequence = s.drop {
+    _blackHole(closureLifetimeTracker)
+    return $0 != wrapValueIntoEquatable(test.element)
+  }
+  let remaining = Array(remainingSequence)
+  let expectedSuffix = test.sequence.suffix(
+    from: test.expected ?? test.sequence.endIndex)
+  expectEqual(expectedSuffix.count, remaining.count)
+  expectEqualSequence(expectedSuffix.map(wrapValueIntoEquatable), remaining)
+}
+
+//===----------------------------------------------------------------------===//
 // prefix()
 //===----------------------------------------------------------------------===//
 
@@ -1652,6 +1744,25 @@ self.test("\(testNamePrefix).prefix/semantics/negative") {
   let s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
   _ = s.prefix(-1)
+}
+
+//===----------------------------------------------------------------------===//
+// prefix(while:)
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).prefix(while:)/semantics").forEach(in: findTests) {
+  test in
+  let s = makeWrappedSequenceWithEquatableElement(test.sequence)
+  let closureLifetimeTracker = LifetimeTracked(0)
+  let remainingSequence = s.prefix {
+    _blackHole(closureLifetimeTracker)
+    return $0 != wrapValueIntoEquatable(test.element)
+  }
+  let expectedPrefix = test.sequence.prefix(
+    upTo: test.expected ?? test.sequence.endIndex)
+  let remaining = Array(remainingSequence)
+  expectEqual(expectedPrefix.count, remaining.count)
+  expectEqualSequence(expectedPrefix.map(wrapValueIntoEquatable), remaining)
 }
 
 //===----------------------------------------------------------------------===//
@@ -1792,7 +1903,7 @@ self.test("\(testNamePrefix).first/semantics") {
       stackTrace: SourceLocStack().with(test.loc))
     if let expectedIdentity = test.expected {
       expectEqual(
-        test.expected, extractValueFromEquatable(found!).identity,
+        expectedIdentity, extractValueFromEquatable(found!).identity,
         "find() should find only the first element matching its predicate")
     }
   }
@@ -1819,25 +1930,25 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
     if wasInvoked {
       expectOptionalEqual(42, result?.value)
     } else {
-      expectEmpty(result)
+      expectNil(result)
     }
   }
 
   for test in forEachTests {
     let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
     var wasInvoked = false
-    var caughtError: Error? = nil
-    var result: OpaqueValue<Int>? = nil
+    var caughtError: Error?
+    var result: OpaqueValue<Int>?
     do {
       result = try s._preprocessingPass {
-        (sequence) -> OpaqueValue<Int> in
+        _ -> OpaqueValue<Int> in
         wasInvoked = true
         throw TestError.error2
       }
     } catch {
       caughtError = error
     }
-    expectEmpty(result)
+    expectNil(result)
     if wasInvoked {
       expectOptionalEqual(TestError.error2, caughtError as? TestError)
     }

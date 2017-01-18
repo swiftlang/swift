@@ -3,11 +3,11 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ----------------------------------------------------------------------------
 #
@@ -20,12 +20,13 @@ import bisect
 import re
 import subprocess
 import sys
+import os
 
 line_pattern = re.compile(
     r'^// ###sourceLocation\(file:\s*"([^"]+)",\s*line:\s*([0-9]+)\s*\)')
 
 
-def _make_line_map(filename, stream=None):
+def _make_line_map(target_filename, stream=None):
     """
     >>> from StringIO import StringIO
     >>> _make_line_map('box',
@@ -39,8 +40,8 @@ def _make_line_map(filename, stream=None):
     ... '''))
     [(0, 'box', 1), (1, 'foo.bar', 3), (5, 'baz.txt', 20)]
     """
-    result = [(0, filename, 1)]
-    input = stream or open(filename)
+    result = [(0, target_filename, 1)]
+    input = stream or open(target_filename)
     for i, l in enumerate(input.readlines()):
         m = line_pattern.match(l)
         if m:
@@ -50,66 +51,250 @@ def _make_line_map(filename, stream=None):
 _line_maps = {}
 
 
-def fline_map(filename):
-    map = _line_maps.get(filename)
+def fline_map(target_filename):
+    map = _line_maps.get(target_filename)
     if map is None:
-        map = _make_line_map(filename)
-        _line_maps[filename] = map
+        map = _make_line_map(target_filename)
+        _line_maps[target_filename] = map
     return map
 
-
-def map_line(filename, line_num):
-    assert(line_num > 0)
-    map = fline_map(filename)
-    index = bisect.bisect_left(map, (line_num, '', 0))
+def map_line_to_source_file(target_filename, target_line_num):
+    """
+    >>> from tempfile import *
+    >>> t = NamedTemporaryFile()
+    >>> t.write('''line 1
+    ... line 2
+    ... // ###sourceLocation(file: "foo.bar", line: 20)
+    ... line 4
+    ... line 5
+    ... // ###sourceLocation(file: "baz.txt", line: 5)
+    ... line 7
+    ... line 8
+    ... ''')
+    >>> t.flush()
+    >>> (t2, l) = map_line_to_source_file(t.name, 1)
+    >>> t2 == t.name, l
+    (True, 1)
+    >>> (t2, l) = map_line_to_source_file(t.name, 2)
+    >>> t2 == t.name, l
+    (True, 2)
+    >>> (t2, l) = map_line_to_source_file(t.name, 3)
+    >>> t2 == t.name, l
+    (True, 3)
+    >>> map_line_to_source_file(t.name, 4)
+    ('foo.bar', 20)
+    >>> map_line_to_source_file(t.name, 5)
+    ('foo.bar', 21)
+    >>> map_line_to_source_file(t.name, 6)
+    ('foo.bar', 22)
+    >>> map_line_to_source_file(t.name, 7)
+    ('baz.txt', 5)
+    >>> map_line_to_source_file(t.name, 8)
+    ('baz.txt', 6)
+    >>> map_line_to_source_file(t.name, 42)
+    ('baz.txt', 40)
+    """
+    assert(target_line_num > 0)
+    map = fline_map(target_filename)
+    index = bisect.bisect_left(map, (target_line_num, '', 0))
     base = map[index - 1]
-    return base[1], base[2] + (line_num - base[0] - 1)
+    return base[1], base[2] + (target_line_num - base[0] - 1)
 
+def map_line_from_source_file(source_filename, source_line_num, target_filename):
+    """
+    >>> from tempfile import *
+    >>> t = NamedTemporaryFile()
+    >>> t.write('''line 1
+    ... line 2
+    ... // ###sourceLocation(file: "foo.bar", line: 20)
+    ... line 4
+    ... line 5
+    ... // ###sourceLocation(file: "baz.txt", line: 5)
+    ... line 7
+    ... line 8
+    ... ''')
+    >>> t.flush()
+    >>> map_line_from_source_file(t.name, 1, t.name)
+    1
+    >>> map_line_from_source_file(t.name, 2, t.name)
+    2
+    >>> map_line_from_source_file(t.name, 3, t.name)
+    3
+    >>> try: map_line_from_source_file(t.name, 4, t.name)
+    ... except RuntimeError: pass
+    >>> try: map_line_from_source_file('foo.bar', 19, t.name)
+    ... except RuntimeError: pass
+    >>> map_line_from_source_file('foo.bar', 20, t.name)
+    4
+    >>> map_line_from_source_file('foo.bar', 21, t.name)
+    5
+    >>> map_line_from_source_file('foo.bar', 22, t.name)
+    6
+    >>> try: map_line_from_source_file('foo.bar', 23, t.name)
+    ... except RuntimeError: pass
+    >>> map_line_from_source_file('baz.txt', 5, t.name)
+    7
+    >>> map_line_from_source_file('baz.txt', 6, t.name)
+    8
+    >>> map_line_from_source_file('baz.txt', 33, t.name)
+    35
+    >>> try: map_line_from_source_file(t.name, 33, t.name)
+    ... except RuntimeError: pass
+    >>> try: map_line_from_source_file('foo.bar', 2, t.name)
+    ... except RuntimeError: pass
+    """
+    assert(source_line_num > 0)
+    map = fline_map(target_filename)
+
+    for i, (target_line_num, found_source_filename, found_source_line_num) in enumerate(map):
+        if found_source_filename != source_filename: continue
+        if found_source_line_num > source_line_num: continue
+        result = target_line_num + (source_line_num - found_source_line_num)
+        if i + 1 == len(map) or map[i + 1][0] > result:
+            return result + 1
+    raise RuntimeError("line not found")
 
 def run():
+    """Simulate a couple of gyb-generated files
+
+    >>> from tempfile import *
+    >>> target1 = NamedTemporaryFile()
+    >>> target1.write('''line 1
+    ... line 2
+    ... // ###sourceLocation(file: "foo.bar", line: 20)
+    ... line 4
+    ... line 5
+    ... // ###sourceLocation(file: "baz.txt", line: 5)
+    ... line 7
+    ... line 8
+    ... ''')
+    >>> target1.flush()
+    >>> target2 = NamedTemporaryFile()
+    >>> target2.write('''// ###sourceLocation(file: "foo.bar", line: 7)
+    ... line 2
+    ... line 3
+    ... // ###sourceLocation(file: "fox.box", line: 11)
+    ... line 5
+    ... line 6
+    ... ''')
+    >>> target2.flush()
+
+    Simulate the raw output of compilation
+
+    >>> raw_output = NamedTemporaryFile()
+    >>> target1_name, target2_name = target1.name, target2.name
+    >>> raw_output.write('''A
+    ... %(target1_name)s:2:111: error one
+    ... B
+    ... %(target1_name)s:4:222: error two
+    ... C
+    ... %(target1_name)s:8:333: error three
+    ... D
+    ... glitch in file %(target2_name)s:1 assert one
+    ... E
+    ... glitch in file %(target2_name)s, line 2 assert two
+    ... glitch at %(target2_name)s, line 3 assert three
+    ... glitch at %(target2_name)s:4 assert four
+    ... glitch in [%(target2_name)s, line 5 assert five
+    ... glitch in [%(target2_name)s:22 assert six
+    ... ''' % locals())
+    >>> raw_output.flush()
+
+    Run this tool on the two targets, using a portable version of Unix 'cat' to
+    dump the output file.
+
+    >>> import subprocess
+    >>> output = subprocess.check_output([
+    ...    __file__, target1.name, target2.name, '--', 
+    ...    sys.executable, '-c', 
+    ...   'import sys;sys.stdout.write(open(sys.argv[1]).read())', raw_output.name])
+
+    Replace temporary filenames and check it.
+
+    >>> print output.replace(target1.name,'TARGET1-NAME').replace(target2.name,'TARGET2-NAME') + 'EOF'
+    A
+    TARGET1-NAME:2:111: error one
+    B
+    foo.bar:20:222: error two
+    C
+    baz.txt:6:333: error three
+    D
+    glitch in file TARGET2-NAME:1 assert one
+    E
+    glitch in file foo.bar, line 7 assert two
+    glitch at foo.bar, line 8 assert three
+    glitch at foo.bar:9 assert four
+    glitch in [fox.box, line 11 assert five
+    glitch in [fox.box:28 assert six
+    EOF
+    >>> print subprocess.check_output([__file__, 'foo.bar', '21', target1.name]),
+    5
+    >>> print subprocess.check_output([__file__, 'foo.bar', '8', target2.name]),
+    3
+
+    """
     if len(sys.argv) <= 1:
         import doctest
         doctest.testmod()
+    elif '--' not in sys.argv:
+        source_file = sys.argv[1]
+        source_line = int(sys.argv[2])
+        target_file = sys.argv[3]
+        print(map_line_from_source_file(source_file, source_line, target_file))
     else:
         dashes = sys.argv.index('--')
         sources = sys.argv[1:dashes]
 
+        # The first argument of command_args is the process to open.
+        # subprocess.Popen doesn't normalise arguments. This means that trying
+        # to open a non-normalised file (e.g. C:/swift/./bin/swiftc.exe) on
+        # Windows results in file/directory not found errors, as Popen delegates
+        # to the Win32 CreateProcess API. Unix systems handle non-normalised
+        # paths, so don't have this problem.
+        # Arguments passed to the process are normalised by the process.
+        command_args = sys.argv[dashes + 1:]
+        command_args[0] = os.path.normpath(command_args[0])
+
         command = subprocess.Popen(
-            sys.argv[dashes + 1:],
+            command_args,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
             universal_newlines=True
         )
 
+        sources = '(?P<file>' + '|'.join(re.escape(s) for s in sources) + ')'
+
         error_pattern = re.compile(
-            '^(?P<file>' + '|'.join(re.escape(s) for s in sources) +
-            '):(?P<line>[0-9]+):(?P<column>[0-9]+):(?P<tail>.*)')
+            '^' + sources + ':(?P<line>[0-9]+):(?P<column>[0-9]+):(?P<tail>.*?)\n?$')
 
         assertion_pattern = re.compile(
-            '^(?P<head>.*( file | at |#[0-9]+: |[[]))(?P<file>' +
-            '|'.join(re.escape(s) for s in sources) +
-            ')(?P<middle>, line |:)(?P<line>[0-9]+)(?P<tail>.*)')
+            '^(?P<head>.*( file | at |#[0-9]+: |[[]))' +
+            sources +
+            '(?P<middle>, line |:)(?P<line>[0-9]+)(?P<tail>.*?)\n?$')
 
         while True:
-            line = command.stdout.readline()
-            if line == '':
+            input = command.stdout.readline()
+            if input == '':
                 break
-            l = line.rstrip('\n')
-            m = error_pattern.match(l)
-            if m:
-                file, line_num = map_line(m.group('file'),
-                                          int(m.group('line')))
-                line = '%s:%s:%s:%s\n' % (
+            output = input
+
+            def decode_match(p, l):
+                m = p.match(l)
+                if m is None: return ()
+                file, line_num = map_line_to_source_file(
+                    m.group('file'), int(m.group('line')))
+                return ((m, file, line_num),)
+                
+            for (m, file, line_num) in decode_match(error_pattern, input):
+                output = '%s:%s:%s:%s\n' % (
                     file, line_num, int(m.group(3)), m.group(4))
-            else:
-                m = assertion_pattern.match(l)
-                if m:
-                    file, line_num = map_line(m.group('file'),
-                                              int(m.group('line')))
-                    line = '%s%s%s%s%s\n' % (
+                break
+            else: 
+                for (m, file, line_num) in decode_match(assertion_pattern, input):
+                    output = '%s%s%s%s%s\n' % (
                         m.group('head'), file, m.group('middle'), line_num,
                         m.group('tail'))
-            sys.stdout.write(line)
+            sys.stdout.write(output)
 
         sys.exit(command.wait())
 

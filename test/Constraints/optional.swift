@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: objc_interop
 
@@ -66,13 +66,13 @@ func test5() -> Int? {
 func test6<T>(_ x : T) {
   // FIXME: this code should work; T could be Int? or Int??
   // or something like that at runtime.  rdar://16374053
-  let y = x as? Int? // expected-error {{cannot downcast from 'T' to a more optional type 'Int?'}}
+  _ = x as? Int? // expected-error {{cannot downcast from 'T' to a more optional type 'Int?'}}
 }
 
 class B : A { }
 
 func test7(_ x : A) {
-  let y = x as? B? // expected-error{{cannot downcast from 'A' to a more optional type 'B?'}}
+  _ = x as? B? // expected-error{{cannot downcast from 'A' to a more optional type 'B?'}}
 }
 
 func test8(_ x : AnyObject?) {
@@ -118,4 +118,63 @@ func testVoidOptional() {
 
   let optNoop: (()?) -> ()? = { return $0 }
   voidOptional(optNoop)
+}
+
+func testTernaryWithNil(b: Bool, s: String, i: Int) {
+  let t1 = b ? s : nil
+  let _: Double = t1 // expected-error{{value of type 'String?'}}
+  let t2 = b ? nil : i
+  let _: Double = t2 // expected-error{{value of type 'Int?'}}
+  let t3 = b ? "hello" : nil
+  let _: Double = t3 // expected-error{{value of type 'String?'}}
+  let t4 = b ? nil : 1
+  let _: Double = t4 // expected-error{{value of type 'Int?'}}
+}
+
+// inference with IUOs
+infix operator ++++
+
+protocol PPPP {
+  static func ++++(x: Self, y: Self) -> Bool
+}
+
+func compare<T: PPPP>(v: T, u: T!) -> Bool {
+  return v ++++ u
+}
+
+func sr2752(x: String?, y: String?) {
+  _ = x.map { xx in
+    y.map { _ in "" } ?? "\(xx)"
+  }
+}
+
+// SR-3248 - Invalid diagnostic calling implicitly unwrapped closure
+var sr3248 : ((Int) -> ())!
+sr3248?(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
+sr3248!(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
+sr3248(a: 2)  // expected-error {{extraneous argument label 'a:' in call}}
+
+struct SR_3248 {
+    var callback: (([AnyObject]) -> Void)!
+}
+
+SR_3248().callback?("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+SR_3248().callback!("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+SR_3248().callback("test")  // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+
+_? = nil  // expected-error {{'nil' requires a contextual type}}
+_?? = nil // expected-error {{'nil' requires a contextual type}}
+
+
+// rdar://problem/29993596
+func takeAnyObjects(_ lhs: AnyObject?, _ rhs: AnyObject?) { }
+
+infix operator !====
+
+func !====(_ lhs: AnyObject?, _ rhs: AnyObject?) -> Bool { return false }
+
+func testAnyObjectImplicitForce(lhs: AnyObject?!, rhs: AnyObject?) {
+  if lhs !==== rhs { }
+
+  takeAnyObjects(lhs, rhs)
 }

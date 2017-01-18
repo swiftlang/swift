@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -62,10 +62,13 @@ public extension NSGradient {
 
 // Fix the ARGV type of NSApplicationMain, which nonsensically takes
 // argv as a const char**.
-@_silgen_name("NSApplicationMain")
 public func NSApplicationMain(
   _ argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
-) -> Int32
+) -> Int32 {
+  return argv.withMemoryRebound(to: UnsafePointer<CChar>.self, capacity: Int(argc)) {
+    __NSApplicationMain(argc, $0)
+  }
+}
 
 extension NSColor : _ExpressibleByColorLiteral {
   public required convenience init(colorLiteralRed red: Float, green: Float,

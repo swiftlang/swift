@@ -7,7 +7,7 @@
         "clang": {
             "remote": { "id": "apple/swift-clang" } },
         "swift": {
-            "remote": { "id": "apple/swift-swift" } },
+            "remote": { "id": "apple/swift" } },
         "lldb": {
             "remote": { "id": "apple/swift-lldb" } },
         "cmark": {
@@ -63,8 +63,26 @@
                 "swift-corelibs-xctest": "master-next",
                 "swift-corelibs-foundation": "master-next",
                 "swift-corelibs-libdispatch": "master-next",
-                "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master"
+                "swift-integration-tests": "master-next",
+                "swift-xcode-playground-support": "master-next"
+            }
+        },
+        "next-upstream" : {
+            "aliases": ["next-upstream"],
+            "repos": {
+                "llvm": "upstream-with-swift",
+                "clang": "upstream-with-swift",
+                "compiler-rt": "upstream-with-swift",
+                "swift": "master-next",
+                "lldb": "upstream",
+                "cmark": "master",
+                "llbuild": "master-next",
+                "swiftpm": "master-next",
+                "swift-corelibs-xctest": "master-next",
+                "swift-corelibs-foundation": "master-next",
+                "swift-corelibs-libdispatch": "master-next",
+                "swift-integration-tests": "master-next",
+                "swift-xcode-playground-support": "master-next"
             }
         },
         "upstream": {
@@ -188,6 +206,24 @@
                 "swift-corelibs-libdispatch": "swift-3.0-branch",
                 "swift-integration-tests": "swift-3.0-branch",
                 "swift-xcode-playground-support": "swift-3.0-branch"
+            }
+        },
+        "swift-3.1-branch" : {
+            "aliases": ["swift-3.1-branch"],
+            "repos": {
+                "llvm": "swift-3.1-branch",
+                "clang": "swift-3.1-branch",
+                "swift": "swift-3.1-branch",
+                "lldb": "swift-3.1-branch",
+                "cmark": "swift-3.1-branch",
+                "llbuild": "swift-3.1-branch",
+                "swiftpm": "swift-3.1-branch",
+                "compiler-rt": "swift-3.1-branch",
+                "swift-corelibs-xctest": "swift-3.1-branch",
+                "swift-corelibs-foundation": "swift-3.1-branch",
+                "swift-corelibs-libdispatch": "swift-3.1-branch",
+                "swift-integration-tests": "swift-3.1-branch",
+                "swift-xcode-playground-support": "swift-3.1-branch"
             }
         }
     }

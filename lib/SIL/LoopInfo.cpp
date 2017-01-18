@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,17 +31,17 @@ void SILLoop::dump() const {
 #endif
 }
 
-SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) {
-  LI.analyze(*DT);
+SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) : Dominance(DT) {
+  LI.analyze(*Dominance);
 }
 
 bool SILLoop::canDuplicate(SILInstruction *I) const {
-  // The dealloc_stack of an alloc_stack must be in the loop, otherwise the
-  // dealloc_stack will be fed by a phi node of two alloc_stacks.
-  if (auto *Alloc = dyn_cast<AllocStackInst>(I)) {
-    for (auto *UI : Alloc->getUses()) {
-      if (auto *Dealloc = dyn_cast<DeallocStackInst>(UI->getUser())) {
-        if (!contains(Dealloc->getParent()))
+  // The deallocation of a stack allocation must be in the loop, otherwise the
+  // deallocation will be fed by a phi node of two allocations.
+  if (I->isAllocatingStack()) {
+    for (auto *UI : I->getUses()) {
+      if (UI->getUser()->isDeallocatingStack()) {
+        if (!contains(UI->getUser()->getParent()))
           return false;
       }
     }
@@ -77,10 +77,10 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
   }
 
   assert(I->isTriviallyDuplicatable() &&
-         "Code here must match isTriviallyDuplicatable in SILInstruction");
+    "Code here must match isTriviallyDuplicatable in SILInstruction");
   return true;
 }
 
 void SILLoopInfo::verify() const {
-  LI.verify();
+  LI.verify(*Dominance);
 }

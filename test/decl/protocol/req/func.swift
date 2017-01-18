@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Test function requirements within protocols, as well as conformance to
 // said protocols.
@@ -23,7 +23,7 @@ struct X1b : P1 {
 protocol P2 {
   associatedtype Assoc : P1 // expected-note{{ambiguous inference of associated type 'Assoc': 'X1a' vs. 'X1b'}}
   // expected-note@-1{{protocol requires nested type 'Assoc'}}
-  func f1(_ x: Assoc) // expected-note{{protocol requires function 'f1' with type '(Assoc) -> ()'}} expected-note{{protocol requires function 'f1' with type '(Assoc) -> ()'}}
+  func f1(_ x: Assoc) // expected-note{{protocol requires function 'f1' with type '(X2w.Assoc) -> ()'}} expected-note{{protocol requires function 'f1' with type '(X2y.Assoc) -> ()'}}
 }
 
 // Exact match.
@@ -88,7 +88,7 @@ prefix operator ~~
 
 protocol P3 {
   associatedtype Assoc : P1
-  static prefix func ~~(_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X3z) -> Assoc'}}
+  static prefix func ~~(_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X3z) -> X3z.Assoc'}}
 }
 
 // Global operator match
@@ -111,7 +111,7 @@ postfix func ~~(_: X3z) -> X1a {} // expected-note{{candidate is postfix, not pr
 postfix operator ~~
 protocol P4 {
   associatedtype Assoc : P1
-  static postfix func ~~ (_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X4z) -> Assoc'}}
+  static postfix func ~~ (_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X4z) -> X4z.Assoc'}}
 }
 
 // Global operator match

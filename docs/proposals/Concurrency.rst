@@ -65,7 +65,9 @@ deallocated class instance.  To understand the bug try to imagine two threads
 executing the SIL code below in lockstep.  After they both load the same value
 they both try to release the object.  One thread succeeds and deallocates the
 object while another thread attempts to read the memory of a deallocated
-object::
+object:
+
+.. code-block:: sil
 
   %10 = global_addr @singleton : $*Bird
 
@@ -78,7 +80,9 @@ object::
 
 Next, we'll look into the problem of sliced values. Intuitively, it is easy to
 see why sharing memory between two threads could lead to catastrophic bugs.
-Consider the program below::
+Consider the program below:
+
+.. code-block:: none
 
   Thread #1:              Thread #2:
    A.first = "John"        A.first = "Paul"
@@ -288,7 +292,7 @@ Streams are the only legitimate channel of communication between threads.
 
 Streams can be shared by multiple tasks. These tasks can read from and write into the stream
 concurrently. Reads from streams that contain no data and writes into full streams
-will be blocked, meaning that the operating system will put the calling thread to sleep and wait for 
+will be blocked, meaning that the operating system will put the calling thread to sleep and wait for
 new data to arrive to wake the sleeping thread.
 This property allows the Stream to be used as a synchronization mechanism.
 
@@ -366,7 +370,7 @@ declaration of the streams in the closure.
 
 Stream utilities
 ----------------
-The Swift library can to implement a few utilities that will allow users and
+The Swift library can implement a few utilities that will allow users and
 library designers to build cool things:
 
 *  The ``Funnel`` class accepts multiple incoming streams and weaves them into a
@@ -644,11 +648,11 @@ length in the previous sections).
 
 The ``accept`` method is executed by a user-space scheduler and not by live
 thread and this allows the system to scale to tens of thousands of active
-actors. 
+actors.
 
 The code below depicts the famous prime numbers sieve program using actors. The
 sieve is made of a long chain of actors that pass messages to one another.
-Finally, a collector actor saves all of the messages into an array. 
+Finally, a collector actor saves all of the messages into an array.
 
 .. code-block:: swift
 

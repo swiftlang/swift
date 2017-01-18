@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,21 +25,42 @@ using ARCBBState = ARCSequenceDataflowEvaluator::ARCBBState;
 
 } // end anonymous namespace
 
+
+//===----------------------------------------------------------------------===//
+//                             Utilities 
+//===----------------------------------------------------------------------===//
+
+/// Return true if this instruction is the epilogue release for the \p Arg.
+/// false otherwise.
+static bool isOwnedArgumentEpilogueRelease(SILInstruction *I, SILValue Arg,
+                                           EpilogueARCFunctionInfo *EAFI) {
+  auto Releases = 
+    EAFI->computeEpilogueARCInstructions(
+            EpilogueARCContext::EpilogueARCKind::Release, Arg);
+  return Releases.size() && Releases.count(I); 
+}
+
+static bool isGuaranteedSafetyByEpilogueRelease(SILInstruction *I, SILValue Arg,
+                                                EpilogueARCFunctionInfo *EAFI) {
+  auto Releases = 
+    EAFI->computeEpilogueARCInstructions(
+            EpilogueARCContext::EpilogueARCKind::Release, Arg);
+  return Releases.size() && !Releases.count(I);
+}
+
 //===----------------------------------------------------------------------===//
 //                      BottomUpRCStateTransitionVisitor
 //===----------------------------------------------------------------------===//
 
 template <class ARCState>
 BottomUpDataflowRCStateVisitor<ARCState>::BottomUpDataflowRCStateVisitor(
-    RCIdentityFunctionInfo *RCFI, ARCState &State,
-    bool FreezeOwnedArgEpilogueReleases,
-    ConsumedArgToEpilogueReleaseMatcher &ERM,
+    RCIdentityFunctionInfo *RCFI, EpilogueARCFunctionInfo *EAFI,
+    ARCState &State, bool FreezeOwnedArgEpilogueReleases,
     IncToDecStateMapTy &IncToDecStateMap,
     ImmutablePointerSetFactory<SILInstruction> &SetFactory)
-    : RCFI(RCFI), DataflowState(State),
+    : RCFI(RCFI), EAFI(EAFI), DataflowState(State),
       FreezeOwnedArgEpilogueReleases(FreezeOwnedArgEpilogueReleases),
-      EpilogueReleaseMatcher(ERM), IncToDecStateMap(IncToDecStateMap),
-      SetFactory(SetFactory) {}
+      IncToDecStateMap(IncToDecStateMap), SetFactory(SetFactory) {}
 
 template <class ARCState>
 typename BottomUpDataflowRCStateVisitor<ARCState>::DataflowResult
@@ -60,16 +81,13 @@ static bool isKnownSafe(BottomUpDataflowRCStateVisitor<ARCState> *State,
   // If we are running with 'frozen' owned arg releases, check if we have a
   // frozen use in the side table. If so, this release must be known safe.
   if (State->FreezeOwnedArgEpilogueReleases)
-    if (auto *OwnedRelease =
-            State->EpilogueReleaseMatcher.getSingleReleaseForArgument(Op))
-      if (I != OwnedRelease)
-        return true;
+    if (isGuaranteedSafetyByEpilogueRelease(I, Op, State->EAFI))
+      return true;
 
   // A guaranteed function argument is guaranteed to outlive the function we are
   // processing. So bottom up for such a parameter, we are always known safe.
-  if (auto *Arg = dyn_cast<SILArgument>(Op)) {
-    if (Arg->isFunctionArg() &&
-        Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed)) {
+  if (auto *Arg = dyn_cast<SILFunctionArgument>(Op)) {
+    if (Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed)) {
       return true;
     }
   }
@@ -77,9 +95,8 @@ static bool isKnownSafe(BottomUpDataflowRCStateVisitor<ARCState> *State,
   // If Op is a load from an in_guaranteed parameter, it is guaranteed as well.
   if (auto *LI = dyn_cast<LoadInst>(Op)) {
     SILValue RCIdentity = State->RCFI->getRCIdentityRoot(LI->getOperand());
-    if (auto *Arg = dyn_cast<SILArgument>(RCIdentity)) {
-      if (Arg->isFunctionArg() &&
-          Arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)) {
+    if (auto *Arg = dyn_cast<SILFunctionArgument>(RCIdentity)) {
+      if (Arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)) {
         return true;
       }
     }
@@ -100,8 +117,7 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
   // If this instruction is a post dominating release, skip it so we don't pair
   // it up with anything. Do make sure that it does not effect any other
   // instructions.
-  if (FreezeOwnedArgEpilogueReleases &&
-      EpilogueReleaseMatcher.isSingleReleaseMatchedToArgument(I))
+  if (FreezeOwnedArgEpilogueReleases && isOwnedArgumentEpilogueRelease(I, Op, EAFI))
     return DataflowResult(Op);
 
   BottomUpRefCountState &State = DataflowState.getBottomUpRefCountState(Op);
@@ -246,8 +262,8 @@ TopDownDataflowRCStateVisitor<ARCState>::visitStrongIncrement(ValueBase *V) {
 
 template <class ARCState>
 typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
-TopDownDataflowRCStateVisitor<ARCState>::
-visitStrongEntranceArgument(SILArgument *Arg) {
+TopDownDataflowRCStateVisitor<ARCState>::visitStrongEntranceArgument(
+    SILFunctionArgument *Arg) {
   DEBUG(llvm::dbgs() << "VISITING ENTRANCE ARGUMENT: " << *Arg);
 
   if (!Arg->hasConvention(SILArgumentConvention::Direct_Owned)) {
@@ -325,7 +341,7 @@ template <class ARCState>
 typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
 TopDownDataflowRCStateVisitor<ARCState>::
 visitStrongEntrance(ValueBase *V) {
-  if (auto *Arg = dyn_cast<SILArgument>(V))
+  if (auto *Arg = dyn_cast<SILFunctionArgument>(V))
     return visitStrongEntranceArgument(Arg);
 
   if (auto *AI = dyn_cast<ApplyInst>(V))
@@ -354,4 +370,4 @@ template class BottomUpDataflowRCStateVisitor<ARCRegionState>;
 template class TopDownDataflowRCStateVisitor<ARCBBState>;
 template class TopDownDataflowRCStateVisitor<ARCRegionState>;
 
-} // end swift namespace
+} // namespace swift

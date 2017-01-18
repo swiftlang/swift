@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
 public class Foo {
   // CHECK: !DISubprogram(name: "deinit", linkageName: "_TFC11Destructors3FooD"

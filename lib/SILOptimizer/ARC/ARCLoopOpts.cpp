@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -68,12 +68,13 @@ class ARCLoopOpts : public SILFunctionTransform {
     // Get all of the analyses that we need.
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
+    auto *EAFI = getAnalysis<EpilogueARCAnalysis>()->get(F);
     auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
     ProgramTerminationFunctionInfo PTFI(F);
 
     // Create all of our visitors, register them with the visitor group, and
     // run.
-    LoopARCPairingContext LoopARCContext(*F, AA, LRFI, LI, RCFI, &PTFI);
+    LoopARCPairingContext LoopARCContext(*F, AA, LRFI, LI, RCFI, EAFI, &PTFI);
     SILLoopVisitorGroup VisitorGroup(F, LI);
     VisitorGroup.addVisitor(&LoopARCContext);
     VisitorGroup.run();

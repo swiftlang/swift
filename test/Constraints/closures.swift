@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func myMap<T1, T2>(_ array: [T1], _ fn: (T1) -> T2) -> [T2] {}
 
@@ -9,7 +9,7 @@ _ = myMap(intArray, { x -> String in String(x) } )
 
 // Closures with too few parameters.
 func foo(_ x: (Int, Int) -> Int) {}
-foo({$0}) // expected-error{{cannot convert value of type '(Int, Int)' to closure result type 'Int'}}
+foo({$0}) // expected-error{{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
 
 struct X {}
 func mySort(_ array: [String], _ predicate: (String, String) -> Bool) -> [String] {}
@@ -175,7 +175,7 @@ func typeCheckMultiStmtClosureCrash() {
 }
 
 // SR-832 - both these should be ok
-func someFunc(_ foo: (@escaping (String) -> String)?, 
+func someFunc(_ foo: ((String) -> String)?,
               bar: @escaping (String) -> String) {
     let _: (String) -> String = foo != nil ? foo! : bar
     let _: (String) -> String = foo ?? bar
@@ -202,7 +202,7 @@ func acceptNothingToInt (_: () -> Int) {}
 func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
   // expected-note@-1{{parameter 'ac1' is implicitly non-escaping because it was declared @autoclosure}}
   acceptNothingToInt({ac1($0)})
-  // expected-error@-1{{cannot convert value of type '(_) -> Int' to expected argument type '() -> Int'}}
+  // expected-error@-1{{contextual closure type '() -> Int' expects 0 arguments, but 1 was used in closure body}}
   // FIXME: expected-error@-2{{closure use of non-escaping parameter 'ac1' may allow it to escape}}
 }
 
@@ -238,7 +238,7 @@ func ident<T>(_ t: T) -> T {}
 var c = ident({1.DOESNT_EXIST}) // error: expected-error {{value of type 'Int' has no member 'DOESNT_EXIST'}}
 
 // <rdar://problem/20712541> QoI: Int/UInt mismatch produces useless error inside a block
-var afterMessageCount : Int? = nil
+var afterMessageCount : Int?
 
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(_ a : () -> ()) {}
@@ -323,4 +323,117 @@ func r20789423() {
   
 }
 
+// Make sure that behavior related to allowing trailing closures to match functions
+// with Any as a final parameter is the same after the changes made by SR-2505, namely:
+// that we continue to select function that does _not_ have Any as a final parameter in
+// presence of other possibilities.
 
+protocol SR_2505_Initable { init() }
+struct SR_2505_II : SR_2505_Initable {}
+
+protocol P_SR_2505 {
+  associatedtype T: SR_2505_Initable
+}
+
+extension P_SR_2505 {
+  func test(it o: (T) -> Bool) -> Bool {
+    return o(T.self())
+  }
+}
+
+class C_SR_2505 : P_SR_2505 {
+  typealias T = SR_2505_II
+
+  func test(_ o: Any) -> Bool {
+    return false
+  }
+
+  func call(_ c: C_SR_2505) -> Bool {
+    // Note: no diagnostic about capturing 'self', because this is a
+    // non-escaping closure -- that's how we know we have selected
+    // test(it:) and not test(_)
+    return c.test { o in test(o) }
+  }
+}
+
+let _ = C_SR_2505().call(C_SR_2505())
+
+// <rdar://problem/28909024> Returning incorrect result type from method invocation can result in nonsense diagnostic
+extension Collection {
+  func r28909024(_ predicate: (Iterator.Element)->Bool) -> Index {
+    return startIndex
+  }
+}
+func fn_r28909024(n: Int) {
+  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}}
+    _ in true
+  }
+}
+
+// SR-2994: Unexpected ambiguous expression in closure with generics
+struct S_2994 {
+  var dataOffset: Int
+}
+class C_2994<R> {
+  init(arg: (R) -> Void) {}
+}
+func f_2994(arg: String) {}
+func g_2994(arg: Int) -> Double {
+  return 2
+}
+C_2994<S_2994>(arg: { (r: S_2994) in f_2994(arg: g_2994(arg: r.dataOffset)) }) // expected-error {{cannot convert value of type 'Double' to expected argument type 'String'}}
+
+let _ = { $0[$1] }(1, 1) // expected-error {{cannot subscript a value of incorrect or ambiguous type}}
+let _ = { $0 = ($0 = {}) } // expected-error {{assigning a variable to itself}}
+let _ = { $0 = $0 = 42 } // expected-error {{assigning a variable to itself}}
+
+// https://bugs.swift.org/browse/SR-403
+// The () -> T => () -> () implicit conversion was kicking in anywhere
+// inside a closure result, not just at the top-level.
+let mismatchInClosureResultType : (String) -> ((Int) -> Void) = {
+  (String) -> ((Int) -> Void) in
+    return { }
+    // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}
+}
+
+// SR-3520: Generic function taking closure with inout parameter can result in a variety of compiler errors or EXC_BAD_ACCESS
+func sr3520_1<T>(_ g: (inout T) -> Int) {}
+sr3520_1 { $0 = 1 } // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+
+func sr3520_2<T>(_ item: T, _ update: (inout T) -> Void) {
+  var x = item
+  update(&x)
+}
+var sr3250_arg = 42
+sr3520_2(sr3250_arg) { $0 += 3 } // ok
+
+// This test makes sure that having closure with inout argument doesn't crash with member lookup
+struct S_3520 {
+  var number1: Int
+}
+func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {}
+sr3520_set_via_closure({ $0.number1 = $1 }) // expected-error {{type of expression is ambiguous without more context}}
+
+// SR-1976/SR-3073: Inference of inout
+func sr1976<T>(_ closure: (inout T) -> Void) {}
+sr1976({ $0 += 2 }) // ok
+
+// SR-3073: UnresolvedDotExpr in single expression closure
+
+struct SR3073Lense<Whole, Part> {
+  let set: (inout Whole, Part) -> ()
+}
+struct SR3073 {
+  var number1: Int
+  func lenses() {
+    let _: SR3073Lense<SR3073, Int> = SR3073Lense(
+      set: { $0.number1 = $1 } // ok
+    )
+  }
+}
+
+// SR-3479: Segmentation fault and other error for closure with inout parameter
+func sr3497_unfold<A, B>(_ a0: A, next: (inout A) -> B) {}
+func sr3497() {
+  let _ = sr3497_unfold((0, 0)) { s in 0 } // ok
+}

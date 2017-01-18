@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 var zero: Int = 0
 
@@ -10,7 +10,7 @@ func getInt() -> Int { return zero }
 // CHECK: bb0(%0 : $Int):
 func physical_tuple_lvalue(_ c: Int) {
   var x : (Int, Int)
-  // CHECK: [[BOX:%[0-9]+]] = alloc_box $(Int, Int)
+  // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var (Int, Int) }
   // CHECK: [[XADDR1:%.*]] = project_box [[BOX]]
   // CHECK: [[XADDR:%[0-9]+]] = mark_uninitialized [var] [[XADDR1]]
   x.1 = c
@@ -32,30 +32,22 @@ func physical_tuple_rvalue() -> Int {
 // CHECK-LABEL: sil hidden  @_TF10properties16tuple_assignment
 func tuple_assignment(_ a: inout Int, b: inout Int) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int):
-  // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
-  // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
-  // CHECK: [[B_LOCAL:%.*]] = alloc_box $Int
-  // CHECK: [[PBB:%.*]] = project_box [[B_LOCAL]]
-  // CHECK: [[B:%[0-9]+]] = load [[PBB]]
-  // CHECK: [[A:%[0-9]+]] = load [[PBA]]
-  // CHECK: assign [[B]] to [[PBA]]
-  // CHECK: assign [[A]] to [[PBB]]
+  // CHECK: [[B:%[0-9]+]] = load [trivial] [[B_ADDR]]
+  // CHECK: [[A:%[0-9]+]] = load [trivial] [[A_ADDR]]
+  // CHECK: assign [[B]] to [[A_ADDR]]
+  // CHECK: assign [[A]] to [[B_ADDR]]
   (a, b) = (b, a)
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties18tuple_assignment_2
 func tuple_assignment_2(_ a: inout Int, b: inout Int, xy: (Int, Int)) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int, [[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int):
-  // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
-  // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
-  // CHECK: [[B_LOCAL:%.*]] = alloc_box $Int
-  // CHECK: [[PBB:%.*]] = project_box [[B_LOCAL]]
   (a, b) = xy
   // CHECK: [[XY2:%[0-9]+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
   // CHECK: [[X:%[0-9]+]] = tuple_extract [[XY2]] : {{.*}}, 0
   // CHECK: [[Y:%[0-9]+]] = tuple_extract [[XY2]] : {{.*}}, 1
-  // CHECK: assign [[X]] to [[PBA]]
-  // CHECK: assign [[Y]] to [[PBB]]
+  // CHECK: assign [[X]] to [[A_ADDR]]
+  // CHECK: assign [[Y]] to [[B_ADDR]]
 }
 
 class Ref {
@@ -98,7 +90,7 @@ struct Val {
 // CHECK-LABEL: sil hidden  @_TF10properties22physical_struct_lvalue
 func physical_struct_lvalue(_ c: Int) {
   var v : Val
-  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[VADDR:%[0-9]+]] = alloc_box ${ var Val }
   v.y = c
   // CHECK: assign %0 to [[X_1]]
 }
@@ -109,23 +101,25 @@ func physical_struct_lvalue(_ c: Int) {
 
    // CHECK: [[FN:%[0-9]+]] = class_method %0 : $Ref, #Ref.y!setter.1
    // CHECK: apply [[FN]](%1, %0) : $@convention(method) (Int, @guaranteed Ref) -> ()
-   // CHECK: strong_release %0 : $Ref
+   // CHECK: destroy_value %0 : $Ref
   }
 
 
 // CHECK-LABEL: sil hidden  @_TF10properties24physical_subclass_lvalue
- func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
-    r.y = a
-   // strong_retain %0 : $RefSubclass
-   // CHECK: [[R_SUP:%[0-9]+]] = upcast %0 : $RefSubclass to $Ref
-   // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> () , $@convention(method) (Int, @guaranteed Ref) -> ()
-   // CHECK: apply [[FN]](%1, [[R_SUP]]) :
-   // CHECK: strong_release [[R_SUP]]
-    r.w = a
+func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
+  // CHECK: bb0([[ARG1:%.*]] : $RefSubclass, [[ARG2:%.*]] : $Int):
+  r.y = a
+  // CHECK: [[ARG1_COPY:%.*]] = copy_value [[ARG1]] : $RefSubclass
+  // CHECK: [[R_SUP:%[0-9]+]] = upcast [[ARG1_COPY]] : $RefSubclass to $Ref
+  // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> () , $@convention(method) (Int, @guaranteed Ref) -> ()
+  // CHECK: apply [[FN]]([[ARG2]], [[R_SUP]]) :
+  // CHECK: destroy_value [[R_SUP]]
+  r.w = a
 
-   // CHECK: [[FN:%[0-9]+]] = class_method %0 : $RefSubclass, #RefSubclass.w!setter.1
-   // CHECK: apply [[FN]](%1, %0) : $@convention(method) (Int, @guaranteed RefSubclass) -> ()
-  }
+  // CHECK: [[FN:%[0-9]+]] = class_method [[ARG1]] : $RefSubclass, #RefSubclass.w!setter.1
+  // CHECK: apply [[FN]](%1, [[ARG1]]) : $@convention(method) (Int, @guaranteed RefSubclass) -> ()
+  // CHECK: destroy_value [[ARG1]]
+}
   
 
 
@@ -167,10 +161,8 @@ func logical_struct_get() -> Int {
 func logical_struct_set(_ value: inout Val, z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z:%[0-9]+]] : $Int):
   value.z = z
-  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
-  // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals1z
-  // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[PB]])
+  // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[VAL]])
   // CHECK: return
 }
 
@@ -178,9 +170,7 @@ func logical_struct_set(_ value: inout Val, z: Int) {
 func logical_struct_in_tuple_set(_ value: inout (Int, Val), z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*(Int, Val), [[Z:%[0-9]+]] : $Int):
   value.1.z = z
-  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $(Int, Val)
-  // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
-  // CHECK: [[VAL_1:%[0-9]+]] = tuple_element_addr [[PB]] : {{.*}}, 1
+  // CHECK: [[VAL_1:%[0-9]+]] = tuple_element_addr [[VAL]] : {{.*}}, 1
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals1z
   // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[VAL_1]])
   // CHECK: return
@@ -190,11 +180,9 @@ func logical_struct_in_tuple_set(_ value: inout (Int, Val), z: Int) {
 func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.ref.val_prop.z_tuple.1 = z1
-  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
-  // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
   // -- val.ref
-  // CHECK: [[VAL_REF_ADDR:%[0-9]+]] = struct_element_addr [[PB]] : $*Val, #Val.ref
-  // CHECK: [[VAL_REF:%[0-9]+]] = load [[VAL_REF_ADDR]]
+  // CHECK: [[VAL_REF_ADDR:%[0-9]+]] = struct_element_addr [[VAL]] : $*Val, #Val.ref
+  // CHECK: [[VAL_REF:%[0-9]+]] = load [copy] [[VAL_REF_ADDR]]
   // -- getters and setters
   // -- val.ref.val_prop
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
@@ -207,8 +195,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Val
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
-  // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
-  // CHECK: retain_value [[LD]]
+  // CHECK: [[LD:%[0-9]+]] = load [copy] [[VAL_REF_VAL_PROP_MAT]]
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
   // CHECK: [[A0:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 0
@@ -216,13 +203,13 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[V_R_VP_Z_TUPLE:%[0-9]+]] = apply [[GET_Z_TUPLE_METHOD]]([[LD]])
   // CHECK: [[T0:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 0
   // CHECK: [[T1:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 1
-  // CHECK: store [[T0]] to [[A0]]
-  // CHECK: store [[T1]] to [[A1]]
+  // CHECK: store [[T0]] to [trivial] [[A0]]
+  // CHECK: store [[T1]] to [trivial] [[A1]]
   // -- write to val.ref.val_prop.z_tuple.1
   // CHECK: [[V_R_VP_Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[V_R_VP_Z_TUPLE_1]]
   // -- writeback to val.ref.val_prop.z_tuple
-  // CHECK: [[WB_V_R_VP_Z_TUPLE:%[0-9]+]] = load [[V_R_VP_Z_TUPLE_MAT]]
+  // CHECK: [[WB_V_R_VP_Z_TUPLE:%[0-9]+]] = load [trivial] [[V_R_VP_Z_TUPLE_MAT]]
   // CHECK: [[SET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals7z_tupleT
   // CHECK: apply [[SET_Z_TUPLE_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_REF_VAL_PROP_MAT]])
   // -- writeback to val.ref.val_prop
@@ -230,7 +217,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
   // CHECK: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Ref, @thick Ref.Type) -> ()
   // CHECK: [[REF_MAT:%.*]] = alloc_stack $Ref
-  // CHECK: store [[VAL_REF]] to [[REF_MAT]]
+  // CHECK: store [[VAL_REF]] to [init] [[REF_MAT]]
   // CHECK: [[T0:%.*]] = metatype $@thick Ref.Type
   // CHECK: [[T1:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_MAT]]
   // CHECK: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[REF_MAT]], [[T0]])
@@ -253,24 +240,21 @@ func reftype_rvalue_set(_ value: Val) {
 func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.z_tuple.1 = z1
-  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
-  // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
   // CHECK: [[Z_TUPLE_MATERIALIZED:%[0-9]+]] = alloc_stack $(Int, Int)
-  // CHECK: [[VAL1:%[0-9]+]] = load [[PB]]
-  // CHECK: retain_value [[VAL1]]
+  // CHECK: [[VAL1:%[0-9]+]] = load [copy] [[VAL]]
   // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
   // CHECK: [[A0:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 0
   // CHECK: [[A1:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: [[Z_TUPLE:%[0-9]+]] = apply [[Z_GET_METHOD]]([[VAL1]])
   // CHECK: [[T0:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 0
   // CHECK: [[T1:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 1
-  // CHECK: store [[T0]] to [[A0]]
-  // CHECK: store [[T1]] to [[A1]]
+  // CHECK: store [[T0]] to [trivial] [[A0]]
+  // CHECK: store [[T1]] to [trivial] [[A1]]
   // CHECK: [[Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[Z_TUPLE_1]]
-  // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [[Z_TUPLE_MATERIALIZED]]
+  // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [trivial] [[Z_TUPLE_MATERIALIZED]]
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals7z_tupleT
-  // CHECK: apply [[Z_SET_METHOD]]({{%[0-9]+, %[0-9]+}}, [[PB]])
+  // CHECK: apply [[Z_SET_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL]])
   // CHECK: dealloc_stack [[Z_TUPLE_MATERIALIZED]]
   // CHECK: return
 }
@@ -338,7 +322,7 @@ func inout_arg(_ x: inout Int) {}
 // CHECK-LABEL: sil hidden  @_TF10properties14physical_inout
 func physical_inout(_ x: Int) {
   var x = x
-  // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PB:%.*]] = project_box [[XADDR]]
   inout_arg(&x)
   // CHECK: [[INOUT_ARG:%[0-9]+]] = function_ref @_TF10properties9inout_arg
@@ -363,7 +347,7 @@ func val_subscript_get(_ v: Val, i: Int) -> Float {
 func val_subscript_set(_ v: Val, i: Int, x: Float) {
   var v = v
   v[i] = x
-  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[VADDR:%[0-9]+]] = alloc_box ${ var Val }
   // CHECK: [[PB:%.*]] = project_box [[VADDR]]
   // CHECK: [[SUBSCRIPT_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals9subscript
   // CHECK: apply [[SUBSCRIPT_SET_METHOD]]([[X]], [[I]], [[PB]])
@@ -476,16 +460,14 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestsw1a
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
-      // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
-      // CHECK-NEXT: [[PB:%.*]] = project_box [[SELFBOX]]
-      // CHECK-NEXT: copy_addr %1 to [initialization] [[PB]] : $*DidSetWillSetTests
+      // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
 
       takeInt(a)
 
       // CHECK-NEXT: // function_ref properties.takeInt
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
-      // CHECK-NEXT: [[FIELDPTR:%.*]] = struct_element_addr [[PB]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
-      // CHECK-NEXT: [[A:%.*]] = load [[FIELDPTR]] : $*Int
+      // CHECK-NEXT: [[FIELDPTR:%.*]] = struct_element_addr %1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: [[A:%.*]] = load [trivial] [[FIELDPTR]] : $*Int
       // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
       takeInt(newA)
@@ -493,7 +475,6 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: // function_ref properties.takeInt (Swift.Int) -> ()
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
       // CHECK-NEXT: apply [[TAKEINTFN]](%0) : $@convention(thin) (Int) -> ()
-      // CHECK-NEXT: copy_addr [[PB]] to %1 : $*DidSetWillSetTests
     }
 
     didSet {
@@ -501,16 +482,14 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestsW1a
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug
-      // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
-      // CHECK-NEXT: [[PB:%.*]] = project_box [[SELFBOX]]
-      // CHECK-NEXT: copy_addr %1 to [initialization] [[PB]] : $*DidSetWillSetTests
+      // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
 
       takeInt(a)
 
       // CHECK-NEXT: // function_ref properties.takeInt (Swift.Int) -> ()
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
-      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[PB]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
-      // CHECK-NEXT: [[A:%.*]] = load [[AADDR]] : $*Int
+      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr %1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: [[A:%.*]] = load [trivial] [[AADDR]] : $*Int
       // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
       a = zero  // reassign, but don't infinite loop.
@@ -519,9 +498,8 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @_TF10propertiesau4zero
       // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
       // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to [strict] $*Int
-      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[PB]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr %1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: copy_addr [[ZEROADDR]] to [[AADDR]] : $*Int
-      // CHECK-NEXT: copy_addr [[PB]] to %1 : $*DidSetWillSetTests
     }
   }
 
@@ -530,40 +508,34 @@ struct DidSetWillSetTests: ForceAccessors {
     a = x
     a = x
   }
-  
-   
+
   // These are the synthesized getter and setter for the willset/didset variable.
 
   // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.getter
-  // CHECK-NEXT: sil hidden [transparent] @_TFV10properties18DidSetWillSetTestsg1a
+  // CHECK-NEXT: sil hidden [transparent] @_TFV10properties18DidSetWillSetTestsg1aSi
   // CHECK: bb0(%0 : $DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT:   return %2 : $Int{{.*}}                      // id: %3
-  
-  // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.setter
-  // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestss1a
-  // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
-  // CHECK-NEXT:   debug_value %0
-  // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
-  // CHECK-NEXT: [[PB:%.*]] = project_box [[SELFBOX]]
-  // CHECK-NEXT: copy_addr %1 to [initialization] [[PB]] : $*DidSetWillSetTests
 
-  // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[PB]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
-  // CHECK-NEXT: [[OLDVAL:%.*]] = load [[AADDR]] : $*Int
+  // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.setter
+  // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestss1aSi
+  // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
+  // CHECK-NEXT: debug_value %0
+  // CHECK-NEXT: debug_value_addr %1
+
+  // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr %1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
+  // CHECK-NEXT: [[OLDVAL:%.*]] = load [trivial] [[AADDR]] : $*Int
   // CHECK-NEXT: debug_value [[OLDVAL]] : $Int, let, name "tmp"
 
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.willset : Swift.Int
   // CHECK-NEXT: [[WILLSETFN:%.*]] = function_ref @_TFV10properties18DidSetWillSetTestsw1a
-  // CHECK-NEXT:  apply [[WILLSETFN]](%0, [[PB]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-  // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[PB]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+  // CHECK-NEXT:  apply [[WILLSETFN]](%0, %1) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+  // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr %1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT: assign %0 to [[AADDR]] : $*Int
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.didset : Swift.Int
   // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @_TFV10properties18DidSetWillSetTestsW1a{{.*}} : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-  // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[PB]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-
-  // CHECK-NEXT: copy_addr [[PB]] to %1 : $*DidSetWillSetTests
-
+  // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], %1) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
 
   // CHECK-LABEL: sil hidden @_TFV10properties18DidSetWillSetTestsC
   // CHECK: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
@@ -629,9 +601,9 @@ func local_observing_property(_ arg: Int) {
 
 // CHECK-LABEL: sil hidden @{{.*}}local_observing_property
 // CHECK: bb0([[ARG:%[0-9]+]] : $Int)
-// CHECK: [[BOX:%[0-9]+]] = alloc_box $Int
+// CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var Int }
 // CHECK: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: store [[ARG]] to [[PB]]
+// CHECK: store [[ARG]] to [trivial] [[PB]]
 
 
 
@@ -694,22 +666,23 @@ func propertyWithDidSetTakingOldValue() {
 
 // CHECK: // properties.(propertyWithDidSetTakingOldValue () -> ()).(p #1).setter : Swift.Int
 // CHECK-NEXT: sil {{.*}} @_TFF10properties32propertyWithDidSetTakingOldValue
-// CHECK: bb0(%0 : $Int, %1 : $@box Int):
-// CHECK-NEXT:  debug_value %0 : $Int, let, name "newValue", argno 1
-// CHECK-NEXT:  %3 = project_box %1
-// CHECK-NEXT:  debug_value_addr %3 : $*Int, var, name "p", argno 2
-// CHECK-NEXT:  %5 = load %3 : $*Int
-// CHECK-NEXT:  debug_value %5 : $Int
-// CHECK-NEXT:  assign %0 to %3 : $*Int
-// CHECK-NEXT:  strong_retain %1 : $@box Int
-// CHECK-NEXT:  mark_function_escape %3
+// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : ${ var Int }):
+// CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "newValue", argno 1
+// CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]
+// CHECK-NEXT:  debug_value_addr [[ARG2_PB]] : $*Int, var, name "p", argno 2
+// CHECK-NEXT:  [[ARG2_PB_VAL:%.*]] = load [trivial] [[ARG2_PB]] : $*Int
+// CHECK-NEXT:  debug_value [[ARG2_PB_VAL]] : $Int
+// CHECK-NEXT:  assign [[ARG1]] to [[ARG2_PB]] : $*Int
+// CHECK-NEXT:  [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : ${ var Int }
+// SEMANTIC ARC TODO: Another case where we need to put the mark_function_escape on a new projection after a copy.
+// CHECK-NEXT:  mark_function_escape [[ARG2_PB]]
 // CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  %10 = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned @box Int) -> ()
-// CHECK-NEXT:  %11 = apply %10(%5, %1) : $@convention(thin) (Int, @owned @box Int) -> ()
-// CHECK-NEXT:  strong_release %1 : $@box Int
+// CHECK-NEXT:  [[FUNC:%.*]] = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned { var Int }) -> ()
+// CHECK-NEXT:  %11 = apply [[FUNC]]([[ARG2_PB_VAL]], [[ARG2_COPY]]) : $@convention(thin) (Int, @owned { var Int }) -> ()
+// CHECK-NEXT:  destroy_value [[ARG2]] : ${ var Int }
 // CHECK-NEXT:  %13 = tuple ()
 // CHECK-NEXT:  return %13 : $()
-// CHECK-NEXT:}
+// CHECK-NEXT:} // end sil function '_TFF10properties32propertyWithDidSetTakingOldValue{{.*}}'
 
 
 class BaseProperty {
@@ -726,11 +699,15 @@ class DerivedProperty : BaseProperty {
 
 // rdar://16381392 - Super property references in non-objc classes should be direct.
 
-// CHECK: sil hidden @_TFC10properties15DerivedProperty24super_property_reference
-// CHECK: bb0(%0 : $DerivedProperty):
-// CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
-// CHECK:  [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1xSi : $@convention(method) (@guaranteed BaseProperty) -> Int 
-// CHECK:  apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int{{.*}} // user: %7
+// CHECK-LABEL: sil hidden @_TFC10properties15DerivedProperty24super_property_referencefT_Si : $@convention(method) (@guaranteed DerivedProperty) -> Int {
+// CHECK: bb0([[SELF:%.*]] : $DerivedProperty):
+// CHECK:   [[SELF_COPY:%[0-9]+]] = copy_value [[SELF]]
+// CHECK:   [[BASEPTR:%[0-9]+]] = upcast [[SELF_COPY]] : $DerivedProperty to $BaseProperty
+// CHECK:   [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1xSi : $@convention(method) (@guaranteed BaseProperty) -> Int 
+// CHECK:   [[RESULT:%.*]] = apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int
+// CHECK:   destroy_value [[BASEPTR]]
+// CHECK:   return [[RESULT]] : $Int
+// CHECK: } // end sil function '_TFC10properties15DerivedProperty24super_property_referencefT_Si'
 
 
 // <rdar://problem/16411449> ownership qualifiers don't work with non-mutating struct property
@@ -873,7 +850,7 @@ func genericProps(_ x: GenericClass<String>) {
   // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.y!getter.1
   let _ = x.y
   // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<String>, #GenericClass.z
-  // CHECK: load [[Z]] : $*String
+  // CHECK: load [copy] [[Z]] : $*String
   let _ = x.z
 }
 
@@ -893,10 +870,10 @@ class ClassWithLetProperty {
   // We shouldn't have any dynamic dispatch within this method, just load p.
   func ReturnConstant() -> Int { return p }
 // CHECK-LABEL: sil hidden @_TFC10properties20ClassWithLetProperty14ReturnConstant
-// CHECK:       bb0(%0 : $ClassWithLetProperty):
+// CHECK:       bb0([[ARG:%.*]] : $ClassWithLetProperty):
 // CHECK-NEXT:    debug_value
-// CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr %0 : $ClassWithLetProperty, #ClassWithLetProperty.p
-// CHECK-NEXT:    [[VAL:%[0-9]+]] = load [[PTR]] : $*Int
+// CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr [[ARG]] : $ClassWithLetProperty, #ClassWithLetProperty.p
+// CHECK-NEXT:    [[VAL:%[0-9]+]] = load [trivial] [[PTR]] : $*Int
 // CHECK-NEXT:   return [[VAL]] : $Int
 
 
@@ -916,22 +893,22 @@ class r19254812Derived: r19254812Base{
     use(pi)
   }
   
-// Accessing the "pi" property should not retain/release self.
+// Accessing the "pi" property should not copy_value/release self.
 // CHECK-LABEL: sil hidden @_TFC10properties16r19254812Derivedc
 // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] 
 
-// Initialization of the pi field: no retains/releases.
-// CHECK:  [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*r19254812Derived
+// Initialization of the pi field: no copy_values/releases.
+// CHECK:  [[SELF:%[0-9]+]] = load_borrow [[SELFMUI]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
 // CHECK-NEXT:  assign {{.*}} to [[PIPTR]] : $*Double
 
-// CHECK-NOT: strong_release
-// CHECK-NOT: strong_retain
+// CHECK-NOT: destroy_value
+// CHECK-NOT: copy_value
 
-// Load of the pi field: no retains/releases.
-// CHECK:  [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*r19254812Derived
+// Load of the pi field: no copy_values/releases.
+// CHECK:  [[SELF:%[0-9]+]] = load_borrow [[SELFMUI]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
-// CHECK-NEXT:  {{.*}} = load [[PIPTR]] : $*Double
+// CHECK-NEXT:  {{.*}} = load [trivial] [[PIPTR]] : $*Double
 // CHECK: return
 }
 
@@ -943,14 +920,14 @@ class RedundantSelfRetains {
     f = RedundantSelfRetains()
   }
   
-  // <rdar://problem/19275047> Extraneous retains/releases of self are bad
+  // <rdar://problem/19275047> Extraneous copy_values/releases of self are bad
   func testMethod1() {
     f = RedundantSelfRetains()
   }
   // CHECK-LABEL: sil hidden @_TFC10properties20RedundantSelfRetains11testMethod1
   // CHECK: bb0(%0 : $RedundantSelfRetains):
 
-  // CHECK-NOT: strong_retain
+  // CHECK-NOT: copy_value
   
   // CHECK: [[FPTR:%[0-9]+]] = ref_element_addr %0 : $RedundantSelfRetains, #RedundantSelfRetains.f
   // CHECK-NEXT: assign {{.*}} to [[FPTR]] : $*RedundantSelfRetains
@@ -964,15 +941,15 @@ class RedundantRetains {
 
 func testRedundantRetains() {
   let a = RedundantRetains()
-  a.field = 4  // no retain/release of a necessary here.
+  a.field = 4  // no copy_value/release of a necessary here.
 }
 
 // CHECK-LABEL: sil hidden @_TF10properties20testRedundantRetainsFT_T_ : $@convention(thin) () -> () {
 // CHECK: [[A:%[0-9]+]] = apply
-// CHECK-NOT: strong_retain
-// CHECK: strong_release [[A]] : $RedundantRetains
-// CHECK-NOT: strong_retain
-// CHECK-NOT: strong_release
+// CHECK-NOT: copy_value
+// CHECK: destroy_value [[A]] : $RedundantRetains
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
 // CHECK: return
 
 struct AddressOnlyNonmutatingSet<T> {
@@ -1007,7 +984,7 @@ struct AddressOnlyReadOnlySubscript {
 }
 
 // CHECK-LABEL: sil hidden @_TF10properties43addressOnlyReadOnlySubscriptFromMutableBase
-// CHECK:         [[BASE:%.*]] = alloc_box $AddressOnlyReadOnlySubscript
+// CHECK:         [[BASE:%.*]] = alloc_box ${ var AddressOnlyReadOnlySubscript }
 // CHECK:         copy_addr [[BASE:%.*]] to [initialization] [[COPY:%.*]] :
 // CHECK:         [[GETTER:%.*]] = function_ref @_TFV10properties28AddressOnlyReadOnlySubscriptg9subscript
 // CHECK:         apply [[GETTER]]({{%.*}}, [[COPY]])
@@ -1025,9 +1002,9 @@ struct MutatingGetterStruct {
   }
 
   // CHECK-LABEL: sil hidden @_TZFV10properties20MutatingGetterStruct4test
-  // CHECK: [[X:%.*]] = alloc_box $MutatingGetterStruct, var, name "x"
+  // CHECK: [[X:%.*]] = alloc_box ${ var MutatingGetterStruct }, var, name "x"
   // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
-  // CHECK: store {{.*}} to [[PB]] : $*MutatingGetterStruct
+  // CHECK: store {{.*}} to [trivial] [[PB]] : $*MutatingGetterStruct
   // CHECK: apply {{%.*}}([[PB]]) : $@convention(method) (@inout MutatingGetterStruct) -> Int
   static func test() {
     var x = MutatingGetterStruct()
@@ -1058,12 +1035,13 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
   }
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_TFC10properties29BaseClassWithInternalPropertyg1xT_
+// CHECK-LABEL: sil hidden @_TFC10properties29BaseClassWithInternalPropertyg1xT_
 
-// CHECK-LABEL: sil [transparent] [fragile] @_TFC10properties30DerivedClassWithPublicPropertyg1xT_
+// CHECK-LABEL: sil @_TFC10properties30DerivedClassWithPublicPropertyg1xT_
 // CHECK:       bb0([[SELF:%.*]] : $DerivedClassWithPublicProperty):
-// CHECK:         strong_retain [[SELF]] : $DerivedClassWithPublicProperty
-// CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty
-// CHECK-NEXT:    [[METHOD:%.*]] = super_method [[SELF]] : $DerivedClassWithPublicProperty, #BaseClassWithInternalProperty.x!getter.1 : (BaseClassWithInternalProperty) -> () -> () , $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
-// CHECK-NEXT:    strong_release [[SUPER]] : $BaseClassWithInternalProperty
+// CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]] : $DerivedClassWithPublicProperty
+// CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF_COPY]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty
+// CHECK:         [[GETTER:%.*]] = function_ref @_TFC10properties29BaseClassWithInternalPropertyg1xT_
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
+// CHECK-NEXT:    destroy_value [[SUPER]] : $BaseClassWithInternalProperty
+// CHECK: } // end sil function '_TFC10properties30DerivedClassWithPublicPropertyg1xT_'

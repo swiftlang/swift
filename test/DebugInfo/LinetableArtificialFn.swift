@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - -disable-sil-linking | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - -disable-sil-linking | %FileCheck %s
 
 // Verify that a helper function that is generated on-the-fly does
 // not mess up the linetable of the calling function.

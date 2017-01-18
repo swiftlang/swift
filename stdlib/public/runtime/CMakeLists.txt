@@ -21,27 +21,28 @@ endif()
 list(APPEND swift_runtime_compile_flags
      "-D__SWIFT_CURRENT_DYLIB=swiftCore")
 
-set(swift_runtime_objc_sources)
-set(swift_runtime_unicode_normalization_sources)
-if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
-  set(swift_runtime_objc_sources
-      ErrorObject.mm
-      SwiftObject.mm
-      SwiftValue.mm
-      Remangle.cpp
-      Reflection.mm)
-else()
-endif()
+set(swift_runtime_objc_sources
+    ErrorObject.mm
+    SwiftObject.mm
+    SwiftValue.mm
+    Remangle.cpp
+    Reflection.mm)
 
 set(swift_runtime_sources
+    AnyHashableSupport.cpp
     Casting.cpp
     CygwinPort.cpp
     Demangle.cpp
     Enum.cpp
+    ErrorObjectConstants.cpp
     ErrorObjectNative.cpp
     Errors.cpp
+    ErrorDefaultImpls.cpp
     Heap.cpp
     HeapObject.cpp
+    ImageInspectionMachO.cpp
+    ImageInspectionELF.cpp
+    ImageInspectionWin32.cpp
     KnownMetadata.cpp
     Metadata.cpp
     MetadataLookup.cpp
@@ -50,9 +51,7 @@ set(swift_runtime_sources
     Once.cpp
     Portability.cpp
     ProtocolConformance.cpp
-    ReflectionNative.cpp
-    RuntimeEntrySymbols.cpp
-    SwiftObjectNative.cpp)
+    RuntimeEntrySymbols.cpp)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
@@ -61,15 +60,65 @@ set(LLVM_OPTIONAL_SOURCES
     MutexPThread.cpp
     MutexWin32.cpp
     CygwinPort.cpp
+    ImageInspectionELF.cpp
+    ImageInspectionStatic.cpp
+    StaticBinaryELF.cpp
     ${swift_runtime_sources}
     ${swift_runtime_objc_sources}
     ${swift_runtime_leaks_sources})
+
+set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
+list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
+
+set(sdk "${SWIFT_HOST_VARIANT_SDK}")
+if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
+  list(REMOVE_ITEM swift_runtime_sources ImageInspectionELF.cpp)
+  set(static_binary_lnk_file_list)
+  string(TOLOWER "${sdk}" lowercase_sdk)
+
+  # These two libaries are only used with the static swiftcore
+  add_library(swiftImageInspectionStatic STATIC
+              ImageInspectionStatic.cpp
+              StaticBinaryELF.cpp)
+  set_target_properties(swiftImageInspectionStatic PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
+
+  add_library(swiftImageInspectionShared STATIC ImageInspectionELF.cpp)
+  set_target_properties(swiftImageInspectionShared PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
+
+  swift_install_in_component(stdlib
+    TARGETS swiftImageInspectionStatic swiftImageInspectionShared
+    DESTINATION "lib/swift_static/${lowercase_sdk}")
+
+  # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
+  set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
+  add_custom_command_target(swift_static_binary_${sdk}_args
+    COMMAND
+      "${CMAKE_COMMAND}" -E copy
+      "${SWIFT_SOURCE_DIR}/utils/${lowercase}/static-executable-args.lnk"
+      "${SWIFTSTATICLIB_DIR}/${linkfile}"
+    OUTPUT
+      "${SWIFTSTATICLIB_DIR}/${linkfile}")
+
+  list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
+  swift_install_in_component(stdlib
+    FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
+    DESTINATION "lib/swift_static/${lowercase_sdk}")
+  add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
+
+  add_swift_library(swiftImageInspectionShared OBJECT_LIBRARY TARGET_LIBRARY
+    ImageInspectionELF.cpp
+    C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
+    LINK_FLAGS ${swift_runtime_linker_flags}
+    INSTALL_IN_COMPONENT never_install)
+endif()
 
 add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
-  C_COMPILE_FLAGS ${swift_runtime_compile_flags} -DswiftCore_EXPORTS
+  C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
   LINK_FLAGS ${swift_runtime_linker_flags}
   INSTALL_IN_COMPONENT never_install)
 

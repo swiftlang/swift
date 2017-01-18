@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var func6 : (_ fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
@@ -14,13 +14,18 @@ var closure3a : () -> () -> (Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int) -> (Int) -> (Int,Int) = {{ (4, 2) }} // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}}  {{52-52=_,_ in }}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int = {
-       $0 + 1.0 // expected-error {{binary operator '+' cannot be applied to two 'Double' operands}} expected-note {{expected an argument list of type '(Int, Int)'}}
+       $0 + 1.0 // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
 }
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}
 
 var closure7 : Int =
    { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{9-9=()}}
+
+var capturedVariable = 1
+var closure8 = { [capturedVariable] in
+  capturedVariable += 1 // expected-error {{left side of mutating operator isn't mutable: 'capturedVariable' is an immutable capture}}
+}
 
 func funcdecl1(_ a: Int, _ y: Int) {}
 func funcdecl3() -> Int {}
@@ -33,7 +38,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   
   func6({$0 + $1})       // Closure with two named anonymous arguments
   func6({($0) + $1})    // Closure with sequence expr inferred type
-  func6({($0) + $0})    // // expected-error {{binary operator '+' cannot be applied to two '(Int, Int)' operands}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  func6({($0) + $0})    // // expected-error {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
 
 
   var testfunc : ((), Int) -> Int  // expected-note {{'testfunc' declared here}}

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class C : Hashable {
 	var x = 0
@@ -39,7 +39,7 @@ dictCC as Dictionary<U, D> // expected-error{{cannot convert value of type 'Dict
 dictCC as Dictionary<U, U> // expected-error{{cannot convert value of type 'Dictionary<C, C>' to type 'Dictionary<U, U>' in coercion}}
 
 // Test dictionary conditional downcasts to unrelated types
-if let dictDU = dictCC as? Dictionary<D, U> { } // expected-error{{'Dictionary<C, C>' is not convertible to 'Dictionary<D, U>'}}
-if let dictUD = dictCC as? Dictionary<U, D> { } // expected-error{{'Dictionary<C, C>' is not convertible to 'Dictionary<U, D>'}}
-if let dictUU = dictCC as? Dictionary<U, U> { } // expected-error{{'Dictionary<C, C>' is not convertible to 'Dictionary<U, U>'}}
+if let dictDU = dictCC as? Dictionary<D, U> { } // expected-warning{{cast from 'Dictionary<C, C>' to unrelated type 'Dictionary<D, U>' always fails}}
+if let dictUD = dictCC as? Dictionary<U, D> { } // expected-warning{{cast from 'Dictionary<C, C>' to unrelated type 'Dictionary<U, D>' always fails}}
+if let dictUU = dictCC as? Dictionary<U, U> { } // expected-warning{{cast from 'Dictionary<C, C>' to unrelated type 'Dictionary<U, U>' always fails}}
 

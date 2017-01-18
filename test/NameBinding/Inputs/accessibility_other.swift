@@ -11,7 +11,7 @@ extension Foo {
 }
 
 struct PrivateInit {
-  private init() {}  // expected-note {{'init' declared here}}
+  private init() {}  // expected-note {{'init()' declared here}}
 }
 
 extension Foo {

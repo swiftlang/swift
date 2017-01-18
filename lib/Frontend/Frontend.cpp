@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -223,10 +223,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   return false;
 }
 
-Module *CompilerInstance::getMainModule() {
+ModuleDecl *CompilerInstance::getMainModule() {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-    MainModule = Module::create(ID, *Context);
+    MainModule = ModuleDecl::create(ID, *Context);
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
 
@@ -241,7 +241,7 @@ Module *CompilerInstance::getMainModule() {
 void CompilerInstance::performSema() {
   const FrontendOptions &options = Invocation.getFrontendOptions();
   const InputFileKind Kind = Invocation.getInputKind();
-  Module *MainModule = getMainModule();
+  ModuleDecl *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
 
   auto modImpKind = SourceFile::ImplicitModuleImportKind::Stdlib;
@@ -297,7 +297,7 @@ void CompilerInstance::performSema() {
   auto clangImporter =
     static_cast<ClangImporter *>(Context->getClangModuleLoader());
 
-  Module *underlying = nullptr;
+  ModuleDecl *underlying = nullptr;
   if (options.ImportUnderlyingModule) {
     underlying = clangImporter->loadModule(SourceLoc(),
                                            std::make_pair(MainModule->getName(),
@@ -308,7 +308,7 @@ void CompilerInstance::performSema() {
     }
   }
 
-  Module *importedHeaderModule = nullptr;
+  ModuleDecl *importedHeaderModule = nullptr;
   StringRef implicitHeaderPath = options.ImplicitObjCHeaderPath;
   if (!implicitHeaderPath.empty()) {
     if (!clangImporter->importBridgingHeader(implicitHeaderPath, MainModule)) {
@@ -317,12 +317,12 @@ void CompilerInstance::performSema() {
     }
   }
 
-  SmallVector<Module *, 4> importModules;
+  SmallVector<ModuleDecl *, 4> importModules;
   if (!options.ImplicitImportModuleNames.empty()) {
     for (auto &ImplicitImportModuleName : options.ImplicitImportModuleNames) {
       if (Lexer::isIdentifier(ImplicitImportModuleName)) {
         auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
-        Module *importModule = Context->getModule(std::make_pair(moduleID,
+        ModuleDecl *importModule = Context->getModule(std::make_pair(moduleID,
                                                                  SourceLoc()));
         if (importModule) {
           importModules.push_back(importModule);
@@ -348,7 +348,7 @@ void CompilerInstance::performSema() {
       return;
 
     using ImportPair =
-        std::pair<Module::ImportedModule, SourceFile::ImportOptions>;
+        std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>;
     SmallVector<ImportPair, 4> additionalImports;
 
     if (underlying)
@@ -471,6 +471,9 @@ void CompilerInstance::performSema() {
   if (options.actionIsImmediate()) {
     TypeCheckOptions |= TypeCheckingFlags::ForImmediateMode;
   }
+  if (options.DebugTimeExpressionTypeChecking) {
+    TypeCheckOptions |= TypeCheckingFlags::DebugTimeExpressions;
+  }
 
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {
@@ -506,10 +509,18 @@ void CompilerInstance::performSema() {
     Diags.setSuppressWarnings(DidSuppressWarnings);
     
     if (mainIsPrimary && !Context->hadError() &&
+        Invocation.getFrontendOptions().PCMacro) {
+      performPCMacro(MainFile, PersistentState.getTopLevelContext());
+    }
+    
+    // Playground transform knows to look out for PCMacro's changes and not
+    // to playground log them.
+    if (mainIsPrimary && !Context->hadError() &&
         Invocation.getFrontendOptions().PlaygroundTransform)
       performPlaygroundTransform(MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);
-    if (!mainIsPrimary)
+    if (!mainIsPrimary) {
       performNameBinding(MainFile);
+    }
   }
 
   // Type-check each top-level input besides the main source file.
@@ -545,7 +556,7 @@ void CompilerInstance::performSema() {
 
 void CompilerInstance::performParseOnly() {
   const InputFileKind Kind = Invocation.getInputKind();
-  Module *MainModule = getMainModule();
+  ModuleDecl *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
 
   assert((Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_Swift_Library) &&

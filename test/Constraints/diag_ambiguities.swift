@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func f0(_ i: Int, _ d: Double) {} // expected-note{{found this candidate}}
 func f0(_ d: Double, _ i: Int) {} // expected-note{{found this candidate}}
@@ -28,3 +28,16 @@ C(g) // expected-error{{ambiguous use of 'g'}}
 
 func h<T>(_ x: T) -> () {}
 C(h) // expected-error{{ambiguous use of 'init'}}
+
+func rdar29691909_callee(_ o: AnyObject?) -> Any? { return o } // expected-note {{found this candidate}}
+func rdar29691909_callee(_ o: AnyObject) -> Any { return o } // expected-note {{found this candidate}}
+
+func rdar29691909(o: AnyObject) -> Any? {
+  return rdar29691909_callee(o) // expected-error{{ambiguous use of 'rdar29691909_callee'}}
+}
+
+// Ensure that we decay Any! to Any? rather than allowing Any!-to-Any
+// conversion directly and ending up with an ambiguity here.
+func rdar29907555(_ value: Any!) -> String {
+  return "\(value)" // no error
+}

@@ -2,9 +2,9 @@
 //
 // This source file is part of the Swift.org open source project
 // Licensed under Apache License v2.0 with Runtime Library Exception
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
-// See http://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// See https://swift.org/LICENSE.txt for license information
 //
 //===----------------------------------------------------------------------===//
 //
@@ -119,7 +119,7 @@ class GlobalNumberState {
 };
 
 /// FunctionComparator - Compares two functions to determine whether or not
-/// they will generate machine code with the same behaviour. DataLayout is
+/// they will generate machine code with the same behavior. DataLayout is
 /// used if available. The comparator always fails conservatively (erring on the
 /// side of claiming that two functions are different).
 class FunctionComparator {
@@ -128,7 +128,7 @@ public:
                      GlobalNumberState* GN)
       : FnL(F1), FnR(F2), GlobalNumbers(GN) {}
 
-  /// Test whether the two functions have equivalent behaviour.
+  /// Test whether the two functions have equivalent behavior.
   int compare();
   /// Hash a function. Equivalent functions will have the same hash, and unequal
   /// functions will have different hashes with high probability.
@@ -136,7 +136,7 @@ public:
   static FunctionHash functionHash(Function &);
 
 private:
-  /// Test whether two basic blocks have equivalent behaviour.
+  /// Test whether two basic blocks have equivalent behavior.
   int cmpBasicBlocks(const BasicBlock *BBL, const BasicBlock *BBR);
 
   /// Constants comparison.
@@ -358,6 +358,7 @@ private:
   int cmpAttrs(const AttributeSet L, const AttributeSet R) const;
   int cmpRangeMetadata(const MDNode* L, const MDNode* R) const;
   int cmpOperandBundlesSchema(const Instruction *L, const Instruction *R) const;
+  int cmpOrdering(llvm::AtomicOrdering L, llvm::AtomicOrdering R) const;
 
   // The two functions undergoing comparison.
   const Function *FnL, *FnR;
@@ -521,6 +522,13 @@ int FunctionComparator::cmpOperandBundlesSchema(const Instruction *L,
   }
 
   return 0;
+}
+
+int FunctionComparator::cmpOrdering(llvm::AtomicOrdering L,
+                                    llvm::AtomicOrdering R) const {
+  if (L == R)
+    return 0;
+  return isAtLeastOrStrongerThan(L, R) ? 1 : -1;
 }
 
 /// Constants comparison:
@@ -872,7 +880,7 @@ int FunctionComparator::cmpOperations(const Instruction *L,
             cmpNumbers(LI->getAlignment(), cast<LoadInst>(R)->getAlignment()))
       return Res;
     if (int Res =
-            cmpNumbers(LI->getOrdering(), cast<LoadInst>(R)->getOrdering()))
+            cmpOrdering(LI->getOrdering(), cast<LoadInst>(R)->getOrdering()))
       return Res;
     if (int Res =
             cmpNumbers(LI->getSynchScope(), cast<LoadInst>(R)->getSynchScope()))
@@ -888,7 +896,7 @@ int FunctionComparator::cmpOperations(const Instruction *L,
             cmpNumbers(SI->getAlignment(), cast<StoreInst>(R)->getAlignment()))
       return Res;
     if (int Res =
-            cmpNumbers(SI->getOrdering(), cast<StoreInst>(R)->getOrdering()))
+            cmpOrdering(SI->getOrdering(), cast<StoreInst>(R)->getOrdering()))
       return Res;
     return cmpNumbers(SI->getSynchScope(), cast<StoreInst>(R)->getSynchScope());
   }
@@ -942,7 +950,7 @@ int FunctionComparator::cmpOperations(const Instruction *L,
   }
   if (const FenceInst *FI = dyn_cast<FenceInst>(L)) {
     if (int Res =
-            cmpNumbers(FI->getOrdering(), cast<FenceInst>(R)->getOrdering()))
+            cmpOrdering(FI->getOrdering(), cast<FenceInst>(R)->getOrdering()))
       return Res;
     return cmpNumbers(FI->getSynchScope(), cast<FenceInst>(R)->getSynchScope());
   }
@@ -954,11 +962,11 @@ int FunctionComparator::cmpOperations(const Instruction *L,
     if (int Res = cmpNumbers(CXI->isWeak(),
                              cast<AtomicCmpXchgInst>(R)->isWeak()))
       return Res;
-    if (int Res = cmpNumbers(CXI->getSuccessOrdering(),
-                             cast<AtomicCmpXchgInst>(R)->getSuccessOrdering()))
+    if (int Res = cmpOrdering(CXI->getSuccessOrdering(),
+                              cast<AtomicCmpXchgInst>(R)->getSuccessOrdering()))
       return Res;
-    if (int Res = cmpNumbers(CXI->getFailureOrdering(),
-                             cast<AtomicCmpXchgInst>(R)->getFailureOrdering()))
+    if (int Res = cmpOrdering(CXI->getFailureOrdering(),
+                              cast<AtomicCmpXchgInst>(R)->getFailureOrdering()))
       return Res;
     return cmpNumbers(CXI->getSynchScope(),
                       cast<AtomicCmpXchgInst>(R)->getSynchScope());
@@ -970,8 +978,8 @@ int FunctionComparator::cmpOperations(const Instruction *L,
     if (int Res = cmpNumbers(RMWI->isVolatile(),
                              cast<AtomicRMWInst>(R)->isVolatile()))
       return Res;
-    if (int Res = cmpNumbers(RMWI->getOrdering(),
-                             cast<AtomicRMWInst>(R)->getOrdering()))
+    if (int Res = cmpOrdering(RMWI->getOrdering(),
+                              cast<AtomicRMWInst>(R)->getOrdering()))
       return Res;
     return cmpNumbers(RMWI->getSynchScope(),
                       cast<AtomicRMWInst>(R)->getSynchScope());
@@ -1140,7 +1148,7 @@ int FunctionComparator::cmpOperands(const Instruction *L, const Instruction *R,
   return 0;
 }
 
-// Test whether two basic blocks have equivalent behaviour.
+// Test whether two basic blocks have equivalent behavior.
 int FunctionComparator::cmpBasicBlocks(const BasicBlock *BBL,
                                        const BasicBlock *BBR) {
   BasicBlock::const_iterator InstL = BBL->begin(), InstLE = BBL->end();
@@ -1188,7 +1196,7 @@ int FunctionComparator::cmpBasicBlocks(const BasicBlock *BBL,
   return 0;
 }
 
-// Test whether the two functions have equivalent behaviour.
+// Test whether the two functions have equivalent behavior.
 int FunctionComparator::compare() {
   sn_mapL.clear();
   sn_mapR.clear();
@@ -1972,6 +1980,9 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
                                            FirstF->getLinkage(),
                                            FirstF->getName() + "_merged");
   NewFunction->copyAttributesFrom(FirstF);
+  // NOTE: this function is not externally available, do ensure that we reset
+  // the DLL storage
+  NewFunction->setDLLStorageClass(GlobalValue::DefaultStorageClass);
   NewFunction->setLinkage(GlobalValue::InternalLinkage);
 
   // Insert the new function after the last function in the equivalence class.

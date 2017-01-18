@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -61,6 +61,8 @@ inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
   case SubSeqRelation_t::RHSStrictSubSeqOfLHS:
     return true;
   }
+
+  llvm_unreachable("Unhandled SubSeqRelation_t in switch.");
 }
 
 /// Extract an integer index from a SILValue.
@@ -91,8 +93,9 @@ enum class ProjectionKind : unsigned {
   Upcast = 0,
   RefCast = 1,
   BitwiseCast = 2,
+  TailElems = 3,
   FirstPointerKind = Upcast,
-  LastPointerKind = BitwiseCast,
+  LastPointerKind = TailElems,
 
   // Index Projection Kinds
   FirstIndexKind = 7,
@@ -124,6 +127,7 @@ static inline bool isCastProjectionKind(ProjectionKind Kind) {
   case ProjectionKind::Class:
   case ProjectionKind::Enum:
   case ProjectionKind::Box:
+  case ProjectionKind::TailElems:
     return false;
   }
 }
@@ -155,6 +159,12 @@ struct ProjectionIndex {
     case ValueKind::RefElementAddrInst: {
       RefElementAddrInst *REA = cast<RefElementAddrInst>(V);
       Index = REA->getFieldNo();
+      Aggregate = REA->getOperand();
+      break;
+    }
+    case ValueKind::RefTailAddrInst: {
+      RefTailAddrInst *REA = cast<RefTailAddrInst>(V);
+      Index = 0;
       Aggregate = REA->getOperand();
       break;
     }
@@ -286,18 +296,20 @@ public:
     case ProjectionKind::Enum:
       return BaseType.getEnumElementType(getEnumElementDecl(BaseType), M);
     case ProjectionKind::Box:
-      return SILType::getPrimitiveAddressType(BaseType.castTo<SILBoxType>()->
-                                              getBoxedType());
+      return BaseType.castTo<SILBoxType>()->getFieldType(M, getIndex());
     case ProjectionKind::Tuple:
       return BaseType.getTupleElementType(getIndex());
     case ProjectionKind::Upcast:
     case ProjectionKind::RefCast:
     case ProjectionKind::BitwiseCast:
+    case ProjectionKind::TailElems:
       return getCastType(BaseType);
     case ProjectionKind::Index:
       // Index types do not change the underlying type.
       return BaseType;
     }
+
+    llvm_unreachable("Unhandled ProjectionKind in switch.");
   }
 
   VarDecl *getVarDecl(SILType BaseType) const {
@@ -323,13 +335,19 @@ public:
 
   SILType getCastType(SILType BaseType) const {
     assert(isValid());
-    assert(getKind() == ProjectionKind::Upcast ||
-           getKind() == ProjectionKind::RefCast ||
-           getKind() == ProjectionKind::BitwiseCast);
     auto *Ty = getPointer();
     assert(Ty->isCanonical());
-    return SILType::getPrimitiveType(Ty->getCanonicalType(),
-                                     BaseType.getCategory());
+    switch (getKind()) {
+      case ProjectionKind::Upcast:
+      case ProjectionKind::RefCast:
+      case ProjectionKind::BitwiseCast:
+        return SILType::getPrimitiveType(Ty->getCanonicalType(),
+                                         BaseType.getCategory());
+      case ProjectionKind::TailElems:
+        return SILType::getPrimitiveAddressType(Ty->getCanonicalType());
+      default:
+        llvm_unreachable("unknown cast projection type");
+    }
   }
 
   bool operator<(const Projection &Other) const;
@@ -362,6 +380,7 @@ public:
     }
     case ValueKind::StructElementAddrInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::RefTailAddrInst:
     case ValueKind::ProjectBoxInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
@@ -385,7 +404,8 @@ public:
   /// Returns true if this instruction projects from an object type into an
   /// address subtype.
   static bool isObjectToAddressProjection(SILValue V) {
-    return isa<RefElementAddrInst>(V) || isa<ProjectBoxInst>(V);
+    return isa<RefElementAddrInst>(V) || isa<RefTailAddrInst>(V) ||
+           isa<ProjectBoxInst>(V);
   }
 
   /// Given a specific SILType, return all first level projections if it is an
@@ -410,10 +430,13 @@ public:
     case ProjectionKind::Tuple:
     case ProjectionKind::Index:
     case ProjectionKind::Class:
+    case ProjectionKind::TailElems:
     case ProjectionKind::Enum:
     case ProjectionKind::Box:
       return false;
     }
+
+    llvm_unreachable("Unhandled ProjectionKind in switch.");
   }
 
   bool isNominalKind() const {
@@ -428,8 +451,11 @@ public:
     case ProjectionKind::Tuple:
     case ProjectionKind::Upcast:
     case ProjectionKind::Box:
+    case ProjectionKind::TailElems:
       return false;
     }
+
+    llvm_unreachable("Unhandled ProjectionKind in switch.");
   }
 
   /// Form an aggregate of type BaseType using the SILValue Values. Returns the
@@ -870,6 +896,9 @@ public:
   bool isSingleton() const {
     // If we only have one root node, there is no interesting explosion
     // here. Exit early.
+    //
+    // NOTE: In case of a type unable to be exploded, e.g. enum, we treated it
+    // as a singleton.
     if (ProjectionTreeNodes.size() == 1)
       return true;
 

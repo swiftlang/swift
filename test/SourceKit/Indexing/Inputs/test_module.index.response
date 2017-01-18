@@ -16,6 +16,30 @@
       key.usr: "s:C11test_module2C2"
     },
     {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "ComputedProperty",
+      key.usr: "s:C11test_module16ComputedProperty",
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "value",
+          key.usr: "s:vC11test_module16ComputedProperty5valueSi",
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:value",
+              key.usr: "s:FC11test_module16ComputedPropertyg5valueSi"
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.name: "setter:value",
+              key.usr: "s:FC11test_module16ComputedPropertys5valueSi"
+            }
+          ]
+        }
+      ]
+    },
+    {
       key.kind: source.lang.swift.decl.protocol,
       key.name: "Prot1",
       key.usr: "s:P11test_module5Prot1"
@@ -31,11 +55,6 @@
           key.usr: "s:P11test_module5Prot1"
         }
       ]
-    },
-    {
-      key.kind: source.lang.swift.decl.protocol,
-      key.name: "Prot3",
-      key.usr: "s:P11test_module5Prot3"
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -60,26 +79,14 @@
       ]
     },
     {
-      key.kind: source.lang.swift.decl.class,
-      key.name: "ComputedProperty",
-      key.usr: "s:C11test_module16ComputedProperty",
-      key.entities: [
-        {
-          key.kind: source.lang.swift.decl.var.instance,
-          key.name: "value",
-          key.usr: "s:vC11test_module16ComputedProperty5valueSi",
-          key.entities: [
-            {
-              key.kind: source.lang.swift.decl.function.accessor.getter,
-              key.usr: "s:FC11test_module16ComputedPropertyg5valueSi"
-            },
-            {
-              key.kind: source.lang.swift.decl.function.accessor.setter,
-              key.usr: "s:FC11test_module16ComputedPropertys5valueSi"
-            }
-          ]
-        }
-      ]
+      key.kind: source.lang.swift.decl.protocol,
+      key.name: "Prot3",
+      key.usr: "s:P11test_module5Prot3"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.name: "globalFunc()",
+      key.usr: "s:F11test_module10globalFuncFT_T_"
     },
     {
       key.kind: source.lang.swift.decl.class,

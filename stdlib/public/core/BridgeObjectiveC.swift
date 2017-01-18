@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -161,6 +161,20 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
 /// COMPILER_INTRINSIC
 @_silgen_name("_swift_bridgeAnythingNonVerbatimToObjectiveC")
 public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject
+
+/// Convert a purportedly-nonnull `id` value from Objective-C into an Any.
+///
+/// Since Objective-C APIs sometimes get their nullability annotations wrong,
+/// this includes a failsafe against nil `AnyObject`s, wrapping them up as
+/// a nil `AnyObject?`-inside-an-`Any`.
+///
+/// COMPILER_INTRINSIC
+public func _bridgeAnyObjectToAny(_ possiblyNullObject: AnyObject?) -> Any {
+  if let nonnullObject = possiblyNullObject {
+    return nonnullObject // AnyObject-in-Any
+  }
+  return possiblyNullObject as Any
+}
 
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
@@ -355,7 +369,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     /// Retrieve the value the pointer points to.
     @_transparent get {
       // We can do a strong load normally.
-      return unsafeBitCast(self, to: UnsafeMutablePointer<Pointee>.self).pointee
+      return UnsafePointer(self).pointee
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -455,15 +469,20 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
 }
 
 extension UnsafeMutableRawPointer {
-  /// Convert from `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
+  ///
+  /// - Parameter other: The pointer to convert.
   @_transparent
   public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
-  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
   ///
-  /// Returns nil if `other` is nil.
+  /// - Parameter other: The pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
   @_transparent
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -472,15 +491,20 @@ extension UnsafeMutableRawPointer {
 }
 
 extension UnsafeRawPointer {
-  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
+  ///
+  /// - Parameter other: The pointer to convert.
   @_transparent
   public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
-  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
   ///
-  /// Returns nil if `other` is nil.
+  /// - Parameter other: The pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
   @_transparent
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -546,7 +570,7 @@ internal struct _CocoaFastEnumerationStackBuf {
     _item14 = _item0
     _item15 = _item0
 
-    _sanityCheck(MemoryLayout._ofInstance(self).size >=
+    _sanityCheck(MemoryLayout.size(ofValue: self) >=
                    MemoryLayout<Optional<UnsafeRawPointer>>.size * count)
   }
 }
@@ -564,6 +588,18 @@ extension AutoreleasingUnsafeMutablePointer {
   public init() {
     Builtin.unreachable()
   }
+}
+
+/// Get the ObjC type encoding for a type as a pointer to a C string.
+///
+/// This is used by the Foundation overlays. The compiler will error if the
+/// passed-in type is generic or not representable in Objective-C
+@_transparent
+public func _getObjCTypeEncoding<T>(_ type: T.Type) -> UnsafePointer<Int8> {
+  // This must be `@_transparent` because `Builtin.getObjCTypeEncoding` is
+  // only supported by the compiler for concrete types that are representable
+  // in ObjC.
+  return UnsafePointer(Builtin.getObjCTypeEncoding(type))
 }
 
 #endif

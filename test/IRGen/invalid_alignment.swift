@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -verify
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s -verify
 
 @_alignment(1) // expected-error{{cannot decrease alignment below natural alignment of 4}}
 struct Bar { var x, y, z, w: Float }

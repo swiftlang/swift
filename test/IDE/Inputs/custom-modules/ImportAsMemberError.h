@@ -12,18 +12,6 @@ struct __attribute__((swift_name("ErrorStruct"))) IAMStruct {
 @end
 typedef NSObject<ImportedProtocolBase> *ImportedProtocolBase_t;
 
-@protocol ErrorProto;
-@protocol ErrorProto <ImportedProtocolBase>
-@end
-
-typedef NSObject<ErrorProto> *ErrorProto_t;
-
-// Instance and static member onto protocol
-void mutateSomeStaticState(void)
-    __attribute__((swift_name("ErrorProto.mutateSomeStaticState()"))); // ok
-void mutateSomeInstanceState(ErrorProto_t self) __attribute__((
-    swift_name("ErrorProto.mutateSomeInstanceState(self:)"))); // error
-
 // Non-prototype declaration
 extern void IAMErrorStructHasPrototype(void)
     __attribute__((swift_name("ErrorStruct.hasPrototype()"))); // ok

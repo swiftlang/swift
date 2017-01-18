@@ -16,9 +16,9 @@ DictionaryTests.test("index<Hashable>(forKey:)") {
   expectEqual(2020, d[d.index(forKey: 20)!].value)
   expectEqual(3030, d[d.index(forKey: 30.0)!].value)
 
-  expectEmpty(d.index(forKey: 10.0))
-  expectEmpty(d.index(forKey: 20.0))
-  expectEmpty(d.index(forKey: 30))
+  expectNil(d.index(forKey: 10.0))
+  expectNil(d.index(forKey: 20.0))
+  expectNil(d.index(forKey: 30))
 }
 
 DictionaryTests.test("subscript<Hashable>(_:)") {
@@ -100,7 +100,7 @@ DictionaryTests.test("updateValue<Hashable>(_:forKey:)") {
     expectEqual(expected, d)
   }
 
-  expectEmpty(d.updateValue(4040, forKey: 10.0))
+  expectNil(d.updateValue(4040, forKey: 10.0))
   do {
     let expected: [AnyHashable : Int] = [
       AnyHashable(10) : 101010,
@@ -111,7 +111,7 @@ DictionaryTests.test("updateValue<Hashable>(_:forKey:)") {
     expectEqual(expected, d)
   }
 
-  expectEmpty(d.updateValue(5050, forKey: 20.0))
+  expectNil(d.updateValue(5050, forKey: 20.0))
   do {
     let expected: [AnyHashable : Int] = [
       AnyHashable(10) : 101010,
@@ -123,7 +123,7 @@ DictionaryTests.test("updateValue<Hashable>(_:forKey:)") {
     expectEqual(expected, d)
   }
 
-  expectEmpty(d.updateValue(6060, forKey: 30))
+  expectNil(d.updateValue(6060, forKey: 30))
   do {
     let expected: [AnyHashable : Int] = [
       AnyHashable(10) : 101010,
@@ -144,9 +144,9 @@ DictionaryTests.test("removeValue<Hashable>(forKey:)") {
     AnyHashable(30.0) : 3030,
   ]
 
-  expectEmpty(d.removeValue(forKey: 10.0))
-  expectEmpty(d.removeValue(forKey: 20.0))
-  expectEmpty(d.removeValue(forKey: 30))
+  expectNil(d.removeValue(forKey: 10.0))
+  expectNil(d.removeValue(forKey: 20.0))
+  expectNil(d.removeValue(forKey: 30))
 
   expectEqual(1010, d.removeValue(forKey: 10)!)
   expectEqual(2020, d.removeValue(forKey: 20)!)

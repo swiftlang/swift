@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 // FuncDecl: Choose 0
 func f1<T>(x: T) {}
@@ -63,4 +63,17 @@ struct S23<T where T: Comparable> where T: Equatable {} // expected-warning {{'w
 // NominalTypeDecl: Choose 3
 // 1,2,3
 struct S123<T: Hashable where T: Comparable> where T: Equatable {} // expected-warning {{'where' clause next to generic parameters is deprecated and will be removed in the future version of Swift}} {{24-44=}} {{46-51=where T: Comparable,}}
+
+
+protocol ProtoA {}
+protocol ProtoB {}
+protocol ProtoC {}
+protocol ProtoD {}
+func testCombinedConstraints<T: ProtoA & ProtoB where T: ProtoC>(x: T) {} // expected-warning {{'where' clause next to generic parameters is deprecated and will be removed in the future version of Swift}} {{48-64=}} {{71-71= where T: ProtoC}}
+func testCombinedConstraints<T: ProtoA & ProtoB where T: ProtoC>(x: T) where T: ProtoD {} // expected-warning {{'where' clause next to generic parameters is deprecated and will be removed in the future version of Swift}} {{48-64=}} {{72-77=where T: ProtoC,}}
+
+func testCombinedConstraintsOld<T: protocol<ProtoA, ProtoB> where T: ProtoC>(x: T) {} // expected-warning {{'where' clause next to generic parameters is deprecated and will be removed in the future version of Swift}} {{60-76=}} {{83-83= where T: ProtoC}}
+// expected-warning@-1 {{'protocol<...>' composition syntax is deprecated}}
+func testCombinedConstraintsOld<T: protocol<ProtoA, ProtoB> where T: ProtoC>(x: T) where T: ProtoD {} // expected-warning {{'where' clause next to generic parameters is deprecated and will be removed in the future version of Swift}} {{60-76=}} {{84-89=where T: ProtoC,}}
+// expected-warning@-1 {{'protocol<...>' composition syntax is deprecated}}
 

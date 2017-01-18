@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -parse-as-library %s | %FileCheck %s
 
 
 func dup<T>(_ x: T) -> (T, T) { return (x,x) }
@@ -6,7 +6,8 @@ func dup<T>(_ x: T) -> (T, T) { return (x,x) }
 // CHECK:      ([[RESULT_0:%.*]] : $*T, [[RESULT_1:%.*]] : $*T, [[XVAR:%.*]] : $*T):
 // CHECK-NEXT: debug_value_addr [[XVAR]] : $*T, let, name "x"
 // CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[RESULT_0]]
-// CHECK-NEXT: copy_addr [take] [[XVAR]] to [initialization] [[RESULT_1]]
+// CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[RESULT_1]]
+// CHECK-NEXT: destroy_addr [[XVAR]]
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
 // CHECK-NEXT: return [[T0]]
 

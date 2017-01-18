@@ -16,6 +16,8 @@ We use multiple approaches to test the Swift toolchain.
 
 * LLVM lit-based testsuites for the compiler, runtime and the standard library.
 
+* Unit tests for sub-tools.
+
 * A selection of open source projects written in Swift.
 
 The LLVM lit-based testsuite
@@ -36,11 +38,13 @@ The LLVM lit-based testsuite
 Testsuite subsets
 -----------------
 
-The testsuite is split into three subsets:
+The testsuite is split into four subsets:
 
 * Primary testsuite, located under ``swift/test``.
 
 * Validation testsuite, located under ``swift/validation-test``.
+
+* Unit tests, located under ``swift/unittests``.
 
 * Long tests, which are marked with ``REQUIRES: long_test``.
 
@@ -62,7 +66,9 @@ test suite, via ``utils/build-script --validation-test``.
 Although it is not recommended for day-to-day contributions, it is also
 technically possible to execute the tests directly via CMake. For example, if you have
 built Swift products at the directory ``build/Ninja-ReleaseAssert/swift-macosx-x86_64``,
-you may run the entire test suite directly using the following command::
+you may run the entire test suite directly using the following command:
+
+.. code-block:: bash
 
   cmake --build build/Ninja-ReleaseAssert/swift-macosx-x86_64 -- check-swift-macosx-x86_64
 
@@ -89,6 +95,11 @@ Besides ``check-swift``, other targets are also available. Here's the full list:
 
   Runs all tests (primary, validation, and long).
 
+* ``SwiftUnitTests``
+
+  Builds all unit tests.  Executables are located under
+  ``${SWIFT_BUILD_ROOT}/unittests`` and must be run individually.
+
 For every target above, there are variants for different optimizations:
 
 * the target itself (e.g., ``check-swift``) -- runs all tests from the primary
@@ -112,7 +123,9 @@ For every target above, there are variants for different optimizations:
   ``executable_test`` in ``-Onone`` mode.
 
 If you need to manually run certain tests, you can invoke LLVM's lit.py script
-directly. For example::
+directly. For example:
+
+.. code-block:: bash
 
     % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/Parse/
 
@@ -128,7 +141,7 @@ source 'test/' directory.) There is a more verbose form that specifies the
 testing configuration explicitly, which then allows you to test files
 regardless of location.
 
-::
+.. code-block:: bash
 
     % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
 
@@ -136,6 +149,23 @@ For more complicated configuration, copy the invocation from one of the build
 targets mentioned above and modify it as necessary. lit.py also has several
 useful features, like timing tests and providing a timeout. Check these features
 out with ``lit.py -h``.
+
+Extra lit.py invocation options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* ``--param gmalloc`` will run all tests under Guard Malloc (macOS only). See
+  ``man libgmalloc`` for more information.
+
+* ``--param swift-version=<MAJOR>`` overrides the default Swift language
+  version used by swift/swiftc and swift-ide-test.
+
+* ``--param interpret`` is an experimental option for running execution tests
+  using Swift's interpreter rather than compiling them first. Note that this
+  does not affect all substitutions.
+
+* ``--param swift_test_mode=<MODE>`` drives the various suffix variations
+  mentioned above. Again, it's best to get the invocation from the existing
+  build system targets and modify it rather than constructing it yourself.
 
 Writing tests
 -------------
@@ -192,8 +222,8 @@ Substitutions in lit tests
 Substitutions that start with ``%target`` configure the compiler for building
 code for the target that is not the build machine:
 
-* ``%target-parse-verify-swift``: parse and type check the current Swift file
-  for the target platform and verify diagnostics, like ``swift -frontend -parse -verify
+* ``%target-typecheck-verify-swift``: parse and type check the current Swift file
+  for the target platform and verify diagnostics, like ``swift -frontend -typecheck -verify
   %s``.
 
   Use this substitution for testing semantic analysis in the compiler.
@@ -242,7 +272,7 @@ code for the target that is not the build machine:
 
 * ``%target-sil-opt``: run ``sil-opt`` for the target.
 
-* ``%target-sil-extract``: run ``sil-extract`` for the target.
+* ``%target-sil-func-extractor``: run ``sil-func-extractor`` for the target.
 
 * ``%target-swift-ide-test``: run ``swift-ide-test`` for the target.
 
@@ -314,7 +344,7 @@ When you can't use ``%target-*`` substitutions, you can use:
 
 * ``%sil-opt``: like ``%target-sil-opt`` for the build machine.
 
-* ``%sil-extract``: run ``%target-sil-extract`` for the build machine.
+* ``%sil-func-extractor``: run ``%target-sil-func-extractor`` for the build machine.
 
 * ``%lldb-moduleimport-test``: run ``lldb-moduleimport-test`` for the build
   machine in order simulate importing LLDB importing modules from the
@@ -358,10 +388,16 @@ Other substitutions:
 * ``%{python}``: run the same Python interpreter that's being used to run the
   current ``lit`` test.
 
+* ``%FileCheck``: like the LLVM ``FileCheck`` utility, but occurrences of full
+  paths to the source and build directories in the input text are replaced with
+  path-independent constants.
+
+* ``%raw-FileCheck``: the LLVM ``FileCheck`` utility.
+
 When writing a test where output (or IR, SIL) depends on the bitness of the
 target CPU, use this pattern::
 
-  // RUN: %target-swift-frontend ... | FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
+  // RUN: %target-swift-frontend ... | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
 
   // CHECK: common line
   // CHECK-32: only for 32-bit
@@ -377,7 +413,7 @@ target CPU, use this pattern::
 When writing a test where output (or IR, SIL) depends on the target CPU itself,
 use this pattern::
 
-  // RUN: %target-swift-frontend ... | FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+  // RUN: %target-swift-frontend ... | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 
   // CHECK: common line
   // CHECK-i386:        only for i386
@@ -402,6 +438,10 @@ FIXME: full list.
   plus cpu configuration.
 
 * ``optimized_stdlib_<CPUNAME>``: an optimized stdlib plus cpu configuration.
+
+* ``SWIFT_VERSION=<MAJOR>``: restricts a test to Swift 3 or Swift 4. If you
+  need to use this, make sure to add a test for the other version as well
+  unless you are specifically testing ``-swift-version``-related functionality.
 
 * ``XFAIL: linux``: tests that need to be adapted for Linux, for example parts
   that depend on Objective-C interop need to be split out.

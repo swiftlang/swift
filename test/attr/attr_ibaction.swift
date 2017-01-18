@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: objc_interop
 
@@ -62,6 +62,11 @@ protocol CP2 : class { }
   @IBAction func action4(_: AnyObject) {}
   @IBAction func action5(_: AnyObject?) {}
   @IBAction func action6(_: AnyObject!) {}
+
+  // Any
+  @IBAction func action4a(_: Any) {}
+  @IBAction func action5a(_: Any?) {}
+  @IBAction func action6a(_: Any!) {}
 
   // Protocol types
   @IBAction func action7(_: P1) {} // expected-error{{argument to @IBAction method cannot have non-object type 'P1'}}

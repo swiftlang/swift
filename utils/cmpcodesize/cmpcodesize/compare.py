@@ -2,11 +2,11 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 from __future__ import print_function
 
@@ -17,39 +17,32 @@ import subprocess
 
 from operator import itemgetter
 
-prefixes = {
+categories = [
     # Cpp
-    "__Z": "CPP",
-    "_swift": "CPP",
-    "__swift": "CPP",
+    ["CPP", re.compile('^(__Z|_+swift)')],
 
     # Objective-C
-    "+[": "ObjC",
-    "-[": "ObjC",
+    ["ObjC", re.compile('^[+-]\[')],
 
     # Swift
-    "__TP": "Partial Apply",
-    "__TTW": "Protocol Witness",
-    "__Tw": "Value Witness",
-    "__TM": "Type Metadata",
-    "__TF": "Swift Function",
-    "__TTSg": "Generic Spec",
-    "__TTSf": "FuncSig Spec",
-    "__TZF": "Static Func",
+    ["Partial Apply", re.compile('^__(TPA|T0.*T[aA]$)')],
+    ["Protocol Witness", re.compile('^__(TTW|T0.*TW$)')],
+    ["Value Witness", re.compile('^__(Tw|T0.*w..$)')],
+    ["Type Metadata", re.compile('^__(TM|T0.*(N|M.)$)')],
     # Function signature specialization of a generic specialization.
-    "__TTSGF": "FuncSigGen Spec",
-    "__TTo": "Swift @objc Func",
-}
-
-infixes = {
-    # Swift
-    "q_": "Generic Function"
-}
-
-generic_function_prefix = "__TTSg"
-
-sorted_prefixes = sorted(prefixes)
-sorted_infixes = sorted(infixes)
+    ["FuncSigGen Spec", re.compile(
+        '^__(TTSf.*__TTSg|T0.*T[gGpP]q?[0-9].*Tfq?[0-9])')],
+    ["Generic Spec", re.compile('^__(TTSg|T0.*T[gGpP]q?[0-9])')],
+    ["FuncSig Spec", re.compile('^__(TTSf|T0.*Tfq?[0-9])')],
+    ["Generic Function", re.compile(
+        '__(T[^0].*q(x|d?[0-9]*_)|T0.*q(z|d?[0-9]*_))')],
+    ["Static Func", re.compile('^__(TZF|T0.*FZ)')],
+    ["Swift @objc Func", re.compile('^__(TTo|T0.*To$)')],
+    ["Accessor", re.compile('^__(TW[atTlI]|T0.*W[atTlI]$)')],
+    ["Getter/Setter", re.compile('^__(T[Fvi][gsmwWl]|T0.*f[gGsmwWal]$)')],
+    ["Swift Function", re.compile('^__(TF|T0.*(F|f.|f[AuU][0-9]*_)$)')],
+    ["Unknown", re.compile('')]
+]
 
 
 def add_function(sizes, function, start_addr, end_addr, group_by_prefix):
@@ -59,20 +52,15 @@ def add_function(sizes, function, start_addr, end_addr, group_by_prefix):
     size = end_addr - start_addr
 
     if group_by_prefix:
-        for infix in sorted_infixes:
-            if infix in function:
-                if generic_function_prefix not in function:
-                    sizes[infixes[infix]] += size
-                    return
-        for prefix in sorted_prefixes:
-            if function.startswith(prefix):
-                # Special handling for function signature specializations
-                # of generic specializations.
-                if prefix == "__TTSf" and generic_function_prefix in function:
-                    prefix = "__TTSGF"
-                sizes[prefixes[prefix]] += size
+        if function.endswith('_merged'):
+            function = function[:-7]
+        for cat in categories:
+            cat_name = cat[0]
+            pattern = cat[1]
+            if pattern.match(function):
+                sizes[cat_name] += size
                 return
-        sizes["Unknown"] += size
+        assert False, "function name not matching any pattern"
     else:
         sizes[function] += size
 
@@ -195,12 +183,9 @@ def compare_sizes_of_file(old_files, new_files, all_sections, list_categories):
 
     compare_sizes(old_sizes, new_sizes, "__text", title)
     if list_categories:
-        prev = None
-        for category_name in sorted(prefixes.values()) + \
-                sorted(infixes.values()) + ["Unknown"]:
-            if category_name != prev:
-                compare_sizes(old_sizes, new_sizes, category_name, "")
-            prev = category_name
+        for cat in categories:
+            cat_name = cat[0]
+            compare_sizes(old_sizes, new_sizes, cat_name, "")
 
     if all_sections:
         section_title = "    section"

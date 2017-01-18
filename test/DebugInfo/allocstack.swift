@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
-// RUN: %target-swift-frontend %s -emit-sil -g -o - | FileCheck -check-prefix=CHECK-SIL %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-sil -g -o - | %FileCheck -check-prefix=CHECK-SIL %s
 import StdlibUnittest
 
 // Test that debug info for local variables is preserved by the

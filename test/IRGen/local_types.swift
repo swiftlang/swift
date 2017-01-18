@@ -1,14 +1,12 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-frontend -emit-module %S/Inputs/local_types_helper.swift -o %t
-// RUN: %target-swift-frontend -emit-ir -parse-as-library %s -I %t > %t.ll
-// RUN: FileCheck %s < %t.ll
-// RUN: FileCheck -check-prefix=NEGATIVE %s < %t.ll
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module %S/Inputs/local_types_helper.swift -o %t
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -parse-as-library %s -I %t > %t.ll
+// RUN: %FileCheck %s < %t.ll
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.ll
 
 // XFAIL: linux
 
 import local_types_helper
-
-// CHECK-DAG: @_TMVF18local_types_helper4testFT_T_L_1S = external hidden global %swift.type
 
 public func singleFunc() {
   // CHECK-DAG: @_TWVVF11local_types10singleFuncFT_T_L_16SingleFuncStruct = hidden constant
@@ -34,7 +32,7 @@ public struct PatternStruct {
   })()
 }
 
-public func singleDefaultArgument(i i: Int = {
+public func singleDefaultArgument(i: Int = {
   // CHECK-DAG: @_TWVVFIF11local_types21singleDefaultArgumentFT1iSi_T_A_U_FT_SiL_27SingleDefaultArgumentStruct = hidden constant
   struct SingleDefaultArgumentStruct {
     let i: Int
@@ -89,7 +87,6 @@ public func innerIfConfig() {
 
 // CHECK-LABEL: define{{( protected)?}} void @_TF11local_types8callTestFT_T_() {{.*}} {
 public func callTest() {
-  // CHECK: call %swift.type* @_TMaMVF18local_types_helper4testFT_T_L_1S()
   test()
 } // CHECK: {{^[}]$}}
 

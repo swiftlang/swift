@@ -1,6 +1,6 @@
-// RUN: %target-swift-remoteast-test-with-sdk %s | FileCheck %s
+// RUN: %target-swift-remoteast-test-with-sdk %s | %FileCheck %s
 
-// REQUIRES: swift_interpreter
+// REQUIRES: swift-remoteast-test
 // REQUIRES: objc_interop
 
 import Foundation

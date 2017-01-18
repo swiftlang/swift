@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -O %s | %FileCheck %s
 
+// REQUIRES: 30043258
 // XFAIL: linux
 
 import Darwin
@@ -25,15 +26,43 @@ public func test2(f : Double) -> Double {
 // we want sqrt(negative) to be defined to be NaN for IEEE 754 conformance.
 
 // CHECK-LABEL: define {{.*}}test3
-// CHECK-NOT: call double @llvm.sqrt.f64
+// CHECK: call double @sqrt
 
 public func test3(d : Double) -> Double {
   return sqrt(d)
 }
 
 // CHECK-LABEL: define {{.*}}test4
-// CHECK-NOT: call float @llvm.sqrt.f32
+// CHECK: call float @sqrtf
 
 public func test4(f : Float) -> Float {
   return sqrt(f)
+}
+
+// CHECK-LABEL: define {{.*}}test5
+// CHECK: ret float 2
+
+public func test5( ) -> Float {
+  return sqrt(4)
+}
+
+// CHECK-LABEL: define {{.*}}test6
+// CHECK: ret double 2
+
+public func test6( ) -> Double {
+  return sqrt(4)
+}
+
+// CHECK-LABEL: define {{.*}}test7
+// CHECK-NOT: ret float undef
+
+public func test7( ) -> Float {
+  return sqrt(-1)
+}
+
+// CHECK-LABEL: define {{.*}}test8
+// CHECK-NOT: ret double undef
+
+public func test8( ) -> Double {
+  return sqrt(-1)
 }

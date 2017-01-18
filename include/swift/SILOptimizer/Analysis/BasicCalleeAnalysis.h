@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -76,7 +76,7 @@ public:
 class CalleeCache {
   typedef llvm::SmallVector<SILFunction *, 16> Callees;
   typedef llvm::PointerIntPair<Callees *, 1> CalleesAndCanCallUnknown;
-  typedef llvm::DenseMap<AbstractFunctionDecl *, CalleesAndCanCallUnknown>
+  typedef llvm::DenseMap<SILDeclRef, CalleesAndCanCallUnknown>
       CacheType;
 
   SILModule &M;
@@ -101,16 +101,20 @@ public:
   /// Return the list of callees that can potentially be called at the
   /// given apply site.
   CalleeList getCalleeList(FullApplySite FAS) const;
+  /// Return the list of callees that can potentially be called at the
+  /// given instruction. E.g. it could be destructors.
+  CalleeList getCalleeList(SILInstruction *I) const;
 
 private:
   void enumerateFunctionsInModule();
   void sortAndUniqueCallees();
   CalleesAndCanCallUnknown &getOrCreateCalleesForMethod(SILDeclRef Decl);
   void computeClassMethodCalleesForClass(ClassDecl *CD);
+  void computeClassMethodCallees(ClassDecl *CD, SILDeclRef Method);
   void computeWitnessMethodCalleesForWitnessTable(SILWitnessTable &WT);
   void computeMethodCallees();
   SILFunction *getSingleCalleeForWitnessMethod(WitnessMethodInst *WMI) const;
-  CalleeList getCalleeList(AbstractFunctionDecl *Decl) const;
+  CalleeList getCalleeList(SILDeclRef Decl) const;
   CalleeList getCalleeList(WitnessMethodInst *WMI) const;
   CalleeList getCalleeList(ClassMethodInst *CMI) const;
   CalleeList getCalleeListForCalleeKind(SILValue Callee) const;
@@ -140,6 +144,13 @@ public:
       Cache = llvm::make_unique<CalleeCache>(M);
 
     return Cache->getCalleeList(FAS);
+  }
+
+  CalleeList getCalleeList(SILInstruction *I) {
+    if (!Cache)
+      Cache = llvm::make_unique<CalleeCache>(M);
+
+    return Cache->getCalleeList(I);
   }
 };
 

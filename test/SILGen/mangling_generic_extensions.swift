@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 struct Foo<T> {
 }
@@ -53,6 +53,6 @@ extension Runcible {
 }
 
 extension Runcible where Self.Spoon == Self.Hat {
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8Runciblewx3Hatzwx5SpoonrS0_5runcefT_T_
+  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8Runciblewx5Spoonzwx3HatrS0_5runcefT_T_
   func runce() {}
 }

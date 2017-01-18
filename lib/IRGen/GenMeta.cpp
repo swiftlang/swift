@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
@@ -224,7 +223,7 @@ namespace {
       assert(Types.size() == Values.size());
     }
   };
-}
+} // end anonymous namespace
 
 /// Given an array of polymorphic arguments as might be set up by
 /// GenericArguments, bind the polymorphic parameters.
@@ -236,7 +235,7 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   array = IGF.Builder.CreateElementBitCast(array, IGF.IGM.TypeMetadataPtrTy);
 
   auto getInContext = [&](CanType type) -> CanType {
-    return ArchetypeBuilder::mapTypeIntoContext(typeDecl, type, nullptr)
+    return typeDecl->mapTypeIntoContext(type)
              ->getCanonicalType();
   };
 
@@ -267,8 +266,8 @@ static bool isTypeErasedGenericClassType(CanType type) {
 }
 
 // Get the type that exists at runtime to represent a compile-time type.
-static CanType
-getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
+CanType
+irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
   return CanType(type.transform([&](Type t) -> Type {
     if (isTypeErasedGenericClassType(CanType(t))) {
       return t->getAnyNominal()->getDeclaredType()->getCanonicalType();
@@ -435,12 +434,7 @@ bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass) {
   // is enough to conclusively force us into a slower path.
   // Eventually we might have an attribute here or something based on
   // the deployment target.
-  return hasKnownSwiftImplementation(IGM, theClass);
-}
-
-/// Is the given class known to have an implementation in Swift?
-bool irgen::hasKnownSwiftImplementation(IRGenModule &IGM, ClassDecl *theClass) {
-  return !theClass->hasClangNode();
+  return theClass->hasKnownSwiftImplementation();
 }
 
 /// Is the given method known to be callable by vtable lookup?
@@ -451,7 +445,7 @@ bool irgen::hasKnownVTableEntry(IRGenModule &IGM,
   if (!theClass) {
     return false;
   }
-  return hasKnownSwiftImplementation(IGM, theClass);
+  return theClass->hasKnownSwiftImplementation();
 }
 
 /// Is it basically trivial to access the given metadata?  If so, we don't
@@ -474,7 +468,7 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
         return false;
 
     // Resiliently-sized metadata access always requires an accessor.
-    return (IGM.getTypeInfoForLowered(type).isFixedSize());
+    return (IGM.getTypeInfoForUnlowered(type).isFixedSize());
   }
 
   // The empty tuple type has a singleton metadata.
@@ -766,12 +760,6 @@ namespace {
       }
     }
 
-    llvm::Value *visitPolymorphicFunctionType(CanPolymorphicFunctionType type) {
-      IGF.unimplemented(SourceLoc(),
-                        "metadata ref for polymorphic function type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
-    }
-
     llvm::Value *visitGenericFunctionType(CanGenericFunctionType type) {
       IGF.unimplemented(SourceLoc(),
                         "metadata ref for generic function type");
@@ -1039,7 +1027,7 @@ namespace {
       return metatype;
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit a type metadata reference without using an accessor function.
 static llvm::Value *emitDirectTypeMetadataRef(IRGenFunction &IGF,
@@ -1147,7 +1135,7 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   // code in emitInPlaceTypeMetadataAccessFunctionBody.
   if (!isLoadFrom(directResult, cache)) {
     IGF.Builder.CreateStore(directResult, cache)
-      ->setAtomic(llvm::Release);
+      ->setAtomic(llvm::AtomicOrdering::Release);
   }
 
   IGF.Builder.CreateBr(contBB);
@@ -1244,7 +1232,7 @@ createInPlaceMetadataInitializationFunction(IRGenModule &IGM,
   // Store back to the cache variable.
   IGF.Builder.CreateStore(relocatedMetadata,
                           Address(cacheVariable, IGM.getPointerAlignment()))
-    ->setAtomic(llvm::Release);
+    ->setAtomic(llvm::AtomicOrdering::Release);
 
   IGF.Builder.CreateRetVoid();
   return fn;
@@ -1340,7 +1328,7 @@ static llvm::Value *emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   // Non-native types are just wrapped in various ways.
   if (auto classDecl = dyn_cast<ClassDecl>(typeDecl)) {
     // We emit a completely different pattern for foreign classes.
-    if (classDecl->isForeign()) {
+    if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       return emitForeignTypeMetadataRef(IGF, type);
     }
 
@@ -1554,7 +1542,31 @@ namespace {
     llvm::Value *visitType(CanType t) {
       return IGF.emitTypeMetadataRef(t);
     }
-      
+
+    llvm::Value *visitBoundGenericEnumType(CanBoundGenericEnumType type) {
+      // Optionals have a lowered payload type, so we recurse here.
+      if (auto objectTy = CanType(type).getAnyOptionalObjectType()) {
+        auto payloadMetadata = visit(objectTy);
+        llvm::Value *args[] = { payloadMetadata };
+        llvm::Type *types[] = { IGF.IGM.TypeMetadataPtrTy };
+
+        // Call the generic metadata accessor function.
+        llvm::Function *accessor =
+            IGF.IGM.getAddrOfGenericTypeMetadataAccessFunction(
+                type->getDecl(), types, NotForDefinition);
+
+        auto result = IGF.Builder.CreateCall(accessor, args);
+        result->setDoesNotThrow();
+        result->addAttribute(llvm::AttributeSet::FunctionIndex,
+                             llvm::Attribute::ReadNone);
+
+        return result;
+      }
+
+      // Otherwise, generic arguments are not lowered.
+      return visitType(type);
+    }
+
     llvm::Value *visitTupleType(CanTupleType type) {
       if (auto cached = tryGetLocal(type))
         return cached;
@@ -1671,6 +1683,7 @@ namespace {
       case SILFunctionType::Representation::WitnessMethod:
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::CFunctionPointer:
+      case SILFunctionType::Representation::Closure:
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
         return emitDirectMetadataRef(C.TheRawPointerType);
@@ -1683,6 +1696,8 @@ namespace {
         // All block types look like Builtin.UnknownObject.
         return emitDirectMetadataRef(C.TheUnknownObjectType);
       }
+
+      llvm_unreachable("Not a valid SILFunctionType.");
     }
 
     llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type) {
@@ -1708,24 +1723,26 @@ namespace {
         // FIXME: It'd be nice not to need a runtime call here.
         return IGF.emitTypeMetadataRef(type);
       }
+
+      llvm_unreachable("Not a valid MetatypeRepresentation.");
     }
 
     /// Try to find the metatype in local data.
     llvm::Value *tryGetLocal(CanType type) {
       return IGF.tryGetLocalTypeDataForLayout(
-                                          SILType::getPrimitiveObjectType(type),
+                                          IGF.IGM.getLoweredType(type),
                                           LocalTypeDataKind::forTypeMetadata());
     }
 
     /// Set the metatype in local data.
     llvm::Value *setLocal(CanType type, llvm::Instruction *metatype) {
-      IGF.setScopedLocalTypeDataForLayout(SILType::getPrimitiveObjectType(type),
+      IGF.setScopedLocalTypeDataForLayout(IGF.IGM.getLoweredType(type),
                                           LocalTypeDataKind::forTypeMetadata(),
                                           metatype);
       return metatype;
     }
   };
-}
+} // end anonymous namespace
 
 llvm::Value *IRGenFunction::emitTypeMetadataRefForLayout(SILType type) {
   return EmitTypeMetadataRefForLayout(*this).visit(type.getSwiftRValueType());
@@ -1770,7 +1787,7 @@ namespace {
     /// Emit the type layout by projecting it from dynamic type metadata.
     llvm::Value *emitFromTypeMetadata(CanType t) {
       auto *vwtable = IGF.emitValueWitnessTableRefForLayout(
-                                            SILType::getPrimitiveObjectType(t));
+                                                    IGF.IGM.getLoweredType(t));
       return emitFromValueWitnessTablePointer(vwtable);
     }
 
@@ -1811,7 +1828,7 @@ namespace {
 
     /// Fallback default implementation.
     llvm::Value *visitType(CanType t) {
-      auto silTy = SILType::getPrimitiveObjectType(t);
+      auto silTy = IGF.IGM.getLoweredType(t);
       auto &ti = IGF.getTypeInfo(silTy);
 
       // If the type is in the same source file, or has a common value
@@ -1850,6 +1867,7 @@ namespace {
       case SILFunctionType::Representation::WitnessMethod:
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::CFunctionPointer:
+      case SILFunctionType::Representation::Closure:
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
         return emitFromValueWitnessTable(C.TheRawPointerType);
@@ -1861,6 +1879,8 @@ namespace {
         // All block types look like Builtin.UnknownObject.
         return emitFromValueWitnessTable(C.TheUnknownObjectType);
       }
+
+      llvm_unreachable("Not a valid SILFunctionType.");
     }
 
     llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type) {
@@ -1879,6 +1899,8 @@ namespace {
         return emitFromValueWitnessTable(
                      CanMetatypeType::get(IGF.IGM.Context.TheNativeObjectType));
       }
+
+      llvm_unreachable("Not a valid MetatypeRepresentation.");
     }
 
     llvm::Value *visitAnyClassType(ClassDecl *classDecl) {
@@ -1896,6 +1918,8 @@ namespace {
       case ReferenceCounting::Error:
         llvm_unreachable("classes shouldn't have this kind of refcounting");
       }
+
+      llvm_unreachable("Not a valid ReferenceCounting.");
     }
 
     llvm::Value *visitClassType(CanClassType type) {
@@ -2414,8 +2438,10 @@ namespace {
                          NominalTypeDecl::StoredPropertyRange storedProperties){
     SmallVector<FieldTypeInfo, 4> types;
     for (VarDecl *prop : storedProperties) {
-      types.push_back(FieldTypeInfo(prop->getType()->getCanonicalType(),
-                                    /*indirect*/ false));
+      auto propertyType = prop->getType()->getCanonicalType();
+      types.push_back(FieldTypeInfo(propertyType,
+                                    /*indirect*/ false,
+                                    propertyType->is<WeakStorageType>()));
     }
     return getFieldTypeAccessorFn(IGM, type, types);
   }
@@ -2426,12 +2452,25 @@ namespace {
                          NominalTypeDecl *type,
                          ArrayRef<EnumImplStrategy::Element> enumElements) {
     SmallVector<FieldTypeInfo, 4> types;
+
+    // This is a terrible special case, but otherwise the archetypes
+    // aren't mapped correctly because the EnumImplStrategy ends up
+    // using the lowered cases, i.e. the cases for Optional<>.
+    if (type->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional) {
+      assert(enumElements.size() == 1);
+      auto caseType =
+        IGM.Context.getImplicitlyUnwrappedOptionalSomeDecl()
+           ->getArgumentType()->getCanonicalType();
+      types.push_back(FieldTypeInfo(caseType, false, false));
+      return getFieldTypeAccessorFn(IGM, type, types);
+    }
+
     for (auto &elt : enumElements) {
       assert(elt.decl->hasArgumentType() && "enum case doesn't have arg?!");
       auto caseType = elt.decl->getArgumentType()->getCanonicalType();
       bool isIndirect = elt.decl->isIndirect()
         || elt.decl->getParentEnum()->isIndirect();
-      types.push_back(FieldTypeInfo(caseType, isIndirect));
+      types.push_back(FieldTypeInfo(caseType, isIndirect, /*weak*/ false));
     }
     return getFieldTypeAccessorFn(IGM, type, types);
   }
@@ -2686,7 +2725,7 @@ namespace {
     }
   };
 
-}
+} // end anonymous namespace
 
 void
 IRGenModule::addLazyFieldTypeAccessor(NominalTypeDecl *type,
@@ -2760,6 +2799,18 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   // use it to provide metadata for generic parameters in field types.
   IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, metadata);
   
+  // Bind archetype access paths if the type is generic.
+  if (type->isGenericContext()) {
+    auto declCtxt = type;
+    if (auto generics = declCtxt->getGenericSignatureOfContext()) {
+      auto getInContext = [&](CanType type) -> CanType {
+        return declCtxt->mapTypeIntoContext(type)
+            ->getCanonicalType();
+      };
+      bindArchetypeAccessPaths(IGF, generics, getInContext);
+    }
+  }
+
   // Allocate storage for the field vector.
   unsigned allocSize = fieldTypes.size() * IGM.getPointerSize().getValue();
   auto allocSizeVal = llvm::ConstantInt::get(IGM.IntPtrTy, allocSize);
@@ -2784,9 +2835,13 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
     
     auto metadata = IGF.emitTypeMetadataRef(fieldTy);
 
+    auto fieldTypeInfo = fieldTypes[i];
+
     // Mix in flag bits.
-    if (fieldTypes[i].isIndirect()) {
-      auto flags = FieldType().withIndirect(true);
+    if (fieldTypeInfo.hasFlags()) {
+      auto flags = FieldType()
+        .withIndirect(fieldTypeInfo.isIndirect())
+        .withWeak(fieldTypeInfo.isWeak());
       auto metadataBits = IGF.Builder.CreatePtrToInt(metadata, IGF.IGM.SizeTy);
       metadataBits = IGF.Builder.CreateOr(metadataBits,
                    llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getIntValue()));
@@ -3108,7 +3163,7 @@ namespace {
       return makeArray(IGM.Int8PtrTy, privateData);
     }
   };
-}
+} // end anonymous namespace
 
 // Classes
 
@@ -3626,9 +3681,7 @@ namespace {
         return;
       }
 
-      Type superclassTy
-        = ArchetypeBuilder::mapTypeIntoContext(Target,
-                                               Target->getSuperclass());
+      Type superclassTy = Target->mapTypeIntoContext(Target->getSuperclass());
 
       if (!addReferenceToHeapMetadata(superclassTy->getCanonicalType(),
                                       /*allowUninit*/ false)) {
@@ -3767,7 +3820,7 @@ namespace {
       llvm::Value *superMetadata;
       if (Target->hasSuperclass()) {
         Type superclass = Target->getSuperclass();
-        superclass = ArchetypeBuilder::mapTypeIntoContext(Target, superclass);
+        superclass = Target->mapTypeIntoContext(superclass);
         superMetadata =
           emitClassHeapMetadataRef(IGF, superclass->getCanonicalType(),
                                    MetadataValueType::ObjCClass);
@@ -3962,7 +4015,7 @@ namespace {
       (void) emitFinishInitializationOfClassMetadata(IGF, metadata);
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit the ObjC-compatible class symbol for a class.
 /// Since LLVM and many system linkers do not have a notion of relative symbol
@@ -4150,7 +4203,7 @@ namespace {
       super::addParentMetadataRef(forClass, classType);
     }
   END_METADATA_SEARCHER()
-}
+} // end anonymous namespace
 
 /// Return the index of the parent metadata pointer for the given class.
 static int getClassParentIndex(IRGenModule &IGM, ClassDecl *classDecl) {
@@ -4205,7 +4258,7 @@ namespace {
         this->setTargetOffset();
     }
   END_GENERIC_METADATA_SEARCHER(GenericRequirements)
-}
+} // end anonymous namespace
 
 static int getIndexOfGenericRequirement(IRGenModule &IGM,
                                         NominalTypeDecl *decl,
@@ -4453,6 +4506,8 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
     return objcClass;
   }
   }
+
+  llvm_unreachable("Not a valid IsaEncoding.");
 }
 
 /// Given an object of class type, produce the heap metadata reference
@@ -4588,7 +4643,7 @@ namespace {
       super::addMethod(fn);
     }
   END_METADATA_SEARCHER()
-}
+} // end anonymous namespace
 
 /// Load the correct virtual function for the given class method.
 llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
@@ -4671,9 +4726,11 @@ namespace {
       : super(IGM, theDecl) {}
 
     CanType getParentType() const {
-      Type parentType =
-        Target->getDeclContext()->getDeclaredTypeInContext();
-      return (parentType ? parentType->getCanonicalType() : CanType());
+      Type type = Target->getDeclaredTypeInContext();
+      Type parentType = type->getNominalParent();
+      if (parentType)
+        return parentType->getCanonicalType();
+      return CanType();
     }
 
   public:
@@ -4694,7 +4751,7 @@ namespace {
       addWord(parentMetadata);
     }
   };
-}
+} // end anonymous namespace
 
 static llvm::Value *
 emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
@@ -4795,8 +4852,7 @@ namespace {
       assert(var->hasStorage() &&
              "storing field offset for computed property?!");
       SILType structType =
-        SILType::getPrimitiveAddressType(
-                       Target->getDeclaredTypeInContext()->getCanonicalType());
+        IGM.getLoweredType(Target->getDeclaredTypeInContext());
 
       llvm::Constant *offset =
         emitPhysicalStructMemberFixedOffset(IGM, structType, var);
@@ -4925,12 +4981,12 @@ namespace {
                                 llvm::Value *vwtable) {
       // Nominal types are always preserved through SIL lowering.
       auto structTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-      IGM.getTypeInfoForLowered(structTy)
+      IGM.getTypeInfoForUnlowered(structTy)
         .initializeMetadata(IGF, metadata, vwtable,
-                            SILType::getPrimitiveAddressType(structTy));
+                            IGF.IGM.getLoweredType(structTy));
     }
   };
-}
+} // end anonymous namespace
 
 /// Emit the type metadata or metadata template for a struct.
 void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
@@ -5032,7 +5088,7 @@ public:
   
   void addPayloadSize() {
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
+    auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
     if (!enumTI.isFixedSize(ResilienceExpansion::Maximal)) {
       addConstantWord(0);
       HasUnfilledPayloadSize = true;
@@ -5102,7 +5158,7 @@ public:
     // In all cases where a payload size is demanded in the metadata, it's
     // runtime-dependent, so fill in a zero here.
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
+    auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
     (void) enumTI;
     assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
            "non-generic, non-resilient enums don't need payload size in metadata");
@@ -5114,13 +5170,13 @@ public:
                               llvm::Value *vwtable) {
     // Nominal types are always preserved through SIL lowering.
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    IGM.getTypeInfoForLowered(enumTy)
+    IGM.getTypeInfoForUnlowered(enumTy)
       .initializeMetadata(IGF, metadata, vwtable,
-                          SILType::getPrimitiveAddressType(enumTy));
+                          IGF.IGM.getLoweredType(enumTy));
   }
 };
   
-}
+} // end anonymous namespace
 
 void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   // Set up a dummy global to stand in for the metadata object while we produce
@@ -5422,7 +5478,7 @@ namespace {
       assert(HasUnfilledParent);
     }
   };
-}
+} // end anonymous namespace
 
 llvm::Constant *
 IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
@@ -5538,6 +5594,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ErrorCodeProtocol:
     return SpecialProtocol::None;
   }
+
+  llvm_unreachable("Not a valid KnownProtocolKind.");
 }
 
 namespace {

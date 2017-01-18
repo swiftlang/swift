@@ -33,10 +33,6 @@ Classes:
     SwiftPrivate: true
 - Name: TKSmartCardATRInterfaceGroup
   SwiftName: TKSmartCardATR.InterfaceGroup
-- Name: TKTokenKeyAlgorithm
-  SwiftName: TKTokenSessionDelegate.KeyAlgorithm
-- Name: TKTokenKeyExchangeParameters
-  SwiftName: TKTokenSessionDelegate.KeyExchangeParameters
 Protocols:
 - Name: TKTokenSessionDelegate
   Methods:

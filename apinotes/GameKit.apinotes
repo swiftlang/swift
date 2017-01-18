@@ -5,7 +5,7 @@ Classes:
     Methods:
       - Selector:        'localPlayer'
         MethodKind:      Class
-        FactoryAsInit:   C
+        SwiftName:       'localPlayer()'
 Tags:
 - Name: GKErrorCode
   NSErrorDomain: GKErrorDomain

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -85,7 +85,7 @@ public // @testable
 func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
   desired: AnyObject) -> Bool {
-  var expected: UnsafeRawPointer? = nil
+  var expected: UnsafeRawPointer?
   let desiredPtr = Unmanaged.passRetained(desired).toOpaque()
   let wonRace = _stdlib_atomicCompareExchangeStrongPtr(
     object: unsafeBitCast(target, to: _PointerToPointer.self),
@@ -348,7 +348,7 @@ internal struct _Buffer72 {
 % for bits in [ 32, 64, 80 ]:
 
 % if bits == 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
 % end
 
 @_silgen_name("swift_float${bits}ToString")
@@ -495,13 +495,13 @@ class _SwiftNativeNSSet {}
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSEnumeratorBase)
 class _SwiftNativeNSEnumerator {}
 
-// FIXME(ABI): move into the Foundation overlay and remove 'open'
+// FIXME(ABI)#60 : move into the Foundation overlay and remove 'open'
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSDataBase)
 open class _SwiftNativeNSData {
   public init() {}
 }
 
-// FIXME(ABI): move into the Foundation overlay and remove 'open'
+// FIXME(ABI)#61 : move into the Foundation overlay and remove 'open'
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSCharacterSetBase)
 open class _SwiftNativeNSCharacterSet {
   public init() {}

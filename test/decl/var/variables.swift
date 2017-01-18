@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var t1 : Int
 var t2 = 10
@@ -8,15 +8,11 @@ var t7, t8 : Int
 var t9, t10 = 20 // expected-error {{type annotation missing in pattern}}
 var t11, t12 : Int = 20 // expected-error {{type annotation missing in pattern}}
 var t13 = 2.0, t14 : Int
-var (x = 123, // expected-error 2 {{expected ',' separator}} {{7-7=,}} {{7-7=,}} expected-error {{expected pattern}}
-     y = 456) : (Int,Int) // expected-error 2 {{expected ',' separator}} {{7-7=,}} {{7-7=,}} expected-error {{expected pattern}}
+var (x = 123, // expected-error {{expected ',' separator}} {{7-7=,}} expected-error {{expected pattern}}
+     y = 456) : (Int,Int)
 var bfx : Int, bfy : Int
 
 _ = 10
-
-func _(_ x: Int) {} // expected-error {{keyword '_' cannot be used as an identifier here}}
-// expected-note @-1 {{if this name is unavoidable, use backticks to escape it}}
-
 
 var self1 = self1 // expected-error {{variable used within its own initial value}}
 var self2 : Int = self2 // expected-error {{variable used within its own initial value}}

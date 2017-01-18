@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | %FileCheck %s
 //
 // REQUIRES: objc_interop
 
@@ -27,5 +27,7 @@ func extensionMethodCurrying(_ x: Foo) {
 
 // CHECK-LABEL: sil shared [thunk] @_TFC15extensions_objc3Foo3kayF
 // CHECK:         function_ref @_TTDFC15extensions_objc3Foo3kayf
-// CHECK:       sil shared [transparent] [thunk] @_TTDFC15extensions_objc3Foo3kayf
-// CHECK:         class_method [volatile] %0 : $Foo, #Foo.kay!1.foreign
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTDFC15extensions_objc3Foo3kayf
+// CHECK:         bb0([[SELF:%.*]] : $Foo):
+// CHECK:           [[SELF_COPY:%.*]] = copy_value [[SELF]]
+// CHECK:           class_method [volatile] [[SELF_COPY]] : $Foo, #Foo.kay!1.foreign

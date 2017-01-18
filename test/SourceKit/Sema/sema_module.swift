@@ -1,4 +1,4 @@
-// RUN: %sourcekitd-test -req=sema %s -- %s | FileCheck %s
+// RUN: %sourcekitd-test -req=sema %s -- %s | %FileCheck %s
 Swift.String
 Swift
 // CHECK: key.kind: source.lang.swift.ref.struct,

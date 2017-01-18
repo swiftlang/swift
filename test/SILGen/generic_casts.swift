@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 protocol ClassBound : class {}
 protocol NotClassBound {}
@@ -41,7 +41,7 @@ func opaque_archetype_to_class_archetype
 <T:NotClassBound, U:ClassBound> (_ t:T) -> U {
   return t as! U
   // CHECK: unconditional_checked_cast_addr take_always T in {{%.*}} : $*T to U in [[DOWNCAST_ADDR:%.*]] : $*U
-  // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]] : $*U
+  // CHECK: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]] : $*U
   // CHECK: return [[DOWNCAST]] : $U
 }
 
@@ -58,7 +58,7 @@ func class_archetype_to_class_archetype
 <T:ClassBound, U:ClassBound>(_ t:T) -> U {
   return t as! U
   // CHECK: unconditional_checked_cast_addr {{.*}} T in {{%.*}} : $*T to U in [[DOWNCAST_ADDR:%.*]] : $*U
-  // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]]
+  // CHECK: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]]
   // CHECK: return [[DOWNCAST]] : $U
 }
 
@@ -89,7 +89,7 @@ func opaque_archetype_to_loadable_concrete
 <T:NotClassBound>(_ t:T) -> S {
   return t as! S
   // CHECK: unconditional_checked_cast_addr take_always T in {{%.*}} : $*T to S in [[DOWNCAST_ADDR:%.*]] : $*S
-  // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]] : $*S
+  // CHECK: [[DOWNCAST:%.*]] = load [trivial] [[DOWNCAST_ADDR]] : $*S
   // CHECK: return [[DOWNCAST]] : $S
 }
 
@@ -141,7 +141,7 @@ func opaque_existential_to_class_archetype
 <T:ClassBound>(_ p:NotClassBound) -> T {
   return p as! T
   // CHECK: unconditional_checked_cast_addr take_always NotClassBound in {{%.*}} : $*NotClassBound to T in [[DOWNCAST_ADDR:%.*]] : $*T
-  // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]] : $*T
+  // CHECK: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]] : $*T
   // CHECK: return [[DOWNCAST]] : $T
 }
 
@@ -157,7 +157,7 @@ func class_existential_to_class_archetype
 <T:ClassBound>(_ p:ClassBound) -> T {
   return p as! T
   // CHECK: unconditional_checked_cast_addr {{.*}} ClassBound in {{%.*}} : $*ClassBound to T in [[DOWNCAST_ADDR:%.*]] : $*T
-  // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]]
+  // CHECK: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]]
   // CHECK: return [[DOWNCAST]] : $T
 }
 
@@ -185,7 +185,7 @@ func opaque_existential_is_addr_only_concrete(_ p: NotClassBound) -> Bool {
 func opaque_existential_to_loadable_concrete(_ p: NotClassBound) -> S {
   return p as! S
   // CHECK:   unconditional_checked_cast_addr take_always NotClassBound in {{%.*}} : $*NotClassBound to S in [[DOWNCAST_ADDR:%.*]] : $*S
-  // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]] : $*S
+  // CHECK: [[DOWNCAST:%.*]] = load [trivial] [[DOWNCAST_ADDR]] : $*S
   // CHECK: return [[DOWNCAST]] : $S
 }
 

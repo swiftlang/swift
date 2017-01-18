@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %s -import-objc-header %S/Inputs/errors.h -o %t/main
 // RUN: %target-run %t/main
 
@@ -40,13 +40,13 @@ ErrorHandlingTests.test("succeedIgnoringError") {
 ErrorHandlingTests.test("fail") {
   let obj = ErrorImpl()
   let result = testFail(obj)
-  expectEmpty(result)
+  expectNil(result)
 }
 
 ErrorHandlingTests.test("failIgnoringError") {
   let obj = ErrorImpl()
   let result = testFailIgnoringError(obj)
-  expectEmpty(result)
+  expectNil(result)
 }
 
 runAllTests()

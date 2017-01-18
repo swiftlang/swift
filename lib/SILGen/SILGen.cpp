@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -36,7 +36,7 @@ using namespace Lowering;
 // SILGenModule Class implementation
 //===----------------------------------------------------------------------===//
 
-SILGenModule::SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile)
+SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM, bool makeModuleFragile)
   : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
     Profiler(nullptr), makeModuleFragile(makeModuleFragile) {
 }
@@ -44,6 +44,20 @@ SILGenModule::SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile)
 SILGenModule::~SILGenModule() {
   assert(!TopLevelSGF && "active source file lowering!?");
   M.verify();
+}
+
+EnumElementDecl *SILGenModule::getLoweredEnumElementDecl(EnumElementDecl *elt) {
+  auto &ctx = getASTContext();
+  if (elt->getParentEnum()->classifyAsOptionalType()
+        != OTK_ImplicitlyUnwrappedOptional)
+    return elt;
+
+  if (elt == ctx.getImplicitlyUnwrappedOptionalSomeDecl()) {
+    return ctx.getOptionalSomeDecl();
+  } else {
+    assert(elt == ctx.getImplicitlyUnwrappedOptionalNoneDecl());
+    return ctx.getOptionalNoneDecl();
+  }
 }
 
 static SILDeclRef
@@ -59,7 +73,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
 
   if (!cacheSlot) {
     ASTContext &ctx = SGM.M.getASTContext();
-    Module *mod = ctx.getLoadedModule(moduleName);
+    ModuleDecl *mod = ctx.getLoadedModule(moduleName);
     if (!mod) {
       SGM.diagnose(SourceLoc(), diag::bridging_module_missing,
                    moduleName.str(), functionName);
@@ -67,7 +81,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     }
 
     SmallVector<ValueDecl *, 2> decls;
-    mod->lookupValue(/*accessPath=*/{}, ctx.getIdentifier(functionName),
+    mod->lookupValue(/*AccessPath=*/{}, ctx.getIdentifier(functionName),
                      NLKind::QualifiedLookup, decls);
     if (decls.empty()) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_missing,
@@ -87,7 +101,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
-    assert(fd->hasType() && "bridging functions must be type-checked");
+    assert(fd->hasInterfaceType() && "bridging functions must be type-checked");
 
     // Check that the function takes the expected arguments and returns the
     // expected result type.
@@ -319,15 +333,13 @@ VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
   return found;
 }
 
-ProtocolConformance *
+Optional<ProtocolConformanceRef>
 SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   auto proto = getBridgedStoredNSError(loc);
-  if (!proto) return nullptr;
+  if (!proto) return None;
 
   // Find the conformance to _BridgedStoredNSError.
-  auto result = SwiftModule->lookupConformance(type, proto, nullptr);
-  if (result) return result->getConcrete();
-  return nullptr;
+  return SwiftModule->lookupConformance(type, proto, nullptr);
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
@@ -382,7 +394,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   // builtins.
   CanType Int32Ty;
   if (auto Int32Decl = dyn_cast_or_null<TypeDecl>(findStdlibDecl("Int32"))) {
-    Int32Ty = Int32Decl->getDeclaredType()->getCanonicalType();
+    Int32Ty = Int32Decl->getDeclaredInterfaceType()->getCanonicalType();
   } else {
     Int32Ty = CanType(BuiltinIntegerType::get(32, C));
   }
@@ -390,9 +402,10 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   CanType PtrPtrInt8Ty = C.TheRawPointerType;
   if (auto PointerDecl = C.getUnsafeMutablePointerDecl()) {
     if (auto Int8Decl = cast<TypeDecl>(findStdlibDecl("Int8"))) {
+      Type Int8Ty = Int8Decl->getDeclaredInterfaceType();
       Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
                                                  nullptr,
-                                                 Int8Decl->getDeclaredType());
+                                                 Int8Ty);
       Type OptPointerInt8Ty = OptionalType::get(PointerInt8Ty);
       PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
                                            nullptr,
@@ -577,8 +590,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
 
   assert(F->empty() && "already emitted function?!");
 
-  F->setContextGenericParams(
-                         Types.getConstantInfo(constant).ContextGenericParams);
+  F->setGenericEnvironment(Types.getConstantInfo(constant).GenericEnv);
 
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
@@ -586,7 +598,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
 
   DEBUG(llvm::dbgs() << "lowering ";
         F->printName(llvm::dbgs());
-        llvm::dbgs() << " : $";
+        llvm::dbgs() << " : ";
         F->getLoweredType().print(llvm::dbgs());
         llvm::dbgs() << '\n';
         if (astNode) {
@@ -1026,9 +1038,9 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
   unsigned index = 0;
   for (auto paramList : paramLists) {
     for (auto param : *paramList) {
-      if (auto handle = param->getDefaultValue())
+      if (auto defaultArg = param->getDefaultValue())
         emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
-                                handle->getExpr());
+                                defaultArg);
       ++index;
     }
   }
@@ -1183,6 +1195,9 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
   if (!TopLevelSGF->B.hasValidInsertionPoint())
     return;
 
+  ProfilerRAII Profiler(*this, td);
+  TopLevelSGF->emitProfilerIncrement(td->getBody());
+ 
   for (auto &ESD : td->getBody()->getElements()) {
     if (!TopLevelSGF->B.hasValidInsertionPoint()) {
       if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
@@ -1205,31 +1220,6 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
     } else {
       TopLevelSGF->visit(ESD.get<Decl*>());
     }
-  }
-}
-
-static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
-  assert(gen.B.getInsertionBB()->getIterator() == gen.F.begin()
-         && "not at entry point?!");
-
-  SILBasicBlock *entry = gen.B.getInsertionBB();
-  // Create the argc and argv arguments.
-  auto &C = gen.getASTContext();
-  auto FnTy = gen.F.getLoweredFunctionType();
-  auto argc = new (gen.F.getModule()) SILArgument(
-                                  entry, FnTy->getParameters()[0].getSILType());
-  auto argv = new (gen.F.getModule()) SILArgument(
-                                  entry, FnTy->getParameters()[1].getSILType());
-
-  // If the standard library provides a _stdlib_didEnterMain intrinsic, call it
-  // first thing.
-  if (auto didEnterMain = C.getDidEnterMain(nullptr)) {
-    ManagedValue params[] = {
-      ManagedValue::forUnmanaged(argc),
-      ManagedValue::forUnmanaged(argv),
-    };
-    (void) gen.emitApplyOfLibraryIntrinsic(loc, didEnterMain, {}, params,
-                                           SGFContext());
   }
 }
 
@@ -1295,9 +1285,13 @@ public:
       sgm.TopLevelSGF->prepareRethrowEpilog(
                                  CleanupLocation::getModuleCleanupLocation());
 
+      // Create the argc and argv arguments.
       auto PrologueLoc = RegularLocation::getModuleLocation();
       PrologueLoc.markAsPrologue();
-      emitTopLevelProlog(*sgm.TopLevelSGF, PrologueLoc);
+      auto entry = sgm.TopLevelSGF->B.getInsertionBB();
+      auto FnTy = sgm.TopLevelSGF->F.getLoweredFunctionType();
+      entry->createFunctionArgument(FnTy->getParameters()[0].getSILType());
+      entry->createFunctionArgument(FnTy->getParameters()[1].getSILType());
 
       scope.emplace(sgm.TopLevelSGF->Cleanups,
                     CleanupLocation::getModuleCleanupLocation());
@@ -1352,7 +1346,8 @@ public:
         auto returnBB = gen.createBasicBlock();
         if (gen.B.hasValidInsertionPoint())
           gen.B.createBranch(returnLoc, returnBB, returnValue);
-        returnValue = returnBB->createBBArg(returnType);
+        returnValue =
+            returnBB->createPHIArgument(returnType, ValueOwnershipKind::Owned);
         gen.B.emitBlock(returnBB);
 
         // Emit the rethrow block.
@@ -1360,7 +1355,7 @@ public:
                                     FunctionSection::Postmatter);
 
         // Log the error.
-        SILValue error = rethrowBB->getBBArg(0);
+        SILValue error = rethrowBB->getArgument(0);
         gen.B.createBuiltin(moduleLoc,
                             sgm.getASTContext().getIdentifier("errorInMain"),
                             sgm.Types.getEmptyTupleType(), {}, {error});
@@ -1396,8 +1391,12 @@ public:
       // Assign a debug scope pointing into the void to the top level function.
       toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc, toplevel));
 
+      // Create the argc and argv arguments.
       SILGenFunction gen(sgm, *toplevel);
-      emitTopLevelProlog(gen, mainClass);
+      auto entry = gen.B.getInsertionBB();
+      auto FnTy = gen.F.getLoweredFunctionType();
+      entry->createFunctionArgument(FnTy->getParameters()[0].getSILType());
+      entry->createFunctionArgument(FnTy->getParameters()[1].getSILType());
       gen.emitArtificialTopLevel(mainClass);
     }
   }
@@ -1410,6 +1409,9 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
   for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem))
     visit(D);
 
+  for (Decl *D : sf->LocalTypeDecls)
+    visit(D);
+
   // Mark any conformances as "used".
   for (auto conformance : sf->getUsedConformances())
     useConformance(ProtocolConformanceRef(conformance));
@@ -1420,7 +1422,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,
+SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
                         Optional<unsigned> startElem, bool makeModuleFragile,
                         bool isWholeModule) {
   SharedTimer timer("SILGen");
@@ -1493,7 +1495,7 @@ SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(Module *mod,
+swift::performSILGeneration(ModuleDecl *mod,
                             SILOptions &options,
                             bool makeModuleFragile,
                             bool wholeModuleCompilation) {

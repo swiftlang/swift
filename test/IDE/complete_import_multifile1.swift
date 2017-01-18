@@ -1,5 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT1 | FileCheck %s -check-prefix=CLANG_IMPORT1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -second-source-filename %S/Inputs/complete_import_multifile2.swift -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT1 | FileCheck %s -check-prefix=CLANG_IMPORT1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT1 | %FileCheck %s -check-prefix=CLANG_IMPORT1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -second-source-filename %S/Inputs/complete_import_multifile2.swift -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT1 | %FileCheck %s -check-prefix=CLANG_IMPORT1
 // REQUIRES: objc_interop
 
 import #^CLANG_IMPORT1^#

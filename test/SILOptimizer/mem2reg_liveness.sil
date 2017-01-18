@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -mem2reg | %FileCheck %s
 
 import Builtin
 import Swift
@@ -39,7 +39,7 @@ bb3:                                              // Preds: bb1
   br bb4                                          // id: %24
 
 bb4:                                              // Preds: bb3 bb2
-  // function_ref  
+  // function_ref
   %25 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %36
   %26 = load %8 : $*Int64                       // user: %30
   %27 = integer_literal $Builtin.Int64, 2         // user: %31

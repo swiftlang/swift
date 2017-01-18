@@ -1,4 +1,4 @@
-// RUN: not %swift -parse -target %target-triple %s -emit-fixits-path %t.remap -I %S/Inputs
+// RUN: not %swift -typecheck -target %target-triple %s -emit-fixits-path %t.remap -I %S/Inputs
 // RUN: c-arcmt-test %t.remap | arcmt-test -verify-transformed-files %s.result
 
 class Base {}
@@ -77,6 +77,51 @@ func testMask12(a: MyEventMask2?) {
 func testMask13(a: MyEventMask2?) {
   testMask1(a: a) // no fix, nullability mismatch.
 }
+func testMask14() {
+  sendIt(1)
+  sendItOpt(2)
+}
+
+struct Wrapper {
+  typealias InnerMask = MyEventMask2
+}
+func sendItInner(_: Wrapper.InnerMask) {}
+func testInnerMask(a: UInt64) {
+  sendItInner(a)
+}
+
+struct SomeName : RawRepresentable {
+  init(_ rawValue: String) {}
+  init(rawValue: String) {}
+  var rawValue: String { return "" }
+}
+func testPassSomeName(_: SomeName) {}
+func testConvertSomeName(s: String) {
+  testPassSomeName("\(s)}")
+}
+
+class WrappedClass {}
+class WrappedClassSub: WrappedClass {}
+struct ClassWrapper : RawRepresentable {
+  var rawValue: WrappedClass
+}
+func testPassAnyObject(_: AnyObject) {}
+func testPassAnyObjectOpt(_: AnyObject?) {}
+func testPassWrappedSub(_: WrappedClassSub) {}
+func testConvertClassWrapper(_ x: ClassWrapper, _ sub: WrappedClassSub) {
+  testPassAnyObject(x)
+  testPassAnyObjectOpt(x)
+  testPassWrappedSub(x)
+
+  let iuo: ClassWrapper! = x
+  testPassAnyObject(iuo)
+  testPassAnyObjectOpt(iuo)
+
+  let _: ClassWrapper = sub
+  let _: ClassWrapper = x.rawValue
+  // FIXME: This one inserts 'as!', which is incorrect.
+  let _: ClassWrapper = sub as AnyObject
+}
 
 enum MyEnumType : UInt32 {
   case invalid
@@ -100,7 +145,7 @@ func baz(var x: Int) {
   x += 10
 }
 func foo(let y: String, inout x: Int) {
-  
+
 }
 
 struct Test1 : OptionSet {
@@ -169,8 +214,12 @@ var graph: Graph2
 class Graph3<NodeType : ObjCProt> {}
 var graph: Graph3
 
-class GraphNoFix<NodeType : SomeProt> {}
-var graph: GraphNoFix
+class Graph4<NodeType : SomeProt> {}
+var graph: Graph4
+var graphAgain = Graph4()
+
+class GraphCombo<NodeType : SomeProt & ObjCProt> {}
+var graph: GraphCombo
 
 func evilCommas(s: String) {
   _ = s[s.startIndex..<<#editorplaceholder#>]
@@ -189,7 +238,7 @@ protocol NonObjCProtocol {}
   @IBOutlet private var ibout3: NonObjCProtocol!
   @IBOutlet private let ibout4: IBIssues!
   @IBOutlet private var ibout5: [[IBIssues]]!
-  @IBOutlet private var ibout6: [String:String]!
+  @IBOutlet private var ibout6: [String: String]!
   @IBInspectable static private var ibinspect1: IBIssues!
   @IBAction static func ibact() {}
 }
@@ -215,9 +264,49 @@ func testescape(rec: ()->()) {
   fnWithClosure { rec() }
 }
 
+@warn_unused_result func testDeprecatedAttr() -> Int { return 0 }
+
 protocol Prot1 {}
 protocol Prot2 {
   associatedtype Ty = Prot1
 }
 class Cls1 : Prot1 {}
 func testwhere<T: Prot2 where T.Ty == Cls1>(_: T) {}
+
+enum E {
+  case abc
+}
+func testEnumRename() { _ = E.Abc }
+
+func testAnyToAnyObject(x: Any) {
+  x.instMeth(p: 1)
+}
+
+func testProtocolCompositionSyntax() {
+  var _: protocol<>
+  var _: protocol<Prot1>
+  var _: protocol<Prot1, Prot2>
+}
+
+func disable_unnamed_param_reorder(p: Int, _: String) {}
+disable_unnamed_param_reorder(0, "") // no change.
+
+prefix operator ***** {}
+
+class BoolFoo : BooleanType {
+  var boolValue: Bool {return false}
+}
+func testBoolValue(a : BoolFoo) {
+  if a { }
+  guard a {}
+  if a as BoolFoo {}
+}
+
+protocol P1 {}
+protocol P2 {}
+var a : protocol<P1, P2>?
+var a2 : protocol<P1>= 17
+
+class TestOptionalMethodFixit {
+  optional func test() {}
+}

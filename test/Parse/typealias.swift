@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 //===--- Simple positive tests.
 
@@ -9,7 +9,10 @@ var fiveInts : FiveInts = ((4,2), (1,2,3))
 
 
 // <rdar://problem/13339798> QoI: poor diagnostic in malformed typealias
-typealias Foo : Int  // expected-error {{expected '=' in typealias declaration}} {{15-16==}}
+typealias Foo1 : Int  // expected-error {{expected '=' in typealias declaration}} {{16-17==}}
+typealias Foo2: Int  // expected-error {{expected '=' in typealias declaration}} {{15-16= =}}
+typealias Foo3 :Int  // expected-error {{expected '=' in typealias declaration}} {{16-17== }}
+typealias Foo4:/*comment*/Int  // expected-error {{expected '=' in typealias declaration}} {{15-16= = }}
 
 //===--- Tests for error recovery.
 
@@ -28,3 +31,4 @@ typealias Recovery5 : Int, Float // expected-error {{expected '=' in typealias d
 
 typealias Recovery6 = = // expected-error {{expected type in typealias declaration}}
 
+typealias switch = Int // expected-error {{keyword 'switch' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{11-17=`switch`}}

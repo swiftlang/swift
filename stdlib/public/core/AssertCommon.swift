@@ -2,13 +2,15 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+import SwiftShims
 
 // Implementation Note: this file intentionally uses very LOW-LEVEL
 // CONSTRUCTS, so that assert and fatal may be used liberally in
@@ -70,39 +72,6 @@ func _fatalErrorFlags() -> UInt32 {
 #endif
 }
 
-@_silgen_name("_swift_stdlib_reportFatalErrorInFile")
-func _reportFatalErrorInFile(
-  // FIXME(ABI): add argument labels to conform to API guidelines.
-  _ prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
-  _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
-  _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
-  _ line: UInt, flags: UInt32)
-
-@_silgen_name("_swift_stdlib_reportFatalError")
-func _reportFatalError(
-  // FIXME(ABI): add argument labels to conform to API guidelines.
-  _ prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
-  _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
-  flags: UInt32)
-
-@_versioned
-@_silgen_name("_swift_stdlib_reportUnimplementedInitializerInFile")
-func _reportUnimplementedInitializerInFile(
-  // FIXME(ABI): add argument labels to conform to API guidelines.
-  _ className: UnsafePointer<UInt8>, _ classNameLength: UInt,
-  _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
-  _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
-  _ line: UInt, _ column: UInt,
-  flags: UInt32)
-
-@_versioned
-@_silgen_name("_swift_stdlib_reportUnimplementedInitializer")
-func _reportUnimplementedInitializer(
-  // FIXME(ABI): add argument labels to conform to API guidelines.
-  _ className: UnsafePointer<UInt8>, _ classNameLength: UInt,
-  _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
-  flags: UInt32)
-
 /// This function should be used only in the implementation of user-level
 /// assertions.
 ///
@@ -111,10 +80,9 @@ func _reportUnimplementedInitializer(
 @_versioned
 @inline(never)
 @_semantics("stdlib_binary_only")
-func _assertionFailed(
-  // FIXME(ABI): add argument labels to conform to API guidelines.
+func _assertionFailure(
   _ prefix: StaticString, _ message: StaticString,
-  _ file: StaticString, _ line: UInt,
+  file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
   prefix.withUTF8Buffer {
@@ -123,11 +91,11 @@ func _assertionFailed(
       (message) -> Void in
       file.withUTF8Buffer {
         (file) -> Void in
-        _reportFatalErrorInFile(
-          prefix.baseAddress!, UInt(prefix.count),
-          message.baseAddress!, UInt(message.count),
-          file.baseAddress!, UInt(file.count), line,
-          flags: flags)
+        _swift_stdlib_reportFatalErrorInFile(
+          prefix.baseAddress!, CInt(prefix.count),
+          message.baseAddress!, CInt(message.count),
+          file.baseAddress!, CInt(file.count), UInt32(line),
+          flags)
         Builtin.int_trap()
       }
     }
@@ -143,10 +111,9 @@ func _assertionFailed(
 @_versioned
 @inline(never)
 @_semantics("stdlib_binary_only")
-func _assertionFailed(
-  // FIXME(ABI): add argument labels to conform to API guidelines.
+func _assertionFailure(
   _ prefix: StaticString, _ message: String,
-  _ file: StaticString, _ line: UInt,
+  file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
   prefix.withUTF8Buffer {
@@ -155,11 +122,11 @@ func _assertionFailed(
       (messageUTF8) -> Void in
       file.withUTF8Buffer {
         (file) -> Void in
-        _reportFatalErrorInFile(
-          prefix.baseAddress!, UInt(prefix.count),
-          messageUTF8.baseAddress!, UInt(messageUTF8.count),
-          file.baseAddress!, UInt(file.count), line,
-          flags: flags)
+        _swift_stdlib_reportFatalErrorInFile(
+          prefix.baseAddress!, CInt(prefix.count),
+          messageUTF8.baseAddress!, CInt(messageUTF8.count),
+          file.baseAddress!, CInt(file.count), UInt32(line),
+          flags)
       }
     }
   }
@@ -177,9 +144,8 @@ func _assertionFailed(
 @_semantics("stdlib_binary_only")
 @_semantics("arc.programtermination_point")
 func _fatalErrorMessage(
-  // FIXME(ABI): add argument labels to conform to API guidelines.
   _ prefix: StaticString, _ message: StaticString,
-  _ file: StaticString, _ line: UInt,
+  file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
 #if INTERNAL_CHECKS_ENABLED
@@ -189,11 +155,11 @@ func _fatalErrorMessage(
       (message) in
       file.withUTF8Buffer {
         (file) in
-        _reportFatalErrorInFile(
-          prefix.baseAddress!, UInt(prefix.count),
-          message.baseAddress!, UInt(message.count),
-          file.baseAddress!, UInt(file.count), line,
-          flags: flags)
+        _swift_stdlib_reportFatalErrorInFile(
+          prefix.baseAddress!, CInt(prefix.count),
+          message.baseAddress!, CInt(message.count),
+          file.baseAddress!, CInt(file.count), UInt32(line),
+          flags)
       }
     }
   }
@@ -202,10 +168,10 @@ func _fatalErrorMessage(
     (prefix) in
     message.withUTF8Buffer {
       (message) in
-      _reportFatalError(
-        prefix.baseAddress!, UInt(prefix.count),
-        message.baseAddress!, UInt(message.count),
-        flags: flags)
+      _swift_stdlib_reportFatalError(
+        prefix.baseAddress!, CInt(prefix.count),
+        message.baseAddress!, CInt(message.count),
+        flags)
     }
   }
 #endif
@@ -235,11 +201,12 @@ func _unimplementedInitializer(className: StaticString,
         (initName) in
         file.withUTF8Buffer {
           (file) in
-          _reportUnimplementedInitializerInFile(
-            className.baseAddress!, UInt(className.count),
-            initName.baseAddress!, UInt(initName.count),
-            file.baseAddress!, UInt(file.count), line, column,
-            flags: 0)
+          _swift_stdlib_reportUnimplementedInitializerInFile(
+            className.baseAddress!, CInt(className.count),
+            initName.baseAddress!, CInt(initName.count),
+            file.baseAddress!, CInt(file.count),
+            UInt32(line), UInt32(column),
+            /*flags:*/ 0)
         }
       }
     }
@@ -248,10 +215,10 @@ func _unimplementedInitializer(className: StaticString,
       (className) in
       initName.withUTF8Buffer {
         (initName) in
-        _reportUnimplementedInitializer(
-          className.baseAddress!, UInt(className.count),
-          initName.baseAddress!, UInt(initName.count),
-          flags: 0)
+        _swift_stdlib_reportUnimplementedInitializer(
+          className.baseAddress!, CInt(className.count),
+          initName.baseAddress!, CInt(initName.count),
+          /*flags:*/ 0)
       }
     }
   }
@@ -259,11 +226,11 @@ func _unimplementedInitializer(className: StaticString,
   Builtin.int_trap()
 }
 
-// FIXME(ABI): rename to something descriptive.
+// FIXME(ABI)#21 (Type Checker): rename to something descriptive.
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
-  _assertionFailed("fatal error", message(), file, line, flags: 0)
+  _assertionFailure("fatal error", message(), file: file, line: line, flags: 0)
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -27,7 +27,7 @@ bb0(%0 : $@thick C.Type):
   %2 = class_method %0 : $@thick C.Type, #C.init!allocator.1 : (C.Type) -> () -> C , $@convention(method) (@thick C.Type) -> @owned C
   // CHECK:   [[RESULT:%[0-9]+]] = call %C12dynamic_init1C* [[CTOR_FN]](%swift.type* %0)
   %3 = apply %2(%0) : $@convention(method) (@thick C.Type) -> @owned C
-  // CHECK:   call void bitcast (void (%swift.refcounted*)* @rt_swift_release to void (%C12dynamic_init1C*)*)(%C12dynamic_init1C* [[RESULT]])
+  // CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%C12dynamic_init1C*)*)(%C12dynamic_init1C* [[RESULT]])
   strong_release %3 : $C
   // CHECK: ret void
   %5 = tuple ()

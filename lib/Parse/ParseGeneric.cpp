@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -71,7 +71,8 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
       ParserResult<TypeRepr> Ty;
       
       if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol, tok::kw_Any)) {
-        Ty = parseTypeIdentifierOrTypeComposition();
+        Ty = parseTypeForInheritance(diag::expected_identifier_for_type,
+                                     diag::expected_ident_type_in_inheritance);
       } else if (Tok.is(tok::kw_class)) {
         diagnose(Tok, diag::unexpected_class_constraint);
         diagnose(Tok, diag::suggest_anyobject, Name)
@@ -94,7 +95,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     // Semantic analysis fills in the depth when it processes the generic
     // parameter list.
     auto Param = new (Context) GenericTypeParamDecl(CurDeclContext, Name,
-                                                    NameLoc, /*Depth=*/0,
+                                                    NameLoc, /*depth=*/0,
                                                     GenericParams.size());
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
@@ -121,26 +122,28 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   
   // Parse the closing '>'.
   SourceLoc RAngleLoc;
-  if (!startsWithGreater(Tok)) {
+  if (startsWithGreater(Tok)) {
+    RAngleLoc = consumeStartingGreater();
+  } else {
     if (!Invalid) {
       diagnose(Tok, diag::expected_rangle_generics_param);
       diagnose(LAngleLoc, diag::opening_angle);
-      
       Invalid = true;
     }
-    
+
     // Skip until we hit the '>'.
-    skipUntilGreaterInTypeList();
-    if (startsWithGreater(Tok))
-      RAngleLoc = consumeStartingGreater();
-    else
-      Invalid = true;
-  } else {
-    RAngleLoc = consumeStartingGreater();
+    RAngleLoc = skipUntilGreaterInTypeList();
   }
 
-  if (GenericParams.empty() || Invalid)
+  if (GenericParams.empty() || Invalid) {
+    // FIXME: We should really return the generic parameter list here,
+    // even if some generic parameters were invalid, since we rely on
+    // decl->setGenericParams() to re-parent the GenericTypeParamDecls
+    // into the right DeclContext.
+    for (auto Param : GenericParams)
+      Param->setInvalid();
     return nullptr;
+  }
 
   return makeParserResult(GenericParamList::create(Context, LAngleLoc,
                                                    GenericParams, WhereLoc,
@@ -183,17 +186,7 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   // as written all the way to the right angle bracket (">")
   auto LastGenericParam = GenericParams->getParams().back();
   auto EndOfLastGenericParam =
-  Lexer::getLocForEndOfToken(SourceMgr,
-                             LastGenericParam->getLoc());
-
-  // If the generic parameter list has inherited requirements attached
-  // directly to the parameters themselves, leave them in place.
-  auto InheritedGenericConstraints = LastGenericParam->getInherited();
-  if (!InheritedGenericConstraints.empty()) {
-    EndOfLastGenericParam =
-    Lexer::getLocForEndOfToken(SourceMgr,
-                               InheritedGenericConstraints.back().getLoc());
-  }
+      Lexer::getLocForEndOfToken(SourceMgr, LastGenericParam->getEndLoc());
 
   CharSourceRange RemoveWhereRange { SourceMgr,
     EndOfLastGenericParam,
@@ -218,17 +211,14 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
 
   auto Diag = diagnose(WhereRangeInsideBrackets.Start,
                        diag::where_inside_brackets);
+  Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
+                        RemoveWhereRange.getEnd());
 
   if (Tok.is(tok::kw_where)) {
-    Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
-                          RemoveWhereRange.getEnd())
-      .fixItReplace(Tok.getLoc(),
-                    WhereClauseText.str());
+    Diag.fixItReplace(Tok.getLoc(), WhereClauseText.str());
   } else {
-    Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
-                          RemoveWhereRange.getEnd())
-      .fixItInsert(Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc),
-                   WhereClauseText.str());
+    Diag.fixItInsert(Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc),
+                     WhereClauseText.str());
   }
 }
 
@@ -273,7 +263,9 @@ ParserStatus Parser::parseGenericWhereClause(
       SourceLoc ColonLoc = consumeToken();
 
       // Parse the protocol or composition.
-      ParserResult<TypeRepr> Protocol = parseTypeIdentifierOrTypeComposition();
+      ParserResult<TypeRepr> Protocol = parseTypeForInheritance(
+          diag::expected_identifier_for_type,
+          diag::expected_ident_type_in_inheritance);
       
       if (Protocol.isNull()) {
         Status.setIsParseError();

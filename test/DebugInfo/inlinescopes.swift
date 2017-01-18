@@ -1,10 +1,10 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: echo "public var x = Int64()" \
 // RUN:   | %target-swift-frontend -module-name FooBar -emit-module -o %t -
 // RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o %t.ll
-// RUN: FileCheck %s < %t.ll
-// RUN: FileCheck %s -check-prefix=TRANSPARENT-CHECK < %t.ll
+// RUN: %FileCheck %s < %t.ll
+// RUN: %FileCheck %s -check-prefix=TRANSPARENT-CHECK < %t.ll
 
 // CHECK: define{{( protected)?( signext)?}} i32 @main
 // CHECK: call {{.*}}noinline{{.*}}, !dbg ![[CALL:.*]]

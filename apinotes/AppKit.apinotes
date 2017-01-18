@@ -1369,3 +1369,6 @@ Enumerators:
   SwiftName: viewNotSizable
 - Name: NSWindowStyleMaskBorderless
   SwiftName: borderless
+Functions:
+- Name: NSApplicationMain
+  SwiftPrivate: true

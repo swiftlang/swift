@@ -1,18 +1,18 @@
 // RUN: %target-build-swift -Onone -emit-sib %s -o %t.sib
 // RUN: %target-build-swift %t.sib -o %t
-// RUN: %target-run %t | FileCheck %s
+// RUN: %target-run %t | %FileCheck %s
 
 // RUN: %target-build-swift -Onone -c %t.sib -o %t.o
 // RUN: %target-build-swift %t.o -o %t
-// RUN: %target-run %t | FileCheck %s
+// RUN: %target-run %t | %FileCheck %s
 
 // RUN: %target-build-swift -Onone -emit-sibgen %s -o %t.sib
 // RUN: %target-build-swift %t.sib -o %t
-// RUN: %target-run %t | FileCheck %s
+// RUN: %target-run %t | %FileCheck %s
 
 // RUN: %target-build-swift -Onone -c %t.sib -o %t.o
 // RUN: %target-build-swift %t.o -o %t
-// RUN: %target-run %t | FileCheck %s
+// RUN: %target-run %t | %FileCheck %s
 // REQUIRES: executable_test
 
 // CHECK: Hello World

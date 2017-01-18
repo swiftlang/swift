@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -25,6 +25,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Availability.h"
+#include "swift/Basic/Compiler.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
@@ -62,10 +63,12 @@ enum class ExprKind : uint8_t {
 #include "swift/AST/ExprNodes.def"
 };
   
-/// Discriminates the different kinds of checked cast supported.
+/// Discriminates certain kinds of checked cast that have specialized diagnostic
+/// and/or code generation peephole behavior.
 ///
-/// This enumeration should not exist. Only the collection downcast kinds are
-/// currently significant. Please don't add new kinds.
+/// This enumeration should not have any semantic effect on the behavior of a
+/// well-typed program, since the runtime can perform all casts that are
+/// statically accepted.
 enum class CheckedCastKind : unsigned {
   /// The kind has not been determined yet.
   Unresolved,
@@ -75,24 +78,25 @@ enum class CheckedCastKind : unsigned {
 
   /// The requested cast is an implicit conversion, so this is a coercion.
   Coercion = First_Resolved,
-  /// A non-value-changing checked cast.
+  /// A checked cast with no known specific behavior.
   ValueCast,
   // A downcast from an array type to another array type.
   ArrayDowncast,
   // A downcast from a dictionary type to another dictionary type.
   DictionaryDowncast,
-  // A downcast from a dictionary type to another dictionary type that
-  // requires bridging.
-  DictionaryDowncastBridged,
   // A downcast from a set type to another set type.
   SetDowncast,
-  // A downcast from a set type to another set type that requires bridging.
-  SetDowncastBridged,
-  /// A downcast from an object of class or Objective-C existential
-  /// type to its bridged value type.
-  BridgeFromObjectiveC,
+  /// A bridging conversion that always succeeds.
+  BridgingCoercion,
+  /// A bridging conversion that may fail, because there are multiple Swift
+  /// value types that bridge to the same Cocoa object type.
+  ///
+  /// This kind is only used for Swift 3 compatibility diagnostics and is
+  /// treated the same as 'BridgingCoercion' otherwise. In Swift 4 or later,
+  /// any conversions with this kind show up as ValueCasts.
+  Swift3BridgingDowncast,
 
-  Last_CheckedCastKind = BridgeFromObjectiveC,
+  Last_CheckedCastKind = Swift3BridgingDowncast,
 };
 
 enum class AccessSemantics : unsigned char {
@@ -329,12 +333,8 @@ class alignas(8) Expr {
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     unsigned HasAnonymousClosureVars : 1;
-    
-    /// True if this is a closure created as a result of a void contextual
-    /// conversion.
-    unsigned IsVoidConversionClosure : 1;
   };
-  enum { NumClosureExprBits = NumAbstractClosureExprBits + 2 };
+  enum { NumClosureExprBits = NumAbstractClosureExprBits + 1 };
   static_assert(NumClosureExprBits <= 32, "fits in an unsigned");
 
   class BindOptionalExprBitfields {
@@ -392,9 +392,8 @@ class alignas(8) Expr {
   class CollectionUpcastConversionExprBitfields {
     friend class CollectionUpcastConversionExpr;
     unsigned : NumExprBits;
-    unsigned BridgesToObjC : 1;
   };
-  enum { NumCollectionUpcastConversionExprBits = NumExprBits + 1 };
+  enum { NumCollectionUpcastConversionExprBits = NumExprBits + 0 };
   static_assert(NumCollectionUpcastConversionExprBits <= 32, "fits in an unsigned");
 
   class ObjCSelectorExprBitfields {
@@ -501,8 +500,6 @@ public:
   SourceLoc getLoc() const { return (SUBEXPR)->getLoc(); } \
   SourceRange getSourceRange() const { return (SUBEXPR)->getSourceRange(); }
 
-  SourceLoc TrailingSemiLoc;
-
   /// getSemanticsProvidingExpr - Find the smallest subexpression
   /// which obeys the property that evaluating it is exactly
   /// equivalent to evaluating this expression.
@@ -545,22 +542,24 @@ public:
   /// walk into the body of it (unless it is single-expression).
   void forEachChildExpr(const std::function<Expr*(Expr*)> &callback);
 
-  /// findExistingInitializerContext - Given that this expression is
-  /// an initializer that belongs in some sort of Initializer
-  /// context, look through it for any existing context object.
-  Initializer *findExistingInitializerContext();
-
   /// Determine whether this expression refers to a type by name.
   ///
   /// This distinguishes static references to types, like Int, from metatype
   /// values, "someTy: Any.Type".
-  bool isTypeReference() const;
+  bool isTypeReference(llvm::function_ref<Type(const Expr &)> getType
+                       = [](const Expr &E) -> Type {
+                         return E.getType();
+                       }) const;
 
   /// Determine whether this expression refers to a statically-derived metatype.
   ///
   /// This implies `isTypeReference`, but also requires that the referenced type
   /// is not an archetype or dependent type.
-  bool isStaticallyDerivedMetatype() const;
+  bool isStaticallyDerivedMetatype(
+      llvm::function_ref<Type(const Expr &)> getType
+      = [](const Expr &E) -> Type {
+        return E.getType();
+      }) const;
 
   /// isImplicit - Determines whether this expression was implicitly-generated,
   /// rather than explicitly written in the AST.
@@ -591,6 +590,10 @@ public:
   /// \param allowOverwrite - true if it's okay if an expression already
   ///   has an access kind
   void propagateLValueAccessKind(AccessKind accessKind,
+                                 llvm::function_ref<Type(Expr *)> getType
+                                   = [](Expr *E) -> Type {
+                                     return E->getType();
+                                 },
                                  bool allowOverwrite = false);
 
   /// Retrieves the declaration that is being referenced by this
@@ -668,15 +671,14 @@ class TrailingCallArguments
   }
 
   size_t numTrailingObjects(
-      typename TrailingObjects::template OverloadToken<Identifier>) const {
+      SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Identifier)) const {
     return asDerived().getNumArguments();
   }
 
   size_t numTrailingObjects(
-      typename TrailingObjects::template OverloadToken<SourceLoc>) const {
-    return asDerived().hasArgumentLabelLocs()
-             ? asDerived().getNumArguments()
-             : 0;
+      SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(SourceLoc)) const {
+    return asDerived().hasArgumentLabelLocs() ? asDerived().getNumArguments()
+                                              : 0;
   }
 
   /// Retrieve the buffer containing the argument labels.
@@ -763,10 +765,6 @@ public:
   CodeCompletionExpr(SourceRange Range, Type Ty = Type()) :
       Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
       Range(Range) {}
-
-  CodeCompletionExpr(CharSourceRange Range, Type Ty = Type()) :
-      Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
-      Range(SourceRange(Range.getStart(), Range.getEnd())) {}
 
   SourceRange getSourceRange() const { return Range; }
 
@@ -989,6 +987,7 @@ public:
 /// "[\(min)..\(max)]"
 /// \endcode
 class InterpolatedStringLiteralExpr : public LiteralExpr {
+  /// Points at the beginning quote.
   SourceLoc Loc;
   MutableArrayRef<Expr *> Segments;
   Expr *SemanticExpr;
@@ -1007,10 +1006,12 @@ public:
   void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
   
   SourceLoc getStartLoc() const {
-    return Segments.front()->getStartLoc();
+    return Loc;
   }
   SourceLoc getEndLoc() const {
-    return Segments.back()->getEndLoc();
+    // SourceLocs are token based, and the interpolated string is one string
+    // token, so the range should be (Start == End).
+    return Loc;
   }
   
   static bool classof(const Expr *E) {
@@ -1337,7 +1338,14 @@ public:
 
   // The type of a TypeExpr is always a metatype type.  Return the instance
   // type, ErrorType if an error, or null if not set yet.
-  Type getInstanceType() const;
+  Type getInstanceType(llvm::function_ref<bool(const Expr &)> hasType
+                       = [](const Expr &E) -> bool {
+                         return !!E.getType();
+                       },
+                       llvm::function_ref<Type(const Expr &)> getType
+                       = [](const Expr &E) -> Type {
+                         return E.getType();
+                       }) const;
   
   // Create an implicit TypeExpr, which has no location information.
   static TypeExpr *createImplicit(Type Ty, ASTContext &C) {
@@ -1418,7 +1426,11 @@ protected:
 
 public:
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
-  
+
+  void setDecls(ArrayRef<ValueDecl *> domain) {
+    Decls = domain;
+  }
+
   /// getBaseType - Determine the type of the base object provided for the
   /// given overload set, which is only non-null when dealing with an overloaded
   /// member reference.
@@ -1757,7 +1769,7 @@ public:
 /// bar.foo.  These always have unresolved type.
 class UnresolvedMemberExpr final
     : public Expr,
-      public TrailingCallArguments<UnresolvedMemberExpr>  {
+      public TrailingCallArguments<UnresolvedMemberExpr> {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclName Name;
@@ -2063,8 +2075,7 @@ public:
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
-  SourceLoc getStartLoc() const;
-  SourceLoc getEndLoc() const;
+  SourceRange getSourceRange() const;
 
   /// \brief Whether this expression has a trailing closure as its argument.
   bool hasTrailingClosure() const { return TupleExprBits.HasTrailingClosure; }
@@ -2532,6 +2543,69 @@ public:
   }
 };
 
+/// \brief An expression that grants temporary escapability to a nonescaping
+/// closure value.
+///
+/// This expression is formed by the type checker when a call to the
+/// `withoutActuallyEscaping` declaration is made.
+class MakeTemporarilyEscapableExpr : public Expr {
+  Expr *NonescapingClosureValue;
+  OpaqueValueExpr *EscapingClosureValue;
+  Expr *SubExpr;
+  SourceLoc NameLoc, LParenLoc, RParenLoc;
+
+public:
+  MakeTemporarilyEscapableExpr(SourceLoc NameLoc,
+                               SourceLoc LParenLoc,
+                               Expr *NonescapingClosureValue,
+                               Expr *SubExpr,
+                               SourceLoc RParenLoc,
+                               OpaqueValueExpr *OpaqueValueForEscapingClosure,
+                               bool implicit = false)
+    : Expr(ExprKind::MakeTemporarilyEscapable, implicit, Type()),
+      NonescapingClosureValue(NonescapingClosureValue),
+      EscapingClosureValue(OpaqueValueForEscapingClosure),
+      SubExpr(SubExpr),
+      NameLoc(NameLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc)
+  {}
+  
+  SourceLoc getStartLoc() const {
+    return NameLoc;
+  }
+  SourceLoc getEndLoc() const {
+    return RParenLoc;
+  }
+  
+  SourceLoc getLoc() const {
+    return NameLoc;
+  }
+  
+  /// Retrieve the opaque value representing the escapable copy of the
+  /// closure.
+  OpaqueValueExpr *getOpaqueValue() const { return EscapingClosureValue; }
+  
+  /// Retrieve the nonescaping closure expression.
+  Expr *getNonescapingClosureValue() const {
+    return NonescapingClosureValue;
+  }
+  void setNonescapingClosureValue(Expr *e) {
+    NonescapingClosureValue = e;
+  }
+  
+  /// Retrieve the subexpression that has access to the escapable copy of the
+  /// closure.
+  Expr *getSubExpr() const {
+    return SubExpr;
+  }
+  void setSubExpr(Expr *e) {
+    SubExpr = e;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MakeTemporarilyEscapable;
+  }
+};
+
 /// \brief An expression that opens up a value of protocol or protocol
 /// composition type and gives a name to its dynamic type.
 ///
@@ -2547,8 +2621,9 @@ class OpenExistentialExpr : public Expr {
 public:
   OpenExistentialExpr(Expr *existentialValue,
                       OpaqueValueExpr *opaqueValue,
-                      Expr *subExpr)
-    : Expr(ExprKind::OpenExistential, /*Implicit=*/ true, subExpr->getType()),
+                      Expr *subExpr,
+                      Type subExprTy)
+    : Expr(ExprKind::OpenExistential, /*Implicit=*/ true, subExprTy),
       ExistentialValue(existentialValue), OpaqueValue(opaqueValue), 
       SubExpr(subExpr) { }
 
@@ -2935,19 +3010,12 @@ private:
 public:
   CollectionUpcastConversionExpr(Expr *subExpr, Type type,
                                  ConversionPair keyConversion,
-                                 ConversionPair valueConversion,
-                                 bool bridgesToObjC)
+                                 ConversionPair valueConversion)
     : ImplicitConversionExpr(
         ExprKind::CollectionUpcastConversion, subExpr, type),
       KeyConversion(keyConversion), ValueConversion(valueConversion) {
     assert((!KeyConversion || ValueConversion)
            && "key conversion without value conversion");
-    CollectionUpcastConversionExprBits.BridgesToObjC = bridgesToObjC;
-  }
-
-  /// Whether this upcast bridges the source elements to Objective-C.
-  bool bridgesToObjC() const {
-    return CollectionUpcastConversionExprBits.BridgesToObjC;
   }
 
   /// Returns the expression that should be used to perform a
@@ -3386,7 +3454,6 @@ public:
       Body(nullptr) {
     setParameterList(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
-    ClosureExprBits.IsVoidConversionClosure = false;
   }
 
   SourceRange getSourceRange() const;
@@ -3412,18 +3479,6 @@ public:
     ClosureExprBits.HasAnonymousClosureVars = true;
   }
   
-  /// \brief Determine if this closure was created to satisfy a contextual
-  /// conversion to a void function type.
-  bool isVoidConversionClosure() const {
-    return ClosureExprBits.IsVoidConversionClosure;
-  }
-  
-  /// \brief Indicate that this closure was created to satisfy a contextual
-  /// conversion to a void function type.
-  void setIsVoidConversionClosure() {
-    ClosureExprBits.IsVoidConversionClosure = true;
-  }
-
   /// \brief Determine whether this closure expression has an
   /// explicitly-specified result type.
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
@@ -3901,8 +3956,8 @@ class DotSyntaxBaseIgnoredExpr : public Expr {
   SourceLoc DotLoc;
   Expr *RHS;
 public:
-  DotSyntaxBaseIgnoredExpr(Expr *LHS, SourceLoc DotLoc, Expr *RHS)
-    : Expr(ExprKind::DotSyntaxBaseIgnored, /*Implicit=*/false, RHS->getType()),
+  DotSyntaxBaseIgnoredExpr(Expr *LHS, SourceLoc DotLoc, Expr *RHS, Type rhsTy)
+    : Expr(ExprKind::DotSyntaxBaseIgnored, /*Implicit=*/false, rhsTy),
       LHS(LHS), DotLoc(DotLoc), RHS(RHS) {
   }
   
@@ -4277,11 +4332,13 @@ public:
   SourceLoc getLoc() const { return EqualLoc; }
   SourceLoc getStartLoc() const {
     if (!isFolded()) return EqualLoc;
-    return (Dest->isImplicit() ? Src->getStartLoc() : Dest->getStartLoc());
+    return ( Dest->getStartLoc().isValid()
+           ? Dest->getStartLoc()
+           : Src->getStartLoc());
   }
   SourceLoc getEndLoc() const {
     if (!isFolded()) return EqualLoc;
-    return Src->getEndLoc();
+    return (Src->getEndLoc().isValid() ? Src->getEndLoc() : Dest->getEndLoc());
   }
   
   /// True if the node has been processed by binary expression folding.
@@ -4292,29 +4349,6 @@ public:
   }
 };
 
-/// \brief An expression that describes the use of a default value, which may
-/// come from the default argument of a function type or member initializer.
-///
-/// This expression is synthesized by type checking and cannot be written
-/// directly by the user.
-class DefaultValueExpr : public Expr {
-  Expr *subExpr;
-
-public:
-  explicit DefaultValueExpr(Expr *subExpr)
-    : Expr(ExprKind::DefaultValue, /*Implicit=*/true, subExpr->getType()),
-      subExpr(subExpr) { }
-
-  Expr *getSubExpr() const { return subExpr; }
-  void setSubExpr(Expr *sub) { subExpr = sub; }
-  
-  SourceRange getSourceRange() const { return SourceRange(); }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::DefaultValue;
-  }
-};
-  
 /// \brief A pattern production that has been parsed but hasn't been resolved
 /// into a complete pattern. Name binding converts these into standalone pattern
 /// nodes or raises an error if a pattern production appears in an invalid
@@ -4420,6 +4454,8 @@ public:
     case ObjCSelectorKind::Setter:
       return true;
     }
+
+    llvm_unreachable("Unhandled ObjcSelectorKind in switch.");
   }
 
   /// Whether this selector references a method.

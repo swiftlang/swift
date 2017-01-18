@@ -3,7 +3,7 @@
 We have a pretty good user model for C pointer interop now, but the language
 model still needs improvement. Building the user model on top of implicit
 conversions has a number of undesirable side effects. We end up with a mess of
-pointer types—the intended user-facing, one-word pointer types
+pointer types--the intended user-facing, one-word pointer types
 ``UnsafeMutablePointer`` and ``OpaquePointer``, which expose a full pointer-ish API
 and are naturally ABI-compatible with C pointers; and the bridging pointer
 types, ``ObjCMutablePointer``, ``CMutablePointer``, ``CConstPointer``,
@@ -16,7 +16,7 @@ confusing jumble.
 
 The best solution to this is to burn the user model into the language, giving
 function applications special powers to provide the user model for pointers. We
-then provide only one set of plain pointer types, with 
+then provide only one set of plain pointer types, with
 special intrinsic behavior when used as function arguments.
 
 The Pointer Types
@@ -116,7 +116,7 @@ So if you have a function declared::
 
 You can call it as any of::
 
-  var x: NSBas? = nil
+  var x: NSBas?
   var p: AutoreleasingUnsafeMutablePointer<NSBas?> = nil
   bas(nil)
   bas(p)
@@ -176,7 +176,7 @@ You can call it as any of::
 
 A type checker limitation prevents array literals from being passed directly
 to ``UnsafeRawPointer`` arguments without type annotation. As a
-workaround, you can bind the array literal to a constant, as above, or 
+workaround, you can bind the array literal to a constant, as above, or
 specify the array type with ``as``::
 
   zang([1.0, 2.0, 3.0] as [Double])

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass="Function Signature Optimization" -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass="Function Signature Optimization" -emit-sil %s | %FileCheck %s
 // We want to check two things here:
 // - Correctness
 // - That certain "is" checks are eliminated based on static analysis at compile-time
@@ -25,7 +25,7 @@ struct CX: _ObjectiveCBridgeable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: ObjCX?)
       -> CX {
-    var result: CX? = nil
+    var result: CX?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }

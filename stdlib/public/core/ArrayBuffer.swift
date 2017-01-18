@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@ import SwiftShims
 internal typealias _ArrayBridgeStorage
   = _BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>
 
+@_versioned
 @_fixed_layout
 internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
@@ -29,6 +30,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
     _storage = _ArrayBridgeStorage(native: _emptyArrayStorage)
   }
 
+  @_versioned  // FIXME(abi): Used from tests
   internal init(nsArray: _NSArrayCore) {
     _sanityCheck(_isClassOrObjCExistential(Element.self))
     _storage = _ArrayBridgeStorage(objC: nsArray)
@@ -60,7 +62,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
     _sanityCheck(_isClassOrObjCExistential(U.self))
     
     // FIXME: can't check that U is derived from Element pending
-    // <rdar://problem/19915280> generic metatype casting doesn't work
+    // <rdar://problem/20028320> generic metatype casting doesn't work
     // _sanityCheck(U.self is Element.Type)
 
     return _ArrayBuffer<U>(
@@ -78,6 +80,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
     _storage = storage
   }
 
+  @_versioned
   internal var _storage: _ArrayBridgeStorage
 }
 
@@ -112,7 +115,8 @@ extension _ArrayBuffer {
 
   /// Convert to an NSArray.
   ///
-  /// O(1) if the element type is bridged verbatim, O(N) otherwise.
+  /// O(1) if the element type is bridged verbatim, O(*n*) otherwise.
+  @_versioned  // FIXME(abi): Used from tests
   internal func _asCocoaArray() -> _NSArrayCore {
     return _fastPath(_isNative) ? _native._asCocoaArray() : _nonNative
   }
@@ -273,6 +277,7 @@ extension _ArrayBuffer {
   /// A pointer to the first element.
   ///
   /// - Precondition: The elements are known to be stored contiguously.
+  @_versioned
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
     _sanityCheck(_isNative, "must be a native buffer")
     return _native.firstElementAddress
@@ -383,8 +388,8 @@ extension _ArrayBuffer {
       }
       else {
         var refCopy = self
-        refCopy.replace(
-          subRange: i..<(i + 1),
+        refCopy.replaceSubrange(
+          i..<(i + 1),
           with: 1,
           elementsOf: CollectionOfOne(newValue))
       }

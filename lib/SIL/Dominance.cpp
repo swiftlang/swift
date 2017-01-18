@@ -2,16 +2,17 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/Dominance.h"
 #include "llvm/Support/GenericDomTree.h"
 #include "llvm/Support/GenericDomTreeConstruction.h"
@@ -49,6 +50,17 @@ bool DominanceInfo::properlyDominates(SILInstruction *a, SILInstruction *b) {
       return true;
   }
 
+  return false;
+}
+
+/// Does value A properly dominate instruction B?
+bool DominanceInfo::properlyDominates(SILValue a, SILInstruction *b) {
+  if (auto *Inst = dyn_cast<SILInstruction>(a)) {
+    return properlyDominates(Inst, b);
+  }
+  if (auto *Arg = dyn_cast<SILArgument>(a)) {
+    return dominates(Arg->getParent(), b->getParent());
+  }
   return false;
 }
 

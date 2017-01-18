@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s
 
 import Swift
 sil @test : $@convention(thin) <U where U : AnyObject> (@inout Optional<U>) -> () {

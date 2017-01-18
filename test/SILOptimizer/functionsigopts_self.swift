@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -sil-inline-threshold 0 -emit-sil -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
 //
 // This is a .swift test because the SIL parser does not support Self.
 
@@ -24,7 +24,7 @@ extension C {
 // CHECK-LABEL: sil hidden @_TTSf4d_n___TZFC20functionsigopts_self1C7factory{{.*}} : $@convention(method) (@thick C.Type) -> @owned C
 // CHECK: bb0(%0 : $@thick C.Type):
 // CHECK: function_ref functionsigopts_self.gen <A> () -> A
-// CHECK: apply %{{[0-9]+}}<Self>
+// CHECK: apply %{{[0-9]+}}<@dynamic_self C>
 
 // Call the function so the specialization is not dead.
 var x = C()

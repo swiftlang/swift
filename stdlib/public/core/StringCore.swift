@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -114,12 +114,12 @@ public struct _StringCore {
         src: srcStart,
         size: UInt(count << (srcElementWidth - 1)))
     }
-    else if (srcElementWidth < dstElementWidth) {
+    else if srcElementWidth < dstElementWidth {
       // Widening ASCII to UTF-16; we need to copy the bytes manually
       var dest = dstStart.assumingMemoryBound(to: UTF16.CodeUnit.self)
       var src = srcStart.assumingMemoryBound(to: UTF8.CodeUnit.self)
       let srcEnd = src + count
-      while (src != srcEnd) {
+      while src != srcEnd {
         dest.pointee = UTF16.CodeUnit(src.pointee)
         dest += 1
         src += 1
@@ -130,7 +130,7 @@ public struct _StringCore {
       var dest = dstStart.assumingMemoryBound(to: UTF8.CodeUnit.self)
       var src = srcStart.assumingMemoryBound(to: UTF16.CodeUnit.self)
       let srcEnd = src + count
-      while (src != srcEnd) {
+      while src != srcEnd {
         dest.pointee = UTF8.CodeUnit(src.pointee)
         dest += 1
         src += 1
@@ -240,6 +240,13 @@ public struct _StringCore {
     return _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self)
   }
 
+  public var asciiBuffer: UnsafeMutableBufferPointer<UTF8.CodeUnit>? {
+    if elementWidth != 1 {
+      return nil
+    }
+    return UnsafeMutableBufferPointer(start: startASCII, count: count)
+  }
+
   /// the native _StringBuffer, if any, or `nil`.
   public var nativeBuffer: _StringBuffer? {
     if !hasCocoaBuffer {
@@ -254,9 +261,7 @@ public struct _StringCore {
   /// the Cocoa String buffer, if any, or `nil`.
   public var cocoaBuffer: _CocoaString? {
     if hasCocoaBuffer {
-      return _owner.map {
-        unsafeBitCast($0, to: _CocoaString.self)
-      }
+      return _owner
     }
     return nil
   }
@@ -299,8 +304,12 @@ public struct _StringCore {
     // Always dereference two bytes, but when elements are 8 bits we
     // multiply the high byte by 0.
     // FIXME(performance): use masking instead of multiplication.
+#if _endian(little)
     return UTF16.CodeUnit(p.pointee)
       + UTF16.CodeUnit((p + 1).pointee) * _highByteMultiplier
+#else
+    return _highByteMultiplier == 0 ? UTF16.CodeUnit(p.pointee) : UTF16.CodeUnit((p + 1).pointee) + UTF16.CodeUnit(p.pointee) * _highByteMultiplier
+#endif
   }
 
   /// Get the Nth UTF-16 Code Unit stored.
@@ -354,7 +363,7 @@ public struct _StringCore {
         _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
       }
     }
-    else if (hasCocoaBuffer) {
+    else if hasCocoaBuffer {
 #if _runtime(_ObjC)
       _StringCore(
         _cocoaStringToContiguous(
@@ -549,7 +558,7 @@ public struct _StringCore {
   /// Returns `true` iff the contents of this string can be
   /// represented as pure ASCII.
   ///
-  /// - Complexity: O(N) in the worst case.
+  /// - Complexity: O(*n*) in the worst case.
   func isRepresentableAsASCII() -> Bool {
     if _slowPath(!hasContiguousStorage) {
       return false
@@ -585,7 +594,7 @@ extension _StringCore : RangeReplaceableCollection {
   /// Replace the elements within `bounds` with `newElements`.
   ///
   /// - Complexity: O(`bounds.count`) if `bounds.upperBound
-  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
+  ///   == self.endIndex` and `newElements.isEmpty`, O(*n*) otherwise.
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Int>,
     with newElements: C

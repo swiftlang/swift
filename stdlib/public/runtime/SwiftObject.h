@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -26,29 +26,15 @@
 #include <objc/NSObject.h>
 #endif
 
-namespace swift {
 
 #if SWIFT_OBJC_INTEROP
-struct SwiftObject_s {
-  void *isa __attribute__((__unavailable__));
-  uint32_t strongRefCount __attribute__((__unavailable__));
-  uint32_t weakRefCount __attribute__((__unavailable__));
-};
-
-static_assert(sizeof(SwiftObject_s) == sizeof(HeapObject),
-              "SwiftObject and HeapObject must have the same header");
-static_assert(std::is_trivially_constructible<SwiftObject_s>::value,
-              "SwiftObject must be trivially constructible");
-static_assert(std::is_trivially_destructible<SwiftObject_s>::value,
-              "SwiftObject must be trivially destructible");
-
-} // namespace swift
 
 #if __has_attribute(objc_root_class)
 __attribute__((__objc_root_class__))
 #endif
 SWIFT_RUNTIME_EXPORT @interface SwiftObject<NSObject> {
-  swift::SwiftObject_s header;
+  Class isa;
+  SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
 }
 
 - (BOOL)isEqual:(id)object;
@@ -92,8 +78,8 @@ void swift_getSummary(String *out, OpaqueValue *value, const Metadata *T);
 // Convert a Swift String to an NSString.
 NSString *convertStringToNSString(String *swiftString);
 
-#endif
-  
 }
+
+#endif
 
 #endif

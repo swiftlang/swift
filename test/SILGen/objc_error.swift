@@ -1,22 +1,31 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_TF10objc_error20NSErrorError_erasureFCSo7NSErrorPs5Error_
-// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $NSError : $NSError, $Error
-// CHECK:         return [[ERROR_TYPE]]
+// CHECK-LABEL: sil hidden @_TF10objc_error20NSErrorError_erasureFCSo7NSErrorPs5Error_ : $@convention(thin) (@owned NSError) -> @owned Error {
+// CHECK:         bb0([[ERROR:%.*]] : $NSError):
+// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[ERROR]]
+// CHECK:           [[ERROR_TYPE:%.*]] = init_existential_ref [[ERROR_COPY]] : $NSError : $NSError, $Error
+// CHECK:           destroy_value [[ERROR]]
+// CHECK:           return [[ERROR_TYPE]]
+// CHECK:       } // end sil function '_TF10objc_error20NSErrorError_erasureFCSo7NSErrorPs5Error_'
 func NSErrorError_erasure(_ x: NSError) -> Error {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF10objc_error30NSErrorError_archetype_erasure
-// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $T : $T, $Error
-// CHECK:         return [[ERROR_TYPE]]
+// CHECK-LABEL: sil hidden @_TF10objc_error30NSErrorError_archetype_erasureuRxCSo7NSErrorrFxPs5Error_ : $@convention(thin) <T where T : NSError> (@owned T) -> @owned Error {
+// CHECK:         bb0([[ERROR:%.*]] : $T):
+// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[ERROR]]
+// CHECK:           [[T0:%.*]] = upcast [[ERROR_COPY]] : $T to $NSError
+// CHECK:           [[ERROR_TYPE:%.*]] = init_existential_ref [[T0]] : $NSError : $NSError, $Error
+// CHECK:           destroy_value [[ERROR]]
+// CHECK:           return [[ERROR_TYPE]]
+// CHECK: } // end sil function '_TF10objc_error30NSErrorError_archetype_erasureuRxCSo7NSErrorrFxPs5Error_'
 func NSErrorError_archetype_erasure<T : NSError>(_ t: T) -> Error {
   return t
 }
@@ -81,18 +90,14 @@ func testAcceptError(error: Error) {
 // CHECK-LABEL: sil hidden @_TF10objc_error16testProduceError
 func testProduceError() -> Error {
   // CHECK: function_ref @produceError : $@convention(c) () -> @autoreleased NSError
-  // CHECK-NOT: return
-  // CHECK: enum $Optional<NSError>, #Optional.some!enumelt.1
-  // CHECK-NOT: return
-  // CHECK: function_ref @swift_convertNSErrorToError
+  // CHECK: init_existential_ref {{.*}} : $NSError : $NSError, $Error
   return produceError()
 }
 
 // CHECK-LABEL: sil hidden @_TF10objc_error24testProduceOptionalError
 func testProduceOptionalError() -> Error? {
   // CHECK: function_ref @produceOptionalError
-  // CHECK-NOT: return
-  // CHECK: function_ref @swift_convertNSErrorToError
+  // CHECK: init_existential_ref {{.*}} : $NSError : $NSError, $Error
   return produceOptionalError();
 }
 
@@ -112,36 +117,47 @@ func eraseMyNSError() -> Error {
 // CHECK-LABEL: sil hidden @_TF10objc_error25eraseFictionalServerErrorFT_Ps5Error_
 func eraseFictionalServerError() -> Error {
   // CHECK-NOT: return
-  // CHECK: [[NSERROR_GETTER:%[0-9]+]] = function_ref @_TFVSC20FictionalServerErrorg8_nsErrorCSo7NSError
-  // CHECK: [[NSERROR:%[0-9]+]] = apply [[NSERROR_GETTER]]
-  // CHECK: [[ERROR:%[0-9]+]] = init_existential_ref [[NSERROR]]
+  // CHECK: [[NSERROR:%[0-9]+]] = struct_extract {{.*}} : $FictionalServerError, #FictionalServerError._nsError
+  // CHECK: [[NSERROR_COPY:%.*]] = copy_value [[NSERROR]]
+  // CHECK: [[ERROR:%[0-9]+]] = init_existential_ref [[NSERROR_COPY]]
   // CHECK: return [[ERROR]]
   return FictionalServerError(.meltedDown)
 }
+// CHECK: } // end sil function '_TF10objc_error25eraseFictionalServerErrorFT_Ps5Error_'
 
 // SR-1562
 extension Error {
   // CHECK-LABEL: sil hidden @_TFE10objc_errorPs5Error16convertToNSErrorfT_CSo7NSError
   // CHECK: bb0([[SELF:%[0-9]+]] : $*Self)
 	func convertToNSError() -> NSError {
+    // CHECK: [[COPY:%.*]] = alloc_stack $Self
+    // CHECK: copy_addr [[SELF]] to [initialization] [[COPY]]
+    // CHECK: [[COPY2:%.*]] = alloc_stack $Self
+    // CHECK: copy_addr [[COPY]] to [initialization] [[COPY2]]
     // CHECK: [[GET_EMBEDDED_FN:%[0-9]+]] = function_ref @swift_stdlib_getErrorEmbeddedNSError
-    // CHECK: [[EMBEDDED_RESULT_OPT:%[0-9]+]] = apply [[GET_EMBEDDED_FN]]
-    // CHECK: [[HAS_EMBEDDED_RESULT:%[0-9]+]] = select_enum [[EMBEDDED_RESULT_OPT]] : $Optional<AnyObject>
-    // CHECK: cond_br [[HAS_EMBEDDED_RESULT]], [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
+    // CHECK: [[EMBEDDED_RESULT_OPT:%[0-9]+]] = apply [[GET_EMBEDDED_FN]]<Self>([[COPY2]])
+    // CHECK: switch_enum [[EMBEDDED_RESULT_OPT]] : $Optional<AnyObject>,
+    // CHECK-SAME: case #Optional.some!enumelt.1: [[SUCCESS:bb[0-9]+]],
+    // CHECK-SAME: case #Optional.none!enumelt: [[FAILURE:bb[0-9]+]]
 
-    // CHECK: [[SUCCESS]]:
-    // CHECK: [[EMBEDDED_RESULT:%[0-9]+]] = unchecked_enum_data [[EMBEDDED_RESULT_OPT]] : $Optional<AnyObject>, #Optional.some!enumelt.1
+    // CHECK: [[SUCCESS]]([[EMBEDDED_RESULT:%.*]] : $AnyObject):
     // CHECK: [[EMBEDDED_NSERROR:%[0-9]+]] = unchecked_ref_cast [[EMBEDDED_RESULT]] : $AnyObject to $NSError
     // CHECK: [[ERROR:%[0-9]+]] = init_existential_ref [[EMBEDDED_NSERROR]] : $NSError : $NSError, $Error
+    // CHECK: destroy_addr [[COPY]] : $*Self
     // CHECK: br [[CONTINUATION:bb[0-9]+]]([[ERROR]] : $Error)
 
     // CHECK: [[FAILURE]]:
     // CHECK: [[ERROR_BOX:%[0-9]+]] = alloc_existential_box $Error, $Self
     // CHECK: [[ERROR_PROJECTED:%[0-9]+]] = project_existential_box $Self in [[ERROR_BOX]] : $Error
-    // CHECK: copy_addr [[SELF]] to [initialization] [[ERROR_PROJECTED]] : $*Self
+    // CHECK: copy_addr [take] [[COPY]] to [initialization] [[ERROR_PROJECTED]] : $*Self
     // CHECK: br [[CONTINUATION]]([[ERROR_BOX]] : $Error)
 
     // CHECK: [[CONTINUATION]]([[ERROR_ARG:%[0-9]+]] : $Error):
 		return self as NSError
 	}
+}
+
+class Gizmoid : NSObject {
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC10objc_error7GizmoidcfzT3fooT__S0_ : $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned Gizmoid) -> @owned Optional<Gizmoid>
+  @objc init(foo: ()) throws {}
 }

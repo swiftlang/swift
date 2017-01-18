@@ -74,10 +74,10 @@ SequenceTypeTests.test("${algorithmKind}/WhereElementIsComparable") {
         test.expected${AlgorithmKind}Index!, result.identity,
         stackTrace: SourceLocStack().with(test.loc))
     } else {
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Value,
         stackTrace: SourceLocStack().with(test.loc))
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Index,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -106,10 +106,10 @@ SequenceTypeTests.test("${algorithmKind}/Predicate") {
         test.expected${AlgorithmKind}Index!, result.identity,
         stackTrace: SourceLocStack().with(test.loc))
     } else {
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Value,
         stackTrace: SourceLocStack().with(test.loc))
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Index,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -144,7 +144,7 @@ SequenceTypeTests.test("Demonstration/NotCustomizable") {
   let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
 
   tester.nonCustomizableOperation()
-  
+
   expectNotCustomizable(tester, tester.log.nonCustomizableOperation)
 }
 
@@ -262,7 +262,7 @@ SequenceTypeTests.test("enumerated()") {
     expectType(
       EnumeratedSequence<MinimalSequence<OpaqueValue<Int>>>.self,
       &result)
-    
+
     checkSequence(
       test.expected.map {
         (offset: $0.0, element: OpaqueValue($0.1))
@@ -558,8 +558,9 @@ func callStaticContains(
 }
 
 func callGenericContains<
-  S : Sequence where S.Iterator.Element : Equatable
->(_ sequence: S, _ element: S.Iterator.Element) -> Bool {
+  S : Sequence
+>(_ sequence: S, _ element: S.Iterator.Element) -> Bool
+where S.Iterator.Element : Equatable {
   return sequence.contains(element)
 }
 
@@ -708,11 +709,11 @@ SequenceTypeTests.test("filter/Sequence/Semantics") {
       UnderestimatedCountBehavior.half,
       UnderestimatedCountBehavior.value(0)
     ] {
-      
+
       let s = DefaultedSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
         underestimatedCount: underestimatedCountBehavior)
-      
+
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -942,16 +943,6 @@ SequenceTypeTests.test("forEach/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
-// first()
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("first/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.first { $0.value == 1 }
-  expectCustomizable(tester, tester.log.first)
-}
-
-//===----------------------------------------------------------------------===//
 // dropFirst()
 //===----------------------------------------------------------------------===//
 
@@ -972,6 +963,16 @@ SequenceTypeTests.test("dropLast/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
+// drop(while:)
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("drop(while:)/dispatch") {
+  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.drop { _ in return false }
+  expectCustomizable(tester, tester.log.dropWhile)
+}
+
+//===----------------------------------------------------------------------===//
 // prefix()
 //===----------------------------------------------------------------------===//
 
@@ -979,6 +980,16 @@ SequenceTypeTests.test("prefix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   _ = tester.prefix(1)
   expectCustomizable(tester, tester.log.prefixMaxLength)
+}
+
+//===----------------------------------------------------------------------===//
+// prefix(while:)
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("prefix(while:)/dispatch") {
+  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.prefix { _ in return false }
+  expectCustomizable(tester, tester.log.prefixWhile)
 }
 
 //===----------------------------------------------------------------------===//
@@ -1044,7 +1055,7 @@ SequenceTypeTests.test("zip") {
     checkSequence(
       test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, result,
       stackTrace: SourceLocStack().with(test.loc), sameValue: compareElements)
-    
+
     // Check leftovers *after* doing checkSequence(), not before, to ensure
     // that checkSequence() didn't force us to consume more elements than
     // needed.

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 
 // RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c %S/../Inputs/resilient_struct.swift -o %t/resilient_struct.o
 // RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c %S/../Inputs/resilient_struct.swift -o %t/resilient_struct.o
@@ -402,6 +402,27 @@ ResilientEnumTestSuite.test("ResilientEnumWithEmptyCase") {
   }
 
   expectEqual(b, [0, 1, 2])
+}
+
+// Methods inside extensions of resilient enums fish out type parameters
+// from metadata -- make sure we can do that
+extension ResilientMultiPayloadGenericEnum {
+  public func getTypeParameter() -> T.Type {
+    return T.self
+  }
+}
+
+extension ResilientMultiPayloadGenericEnumFixedSize {
+  public func getTypeParameter() -> T.Type {
+    return T.self
+  }
+}
+
+class Base {}
+
+ResilientEnumTestSuite.test("ResilientEnumExtension") {
+  expectEqual(Base.self, ResilientMultiPayloadGenericEnum<Base>.A.getTypeParameter())
+  expectEqual(Base.self, ResilientMultiPayloadGenericEnumFixedSize<Base>.A.getTypeParameter())
 }
 
 runAllTests()

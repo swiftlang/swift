@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -103,9 +103,16 @@ private:
   /// A map from generic parameter lists to the decls they come from.
   llvm::DenseMap<const GenericParamList *, const Decl *> GenericContexts;
 
+  /// A map from generic environments to their serialized IDs.
+  llvm::DenseMap<const GenericEnvironment *, GenericEnvironmentID>
+    GenericEnvironmentIDs;
+
   // A map from NormalProtocolConformances to their serialized IDs.
   llvm::DenseMap<const NormalProtocolConformance *, NormalConformanceID>
     NormalConformances;
+
+  // A map from SILLayouts to their serialized IDs.
+  llvm::DenseMap<SILLayout *, SILLayoutID> SILLayouts;
 
 public:
   using DeclTableData = SmallVector<std::pair<uint8_t, DeclID>, 4>;
@@ -141,8 +148,14 @@ private:
   /// Local DeclContexts that need to be serialized.
   std::queue<const DeclContext*> LocalDeclContextsToWrite;
 
+  /// Generic environments that need to be serialized.
+  std::queue<const GenericEnvironment*> GenericEnvironmentsToWrite;
+
   /// NormalProtocolConformances that need to be serialized.
   std::queue<const NormalProtocolConformance *> NormalConformancesToWrite;
+
+  /// SILLayouts that need to be serialized.
+  std::queue<SILLayout *> SILLayoutsToWrite;
 
   /// All identifiers that need to be serialized.
   std::vector<Identifier> IdentifiersToWrite;
@@ -170,9 +183,17 @@ private:
   /// IdentifierID.
   std::vector<CharOffset> IdentifierOffsets;
 
+  /// The offset of each GenericEnvironment in the bitstream, indexed by
+  /// GenericEnvironmentID.
+  std::vector<BitOffset> GenericEnvironmentOffsets;
+
   /// The offset of each NormalProtocolConformance in the bitstream, indexed by
   /// NormalConformanceID.
   std::vector<BitOffset> NormalConformanceOffsets;
+
+  /// The offset of each SILLayout in the bitstream, indexed by
+  /// SILLayoutID.
+  std::vector<BitOffset> SILLayoutOffsets;
 
   /// The decls that adopt compiler-known protocols.
   SmallVector<DeclID, 2> KnownProtocolAdopters[NumKnownProtocols];
@@ -189,6 +210,9 @@ private:
   /// The last assigned NormalConformanceID for decl contexts from this module.
   uint32_t /*NormalConformanceID*/ LastNormalConformanceID = 0;
 
+  /// The last assigned SILLayoutID for SIL layouts from this module.
+  uint32_t /*SILLayoutID*/ LastSILLayoutID = 0;
+
   /// The last assigned DeclID for types from this module.
   uint32_t /*TypeID*/ LastTypeID = 0;
 
@@ -198,6 +222,10 @@ private:
   /// 0 will always represent the empty identifier.
   uint32_t /*IdentifierID*/ LastIdentifierID =
       serialization::NUM_SPECIAL_MODULES - 1;
+
+  /// The last assigned GenericEnvironmentID for generic environments from this
+  /// module.
+  uint32_t /*GenericEnvironmentID*/ LastGenericEnvironmentID = 0;
 
   /// Returns the record code for serializing the given vector of offsets.
   ///
@@ -214,8 +242,12 @@ private:
       return index_block::DECL_CONTEXT_OFFSETS;
     if (&values == &LocalDeclContextOffsets)
       return index_block::LOCAL_DECL_CONTEXT_OFFSETS;
+    if (&values == &GenericEnvironmentOffsets)
+      return index_block::GENERIC_ENVIRONMENT_OFFSETS;
     if (&values == &NormalConformanceOffsets)
       return index_block::NORMAL_CONFORMANCE_OFFSETS;
+    if (&values == &SILLayoutOffsets)
+      return index_block::SIL_LAYOUT_OFFSETS;
     llvm_unreachable("unknown offset kind");
   }
 
@@ -239,10 +271,14 @@ private:
   void writeParameterList(const ParameterList *PL);
 
   /// Writes the given pattern, recursively.
-  void writePattern(const Pattern *pattern);
+  void writePattern(const Pattern *pattern, DeclContext *owningDC);
+
+  /// Writes a generic parameter list.
+  bool writeGenericParams(const GenericParamList *genericParams);
 
   /// Writes a set of generic requirements.
-  void writeRequirements(ArrayRef<Requirement> requirements);
+  void writeGenericRequirements(ArrayRef<Requirement> requirements,
+                                const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
@@ -290,7 +326,8 @@ private:
   void writeLocalDeclContext(const DeclContext *DC);
 
   /// Write the components of a PatternBindingInitializer as a local context.
-  void writePatternBindingInitializer(PatternBindingDecl *binding);
+  void writePatternBindingInitializer(PatternBindingDecl *binding,
+                                      unsigned bindingIndex);
 
   /// Write the components of a DefaultArgumentInitializer as a local context.
   void writeDefaultArgumentInitializer(const DeclContext *parentContext, unsigned index);
@@ -300,6 +337,9 @@ private:
 
   /// Writes the given type.
   void writeType(Type ty);
+
+  /// Writes a generic environment.
+  void writeGenericEnvironment(const GenericEnvironment *env);
 
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
@@ -378,6 +418,11 @@ public:
   /// The DeclContext will be scheduled for serialization if necessary.
   DeclContextID addLocalDeclContextRef(const DeclContext *DC);
 
+  /// Records the use of the given generic environment.
+  ///
+  /// The GenericEnvironment will be scheduled for serialization if necessary.
+  GenericEnvironmentID addGenericEnvironmentRef(const GenericEnvironment *env);
+
   /// Records the use of the given normal protocol conformance.
   ///
   /// The normal protocol conformance will be scheduled for
@@ -386,6 +431,9 @@ public:
   /// \returns The ID for the given conformance in this module.
   NormalConformanceID addConformanceRef(
                         const NormalProtocolConformance *conformance);
+
+  /// Records the use of the given SILLayout.
+  SILLayoutID addSILLayoutRef(SILLayout *layout);
 
   /// Records the use of the given module.
   ///
@@ -397,24 +445,35 @@ public:
 
   /// Writes a list of generic substitutions. abbrCode is needed to support
   /// usage out of decl block.
+  ///
+  /// \param genericEnv When provided, the generic environment that describes
+  /// the archetypes within the substitutions. The replacement types within
+  /// the substitution will be mapped out of the generic environment before
+  /// being written.
   void writeSubstitutions(ArrayRef<Substitution> substitutions,
-                          const std::array<unsigned, 256> &abbrCodes);
+                          const std::array<unsigned, 256> &abbrCodes,
+                          GenericEnvironment *genericEnv = nullptr);
 
   /// Write a normal protocol conformance.
   void writeNormalConformance(const NormalProtocolConformance *conformance);
 
+  /// Write a SILLayout.
+  void writeSILLayout(SILLayout *conformance);
+
   /// Writes a protocol conformance.
+  ///
+  /// \param genericEnv When provided, the generic environment that describes
+  /// the archetypes within the substitutions. The replacement types within
+  /// the substitution will be mapped out of the generic environment before
+  /// being written.
   void writeConformance(ProtocolConformanceRef conformance,
-                        const std::array<unsigned, 256> &abbrCodes);
+                        const std::array<unsigned, 256> &abbrCodes,
+                        GenericEnvironment *genericEnv = nullptr);
 
   /// Writes a protocol conformance.
   void writeConformance(ProtocolConformance *conformance,
-                        const std::array<unsigned, 256> &abbrCodes);
-
-  /// Writes a generic parameter list.
-  bool writeGenericParams(const GenericParamList *genericParams,
-                          const std::array<unsigned, 256> &abbrCodes);
-
+                        const std::array<unsigned, 256> &abbrCodes,
+                        GenericEnvironment *genericEnv = nullptr);
 };
 } // end namespace serialization
 } // end namespace swift

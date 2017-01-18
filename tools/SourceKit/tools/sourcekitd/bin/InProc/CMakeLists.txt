@@ -5,7 +5,7 @@ if (SOURCEKIT_INSTALLING_INPROC)
     ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
     sourcekitdInProc.cpp
     DEPENDS SourceKitSwiftLang sourcekitdAPI
-    COMPONENT_DEPENDS support
+    LLVM_COMPONENT_DEPENDS support coverage
     MODULEMAP module.modulemap
     INSTALL_IN_COMPONENT sourcekit-inproc
   )
@@ -14,7 +14,7 @@ else()
   add_sourcekit_library(sourcekitdInProc
     sourcekitdInProc.cpp
     DEPENDS SourceKitSwiftLang sourcekitdAPI
-    COMPONENT_DEPENDS support
+    LLVM_COMPONENT_DEPENDS support coverage
     INSTALL_IN_COMPONENT sourcekit-inproc
 
     # Note that this cannot be a static library due to the way it looks for the

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -178,6 +178,19 @@ inline void set_union_for_each(const Container1 &C1, const Container2 &C2,
       >::value,
       "Expected both containers to have the same iterator value type");
   set_union_for_each(C1.begin(), C1.end(), C2.begin(), C2.end(), f);
+}
+
+/// Takes an iterator and an iterator pointing to the end of the iterator range.
+/// If the iterator already points to the end of its range, simply return it,
+/// otherwise return the next element.
+template <typename Iterator>
+inline Iterator next_or_end(Iterator it, Iterator end) {
+  return (it == end) ? end : std::next(it);
+}
+
+template <typename Iterator>
+inline Iterator prev_or_begin(Iterator it, Iterator begin) {
+  return (it == begin) ? begin : std::prev(it);
 }
 
 /// @}
@@ -690,6 +703,48 @@ template <typename Container>
 inline bool is_sorted_and_uniqued(const Container &C) {
   return is_sorted_and_uniqued(C.begin(), C.end());
 }
+
+//===----------------------------------------------------------------------===//
+//                              Function Traits
+//===----------------------------------------------------------------------===//
+
+template<class T>
+struct function_traits : function_traits<decltype(&T::operator())> {
+};
+
+// function
+template<class R, class... Args>
+struct function_traits<R(Args...)> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+// function pointer
+template<class R, class... Args>
+struct function_traits<R (*)(Args...)> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+// std::function
+template<class R, class... Args>
+struct function_traits<std::function<R(Args...)>> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+// pointer-to-member-function (i.e., operator()'s)
+template<class T, class R, class... Args>
+struct function_traits<R (T::*)(Args...)> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+template<class T, class R, class... Args>
+struct function_traits<R (T::*)(Args...) const> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
 
 } // end namespace swift
 

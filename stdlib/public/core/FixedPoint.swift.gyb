@@ -2,17 +2,18 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 %{
 
 from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
+from SwiftFloatingPointTypes import all_floating_point_types, getFtoIBounds
 
 #
 # Utility code for later in this template
@@ -88,13 +89,13 @@ public protocol SignedInteger : _SignedInteger, Integer {
 }
 
 extension SignedInteger {
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#29 : using Int as the return value is wrong.
   @_transparent
   public func distance(to other: Self) -> Int {
     return numericCast((numericCast(other) as IntMax) - numericCast(self))
   }
 
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#30 : using Int as the argument is wrong.
   @_transparent
   public func advanced(by n: Int) -> Self {
     return numericCast((numericCast(self) as IntMax) + numericCast(n))
@@ -124,13 +125,13 @@ public protocol UnsignedInteger : _DisallowMixedSignArithmetic, Integer {
 }
 
 extension UnsignedInteger {
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#31 : using Int as the return value is wrong.
   @_transparent
   public func distance(to other: Self) -> Int {
     return numericCast((numericCast(other) as IntMax) - numericCast(self))
   }
 
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#32 : using Int as the return value is wrong.
   @_transparent
   public func advanced(by n: Int) -> Self {
     return numericCast((numericCast(self) as IntMax) + numericCast(n))
@@ -272,7 +273,7 @@ public struct ${Self}
 #if _endian(big)
     self = value
 #else
-    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value))
 #endif
   }
 
@@ -283,7 +284,7 @@ public struct ${Self}
 #if _endian(little)
     self = value
 #else
-    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value))
 #endif
   }
 %  end
@@ -429,7 +430,6 @@ extension ${Self} {
 }
 
 % if signed:
-@_transparent
 extension ${Self} : SignedNumber {}
 % end
 
@@ -459,7 +459,7 @@ fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_fun
 %       else: # Smaller size input, unsigned to signed or unsigned to unsigned.
   result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(src), false._value)
 %       end
-% 
+%
 % if not safelyConvertible:
   ${error_check}
 % end
@@ -474,7 +474,6 @@ fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_fun
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
 %    safelyConvertible = (srcBits < bits and (srcSign == sign or signed)) or (srcBits == bits and srcSign == sign)
 
-@_transparent
 extension ${Self} {
 
   @_transparent
@@ -486,11 +485,11 @@ extension ${Self} {
         )
     }
   }
-    
+
 % if safelyConvertible:
   @available(*, message: "Converting ${Src} to ${Self} will always succeed.")
 % end
-  @_transparent 
+  @_transparent
   public init?(exactly value: ${Src}) {
     ${gyb.execute_template(
         fixed_fixed_conversion_function,
@@ -524,6 +523,46 @@ extension ${Self} {
 % end
 
 extension ${Self} {
+// Construction of integers from floating point numbers.
+%   for src_type in all_floating_point_types():
+%     Src = src_type.stdlib_name
+%     srcBits = src_type.bits
+%     (lower, upper) = getFtoIBounds(floatBits=srcBits, intBits=int(bits), signed=signed)
+
+%     if srcBits == 80:
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%     end
+
+  /// Creates a new instance by rounding the given floating-point value toward
+  /// zero.
+  ///
+  /// - Parameter other: A floating-point value. When `other` is rounded toward
+  ///   zero, the result must be within the range `${Self}.min...${Self}.max`.
+  @_transparent
+  public init(_ value: ${Src}) {
+    _precondition(value.isFinite,
+      "${Src} value cannot be converted to ${Self} because it is either infinite or NaN")
+    _precondition(value > ${str(lower)}.0,
+      "${Src} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
+    _precondition(value < ${str(upper)}.0,
+      "${Src} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
+  }
+
+  /// Creates a ${Self} whose value is `value`
+  /// if no rounding is necessary, nil otherwise.
+  @inline(__always)
+  public init?(exactly value: ${Src}) {
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
+    if ${Src}(self) != value {
+      return nil
+    }
+  }
+%     if srcBits == 80:
+#endif
+%     end
+%   end
+
   /// Construct a `${Self}` having the same memory representation as
   /// the `${OtherSelf}` `bitPattern`.  No range or overflow checking
   /// occurs, and the resulting `${Self}` may not have the same numeric
@@ -631,9 +670,9 @@ public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
 % end
 
 // Bitwise operations
-@_transparent
 extension ${Self} : BitwiseOperations {
   /// The empty bitset of type `${Self}`.
+  @_transparent
   public static var allZeros: ${Self} { return 0 }
 }
 

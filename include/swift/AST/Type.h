@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,7 +19,9 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/OptionSet.h"
@@ -40,27 +42,94 @@ class NominalTypeDecl;
 class GenericTypeDecl;
 class NormalProtocolConformance;
 enum OptionalTypeKind : unsigned;
+class ProtocolConformanceRef;
 class ProtocolDecl;
+class ProtocolType;
 class StructDecl;
+class SubstitutableType;
+class SubstitutionMap;
 class TypeBase;
 class Type;
 class TypeWalker;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
-typedef llvm::DenseMap<TypeBase *, Type> TypeSubstitutionMap;
+typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
+
+/// Function used to provide substitutions.
+///
+/// Returns a null \c Type to indicate that there is no substitution for
+/// this substitutable type; otherwise, the replacement type.
+using TypeSubstitutionFn
+  = llvm::function_ref<Type(SubstitutableType *dependentType)>;
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// queries an underlying \c TypeSubstitutionMap.
+struct QueryTypeSubstitutionMap {
+  const TypeSubstitutionMap &substitutions;
+
+  Type operator()(SubstitutableType *type) const;
+};
+
+/// Function used to resolve conformances.
+using GenericFunction = auto(CanType dependentType,
+  Type conformingReplacementType,
+  ProtocolType *conformedProtocol)
+  ->Optional<ProtocolConformanceRef>;
+using LookupConformanceFn = llvm::function_ref<GenericFunction>;
+  
+/// Functor class suitable for use as a \c LookupConformanceFn to look up a
+/// conformance through a module.
+class LookUpConformanceInModule {
+  ModuleDecl *M;
+public:
+  explicit LookUpConformanceInModule(ModuleDecl *M)
+    : M(M) {}
+  
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
+
+/// Functor class suitable for use as a \c LookupConformanceFn to look up a
+/// conformance in a \c SubstitutionMap.
+class LookUpConformanceInSubstitutionMap {
+  const SubstitutionMap &Subs;
+public:
+  explicit LookUpConformanceInSubstitutionMap(const SubstitutionMap &Subs)
+    : Subs(Subs) {}
+  
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
+
+/// Functor class suitable for use as a \c LookupConformanceFn that provides
+/// only abstract conformances for generic types. Asserts that the replacement
+/// type is an opaque generic type.
+class MakeAbstractConformanceForGenericType {
+public:
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
 
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
   /// If a type cannot be produced because some member type is
-  /// missing, return the identity type rather than a null type.
-  IgnoreMissing = 0x01,
+  /// missing, place an 'error' type into the position of the base.
+  UseErrorType = 0x01,
   /// Allow substitutions to recurse into SILFunctionTypes.
   /// Normally, SILType::subst() should be used for lowered
   /// types, however in special cases where the substitution
   /// is just changing between contextual and interface type
   /// representations, using Type::subst() is allowed.
   AllowLoweredTypes = 0x02,
+  /// Map member types to their desugared witness type.
+  DesugarMemberTypes = 0x04,
 };
 
 /// Options for performing substitutions into a type.
@@ -148,6 +217,30 @@ public:
   /// \returns the result of transforming the type.
   Type transform(llvm::function_ref<Type(Type)> fn) const;
 
+  /// Transform the given type by applying the user-provided function to
+  /// each type.
+  ///
+  /// This routine applies the given function to transform one type into
+  /// another. If the function leaves the type unchanged, recurse into the
+  /// child type nodes and transform those. If any child type node changes,
+  /// the parent type node will be rebuilt.
+  ///
+  /// If at any time the function returns a null type, the null will be
+  /// propagated out.
+  ///
+  /// If the the function returns \c None, the transform operation will
+  ///
+  /// \param fn A function object with the signature
+  /// \c Optional<Type>(TypeBase *), which accepts a type pointer and returns a
+  /// transformed type, a null type (which will propagate the null type to the
+  /// outermost \c transform() call), or None (to indicate that the transform
+  /// operation should recursively transform the subtypes). The function object
+  /// should use \c dyn_cast rather \c getAs, because the transform itself
+  /// handles desugaring.
+  ///
+  /// \returns the result of transforming the type.
+  Type transformRec(llvm::function_ref<Optional<Type>(TypeBase *)> fn) const;
+
   /// Look through the given type and its children and apply fn to them.
   void visit(llvm::function_ref<void (Type)> fn) const {
     findIf([&fn](Type t) -> bool {
@@ -159,7 +252,7 @@ public:
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
   ///
-  /// \param module The module in which the substitution occurs.
+  /// \param module The module to use for conformance lookups.
   ///
   /// \param substitutions The mapping from substitutable types to their
   /// replacements.
@@ -167,8 +260,39 @@ public:
   /// \param options Options that affect the substitutions.
   ///
   /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(ModuleDecl *module, TypeSubstitutionMap &substitutions,
-             SubstOptions options) const;
+  Type subst(ModuleDecl *module,
+             const TypeSubstitutionMap &substitutions,
+             SubstOptions options = None) const;
+
+  /// Replace references to substitutable types with new, concrete types and
+  /// return the substituted result.
+  ///
+  /// \param substitutions The mapping from substitutable types to their
+  /// replacements and conformances.
+  ///
+  /// \param options Options that affect the substitutions.
+  ///
+  /// \returns the substituted type, or a null type if an error occurred.
+  Type subst(const SubstitutionMap &substitutions,
+             SubstOptions options = None) const;
+
+  /// Replace references to substitutable types with new, concrete types and
+  /// return the substituted result.
+  ///
+  /// \param substitutions A function mapping from substitutable types to their
+  /// replacements.
+  ///
+  /// \param conformances A function for looking up conformances.
+  ///
+  /// \param options Options that affect the substitutions.
+  ///
+  /// \returns the substituted type, or a null type if an error occurred.
+  Type subst(TypeSubstitutionFn substitutions,
+             LookupConformanceFn conformances,
+             SubstOptions options = None) const;
+
+  /// Replace references to substitutable types with error types.
+  Type substDependentTypesWithErrorTypes() const;
 
   bool isPrivateStdlibType(bool whitelistProtocols=true) const;
 
@@ -181,14 +305,11 @@ public:
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
 
-  /// Get the canonical type, or return null if the type is null.
-  CanType getCanonicalTypeOrNull() const; // in Types.h
-
-  /// Computes the meet between two types.
+  /// Computes the join between two types.
   ///
-  /// The meet of two types is the most specific type that is a supertype of
-  /// both \c type1 and \c type2. For example, given a simple class hierarchy as
-  /// follows:
+  /// The join of two types is the most specific type that is a supertype of
+  /// both \c type1 and \c type2, e.g., the least upper bound in the type
+  /// lattice. For example, given a simple class hierarchy as follows:
   ///
   /// \code
   /// class A { }
@@ -197,15 +318,15 @@ public:
   /// class D { }
   /// \endcode
   ///
-  /// The meet of B and C is A, the meet of A and B is A. However, there is no
-  /// meet of D and A (or D and B, or D and C) because there is no common
+  /// The join of B and C is A, the join of A and B is A. However, there is no
+  /// join of D and A (or D and B, or D and C) because there is no common
   /// superclass. One would have to jump to an existential (e.g., \c AnyObject)
   /// to find a common type.
   /// 
-  /// \returns the meet of the two types, if there is a concrete type that can
-  /// express the meet, or a null type if the only meet would be a more-general
+  /// \returns the join of the two types, if there is a concrete type that can
+  /// express the join, or a null type if the only join would be a more-general
   /// existential type (e.g., \c Any).
-  static Type meet(Type type1, Type type2);
+  static Type join(Type type1, Type type2);
 
 private:
   // Direct comparison is disabled for types, because they may not be canonical.
@@ -304,6 +425,11 @@ public:
   CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
+
+  /// Returns information about the layout constraint represented by
+  /// this type. If this type does not represent a layout constraint,
+  /// it returns an empty LayoutConstraint.
+  LayoutConstraint getLayoutConstraint() const;
 
   /// \brief Retrieve the most-specific class bound of this type,
   /// which is either a class, a bound-generic class, or a class-bounded
@@ -442,7 +568,11 @@ public:
   // in Decl.h
   explicit CanGenericSignature(GenericSignature *Signature);
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
-  
+
+  /// Retrieve the canonical generic environment associated with this
+  /// generic signature.
+  GenericEnvironment *getGenericEnvironment(ModuleDecl &module) const;
+
   GenericSignature *operator->() const {
     return Signature;
   }
@@ -522,6 +652,19 @@ namespace llvm {
       return swift::CanType((swift::TypeBase*)P);
     }
   };
+
+  template<>
+  class PointerLikeTypeTraits<swift::CanGenericSignature> {
+  public:
+    static inline swift::CanGenericSignature getFromVoidPointer(void *P) {
+      return swift::CanGenericSignature((swift::GenericSignature*)P);
+    }
+    static inline void *getAsVoidPointer(swift::CanGenericSignature S) {
+      return (void*)S.getPointer();
+    }
+    enum { NumLowBitsAvailable = swift::TypeAlignInBits };
+  };
+  
 } // end namespace llvm
 
 #endif

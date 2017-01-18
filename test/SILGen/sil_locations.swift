@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | %FileCheck %s
 
 // FIXME: Not sure if this an ideal source info for the branch - 
 // it points to if, not the last instruction in the block.
@@ -145,10 +145,10 @@ func testSwitch() {
   // CHECK: cond_br
   //
     var z: Int = 200
-  // CHECK: [[VAR_Z:%[0-9]+]] = alloc_box $Int, var, name "z"{{.*}}line:[[@LINE-1]]:9
+  // CHECK: [[VAR_Z:%[0-9]+]] = alloc_box ${ var Int }, var, name "z"{{.*}}line:[[@LINE-1]]:9
   // CHECK: integer_literal $Builtin.Int2048, 200, loc "{{.*}}":[[@LINE-2]]:18
     x = z
-  // CHECK:  strong_release [[VAR_Z]]{{.*}}, loc "{{.*}}":[[@LINE-1]]:9, {{.*}}:cleanup
+  // CHECK:  destroy_value [[VAR_Z]]{{.*}}, loc "{{.*}}":[[@LINE-1]]:9, {{.*}}:cleanup
   case (3, let y):
     x += 1
   }
@@ -186,11 +186,11 @@ func testFor() {
   }
 
   // CHECK-LABEL: sil hidden @_TF13sil_locations7testForFT_T_
-  // CHECK: [[VAR_Y_IN_FOR:%[0-9]+]]  = alloc_box $Int, var, name "y", loc "{{.*}}":[[@LINE-10]]:9
+  // CHECK: [[VAR_Y_IN_FOR:%[0-9]+]]  = alloc_box ${ var Int }, var, name "y", loc "{{.*}}":[[@LINE-10]]:9
   // CHECK: integer_literal $Builtin.Int2048, 300, loc "{{.*}}":[[@LINE-11]]:18
-  // CHECK: strong_release [[VAR_Y_IN_FOR]] : $@box Int
+  // CHECK: destroy_value [[VAR_Y_IN_FOR]] : ${ var Int }
   // CHECK: br bb{{.*}}, loc "{{.*}}":[[@LINE-10]]:7
-  // CHECK: strong_release [[VAR_Y_IN_FOR]] : $@box Int
+  // CHECK: destroy_value [[VAR_Y_IN_FOR]] : ${ var Int }
   // CHECK: br bb{{.*}}, loc "{{.*}}":[[@LINE-9]]:5
   
   
@@ -239,7 +239,7 @@ func interpolated_string(_ x: Int, y: String) -> String {
 
 
 
-  // CHECK: retain_value{{.*}}, loc "{{.*}}":[[@LINE-5]]:37
+  // CHECK: copy_value{{.*}}, loc "{{.*}}":[[@LINE-5]]:37
 
 
 }

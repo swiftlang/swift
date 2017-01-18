@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
 
 import Swift // just for Optional
 
@@ -102,26 +102,26 @@ func calls(_ i:Int, j:Int, k:Int) {
   var j = j
   var k = k
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
-  // CHECK: [[IBOX:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[IBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
   // CHECK: [[IADDR:%.*]] = project_box [[IBOX]]
-  // CHECK: [[JBOX:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[JBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
   // CHECK: [[JADDR:%.*]] = project_box [[JBOX]]
-  // CHECK: [[KBOX:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[KBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
   // CHECK: [[KADDR:%.*]] = project_box [[KBOX]]
 
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
   // CHECK: apply [[FUNC]]([[I]], [[J]])
   standalone_function(i, j)
 
   // -- Curry 'self' onto struct method argument lists.
 
-  // CHECK: [[ST_ADDR:%.*]] = alloc_box $SomeStruct
+  // CHECK: [[ST_ADDR:%.*]] = alloc_box ${ var SomeStruct }
   // CHECK: [[CTOR:%.*]] = function_ref @_TFV9functions10SomeStructC{{.*}} : $@convention(method) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
   // CHECK: [[METATYPE:%.*]] = metatype $@thin SomeStruct.Type
-  // CHECK: [[I:%.*]] = load [[IADDR]]
-  // CHECK: [[J:%.*]] = load [[JADDR]]
+  // CHECK: [[I:%.*]] = load [trivial] [[IADDR]]
+  // CHECK: [[J:%.*]] = load [trivial] [[JADDR]]
   // CHECK: apply [[CTOR]]([[I]], [[J]], [[METATYPE]]) : $@convention(method) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
   var st = SomeStruct(x: i, y: j)
 
@@ -134,19 +134,20 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // -- Curry 'self' onto method argument lists dispatched using class_method.
 
-  // CHECK: [[CBOX:%[0-9]+]] = alloc_box $SomeClass
+  // CHECK: [[CBOX:%[0-9]+]] = alloc_box ${ var SomeClass }
   // CHECK: [[CADDR:%.*]] = project_box [[CBOX]]
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TFC9functions9SomeClassC{{.*}} : $@convention(method) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeClass.Type
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
   // CHECK: [[C:%[0-9]+]] = apply [[FUNC]]([[I]], [[J]], [[META]])
   var c = SomeClass(x: i, y: j)
 
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // CHECK: apply [[METHOD]]([[I]], [[C]])
+  // CHECK: destroy_value [[C]]
   c.method(i)
 
   // -- Curry 'self' onto unapplied methods dispatched using class_method.
@@ -155,53 +156,59 @@ func calls(_ i:Int, j:Int, k:Int) {
   var cm1 = SomeClass.method(c)
   cm1(i)
 
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // CHECK: apply [[METHOD]]([[I]], [[C]])
+  // CHECK: destroy_value [[C]]
   SomeClass.method(c)(i)
 
   // -- Curry the Type onto static method argument lists.
   
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [[META:%[0-9]+]] : {{.*}}, #SomeClass.static_method!1
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
+  // CHECK: [[C:%[0-9]+]] = load_borrow [[CADDR]]
+  // CHECK: [[META:%.*]] = value_metatype $@thick SomeClass.Type, [[C]]
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[META]] : {{.*}}, #SomeClass.static_method!1
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // CHECK: apply [[METHOD]]([[I]], [[META]])
   type(of: c).static_method(i)
 
   // -- Curry property accesses.
 
   // -- FIXME: class_method-ify class getters.
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
   // CHECK: [[GETTER:%[0-9]+]] = class_method {{.*}} : $SomeClass, #SomeClass.someProperty!getter.1
   // CHECK: apply [[GETTER]]([[C]])
+  // CHECK: destroy_value [[C]]
   i = c.someProperty
 
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.someProperty!setter.1 : (SomeClass) -> (Builtin.Int64) -> ()
   // CHECK: apply [[SETTER]]([[I]], [[C]])
+  // CHECK: destroy_value [[C]]
   c.someProperty = i
 
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
+  // CHECK: [[K:%[0-9]+]] = load [trivial] [[KADDR]]
   // CHECK: [[GETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!getter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 , $@convention(method) (Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> Builtin.Int64
   // CHECK: apply [[GETTER]]([[J]], [[K]], [[C]])
+  // CHECK: destroy_value [[C]]
   i = c[j, k]
 
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
+  // CHECK: [[K:%[0-9]+]] = load [trivial] [[KADDR]]
   // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> () , $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
   // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[C]])
+  // CHECK: destroy_value [[C]]
   c[i, j] = k
 
   // -- Curry the projected concrete value in an existential (or its Type)
   // -- onto protocol type methods dispatched using protocol_method.
 
-  // CHECK: [[PBOX:%[0-9]+]] = alloc_box $SomeProtocol
+  // CHECK: [[PBOX:%[0-9]+]] = alloc_box ${ var SomeProtocol }
   // CHECK: [[PADDR:%.*]] = project_box [[PBOX]]
   var p : SomeProtocol = ConformsToSomeProtocol()
 
@@ -209,7 +216,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: copy_addr [[PADDR]] to [initialization] [[TEMP]]
   // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr [[TEMP]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
   // CHECK: destroy_addr [[PVALUE]]
   // CHECK: deinit_existential_addr [[TEMP]]
@@ -218,45 +225,48 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
   var sp : SomeProtocol = ConformsToSomeProtocol()
   sp.method(i)
 
   // FIXME: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED:@opened(.*) SomeProtocol]], #SomeProtocol.static_method!1
-  // FIXME: [[I:%[0-9]+]] = load [[IADDR]]
+  // FIXME: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // FIXME: apply [[PMETHOD]]([[I]], [[PMETA]])
   // Needs existential metatypes
   //type(of: p).static_method(i)
 
   // -- Use an apply or partial_apply instruction to bind type parameters of a generic.
 
-  // CHECK: [[GBOX:%[0-9]+]] = alloc_box $SomeGeneric<Builtin.Int64>
+  // CHECK: [[GBOX:%[0-9]+]] = alloc_box ${ var SomeGeneric<Builtin.Int64> }
   // CHECK: [[GADDR:%.*]] = project_box [[GBOX]]
   // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGenericC{{.*}} : $@convention(method) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeGeneric<Builtin.Int64>.Type
   // CHECK: apply [[CTOR_GEN]]<Builtin.Int64>([[META]])
   var g = SomeGeneric<Builtin.Int64>()
 
-  // CHECK: [[G:%[0-9]+]] = load [[GADDR]]
+  // CHECK: [[G:%[0-9]+]] = load [copy] [[GADDR]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.method!1
   // CHECK: [[TMPI:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPI]], [[G]])
+  // CHECK: destroy_value [[G]]
   g.method(i)
 
-  // CHECK: [[G:%[0-9]+]] = load [[GADDR]]
+  // CHECK: [[G:%[0-9]+]] = load [copy] [[GADDR]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.generic!1
   // CHECK: [[TMPJ:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPJ]], [[G]])
+  // CHECK: destroy_value [[G]]
   g.generic(j)
 
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.generic!1
   // CHECK: [[TMPK:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPK]], [[C]])
+  // CHECK: destroy_value [[C]]
   c.generic(k)
 
   // FIXME: curried generic entry points
@@ -272,31 +282,31 @@ func calls(_ i:Int, j:Int, k:Int) {
   // SIL-level "thin" function values need to be able to convert to
   // "thick" function values when stored, returned, or passed as arguments.
 
-  // CHECK: [[FBOX:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[FBOX:%[0-9]+]] = alloc_box ${ var @callee_owned (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 }
   // CHECK: [[FADDR:%.*]] = project_box [[FBOX]]
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
-  // CHECK: store [[FUNC_THICK]] to [[FADDR]]
+  // CHECK: store [[FUNC_THICK]] to [init] [[FADDR]]
   var f = standalone_function
-  // CHECK: [[F:%[0-9]+]] = load [[FADDR]]
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
+  // CHECK: [[F:%[0-9]+]] = load [copy] [[FADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
   // CHECK: apply [[F]]([[I]], [[J]])
   f(i, j)
 
   // CHECK: [[HOF:%[0-9]+]] = function_ref @_TF9functions21higher_order_function{{.*}} : $@convention(thin) {{.*}}
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
   // CHECK: apply [[HOF]]([[FUNC_THICK]], [[I]], [[J]])
   higher_order_function(standalone_function, i, j)
 
   // CHECK: [[HOF2:%[0-9]+]] = function_ref @_TF9functions22higher_order_function2{{.*}} : $@convention(thin) {{.*}}
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%.*]] = thin_to_thick_function [[FUNC_THIN]]
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
   // CHECK: apply [[HOF2]]([[FUNC_THICK]], [[I]], [[J]])
   higher_order_function2(standalone_function, i, j)
 }
@@ -428,12 +438,12 @@ func testNoescape() {
 // CHECK-LABEL: functions.testNoescape () -> ()
 // CHECK-NEXT: sil hidden @_TF9functions12testNoescapeFT_T_ : $@convention(thin) () -> ()
 // CHECK: function_ref functions.(testNoescape () -> ()).(closure #1)
-// CHECK-NEXT: function_ref @_TFF9functions12testNoescapeFT_T_U_FT_T_ : $@convention(thin) (@owned @box Int) -> ()
+// CHECK-NEXT: function_ref @_TFF9functions12testNoescapeFT_T_U_FT_T_ : $@convention(thin) (@owned { var Int }) -> ()
 
 // Despite being a noescape closure, this needs to capture 'a' by-box so it can
 // be passed to the capturing closure.closure
 // CHECK: functions.(testNoescape () -> ()).(closure #1)
-// CHECK-NEXT: sil shared @_TFF9functions12testNoescapeFT_T_U_FT_T_ : $@convention(thin) (@owned @box Int) -> () {
+// CHECK-NEXT: sil shared @_TFF9functions12testNoescapeFT_T_U_FT_T_ : $@convention(thin) (@owned { var Int }) -> () {
 
 
 
@@ -453,10 +463,10 @@ func testNoescape2() {
 // CHECK-LABEL: sil hidden @_TF9functions13testNoescape2FT_T_ : $@convention(thin) () -> () {
 
 // CHECK: // functions.(testNoescape2 () -> ()).(closure #1)
-// CHECK-NEXT: sil shared @_TFF9functions13testNoescape2FT_T_U_FT_T_ : $@convention(thin) (@owned @box Int) -> () {
+// CHECK-NEXT: sil shared @_TFF9functions13testNoescape2FT_T_U_FT_T_ : $@convention(thin) (@owned { var Int }) -> () {
 
 // CHECK: // functions.(testNoescape2 () -> ()).(closure #1).(closure #1)
-// CHECK-NEXT: sil shared @_TFFF9functions13testNoescape2FT_T_U_FT_T_U_FT_T_ : $@convention(thin) (@owned @box Int) -> () {
+// CHECK-NEXT: sil shared @_TFFF9functions13testNoescape2FT_T_U_FT_T_U_FT_T_ : $@convention(thin) (@owned { var Int }) -> () {
 
 enum PartialApplyEnumPayload<T, U> {
   case Left(T)

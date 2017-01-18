@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,6 +19,7 @@
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -37,6 +38,9 @@ class GenericSpecializer : public SILFunctionTransform {
     SILFunction &F = *getFunction();
     DEBUG(llvm::dbgs() << "***** GenericSpecializer on function:" << F.getName()
                        << " *****\n");
+
+    // Lock BCA so it's not invalidated along with the rest of the call graph.
+    AnalysisPreserver BCAP(PM->getAnalysis<BasicCalleeAnalysis>());
 
     if (specializeAppliesInFunction(F))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
@@ -82,6 +86,8 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       auto *I = Applies.pop_back_val();
       auto Apply = ApplySite::isa(I);
       assert(Apply && "Expected an apply!");
+      SILFunction *Callee = Apply.getReferencedFunction();
+      assert(Callee && "Expected to have a known callee");
 
       // We have a call that can potentially be specialized, so
       // attempt to do so.
@@ -106,7 +112,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       // (as opposed to returning a previous specialization), we need to notify
       // the pass manager so that the new functions get optimized.
       for (SILFunction *NewF : reverse(NewFunctions)) {
-        notifyPassManagerOfFunction(NewF);
+        notifyPassManagerOfFunction(NewF, Callee);
       }
     }
   }

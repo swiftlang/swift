@@ -1,11 +1,11 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend %S/Inputs/shared_function_serialization_input.swift -o %t/Swift.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-link-name swiftCore -module-name Swift -sil-serialize-all -O
-// RUN: %target-sil-opt -enable-sil-verify-all -I %t -linker -inline %s -o - | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -I %t -linker -inline %s -o - | %FileCheck %s
 
-// CHECK: sil private @top_level_code 
-// CHECK: sil public_external [fragile] @{{.*}}_TFVs1XCfT_S_ 
-// CHECK: sil public_external [fragile] @{{.*}}_TFs17the_thing_it_doesFT1xVs1X_T_ 
+// CHECK: sil private @top_level_code
+// CHECK: sil public_external [fragile] @{{.*}}_TFVs1XCfT_S_
+// CHECK: sil public_external [fragile] @{{.*}}_TFs17the_thing_it_doesFT1xVs1X_T_
 // CHECK: sil shared_external [fragile] [noinline] @{{.*}}_TTSgq5Vs1X___TFs9the_thingurFT1tx_T_
 
 sil_stage canonical

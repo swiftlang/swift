@@ -1,5 +1,5 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -module-to-print=ImportedProtocols.SubModule -source-filename %s > %t.printed.txt
-// RUN: FileCheck %s < %t.printed.txt 
+// RUN: %FileCheck %s < %t.printed.txt 
 
 // REQUIRES: objc_interop
 

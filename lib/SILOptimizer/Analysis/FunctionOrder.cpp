@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -40,10 +40,10 @@ void BottomUpFunctionOrder::DFS(SILFunction *Start) {
   for (auto &B : *Start) {
     for (auto &I : B) {
       auto FAS = FullApplySite::isa(&I);
-      if (!FAS)
+      if (!FAS && !isa<StrongReleaseInst>(&I) && !isa<ReleaseValueInst>(&I))
         continue;
 
-      auto Callees = BCA->getCalleeList(FAS);
+      auto Callees = FAS ? BCA->getCalleeList(FAS) : BCA->getCalleeList(&I);
       for (auto *CalleeFn : Callees) {
         // If not yet visited, visit the callee.
         if (DFSNum.find(CalleeFn) == DFSNum.end()) {

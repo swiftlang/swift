@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -46,7 +46,7 @@ public func assert(
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), expected: true) {
-      _assertionFailed("assertion failed", message(), file, line,
+      _assertionFailure("assertion failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
   }
@@ -88,7 +88,7 @@ public func precondition(
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), expected: true) {
-      _assertionFailed("precondition failed", message(), file, line,
+      _assertionFailure("precondition failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
@@ -128,7 +128,7 @@ public func assertionFailure(
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailed("fatal error", message(), file, line,
+    _assertionFailure("fatal error", message(), file: file, line: line,
       flags: _fatalErrorFlags())
   }
   else if _isFastAssertConfiguration() {
@@ -167,7 +167,7 @@ public func preconditionFailure(
 ) -> Never {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
-    _assertionFailed("fatal error", message(), file, line,
+    _assertionFailure("fatal error", message(), file: file, line: line,
       flags: _fatalErrorFlags())
   } else if _isReleaseAssertConfiguration() {
     Builtin.int_trap()
@@ -188,7 +188,7 @@ public func fatalError(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  _assertionFailed("fatal error", message(), file, line,
+  _assertionFailure("fatal error", message(), file: file, line: line,
     flags: _fatalErrorFlags())
 }
 
@@ -206,7 +206,7 @@ public func _precondition(
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), expected: true) {
-      _fatalErrorMessage("fatal error", message, file, line,
+      _fatalErrorMessage("fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
@@ -235,8 +235,8 @@ public func _overflowChecked<T>(
   let (result, error) = args
   if _isDebugAssertConfiguration() {
     if _branchHint(error, expected: false) {
-      _fatalErrorMessage("fatal error", "Overflow/underflow", file, line,
-        flags: _fatalErrorFlags())
+      _fatalErrorMessage("fatal error", "Overflow/underflow", 
+        file: file, line: line, flags: _fatalErrorFlags())
     }
   } else {
     Builtin.condfail(error._value)
@@ -260,7 +260,7 @@ public func _debugPrecondition(
   // Only check in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), expected: true) {
-      _fatalErrorMessage("fatal error", message, file, line,
+      _fatalErrorMessage("fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   }
@@ -290,7 +290,7 @@ public func _sanityCheck(
 ) {
 #if INTERNAL_CHECKS_ENABLED
   if !_branchHint(condition(), expected: true) {
-    _fatalErrorMessage("fatal error", message, file, line,
+    _fatalErrorMessage("fatal error", message, file: file, line: line,
       flags: _fatalErrorFlags())
   }
 #endif

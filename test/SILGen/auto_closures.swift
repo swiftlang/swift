@@ -1,11 +1,14 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 struct Bool {}
 var false_ = Bool()
 
-// CHECK-LABEL: sil hidden @_TF13auto_closures17call_auto_closure
+// CHECK-LABEL: sil hidden @_TF13auto_closures17call_auto_closureFKT_VS_4BoolS0_ : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
 func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
-  // CHECK: [[RET:%.*]] = apply %0()
+  // CHECK: bb0([[CLOSURE:%.*]] : $@callee_owned () -> Bool):
+  // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[CLOSURE]]
+  // CHECK: [[RET:%.*]] = apply [[CLOSURE_COPY]]()
+  // CHECK: destroy_value [[CLOSURE]]
   // CHECK: return [[RET]]
   return x()
 }
@@ -34,9 +37,13 @@ public class Base {
 
 public class Sub : Base {
   // CHECK-LABEL: sil hidden @_TFC13auto_closures3Subg1xVS_4Bool : $@convention(method) (@guaranteed Sub) -> Bool {
-  // CHECK: [[AUTOCLOSURE:%.*]] = function_ref @_TFFC13auto_closures3Subg1xVS_4Boolu_KT_S1_ : $@convention(thin) (@owned Sub) -> Bool
-  // CHECK: = partial_apply [[AUTOCLOSURE]](%0)
-  // CHECK: return {{%.*}} : $Bool
+  // CHECK: bb0([[SELF:%.*]] : $Sub):
+  // CHECK: [[AUTOCLOSURE_CONSUMER:%.*]] = function_ref @_TF13auto_closures17call_auto_closureFKT_VS_4BoolS0_ : $@convention(thin)
+  // CHECK: [[AUTOCLOSURE_FUNC:%.*]] = function_ref @_TFFC13auto_closures3Subg1xVS_4Boolu_KT_S1_ : $@convention(thin) (@owned Sub) -> Bool
+  // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK: [[AUTOCLOSURE:%.*]] = partial_apply [[AUTOCLOSURE_FUNC]]([[SELF_COPY]])
+  // CHECK: [[RET:%.*]] = apply [[AUTOCLOSURE_CONSUMER]]([[AUTOCLOSURE]])
+  // CHECK: return [[RET]] : $Bool
   // CHECK: }
 
   // CHECK-LABEL: sil shared [transparent] @_TFFC13auto_closures3Subg1xVS_4Boolu_KT_S1_ : $@convention(thin) (@owned Sub) -> Bool {

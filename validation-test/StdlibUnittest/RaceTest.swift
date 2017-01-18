@@ -1,7 +1,12 @@
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out
-// RUN: %target-run %t.out | FileCheck %s
+// RUN: %target-run %t.out | %FileCheck %s
 
 import StdlibUnittest
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+import Glibc
+#endif
 
 
 _setTestSuiteFailedCallback() { print("abort()") }
@@ -102,7 +107,77 @@ RaceTestSuite.test("closure") {
 }
 // CHECK: [ RUN      ] Race.closure
 // CHECK: [       OK ] Race.closure
-// CHECK: Race: Some tests failed, aborting
+
+RaceTestSuite.test("timeout-zero") {
+  // Zero timeout is still expected to run at least one trial.
+  let count = _stdlib_AtomicInt(0)
+  runRaceTest(trials: 2000000000, timeoutInSeconds: 0) {
+    _ = count.fetchAndAdd(1)
+  }
+  expectGT(count.load(), 0)
+}
+// CHECK: [ RUN      ] Race.timeout-zero
+// CHECK: [       OK ] Race.timeout-zero
+
+
+func -(_ lhs: timeval, _ rhs: timeval) -> timeval {
+  var result = timeval(tv_sec: 0, tv_usec: 0)
+  result.tv_sec = lhs.tv_sec - rhs.tv_sec
+  result.tv_usec = lhs.tv_usec - rhs.tv_usec
+  if result.tv_usec < 0 {
+    result.tv_usec += 1000000
+    result.tv_sec -= 1
+  }
+  return result
+}
+
+func gettimeofday() -> timeval {
+  var result = timeval(tv_sec: 0, tv_usec: 0)
+  gettimeofday(&result, nil)
+  return result
+}
+
+RaceTestSuite.test("timeout-small") {
+  // Verify that the timeout fires after the correct number of seconds.
+  // If the timeout fails to fire then this test will run for a very long time.
+  var startTime: timeval
+  var endTime: timeval
+  let timeout = 5
+  let count = _stdlib_AtomicInt(0)
+  startTime = gettimeofday()
+  runRaceTest(trials: 2000000000, timeoutInSeconds: timeout) {
+    _ = count.fetchAndAdd(1)
+  }
+  endTime = gettimeofday()
+  expectGT(count.load(), 0)
+  // Test should have run to the timeout.
+  // Test should not have run too long after the timeout.
+  let duration = endTime - startTime
+  expectGE(duration.tv_sec, timeout)
+  expectLT(duration.tv_sec, timeout*100)  // large to avoid spurious failures
+}
+// CHECK: [ RUN      ] Race.timeout-small
+// CHECK: [       OK ] Race.timeout-small
+
+RaceTestSuite.test("timeout-big") {
+  // Verify that a short test with a long timeout completes before the timeout.
+  var startTime: timeval
+  var endTime: timeval
+  let timeout = 10000
+  let count = _stdlib_AtomicInt(0)
+  startTime = gettimeofday()
+  runRaceTest(trials: 10, timeoutInSeconds: timeout) {
+    _ = count.fetchAndAdd(1)
+  }
+  endTime = gettimeofday()
+  expectGT(count.load(), 0)
+  // Test should have stopped long before the timeout.
+  let duration = endTime - startTime
+  expectLT(duration.tv_sec, timeout / 2)
+}
+// CHECK: [ RUN      ] Race.timeout-big
+// CHECK: [       OK ] Race.timeout-big
 
 runAllTests()
+// CHECK: Race: Some tests failed, aborting
 

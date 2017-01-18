@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -355,7 +355,7 @@ struct ult {
     return a.ult(b);
   }
 };
-}
+} // end anonymous namespace
 
 static void emitSubSwitch(IRGenFunction &IGF,
                     MutableArrayRef<EnumPayload::LazyValue> values,
@@ -671,6 +671,69 @@ EnumPayload::emitApplyOrMask(IRGenFunction &IGF,
     }
   }
 }
+
+/// Gather spare bits into the low bits of a smaller integer value.
+llvm::Value *irgen::emitGatherSpareBits(IRGenFunction &IGF,
+                                        const SpareBitVector &spareBitMask,
+                                        llvm::Value *spareBits,
+                                        unsigned resultLowBit,
+                                        unsigned resultBitWidth) {
+  auto destTy
+    = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), resultBitWidth);
+  unsigned usedBits = resultLowBit;
+  llvm::Value *result = nullptr;
+
+  auto spareBitEnumeration = spareBitMask.enumerateSetBits();
+  for (auto optSpareBit = spareBitEnumeration.findNext();
+       optSpareBit.hasValue() && usedBits < resultBitWidth;
+       optSpareBit = spareBitEnumeration.findNext()) {
+    unsigned u = optSpareBit.getValue();
+    assert(u >= (usedBits - resultLowBit) &&
+           "used more bits than we've processed?!");
+
+    // Shift the bits into place.
+    llvm::Value *newBits;
+    if (u > usedBits)
+      newBits = IGF.Builder.CreateLShr(spareBits, u - usedBits);
+    else if (u < usedBits)
+      newBits = IGF.Builder.CreateShl(spareBits, usedBits - u);
+    else
+      newBits = spareBits;
+    newBits = IGF.Builder.CreateZExtOrTrunc(newBits, destTy);
+
+    // See how many consecutive bits we have.
+    unsigned numBits = 1;
+    ++u;
+    // We don't need more bits than the size of the result.
+    unsigned maxBits = resultBitWidth - usedBits;
+    for (unsigned e = spareBitMask.size();
+         u < e && numBits < maxBits && spareBitMask[u];
+         ++u) {
+      ++numBits;
+      (void) spareBitEnumeration.findNext();
+    }
+
+    // Mask out the selected bits.
+    auto val = APInt::getAllOnesValue(numBits);
+    if (numBits < resultBitWidth)
+      val = val.zext(resultBitWidth);
+    val = val.shl(usedBits);
+    auto *mask = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), val);
+    newBits = IGF.Builder.CreateAnd(newBits, mask);
+
+    // Accumulate the result.
+    if (result)
+      result = IGF.Builder.CreateOr(result, newBits);
+    else
+      result = newBits;
+
+    usedBits += numBits;
+  }
+
+  return result;
+}
+
+
 
 llvm::Value *
 EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,

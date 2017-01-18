@@ -2,16 +2,16 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
 //  This file defines diagnostics that can be emitted across the whole compiler.
-//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  Each diagnostic is described using one of three kinds (error, warning, or
 //  note) along with a unique identifier, category, options, and text, and is
 //  followed by a signature describing the diagnostic argument kinds.
 //
@@ -49,7 +49,7 @@ ERROR(error_no_group_info,none,
       "no group info found for file: '%0'", (StringRef))
 
 NOTE(previous_decldef,none,
-     "previous %select{declaration|definition}0 of %1 is here", 
+     "previous %select{declaration|definition}0 of %1 is here",
      (bool, Identifier))
 
 
@@ -79,6 +79,8 @@ ERROR(func_decl_without_brace,PointsToFirstBadToken,
 NOTE(convert_let_to_var,none,
      "change 'let' to 'var' to make it mutable", ())
 
+NOTE(note_typo_candidate,none,
+     "did you mean '%0'?", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

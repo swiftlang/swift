@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // ----------------------------------------------------------------------------
 // Using protocol requirements from inside protocol extensions
@@ -221,7 +221,7 @@ func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
-  s4d.extP4Int() // expected-error{{'Int' is not convertible to 'AssocP4' (aka 'Bool')}}
+  s4d.extP4Int() // expected-error{{'Bool' is not convertible to 'Int'}}
   _ = b1
 }
 
@@ -414,8 +414,7 @@ func testSomeCollections(_ sc1: SomeCollection1, sc2: SomeCollection2) {
   _ = mig
 
   var ig = sc2.myGenerate()
-  ig = MyIndexedIterator(container: sc2, index: sc2.myStartIndex) // expected-error{{cannot invoke initializer for type 'MyIndexedIterator<_>' with an argument list of type '(container: SomeCollection2, index: Int)'}}
-  // expected-note @-1 {{expected an argument list of type '(container: C, index: C.Index)'}}
+  ig = MyIndexedIterator(container: sc2, index: sc2.myStartIndex) // expected-error {{cannot assign value of type 'MyIndexedIterator<SomeCollection2>' to type 'OtherIndexedIterator<SomeCollection2>'}}
   _ = ig
 }
 
@@ -498,7 +497,7 @@ struct SConforms8c : PConforms8 {
 }
 
 func testSConforms8c() {
-  let s: SConforms8c.Assoc = "hello" // expected-error{{cannot convert value of type 'String' to specified type 'Assoc' (aka 'Int')}}
+  let s: SConforms8c.Assoc = "hello" // expected-error{{cannot convert value of type 'String' to specified type 'SConforms8c.Assoc' (aka 'Int')}}
   _ = s
   let i: SConforms8c.Assoc = 5
   _ = i
@@ -907,3 +906,10 @@ protocol BadProto5 {
 }
 
 class BadClass5 : BadProto5 {} // expected-error{{type 'BadClass5' does not conform to protocol 'BadProto5'}}
+
+typealias A = BadProto1
+typealias B = BadProto1
+
+extension A & B { // expected-error{{protocol 'BadProto1' in the module being compiled cannot be extended via a typealias}}
+
+}

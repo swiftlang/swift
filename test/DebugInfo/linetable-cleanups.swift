@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+
+// FIXME: https://bugs.swift.org/browse/SR-2808
+// XFAIL: resilient_stdlib
 
 func markUsed<T>(_ t: T) {}
 
@@ -18,10 +21,10 @@ func main() {
 // CHECK: br label
 // CHECK: <label>:
 // CHECK: , !dbg ![[LOOPHEADER_LOC:.*]]
-// CHECK: call void {{.*}}elease({{.*}}) {{#[0-9]+}}, !dbg ![[LOOPHEADER_LOC]]
+// CHECK: call void {{.*[rR]}}elease{{.*}} {{#[0-9]+}}, !dbg ![[LOOPHEADER_LOC]]
 // CHECK: call void @_TF4main8markUsedurFxT_
 // The cleanups should share the line number with the ret stmt.
-// CHECK:  call void {{.*}}elease({{.*}}) {{#[0-9]+}}, !dbg ![[CLEANUPS:.*]]
+// CHECK:  call void {{.*[rR]}}elease{{.*}} {{#[0-9]+}}, !dbg ![[CLEANUPS:.*]]
 // CHECK-NEXT:  !dbg ![[CLEANUPS]]
 // CHECK-NEXT:  bitcast
 // CHECK-NEXT:  llvm.lifetime.end

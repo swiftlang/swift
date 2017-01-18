@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class B {
   var foo: Int
@@ -26,6 +26,11 @@ class D : B {
     let _: () -> D = self.init // expected-error {{partial application of 'self.init' initializer delegation is not allowed}}
   }
 
+  init(z: Int) {
+    super
+      .init(x: z)
+  }
+
   func super_calls() {
     super.foo        // expected-error {{expression resolves to an unused l-value}}
     super.foo.bar    // expected-error {{value of type 'Int' has no member 'bar'}}
@@ -35,6 +40,8 @@ class D : B {
     super.init() // expected-error{{'super.init' cannot be called outside of an initializer}}
     super.init(0) // expected-error{{'super.init' cannot be called outside of an initializer}}
     super[0]        // expected-error {{expression resolves to an unused l-value}}
+    super
+      .bar()
   }
 
   func bad_super_1() {

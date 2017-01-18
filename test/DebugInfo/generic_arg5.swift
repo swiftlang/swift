@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 public struct S<Type>
 {
   let value : Type
@@ -6,7 +6,7 @@ public struct S<Type>
 
 public func foo<Type>(_ values : [S<Type>])
 {
-  // CHECK: define {{.*}}_TFF12generic_arg53foourFGSaGVS_1Sx__T_U_FGS0_Q__GSqGS0_Q___
+  // CHECK: define {{.*}}_TFF12generic_arg53foourFGSaGVS_1Sx__T_U_FGS0_x_GSqGS0_x__
   // CHECK: store %[[TY:.*]]* %1, %[[TY]]** %[[ALLOCA:.*]], align
   // CHECK: call void @llvm.dbg.declare(metadata %[[TY]]** %[[ALLOCA]],
   // CHECK-SAME:       metadata ![[ARG:.*]], metadata ![[EXPR:.*]])

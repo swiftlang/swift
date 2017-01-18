@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -192,14 +192,20 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  internal func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
-    -> UnsafeMutablePointer<Element> {
+  internal func __copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
+    -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
     _abstract()
   }
 
 %   end
 
 %   override = 'override' if Kind != 'Sequence' else ''
+  internal ${override} func _drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    _abstract()
+  }
+
   internal ${override} func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
@@ -209,6 +215,12 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   internal ${override} func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
+    _abstract()
+  }
+
+  internal ${override} func _prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
@@ -225,33 +237,33 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 %   if Kind == 'Collection':
   internal subscript(i: _AnyIndexBox) -> Element { _abstract() }
-  
+
   internal func _index(after i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  
+
   internal func _formIndex(after i: _AnyIndexBox) { _abstract() }
-  
+
   internal func _index(
     _ i: _AnyIndexBox, offsetBy n: IntMax
   ) -> _AnyIndexBox {
     _abstract()
   }
-  
+
   internal func _index(
     _ i: _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox? {
     _abstract()
   }
-  
+
   internal func _formIndex(_ i: inout _AnyIndexBox, offsetBy n: IntMax) {
     _abstract()
   }
-  
+
   internal func _formIndex(
     _ i: inout _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
   ) -> Bool {
     _abstract()
   }
-  
+
   internal func _distance(
     from start: _AnyIndexBox, to end: _AnyIndexBox
   ) -> IntMax {
@@ -375,15 +387,26 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   internal override func __copyToContiguousArray() -> ContiguousArray<Element> {
     return _base._copyToContiguousArray()
   }
-  internal override func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
-    -> UnsafeMutablePointer<Element> {
-    return _base._copyContents(initializing: ptr)
+  internal override func __copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
+    -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
+    let (it,idx) = _base._copyContents(initializing: buf)
+    return (AnyIterator(it),idx)
+  }
+  internal override func _drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    return try _${Kind}Box<S.SubSequence>(_base: _base.drop(while: predicate))
   }
   internal override func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropFirst(n))
   }
   internal override func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropLast(n))
+  }
+  internal override func _prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    return try _${Kind}Box<S.SubSequence>(_base: _base.prefix(while: predicate))
   }
   internal override func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.prefix(maxLength))
@@ -537,7 +560,7 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
     return _makeUnderlyingIterator()
   }
 
-  internal var _makeUnderlyingIterator: @escaping () -> Iterator
+  internal var _makeUnderlyingIterator: () -> Iterator
 }
 
 /// A type-erased sequence.
@@ -566,6 +589,8 @@ public struct AnySequence<Element> : Sequence {
     self.init(_ClosureBasedSequence(makeUnderlyingIterator))
   }
 
+  public typealias Iterator = AnyIterator<Element>
+
   internal init(_box: _AnySequenceBox<Element>) {
     self._box = _box
   }
@@ -580,7 +605,7 @@ extension Any${Kind} {
 %   else:
   /// Returns an iterator over the elements of this collection.
 %   end
-  public func makeIterator() -> AnyIterator<Element> {
+  public func makeIterator() -> Iterator {
     return _box._makeIterator()
   }
 
@@ -606,12 +631,24 @@ extension Any${Kind} {
     return try _box._forEach(body)
   }
 
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> Any${Kind}<Element> {
+    return try Any${Kind}(_box: _box._drop(while: predicate))
+  }
+
   public func dropFirst(_ n: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._dropFirst(n))
   }
 
   public func dropLast(_ n: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._dropLast(n))
+  }
+
+  public func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> Any${Kind}<Element> {
+    return try Any${Kind}(_box: _box._prefix(while: predicate))
   }
 
   public func prefix(_ maxLength: Int) -> Any${Kind}<Element> {
@@ -633,6 +670,12 @@ extension Any${Kind} {
       whereSeparator: isSeparator)
   }
 
+  public func _customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    return _box.__customContainsEquatableElement(element)
+  }
+
   public func _preprocessingPass<R>(
     _ preprocess: () throws -> R
   ) rethrows -> R? {
@@ -643,9 +686,10 @@ extension Any${Kind} {
     return self._box.__copyToContiguousArray()
   }
 
-  public func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)
-    -> UnsafeMutablePointer<Element> {
-    return _box.__copyContents(initializing: ptr)
+  public func _copyContents(initializing buf: UnsafeMutableBufferPointer<Iterator.Element>)
+  -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
+    let (it,idx) = _box.__copyContents(initializing: buf)
+    return (AnyIterator(it),idx)
   }
 }
 % end
@@ -765,6 +809,11 @@ protocol _AnyCollectionProtocol : Collection {
 public struct ${Self}<Element>
   : _AnyCollectionProtocol, ${SelfProtocol} {
 
+//  public typealias Indices
+//    = Default${Traversal.replace('Forward', '')}Indices<${Self}>
+
+  public typealias Iterator = AnyIterator<Element>
+
   internal init(_box: _${Self}Box<Element>) {
     self._box = _box
   }
@@ -780,7 +829,7 @@ public struct ${Self}<Element>
     where
     C.Iterator.Element == Element,
 
-    // FIXME(compiler limitation): these constraints should be applied to
+    // FIXME(ABI)#101 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : ${SubProtocol},
     C.SubSequence.Iterator.Element == Element,
@@ -928,7 +977,13 @@ public struct ${Self}<Element>
 
   /// The number of elements.
   ///
-  /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(N)'}
+% if Traversal != 'RandomAccess':
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Calculating `count` can be an O(*n*)
+  /// operation.
+  ///
+% end
+  /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(*n*)'}
   public var count: IntMax {
     return _box._count
   }
@@ -979,7 +1034,7 @@ extension AnyIterator {
 % for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
 extension Any${Kind} {
 
-  @available(*, unavailable, message: "Please use underestimatedCount property instead.")
+  @available(*, unavailable, renamed: "getter:underestimatedCount()")
   public func underestimateCount() -> Int {
     Builtin.unreachable()
   }

@@ -194,7 +194,7 @@ tests.test("clSetKernelArgsListAPPLE") {
           kernel!, 3,
           0, MemoryLayout<cl_mem>.size, inputPtr,
           1, MemoryLayout<cl_mem>.size, outputPtr,
-          2, MemoryLayout._ofInstance(count).size, countPtr)
+          2, MemoryLayout.size(ofValue: count), countPtr)
       }
     }
   }
@@ -208,7 +208,7 @@ tests.test("clSetKernelArgsListAPPLE") {
 
   // Get the maximum work group size for executing the kernel on the device
   //
-  err = clGetKernelWorkGroupInfo(kernel, device_id, cl_kernel_work_group_info(CL_KERNEL_WORK_GROUP_SIZE), MemoryLayout._ofInstance(local).size, &local, nil)
+  err = clGetKernelWorkGroupInfo(kernel, device_id, cl_kernel_work_group_info(CL_KERNEL_WORK_GROUP_SIZE), MemoryLayout.size(ofValue: local), &local, nil)
   if (err != CL_SUCCESS)
   {
     print("Error: Failed to retrieve kernel work group info! \(err)")

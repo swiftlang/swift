@@ -2,16 +2,17 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
+@_versioned
 internal protocol _ArrayBufferProtocol
   : MutableCollection, RandomAccessCollection {
 
@@ -71,8 +72,8 @@ internal protocol _ArrayBufferProtocol
   ///
   /// - Precondition: This buffer is backed by a uniquely-referenced
   /// `_ContiguousArrayBuffer`.
-  mutating func replace<C>(
-    subRange: Range<Int>,
+  mutating func replaceSubrange<C>(
+    _ subrange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Iterator.Element == Element
@@ -123,41 +124,42 @@ internal protocol _ArrayBufferProtocol
   var identity: UnsafeRawPointer { get }
 
   var startIndex: Int { get }
+  var endIndex: Int { get }
 }
 
-extension _ArrayBufferProtocol where Index == Int {
+extension _ArrayBufferProtocol {
 
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
 
-  internal mutating func replace<C>(
-    subRange: Range<Int>,
+  internal mutating func replaceSubrange<C>(
+    _ subrange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Iterator.Element == Element {
     _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
     let oldCount = self.count
-    let eraseCount = subRange.count
+    let eraseCount = subrange.count
 
     let growth = newCount - eraseCount
     self.count = oldCount + growth
 
     let elements = self.subscriptBaseAddress
-    let oldTailIndex = subRange.upperBound
+    let oldTailIndex = subrange.upperBound
     let oldTailStart = elements + oldTailIndex
     let newTailIndex = oldTailIndex + growth
     let newTailStart = oldTailStart + growth
-    let tailCount = oldCount - subRange.upperBound
+    let tailCount = oldCount - subrange.upperBound
 
     if growth > 0 {
       // Slide the tail part of the buffer forwards, in reverse order
       // so as not to self-clobber.
       newTailStart.moveInitialize(from: oldTailStart, count: tailCount)
 
-      // Assign over the original subRange
+      // Assign over the original subrange
       var i = newValues.startIndex
-      for j in CountableRange(subRange) {
+      for j in CountableRange(subrange) {
         elements[j] = newValues[i]
         newValues.formIndex(after: &i)
       }
@@ -166,18 +168,18 @@ extension _ArrayBufferProtocol where Index == Int {
         (elements + j).initialize(to: newValues[i])
         newValues.formIndex(after: &i)
       }
-      _expectEnd(i, newValues)
+      _expectEnd(of: newValues, is: i)
     }
     else { // We're not growing the buffer
-      // Assign all the new elements into the start of the subRange
-      var i = subRange.lowerBound
+      // Assign all the new elements into the start of the subrange
+      var i = subrange.lowerBound
       var j = newValues.startIndex
       for _ in 0..<newCount {
         elements[i] = newValues[j]
-        formIndex(after: &i)
+        i += 1
         newValues.formIndex(after: &j)
       }
-      _expectEnd(j, newValues)
+      _expectEnd(of: newValues, is: j)
 
       // If the size didn't change, we're done.
       if growth == 0 {
@@ -200,7 +202,7 @@ extension _ArrayBufferProtocol where Index == Int {
         // Assign over the start of the replaced range with the tail
         newTailStart.moveAssign(from: oldTailStart, count: tailCount)
 
-        // Destroy elements remaining after the tail in subRange
+        // Destroy elements remaining after the tail in subrange
         (newTailStart + tailCount).deinitialize(
           count: shrinkage - tailCount)
       }

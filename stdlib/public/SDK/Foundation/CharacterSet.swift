@@ -2,18 +2,23 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
+import CoreFoundation
 
 private func _utfRangeToNSRange(_ inRange : Range<UnicodeScalar>) -> NSRange {
     return NSMakeRange(Int(inRange.lowerBound.value), Int(inRange.upperBound.value - inRange.lowerBound.value))
+}
+
+private func _utfRangeToNSRange(_ inRange : ClosedRange<UnicodeScalar>) -> NSRange {
+    return NSMakeRange(Int(inRange.lowerBound.value), Int(inRange.upperBound.value - inRange.lowerBound.value + 1))
 }
 
 internal final class _SwiftNSCharacterSet : _SwiftNativeNSCharacterSet, _SwiftNativeFoundationType {
@@ -73,7 +78,7 @@ internal final class _SwiftNSCharacterSet : _SwiftNativeNSCharacterSet, _SwiftNa
 */
 public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgebra, _MutablePairBoxing {
     public typealias ReferenceType = NSCharacterSet
-    
+
     internal typealias SwiftNSWrapping = _SwiftNSCharacterSet
     internal typealias ImmutableType = SwiftNSWrapping.ImmutableType
     internal typealias MutableType = SwiftNSWrapping.MutableType
@@ -103,8 +108,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
     public init(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
-        _wrapped = _SwiftNSCharacterSet(immutableObject: NSCharacterSet(range: _utfRangeToNSRange(halfOpenRange)))
+        _wrapped = _SwiftNSCharacterSet(immutableObject: NSCharacterSet(range: _utfRangeToNSRange(range)))
     }
 
     /// Initialize with the characters in the given string.
@@ -133,17 +137,9 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
             return nil
         }
     }
-    
+
     public var hashValue: Int {
         return _mapUnmanaged { $0.hashValue }
-    }
-    
-    public var description: String {
-        return _mapUnmanaged { $0.description }
-    }
-    
-    public var debugDescription: String {
-        return _mapUnmanaged { $0.debugDescription }
     }
     
     private init(reference: NSCharacterSet) {
@@ -299,8 +295,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
     public mutating func insert(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
-        let nsRange = _utfRangeToNSRange(halfOpenRange)
+        let nsRange = _utfRangeToNSRange(range)
         _applyUnmanagedMutation {
             $0.addCharacters(in: nsRange)
         }
@@ -316,8 +311,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
 
     /// Remove a closed range of integer values from the `CharacterSet`.
     public mutating func remove(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
-        let nsRange = _utfRangeToNSRange(halfOpenRange)
+        let nsRange = _utfRangeToNSRange(range)
         _applyUnmanagedMutation {
             $0.removeCharacters(in: nsRange)
         }
@@ -413,19 +407,29 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
         return result
     }
     
-    /// Sets the value to the intersection of the `CharacterSet` with another `CharacterSet`.
+    /// Sets the value to an intersection of the `CharacterSet` with another `CharacterSet`.
     public mutating func formIntersection(_ other: CharacterSet) {
         _applyUnmanagedMutation {
             $0.formIntersection(with: other)
         }
     }
-    
-    /// Returns the exclusive or of the `CharacterSet` with another `CharacterSet`.
+
+    /// Returns a `CharacterSet` created by removing elements in `other` from `self`.
+    public func subtracting(_ other: CharacterSet) -> CharacterSet {
+        return intersection(other.inverted)
+    }
+
+    /// Sets the value to a `CharacterSet` created by removing elements in `other` from `self`.
+    public mutating func subtract(_ other: CharacterSet) {
+        self = subtracting(other)
+    }
+
+    /// Returns an exclusive or of the `CharacterSet` with another `CharacterSet`.
     public func symmetricDifference(_ other: CharacterSet) -> CharacterSet {
         return union(other).subtracting(intersection(other))
     }
     
-    /// Sets the value to the exclusive or of the `CharacterSet` with another `CharacterSet`.
+    /// Sets the value to an exclusive or of the `CharacterSet` with another `CharacterSet`.
     public mutating func formSymmetricDifference(_ other: CharacterSet) {
         self = symmetricDifference(other)
     }
@@ -468,6 +472,16 @@ extension CharacterSet : _ObjectiveCBridgeable {
     
 }
 
+extension CharacterSet : CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String {
+        return _mapUnmanaged { $0.description }
+    }
+
+    public var debugDescription: String {
+        return _mapUnmanaged { $0.debugDescription }
+    }
+}
+
 extension NSCharacterSet : _HasCustomAnyHashableRepresentation {
     // Must be @nonobjc to avoid infinite recursion during bridging.
     @nonobjc
@@ -483,28 +497,37 @@ extension _SwiftNSCharacterSet {
     
     // Immutable
     
+    @objc(bitmapRepresentation)
     var bitmapRepresentation: Data {
         return _mapUnmanaged { $0.bitmapRepresentation }
     }
     
+    @objc(invertedSet)
     var inverted : CharacterSet {
         return _mapUnmanaged { $0.inverted }
     }
     
+    @objc(hasMemberInPlane:)
     func hasMember(inPlane plane: UInt8) -> Bool {
-        return _mapUnmanaged {$0.hasMemberInPlane(plane) }
+        return _mapUnmanaged { $0.hasMemberInPlane(plane) }
     }
     
+    @objc(characterIsMember:)
     func characterIsMember(_ member: unichar) -> Bool {
         return _mapUnmanaged { $0.characterIsMember(member) }
     }
     
+    @objc(longCharacterIsMember:)
     func longCharacterIsMember(_ member: UTF32Char) -> Bool {
         return _mapUnmanaged { $0.longCharacterIsMember(member) }
     }
     
+    @objc(isSupersetOfSet:)
     func isSuperset(of other: CharacterSet) -> Bool {
-        return _mapUnmanaged { $0.isSuperset(of: other) }
+        return _mapUnmanaged {
+            // this is a work around for <rdar://problem/27768939>
+            return CFCharacterSetIsSupersetOfSet($0 as CFCharacterSet, (other as NSCharacterSet).copy() as! CFCharacterSet)
+        }
     }
     
 }

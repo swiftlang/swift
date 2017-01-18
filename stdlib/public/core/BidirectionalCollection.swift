@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,9 +16,12 @@
 /// In most cases, it's best to ignore this protocol and use the
 /// `BidirectionalCollection` protocol instead, because it has a more complete
 /// interface.
-public protocol BidirectionalIndexable : Indexable {
-  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'BidirectionalCollection' instead")
+public typealias BidirectionalIndexable = _BidirectionalIndexable
+public protocol _BidirectionalIndexable : _Indexable {
+  // FIXME(ABI)#22 (Recursive Protocol Constraints): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
+  // rdar://problem/20531108
   //
   // This protocol is almost an implementation detail of the standard
   // library.
@@ -63,7 +66,7 @@ public protocol BidirectionalIndexable : Indexable {
 /// - If `i > c.startIndex && i <= c.endIndex`
 ///   `c.index(after: c.index(before: i)) == i`.
 public protocol BidirectionalCollection
-  : BidirectionalIndexable, Collection {
+  : _BidirectionalIndexable, Collection {
 
 // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
   /// Returns the position immediately before the given index.
@@ -81,18 +84,43 @@ public protocol BidirectionalCollection
 
   /// A sequence that can represent a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence : BidirectionalIndexable, Collection
+  associatedtype SubSequence : _BidirectionalIndexable, Collection
     = BidirectionalSlice<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#93 (Recursive Protocol Constraints):
+  // FIXME(ABI)#94 (Associated Types with where clauses):
+  // This is dependent on both recursive protocol constraints AND associated 
+  // types with where clauses.
   // associatedtype SubSequence : BidirectionalCollection
 
-  /// A type that can represent the indices that are valid for subscripting the
+  /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices : BidirectionalIndexable, Collection
+  associatedtype Indices : _BidirectionalIndexable, Collection
     = DefaultBidirectionalIndices<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#95 (Recursive Protocol Constraints):
+  // FIXME(ABI)#96 (Associated Types with where clauses):
+  // This is dependent on both recursive protocol constraints AND associated 
+  // types with where clauses.
   // associatedtype Indices : BidirectionalCollection
 
+  /// The indices that are valid for subscripting the collection, in ascending
+  /// order.
+  ///
+  /// A collection's `indices` property can hold a strong reference to the
+  /// collection itself, causing the collection to be non-uniquely referenced.
+  /// If you mutate the collection while iterating over its indices, a strong
+  /// reference can cause an unexpected copy of the collection. To avoid the
+  /// unexpected copy, use the `index(after:)` method starting with
+  /// `startIndex` to produce indices instead.
+  ///
+  ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
+  ///     var i = c.startIndex
+  ///     while i != c.endIndex {
+  ///         c[i] /= 5
+  ///         i = c.index(after: i)
+  ///     }
+  ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
+  var indices: Indices { get }
+  
   // TODO: swift-3-indexing-model: tests.
   /// The last element of the collection.
   ///
@@ -106,10 +134,33 @@ public protocol BidirectionalCollection
   ///     
   /// - Complexity: O(1)
   var last: Iterator.Element? { get }
+
+  /// Accesses a contiguous subrange of the collection's elements.
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection uses. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice of an array of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     print(streetsSlice)
+  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     print(streets[index!])
+  ///     // Prints "Evarts"
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
+  subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 
 /// Default implementation for bidirectional collections.
-extension BidirectionalIndexable {
+extension _BidirectionalIndexable {
 
   @inline(__always)
   public func formIndex(before i: inout Index) {
@@ -177,6 +228,10 @@ extension BidirectionalCollection where SubSequence == BidirectionalSlice<Self> 
 extension BidirectionalCollection where SubSequence == Self {
   /// Removes and returns the last element of the collection.
   ///
+  /// You can use `popLast()` to remove the last element of a collection that
+  /// might be empty. The `removeLast()` method must be used only on a
+  /// nonempty collection.
+  ///
   /// - Returns: The last element of the collection if the collection has one
   ///   or more elements; otherwise, `nil`.
   ///
@@ -191,7 +246,8 @@ extension BidirectionalCollection where SubSequence == Self {
 
   /// Removes and returns the last element of the collection.
   ///
-  /// The collection must not be empty.
+  /// The collection must not be empty. To remove the last element of a
+  /// collection that might be empty, use the `popLast()` method instead.
   ///
   /// - Returns: The last element of the collection.
   ///

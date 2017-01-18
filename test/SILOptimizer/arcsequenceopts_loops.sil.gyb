@@ -1,8 +1,8 @@
 %# -*- mode: sil -*-
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %gyb %s > %t/arc-sequence-opts-loops.sil
-// RUN: %target-sil-opt -enable-sil-verify-all -arc-sequence-opts %t/arc-sequence-opts-loops.sil -enable-loop-arc=0 | FileCheck %t/arc-sequence-opts-loops.sil
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -arc-sequence-opts %t/arc-sequence-opts-loops.sil -enable-loop-arc=0 | %FileCheck %t/arc-sequence-opts-loops.sil
 
 %# Ignore the following admonition; it applies to the resulting .sil
 %# test file only.
@@ -24,7 +24,7 @@ sil @user : $@convention(thin) (Builtin.NativeObject) -> ()
 //
 // Thus it is a simple loop without any interior basic blocks.
 //
-// We generate test retain release pairs at 
+// We generate test retain release pairs at
 % for i in range(16):
 
 // CHECK-LABEL: sil @loop_form_1_${i} : $@convention(thin) (Builtin.NativeObject) -> () {

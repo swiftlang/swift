@@ -1,6 +1,6 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRAINT1 | FileCheck %s -check-prefix=CONSTRAINT1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRAINT2 | FileCheck %s -check-prefix=CONSTRAINT2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRAINT3 | FileCheck %s -check-prefix=CONSTRAINT3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRAINT1 | %FileCheck %s -check-prefix=CONSTRAINT1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRAINT2 | %FileCheck %s -check-prefix=CONSTRAINT2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRAINT3 | %FileCheck %s -check-prefix=CONSTRAINT3
 
 public protocol P1 {}
 public protocol P2 {}

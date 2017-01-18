@@ -2,15 +2,15 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftShims
+import _SwiftDispatchOverlayShims
 
 public struct DispatchTime : Comparable {
 	public let rawValue: dispatch_time_t
@@ -45,7 +45,6 @@ public struct DispatchTime : Comparable {
 }
 
 public func <(a: DispatchTime, b: DispatchTime) -> Bool {
-	if a.rawValue == ~0 || b.rawValue == ~0 { return false }
 	return a.rawValue < b.rawValue
 }
 
@@ -73,8 +72,12 @@ public struct DispatchWallTime : Comparable {
 }
 
 public func <(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
-	if a.rawValue == ~0 || b.rawValue == ~0 { return false }
-	return -Int64(a.rawValue) < -Int64(b.rawValue)
+	if b.rawValue == ~0 {
+		return a.rawValue != ~0
+	} else if a.rawValue == ~0 {
+		return false
+	}
+	return -Int64(bitPattern: a.rawValue) < -Int64(bitPattern: b.rawValue)
 }
 
 public func ==(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
