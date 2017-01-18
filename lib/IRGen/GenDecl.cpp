@@ -1233,17 +1233,24 @@ bool LinkEntity::isFragile(IRGenModule &IGM) const {
     case Kind::SILGlobalVariable:
       return getSILGlobalVariable()->isFragile();
       
-    case Kind::DirectProtocolWitnessTable: {
-      if (auto wt = IGM.getSILModule().lookUpWitnessTable(
-              getProtocolConformance())) {
-        return wt->isFragile();
-      } else {
-        return false;
-      }
-    }
-      
+    case Kind::ReflectionAssociatedTypeDescriptor:
+    case Kind::ReflectionSuperclassDescriptor:
+      return false;
+
     default:
       break;
+  }
+  if (isProtocolConformanceKind(getKind())) {
+    if (SILWitnessTable *wt = IGM.getSILModule().lookUpWitnessTable(
+                                            getProtocolConformance(), false)) {
+      SILLinkage L = wt->getLinkage();
+      // We don't deserialize the fragile attribute correctly. But we know that
+      // if the witness table was deserialized (= available externally) and it's
+      // not public, it must be fragile.
+      if (swift::isAvailableExternally(L) && !hasPublicVisibility(L))
+        return true;
+      return wt->isFragile();
+    }
   }
   return false;
 }

@@ -44,23 +44,23 @@
 
 // FILE_A-NOT: sil [transparent] [thunk] @_TTWV4main5Things9EquatableS_ZFS1_oi2ee
 // FILE_A-NOT: sil [transparent] [thunk] @_TTWV4main5Things8HashableS_FS1_g9hashValueSi
-// FILE_A-NOT: sil_witness_table Thing: Hashable module main
-// FILE_A-NOT: sil_witness_table Thing: Equatable module main
+// FILE_A-NOT: sil_witness_table hidden Thing: Hashable module main
+// FILE_A-NOT: sil_witness_table hidden Thing: Equatable module main
 
 // FILE_B-NOT: sil [transparent] [thunk] @_TTWV4main5Things9EquatableS_ZFS1_oi2ee
-// FILE_B: sil [transparent] [thunk] @_TTWV4main5Things8HashableS_FS1_g9hashValueSi
+// FILE_B: sil hidden [transparent] [thunk] @_TTWV4main5Things8HashableS_FS1_g9hashValueSi
 // FILE_B-NOT: sil [transparent] [thunk] @_TTWV4main5Things9EquatableS_ZFS1_oi2ee
 
-// FILE_B-NOT: sil_witness_table Thing: Equatable module main
-// FILE_B: sil_witness_table Thing: Hashable module main
-// FILE_B-NOT: sil_witness_table Thing: Equatable module main
+// FILE_B-NOT: sil_witness_table hidden Thing: Equatable module main
+// FILE_B: sil_witness_table hidden Thing: Hashable module main
+// FILE_B-NOT: sil_witness_table hidden Thing: Equatable module main
 
-// FILE_C-NOT: sil [transparent] [thunk] @_TTWV4main5Things8HashableS_FS1_g9hashValueSi
-// FILE_C: sil [transparent] [thunk] @_TTWV4main5Things9EquatableS_ZFS1_oi2ee
-// FILE_C-NOT: sil [transparent] [thunk] @_TTWV4main5Things8HashableS_FS1_g9hashValueSi
+// FILE_C-NOT: sil hidden [transparent] [thunk] @_TTWV4main5Things8HashableS_FS1_g9hashValueSi
+// FILE_C: sil hidden [transparent] [thunk] @_TTWV4main5Things9EquatableS_ZFS1_oi2ee
+// FILE_C-NOT: sil hidden [transparent] [thunk] @_TTWV4main5Things8HashableS_FS1_g9hashValueSi
 
-// FILE_C-NOT: sil_witness_table Thing: Hashable module main
-// FILE_C: sil_witness_table Thing: Equatable module main
-// FILE_C-NOT: sil_witness_table Thing: Hashable module main
+// FILE_C-NOT: sil_witness_table hidden Thing: Hashable module main
+// FILE_C: sil_witness_table hidden Thing: Equatable module main
+// FILE_C-NOT: sil_witness_table hidden Thing: Hashable module main
 
 struct Thing { var value: Int }
