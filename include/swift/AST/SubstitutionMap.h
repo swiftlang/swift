@@ -43,7 +43,7 @@ class SubstitutionMap {
   using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
 
   llvm::DenseMap<SubstitutableType *, Type> subMap;
-  llvm::DenseMap<TypeBase *, ArrayRef<ProtocolConformanceRef>> conformanceMap;
+  llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>> conformanceMap;
   llvm::DenseMap<TypeBase *, SmallVector<ParentType, 1>> parentMap;
 
   Optional<ProtocolConformanceRef>
@@ -66,7 +66,7 @@ public:
 
   void addSubstitution(CanSubstitutableType type, Type replacement);
 
-  void addConformances(CanType type, ArrayRef<ProtocolConformanceRef> conformances);
+  void addConformance(CanType type, ProtocolConformanceRef conformance);
 
   void addParent(CanType type, CanType parent,
                  AssociatedTypeDecl *assocType);

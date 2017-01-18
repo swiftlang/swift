@@ -4335,12 +4335,10 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
         reqToSyntheticMap.addSubstitution(canonicalGP, concreteTy);
 
         if (unsigned numConformances = *rawIDIter++) {
-          SmallVector<ProtocolConformanceRef, 2> conformances;
           while (numConformances--) {
-            conformances.push_back(readConformance(DeclTypeCursor));
+            reqToSyntheticMap.addConformance(
+                canonicalGP, readConformance(DeclTypeCursor));
           }
-          reqToSyntheticMap.addConformances(canonicalGP,
-                                            ctx.AllocateCopy(conformances));
         }
       }
     }

@@ -1776,9 +1776,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       specialized = ctx.getSpecializedConformance(concreteTy, conformance,
                                                   concreteSubs);
 
-    SmallVector<ProtocolConformanceRef, 1> conformances;
-    conformances.push_back(ProtocolConformanceRef(specialized));
-    reqtSubs.addConformances(selfTy, ctx.AllocateCopy(conformances));
+    reqtSubs.addConformance(selfTy, ProtocolConformanceRef(specialized));
 
     auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
     auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();
