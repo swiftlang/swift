@@ -393,9 +393,11 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitEndBorrowInst(EndBorrowInst *I) {
-  // We do not consider the source to be a verified use for now.
-  if (getOperandIndex() == EndBorrowInst::Src)
+  // We do not consider the original value to be a verified use. But the value
+  // does need to be alive.
+  if (getOperandIndex() == EndBorrowInst::OriginalValue)
     return {true, false};
+  // The borrowed value is a verified use though of the begin_borrow.
   return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed), true};
 }
 

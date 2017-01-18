@@ -203,15 +203,15 @@ void TemporaryInitialization::finishInitialization(SILGenFunction &gen) {
 
 namespace {
 class EndBorrowCleanup : public Cleanup {
-  SILValue borrowee;
+  SILValue original;
   SILValue borrowed;
 
 public:
-  EndBorrowCleanup(SILValue borrowee, SILValue borrowed)
-      : borrowee(borrowee), borrowed(borrowed) {}
+  EndBorrowCleanup(SILValue original, SILValue borrowed)
+      : original(original), borrowed(borrowed) {}
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.createEndBorrow(l, borrowee, borrowed);
+    gen.B.createEndBorrow(l, borrowed, original);
   }
 };
 } // end anonymous namespace
@@ -1159,9 +1159,9 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
   return Cleanups.getTopCleanup();
 }
 
-CleanupHandle SILGenFunction::enterEndBorrowCleanup(SILValue borrowee,
+CleanupHandle SILGenFunction::enterEndBorrowCleanup(SILValue original,
                                                     SILValue borrowed) {
-  Cleanups.pushCleanup<EndBorrowCleanup>(borrowee, borrowed);
+  Cleanups.pushCleanup<EndBorrowCleanup>(original, borrowed);
   return Cleanups.getTopCleanup();
 }
 

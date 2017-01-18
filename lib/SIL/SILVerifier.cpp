@@ -1184,8 +1184,8 @@ public:
     // We allow for end_borrow to express relationships in between addresses and
     // values, but we require that the types are the same ignoring value
     // category.
-    require(EBI->getDest()->getType().getObjectType() ==
-                EBI->getSrc()->getType().getObjectType(),
+    require(EBI->getBorrowedValue()->getType().getObjectType() ==
+                EBI->getOriginalValue()->getType().getObjectType(),
             "end_borrow can only relate the same types ignoring value "
             "category");
   }

@@ -1173,11 +1173,10 @@ public:
                                       const TypeLowering &lowering);
   ManagedValue emitManagedBeginBorrow(SILLocation loc, SILValue v);
 
-  ManagedValue emitManagedBorrowedRValueWithCleanup(SILValue borrowee,
-                                                    SILValue borrower);
-  ManagedValue
-  emitManagedBorrowedRValueWithCleanup(SILValue borrowee, SILValue borrower,
-                                       const TypeLowering &lowering);
+  ManagedValue emitManagedBorrowedRValueWithCleanup(SILValue original,
+                                                    SILValue borrowedValue);
+  ManagedValue emitManagedBorrowedRValueWithCleanup(
+      SILValue original, SILValue borrowedValue, const TypeLowering &lowering);
 
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
   ManagedValue emitManagedRValueWithCleanup(SILValue v,
@@ -1624,9 +1623,9 @@ public:
                                               ExistentialRepresentation repr);
 
   /// Enter a cleanup to emit an EndBorrow stating that \p borrowed (the
-  /// borrowed entity) is no longer borrowed from \p borrowee, the original
+  /// borrowed entity) is no longer borrowed from \p original, the original
   /// value.
-  CleanupHandle enterEndBorrowCleanup(SILValue borrowee, SILValue borrowed);
+  CleanupHandle enterEndBorrowCleanup(SILValue original, SILValue borrowed);
 
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E, AccessKind accessKind);
