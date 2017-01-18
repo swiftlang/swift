@@ -2528,8 +2528,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
   StructureMarkerRAII ParsingExprList(*this, Tok);
 
   leftLoc = consumeToken(leftTok);
-  ParserStatus status = parseList(rightTok, leftLoc, rightLoc, tok::comma,
-                                  /*OptionalSep=*/false,
+  ParserStatus status = parseList(rightTok, leftLoc, rightLoc,
                                   /*AllowSepAfterLast=*/false,
                                   rightTok == tok::r_paren
                                     ? diag::expected_rparen_expr_list
@@ -2877,7 +2876,6 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
   CommaLocs.push_back(CommaLoc);
 
   Status |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
-                      tok::comma, /*OptionalSep=*/false,
                       /*AllowSepAfterLast=*/true,
                       diag::expected_rsquare_array_expr,
                       [&] () -> ParserStatus
@@ -2928,8 +2926,8 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
   bool FirstPair = true;
 
   ParserStatus Status =
-      parseList(tok::r_square, LSquareLoc, RSquareLoc, tok::comma,
-                /*OptionalSep=*/false, /*AllowSepAfterLast=*/true,
+      parseList(tok::r_square, LSquareLoc, RSquareLoc,
+                /*AllowSepAfterLast=*/true,
                 diag::expected_rsquare_array_expr, [&]() -> ParserStatus {
     // Parse the next key.
     ParserResult<Expr> Key;

@@ -1233,7 +1233,6 @@ bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args,
     SourceLoc RParenLoc;
 
     if (P.parseList(tok::r_paren, LParenLoc, RParenLoc,
-                    tok::comma, /*OptionalSep=*/false,
                     /*AllowSepAfterLast=*/false,
                     diag::sil_basicblock_arg_rparen,
                     [&]() -> ParserStatus {

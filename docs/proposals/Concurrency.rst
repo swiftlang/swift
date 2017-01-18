@@ -370,7 +370,7 @@ declaration of the streams in the closure.
 
 Stream utilities
 ----------------
-The Swift library can to implement a few utilities that will allow users and
+The Swift library can implement a few utilities that will allow users and
 library designers to build cool things:
 
 *  The ``Funnel`` class accepts multiple incoming streams and weaves them into a

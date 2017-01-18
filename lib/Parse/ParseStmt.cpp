@@ -311,8 +311,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
       for (Decl *D : TmpDecls)
         Entries.push_back(D);
-      if (!TmpDecls.empty())
-        PreviousHadSemi = TmpDecls.back()->TrailingSemiLoc.isValid();
       TmpDecls.clear();
     } else if (Tok.is(tok::pound_if)) {
       SourceLoc StartLoc = Tok.getLoc();
@@ -415,13 +413,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     }
 
     if (!NeedParseErrorRecovery && !PreviousHadSemi && Tok.is(tok::semi)) {
-      if (Result) {
-        if (Result.is<Expr*>()) {
-          Result.get<Expr*>()->TrailingSemiLoc = consumeToken(tok::semi);
-        } else {
-          Result.get<Stmt*>()->TrailingSemiLoc = consumeToken(tok::semi);
-        }
-      }
+      consumeToken();
       PreviousHadSemi = true;
     }
 
