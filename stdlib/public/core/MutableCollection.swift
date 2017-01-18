@@ -333,6 +333,7 @@ public protocol MutableCollection : _MutableIndexable, Collection {
 
 // TODO: swift-3-indexing-model - review the following
 extension MutableCollection {
+  @_inlineable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
@@ -361,6 +362,7 @@ extension MutableCollection {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  @_inlineable
   public subscript(bounds: Range<Index>) -> MutableSlice<Self> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
