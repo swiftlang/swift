@@ -219,6 +219,10 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/netdb.h"
       export *
     }
+    module ifaddrs {
+      header "${GLIBC_INCLUDE_PATH}/ifaddrs.h"
+      export *
+    }
     module search {
       header "${GLIBC_INCLUDE_PATH}/search.h"
       export *
