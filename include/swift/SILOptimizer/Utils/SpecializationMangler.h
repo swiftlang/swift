@@ -132,7 +132,10 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
 
   using ArgInfo = std::pair<ArgumentModifierIntBase,
                             NullablePtr<SILInstruction>>;
-  llvm::SmallVector<ArgInfo, 8> Args;
+  // Information for each SIL argument in the original function before
+  // specialization. This includes SIL indirect result argument required for
+  // the original function type at the current stage of compilation.
+  llvm::SmallVector<ArgInfo, 8> OrigArgs;
 
   ReturnValueModifierIntBase ReturnValue;
 
@@ -140,14 +143,15 @@ public:
   FunctionSignatureSpecializationMangler(SpecializationPass Pass,
                                          IsFragile_t Fragile,
                                          SILFunction *F);
-  void setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI);
-  void setArgumentClosureProp(unsigned ArgNo, PartialApplyInst *PAI);
-  void setArgumentClosureProp(unsigned ArgNo, ThinToThickFunctionInst *TTTFI);
-  void setArgumentDead(unsigned ArgNo);
-  void setArgumentOwnedToGuaranteed(unsigned ArgNo);
-  void setArgumentSROA(unsigned ArgNo);
-  void setArgumentBoxToValue(unsigned ArgNo);
-  void setArgumentBoxToStack(unsigned ArgNo);
+  void setArgumentConstantProp(unsigned OrigArgIdx, LiteralInst *LI);
+  void setArgumentClosureProp(unsigned OrigArgIdx, PartialApplyInst *PAI);
+  void setArgumentClosureProp(unsigned OrigArgIdx,
+                              ThinToThickFunctionInst *TTTFI);
+  void setArgumentDead(unsigned OrigArgIdx);
+  void setArgumentOwnedToGuaranteed(unsigned OrigArgIdx);
+  void setArgumentSROA(unsigned OrigArgIdx);
+  void setArgumentBoxToValue(unsigned OrigArgIdx);
+  void setArgumentBoxToStack(unsigned OrigArgIdx);
   void setReturnValueOwnedToUnowned();
 
   std::string mangle(int UniqueID = 0);

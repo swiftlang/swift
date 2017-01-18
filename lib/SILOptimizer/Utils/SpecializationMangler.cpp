@@ -101,64 +101,59 @@ FunctionSignatureSpecializationMangler(Demangle::SpecializationPass P,
   for (unsigned i = 0, e = F->getLoweredFunctionType()->getNumSILArguments();
        i != e; ++i) {
     (void)i;
-    Args.push_back({ArgumentModifierIntBase(ArgumentModifier::Unmodified),
-                    nullptr});
+    OrigArgs.push_back(
+        {ArgumentModifierIntBase(ArgumentModifier::Unmodified), nullptr});
   }
   ReturnValue = ReturnValueModifierIntBase(ReturnValueModifier::Unmodified);
 }
 
-void
-FunctionSignatureSpecializationMangler::
-setArgumentDead(unsigned ArgNo) {
-  Args[ArgNo].first |= ArgumentModifierIntBase(ArgumentModifier::Dead);
+void FunctionSignatureSpecializationMangler::setArgumentDead(
+    unsigned OrigArgIdx) {
+  OrigArgs[OrigArgIdx].first |= ArgumentModifierIntBase(ArgumentModifier::Dead);
 }
 
-void
-FunctionSignatureSpecializationMangler::
-setArgumentClosureProp(unsigned ArgNo, PartialApplyInst *PAI) {
-  auto &Info = Args[ArgNo];
+void FunctionSignatureSpecializationMangler::setArgumentClosureProp(
+    unsigned OrigArgIdx, PartialApplyInst *PAI) {
+  auto &Info = OrigArgs[OrigArgIdx];
   Info.first = ArgumentModifierIntBase(ArgumentModifier::ClosureProp);
   Info.second = PAI;
 }
 
-void
-FunctionSignatureSpecializationMangler::
-setArgumentClosureProp(unsigned ArgNo, ThinToThickFunctionInst *TTTFI) {
-  auto &Info = Args[ArgNo];
+void FunctionSignatureSpecializationMangler::setArgumentClosureProp(
+    unsigned OrigArgIdx, ThinToThickFunctionInst *TTTFI) {
+  auto &Info = OrigArgs[OrigArgIdx];
   Info.first = ArgumentModifierIntBase(ArgumentModifier::ClosureProp);
   Info.second = TTTFI;
 }
 
-void
-FunctionSignatureSpecializationMangler::
-setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI) {
-  auto &Info = Args[ArgNo];
+void FunctionSignatureSpecializationMangler::setArgumentConstantProp(
+    unsigned OrigArgIdx, LiteralInst *LI) {
+  auto &Info = OrigArgs[OrigArgIdx];
   Info.first = ArgumentModifierIntBase(ArgumentModifier::ConstantProp);
   Info.second = LI;
 }
 
-void
-FunctionSignatureSpecializationMangler::
-setArgumentOwnedToGuaranteed(unsigned ArgNo) {
-  Args[ArgNo].first |= ArgumentModifierIntBase(ArgumentModifier::OwnedToGuaranteed);
+void FunctionSignatureSpecializationMangler::setArgumentOwnedToGuaranteed(
+    unsigned OrigArgIdx) {
+  OrigArgs[OrigArgIdx].first |=
+      ArgumentModifierIntBase(ArgumentModifier::OwnedToGuaranteed);
 }
 
-void
-FunctionSignatureSpecializationMangler::
-setArgumentSROA(unsigned ArgNo) {
-  Args[ArgNo].first |= ArgumentModifierIntBase(ArgumentModifier::SROA);
+void FunctionSignatureSpecializationMangler::setArgumentSROA(
+    unsigned OrigArgIdx) {
+  OrigArgs[OrigArgIdx].first |= ArgumentModifierIntBase(ArgumentModifier::SROA);
 }
 
-void
-FunctionSignatureSpecializationMangler::
-setArgumentBoxToValue(unsigned ArgNo) {
-  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::BoxToValue);
+void FunctionSignatureSpecializationMangler::setArgumentBoxToValue(
+    unsigned OrigArgIdx) {
+  OrigArgs[OrigArgIdx].first =
+      ArgumentModifierIntBase(ArgumentModifier::BoxToValue);
 }
 
-void
-FunctionSignatureSpecializationMangler::
-setArgumentBoxToStack(unsigned ArgNo) {
-  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::BoxToStack);
+void FunctionSignatureSpecializationMangler::setArgumentBoxToStack(
+    unsigned OrigArgIdx) {
+  OrigArgs[OrigArgIdx].first =
+      ArgumentModifierIntBase(ArgumentModifier::BoxToStack);
 }
 
 void
@@ -316,10 +311,10 @@ std::string FunctionSignatureSpecializationMangler::mangle(int UniqueID) {
   if (UniqueID)
     ArgOpBuffer << UniqueID;
 
-  for (unsigned i : indices(Args)) {
+  for (unsigned i : indices(OrigArgs)) {
     ArgumentModifierIntBase ArgMod;
     NullablePtr<SILInstruction> Inst;
-    std::tie(ArgMod, Inst) = Args[i];
+    std::tie(ArgMod, Inst) = OrigArgs[i];
     mangleArgument(ArgMod, Inst);
   }
   ArgOpBuffer << '_';
