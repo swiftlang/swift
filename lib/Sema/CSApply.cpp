@@ -2683,6 +2683,8 @@ namespace {
       }
 
       Type argType = TupleType::get(typeElements, tc.Context);
+      assert(isa<TupleType>(argType.getPointer()));
+
       Expr *arg =
           TupleExpr::create(tc.Context, SourceLoc(),
                             expr->getElements(),
@@ -2760,6 +2762,8 @@ namespace {
       }
 
       Type argType = TupleType::get(typeElements, tc.Context);
+      assert(isa<TupleType>(argType.getPointer()));
+
       Expr *arg =
             TupleExpr::create(tc.Context, expr->getLBracketLoc(),
                               expr->getElements(),
@@ -5025,9 +5029,9 @@ Expr *ExprRewriter::coerceCallArguments(
     auto paramType = param.Ty;
     if (argType->isEqual(paramType)) {
       toSugarFields.push_back(
-          TupleTypeElt(argType, param.Label, param.parameterFlags));
+          TupleTypeElt(argType, getArgLabel(argIdx), param.parameterFlags));
       fromTupleExprFields[argIdx] =
-          TupleTypeElt(paramType, param.Label, param.parameterFlags);
+          TupleTypeElt(paramType, getArgLabel(argIdx), param.parameterFlags);
       fromTupleExpr[argIdx] = arg;
       continue;
     }
@@ -5084,6 +5088,8 @@ Expr *ExprRewriter::coerceCallArguments(
 
     // If anything about the TupleExpr changed, rebuild a new one.
     Type argTupleType = TupleType::get(fromTupleExprFields, tc.Context);
+    assert(isa<TupleType>(argTupleType.getPointer()));
+
     if (anyChanged || !cs.getType(argTuple)->isEqual(argTupleType)) {
       auto EltNames = argTuple->getElementNames();
       auto EltNameLocs = argTuple->getElementNameLocs();

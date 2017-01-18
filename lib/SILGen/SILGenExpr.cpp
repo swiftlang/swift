@@ -1942,7 +1942,22 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
   
   // Prepare a new tuple to hold the shuffled result.
   RValue result(E->getType()->getCanonicalType());
-  
+
+  // In Swift 3 mode, we might have to shuffle off labels.
+  //
+  // FIXME: Remove this eventually.
+  if (isa<ParenType>(E->getType().getPointer())) {
+    assert(E->getElementMapping().size() == 1);
+    auto shuffleIndex = E->getElementMapping()[0];
+    assert(shuffleIndex != TupleShuffleExpr::DefaultInitialize &&
+           shuffleIndex != TupleShuffleExpr::CallerDefaultInitialize &&
+           shuffleIndex != TupleShuffleExpr::Variadic &&
+           "Only argument tuples can have default initializers & varargs");
+
+    result.addElement(std::move(elements[shuffleIndex]));
+    return result;
+  }
+
   auto outerFields = E->getType()->castTo<TupleType>()->getElements();
   auto shuffleIndexIterator = E->getElementMapping().begin();
   auto shuffleIndexEnd = E->getElementMapping().end();
