@@ -190,9 +190,6 @@ NO_OPERAND_INST(ValueMetatype)
     return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
-CONSTANT_OWNERSHIP_INST(Guaranteed, false, TupleExtract)
-CONSTANT_OWNERSHIP_INST(Guaranteed, false, StructExtract)
-CONSTANT_OWNERSHIP_INST(Guaranteed, false, UncheckedEnumData)
 CONSTANT_OWNERSHIP_INST(Owned, true, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocExistentialBox)
@@ -262,6 +259,30 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, UncheckedTrivialBitCast)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UnconditionalCheckedCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UnmanagedToRef)
 #undef CONSTANT_OWNERSHIP_INST
+
+#define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(                                    \
+    OWNERSHIP, SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS, INST)                     \
+  OwnershipUseCheckerResult                                                    \
+      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
+    assert(I->getNumOperands() && "Expected to have non-zero operands");       \
+    if (ValueOwnershipKind::OWNERSHIP != ValueOwnershipKind::Trivial &&        \
+        getOwnershipKind() == ValueOwnershipKind::Trivial) {                   \
+      assert(isAddressOrTrivialType() &&                                       \
+             "Trivial ownership requires a trivial type or an address");       \
+      return {true, false};                                                    \
+    }                                                                          \
+    if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
+      assert(isAddressOrTrivialType() &&                                       \
+             "Trivial ownership requires a trivial type or an address");       \
+    }                                                                          \
+                                                                               \
+    return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
+            SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
+  }
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, TupleExtract)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, StructExtract)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, UncheckedEnumData)
+#undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 #define ACCEPTS_ANY_OWNERSHIP_INST(INST)                                       \
   OwnershipUseCheckerResult                                                    \

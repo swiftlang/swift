@@ -13,6 +13,11 @@ import Builtin
 // Declarations //
 //////////////////
 
+struct TrivialStruct {
+  var f1: Builtin.Int32
+  var f2: Builtin.Int32
+}
+
 struct NonTrivialStructWithTrivialField {
   var owner: Builtin.NativeObject
   var payload: Builtin.Int32
@@ -25,6 +30,29 @@ struct NonTrivialStructWithTrivialField {
 // Make sure that guaranteed args do not have a consuming use.
 sil @direct_guaranteed_arg_doesnt_have_consuming_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @store_borrow_result : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = store_borrow %0 to %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @trivial_struct_extract_from_non_trivial : $@convention(thin) (@guaranteed NonTrivialStructWithTrivialField) -> () {
+bb0(%0 : $NonTrivialStructWithTrivialField):
+  %1 = struct_extract %0 : $NonTrivialStructWithTrivialField, #NonTrivialStructWithTrivialField.payload
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @trivial_struct_extract_from_trivial : $@convention(thin) (TrivialStruct) -> () {
+bb0(%0 : $TrivialStruct):
+  %1 = struct_extract %0 : $TrivialStruct, #TrivialStruct.f1
   %9999 = tuple()
   return %9999 : $()
 }
