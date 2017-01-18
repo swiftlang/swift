@@ -35,7 +35,7 @@ D: SIL, SILGen, everything in Swift not covered by someone else
 N: Argyrios Kyrzidis
 E: kyrtzidis@apple.com
 G: akyrtzi
-D: IDE, SourceKit, swift-ide-test
+D: IDE, Index, SourceKit, swift-ide-test
 
 N: Luke Larson
 E: llarson@apple.com
@@ -55,9 +55,9 @@ D: Reflection, SwiftRemoteMirror
 N: Jordan Rose
 E: jordan_rose@apple.com
 G: jrose-apple
-D: ClangImporter, Serialization, (Objective-)C printer, Driver
+D: ClangImporter, Serialization, PrintAsObjC, Driver, Frontend
 
 N: Anna Zaks
 E: ganna@apple.com
 G: AnnaZaks
-D: SIL diagnostics passes
+D: SIL diagnostics passes, sanitizers
