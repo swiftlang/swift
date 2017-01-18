@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s 2> %t.dump
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 4
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 4 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 4 2> %t.dump
 // RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.dump
 // REQUIRES: objc_interop
 
@@ -1901,12 +1901,14 @@ class Load1 {
   class func load() { }
   class func alloc() {}
   class func allocWithZone(_: Int) {}
+  class func initialize() {}
 }
 
 @objc class Load2 {
   class func load() { } // expected-error{{method 'load()' defines Objective-C class method 'load', which is not permitted by Swift}}
   class func alloc() {} // expected-error{{method 'alloc()' defines Objective-C class method 'alloc', which is not permitted by Swift}}
   class func allocWithZone(_: Int) {} // expected-error{{method 'allocWithZone' defines Objective-C class method 'allocWithZone:', which is not permitted by Swift}}
+  class func initialize() {} // expected-error{{method 'initialize()' defines Objective-C class method 'initialize', which is not permitted by Swift}}
 }
 
 @objc class Load3 {
@@ -1917,6 +1919,7 @@ class Load1 {
 
   @objc(alloc) class var prop: Int { return 0 } // expected-error{{getter for 'prop' defines Objective-C class method 'alloc', which is not permitted by Swift}}
   @objc(allocWithZone:) class func fooWithZone(_: Int) {} // expected-error{{method 'fooWithZone' defines Objective-C class method 'allocWithZone:', which is not permitted by Swift}}
+  @objc(initialize) class func barnitialize() {} // expected-error{{method 'barnitialize()' defines Objective-C class method 'initialize', which is not permitted by Swift}}
 }
 
 // Members of protocol extensions cannot be @objc
