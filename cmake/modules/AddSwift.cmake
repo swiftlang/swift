@@ -125,17 +125,6 @@ function(_add_variant_c_compile_link_flags)
       "-B" "${SWIFT_ANDROID_PREBUILT_PATH}/arm-linux-androideabi/bin/")
   endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
-    list(APPEND result "-DLLVM_ON_WIN32")
-    list(APPEND result "-D_CRT_SECURE_NO_WARNINGS")
-    list(APPEND result "-D_CRT_NONSTDC_NO_WARNINGS")
-    # TODO(compnerd) permit building for different families
-    list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
-    # TODO(compnerd) handle /MT
-    list(APPEND result "-D_DLL")
-    list(APPEND result "-fms-compatibility-version=1900")
-  endif()
-
   if(IS_DARWIN)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
@@ -231,6 +220,17 @@ function(_add_variant_c_compile_flags)
       list(APPEND result -Xclang;--dependent-lib=msvcrtd)
     endif()
     list(APPEND result -fno-pic)
+  endif()
+
+  if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
+    list(APPEND result "-DLLVM_ON_WIN32")
+    list(APPEND result "-D_CRT_SECURE_NO_WARNINGS")
+    list(APPEND result "-D_CRT_NONSTDC_NO_WARNINGS")
+    # TODO(compnerd) permit building for different families
+    list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
+    # TODO(compnerd) handle /MT
+    list(APPEND result "-D_DLL")
+    list(APPEND result "-fms-compatibility-version=1900")
   endif()
 
   if(CFLAGS_ENABLE_ASSERTIONS)
