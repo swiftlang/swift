@@ -1999,24 +1999,6 @@ extension _ArrayBufferProtocol {
     _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0, _IgnorePointer())
   }
 
-  internal mutating func _arrayReserve(_ minimumCapacity: Int) {
-
-    let oldCount = self.count
-    let requiredCapacity = Swift.max(count, minimumCapacity)
-
-    if _fastPath(
-        requestUniqueMutableBackingBuffer(
-          minimumCapacity: requiredCapacity) != nil
-    ) {
-      return
-    }
-
-    var newBuffer = _forceCreateUniqueMutableBuffer(
-      newCount: oldCount, requiredCapacity: requiredCapacity)
-
-    _arrayOutOfPlaceUpdate(&newBuffer, oldCount, 0, _IgnorePointer())
-  }
-
   /// Append items from `newItems` to a buffer.
   internal mutating func _arrayAppendSequence<S : Sequence>(
     _ newItems: S
