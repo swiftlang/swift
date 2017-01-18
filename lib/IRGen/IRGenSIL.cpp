@@ -2696,7 +2696,7 @@ mapTriviallyToInt(IRGenSILFunction &IGF, const EnumImplStrategy &EIS, SelectEnum
   Explosion enumValue = IGF.getLoweredExplosion(inst->getEnumOperand());
   llvm::Value *result = EIS.emitExtractDiscriminator(IGF, enumValue);
   if (!result) {
-    enumValue.claimAll();
+    (void)enumValue.claimAll();
     return nullptr;
   }
 
@@ -2945,7 +2945,7 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
       .copy(*this, in, out, i->isAtomic() ? irgen::Atomicity::Atomic
                                           : irgen::Atomicity::NonAtomic);
-  out.claimAll();
+  (void)out.claimAll();
 }
 
 void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
@@ -3078,7 +3078,7 @@ void IRGenSILFunction::visitTupleExtractInst(swift::TupleExtractInst *i) {
                                    fullTuple,
                                    i->getFieldNo(),
                                    output);
-  fullTuple.claimAll();
+  (void)fullTuple.claimAll();
   setLoweredExplosion(i, output);
 }
 
@@ -3103,7 +3103,7 @@ void IRGenSILFunction::visitStructExtractInst(swift::StructExtractInst *i) {
                                            i->getField(),
                                            lowered);
 
-  operand.claimAll();
+  (void)operand.claimAll();
   setLoweredExplosion(i, lowered);
 }
 
@@ -3803,7 +3803,7 @@ static void emitPointerCastInst(IRGenSILFunction &IGF,
   llvm::Value *ptrValue = from.claimNext();
   // The input may have witness tables or other additional data, but the class
   // reference is always first.
-  from.claimAll();
+  (void)from.claimAll();
 
   auto schema = ti.getSchema();
   assert(schema.size() == 1
@@ -3879,7 +3879,7 @@ static void emitTrapAndUndefValue(IRGenSILFunction &IGF,
 
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
   IGF.Builder.emitBlock(contBB);
-  in.claimAll();
+  (void)in.claimAll();
   for (auto schema : outTI.getSchema())
     out.add(llvm::UndefValue::get(schema.getScalarType()));
 }
@@ -4080,7 +4080,7 @@ void IRGenSILFunction::visitObjCExistentialMetatypeToObjectInst(
   // can drop.
   Explosion from = getLoweredExplosion(i->getOperand());
   llvm::Value *value = from.claimNext();
-  from.claimAll();
+  (void)from.claimAll();
   value = Builder.CreateBitCast(value, IGM.UnknownRefCountedPtrTy);
   Explosion to;
   to.add(value);

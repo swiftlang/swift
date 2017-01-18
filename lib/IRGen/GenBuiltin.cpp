@@ -125,7 +125,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteedEnd) {
     // Just consume the incoming argument.
     assert(args.size() == 1 && "Expecting one incoming argument");
-    args.claimAll();
+    (void)args.claimAll();
     return;
   }
 
@@ -146,7 +146,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
 
   // These builtins don't care about their argument:
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
-    args.claimAll();
+    (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions[0].getReplacement());
     out.add(valueTy.second.getSize(IGF, valueTy.first));
@@ -154,7 +154,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   }
 
   if (Builtin.ID == BuiltinValueKind::Strideof) {
-    args.claimAll();
+    (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions[0].getReplacement());
     out.add(valueTy.second.getStride(IGF, valueTy.first));
@@ -162,7 +162,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   }
 
   if (Builtin.ID == BuiltinValueKind::Alignof) {
-    args.claimAll();
+    (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions[0].getReplacement());
     // The alignof value is one greater than the alignment mask.
@@ -173,7 +173,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   }
 
   if (Builtin.ID == BuiltinValueKind::IsPOD) {
-    args.claimAll();
+    (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions[0].getReplacement());
     out.add(valueTy.second.getIsPOD(IGF, valueTy.first));
@@ -832,7 +832,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
   
   if (Builtin.ID == BuiltinValueKind::GetObjCTypeEncoding) {
-    args.claimAll();
+    (void)args.claimAll();
     Type valueTy = substitutions[0].getReplacement();
     // Get the type encoding for the associated clang type.
     auto clangTy = IGF.IGM.getClangType(valueTy->getCanonicalType());
