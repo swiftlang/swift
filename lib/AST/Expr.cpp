@@ -1411,6 +1411,8 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
                              ArrayRef<SourceLoc> ElementNameLocs,
                              SourceLoc RParenLoc, bool HasTrailingClosure, 
                              bool Implicit, Type Ty) {
+  assert(!Ty || isa<TupleType>(Ty.getPointer()));
+
   size_t size =
       totalSizeToAlloc<Expr *, Identifier, SourceLoc>(SubExprs.size(),
                                                       ElementNames.size(),
