@@ -52,6 +52,11 @@ E: rjmccall@apple.com
 G: rjmccall
 D: Demangler, IRGen, Runtime
 
+N: Max Moiseev
+E: moiseev@apple.com
+G: moiseev
+D: Apple contact for non-corelibs overlays
+
 N: Tony Parker
 E: anthony.parker@apple.com
 G: parkera
