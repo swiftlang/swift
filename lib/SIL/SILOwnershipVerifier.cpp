@@ -870,6 +870,7 @@ void SILValueOwnershipChecker::checkDataflow() {
       if (VisitedBlocks.count(PredBlock)) {
         continue;
       }
+      VisitedBlocks.insert(PredBlock);
       Worklist.push_back(PredBlock);
     }
   }
