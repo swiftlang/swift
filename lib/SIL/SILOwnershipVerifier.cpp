@@ -352,15 +352,17 @@ OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
   SILModule &M = RI->getModule();
   bool IsTrivial = RI->getOperand()->getType().isTrivial(M);
-  auto Results =
-      RI->getFunction()->getLoweredFunctionType()->getDirectResults();
+  auto FnType = RI->getFunction()->getLoweredFunctionType();
+  auto Results = FnType->getDirectResults();
   if (Results.empty() || IsTrivial) {
     return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
   }
 
+  CanGenericSignature Sig = FnType->getGenericSignature();
+
   // Find the first index where we have a trivial value.
-  auto Iter = find_if(Results, [&M](const SILResultInfo &Info) -> bool {
-    return Info.getOwnershipKind(M) != ValueOwnershipKind::Trivial;
+  auto Iter = find_if(Results, [&M, &Sig](const SILResultInfo &Info) -> bool {
+    return Info.getOwnershipKind(M, Sig) != ValueOwnershipKind::Trivial;
   });
 
   // If we have all trivial, then we must be trivial. Why wasn't our original
@@ -370,10 +372,10 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
     llvm_unreachable("Should have already checked a trivial type?!");
 
   unsigned Index = std::distance(Results.begin(), Iter);
-  ValueOwnershipKind Base = Results[Index].getOwnershipKind(M);
+  ValueOwnershipKind Base = Results[Index].getOwnershipKind(M, Sig);
 
   for (const SILResultInfo &ResultInfo : Results.slice(Index + 1)) {
-    auto RKind = ResultInfo.getOwnershipKind(M);
+    auto RKind = ResultInfo.getOwnershipKind(M, Sig);
     // Ignore trivial types.
     if (RKind.merge(ValueOwnershipKind::Trivial))
       continue;

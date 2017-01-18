@@ -489,19 +489,20 @@ ValueOwnershipKindVisitor::visitApplyInst(ApplyInst *AI) {
   if (Results.empty() || IsTrivial)
     return ValueOwnershipKind::Trivial;
 
+  CanGenericSignature Sig = AI->getSubstCalleeType()->getGenericSignature();
   // Find the first index where we have a trivial value.
-  auto Iter = find_if(Results, [&M](const SILResultInfo &Info) -> bool {
-    return Info.getOwnershipKind(M) != ValueOwnershipKind::Trivial;
+  auto Iter = find_if(Results, [&M, &Sig](const SILResultInfo &Info) -> bool {
+    return Info.getOwnershipKind(M, Sig) != ValueOwnershipKind::Trivial;
   });
   // If we have all trivial, then we must be trivial.
   if (Iter == Results.end())
     return ValueOwnershipKind::Trivial;
 
   unsigned Index = std::distance(Results.begin(), Iter);
-  ValueOwnershipKind Base = Results[Index].getOwnershipKind(M);
+  ValueOwnershipKind Base = Results[Index].getOwnershipKind(M, Sig);
 
   for (const SILResultInfo &ResultInfo : Results.slice(Index+1)) {
-    auto RKind = ResultInfo.getOwnershipKind(M);
+    auto RKind = ResultInfo.getOwnershipKind(M, Sig);
     if (RKind.merge(ValueOwnershipKind::Trivial))
       continue;
 
