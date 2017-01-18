@@ -586,9 +586,14 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
   return fieldTy;
 }
 
-ValueOwnershipKind SILResultInfo::getOwnershipKind(SILModule &M) const {
-  SILType Ty = M.Types.getLoweredType(getType());
-  bool IsTrivial = Ty.isTrivial(M);
+ValueOwnershipKind
+SILResultInfo::getOwnershipKind(SILModule &M,
+                                CanGenericSignature signature) const {
+  if (signature)
+    M.Types.pushGenericContext(signature);
+  bool IsTrivial = getSILType().isTrivial(M);
+  if (signature)
+    M.Types.popGenericContext(signature);
   switch (getConvention()) {
   case ResultConvention::Indirect:
     return ValueOwnershipKind::Trivial; // Should this be an Any?
