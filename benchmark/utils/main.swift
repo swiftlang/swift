@@ -36,6 +36,8 @@ import BitCount
 import ByteSwap
 import Calculator
 import CaptureProp
+import CharacterLiteralsLarge
+import CharacterLiteralsSmall
 import Chars
 import ClassArrayGetter
 import DeadArray
@@ -139,6 +141,8 @@ precommitTests = [
   "ByteSwap": run_ByteSwap,
   "Calculator": run_Calculator,
   "CaptureProp": run_CaptureProp,
+  "CharacterLiteralsLarge": run_CharacterLiteralsLarge,
+  "CharacterLiteralsSmall": run_CharacterLiteralsSmall,
   "Chars": run_Chars,
   "ClassArrayGetter": run_ClassArrayGetter,
   "DeadArray": run_DeadArray,
