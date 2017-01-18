@@ -30,6 +30,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -47,7 +48,7 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
-                         StringRef ArgsHash, llvm::sys::TimeValue StartTime,
+                         StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool SkipTaskExecution,
@@ -162,7 +163,7 @@ static void checkForOutOfDateInputs(DiagnosticEngine &diags,
                                     const InputInfoMap &inputs) {
   for (const auto &inputPair : inputs) {
     auto recordedModTime = inputPair.second.previousModTime;
-    if (recordedModTime == llvm::sys::TimeValue::MaxTime())
+    if (recordedModTime == llvm::sys::TimePoint<>::max())
       continue;
 
     const char *input = inputPair.first->getValue();
@@ -182,7 +183,7 @@ static void checkForOutOfDateInputs(DiagnosticEngine &diags,
 }
 
 static void writeCompilationRecord(StringRef path, StringRef argsHash,
-                                   llvm::sys::TimeValue buildTime,
+                                   llvm::sys::TimePoint<> buildTime,
                                    const InputInfoMap &inputs) {
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it
@@ -197,8 +198,13 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
     return;
   }
 
-  auto writeTimeValue = [](llvm::raw_ostream &out, llvm::sys::TimeValue time) {
-    out << "[" << time.seconds() << ", " << time.nanoseconds() << "]";
+  auto writeTimeValue = [](llvm::raw_ostream &out,
+                           llvm::sys::TimePoint<> time) {
+    using namespace std::chrono;
+    auto secs = time_point_cast<seconds>(time);
+    time -= secs.time_since_epoch(); // remainder in nanoseconds
+    out << "[" << secs.time_since_epoch().count()
+        << ", " << time.time_since_epoch().count() << "]";
   };
 
   using compilation_record::TopLevelKey;
@@ -436,7 +442,7 @@ int Compilation::performJobsImpl() {
   }
 
   int Result = EXIT_SUCCESS;
-  llvm::TimerGroup DriverTimerGroup("Driver Time Compilation");
+  llvm::TimerGroup DriverTimerGroup("driver", "Driver Compilation Time");
   llvm::SmallDenseMap<const Job *, std::unique_ptr<llvm::Timer>, 16>
     DriverTimers;
 
@@ -468,7 +474,7 @@ int Compilation::performJobsImpl() {
       DriverTimers.insert({
         BeganCmd,
         std::unique_ptr<llvm::Timer>(
-          new llvm::Timer(OS.str(), DriverTimerGroup))
+          new llvm::Timer("task", OS.str(), DriverTimerGroup))
       });
       DriverTimers[BeganCmd]->startTimer();
     }

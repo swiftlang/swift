@@ -606,7 +606,7 @@ public:
   void printDebugLocRef(SILLocation Loc, const SourceManager &SM,
                         bool PrintComma = true) {
     auto DL = Loc.decodeDebugLoc(SM);
-    if (DL.Filename) {
+    if (!DL.Filename.empty()) {
       if (PrintComma)
         *this << ", ";
       *this << "loc " << QuotedString(DL.Filename) << ':' << DL.Line << ':'

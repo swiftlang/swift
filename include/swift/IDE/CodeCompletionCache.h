@@ -16,6 +16,7 @@
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/Support/Chrono.h"
 #include <system_error>
 
 namespace swift {
@@ -53,7 +54,7 @@ public:
   };
 
   struct Value : public llvm::ThreadSafeRefCountedBase<Value> {
-    llvm::sys::TimeValue ModuleModificationTime;
+    llvm::sys::TimePoint<> ModuleModificationTime;
     CodeCompletionResultSink Sink;
   };
   using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;

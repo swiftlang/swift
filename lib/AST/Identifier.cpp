@@ -56,12 +56,12 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, swift::ObjCSelector S) {
 
 bool Identifier::isOperatorSlow() const {
   StringRef data = str();
-  auto *s = reinterpret_cast<UTF8 const *>(data.begin()),
-  *end = reinterpret_cast<UTF8 const *>(data.end());
-  UTF32 codePoint;
-  ConversionResult res = llvm::convertUTF8Sequence(&s, end, &codePoint,
-                                                   strictConversion);
-  assert(res == conversionOK && "invalid UTF-8 in identifier?!");
+  auto *s = reinterpret_cast<llvm::UTF8 const *>(data.begin()),
+  *end = reinterpret_cast<llvm::UTF8 const *>(data.end());
+  llvm::UTF32 codePoint;
+  llvm::ConversionResult res =
+    llvm::convertUTF8Sequence(&s, end, &codePoint, llvm::strictConversion);
+  assert(res == llvm::conversionOK && "invalid UTF-8 in identifier?!");
   (void)res;
   return !empty() && isOperatorStartCodePoint(codePoint);
 }

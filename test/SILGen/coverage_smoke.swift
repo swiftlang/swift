@@ -11,6 +11,7 @@
 
 // REQUIRES: profile_runtime
 // REQUIRES: OS=macosx
+// REQUIRES: rdar28221303
 
 // CHECK-INTERNAL: Functions shown: 1
 // CHECK-COV: {{ *}}[[@LINE+1]]|{{ *}}1{{.*}}func f_internal

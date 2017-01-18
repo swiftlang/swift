@@ -3794,8 +3794,8 @@ class DeclGroupNameContext {
       auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
       if (!PathOp.hasValue())
         return NullGroupName;
-      StringRef FullPath = StringRef(VD->getASTContext().SourceMgr.
-                                     getIdentifierForBuffer(PathOp.getValue()));
+      StringRef FullPath =
+        VD->getASTContext().SourceMgr.getIdentifierForBuffer(PathOp.getValue());
       if (!pMap) {
         YamlGroupInputParser Parser(RecordPath);
         if (!Parser.parse()) {

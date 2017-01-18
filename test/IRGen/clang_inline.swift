@@ -1,9 +1,14 @@
+// These run lines use "-Xcc -O3" to trick Clang into emitting IR as /if/ we
+// were going to optimize without actually running the optimizer. This lets us
+// check that the static inline functions in Gizmo.h are correctly emitted as
+// inlineable.
+
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -Xcc -O3 -emit-ir | %FileCheck %s
 
 // RUN: mkdir -p %t/Empty.framework/Modules/Empty.swiftmodule
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module-path %t/Empty.framework/Modules/Empty.swiftmodule/%target-swiftmodule-name %S/../Inputs/empty.swift -module-name Empty
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -F %t -DIMPORT_EMPTY -emit-ir > %t.ll
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -F %t -DIMPORT_EMPTY -Xcc -O3 -emit-ir > %t.ll
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.ll
 

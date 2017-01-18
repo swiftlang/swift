@@ -318,8 +318,7 @@ LLBehavior("view-cfg-long-line-behavior",
                clEnumValN(LongLineBehavior::None, "none", "Print everything"),
                clEnumValN(LongLineBehavior::Truncate, "truncate",
                           "Truncate long lines"),
-               clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines"),
-               clEnumValEnd));
+               clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines")));
 
 static llvm::cl::opt<bool>
 RemoveUseListComments("view-cfg-remove-use-list-comments",

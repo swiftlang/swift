@@ -1493,8 +1493,10 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
                                                                    nullptr, 0);
     sourcekitd_request_dictionary_set_uid(Exp, KeyRequest,
                                           RequestEditorExpandPlaceholder);
-    sourcekitd_request_dictionary_set_string(Exp, KeyName,
-                                             SourceBuf->getBufferIdentifier());
+    auto SourceBufID = SourceBuf->getBufferIdentifier();
+    sourcekitd_request_dictionary_set_stringbuf(Exp, KeyName,
+                                                SourceBufID.data(),
+                                                SourceBufID.size());
     sourcekitd_request_dictionary_set_string(Exp, KeySourceText, "");
     sourcekitd_request_dictionary_set_int64(Exp, KeyOffset, Offset);
     sourcekitd_request_dictionary_set_int64(Exp, KeyLength, Length);
