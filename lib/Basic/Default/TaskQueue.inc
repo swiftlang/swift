@@ -70,7 +70,10 @@ unsigned TaskQueue::getNumberOfParallelTasks() const {
 void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
                         ArrayRef<const char *> Env, void *Context,
                         bool SeparateErrors) {
-  std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context, SeparateErrors));
+  // This implementation of TaskQueue ignores SeparateErrors.
+  // We need to reference SeparateErrors to avoid warnings, though.
+  (void)SeparateErrors;
+  std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context));
   QueuedTasks.push(std::move(T));
 }
 
