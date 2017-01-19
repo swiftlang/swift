@@ -1307,7 +1307,19 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
   }
 
   f2.forEach { block in
-    block(p) // Does not diagnose in Swift 3 mode
+    block(p) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+    block((c, c))
+    block(c, c)
+  }
+
+  f2.forEach { (block: ((Bool, Bool)) -> ()) in
+    block(p)
+    block((c, c))
+    block(c, c)
+  }
+
+  f2.forEach { (block: (Bool, Bool) -> ()) in
+    block(p) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
     block((c, c))
     block(c, c)
   }

@@ -612,7 +612,7 @@ public:
     // some crazy cases that also require major diagnostic work, where the
     // substitutions involve conformances of the same type to the same
     // protocol drawn from different imported modules.
-    ID.AddPointer(type->getCanonicalType().getPointer());
+    ID.AddPointer(type.getPointer());
     ID.AddPointer(genericConformance);
   }
 
