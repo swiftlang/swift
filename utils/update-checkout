@@ -323,7 +323,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     args = parser.parse_args()
 
     if args.reset_to_remote and not args.scheme:
-        print("update-checkout usage error: --reset-to-remote must specify --branch=foo")
+        print("update-checkout usage error: --reset-to-remote must specify --scheme=foo")
         exit(1)
 
     clone = args.clone
