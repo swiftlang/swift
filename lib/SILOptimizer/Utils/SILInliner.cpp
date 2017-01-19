@@ -326,6 +326,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::CopyBlockInst:
     case ValueKind::CopyAddrInst:
     case ValueKind::RetainValueInst:
+    case ValueKind::UnmanagedRetainValueInst:
     case ValueKind::CopyValueInst:
     case ValueKind::CopyUnownedValueInst:
     case ValueKind::DeallocBoxInst:
@@ -340,6 +341,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::ProjectBoxInst:
     case ValueKind::ProjectExistentialBoxInst:
     case ValueKind::ReleaseValueInst:
+    case ValueKind::UnmanagedReleaseValueInst:
     case ValueKind::DestroyValueInst:
     case ValueKind::AutoreleaseValueInst:
     case ValueKind::DynamicMethodBranchInst:

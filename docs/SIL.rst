@@ -3236,6 +3236,23 @@ For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate copies than it is to
 reason about copies of the subobjects.
 
+unmanaged_retain_value
+``````````````````````
+
+::
+
+  sil-instruction ::= 'unmanaged_retain_value' sil-value
+
+  unmanaged_retain_value %0 : $A
+
+This instruction has the same local semantics as ``retain_value`` but:
+
+* Is valid in ownership qualified SIL.
+* Is not intended to be statically paired at compile time by the compiler.
+
+The intention is that this instruction is used to implement unmanaged
+constructs.
+
 copy_value
 ``````````
 
@@ -3284,6 +3301,23 @@ are the preferred forms.
 For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate destroys than it is to
 reason about destroys of the subobjects.
+
+unmanaged_release_value
+```````````````````````
+
+::
+
+  sil-instruction ::= 'unmanaged_release_value' sil-value
+
+  unmanaged_release_value %0 : $A
+
+This instruction has the same local semantics as ``release_value`` but:
+
+* Is valid in ownership qualified SIL.
+* Is not intended to be statically paired at compile time by the compiler.
+
+The intention is that this instruction is used to implement unmanaged
+constructs.
 
 destroy_value
 `````````````

@@ -803,6 +803,20 @@ public:
                                                        operand, atomicity));
   }
 
+  UnmanagedRetainValueInst *createUnmanagedRetainValue(SILLocation Loc,
+                                                       SILValue operand) {
+    assert(F.hasQualifiedOwnership());
+    return insert(new (F.getModule()) UnmanagedRetainValueInst(
+        getSILDebugLocation(Loc), operand));
+  }
+
+  UnmanagedReleaseValueInst *createUnmanagedReleaseValue(SILLocation Loc,
+                                                         SILValue operand) {
+    assert(F.hasQualifiedOwnership());
+    return insert(new (F.getModule()) UnmanagedReleaseValueInst(
+        getSILDebugLocation(Loc), operand));
+  }
+
   CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
     return insert(new (F.getModule())
                       CopyValueInst(getSILDebugLocation(Loc), operand));

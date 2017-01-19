@@ -1910,6 +1910,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     UNARY_INSTRUCTION(CopyUnownedValue)
     UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(CondFail)
+    UNARY_INSTRUCTION(UnmanagedReleaseValue)
+    UNARY_INSTRUCTION(UnmanagedRetainValue)
     REFCOUNTING_INSTRUCTION(StrongPin)
     REFCOUNTING_INSTRUCTION(StrongRetain)
     REFCOUNTING_INSTRUCTION(StrongRelease)

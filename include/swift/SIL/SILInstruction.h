@@ -2996,6 +2996,32 @@ class ReleaseValueInst : public UnaryInstructionBase<ValueKind::ReleaseValueInst
   }
 };
 
+/// Copies a loadable value in an unmanaged, unbalanced way. Only meant for use
+/// in ownership qualified SIL. Please do not use this EVER unless you are
+/// implementing a part of the stdlib called Unmanaged.
+class UnmanagedRetainValueInst
+    : public UnaryInstructionBase<ValueKind::UnmanagedRetainValueInst,
+                                  RefCountingInst,
+                                  /*HasValue*/ false> {
+  friend SILBuilder;
+
+  UnmanagedRetainValueInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand) {}
+};
+
+/// Destroys a loadable value in an unmanaged, unbalanced way. Only meant for
+/// use in ownership qualified SIL. Please do not use this EVER unless you are
+/// implementing a part of the stdlib called Unmanaged.
+class UnmanagedReleaseValueInst
+    : public UnaryInstructionBase<ValueKind::UnmanagedReleaseValueInst,
+                                  RefCountingInst,
+                                  /*HasValue*/ false> {
+  friend SILBuilder;
+
+  UnmanagedReleaseValueInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand) {}
+};
+
 /// Transfers ownership of a loadable value to the current autorelease pool.
 class AutoreleaseValueInst
                   : public UnaryInstructionBase<ValueKind::AutoreleaseValueInst,
