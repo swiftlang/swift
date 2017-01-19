@@ -389,10 +389,16 @@ getSubstitutions(TypeSubstitutionFn subs,
     for (auto req: reqs) {
       assert(req.getKind() == RequirementKind::Conformance);
       auto protoType = req.getSecondType()->castTo<ProtocolType>();
-      // TODO: Error handling for failed conformance lookup.
-      currentConformances.push_back(
-        *lookupConformance(depTy->getCanonicalType(), currentReplacement,
-                           protoType));
+      if (auto conformance = lookupConformance(depTy->getCanonicalType(),
+                                               currentReplacement,
+                                               protoType)) {
+        currentConformances.push_back(*conformance);
+      } else {
+        if (!currentReplacement->hasError())
+          currentReplacement = ErrorType::get(currentReplacement);
+        currentConformances.push_back(
+                                  ProtocolConformanceRef(protoType->getDecl()));
+      }
     }
 
     // Add it to the final substitution list.
