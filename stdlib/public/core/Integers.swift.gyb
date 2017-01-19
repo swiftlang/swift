@@ -2215,7 +2215,7 @@ ${unsafeOperationComment(x.operator)}
     return Self.init(_truncatingBits: UInt(Self.bitWidth._value) &- 1)
   }
 
-% for x in [op for ops in binaryArithmetic.values() for op in ops]:
+% for x in chain(*binaryArithmetic.values()):
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 %   if x.kind != '/':
 ${operatorComment('&' + x.operator)}
@@ -2581,7 +2581,7 @@ public struct ${Self}
 %       end
 // end of FIXME(integers)
 
-%       for x in [op for ops in binaryArithmetic.values() for op in ops]:
+%       for x in chain(*binaryArithmetic.values()):
 
   @_transparent
   public func ${x.name}WithOverflow(
