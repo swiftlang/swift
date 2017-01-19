@@ -69,7 +69,7 @@ class C : P1 {
 }
 
 //   (materializeForSet test from above)
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWC19protocol_extensions1CS_2P1S_FS1_m9subscriptFSiSi
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC19protocol_extensions1CS_2P1S_FS1_m9subscriptFSiSi
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*C):
 // CHECK: function_ref @_TFE19protocol_extensionsPS_2P1g9subscriptFSiSi
 // CHECK: return

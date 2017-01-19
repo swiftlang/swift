@@ -218,6 +218,13 @@ SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
   return SILDefaultWitnessTable::create(*this, Linkage, Protocol);
 }
 
+void SILModule::deleteWitnessTable(SILWitnessTable *Wt) {
+  NormalProtocolConformance *Conf = Wt->getConformance();
+  assert(lookUpWitnessTable(Conf, false) == Wt);
+  WitnessTableMap.erase(Conf);
+  witnessTables.erase(Wt);
+}
+
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             StringRef name,
                                             SILLinkage linkage,
