@@ -13,9 +13,10 @@
 #ifndef SWIFT_SILGEN_SILGENFUNCTION_H
 #define SWIFT_SILGEN_SILGENFUNCTION_H
 
-#include "SILGen.h"
-#include "JumpDest.h"
 #include "Initialization.h"
+#include "JumpDest.h"
+#include "SILGen.h"
+#include "SILGenBuilder.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -175,91 +176,6 @@ enum class FunctionSection : bool {
   Postmatter,
 };
 
-/// A subclass of SILBuilder that tracks used protocol conformances.
-class SILGenBuilder : public SILBuilder {
-  SILGenModule &SGM;
-public:
-  SILGenBuilder(SILGenFunction &gen);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
-                SmallVectorImpl<SILInstruction *> *insertedInsts);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
-                SILBasicBlock::iterator insertInst);
-
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB)
-      : SILGenBuilder(gen, &*insertBB) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
-                SmallVectorImpl<SILInstruction *> *insertedInsts)
-      : SILGenBuilder(gen, &*insertBB, insertedInsts) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
-                SILInstruction *insertInst)
-      : SILGenBuilder(gen, &*insertBB, insertInst->getIterator()) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
-                SILBasicBlock::iterator insertInst)
-      : SILGenBuilder(gen, &*insertBB, insertInst) {}
-
-  SILGenModule &getSILGenModule() const { return SGM; }
-
-  // Metatype instructions use the conformances necessary to instantiate the
-  // type.
-  
-  MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype);
-
-  // Generic apply instructions use the conformances necessary to form the call.
-
-  using SILBuilder::createApply;
-
-  ApplyInst *createApply(SILLocation Loc, SILValue Fn,
-                         SILType SubstFnTy,
-                         SILType Result,
-                         ArrayRef<Substitution> Subs,
-                         ArrayRef<SILValue> Args);
-
-
-  TryApplyInst *createTryApply(SILLocation loc, SILValue fn,
-                               SILType substFnTy,
-                               ArrayRef<Substitution> subs,
-                               ArrayRef<SILValue> args,
-                               SILBasicBlock *normalBB,
-                               SILBasicBlock *errorBB);
-
-  PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
-                                       SILType SubstFnTy,
-                                       ArrayRef<Substitution> Subs,
-                                       ArrayRef<SILValue> Args,
-                                       SILType ClosureTy);
-
-  BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name,
-                             SILType ResultTy, ArrayRef<Substitution> Subs,
-                             ArrayRef<SILValue> Args);
-
-  // Existential containers use the conformances needed by the existential
-  // box.
-
-  InitExistentialAddrInst *
-  createInitExistentialAddr(SILLocation Loc,
-                            SILValue Existential,
-                            CanType FormalConcreteType,
-                            SILType LoweredConcreteType,
-                            ArrayRef<ProtocolConformanceRef> Conformances);
-
-  InitExistentialMetatypeInst *
-  createInitExistentialMetatype(SILLocation loc, SILValue metatype,
-                                SILType existentialType,
-                                ArrayRef<ProtocolConformanceRef> conformances);
-  
-  InitExistentialRefInst *
-  createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
-                           CanType FormalConcreteType,
-                           SILValue Concrete,
-                           ArrayRef<ProtocolConformanceRef> Conformances);
-
-  AllocExistentialBoxInst *createAllocExistentialBox(SILLocation Loc,
-                                 SILType ExistentialType,
-                                 CanType ConcreteType,
-                                 ArrayRef<ProtocolConformanceRef> Conformances);
-};
-
 /// Parameter to \c SILGenFunction::emitCaptures that indicates what the
 /// capture parameters are being emitted for.
 enum class CaptureEmission {
@@ -349,10 +265,9 @@ public:
 
   /// \brief Is emission currently within an inout conversion?
   bool InInOutConversionScope = false;
-  
-  /// B - The SILGenBuilder used to construct the SILFunction.  It is
-  /// what maintains the notion of the current block being emitted
-  /// into.
+
+  /// The SILGenBuilder used to construct the SILFunction.  It is what maintains
+  /// the notion of the current block being emitted into.
   SILGenBuilder B;
 
   SILOpenedArchetypesTracker OpenedArchetypesTracker;
