@@ -131,8 +131,7 @@ func baz(_ y : AnyObject?) {
 // CHECK-LABEL: sil hidden @_TF4main18opt_to_opt_trivialFGSqSi_GSQSi_
 // CHECK:       bb0(%0 : $Optional<Int>):
 // CHECK-NEXT:  debug_value %0 : $Optional<Int>, let, name "x"
-// CHECK-NEXT:  %2 = unchecked_trivial_bit_cast %0 : $Optional<Int> to $Optional<Int>
-// CHECK-NEXT:  return %2 : $Optional<Int>
+// CHECK-NEXT:  return %0 : $Optional<Int>
 // CHECK-NEXT:}
 func opt_to_opt_trivial(_ x: Int?) -> Int! {
   return x
@@ -141,8 +140,7 @@ func opt_to_opt_trivial(_ x: Int?) -> Int! {
 // CHECK-LABEL: sil hidden @_TF4main20opt_to_opt_referenceFGSQCS_1C_GSqS0__ :
 // CHECK:  bb0([[ARG:%.*]] : $Optional<C>):
 // CHECK:    debug_value [[ARG]] : $Optional<C>, let, name "x"
-// CHECK:    [[COPY_ARG:%.*]] = copy_value [[ARG]]
-// CHECK:    [[RESULT:%.*]] = unchecked_ref_cast [[COPY_ARG]] : $Optional<C> to $Optional<C>
+// CHECK:    [[RESULT:%.*]] = copy_value [[ARG]]
 // CHECK:    destroy_value [[ARG]]
 // CHECK:    return [[RESULT]] : $Optional<C>
 // CHECK: } // end sil function '_TF4main20opt_to_opt_referenceFGSQCS_1C_GSqS0__'
@@ -151,8 +149,7 @@ func opt_to_opt_reference(_ x : C!) -> C? { return x }
 // CHECK-LABEL: sil hidden @_TF4main22opt_to_opt_addressOnly
 // CHECK:       bb0(%0 : $*Optional<T>, %1 : $*Optional<T>):
 // CHECK-NEXT:  debug_value_addr %1 : $*Optional<T>, let, name "x"
-// CHECK-NEXT:  %3 = unchecked_addr_cast %0 : $*Optional<T> to $*Optional<T>
-// CHECK-NEXT:  copy_addr %1 to [initialization] %3
+// CHECK-NEXT:  copy_addr %1 to [initialization] %0
 // CHECK-NEXT:  destroy_addr %1
 func opt_to_opt_addressOnly<T>(_ x : T!) -> T? { return x }
 
@@ -164,8 +161,7 @@ public struct TestAddressOnlyStruct<T> {
   // CHECK-LABEL: sil hidden @_TFV4main21TestAddressOnlyStruct8testCall
   // CHECK: bb0(%0 : $*Optional<T>, %1 : $TestAddressOnlyStruct<T>):
   // CHECK: [[TMPBUF:%.*]] = alloc_stack $Optional<T>
-  // CHECK: [[TMPCAST:%.*]] = unchecked_addr_cast [[TMPBUF]]
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPCAST]]
+  // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPBUF]]
   // CHECK-NEXT: apply {{.*}}<T>([[TMPBUF]], %1)
   func testCall(_ a : T!) {
     f(a)
@@ -177,8 +173,7 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
 // CHECK-NEXT: [[X:%.*]] = alloc_box ${ var Optional<Int> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
-// CHECK-NEXT: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*Optional<Int> to $*Optional<Int>
-// CHECK-NEXT: store %0 to [trivial] [[CAST]] : $*Optional<Int>
+// CHECK-NEXT: store %0 to [trivial] [[PB]] : $*Optional<Int>
 // CHECK-NEXT: destroy_value [[X]] : ${ var Optional<Int> }
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
   var x: Int! = a
