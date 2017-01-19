@@ -343,3 +343,15 @@ extension Cookie {
 
 struct Thumbprint : Cookie {}
 // expected-error@-1 {{type 'Thumbprint' does not conform to protocol 'Cookie'}}
+
+// Looking through typealiases
+protocol Vector {
+  associatedtype Element
+  typealias Elements = [Element]
+
+  func process(elements: Elements)
+}
+
+struct Int8Vector : Vector {
+  func process(elements: [Int8]) { }
+}
