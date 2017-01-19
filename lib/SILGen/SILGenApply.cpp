@@ -4349,7 +4349,7 @@ namespace {
             // The captures are represented as a placeholder curry level in the
             // formal type.
             // TODO: Remove this hack.
-            paramLowering.claimCaptureParams(callee.getCaptures());
+            (void)paramLowering.claimCaptureParams(callee.getCaptures());
             claimNextParamClause(origFormalType);
             claimNextParamClause(formalType);
             args.push_back({});

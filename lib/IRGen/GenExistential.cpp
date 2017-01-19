@@ -741,7 +741,7 @@ public:
   /// Given an existential object, returns the payload value.
   llvm::Value *getValue(IRGenFunction &IGF, Explosion &container) const {
     llvm::Value *instance = container.claimNext();
-    container.claim(getNumStoredProtocols());
+    (void)container.claim(getNumStoredProtocols());
     return instance;
   }
 
@@ -806,7 +806,7 @@ public:
     asDerived().emitValueRelease(IGF, value, atomicity);
 
     // Throw out the witness table pointers.
-    src.claim(getNumStoredProtocols());
+    (void)src.claim(getNumStoredProtocols());
   }
 
   void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
@@ -815,7 +815,7 @@ public:
     asDerived().emitValueFixLifetime(IGF, value);
 
     // Throw out the witness table pointers.
-    src.claim(getNumStoredProtocols());
+    (void)src.claim(getNumStoredProtocols());
   }
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
@@ -1067,34 +1067,34 @@ public:
   void strongRetain(IRGenFunction &IGF, Explosion &e,
                     Atomicity atomicity) const override {
     IGF.emitStrongRetain(e.claimNext(), Refcounting, atomicity);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void strongRelease(IRGenFunction &IGF, Explosion &e,
                      Atomicity atomicity) const override {
     IGF.emitStrongRelease(e.claimNext(), Refcounting, atomicity);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void strongRetainUnowned(IRGenFunction &IGF, Explosion &e) const override {
     IGF.emitStrongRetainUnowned(e.claimNext(), Refcounting);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void strongRetainUnownedRelease(IRGenFunction &IGF,
                                   Explosion &e) const override {
     IGF.emitStrongRetainAndUnownedRelease(e.claimNext(), Refcounting);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
     IGF.emitUnownedRetain(e.claimNext(), Refcounting);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
     IGF.emitUnownedRelease(e.claimNext(), Refcounting);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void unownedLoadStrong(IRGenFunction &IGF, Address existential,
