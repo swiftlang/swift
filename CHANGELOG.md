@@ -20,6 +20,29 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* Swift will now warn when an `NSObject` subclass attempts to override the
+  class `initialize` method. Swift doesn't guarantee that references to class
+  names trigger Objective-C class realization if they have no other
+  side effects, leading to bugs when Swift code attempted to override
+  `initialize`.
+
+* [SR-2394](https://bugs.swift.org/browse/SR-2394)
+
+  C functions that "return twice" are no longer imported into Swift. Instead,
+  they are explicitly made unavailable, so attempting to reference them will
+  result in a compilation error.
+
+  Examples of functions that "return twice" include `vfork` and `setjmp`.
+  These functions change the control flow of a program in ways that that Swift
+  has never supported. For example, definitive initialization of variables,
+  a core Swift language feature, could not be guaranteed when these functions
+  were used.
+
+  Swift code that references these functions will no longer compile. Although
+  this could be considered a source-breaking change, it's important to note that
+  any use of these functions would have most likely crashed at runtime. Now,
+  the compiler will prevent them from being used in the first place.
+
 * Indirect fields from C structures and unions are now always imported, while
   they previously weren't imported if they belonged to an union. This is done by
   naming anonymous fields. For example:

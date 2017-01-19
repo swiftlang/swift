@@ -9,4 +9,6 @@ func testOverloaded() {
   overloaded()
   // CHECK: call void @_Z10overloadedi(i32{{( signext)?}} 42)
   overloaded(42)
+  // CHECK: call void @{{.*}}test_my_log
+  test_my_log()
 } // CHECK: {{^}$}}

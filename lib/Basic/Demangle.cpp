@@ -1135,6 +1135,9 @@ private:
   }
 
   NodePointer demangleBoundGenericArgs(NodePointer nominalType) {
+    if (nominalType->getNumChildren() == 0)
+      return nullptr;
+
     // Generic arguments for the outermost type come first.
     NodePointer parentOrModule = nominalType->getChild(0);
 
@@ -1421,15 +1424,6 @@ private:
     return entity;
   }
 
-  NodePointer demangleArchetypeRef(Node::IndexType depth, Node::IndexType i) {
-    // FIXME: Name won't match demangled context generic signatures correctly.
-    auto ref = NodeFactory::create(Node::Kind::ArchetypeRef,
-                                   archetypeName(i, depth));
-    ref->addChild(NodeFactory::create(Node::Kind::Index, depth));
-    ref->addChild(NodeFactory::create(Node::Kind::Index, i));
-    return ref;
-  }
-
   NodePointer getDependentGenericParamType(unsigned depth, unsigned index) {
     DemanglerPrinter PrintName;
     PrintName << archetypeName(index, depth);
@@ -1643,6 +1637,69 @@ private:
       return reqt;
     }
 
+    if (Mangled.nextIf('l')) {
+      StringRef name;
+      Node::Kind kind;
+      Node::IndexType size = SIZE_MAX;
+      Node::IndexType alignment = SIZE_MAX;
+      if (Mangled.nextIf('U')) {
+        kind = Node::Kind::Identifier;
+        name = "U";
+      } else if (Mangled.nextIf('R')) {
+        kind = Node::Kind::Identifier;
+        name = "R";
+      } else if (Mangled.nextIf('N')) {
+        kind = Node::Kind::Identifier;
+        name = "N";
+      } else if (Mangled.nextIf('T')) {
+        kind = Node::Kind::Identifier;
+        name = "T";
+      } else if (Mangled.nextIf('E')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        if (!Mangled.nextIf('_'))
+          return nullptr;
+        if (!demangleNatural(alignment))
+          return nullptr;
+        name = "E";
+      } else if (Mangled.nextIf('e')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        name = "e";
+      } else if (Mangled.nextIf('M')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        if (!Mangled.nextIf('_'))
+          return nullptr;
+        if (!demangleNatural(alignment))
+          return nullptr;
+        name = "M";
+      } else if (Mangled.nextIf('m')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        name = "m";
+      } else {
+        unreachable("Unknown layout constraint");
+      }
+
+      NodePointer second = NodeFactory::create(kind, name);
+      if (!second) return nullptr;
+      auto reqt = NodeFactory::create(
+        Node::Kind::DependentGenericLayoutRequirement);
+      reqt->addChild(constrainedType);
+      reqt->addChild(second);
+      if (size != SIZE_MAX) {
+        reqt->addChild(NodeFactory::create(Node::Kind::Number, size));
+        if (alignment != SIZE_MAX)
+          reqt->addChild(NodeFactory::create(Node::Kind::Number, alignment));
+      }
+      return reqt;
+    }
+
     // Base class constraints are introduced by a class type mangling, which
     // will begin with either 'C' or 'S'.
     if (!Mangled)
@@ -1710,14 +1767,6 @@ private:
       NodePointer stdlib = NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
       return makeAssociatedType(stdlib);
     }
-    if (Mangled.nextIf('d')) {
-      Node::IndexType depth, index;
-      if (!demangleIndex(depth))
-        return nullptr;
-      if (!demangleIndex(index))
-        return nullptr;
-      return demangleArchetypeRef(depth + 1, index);
-    }
     if (Mangled.nextIf('q')) {
       NodePointer index = demangleIndexAsNode();
       if (!index)
@@ -1732,10 +1781,7 @@ private:
       qual_atype->addChild(decl_ctx);
       return qual_atype;
     }
-    Node::IndexType index;
-    if (!demangleIndex(index))
-      return nullptr;
-    return demangleArchetypeRef(0, index);
+    return nullptr;
   }
 
   NodePointer demangleTuple(IsVariadic isV) {
@@ -2386,7 +2432,6 @@ private:
   bool isSimpleType(NodePointer pointer) {
     switch (pointer->getKind()) {
     case Node::Kind::Archetype:
-    case Node::Kind::ArchetypeRef:
     case Node::Kind::AssociatedType:
     case Node::Kind::AssociatedTypeRef:
     case Node::Kind::BoundGenericClass:
@@ -2438,6 +2483,7 @@ private:
     case Node::Kind::DependentGenericSignature:
     case Node::Kind::DependentGenericParamCount:
     case Node::Kind::DependentGenericConformanceRequirement:
+    case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericSameTypeRequirement:
     case Node::Kind::DependentPseudogenericSignature:
     case Node::Kind::Destructor:
@@ -3510,9 +3556,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << pointer->getText();
     return;
   }
-  case Node::Kind::ArchetypeRef:
-    Printer << pointer->getText();
-    return;
   case Node::Kind::AssociatedTypeRef:
     print(pointer->getChild(0));
     Printer << '.' << pointer->getChild(1)->getText();
@@ -3710,6 +3753,40 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     print(type);
     Printer << ": ";
     print(reqt);
+    return;
+  }
+  case Node::Kind::DependentGenericLayoutRequirement: {
+    NodePointer type = pointer->getChild(0);
+    NodePointer layout = pointer->getChild(1);
+    print(type);
+    Printer << ": ";
+    assert(layout->getKind() == Node::Kind::Identifier);
+    assert(layout->getText().size() == 1);
+    char c = layout->getText()[0];
+    StringRef name;
+    if (c == 'U') {
+      name = "_UnknownLayout";
+    } else if (c == 'R') {
+      name = "_RefCountedObject";
+    } else if (c == 'N') {
+      name = "_NativeRefCountedObject";
+    } else if (c == 'T') {
+      name = "_Trivial";
+    } else if (c == 'E' || c == 'e') {
+      name = "_Trivial";
+    } else if (c == 'M' || c == 'm') {
+      name = "_TrivialAtMost";
+    }
+    Printer << name;
+    if (pointer->getNumChildren() > 2) {
+      Printer << "(";
+      print(pointer->getChild(2));
+      if (pointer->getNumChildren() > 3) {
+        Printer << ", ";
+        print(pointer->getChild(3));
+      }
+      Printer << ")";
+    }
     return;
   }
   case Node::Kind::DependentGenericSameTypeRequirement: {

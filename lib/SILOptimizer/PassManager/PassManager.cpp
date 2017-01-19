@@ -27,7 +27,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/TimeValue.h"
+#include "llvm/Support/Chrono.h"
 
 using namespace swift;
 
@@ -321,7 +321,7 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
     F->dump(getOptions().EmitVerboseSIL);
   }
 
-  llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+  llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   Mod->registerDeleteNotificationHandler(SFT);
   if (breakBeforeRunning(F->getName(), SFT->getName()))
     LLVM_BUILTIN_DEBUGTRAP;
@@ -330,8 +330,7 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
   Mod->removeDeleteNotificationHandler(SFT);
 
   if (SILPrintPassTime) {
-    auto Delta =
-        llvm::sys::TimeValue::now().nanoseconds() - StartTime.nanoseconds();
+    auto Delta = (std::chrono::system_clock::now() - StartTime).count();
     llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F->getName()
                  << ")\n";
   }
@@ -445,7 +444,7 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
     printModule(Mod, Options.EmitVerboseSIL);
   }
 
-  llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+  llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->registerDeleteNotificationHandler(SMT);
   SMT->run();
@@ -453,8 +452,7 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
   if (SILPrintPassTime) {
-    auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
-      StartTime.nanoseconds();
+    auto Delta = (std::chrono::system_clock::now() - StartTime).count();
     llvm::dbgs() << Delta << " (" << SMT->getName() << ",Module)\n";
   }
 
@@ -758,7 +756,6 @@ namespace llvm {
   /// CallGraph GraphTraits specialization so the CallGraph can be
   /// iterable by generic graph iterators.
   template <> struct GraphTraits<CallGraph::Node *> {
-    typedef CallGraph::Node NodeType;
     typedef CallGraph::child_iterator ChildIteratorType;
     typedef CallGraph::Node *NodeRef;
 
@@ -778,11 +775,13 @@ namespace llvm {
 
     static NodeRef getEntryNode(GraphType F) { return nullptr; }
 
-    typedef CallGraph::iterator nodes_iterator;
+    typedef pointer_iterator<CallGraph::iterator> nodes_iterator;
     static nodes_iterator nodes_begin(GraphType CG) {
-      return CG->Nodes.begin();
+      return nodes_iterator(CG->Nodes.begin());
     }
-    static nodes_iterator nodes_end(GraphType CG) { return CG->Nodes.end(); }
+    static nodes_iterator nodes_end(GraphType CG) {
+      return nodes_iterator(CG->Nodes.end());
+    }
     static unsigned size(GraphType CG) { return CG->Nodes.size(); }
   };
 

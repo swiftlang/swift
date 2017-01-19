@@ -54,8 +54,7 @@ static llvm::cl::opt<FailureKind> TargetFailureKind(
                    "miscompile that is not a crasher"),
         clEnumValN(FailureKind::RuntimeCrasher, "runtime-crasher",
                    "Delete the target function call to cause a runtime "
-                   "miscompile that is not a crasher"),
-        clEnumValEnd),
+                   "miscompile that is not a crasher")),
     llvm::cl::init(FailureKind::None));
 
 

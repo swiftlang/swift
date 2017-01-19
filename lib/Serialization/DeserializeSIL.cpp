@@ -107,7 +107,7 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
   SILCursor = MF->getSILCursor();
   SILIndexCursor = MF->getSILIndexCursor();
   // Early return if either sil block or sil index block does not exist.
-  if (!SILCursor.getBitStreamReader() || !SILIndexCursor.getBitStreamReader())
+  if (SILCursor.AtEndOfStream() || SILIndexCursor.AtEndOfStream())
     return;
 
   // Load any abbrev records at the start of the block.
@@ -479,18 +479,20 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     scratch.clear();
     kind = SILCursor.readRecord(next.ID, scratch);
     assert(kind == SIL_SPECIALIZE_ATTR && "Missing specialization attribute");
-    
-    unsigned NumSubstitutions;
-    SILSpecializeAttrLayout::readRecord(scratch, NumSubstitutions);
+
+    unsigned exported;
+    unsigned specializationKindVal;
+    SILSpecializeAttrLayout::readRecord(scratch, exported, specializationKindVal);
+    SILSpecializeAttr::SpecializationKind specializationKind =
+        specializationKindVal ? SILSpecializeAttr::SpecializationKind::Partial
+                              : SILSpecializeAttr::SpecializationKind::Full;
+
+    SmallVector<Requirement, 8> requirements;
+    MF->readGenericRequirements(requirements, SILCursor);
 
     // Read the substitution list and construct a SILSpecializeAttr.
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSubstitutions--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "Missing substitution?");
-      Substitutions.push_back(*sub);
-    }
-    fn->addSpecializeAttr(SILSpecializeAttr::create(SILMod, Substitutions));
+    fn->addSpecializeAttr(SILSpecializeAttr::create(
+        SILMod, requirements, exported != 0, specializationKind));
   }
 
   GenericEnvironment *genericEnv = nullptr;

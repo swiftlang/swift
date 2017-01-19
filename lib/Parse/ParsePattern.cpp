@@ -159,8 +159,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
   // Parse the parameter list.
   bool isClosure = paramContext == ParameterContextKind::Closure;
-  return parseList(tok::r_paren, leftParenLoc, rightParenLoc, tok::comma,
-                      /*OptionalSep=*/false, /*AllowSepAfterLast=*/false,
+  return parseList(tok::r_paren, leftParenLoc, rightParenLoc,
+                      /*AllowSepAfterLast=*/false,
                       diag::expected_rparen_parameter,
                       [&]() -> ParserStatus {
     ParsedParameter param;
@@ -867,7 +867,7 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
   ParserStatus ListStatus =
-    parseList(tok::r_paren, LPLoc, RPLoc, tok::comma, /*OptionalSep=*/false,
+    parseList(tok::r_paren, LPLoc, RPLoc,
               /*AllowSepAfterLast=*/false,
               diag::expected_rparen_tuple_pattern_list,
               [&] () -> ParserStatus {

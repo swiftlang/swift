@@ -20,7 +20,9 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/Basic/Compiler.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <utility>
 
@@ -183,9 +185,7 @@ public:
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
-#if !defined(_MSC_VER) || defined(__clang__)
-  void operator delete(void *Data) = delete;
-#endif
+  void operator delete(void *Data) SWIFT_DELETE_OPERATOR_DELETED;
 
   /// Only allow placement new.
   void *operator new(size_t Bytes, void *Mem) {
@@ -223,6 +223,10 @@ public:
 
   /// Get the sugared form of a generic parameter type.
   GenericTypeParamType *getSugaredType(GenericTypeParamType *type) const;
+
+  /// Get the sugared form of a type by substituting any
+  /// generic parameter types by their sugared form.
+  Type getSugaredType(Type type) const;
 
   /// Derive a contextual type substitution map from a substitution array.
   /// This is just like GenericSignature::getSubstitutionMap(), except

@@ -279,6 +279,8 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
     case Accessibility::Open:
       return SILFunction::PublicClass;
   }
+
+  llvm_unreachable("Unhandled Accessibility in switch.");
 }
 
 static bool verifySILSelfParameterType(SILDeclRef DeclRef,
@@ -374,8 +376,12 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     for (auto *A :
            Attrs.getAttributes<SpecializeAttr, false /*AllowInvalid*/>()) {
       auto *SA = cast<SpecializeAttr>(A);
-      auto subs = SA->getConcreteDecl().getSubstitutions();
-      F->addSpecializeAttr(SILSpecializeAttr::create(*this, subs));
+      auto kind = SA->getSpecializationKind() ==
+                          SpecializeAttr::SpecializationKind::Full
+                      ? SILSpecializeAttr::SpecializationKind::Full
+                      : SILSpecializeAttr::SpecializationKind::Partial;
+      F->addSpecializeAttr(SILSpecializeAttr::create(
+          *this, SA->getRequirements(), SA->isExported(), kind));
     }
   }
 
@@ -387,7 +393,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   // it.
   CanSILFunctionType FTy = F->getLoweredFunctionType();
   if (FTy->hasSelfParam()) {
-    (void)verifySILSelfParameterType;
+    (void)&verifySILSelfParameterType;
     assert(verifySILSelfParameterType(constant, F, FTy) &&
            "Invalid signature for SIL Self parameter type");
   }
@@ -432,8 +438,7 @@ const IntrinsicInfo &SILModule::getIntrinsicInfo(Identifier ID) {
 
   // Otherwise, lookup the ID and Type and store them in the map.
   StringRef NameRef = getBuiltinBaseName(getASTContext(), ID.str(), Info.Types);
-  Info.ID =
-    (llvm::Intrinsic::ID)getLLVMIntrinsicID(NameRef, !Info.Types.empty());
+  Info.ID = (llvm::Intrinsic::ID)getLLVMIntrinsicID(NameRef);
 
   return Info;
 }

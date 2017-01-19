@@ -156,10 +156,37 @@ Type TypeChecker::getNSObjectType(DeclContext *dc) {
 }
 
 Type TypeChecker::getNSErrorType(DeclContext *dc) {
-  return getObjectiveCNominalType(*this, NSObjectType, Context.Id_Foundation,
+  return getObjectiveCNominalType(*this, NSErrorType, Context.Id_Foundation,
                                   Context.getSwiftId(
                                     KnownFoundationEntity::NSError),
                                   dc);
+}
+
+Type TypeChecker::getNSNumberType(DeclContext *dc) {
+  return getObjectiveCNominalType(*this, NSNumberType, Context.Id_Foundation,
+                                  Context.getSwiftId(
+                                               KnownFoundationEntity::NSNumber),
+                                  dc);
+}
+
+Type TypeChecker::getNSValueType(DeclContext *dc) {
+  return getObjectiveCNominalType(*this, NSValueType, Context.Id_Foundation,
+                                  Context.getSwiftId(
+                                               KnownFoundationEntity::NSValue),
+                                  dc);
+}
+
+bool TypeChecker::isObjCClassWithMultipleSwiftBridgedTypes(Type t,
+                                                           DeclContext *dc) {
+  if (auto nsNumber = getNSNumberType(dc)) {
+    if (t->isEqual(nsNumber))
+      return true;
+  }
+  if (auto nsValue = getNSValueType(dc)) {
+    if (t->isEqual(nsValue))
+      return true;
+  }
+  return false;
 }
 
 Type TypeChecker::getObjCSelectorType(DeclContext *dc) {

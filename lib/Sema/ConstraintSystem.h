@@ -2482,7 +2482,7 @@ public:
         return false;
 
       // Clearly exponential
-      if (TypeCounter < 32 && CountScopes > (1 << TypeCounter))
+      if (TypeCounter < 32 && CountScopes > (1U << TypeCounter))
         return true;
 
       // Bail out once we've looked at a really large number of

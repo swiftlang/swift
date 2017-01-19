@@ -245,19 +245,19 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     switch(CTypeKind) {
     case MappedCTypeKind::FloatIEEEsingle:
       assert(Bitwidth == 32 && "FloatIEEEsingle should be 32 bits wide");
-      if (&Sem != &APFloat::IEEEsingle)
+      if (&Sem != &APFloat::IEEEsingle())
         return std::make_pair(Type(), "");
       break;
 
     case MappedCTypeKind::FloatIEEEdouble:
       assert(Bitwidth == 64 && "FloatIEEEdouble should be 64 bits wide");
-      if (&Sem != &APFloat::IEEEdouble)
+      if (&Sem != &APFloat::IEEEdouble())
         return std::make_pair(Type(), "");
       break;
 
     case MappedCTypeKind::FloatX87DoubleExtended:
       assert(Bitwidth == 80 && "FloatX87DoubleExtended should be 80 bits wide");
-      if (&Sem != &APFloat::x87DoubleExtended)
+      if (&Sem != &APFloat::x87DoubleExtended())
         return std::make_pair(Type(), "");
       break;
 
@@ -1133,14 +1133,18 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 
     // To keep DI happy, initialize stored properties before computed.
     for (unsigned pass = 0; pass < 2; pass++) {
+      unsigned paramPos = 0;
+
       for (unsigned i = 0, e = members.size(); i < e; i++) {
         auto var = members[i];
 
         if (var->hasClangNode() && isa<clang::IndirectFieldDecl>(var->getClangDecl()))
           continue;
 
-        if (var->hasStorage() == (pass != 0))
+        if (var->hasStorage() == (pass != 0)) {
+          paramPos++;
           continue;
+        }
 
         // Construct left-hand side.
         Expr *lhs = new (context) DeclRefExpr(selfDecl, DeclNameLoc(),
@@ -1149,12 +1153,14 @@ createValueConstructor(ClangImporter::Implementation &Impl,
                                           /*Implicit=*/true);
 
         // Construct right-hand side.
-        auto rhs = new (context) DeclRefExpr(valueParameters[i], DeclNameLoc(),
+        auto rhs = new (context) DeclRefExpr(valueParameters[paramPos],
+                                             DeclNameLoc(),
                                              /*Implicit=*/true);
 
         // Add assignment.
         stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs,
                                                  /*Implicit=*/true));
+        paramPos++;
       }
     }
 
@@ -3451,10 +3457,21 @@ namespace {
       Optional<ForeignErrorConvention> errorConvention;
       bodyParams.push_back(nullptr);
       Type type;
+
+      // If we have a property accessor, find the corresponding property
+      // declaration.
+      const clang::ObjCPropertyDecl *prop = nullptr;
       if (decl->isPropertyAccessor()) {
-        const clang::ObjCPropertyDecl *prop = decl->findPropertyDecl();
-        if (!prop)
-          return nullptr;
+        prop = decl->findPropertyDecl();
+        if (!prop) return nullptr;
+
+        // If we're importing just the accessors (not the property), ignore
+        // the property.
+        if (shouldImportPropertyAsAccessors(prop))
+          prop = nullptr;
+      }
+
+      if (prop) {
         // If the matching property is in a superclass, or if the getter and
         // setter are redeclared in a potentially incompatible way, bail out.
         if (prop->getGetterMethodDecl() != decl &&
@@ -4072,8 +4089,8 @@ namespace {
       //
       // FIXME: Remove this once SILGen gets proper support for factory
       // initializers.
-      if (result->getName() ==
-          result->getASTContext().getIdentifier("OS_object")) {
+      if (decl->getName() == "OS_object" ||
+          decl->getName() == "OS_os_log") {
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
       }
 

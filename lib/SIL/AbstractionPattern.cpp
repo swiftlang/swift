@@ -303,7 +303,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
       if (errorInfo.isErrorParameterReplacedWithVoid()) {
         if (paramIndex == errorParamIndex) {
           assert(isVoidLike(swiftEltType));
-          (void) isVoidLike;
+          (void)&isVoidLike;
           return AbstractionPattern(swiftEltType);
         }
       } else {

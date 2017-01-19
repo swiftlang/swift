@@ -44,7 +44,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
   auto archetype = Builder.resolveArchetype(baseTy);
   assert(archetype && "Bad generic context nesting?");
 
-  return archetype->getRepresentative()
+  return archetype
            ->getNestedType(ref->getIdentifier(), Builder)
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/true);
 }
@@ -54,7 +54,7 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
   auto archetype = Builder.resolveArchetype(selfTy);
   assert(archetype && "Bad generic context nesting?");
   
-  return archetype->getRepresentative()
+  return archetype
            ->getNestedType(assocType->getName(), Builder)
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/true);
 }
@@ -152,7 +152,6 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // Resolve the base to a potential archetype.
   auto basePA = Builder.resolveArchetype(baseTy);
   assert(basePA && "Missing potential archetype for base");
-  basePA = basePA->getRepresentative();
 
   // Retrieve the potential archetype for the nested type.
   auto nestedPA = basePA->getNestedType(ref->getIdentifier(), Builder);
@@ -214,7 +213,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 
 Type CompleteGenericTypeResolver::resolveSelfAssociatedType(
        Type selfTy, AssociatedTypeDecl *assocType) {
-  return Builder.resolveArchetype(selfTy)->getRepresentative()
+  return Builder.resolveArchetype(selfTy)
            ->getNestedType(assocType->getName(), Builder)
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/false);
 }
@@ -310,6 +309,21 @@ void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
                  diag::requires_conformance_nonprotocol,
                  req.getSubjectLoc(), req.getConstraintLoc());
         req.getConstraintLoc().setInvalidType(Context);
+        req.setInvalid();
+        continue;
+      }
+
+      break;
+    }
+
+    case RequirementReprKind::LayoutConstraint: {
+      // Validate the types.
+      if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
+        req.setInvalid();
+        continue;
+      }
+
+      if (req.getLayoutConstraintLoc().isNull()) {
         req.setInvalid();
         continue;
       }
@@ -784,7 +798,10 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
       revertDependentTypeLoc(req.getConstraintLoc());
       break;
     }
-
+    case RequirementReprKind::LayoutConstraint: {
+      revertDependentTypeLoc(req.getSubjectLoc());
+      break;
+    }
     case RequirementReprKind::SameType:
       revertDependentTypeLoc(req.getFirstTypeLoc());
       revertDependentTypeLoc(req.getSecondTypeLoc());
@@ -826,66 +843,12 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
   }
 }
 
-/// Create a text string that describes the bindings of generic parameters that
-/// are relevant to the given set of types, e.g., "[with T = Bar, U = Wibble]".
-///
-/// \param types The types that will be scanned for generic type parameters,
-/// which will be used in the resulting type.
-///
-/// \param genericSig The actual generic parameters, whose names will be used
-/// in the resulting text.
-///
-/// \param substitutions The generic parameter -> generic argument substitutions
-/// that will have been applied to these types. These are used to produce the
-/// "parameter = argument" bindings in the test.
-static std::string gatherGenericParamBindingsText(
-                     ArrayRef<Type> types,
-                     GenericSignature *genericSig,
-                     const TypeSubstitutionMap &substitutions) {
-  llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
-  for (auto type : types) {
-    type.visit([&](Type type) {
-      if (auto gp = type->getAs<GenericTypeParamType>()) {
-        knownGenericParams.insert(gp->getCanonicalType()
-                                    ->castTo<GenericTypeParamType>());
-      }
-    });
-  }
-
-  if (knownGenericParams.empty())
-    return "";
-
-  SmallString<128> result;
-  for (auto gp : genericSig->getGenericParams()) {
-    auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
-    if (!knownGenericParams.count(canonGP))
-      continue;
-
-    if (result.empty())
-      result += " [with ";
-    else
-      result += ", ";
-    result += gp->getName().str();
-    result += " = ";
-
-    auto found = substitutions.find(canonGP);
-    if (found == substitutions.end())
-      return "";
-
-    result += found->second.getString();
-  }
-
-  result += "]";
-  return result.str().str();
-}
-
-std::pair<bool, bool>
-TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
-                                   SourceLoc noteLoc,
-                                   Type owner,
-                                   GenericSignature *genericSig,
-                                   const TypeSubstitutionMap &substitutions,
-                                   UnsatisfiedDependency *unsatisfiedDependency) {
+std::pair<bool, bool> TypeChecker::checkGenericArguments(
+    DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
+    GenericSignature *genericSig, const TypeSubstitutionMap &substitutions,
+    UnsatisfiedDependency *unsatisfiedDependency,
+    ConformanceCheckOptions conformanceOptions,
+    GenericRequirementsCheckListener *listener) {
   // Check each of the requirements.
   ModuleDecl *module = dc->getParentModule();
   for (const auto &req : genericSig->getRequirements()) {
@@ -895,7 +858,9 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
       continue;
     }
 
-    Type secondType = req.getSecondType();
+    Type secondType;
+    if (req.getKind() != RequirementKind::Layout)
+      secondType = req.getSecondType();
     if (secondType) {
       secondType = secondType.subst(module, substitutions);
       if (secondType.isNull()) {
@@ -904,7 +869,11 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
       }
     }
 
-    switch (req.getKind()) {
+    auto kind = req.getKind();
+    if (listener && !listener->shouldCheck(kind, firstType, secondType))
+      continue;
+
+    switch (kind) {
     case RequirementKind::Conformance: {
       // Protocol conformance requirements.
       auto proto = secondType->castTo<ProtocolType>();
@@ -912,19 +881,29 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
       // or non-private dependency.
       // FIXME: Do we really need "used" at this point?
       // FIXME: Poor location information. How much better can we do here?
-      auto result = conformsToProtocol(
-          firstType, proto->getDecl(), dc,
-          ConformanceCheckFlags::Used, loc,
-          unsatisfiedDependency);
+      auto result =
+          conformsToProtocol(firstType, proto->getDecl(), dc,
+                             conformanceOptions, loc, unsatisfiedDependency);
 
       // Unsatisfied dependency case.
       if (result.first)
         return std::make_pair(true, false);
 
       // Conformance check failure case.
-      if (!result.second)
-        return std::make_pair(false, false);
+      if (!result.second) {
+        if (listener && loc.isValid())
+          listener->diagnosed(&req);
 
+        return std::make_pair(false, false);
+      }
+
+      continue;
+    }
+
+    case RequirementKind::Layout: {
+      // TODO: Statically check if a the first type
+      // conforms to the layout constraint, once we
+      // support such static checks.
       continue;
     }
 
@@ -937,9 +916,12 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
 
         diagnose(noteLoc, diag::type_does_not_inherit_requirement,
                  req.getFirstType(), req.getSecondType(),
-                 gatherGenericParamBindingsText(
-                   {req.getFirstType(), req.getSecondType()},
-                   genericSig, substitutions));
+                 genericSig->gatherGenericParamBindingsText(
+                     {req.getFirstType(), req.getSecondType()}, substitutions));
+
+        if (listener)
+          listener->diagnosed(&req);
+
         return std::make_pair(false, false);
       }
       continue;
@@ -949,11 +931,14 @@ TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
         // FIXME: Better location info for both diagnostics.
         diagnose(loc, diag::types_not_equal, owner, firstType, secondType);
 
-        diagnose(noteLoc, diag::types_not_equal_requirement,
-                 req.getFirstType(), req.getSecondType(),
-                 gatherGenericParamBindingsText(
-                   {req.getFirstType(), req.getSecondType()},
-                   genericSig, substitutions));
+        diagnose(noteLoc, diag::types_not_equal_requirement, req.getFirstType(),
+                 req.getSecondType(),
+                 genericSig->gatherGenericParamBindingsText(
+                     {req.getFirstType(), req.getSecondType()}, substitutions));
+
+        if (listener)
+          listener->diagnosed(&req);
+
         return std::make_pair(false, false);
       }
       continue;

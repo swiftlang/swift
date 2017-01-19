@@ -3,8 +3,9 @@
 // XFAIL: *
 
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
-
-
+// Remove XFAIL once the specialization of generics is updated to support the
+// new form of the @_specialize attribute.
+// XFAIL: *
 sil_stage canonical
 
 import Builtin
@@ -35,9 +36,9 @@ public struct G<Container : HasElt> {
   init()
 }
 
-// CHECK: @_specialize(S)
+// CHECK: @_specialize(exported: false, kind: full, where T == S)
 // CHECK: public func getGenericContainer<T>(g: G<T>, e: T.Elt) -> T where T : HasElt, T.Elt : AnElt
-@_specialize(S)
+@_specialize(where T == S)
 public func getGenericContainer<T>(g: G<T>, e: T.Elt) -> T where T : HasElt, T.Elt : AnElt
 
 enum ArithmeticError : Error {
@@ -46,25 +47,25 @@ enum ArithmeticError : Error {
   var _code: Int { get }
 }
 
-// CHECK: @_specialize(Int)
+// CHECK: @_specialize(exported: false, kind: full, where T == Int)
 // CHECK: public func divideNum<T>(num: T, den: T) throws -> T where T : SignedInteger
-@_specialize(Int)
+@_specialize(where T == Int)
 public func divideNum<T : SignedInteger>(num: T, den: T) throws -> T
 
 @inline(never) @_semantics("optimize.sil.never") func foo<T>(t: T) -> Int64
 
-// CHECK: @_specialize(Int64)
-// CHECK: @_specialize(Float)
+// CHECK: @_specialize(exported: false, kind: full, where T == Int64)
+// CHECK: @_specialize(exported: false, kind: full, where T == Float)
 // CHECK: public func voidReturn<T>(t: T)
-@_specialize(Int64)
-@_specialize(Float)
+@_specialize(where T == Int64)
+@_specialize(where T == Float)
 public func voidReturn<T>(t: T)
 
-// CHECK: @_specialize(Int64)
-// CHECK: @_specialize(Float)
+// CHECK: @_specialize(exported: false, kind: full, where T == Int64)
+// CHECK: @_specialize(exported: false, kind: full, where T == Float)
 // CHECK: public func nonvoidReturn<T>(t: T) -> Int64
-@_specialize(Int64)
-@_specialize(Float)
+@_specialize(where T == Int64)
+@_specialize(where T == Float)
 public func nonvoidReturn<T>(t: T) -> Int64
 
 // --- test: protocol conformance, substitution for dependent types
@@ -90,7 +91,7 @@ sil_scope 5 { parent @_TF16eager_specialize19getGenericContaineruRxS_6HasEltwx3E
 sil_scope 6 { parent 5 }
 
 // getGenericContainer<A where ...> (G<A>, e : A.Elt) -> A
-sil [_specialize <S, X>] @_TF16eager_specialize19getGenericContaineruRxS_6HasEltwx3EltS_5AnEltrFTGVS_1Gx_1ewxS1__x : $@convention(thin) <T where T : HasElt, T.Elt : AnElt> (G<T>, @in T.Elt) -> @out T {
+sil [_specialize where T == S] @_TF16eager_specialize19getGenericContaineruRxS_6HasEltwx3EltS_5AnEltrFTGVS_1Gx_1ewxS1__x : $@convention(thin) <T where T : HasElt, T.Elt : AnElt> (G<T>, @in T.Elt) -> @out T {
 bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
   // function_ref G.getContainer(A.Elt) -> A
   %5 = function_ref @_TFV16eager_specialize1G12getContainerfwx3Eltx : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, G<τ_0_0>) -> @out τ_0_0, scope 6 // user: %6
@@ -164,7 +165,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // divideNum<A where ...> (A, den : A) throws -> A
-sil [_specialize <Int>] @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger> (@in T, @in T) -> (@out T, @error Error) {
+sil [_specialize where T == Int] @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger> (@in T, @in T) -> (@out T, @error Error) {
 // %0                                             // user: %19
 // %1                                             // users: %3, %19, %23
 // %2                                             // users: %4, %7, %19, %22
@@ -275,7 +276,7 @@ sil_scope 1 { parent @_TF16eager_specialize10voidReturnurFxT_ : $@convention(thi
 sil_scope 2 { parent 1 }
 
 // voidReturn<A> (A) -> ()
-sil [_specialize <Float>] [_specialize <Int64>] @_TF16eager_specialize10voidReturnurFxT_ : $@convention(thin) <T> (@in T) -> () {
+sil [_specialize where T == Float] [_specialize where T == Int64] @_TF16eager_specialize10voidReturnurFxT_ : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
   // function_ref foo<A> (A) -> Int64
   %2 = function_ref @_TF16eager_specialize3foourFxVs5Int64 : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int64, scope 2 // user: %3
@@ -327,7 +328,7 @@ sil_scope 3 { parent @_TF16eager_specialize13nonvoidReturnurFxVs5Int64 : $@conve
 sil_scope 4 { parent 3 }
 
 // nonvoidReturn<A> (A) -> Int64
-sil [_specialize <Float>] [_specialize <Int64>] @_TF16eager_specialize13nonvoidReturnurFxVs5Int64 : $@convention(thin) <T> (@in T) -> Int64 {
+sil [_specialize where T == Float] [_specialize where T == Int64] @_TF16eager_specialize13nonvoidReturnurFxVs5Int64 : $@convention(thin) <T> (@in T) -> Int64 {
 // %0                                             // users: %1, %3
 bb0(%0 : $*T):
   // function_ref foo<A> (A) -> Int64

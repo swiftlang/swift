@@ -1644,20 +1644,14 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   }
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  auto DbgTy =
+      DebugTypeInfo::getGlobal(var, storageType, fixedSize, fixedAlignment);
   if (var->getDecl()) {
     // If we have the VarDecl, use it for more accurate debugging information.
-    DebugTypeInfo DbgTy(var->getDecl(),
-                        var->getLoweredType().getSwiftType(),
-                        storageType, fixedSize, fixedAlignment);
     gvar = link.createVariable(*this, storageType, fixedAlignment,
                                DbgTy, SILLocation(var->getDecl()),
                                var->getDecl()->getName().str());
   } else {
-    // There is no VarDecl for a SILGlobalVariable, and thus also no context.
-    DeclContext *DeclCtx = nullptr;
-    DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(),
-                        storageType, fixedSize, fixedAlignment, DeclCtx);
-
     Optional<SILLocation> loc;
     if (var->hasLocation())
       loc = var->getLocation();
@@ -2294,8 +2288,8 @@ Address IRGenModule::getAddrOfObjCClassRef(ClassDecl *theClass) {
   Alignment alignment = getPointerAlignment();
 
   LinkEntity entity = LinkEntity::forObjCClassRef(theClass);
-  DebugTypeInfo DbgTy(theClass, ObjCClassPtrTy->getPointerTo(),
-                      getPointerSize(), alignment);
+  auto DbgTy = DebugTypeInfo::getObjCClass(
+      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(entity, alignment, NotForDefinition,
                                     ObjCClassPtrTy, DbgTy);
 
@@ -2320,8 +2314,8 @@ llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass,
   assert(ObjCInterop && "getting address of ObjC class in no-interop mode");
   assert(!theClass->isForeign());
   LinkEntity entity = LinkEntity::forObjCClass(theClass);
-  DebugTypeInfo DbgTy(theClass, ObjCClassPtrTy,
-                      getPointerSize(), getPointerAlignment());
+  auto DbgTy = DebugTypeInfo::getObjCClass(
+      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(entity, getPointerAlignment(),
                                     forDefinition, ObjCClassStructTy, DbgTy);
   return addr;
@@ -2334,8 +2328,8 @@ llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass,
   assert(ObjCInterop && "getting address of ObjC metaclass in no-interop mode");
   assert(!theClass->isForeign());
   LinkEntity entity = LinkEntity::forObjCMetaclass(theClass);
-  DebugTypeInfo DbgTy(theClass, ObjCClassPtrTy,
-                      getPointerSize(), getPointerAlignment());
+  auto DbgTy = DebugTypeInfo::getObjCClass(
+      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(entity, getPointerAlignment(),
                                     forDefinition, ObjCClassStructTy, DbgTy);
   return addr;
@@ -2347,8 +2341,8 @@ llvm::Constant *IRGenModule::getAddrOfSwiftMetaclassStub(ClassDecl *theClass,
                                                 ForDefinition_t forDefinition) {
   assert(ObjCInterop && "getting address of metaclass stub in no-interop mode");
   LinkEntity entity = LinkEntity::forSwiftMetaclassStub(theClass);
-  DebugTypeInfo DbgTy(theClass, ObjCClassPtrTy,
-                      getPointerSize(), getPointerAlignment());
+  auto DbgTy = DebugTypeInfo::getObjCClass(
+      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(entity, getPointerAlignment(),
                                     forDefinition, ObjCClassStructTy, DbgTy);
   return addr;
@@ -2463,9 +2457,9 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
 
   auto entity = LinkEntity::forTypeMetadata(concreteType, addrKind, isPattern);
 
-  auto DbgTy = DebugTypeInfo(MetatypeType::get(concreteType),
-                             defaultVarTy->getPointerTo(),
-                             0, 1, nullptr);
+  auto DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
+                                          defaultVarTy->getPointerTo(), Size(0),
+                                          Alignment(1));
 
   // Define the variable.
   llvm::GlobalVariable *var = cast<llvm::GlobalVariable>(
@@ -2633,12 +2627,13 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                      TypeMetadataAddress::AddressPoint,
                                      isPattern);
 
-  auto DbgTy = ObjCClass 
-    ? DebugTypeInfo(ObjCClass, ObjCClassPtrTy,
-                    getPointerSize(), getPointerAlignment())
-    : DebugTypeInfo(MetatypeType::get(concreteType),
-                    defaultVarTy->getPointerTo(),
-                    0, 1, nullptr);
+  auto DbgTy =
+      ObjCClass
+          ? DebugTypeInfo::getObjCClass(ObjCClass, ObjCClassPtrTy,
+                                        getPointerSize(), getPointerAlignment())
+          : DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
+                                       defaultVarTy->getPointerTo(), Size(0),
+                                       Alignment(1));
 
   auto addr = getAddrOfLLVMVariable(entity, alignment,
                                     nullptr, defaultVarTy, DbgTy, refKind);
@@ -2965,19 +2960,19 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   if (entry) return entry;
 
   // If not, first transcode it to UTF16.
-  SmallVector<UTF16, 128> buffer(utf8.size() + 1); // +1 for ending nulls.
-  const UTF8 *fromPtr = (const UTF8 *) utf8.data();
-  UTF16 *toPtr = &buffer[0];
+  SmallVector<llvm::UTF16, 128> buffer(utf8.size() + 1); // +1 for ending nulls.
+  const llvm::UTF8 *fromPtr = (const llvm::UTF8 *) utf8.data();
+  llvm::UTF16 *toPtr = &buffer[0];
   (void) ConvertUTF8toUTF16(&fromPtr, fromPtr + utf8.size(),
                             &toPtr, toPtr + utf8.size(),
-                            strictConversion);
+                            llvm::strictConversion);
 
   // The length of the transcoded string in UTF-8 code points.
   size_t utf16Length = toPtr - &buffer[0];
 
   // Null-terminate the UTF-16 string.
   *toPtr = 0;
-  ArrayRef<UTF16> utf16(&buffer[0], utf16Length + 1);
+  ArrayRef<llvm::UTF16> utf16(&buffer[0], utf16Length + 1);
 
   auto init = llvm::ConstantDataArray::get(LLVMContext, utf16);
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,

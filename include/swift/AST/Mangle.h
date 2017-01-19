@@ -183,6 +183,7 @@ private:
   void mangleAssociatedTypeName(DependentMemberType *dmt,
                                 bool canAbbreviate);
   void mangleConstrainedType(CanType type);
+  void mangleLayoutConstraint(LayoutConstraint layout);
 };
 
 } // end namespace Mangle

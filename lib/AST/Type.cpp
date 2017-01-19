@@ -673,6 +673,13 @@ ClassDecl *CanType::getClassBoundImpl(CanType type) {
   llvm_unreachable("class has no class bound!");
 }
 
+LayoutConstraint CanType::getLayoutConstraint() const {
+  if (auto archetypeTy = dyn_cast<ArchetypeType>(*this)) {
+    return archetypeTy->getLayoutConstraint();
+  }
+  return LayoutConstraint();
+}
+
 bool TypeBase::isAnyObject() {
   if (auto proto = getAs<ProtocolType>())
     return proto->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
@@ -1439,12 +1446,12 @@ Identifier GenericTypeParamType::getName() const {
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   switch (getFPKind()) {
-  case BuiltinFloatType::IEEE16:  return APFloat::IEEEhalf;
-  case BuiltinFloatType::IEEE32:  return APFloat::IEEEsingle;
-  case BuiltinFloatType::IEEE64:  return APFloat::IEEEdouble;
-  case BuiltinFloatType::IEEE80:  return APFloat::x87DoubleExtended;
-  case BuiltinFloatType::IEEE128: return APFloat::IEEEquad;
-  case BuiltinFloatType::PPC128:  return APFloat::PPCDoubleDouble;
+  case BuiltinFloatType::IEEE16:  return APFloat::IEEEhalf();
+  case BuiltinFloatType::IEEE32:  return APFloat::IEEEsingle();
+  case BuiltinFloatType::IEEE64:  return APFloat::IEEEdouble();
+  case BuiltinFloatType::IEEE80:  return APFloat::x87DoubleExtended();
+  case BuiltinFloatType::IEEE128: return APFloat::IEEEquad();
+  case BuiltinFloatType::PPC128:  return APFloat::PPCDoubleDouble();
   }
   llvm::report_fatal_error("Unknown FP semantics");
 }
@@ -1588,6 +1595,12 @@ bool TypeBase::isSpelledLike(Type other) {
   }
 
   llvm_unreachable("Unknown type kind");
+}
+
+LayoutConstraint TypeBase::getLayoutConstraint() {
+  if (auto archetype = getAs<ArchetypeType>())
+    return archetype->getLayoutConstraint();
+  return LayoutConstraint();
 }
 
 Type TypeBase::getSuperclass(LazyResolver *resolver) {
@@ -2494,7 +2507,7 @@ ArchetypeType::ArchetypeType(
   llvm::PointerUnion<ArchetypeType *, GenericEnvironment *> ParentOrGenericEnv,
   llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
   ArrayRef<ProtocolDecl *> ConformsTo,
-  Type Superclass)
+  Type Superclass, LayoutConstraint Layout)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties::HasArchetype),
       AssocTypeOrName(AssocTypeOrName) {
@@ -2509,11 +2522,16 @@ ArchetypeType::ArchetypeType(
   // Set up the bits we need for trailing objects to work.
   ArchetypeTypeBits.ExpandedNestedTypes = false;
   ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
+  ArchetypeTypeBits.HasLayoutConstraint = static_cast<bool>(Layout);
   ArchetypeTypeBits.NumProtocols = ConformsTo.size();
 
   // Record the superclass.
   if (Superclass)
     *getTrailingObjects<Type>() = Superclass;
+
+  // Record the layout constraint.
+  if (Layout)
+    *getTrailingObjects<LayoutConstraint>() = Layout;
 
   // Copy the protocols.
   std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
@@ -2522,7 +2540,8 @@ ArchetypeType::ArchetypeType(
 
 ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
                              ArrayRef<ProtocolDecl *> ConformsTo,
-                             Type Superclass, UUID uuid)
+                             Type Superclass, LayoutConstraint Layout,
+                             UUID uuid)
   : SubstitutableType(TypeKind::Archetype, &Ctx,
                       RecursiveTypeProperties(
                         RecursiveTypeProperties::HasArchetype |
@@ -2531,11 +2550,16 @@ ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
   // Set up the bits we need for trailing objects to work.
   ArchetypeTypeBits.ExpandedNestedTypes = false;
   ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
+  ArchetypeTypeBits.HasLayoutConstraint = static_cast<bool>(Layout);
   ArchetypeTypeBits.NumProtocols = ConformsTo.size();
 
   // Record the superclass.
   if (Superclass)
     *getTrailingObjects<Type>() = Superclass;
+
+  // Record the layout constraint.
+  if (Layout)
+    *getTrailingObjects<LayoutConstraint>() = Layout;
 
   // Copy the protocols.
   std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
@@ -2550,19 +2574,19 @@ CanArchetypeType ArchetypeType::getNew(
                                    ArchetypeType *Parent,
                                    AssociatedTypeDecl *AssocType,
                                    SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                                   Type Superclass) {
+                                   Type Superclass,
+                                   LayoutConstraint Layout) {
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
   void *mem = Ctx.Allocate(
-                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(ConformsTo.size(),
-                                                             Superclass ? 1 : 0,
-                                                             0),
-                alignof(ArchetypeType), arena);
+      totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
+          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0, 0),
+      alignof(ArchetypeType), arena);
 
-  return CanArchetypeType(new (mem) ArchetypeType(Ctx, Parent, AssocType,
-                                                  ConformsTo, Superclass));
+  return CanArchetypeType(new (mem) ArchetypeType(
+      Ctx, Parent, AssocType, ConformsTo, Superclass, Layout));
 }
 
 CanArchetypeType
@@ -2570,19 +2594,19 @@ ArchetypeType::getNew(const ASTContext &Ctx,
                       GenericEnvironment *genericEnvironment,
                       Identifier Name,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                      Type Superclass) {
+                      Type Superclass,
+                      LayoutConstraint Layout) {
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
   void *mem = Ctx.Allocate(
-                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(ConformsTo.size(),
-                                                             Superclass ? 1 : 0,
-                                                             0),
-                alignof(ArchetypeType), arena);
+      totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
+          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0, 0),
+      alignof(ArchetypeType), arena);
 
-  return CanArchetypeType(new (mem) ArchetypeType(Ctx, genericEnvironment, Name,
-                                                  ConformsTo, Superclass));
+  return CanArchetypeType(new (mem) ArchetypeType(
+      Ctx, genericEnvironment, Name, ConformsTo, Superclass, Layout));
 }
 
 bool ArchetypeType::requiresClass() const {

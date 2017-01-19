@@ -164,3 +164,17 @@ SR_3248().callback("test")  // expected-error {{cannot convert value of type 'St
 
 _? = nil  // expected-error {{'nil' requires a contextual type}}
 _?? = nil // expected-error {{'nil' requires a contextual type}}
+
+
+// rdar://problem/29993596
+func takeAnyObjects(_ lhs: AnyObject?, _ rhs: AnyObject?) { }
+
+infix operator !====
+
+func !====(_ lhs: AnyObject?, _ rhs: AnyObject?) -> Bool { return false }
+
+func testAnyObjectImplicitForce(lhs: AnyObject?!, rhs: AnyObject?) {
+  if lhs !==== rhs { }
+
+  takeAnyObjects(lhs, rhs)
+}

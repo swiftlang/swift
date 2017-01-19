@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 306; // Last change: SILArgument+Ownership
+const uint16_t VERSION_MINOR = 307; // Last change: layout requirements
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -248,8 +248,21 @@ enum GenericRequirementKind : uint8_t {
   Conformance = 0,
   SameType    = 1,
   Superclass  = 2,
+  Layout = 3,
 };
 using GenericRequirementKindField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum LayoutRequirementKind : uint8_t {
+  UnknownLayout = 0,
+  TrivialOfExactSize = 1,
+  TrivialOfAtMostSize = 2,
+  Trivial = 3,
+  RefCountedObject = 4,
+  NativeRefCountedObject = 5,
+};
+using LayoutRequirementKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -1101,6 +1114,14 @@ namespace decls_block {
     TypeIDField                  // same-type; one for value witness marker)
   >;
 
+  using LayoutRequirementLayout = BCRecordLayout<
+    LAYOUT_REQUIREMENT,
+    LayoutRequirementKindField,  // requirement kind
+    TypeIDField,                 // type being constrained
+    BCFixed<24>,                 // size
+    BCFixed<32>                  // alignment
+  >;
+
   /// Specifies the private discriminator string for a private declaration. This
   /// identifies the declaration's original source file in some opaque way.
   using PrivateDiscriminatorLayout = BCRecordLayout<
@@ -1350,7 +1371,8 @@ namespace decls_block {
 
   using SpecializeDeclAttrLayout = BCRecordLayout<
     Specialize_DECL_ATTR,
-    BCArray<TypeIDField> // concrete types
+    BCFixed<1>, // exported flag
+    BCFixed<1> // specialization kind
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \

@@ -19,6 +19,7 @@
 
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILArgumentConvention.h"
@@ -80,7 +81,7 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
 
   SILInstruction() = delete;
   void operator=(const SILInstruction &) = delete;
-  void operator delete(void *Ptr, size_t) = delete;
+  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
 
   /// Check any special state of instructions that are not represented in the
   /// instructions operands/type.
@@ -442,9 +443,9 @@ protected:
   friend llvm::TrailingObjects<DERIVED, Operand, TRAILING_TYPES...>;
 
   typedef llvm::TrailingObjects<DERIVED, Operand, TRAILING_TYPES...>
-      TrailingBase;
+      TrailingObjects;
 
-  using TrailingBase::totalSizeToAlloc;
+  using TrailingObjects::totalSizeToAlloc;
 
   // Total number of operands of this instruction.
   // It is number of type dependent operands + 1.
@@ -459,8 +460,8 @@ public:
     }
   }
 
-  size_t numTrailingObjects(
-      typename TrailingBase::template OverloadToken<Operand>) const {
+  size_t
+      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
     return NumOperands;
   }
 
@@ -512,12 +513,12 @@ public:
   getType() const { return ValueBase::getType(); }
 
   ArrayRef<Operand> getAllOperands() const {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 
@@ -1810,20 +1811,21 @@ class EndBorrowInst : public SILInstruction {
 
 public:
   enum {
-    /// The source of the value being borrowed.
-    Src,
-    /// The destination of the borrowed value.
-    Dest
+    /// The borrowed value.
+    BorrowedValue,
+    /// The original value that was borrowed from.
+    OriginalValue
   };
 
 private:
   FixedOperandList<2> Operands;
-  EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+  EndBorrowInst(SILDebugLocation DebugLoc, SILValue BorrowedValue,
+                SILValue OriginalValue);
 
 public:
-  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getBorrowedValue() const { return Operands[BorrowedValue].get(); }
 
-  SILValue getDest() const { return Operands[Dest].get(); }
+  SILValue getOriginalValue() const { return Operands[OriginalValue].get(); }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
@@ -2265,9 +2267,9 @@ class BindMemoryInst final :
     public SILInstruction,
     protected llvm::TrailingObjects<BindMemoryInst, Operand> {
 
-  typedef llvm::TrailingObjects<BindMemoryInst, Operand> TrailingBase;
-  friend TrailingBase;
-  using TrailingBase::totalSizeToAlloc;
+  typedef llvm::TrailingObjects<BindMemoryInst, Operand> TrailingObjects;
+  friend TrailingObjects;
+  using TrailingObjects::totalSizeToAlloc;
 
   friend SILBuilder;
 
@@ -2302,18 +2304,18 @@ public:
   SILType getBoundType() const { return BoundType ; }
 
   // Implement llvm::TrailingObjects.
-  size_t numTrailingObjects(
-      typename TrailingBase::template OverloadToken<Operand>) const {
+  size_t
+      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
     return NumOperands;
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
+    return {TrailingObjects::template getTrailingObjects<Operand>(),
             static_cast<size_t>(NumOperands)};
   }
 

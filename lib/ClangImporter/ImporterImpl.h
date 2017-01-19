@@ -272,6 +272,9 @@ public:
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
 
+  bool IsReadingBridgingPCH;
+  llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
+
   const Version CurrentVersion;
 
   constexpr static const char * const moduleImportBufferName =
@@ -281,7 +284,7 @@ public:
 
 private:
   /// The Swift lookup table for the bridging header.
-  SwiftLookupTable BridgingHeaderLookupTable;
+  std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
 
   /// The Swift lookup tables, per module.
   ///
@@ -299,7 +302,7 @@ private:
   unsigned VerifiedImportCounter = 0;
 
   /// \brief Clang compiler invocation.
-  llvm::IntrusiveRefCntPtr<clang::CompilerInvocation> Invocation;
+  std::shared_ptr<clang::CompilerInvocation> Invocation;
 
   /// \brief Clang compiler instance, which is used to actually load Clang
   /// modules.
@@ -596,7 +599,8 @@ public:
   /// Imports the given header contents into the Clang context.
   bool importHeader(ModuleDecl *adapter, StringRef headerName,
                     SourceLoc diagLoc, bool trackParsedSymbols,
-                    std::unique_ptr<llvm::MemoryBuffer> contents);
+                    std::unique_ptr<llvm::MemoryBuffer> contents,
+                    bool implicitImport);
 
   /// \brief Retrieve the imported module that should contain the given
   /// Clang decl.
@@ -1165,16 +1169,18 @@ namespace importer {
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
 class SwiftNameLookupExtension : public clang::ModuleFileExtension {
+  std::unique_ptr<SwiftLookupTable> &pchLookupTable;
   LookupTableMap &lookupTables;
   ASTContext &swiftCtx;
   const PlatformAvailability &availability;
   const bool inferImportAsMember;
 
 public:
-  SwiftNameLookupExtension(LookupTableMap &tables, ASTContext &ctx,
+  SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
+                           LookupTableMap &tables, ASTContext &ctx,
                            const PlatformAvailability &avail, bool inferIAM)
-      : lookupTables(tables), swiftCtx(ctx), availability(avail),
-        inferImportAsMember(inferIAM) {}
+      : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
+        availability(avail), inferImportAsMember(inferIAM) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;

@@ -471,7 +471,9 @@ getSubstitutionsForCallee(SILModule &M,
         subMap.addSubstitution(cast<SubstitutableType>(canTy),
                                sub.getReplacement());
       }
-      subMap.addConformances(canTy, sub.getConformances());
+
+      for (auto conformance : sub.getConformances())
+        subMap.addConformance(canTy, conformance);
     }
     assert(origSubs.empty());
   }
@@ -563,6 +565,11 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
     // hidden symbol.
     if (!F->hasValidLinkageForFragileRef())
       return false;
+  }
+
+  if (MI->isVolatile()) {
+    // dynamic dispatch is semantically required, can't devirtualize
+    return false;
   }
 
   // Type of the actual function to be called.
@@ -844,7 +851,8 @@ static void getWitnessMethodSubstitutions(
     auto gp = cast<GenericTypeParamType>(witnessThunkSig->getGenericParams()
                                                  .front()->getCanonicalType());
     subMap.addSubstitution(gp, origSubs.front().getReplacement());
-    subMap.addConformances(gp, origSubs.front().getConformances());
+    for (auto conformance : origSubs.front().getConformances())
+      subMap.addConformance(gp, conformance);
 
     // For default witnesses, innermost generic parameters are always at
     // depth 1.
@@ -911,7 +919,8 @@ static void getWitnessMethodSubstitutions(
         subMap.addSubstitution(cast<SubstitutableType>(canTy),
                                sub.getReplacement());
       }
-      subMap.addConformances(canTy, sub.getConformances());
+      for (auto conformance : sub.getConformances())
+        subMap.addConformance(canTy, conformance);
     }
     assert(subs.empty() && "Did not consume all substitutions");
   }

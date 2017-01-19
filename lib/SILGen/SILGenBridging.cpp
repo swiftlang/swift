@@ -457,7 +457,11 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
     if (bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
       SILValue native = gen.B.emitThickToObjCMetatype(loc, v.getValue(),
                            SILType::getPrimitiveObjectType(loweredBridgedTy));
-      return ManagedValue(native, v.getCleanup());
+      // *NOTE*: ObjCMetatypes are trivial types. They only gain ARC semantics
+      // when they are converted to an object via objc_metatype_to_object.
+      assert(!v.hasCleanup() &&
+             "Metatypes are trivial and thus should not have cleanups");
+      return ManagedValue::forUnmanaged(native);
     }
   }
 
@@ -710,7 +714,11 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
     if (bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
       SILValue native = gen.B.emitObjCToThickMetatype(loc, v.getValue(),
                                         gen.getLoweredType(loweredNativeTy));
-      return ManagedValue(native, v.getCleanup());
+      // *NOTE*: ObjCMetatypes are trivial types. They only gain ARC semantics
+      // when they are converted to an object via objc_metatype_to_object.
+      assert(!v.hasCleanup() && "Metatypes are trivial and should not have "
+                                "cleanups");
+      return ManagedValue::forUnmanaged(native);
     }
   }
 

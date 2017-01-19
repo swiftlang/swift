@@ -114,6 +114,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   case ValueOwnershipKind::Any:
     return os << "Any";
   }
+
+  llvm_unreachable("Unhandled ValueOwnershipKind in switch.");
 }
 
 Optional<ValueOwnershipKind>
@@ -185,6 +187,17 @@ CONSTANT_OWNERSHIP_INST(Owned, LoadUnowned)
 CONSTANT_OWNERSHIP_INST(Owned, LoadWeak)
 CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
 CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
+CONSTANT_OWNERSHIP_INST(Owned, ThinToThickFunction)
+
+// One would think that these /should/ be unowned. In truth they are owned since
+// objc metatypes do not go through the retain/release fast path. In their
+// implementations of retain/release nothing happens, so this is safe.
+//
+// You could even have an optimization that just always removed retain/release
+// operations on these objects.
+CONSTANT_OWNERSHIP_INST(Owned, ObjCExistentialMetatypeToObject)
+CONSTANT_OWNERSHIP_INST(Owned, ObjCMetatypeToObject)
+
 // All addresses have trivial ownership. The values stored at the address may
 // not though.
 CONSTANT_OWNERSHIP_INST(Trivial, AddressToPointer)
@@ -211,9 +224,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, MarkFunctionEscape)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitialized)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, Metatype)
-CONSTANT_OWNERSHIP_INST(Trivial,
-                        ObjCExistentialMetatypeToObject) // Is this right?
-CONSTANT_OWNERSHIP_INST(Trivial, ObjCMetatypeToObject)   // Is this right?
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCProtocol)           // Is this right?
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCToThickMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, OpenExistentialAddr)
@@ -236,16 +246,15 @@ CONSTANT_OWNERSHIP_INST(Trivial, SuperMethod)
 CONSTANT_OWNERSHIP_INST(Trivial, TailAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, ThickToObjCMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, ThinFunctionToPointer)
-CONSTANT_OWNERSHIP_INST(Trivial, ThinToThickFunction)
 CONSTANT_OWNERSHIP_INST(Trivial, TupleElementAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedAddrCast)
-CONSTANT_OWNERSHIP_INST(Trivial, UncheckedBitwiseCast)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedRefCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedTakeEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedTrivialBitCast)
 CONSTANT_OWNERSHIP_INST(Trivial, UnconditionalCheckedCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, ValueMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, WitnessMethod)
+CONSTANT_OWNERSHIP_INST(Trivial, StoreBorrow)
 // TODO: It would be great to get rid of these.
 CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, RefToUnowned)
@@ -254,11 +263,12 @@ CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
 #undef CONSTANT_OWNERSHIP_INST
 
 #define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP, INST)                    \
-  ValueOwnershipKind ValueOwnershipKindVisitor::visit##INST##Inst(INST##Inst *I) { \
-    if (I->getType().isTrivial(I->getModule())) {                       \
-      return ValueOwnershipKind::Trivial;                               \
-    }                                                                   \
-    return ValueOwnershipKind::OWNERSHIP;                               \
+  ValueOwnershipKind ValueOwnershipKindVisitor::visit##INST##Inst(             \
+      INST##Inst *I) {                                                         \
+    if (I->getType().isTrivial(I->getModule())) {                              \
+      return ValueOwnershipKind::Trivial;                                      \
+    }                                                                          \
+    return ValueOwnershipKind::OWNERSHIP;                                      \
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
@@ -286,7 +296,6 @@ NO_RESULT_OWNERSHIP_INST(EndBorrow)
 NO_RESULT_OWNERSHIP_INST(Store)
 NO_RESULT_OWNERSHIP_INST(StoreWeak)
 NO_RESULT_OWNERSHIP_INST(StoreUnowned)
-NO_RESULT_OWNERSHIP_INST(StoreBorrow)
 NO_RESULT_OWNERSHIP_INST(Assign)
 NO_RESULT_OWNERSHIP_INST(DebugValue)
 NO_RESULT_OWNERSHIP_INST(DebugValueAddr)
@@ -390,6 +399,35 @@ FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
 #undef FORWARDING_OWNERSHIP_INST
 
+ValueOwnershipKind
+ValueOwnershipKindVisitor::
+visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
+  ValueOwnershipKind OpOwnership = UBCI->getOperand().getOwnershipKind();
+  bool ResultTypeIsTrivial = UBCI->getType().isTrivial(UBCI->getModule());
+
+  // First check if our operand has a trivial value ownership kind...
+  if (OpOwnership == ValueOwnershipKind::Trivial) {
+    // If we do have a trivial value ownership kind, see if our result type is
+    // trivial or non-trivial. If it is trivial, then we have trivial
+    // ownership. Otherwise, we have unowned ownership since from an ownership
+    // perspective, the value has instantaneously come into existance and
+    // nothing has taken ownership of it.
+    if (ResultTypeIsTrivial) {
+      return ValueOwnershipKind::Trivial;
+    }
+    return ValueOwnershipKind::Unowned;
+  }
+
+  // If our operand has non-trivial ownership, but our result does, then of
+  // course the result has trivial ownership.
+  if (ResultTypeIsTrivial) {
+    return ValueOwnershipKind::Trivial;
+  }
+
+  // Otherwise, we forward our ownership.
+  return visitForwardingInst(UBCI);
+}
+
 // An enum without payload is trivial. One with non-trivial payload is
 // forwarding.
 ValueOwnershipKind
@@ -433,6 +471,8 @@ ValueOwnershipKindVisitor::visitSILFunctionArgument(SILFunctionArgument *Arg) {
   case SILArgumentConvention::Direct_Deallocating:
     llvm_unreachable("No ownership associated with deallocating");
   }
+
+  llvm_unreachable("Unhandled SILArgumentConvention in switch.");
 }
 
 // This is a forwarding instruction through only one of its arguments.
@@ -450,19 +490,20 @@ ValueOwnershipKindVisitor::visitApplyInst(ApplyInst *AI) {
   if (Results.empty() || IsTrivial)
     return ValueOwnershipKind::Trivial;
 
+  CanGenericSignature Sig = AI->getSubstCalleeType()->getGenericSignature();
   // Find the first index where we have a trivial value.
-  auto Iter = find_if(Results, [&M](const SILResultInfo &Info) -> bool {
-    return Info.getOwnershipKind(M) != ValueOwnershipKind::Trivial;
+  auto Iter = find_if(Results, [&M, &Sig](const SILResultInfo &Info) -> bool {
+    return Info.getOwnershipKind(M, Sig) != ValueOwnershipKind::Trivial;
   });
   // If we have all trivial, then we must be trivial.
   if (Iter == Results.end())
     return ValueOwnershipKind::Trivial;
 
   unsigned Index = std::distance(Results.begin(), Iter);
-  ValueOwnershipKind Base = Results[Index].getOwnershipKind(M);
+  ValueOwnershipKind Base = Results[Index].getOwnershipKind(M, Sig);
 
   for (const SILResultInfo &ResultInfo : Results.slice(Index+1)) {
-    auto RKind = ResultInfo.getOwnershipKind(M);
+    auto RKind = ResultInfo.getOwnershipKind(M, Sig);
     if (RKind.merge(ValueOwnershipKind::Trivial))
       continue;
 
@@ -486,6 +527,8 @@ ValueOwnershipKindVisitor::visitLoadInst(LoadInst *LI) {
   case LoadOwnershipQualifier::Trivial:
     return ValueOwnershipKind::Trivial;
   }
+
+  llvm_unreachable("Unhandled LoadOwnershipQualifier in switch.");
 }
 
 ValueOwnershipKind SILValue::getOwnershipKind() const {

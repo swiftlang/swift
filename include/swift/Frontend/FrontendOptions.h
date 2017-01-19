@@ -149,6 +149,8 @@ public:
     /// Parse, type-check, and dump type refinement context hierarchy
     DumpTypeRefinementContexts,
 
+    EmitPCH, ///< Emit PCH of imported bridging header
+
     EmitSILGen, ///< Emit raw SIL
     EmitSIL, ///< Emit canonical SIL
 

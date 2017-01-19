@@ -28,6 +28,7 @@ class Type;
 
 namespace swift {
 class SILDebugScope;
+class SILGlobalVariable;
 
 namespace irgen {
 class TypeInfo;
@@ -47,24 +48,29 @@ public:
   Size size;
   Alignment align;
 
-  // FIXME: feels like there might be too many constructors here
-
   DebugTypeInfo()
       : DeclCtx(nullptr), Type(nullptr), StorageType(nullptr), size(0),
         align(1) {}
-  DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, uint64_t SizeInBytes,
-                uint32_t AlignInBytes, DeclContext *DC);
-  DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, Size size,
-                Alignment align, DeclContext *DC);
-  DebugTypeInfo(swift::Type Ty, const TypeInfo &Info, DeclContext *DC);
-  DebugTypeInfo(TypeDecl *Decl, const TypeInfo &Info);
-  DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageType, Size size,
-                Alignment align);
-  DebugTypeInfo(VarDecl *Decl, swift::Type Ty, const TypeInfo &Info,
-                bool Unwrap);
-  DebugTypeInfo(VarDecl *Decl, swift::Type Ty,
-                llvm::Type *StorageType, Size size,
-                Alignment align);
+  DebugTypeInfo(DeclContext *DC, swift::Type Ty, llvm::Type *StorageTy,
+                Size SizeInBytes, Alignment AlignInBytes);
+  /// Create type for a local variable.
+  static DebugTypeInfo getLocalVariable(DeclContext *DeclCtx, VarDecl *Decl,
+                                        swift::Type Ty, const TypeInfo &Info,
+                                        bool Unwrap);
+  /// Create type for an artificial metadata variable.
+  static DebugTypeInfo getMetadata(swift::Type Ty, llvm::Type *StorageTy,
+                                   Size size, Alignment align);
+  /// Create a standalone type from a TypeInfo object.
+  static DebugTypeInfo getFromTypeInfo(DeclContext *DC, swift::Type Ty,
+                                       const TypeInfo &Info);
+  /// Global variables.
+  static DebugTypeInfo getGlobal(SILGlobalVariable *GV, llvm::Type *StorageType,
+                                 Size size, Alignment align);
+  /// ObjC classes.
+  static DebugTypeInfo getObjCClass(ClassDecl *theClass,
+                                    llvm::Type *StorageType, Size size,
+                                    Alignment align);
+
   TypeBase *getType() const { return Type; }
 
   TypeDecl *getDecl() const;
@@ -72,26 +78,25 @@ public:
 
   void unwrapLValueOrInOutType() {
     Type = Type->getLValueOrInOutObjectType().getPointer();
-  }
+    }
 
-  // Determine whether this type is an Archetype itself.
-  bool isArchetype() const {
-    return Type->getLValueOrInOutObjectType()->getDesugaredType()->getKind() ==
-           TypeKind::Archetype;
-  }
+    // Determine whether this type is an Archetype itself.
+    bool isArchetype() const {
+      return Type->getLValueOrInOutObjectType()->is<ArchetypeType>();
+    }
 
-  /// LValues, inout args, and Archetypes are implicitly indirect by
-  /// virtue of their DWARF type.
-  bool isImplicitlyIndirect() const {
-    return Type->isLValueType() || isArchetype() ||
-           (Type->getKind() == TypeKind::InOut);
-  }
+    /// LValues, inout args, and Archetypes are implicitly indirect by
+    /// virtue of their DWARF type.
+    bool isImplicitlyIndirect() const {
+      return Type->isLValueType() || isArchetype() ||
+             (Type->getKind() == TypeKind::InOut);
+    }
 
-  bool isNull() const { return Type == nullptr; }
-  bool operator==(DebugTypeInfo T) const;
-  bool operator!=(DebugTypeInfo T) const;
+    bool isNull() const { return Type == nullptr; }
+    bool operator==(DebugTypeInfo T) const;
+    bool operator!=(DebugTypeInfo T) const;
 
-  void dump() const;
+    void dump() const;
 };
 }
 }
@@ -101,12 +106,12 @@ namespace llvm {
 // Dense map specialization.
 template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
   static swift::irgen::DebugTypeInfo getEmptyKey() {
-    return swift::irgen::DebugTypeInfo();
+    return {};
   }
   static swift::irgen::DebugTypeInfo getTombstoneKey() {
     return swift::irgen::DebugTypeInfo(
-        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr, 0, 0,
-        0);
+        nullptr, llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(),
+          nullptr, swift::irgen::Size(0), swift::irgen::Alignment(0));
   }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
     return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());

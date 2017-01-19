@@ -1340,6 +1340,26 @@ void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
   mangle(node->getChild(1).get());
 }
 
+void Remangler::mangleDependentGenericLayoutRequirement(Node *node) {
+  mangleConstrainedType(node->getChild(0).get());
+  Out << 'l';
+  auto id =  node->getChild(1)->getText();
+  auto size = -1;
+  if (node->getNumChildren() > 2) {
+    size = node->getChild(2)->getIndex();
+  }
+  int alignment = -1;
+  if (node->getNumChildren() > 3) {
+    alignment = node->getChild(3)->getIndex();
+  }
+  Out << id;
+  if (size >= 0)
+    Out << size;
+  if (alignment >= 0) {
+    Out << "_" << alignment;
+  }
+}
+
 void Remangler::mangleConstrainedType(Node *node) {
   if (node->getFirstChild()->getKind()
         == Node::Kind::DependentGenericParamType) {
@@ -1366,18 +1386,6 @@ void Remangler::mangleAssociatedType(Node *node) {
   } else {
     Out << '_';
   }
-}
-
-void Remangler::mangleArchetypeRef(Node *node) {
-  Node::IndexType relativeDepth = node->getChild(0)->getIndex();
-  Node::IndexType index = node->getChild(1)->getIndex();
-
-  Out << 'Q';
-  if (relativeDepth != 0) {
-    Out << 'd';
-    mangleIndex(relativeDepth - 1);
-  }
-  mangleIndex(index);
 }
 
 void Remangler::mangleQualifiedArchetype(Node *node) {

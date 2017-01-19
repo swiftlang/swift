@@ -1830,11 +1830,14 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
   if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
     auto *baseSubscript = cast<SubscriptDecl>(base);
     bool fixedAny = false;
-    for_each(*subscript->getIndices(),
-             *baseSubscript->getIndices(),
-             [&](ParamDecl *param, const ParamDecl *baseParam) {
-      fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
-    });
+    if (subscript->getIndices()->size() ==
+        baseSubscript->getIndices()->size()) {
+      for_each(*subscript->getIndices(),
+               *baseSubscript->getIndices(),
+               [&](ParamDecl *param, const ParamDecl *baseParam) {
+        fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
+      });
+    }
 
     auto resultType = subscript->getDeclContext()->mapTypeIntoContext(
         subscript->getElementInterfaceType());

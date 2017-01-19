@@ -82,6 +82,9 @@ enum class ConstraintKind : char {
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
+  /// \brief The first type must conform to the layout defined by the second
+  /// component representing a layout constraint.
+  Layout,
   /// \brief The first type describes a literal that conforms to the second
   /// type, which is one of the known expressible-by-literal protocols.
   LiteralConformsTo,
@@ -185,10 +188,6 @@ enum class ConversionRestrictionKind {
   ValueToOptional,
   /// T? -> U? optional to optional conversion (or unchecked to unchecked).
   OptionalToOptional,
-  /// T! -> U? unchecked-optional to optional conversion
-  ImplicitlyUnwrappedOptionalToOptional,
-  /// T? -> U! optional to implicitly unwrapped optional conversion
-  OptionalToImplicitlyUnwrappedOptional,
   /// Implicit forces of implicitly unwrapped optionals to their presumed values
   ForceUnchecked,
   /// Implicit upcast conversion of array types.
@@ -468,6 +467,7 @@ public:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::Layout:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::SelfObjectOfProtocol:

@@ -92,19 +92,13 @@ SubstitutionMap::lookupConformance(CanType type,
 void SubstitutionMap::
 addSubstitution(CanSubstitutableType type, Type replacement) {
   auto result = subMap.insert(std::make_pair(type, replacement));
-  assert(result.second);
+  assert(result.second || result.first->second->isEqual(replacement));
   (void) result;
 }
 
 void SubstitutionMap::
-addConformances(CanType type, ArrayRef<ProtocolConformanceRef> conformances) {
-  if (conformances.empty())
-    return;
-
-  auto result = conformanceMap.insert(
-      std::make_pair(type.getPointer(), conformances));
-  assert(result.second);
-  (void) result;
+addConformance(CanType type, ProtocolConformanceRef conformance) {
+  conformanceMap[type.getPointer()].push_back(conformance);
 }
 
 ArrayRef<ProtocolConformanceRef> SubstitutionMap::
@@ -171,8 +165,6 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
 
   // Map the innermost generic parameters of the derived function to
   // the base.
-  auto &ctx = baseClass->getASTContext();
-
   auto baseParams = baseSig->getInnermostGenericParams();
   if (baseParams.back()->getDepth() >= minDepth) {
     assert(derivedSig);
@@ -202,21 +194,17 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
         auto canTy = t->getCanonicalType();
 
         if (isRootedInInnermostParameter(t)) {
-          auto conformances =
-              ctx.AllocateUninitialized<ProtocolConformanceRef>(
-                  reqs.size());
           for (unsigned i = 0, e = reqs.size(); i < e; i++) {
             auto reqt = reqs[i];
             assert(reqt.getKind() == RequirementKind::Conformance);
             auto *proto = reqt.getSecondType()
                 ->castTo<ProtocolType>()->getDecl();
             if (derivedSubs)
-              conformances[i] = *derivedSubs->lookupConformance(canTy, proto);
+              subMap.addConformance(canTy, *derivedSubs->lookupConformance(
+                                                                 canTy, proto));
             else
-              conformances[i] = ProtocolConformanceRef(proto);
+              subMap.addConformance(canTy, ProtocolConformanceRef(proto));
           }
-
-          subMap.addConformances(canTy, conformances);
         }
 
         return false;

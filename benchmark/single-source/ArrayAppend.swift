@@ -241,3 +241,28 @@ public func run_ArrayAppendToFromGeneric(_ N: Int) {
   }
 }
 
+// Append a single element array with the += operator
+@inline(never)
+public func run_ArrayPlusEqualSingleElementCollection(_ N: Int) {
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [Int]()
+       for _ in 0..<40_000 {
+         nums += [1]
+       }
+    }
+  }
+}
+
+// Append a five element array with the += operator
+@inline(never)
+public func run_ArrayPlusEqualFiveElementCollection(_ N: Int) {
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [Int]()
+       for _ in 0..<40_000 {
+         nums += [1, 2, 3, 4, 5]
+       }
+    }
+  }
+}

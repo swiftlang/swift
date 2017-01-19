@@ -1,0 +1,48 @@
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all=0 -o /dev/null 2>&1  %s
+// REQUIRES: asserts
+
+// This file is meant to contain dataflow tests that if they fail are false
+// positives.
+
+//////////////////
+// Declarations //
+//////////////////
+
+sil_stage canonical
+
+import Builtin
+
+sil @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+
+///////////
+// Tests //
+///////////
+
+sil @leak_loop_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = begin_borrow %0 : $Builtin.NativeObject
+  store_borrow %2 to %1 : $*Builtin.NativeObject
+  %3 = function_ref @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %3(%1) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb5
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb1
+
+bb4:
+  br bb1
+
+bb5:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

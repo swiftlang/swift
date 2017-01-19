@@ -708,6 +708,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -867,6 +868,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
       SWIFT_FALLTHROUGH;
         
+    case ConstraintKind::Layout:
     case ConstraintKind::LiteralConformsTo: {
       // If there is a 'nil' literal constraint, we might need optional
       // supertype bindings.
@@ -1447,20 +1449,45 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
 }
 
 bool ConstraintSystem::Candidate::solve() {
+  // Don't attempt to solve candidate if there is closure
+  // expression involved, because it's handled specially
+  // by parent constaint system (e.g. parameter lists).
+  bool containsClosure = false;
+  E->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+    if (isa<ClosureExpr>(childExpr)) {
+      containsClosure = true;
+      return nullptr;
+    }
+    return childExpr;
+  });
+
+  if (containsClosure)
+    return false;
+
+  auto cleanupImplicitExprs = [&](Expr *expr) {
+    expr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+      Type type = childExpr->getType();
+      if (childExpr->isImplicit() && type && type->hasTypeVariable())
+        childExpr->setType(Type());
+      return childExpr;
+    });
+  };
+
+  // Allocate new constraint system for sub-expression.
+  ConstraintSystem cs(TC, DC, None);
+
   // Cleanup after constraint system generation/solving,
   // because it would assign types to expressions, which
   // might interfere with solving higher-level expressions.
   ExprCleaner cleaner(E);
 
-  // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(TC, DC, None);
-
   // Generate constraints for the new system.
   if (auto generatedExpr = cs.generateConstraints(E)) {
     E = generatedExpr;
   } else {
-    // Failure to generate constraint system for sub-expression means we can't
-    // continue solving sub-expressions.
+    // Failure to generate constraint system for sub-expression
+    // means we can't continue solving sub-expressions.
+    cleanupImplicitExprs(E);
     return true;
   }
 
@@ -1486,14 +1513,16 @@ bool ConstraintSystem::Candidate::solve() {
     cs.solveRec(solutions, FreeTypeVariableBinding::Allow);
   }
 
-  // No solutions for the sub-expression means that either main expression
-  // needs salvaging or it's inconsistent (read: doesn't have solutions).
-  if (solutions.empty())
-    return true;
-
   // Record found solutions as suggestions.
   this->applySolutions(solutions);
-  return false;
+
+  // Let's double-check if we have any implicit expressions
+  // with type variables and nullify their types.
+  cleanupImplicitExprs(E);
+
+  // No solutions for the sub-expression means that either main expression
+  // needs salvaging or it's inconsistent (read: doesn't have solutions).
+  return solutions.empty();
 }
 
 void ConstraintSystem::Candidate::applySolutions(
@@ -1586,8 +1615,9 @@ void ConstraintSystem::shrink(Expr *expr) {
         return {false, expr};
       }
 
-      // Let's not attempt to type-check closures, which has already been
-      // type checked anyway.
+      // Let's not attempt to type-check closures or expressions
+      // which containt closures, because they require special handling
+      // when dealing with context and parameters declarations.
       if (isa<ClosureExpr>(expr)) {
         return {false, expr};
       }
@@ -2197,11 +2227,7 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   if (auto restriction = constraint->getRestriction()) {
     // Non-optional conversions are better than optional-to-optional
     // conversions.
-    if (*restriction == ConversionRestrictionKind::OptionalToOptional ||
-        *restriction
-          == ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional ||
-        *restriction
-          == ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional)
+    if (*restriction == ConversionRestrictionKind::OptionalToOptional)
       return true;
     
     // Array-to-pointer conversions are better than inout-to-pointer conversions.

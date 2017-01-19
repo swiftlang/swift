@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_SILARGUMENT_H
 #define SWIFT_SIL_SILARGUMENT_H
 
+#include "swift/Basic/Compiler.h"
 #include "swift/SIL/SILArgumentConvention.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
@@ -36,7 +37,7 @@ SILFunctionType::getSILArgumentConvention(unsigned index) const {
 
 class SILArgument : public ValueBase {
   void operator=(const SILArgument &) = delete;
-  void operator delete(void *Ptr, size_t) = delete;
+  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
 
   SILBasicBlock *ParentBB;
   const ValueDecl *Decl;

@@ -24,9 +24,11 @@
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
+#include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Witness.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
@@ -742,8 +744,6 @@ public:
   /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;
 
-  SourceLoc TrailingSemiLoc;
-
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -863,11 +863,7 @@ public:
 
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
-
-  // Work around MSVC error: attempting to reference a deleted function.
-#if !defined(_MSC_VER) || defined(__clang__)
-  void operator delete(void *Data) = delete;
-#endif
+  void operator delete(void *Data) SWIFT_DELETE_OPERATOR_DELETED;
 
   // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.
@@ -909,6 +905,10 @@ enum class RequirementReprKind : unsigned {
   /// equivalent.
   SameType,
 
+  /// A layout bound T : L, where T is a type that depends on a generic
+  /// parameter and L is some layout specification that should bound T.
+  LayoutConstraint,
+
   // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
   // when adding enumerators.
 };
@@ -925,7 +925,15 @@ class RequirementRepr {
   SourceLoc SeparatorLoc;
   RequirementReprKind Kind : 2;
   bool Invalid : 1;
-  TypeLoc Types[2];
+  TypeLoc FirstType;
+
+  /// The second element represents the right-hand side of the constraint.
+  /// It can be e.g. a type or a layout constraint.
+  union {
+    TypeLoc SecondType;
+    LayoutConstraintLoc SecondLayout;
+  };
+
   /// Set during deserialization; used to print out the requirements accurately
   /// for the generated interface.
   StringRef AsWrittenString;
@@ -933,8 +941,13 @@ class RequirementRepr {
   RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
                   TypeLoc FirstType, TypeLoc SecondType)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
-      Types{FirstType, SecondType} { }
-  
+      FirstType(FirstType), SecondType(SecondType) { }
+
+  RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
+                  TypeLoc FirstType, LayoutConstraintLoc SecondLayout)
+    : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
+      FirstType(FirstType), SecondLayout(SecondLayout) { }
+
   void printImpl(raw_ostream &OS, bool AsWritten) const;
 
 public:
@@ -964,6 +977,21 @@ public:
     return { EqualLoc, RequirementReprKind::SameType, FirstType, SecondType };
   }
 
+  /// \brief Construct a new layout-constraint requirement.
+  ///
+  /// \param Subject The type that must conform to the given layout 
+  /// requirment.
+  /// \param ColonLoc The location of the ':', or an invalid location if
+  /// this requirement was implied.
+  /// \param Layout The layout requirement to which the
+  /// subject must conform.
+  static RequirementRepr getLayoutConstraint(TypeLoc Subject,
+                                             SourceLoc ColonLoc,
+                                             LayoutConstraintLoc Layout) {
+    return {ColonLoc, RequirementReprKind::LayoutConstraint, Subject,
+            Layout};
+  }
+
   /// \brief Determine the kind of requirement
   RequirementReprKind getKind() const { return Kind; }
 
@@ -976,89 +1004,114 @@ public:
   /// \brief For a type-bound requirement, return the subject of the
   /// conformance relationship.
   Type getSubject() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
-    return Types[0].getType();
+    assert(getKind() == RequirementReprKind::TypeConstraint ||
+           getKind() == RequirementReprKind::LayoutConstraint);
+    return FirstType.getType();
   }
 
   TypeRepr *getSubjectRepr() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
-    return Types[0].getTypeRepr();
+    assert(getKind() == RequirementReprKind::TypeConstraint ||
+           getKind() == RequirementReprKind::LayoutConstraint);
+    return FirstType.getTypeRepr();
   }
 
   TypeLoc &getSubjectLoc() {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
-    return Types[0];
+    assert(getKind() == RequirementReprKind::TypeConstraint ||
+           getKind() == RequirementReprKind::LayoutConstraint);
+    return FirstType;
   }
 
   const TypeLoc &getSubjectLoc() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
-    return Types[0];
+    assert(getKind() == RequirementReprKind::TypeConstraint ||
+           getKind() == RequirementReprKind::LayoutConstraint);
+    return FirstType;
   }
 
   /// \brief For a type-bound requirement, return the protocol or to which
   /// the subject conforms or superclass it inherits.
   Type getConstraint() const {
     assert(getKind() == RequirementReprKind::TypeConstraint);
-    return Types[1].getType();
+    return SecondType.getType();
+  }
+
+  TypeRepr *getConstraintRepr() const {
+    assert(getKind() == RequirementReprKind::TypeConstraint);
+    return SecondType.getTypeRepr();
   }
 
   TypeLoc &getConstraintLoc() {
     assert(getKind() == RequirementReprKind::TypeConstraint);
-    return Types[1];
+    return SecondType;
   }
 
   const TypeLoc &getConstraintLoc() const {
     assert(getKind() == RequirementReprKind::TypeConstraint);
-    return Types[1];
+    return SecondType;
+  }
+
+  LayoutConstraint getLayoutConstraint() const {
+    assert(getKind() == RequirementReprKind::LayoutConstraint);
+    return SecondLayout.getLayoutConstraint();
+  }
+
+  LayoutConstraintLoc &getLayoutConstraintLoc() {
+    assert(getKind() == RequirementReprKind::LayoutConstraint);
+    return SecondLayout;
+  }
+
+  const LayoutConstraintLoc &getLayoutConstraintLoc() const {
+    assert(getKind() == RequirementReprKind::LayoutConstraint);
+    return SecondLayout;
   }
 
   /// \brief Retrieve the location of the ':' in an explicitly-written
   /// conformance requirement.
   SourceLoc getColonLoc() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
+    assert(getKind() == RequirementReprKind::TypeConstraint ||
+           getKind() == RequirementReprKind::LayoutConstraint);
     return SeparatorLoc;
   }
 
   /// \brief Retrieve the first type of a same-type requirement.
   Type getFirstType() const {
     assert(getKind() == RequirementReprKind::SameType);
-    return Types[0].getType();
+    return FirstType.getType();
   }
 
   TypeRepr *getFirstTypeRepr() const {
     assert(getKind() == RequirementReprKind::SameType);
-    return Types[0].getTypeRepr();
+    return FirstType.getTypeRepr();
   }
 
   TypeLoc &getFirstTypeLoc() {
     assert(getKind() == RequirementReprKind::SameType);
-    return Types[0];
+    return FirstType;
   }
 
   const TypeLoc &getFirstTypeLoc() const {
     assert(getKind() == RequirementReprKind::SameType);
-    return Types[0];
+    return FirstType;
   }
 
   /// \brief Retrieve the second type of a same-type requirement.
   Type getSecondType() const {
     assert(getKind() == RequirementReprKind::SameType);
-    return Types[1].getType();
+    return SecondType.getType();
   }
 
   TypeRepr *getSecondTypeRepr() const {
     assert(getKind() == RequirementReprKind::SameType);
-    return Types[1].getTypeRepr();
+    return SecondType.getTypeRepr();
   }
 
   TypeLoc &getSecondTypeLoc() {
     assert(getKind() == RequirementReprKind::SameType);
-    return Types[1];
+    return SecondType;
   }
 
   const TypeLoc &getSecondTypeLoc() const {
     assert(getKind() == RequirementReprKind::SameType);
-    return Types[1];
+    return SecondType;
   }
 
   /// \brief Retrieve the location of the '==' in an explicitly-written
@@ -1069,8 +1122,11 @@ public:
   }
 
   SourceRange getSourceRange() const {
-    return SourceRange(Types[0].getSourceRange().Start,
-                       Types[1].getSourceRange().End);
+    if (getKind() == RequirementReprKind::LayoutConstraint)
+      return SourceRange(FirstType.getSourceRange().Start,
+                         SecondLayout.getSourceRange().End);
+    return SourceRange(FirstType.getSourceRange().Start,
+                       SecondType.getSourceRange().End);
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -2585,6 +2641,8 @@ static inline bool isRawPointerKind(PointerTypeKind PTK) {
   case PTK_AutoreleasingUnsafeMutablePointer:
     return false;
   }
+
+  llvm_unreachable("Unhandled PointerTypeKind in switch.");
 }
 
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.

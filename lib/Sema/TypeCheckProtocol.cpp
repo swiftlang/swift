@@ -1009,11 +1009,11 @@ RequirementEnvironment::RequirementEnvironment(
   {
     SmallVector<ProtocolConformanceRef, 1> conformances;
     if (specialized)
-      conformances.push_back(ProtocolConformanceRef(specialized));
+      reqToSyntheticEnvMap.addConformance(
+          selfType, ProtocolConformanceRef(specialized));
     else
-      conformances.push_back(ProtocolConformanceRef(proto));
-    reqToSyntheticEnvMap.addConformances(selfType,
-                                         ctx.AllocateCopy(conformances));
+      reqToSyntheticEnvMap.addConformance(
+          selfType, ProtocolConformanceRef(proto));
   }
 
   // Construct an archetype builder by collecting the constraints from the
@@ -1067,11 +1067,11 @@ RequirementEnvironment::RequirementEnvironment(
     if (auto archetypeType
           = reqEnv->mapTypeIntoContext(genericParam)->getAs<ArchetypeType>()) {
       // Add substitutions.
-      SmallVector<ProtocolConformanceRef, 1> conformances;
-      for (auto proto : archetypeType->getConformsTo())
-        conformances.push_back(ProtocolConformanceRef(proto));
-      reqToSyntheticEnvMap.addConformances(genericParam->getCanonicalType(),
-                                           ctx.AllocateCopy(conformances));
+      for (auto proto : archetypeType->getConformsTo()) {
+        reqToSyntheticEnvMap.addConformance(
+            genericParam->getCanonicalType(),
+            ProtocolConformanceRef(proto));
+      }
     }
   }
 
@@ -1091,6 +1091,17 @@ RequirementEnvironment::RequirementEnvironment(
 
       builder.addRequirement(Requirement(RequirementKind::Conformance,
                                          first, reqReq.getSecondType()),
+                             source);
+      break;
+    }
+
+    case RequirementKind::Layout: {
+      // Substitute the constrained types.
+      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
+      if (!first->isTypeParameter()) break;
+
+      builder.addRequirement(Requirement(RequirementKind::Layout, first,
+                                         reqReq.getLayoutConstraint()),
                              source);
       break;
     }

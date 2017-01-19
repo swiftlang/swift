@@ -38,22 +38,54 @@ enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
 enum IsThunk_t { IsNotThunk, IsThunk, IsReabstractionThunk };
 
-class SILSpecializeAttr final :
-    private llvm::TrailingObjects<SILSpecializeAttr, Substitution> {
-  friend TrailingObjects;
-
-  unsigned numSubs;
-  
-  SILSpecializeAttr(ArrayRef<Substitution> subs);
-
+class SILSpecializeAttr final {
+  friend SILFunction;
 public:
-  static SILSpecializeAttr *create(SILModule &M, ArrayRef<Substitution> subs);
+  enum class SpecializationKind {
+    Full,
+    Partial
+  };
 
-  ArrayRef<Substitution> getSubstitutions() const {
-    return { getTrailingObjects<Substitution>(), numSubs };
+  static SILSpecializeAttr *create(SILModule &M,
+                                   ArrayRef<Requirement> requirements,
+                                   bool exported, SpecializationKind kind);
+
+  ArrayRef<Requirement> getRequirements() const;
+
+  bool isExported() const {
+    return exported;
   }
-  
+
+  bool isFullSpecialization() const {
+    return kind == SpecializationKind::Full;
+  }
+
+  bool isPartialSpecialization() const {
+    return kind == SpecializationKind::Partial;
+  }
+
+  SpecializationKind getSpecializationKind() const {
+    return kind;
+  }
+
+  SILFunction *getFunction() const {
+    return F;
+  }
+
   void print(llvm::raw_ostream &OS) const;
+
+private:
+  unsigned numRequirements;
+  SpecializationKind kind;
+  bool exported;
+  SILFunction *F;
+
+  SILSpecializeAttr(ArrayRef<Requirement> requirements, bool exported,
+                    SpecializationKind kind);
+
+  Requirement *getRequirementsData() {
+    return reinterpret_cast<Requirement *>(this+1);
+  }
 };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
@@ -452,9 +484,7 @@ public:
   /// Removes all specialize attributes from this function.
   void clearSpecializeAttrs() { SpecializeAttrSet.clear(); }
 
-  void addSpecializeAttr(SILSpecializeAttr *attr) {
-    SpecializeAttrSet.push_back(attr);
-  }
+  void addSpecializeAttr(SILSpecializeAttr *Attr);
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
   ///          or is raw SIL (so that the mandatory passes still run).

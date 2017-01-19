@@ -117,6 +117,9 @@ public:
   /// type or some type derived from it.
   class PotentialArchetype;
 
+  using RequirementRHS =
+      llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+
 private:
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
@@ -211,9 +214,8 @@ public:
   void enumerateRequirements(llvm::function_ref<
                       void (RequirementKind kind,
                             PotentialArchetype *archetype,
-                            llvm::PointerUnion<Type, PotentialArchetype *> type,
+                            RequirementRHS constraint,
                             RequirementSource source)> f);
-  
 
 private:
   PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,
@@ -243,7 +245,11 @@ public:
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
   void addRequirement(const Requirement &req, RequirementSource source);
-  
+
+  bool addLayoutRequirement(PotentialArchetype *PAT,
+                            LayoutConstraint Layout,
+                            RequirementSource Source);
+
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
 
@@ -342,6 +348,12 @@ class ArchetypeBuilder::PotentialArchetype {
   /// \brief The list of protocols to which this archetype will conform.
   llvm::MapVector<ProtocolDecl *, RequirementSource> ConformsTo;
 
+  /// \brief The layout constraint of this archetype, if specified.
+  LayoutConstraint Layout;
+
+  /// The source of the layout constraint requirement.
+  Optional<RequirementSource> LayoutSource;
+
   /// \brief The set of nested types of this archetype.
   ///
   /// For a given nested type name, there may be multiple potential archetypes
@@ -436,6 +448,13 @@ class ArchetypeBuilder::PotentialArchetype {
     return getGenericParam();
   }
 
+  /// \brief Retrieve the representative for this archetype, performing
+  /// path compression on the way.
+  PotentialArchetype *getRepresentative();
+
+  friend class ArchetypeBuilder;
+  friend class GenericSignature;
+
 public:
   ~PotentialArchetype();
 
@@ -518,6 +537,14 @@ public:
     return *SuperclassSource;
   } 
 
+  /// Retrieve the layout constraint of this archetype.
+  LayoutConstraint getLayout() const { return Layout; }
+
+  /// Retrieve the requirement source for the layout constraint requirement.
+  const RequirementSource &getLayoutSource() const {
+    return *LayoutSource;
+  }
+
   /// Retrieve the set of nested types.
   const llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>> &
   getNestedTypes() const{
@@ -527,10 +554,6 @@ public:
   /// \brief Determine the nesting depth of this potential archetype, e.g.,
   /// the number of associated type references.
   unsigned getNestingDepth() const;
-
-  /// \brief Retrieve the representative for this archetype, performing
-  /// path compression on the way.
-  PotentialArchetype *getRepresentative();
 
   /// Retrieve the equivalence class containing this potential archetype.
   ArrayRef<PotentialArchetype *> getEquivalenceClass() {

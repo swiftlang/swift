@@ -152,7 +152,7 @@ public protocol CustomNSError : Error {
 public extension CustomNSError {
   /// Default domain of the error.
   static var errorDomain: String {
-    return String(reflecting: type(of: self))
+    return String(reflecting: self)
   }
 
   /// The error code within the given domain.

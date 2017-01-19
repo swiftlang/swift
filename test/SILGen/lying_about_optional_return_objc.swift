@@ -53,34 +53,35 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
 
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
   _ = dynamic?.voidReturning()
-  // CHECK: unchecked_trivial_bit_cast
+  // CHECK: unchecked_trivial_bit_cast {{.*}} $UnsafeMutableRawPointer to $Optional
   _ = dynamic?.voidPointerReturning()
-  // CHECK: unchecked_trivial_bit_cast
+  // CHECK: unchecked_trivial_bit_cast {{.*}} $OpaquePointer to $Optional
   _ = dynamic?.opaquePointerReturning()
-  // CHECK: unchecked_trivial_bit_cast
+  // CHECK: unchecked_trivial_bit_cast {{.*}} $UnsafeMutablePointer{{.*}} to $Optional
   _ = dynamic?.pointerReturning()
-  // CHECK: unchecked_trivial_bit_cast
+  // CHECK: unchecked_trivial_bit_cast {{.*}} $UnsafePointer{{.*}} to $Optional
   _ = dynamic?.constPointerReturning()
-  // CHECK: unchecked_trivial_bit_cast
+  // CHECK: unchecked_trivial_bit_cast {{.*}} $Selector to $Optional
   _ = dynamic?.selectorReturning()
-  // CHECK: unchecked_ref_cast
+  // CHECK: unchecked_ref_cast {{.*}} $BlockProperty to $Optional
   _ = dynamic?.objectReturning()
-  // CHECK: unchecked_trivial_bit_cast
+  // FIXME: Doesn't opaquely cast the selector result!
+  // C/HECK: unchecked_trivial_bit_cast {{.*}} $Selector to $Optional
   _ = dynamic?.selector
 
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> ()>, #Optional.some
   _ = dynamic?.voidReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> UnsafeMutableRawPointer>, #Optional.some
   _ = dynamic?.voidPointerReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> OpaquePointer>, #Optional.some
   _ = dynamic?.opaquePointerReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> UnsafeMutablePointer{{.*}}>, #Optional.some
   _ = dynamic?.pointerReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> UnsafePointer{{.*}}>, #Optional.some
   _ = dynamic?.constPointerReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> Selector>, #Optional.some
   _ = dynamic?.selectorReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> @owned BlockProperty>, #Optional.some
   _ = dynamic?.objectReturning
 
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()

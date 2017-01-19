@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_BASICBLOCK_H
 #define SWIFT_SIL_BASICBLOCK_H
 
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/TransformArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
@@ -52,7 +53,8 @@ private:
   friend struct llvm::ilist_traits<SILBasicBlock>;
   SILBasicBlock() : Parent(nullptr) {}
   void operator=(const SILBasicBlock &) = delete;
-  void operator delete(void *Ptr, size_t) = delete;
+
+  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
 
   SILBasicBlock(SILFunction *F, SILBasicBlock *afterBB = nullptr);
 

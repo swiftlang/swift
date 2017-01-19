@@ -606,7 +606,7 @@ public:
   void printDebugLocRef(SILLocation Loc, const SourceManager &SM,
                         bool PrintComma = true) {
     auto DL = Loc.decodeDebugLoc(SM);
-    if (DL.Filename) {
+    if (!DL.Filename.empty()) {
       if (PrintComma)
         *this << ", ";
       *this << "loc " << QuotedString(DL.Filename) << ':' << DL.Line << ':'
@@ -1069,8 +1069,10 @@ public:
   }
 
   void visitEndBorrowInst(EndBorrowInst *EBI) {
-    *this << getID(EBI->getDest()) << " from " << getID(EBI->getSrc()) << " : "
-          << EBI->getDest()->getType() << ", " << EBI->getSrc()->getType();
+    *this << getID(EBI->getBorrowedValue()) << " from "
+          << getID(EBI->getOriginalValue()) << " : "
+          << EBI->getBorrowedValue()->getType() << ", "
+          << EBI->getOriginalValue()->getType();
   }
 
   void visitAssignInst(AssignInst *AI) {
@@ -2332,7 +2334,38 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
 
 void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
-  SILPrinter(Ctx).printSubstitutions(getSubstitutions());
+  // Print other types as their Swift representation.
+  PrintOptions SubPrinter = PrintOptions::printSIL();
+  auto exported = isExported() ? "true" : "false";
+  auto kind = isPartialSpecialization() ? "partial" : "full";
+
+  OS << "exported: " << exported << ", ";
+  OS << "kind: " << kind << ", ";
+
+  if (!getRequirements().empty()) {
+    OS << "where ";
+    SILFunction *F = getFunction();
+    assert(F);
+    auto GenericEnv = F->getGenericEnvironment();
+    assert(GenericEnv);
+    interleave(getRequirements(),
+               [&](Requirement req) {
+                 // Use GenericEnvironment to produce user-friendly
+                 // names instead of something like t_0_0.
+                 auto FirstTy = GenericEnv->getSugaredType(req.getFirstType());
+                 if (req.getKind() != RequirementKind::Layout) {
+                   auto SecondTy =
+                       GenericEnv->getSugaredType(req.getSecondType());
+                   Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+                   ReqWithDecls.print(OS, SubPrinter);
+                 } else {
+                   Requirement ReqWithDecls(req.getKind(), FirstTy,
+                                            req.getLayoutConstraint());
+                   ReqWithDecls.print(OS, SubPrinter);
+                 }
+               },
+               [&] { OS << ", "; });
+  }
 }
 
 //===----------------------------------------------------------------------===//

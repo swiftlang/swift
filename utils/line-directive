@@ -20,6 +20,7 @@ import bisect
 import re
 import subprocess
 import sys
+import os
 
 line_pattern = re.compile(
     r'^// ###sourceLocation\(file:\s*"([^"]+)",\s*line:\s*([0-9]+)\s*\)')
@@ -244,8 +245,18 @@ def run():
         dashes = sys.argv.index('--')
         sources = sys.argv[1:dashes]
 
+        # The first argument of command_args is the process to open.
+        # subprocess.Popen doesn't normalise arguments. This means that trying
+        # to open a non-normalised file (e.g. C:/swift/./bin/swiftc.exe) on
+        # Windows results in file/directory not found errors, as Popen delegates
+        # to the Win32 CreateProcess API. Unix systems handle non-normalised
+        # paths, so don't have this problem.
+        # Arguments passed to the process are normalised by the process.
+        command_args = sys.argv[dashes + 1:]
+        command_args[0] = os.path.normpath(command_args[0])
+
         command = subprocess.Popen(
-            sys.argv[dashes + 1:],
+            command_args,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
             universal_newlines=True

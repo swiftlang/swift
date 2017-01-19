@@ -30,7 +30,7 @@ static llvm::cl::opt<PassPipelineKind>
 #define PASSPIPELINE(NAME, DESCRIPTION)                                        \
   clEnumValN(PassPipelineKind::NAME, #NAME, DESCRIPTION),
 #include "swift/SILOptimizer/PassManager/PassPipeline.def"
-                                                        clEnumValEnd));
+                                                        clEnumValN(0, "", "")));
 
 namespace llvm {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, PassPipelineKind Kind) {

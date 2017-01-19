@@ -841,10 +841,10 @@ namespace {
 
   template <typename T>
   struct OperatorLookup {
-    // This assertion fails in MSVC, but not clang-cl.
-#if !defined(_MSC_VER) || defined(__clang__)
-    static_assert(static_cast<T*>(nullptr), "Only usable with operators");
-#endif
+  	// Don't fold this into the static_assert: this would trigger an MSVC bug
+  	// that causes the assertion to fail.
+    static constexpr T* ptr = static_cast<T*>(nullptr);
+    static_assert(ptr, "Only usable with operators");
   };
 
   template <>

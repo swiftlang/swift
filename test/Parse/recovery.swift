@@ -88,10 +88,10 @@ func missingControllingExprInIf() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-warning {{boolean literal is unused}}
   }
 
-  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>
@@ -110,10 +110,10 @@ func missingControllingExprInWhile() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-warning {{boolean literal is unused}}
   }
 
-  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>

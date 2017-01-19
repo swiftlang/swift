@@ -246,9 +246,8 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
   ClangArgList.insert(ClangArgList.end(), ArgList.begin(), ArgList.end());
 
   // Create a new Clang compiler invocation.
-  llvm::IntrusiveRefCntPtr<clang::CompilerInvocation> ClangInvok{
-    clang::createInvocationFromCommandLine(ClangArgList, ClangDiags)
-  };
+  std::unique_ptr<clang::CompilerInvocation> ClangInvok =
+      clang::createInvocationFromCommandLine(ClangArgList, ClangDiags);
   if (!ClangInvok || ClangDiags->hasErrorOccurred()) {
     for (auto I = DiagBuf.err_begin(), E = DiagBuf.err_end(); I != E; ++I) {
       Error += I->second;
@@ -342,7 +341,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
     CCArgs.push_back(Entry);
   }
 
-  if (!ClangInvok->getLangOpts()->CompilingModule) {
+  if (!ClangInvok->getLangOpts()->isCompilingModule()) {
     CCArgs.push_back("-Xclang");
     llvm::SmallString<64> Str;
     Str += "-fmodule-name=";

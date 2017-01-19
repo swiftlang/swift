@@ -3185,8 +3185,8 @@ void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
   SILDebugVariable Var = DbgValue->getVarInfo();
   auto Storage = emitShadowCopy(ErrorResultSlot.getAddress(), getDebugScope(),
                                 Var.Name, Var.ArgNo);
-  DebugTypeInfo DTI(ErrorInfo.getType(), ErrorResultSlot->getType(),
-                    IGM.getPointerSize(), IGM.getPointerAlignment(), nullptr);
+  DebugTypeInfo DTI(nullptr, ErrorInfo.getType(), ErrorResultSlot->getType(),
+                    IGM.getPointerSize(), IGM.getPointerAlignment());
   IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DTI, getDebugScope(),
                                          nullptr, Var.Name, Var.ArgNo,
                                          IndirectValue, ArtificialValue);
@@ -3216,11 +3216,14 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   bool Unwrap = true;
   auto RealTy = SILVal->getType().getSwiftType();
   if (VarDecl *Decl = i->getDecl()) {
-    DbgTy = DebugTypeInfo(Decl, RealTy, getTypeInfo(SILVal->getType()), Unwrap);
+    DbgTy = DebugTypeInfo::getLocalVariable(
+        CurSILFn->getDeclContext(), Decl, RealTy,
+        getTypeInfo(SILVal->getType()), Unwrap);
   } else if (i->getFunction()->isBare() &&
              !SILTy.getSwiftType()->hasArchetype() && !Name.empty()) {
     // Preliminary support for .sil debug information.
-    DbgTy = DebugTypeInfo(RealTy, getTypeInfo(SILTy), nullptr);
+    DbgTy = DebugTypeInfo::getFromTypeInfo(CurSILFn->getDeclContext(), RealTy,
+                                           getTypeInfo(SILTy));
     if (Unwrap)
       DbgTy.unwrapLValueOrInOutType();
   } else
@@ -3255,7 +3258,9 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   bool Unwrap =
       i->getVarInfo().Constant ||
       RealType->getLValueOrInOutObjectType()->getKind() == TypeKind::Archetype;
-  DebugTypeInfo DbgTy(Decl, RealType, getTypeInfo(SILVal->getType()), Unwrap);
+  auto DbgTy = DebugTypeInfo::getLocalVariable(
+      CurSILFn->getDeclContext(), Decl, RealType,
+      getTypeInfo(SILVal->getType()), Unwrap);
   // Put the value's address into a stack slot at -Onone and emit a debug
   // intrinsic.
   unsigned ArgNo = i->getVarInfo().ArgNo;
@@ -3529,7 +3534,8 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     bool Unwrap = true;
     SILType SILTy = i->getType();
     auto RealType = SILTy.getSwiftType().getLValueOrInOutObjectType();
-    auto DbgTy = DebugTypeInfo(Decl, RealType, type, Unwrap);
+    auto DbgTy = DebugTypeInfo::getLocalVariable(CurSILFn->getDeclContext(),
+                                                 Decl, RealType, type, Unwrap);
     StringRef Name = getVarName(i);
     if (auto DS = i->getDebugScope())
       emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Decl, Name,
@@ -3710,9 +3716,10 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
     assert(i->getBoxType()->getLayout()->getFields().size() == 1
            && "box for a local variable should only have one field");
-    DebugTypeInfo DbgTy(Decl,
-            i->getBoxType()->getFieldType(IGM.getSILModule(), 0).getSwiftType(),
-            type, false);
+    auto DbgTy = DebugTypeInfo::getLocalVariable(
+        CurSILFn->getDeclContext(), Decl,
+        i->getBoxType()->getFieldType(IGM.getSILModule(), 0).getSwiftType(),
+          type, /*unwrap = */false);
     IGM.DebugInfo->emitVariableDeclaration(
         Builder,
         emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),

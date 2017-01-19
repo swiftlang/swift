@@ -77,6 +77,7 @@ static bool isEntity(Node::Kind kind) {
 static bool isRequirement(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::DependentGenericSameTypeRequirement:
+    case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericConformanceRequirement:
       return true;
     default:
@@ -884,24 +885,8 @@ static std::string getArchetypeName(Node::IndexType index,
   return std::move(name).str();
 }
 
-NodePointer Demangler::createArchetypeRef(int depth, int i) {
-  if (depth < 0 || i < 0)
-    return nullptr;
-
-  // FIXME: Name won't match demangled context generic signatures correctly.
-  auto ref = NodeFactory::create(Node::Kind::ArchetypeRef,
-                                 getArchetypeName(i, depth));
-  ref->addChild(NodeFactory::create(Node::Kind::Index, depth));
-  ref->addChild(NodeFactory::create(Node::Kind::Index, i));
-  return createType(ref);
-}
-
 
 NodePointer Demangler::demangleArchetype() {
-  int index = demangleIndex();
-  if (index >= 0)
-    return createArchetypeRef(0, index);
-
   switch (nextChar()) {
     case 'a': {
       NodePointer Ident = popNode(Node::Kind::Identifier);
@@ -911,11 +896,6 @@ NodePointer Demangler::demangleArchetype() {
       addSubstitution(AssocTy);
       return AssocTy;
     }
-    case 'd': {
-      int depth = demangleIndex() + 1;
-      int index = demangleIndex();
-      return createArchetypeRef(depth, index);
-    }
     case 'q': {
       NodePointer Idx = demangleIndexAsNode();
       NodePointer Ctx = popContext();
@@ -923,9 +903,6 @@ NodePointer Demangler::demangleArchetype() {
       return createType(createWithChildren(Node::Kind::QualifiedArchetype,
                                            Idx, DeclCtx));
     }
-    case 'P':
-      // TODO: self type of protocol
-      return nullptr;
     case 'y': {
       NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());
       addSubstitution(T);
@@ -1579,7 +1556,7 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
 NodePointer Demangler::demangleGenericRequirement() {
   
   enum { Generic, Assoc, CompoundAssoc, Substitution } TypeKind;
-  enum { Protocol, BaseClass, SameType } ConstraintKind;
+  enum { Protocol, BaseClass, SameType, Layout } ConstraintKind;
   
   switch (nextChar()) {
     case 'c': ConstraintKind = BaseClass; TypeKind = Assoc; break;
@@ -1590,42 +1567,98 @@ NodePointer Demangler::demangleGenericRequirement() {
     case 'T': ConstraintKind = SameType; TypeKind = CompoundAssoc; break;
     case 's': ConstraintKind = SameType; TypeKind = Generic; break;
     case 'S': ConstraintKind = SameType; TypeKind = Substitution; break;
+    case 'm': ConstraintKind = Layout; TypeKind = Assoc; break;
+    case 'M': ConstraintKind = Layout; TypeKind = CompoundAssoc; break;
+    case 'l': ConstraintKind = Layout; TypeKind = Generic; break;
+    case 'L': ConstraintKind = Layout; TypeKind = Substitution; break;
     case 'p': ConstraintKind = Protocol; TypeKind = Assoc; break;
     case 'P': ConstraintKind = Protocol; TypeKind = CompoundAssoc; break;
     case 'Q': ConstraintKind = Protocol; TypeKind = Substitution; break;
     default:  ConstraintKind = Protocol; TypeKind = Generic; pushBack(); break;
   }
-  
+
   NodePointer ConstrTy;
+
   switch (TypeKind) {
-    case Generic:
-      ConstrTy = createType(demangleGenericParamIndex());
-      break;
-    case Assoc:
-      ConstrTy = demangleAssociatedTypeSimple(demangleGenericParamIndex());
-      addSubstitution(ConstrTy);
-      break;
-    case CompoundAssoc:
-      ConstrTy = demangleAssociatedTypeCompound(demangleGenericParamIndex());
-      addSubstitution(ConstrTy);
-      break;
-    case Substitution:
-      ConstrTy = popNode(Node::Kind::Type);
-      break;
+  case Generic:
+    ConstrTy = createType(demangleGenericParamIndex());
+    break;
+  case Assoc:
+    ConstrTy = demangleAssociatedTypeSimple(demangleGenericParamIndex());
+    addSubstitution(ConstrTy);
+    break;
+  case CompoundAssoc:
+    ConstrTy = demangleAssociatedTypeCompound(demangleGenericParamIndex());
+    addSubstitution(ConstrTy);
+    break;
+  case Substitution:
+    ConstrTy = popNode(Node::Kind::Type);
+    break;
   }
+
   switch (ConstraintKind) {
-    case Protocol:
-      return createWithChildren(
-                            Node::Kind::DependentGenericConformanceRequirement,
-                            ConstrTy, popProtocol());
-    case BaseClass:
-      return createWithChildren(
-                            Node::Kind::DependentGenericConformanceRequirement,
-                            ConstrTy, popNode(Node::Kind::Type));
-    case SameType:
-      return createWithChildren(Node::Kind::DependentGenericSameTypeRequirement,
-                                ConstrTy, popNode(Node::Kind::Type));
+  case Protocol:
+    return createWithChildren(
+        Node::Kind::DependentGenericConformanceRequirement, ConstrTy,
+        popProtocol());
+  case BaseClass:
+    return createWithChildren(
+        Node::Kind::DependentGenericConformanceRequirement, ConstrTy,
+        popNode(Node::Kind::Type));
+  case SameType:
+    return createWithChildren(Node::Kind::DependentGenericSameTypeRequirement,
+                              ConstrTy, popNode(Node::Kind::Type));
+  case Layout: {
+    auto c = nextChar();
+    NodePointer size = nullptr;
+    NodePointer alignment = nullptr;
+    StringRef name;
+    if (c == 'U') {
+      name = "U";
+    } else if (c == 'R') {
+      name = "R";
+    } else if (c == 'N') {
+      name = "N";
+    } else if (c == 'T') {
+      name = "T";
+    } else if (c == 'E') {
+      size = demangleIndexAsNode();
+      if (!size)
+        return nullptr;
+      alignment = demangleIndexAsNode();
+      name = "E";
+    } else if (c == 'e') {
+      size = demangleIndexAsNode();
+      if (!size)
+        return nullptr;
+      name = "e";
+    } else if (c == 'M') {
+      size = demangleIndexAsNode();
+      if (!size)
+        return nullptr;
+      alignment = demangleIndexAsNode();
+      name = "M";
+    } else if (c == 'm') {
+      size = demangleIndexAsNode();
+      if (!size)
+        return nullptr;
+      name = "m";
+    } else {
+      llvm_unreachable("Unknown layout constraint");
+    }
+
+    auto NameNode = NodeFactory::create(Node::Kind::Identifier, name);
+    auto LayoutRequirement = createWithChildren(
+        Node::Kind::DependentGenericLayoutRequirement, ConstrTy, NameNode);
+    if (size)
+      LayoutRequirement->addChild(size);
+    if (alignment)
+      LayoutRequirement->addChild(alignment);
+    return LayoutRequirement;
   }
+  }
+
+  llvm_unreachable("Unhandled TypeKind in switch.");
 }
 
 NodePointer Demangler::demangleGenericType() {

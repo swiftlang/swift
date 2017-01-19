@@ -548,13 +548,17 @@ tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
 #include "swift/Parse/Tokens.def"
     .Default(tok::identifier);
 
-  // These keywords are only active in SIL mode.
-  if ((Kind == tok::kw_sil || Kind == tok::kw_sil_stage ||
-       Kind == tok::kw_sil_vtable || Kind == tok::kw_sil_global ||
-       Kind == tok::kw_sil_witness_table || Kind == tok::kw_sil_default_witness_table ||
-       Kind == tok::kw_sil_coverage_map || Kind == tok::kw_undef) &&
-      !InSILMode)
-    Kind = tok::identifier;
+  // SIL keywords are only active in SIL mode.
+  switch (Kind) {
+#define SIL_KEYWORD(kw) \
+    case tok::kw_##kw:
+#include "swift/Parse/Tokens.def"
+      if (!InSILMode)
+        Kind = tok::identifier;
+      break;
+    default:
+      break;
+  }
   return Kind;
 }
 

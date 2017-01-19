@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/OptionSet.h"
@@ -424,6 +425,11 @@ public:
   CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
+
+  /// Returns information about the layout constraint represented by
+  /// this type. If this type does not represent a layout constraint,
+  /// it returns an empty LayoutConstraint.
+  LayoutConstraint getLayoutConstraint() const;
 
   /// \brief Retrieve the most-specific class bound of this type,
   /// which is either a class, a bound-generic class, or a class-bounded

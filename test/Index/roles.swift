@@ -38,10 +38,9 @@ var z: Int {
 // Write + Read of z
 z = z + 1
 // CHECK: [[@LINE-1]]:1 | variable/Swift | z | s:v14swift_ide_test1zSi | Ref,Writ | rel: 0
-// CHECK: [[@LINE-2]]:1 | function/acc-set/Swift | setter:z | s:F14swift_ide_tests1zSi | Ref,Call,Impl,RelCall | rel: 1
-// CHECK-NEXT: RelCall | z | s:v14swift_ide_test1zSi
-// CHECK: [[@LINE-4]]:5 | variable/Swift | z | s:v14swift_ide_test1zSi | Ref,Read | rel: 0
-// CHECK-NEXT: [[@LINE-5]]:5 | function/acc-get/Swift | getter:z | s:F14swift_ide_testg1zSi | Ref,Call,Impl,RelCall | rel: 1
+// CHECK: [[@LINE-2]]:1 | function/acc-set/Swift | setter:z | s:F14swift_ide_tests1zSi | Ref,Call,Impl | rel: 0
+// CHECK: [[@LINE-3]]:5 | variable/Swift | z | s:v14swift_ide_test1zSi | Ref,Read | rel: 0
+// CHECK: [[@LINE-4]]:5 | function/acc-get/Swift | getter:z | s:F14swift_ide_testg1zSi | Ref,Call,Impl | rel: 0
 
 // Call
 func aCalledFunction() {}
@@ -71,10 +70,10 @@ struct AStruct {
     x += 1
     // CHECK: [[@LINE-1]]:5 | instance-property/Swift | x | s:vV14swift_ide_test7AStruct1xSi | Ref,Read,Writ | rel: 0
     // CHECK: [[@LINE-2]]:5 | function/acc-get/Swift | getter:x | s:FV14swift_ide_test7AStructg1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
-    // CHECK-NEXT: RelCall | x | s:vV14swift_ide_test7AStruct1xSi
+    // CHECK-NEXT: RelCall | aMethod() | s:FV14swift_ide_test7AStruct7aMethodFT_T_
     // CHECK-NEXT: RelRec | AStruct | s:V14swift_ide_test7AStruct
     // CHECK: [[@LINE-5]]:5 | function/acc-set/Swift | setter:x | s:FV14swift_ide_test7AStructs1xSi | Ref,Call,Impl,RelRec,RelCall | rel: 2
-    // CHECK-NEXT: RelCall | x | s:vV14swift_ide_test7AStruct1xSi
+    // CHECK-NEXT: RelCall | aMethod() | s:FV14swift_ide_test7AStruct7aMethodFT_T_
     // CHECK-NEXT: RelRec | AStruct | s:V14swift_ide_test7AStruct
     // CHECK: [[@LINE-8]]:7 | static-method/infix-operator/Swift | +=(_:_:) | s:ZFSioi2peFTRSiSi_T_ | Ref,Call,RelRec,RelCall | rel: 2
     // CHECK-NEXT: RelCall | aMethod() | s:FV14swift_ide_test7AStruct7aMethodFT_T_
