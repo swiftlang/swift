@@ -17,22 +17,28 @@ using namespace swift;
 using namespace Lowering;
 
 //===----------------------------------------------------------------------===//
+//                              Utility Methods
+//===----------------------------------------------------------------------===//
+
+SILGenModule &SILGenBuilder::getSILGenModule() const { return gen.SGM; }
+
+//===----------------------------------------------------------------------===//
 //                                Constructors
 //===----------------------------------------------------------------------===//
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &gen)
-    : SILBuilder(gen.F), SGM(gen.SGM) {}
+    : SILBuilder(gen.F), gen(gen) {}
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB)
-    : SILBuilder(insertBB), SGM(gen.SGM) {}
+    : SILBuilder(insertBB), gen(gen) {}
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
                              SmallVectorImpl<SILInstruction *> *insertedInsts)
-    : SILBuilder(insertBB, insertedInsts), SGM(gen.SGM) {}
+    : SILBuilder(insertBB, insertedInsts), gen(gen) {}
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
                              SILBasicBlock::iterator insertInst)
-    : SILBuilder(insertBB, insertInst), SGM(gen.SGM) {}
+    : SILBuilder(insertBB, insertInst), gen(gen) {}
 
 //===----------------------------------------------------------------------===//
 //                            Instruction Emission
@@ -52,8 +58,9 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
       if (!t->getAnyNominal())
         return false;
 
-      auto subs = t->gatherAllSubstitutions(SGM.SwiftModule, nullptr);
-      SGM.useConformancesFromSubstitutions(subs);
+      auto subs =
+          t->gatherAllSubstitutions(getSILGenModule().SwiftModule, nullptr);
+      getSILGenModule().useConformancesFromSubstitutions(subs);
       return false;
     });
 
@@ -68,7 +75,7 @@ ApplyInst *SILGenBuilder::createApply(SILLocation Loc, SILValue Fn,
                                       SILType SubstFnTy, SILType Result,
                                       ArrayRef<Substitution> Subs,
                                       ArrayRef<SILValue> Args) {
-  SGM.useConformancesFromSubstitutions(Subs);
+  getSILGenModule().useConformancesFromSubstitutions(Subs);
   return SILBuilder::createApply(Loc, Fn, SubstFnTy, Result, Subs, Args, false);
 }
 
@@ -78,7 +85,7 @@ TryApplyInst *SILGenBuilder::createTryApply(SILLocation loc, SILValue Fn,
                                             ArrayRef<SILValue> args,
                                             SILBasicBlock *normalBB,
                                             SILBasicBlock *errorBB) {
-  SGM.useConformancesFromSubstitutions(subs);
+  getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createTryApply(loc, Fn, substFnTy, subs, args, normalBB,
                                     errorBB);
 }
@@ -86,7 +93,7 @@ TryApplyInst *SILGenBuilder::createTryApply(SILLocation loc, SILValue Fn,
 PartialApplyInst *SILGenBuilder::createPartialApply(
     SILLocation Loc, SILValue Fn, SILType SubstFnTy,
     ArrayRef<Substitution> Subs, ArrayRef<SILValue> Args, SILType ClosureTy) {
-  SGM.useConformancesFromSubstitutions(Subs);
+  getSILGenModule().useConformancesFromSubstitutions(Subs);
   return SILBuilder::createPartialApply(Loc, Fn, SubstFnTy, Subs, Args,
                                         ClosureTy);
 }
@@ -95,7 +102,7 @@ BuiltinInst *SILGenBuilder::createBuiltin(SILLocation Loc, Identifier Name,
                                           SILType ResultTy,
                                           ArrayRef<Substitution> Subs,
                                           ArrayRef<SILValue> Args) {
-  SGM.useConformancesFromSubstitutions(Subs);
+  getSILGenModule().useConformancesFromSubstitutions(Subs);
   return SILBuilder::createBuiltin(Loc, Name, ResultTy, Subs, Args);
 }
 
@@ -104,7 +111,7 @@ InitExistentialAddrInst *SILGenBuilder::createInitExistentialAddr(
     SILType LoweredConcreteType,
     ArrayRef<ProtocolConformanceRef> Conformances) {
   for (auto conformance : Conformances)
-    SGM.useConformance(conformance);
+    getSILGenModule().useConformance(conformance);
 
   return SILBuilder::createInitExistentialAddr(
       Loc, Existential, FormalConcreteType, LoweredConcreteType, Conformances);
@@ -114,7 +121,7 @@ InitExistentialMetatypeInst *SILGenBuilder::createInitExistentialMetatype(
     SILLocation loc, SILValue metatype, SILType existentialType,
     ArrayRef<ProtocolConformanceRef> conformances) {
   for (auto conformance : conformances)
-    SGM.useConformance(conformance);
+    getSILGenModule().useConformance(conformance);
 
   return SILBuilder::createInitExistentialMetatype(
       loc, metatype, existentialType, conformances);
@@ -124,7 +131,7 @@ InitExistentialRefInst *SILGenBuilder::createInitExistentialRef(
     SILLocation Loc, SILType ExistentialType, CanType FormalConcreteType,
     SILValue Concrete, ArrayRef<ProtocolConformanceRef> Conformances) {
   for (auto conformance : Conformances)
-    SGM.useConformance(conformance);
+    getSILGenModule().useConformance(conformance);
 
   return SILBuilder::createInitExistentialRef(
       Loc, ExistentialType, FormalConcreteType, Concrete, Conformances);
@@ -134,7 +141,7 @@ AllocExistentialBoxInst *SILGenBuilder::createAllocExistentialBox(
     SILLocation Loc, SILType ExistentialType, CanType ConcreteType,
     ArrayRef<ProtocolConformanceRef> Conformances) {
   for (auto conformance : Conformances)
-    SGM.useConformance(conformance);
+    getSILGenModule().useConformance(conformance);
 
   return SILBuilder::createAllocExistentialBox(Loc, ExistentialType,
                                                ConcreteType, Conformances);
