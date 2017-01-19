@@ -105,7 +105,8 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
     auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
                                          indexExpr, /*implicit*/ true);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
-                                  SourceLoc());
+                                  SourceLoc(), SourceLoc(), SourceLoc(),
+                                  /*implicit*/ true);
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false,
                                      SourceLoc(), body));
@@ -178,7 +179,9 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
                                      boolTy);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
-  BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
+  BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
+                                      SourceLoc(), SourceLoc(),
+                                      /*implicit*/ true);
   eqDecl->setBody(body);
 }
 
@@ -339,7 +342,8 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), memberRef);
   statements.push_back(returnStmt);
 
-  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
+  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
+                                SourceLoc(), SourceLoc(), /*implicit*/ true);
   hashValueDecl->setBody(body);
 }
 

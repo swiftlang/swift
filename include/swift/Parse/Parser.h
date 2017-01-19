@@ -771,7 +771,7 @@ public:
                        ParameterList *Indices, TypeLoc ElementTy,
                        ParsedAccessors &accessors,
                        SourceLoc &LastValidLoc,
-                       SourceLoc StaticLoc, SourceLoc VarLBLoc,
+                       SourceLoc StaticLoc, const SourceLoc VarLBLoc,
                        SmallVectorImpl<Decl *> &Decls);
   bool parseGetSet(ParseDeclOptions Flags,
                    ParameterList *Indices, TypeLoc ElementTy,

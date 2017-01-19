@@ -8077,7 +8077,8 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
 
   // Create an empty body for the default constructor. The type-check of the
   // constructor body will introduce default initializations of the members.
-  ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
+  ctor->setBody(BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+                                  SourceLoc(), SourceLoc(), /*implicit*/ true));
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {

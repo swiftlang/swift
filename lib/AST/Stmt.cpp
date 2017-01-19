@@ -128,9 +128,11 @@ SourceLoc Stmt::getEndLoc() const {
 }
 
 BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
-                     SourceLoc rbloc, Optional<bool> implicit)
+                     SourceLoc rbloc, SourceLoc startLoc, SourceLoc endLoc,
+                     Optional<bool> implicit)
   : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
-    NumElements(elts.size()), LBLoc(lbloc), RBLoc(rbloc)
+    NumElements(elts.size()), LBLoc(lbloc), RBLoc(rbloc), StartLoc(startLoc),
+    EndLoc(endLoc)
 {
   std::uninitialized_copy(elts.begin(), elts.end(),
                           getTrailingObjects<ASTNode>());
@@ -138,13 +140,15 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
 
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
                              ArrayRef<ASTNode> elts, SourceLoc rbloc,
+                             SourceLoc startLoc, SourceLoc endLoc,
                              Optional<bool> implicit) {
   assert(std::none_of(elts.begin(), elts.end(),
                       [](ASTNode node) -> bool { return node.isNull(); }) &&
          "null element in BraceStmt");
   void *Buffer = ctx.Allocate(totalSizeToAlloc<ASTNode>(elts.size()),
                               alignof(BraceStmt));
-  return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
+  return ::new(Buffer) BraceStmt(lbloc, elts, rbloc,
+                                 startLoc, endLoc, implicit);
 }
 
 SourceLoc ReturnStmt::getStartLoc() const {

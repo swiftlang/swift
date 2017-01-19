@@ -205,7 +205,7 @@ static void diagnoseDiscardedClosure(Parser &P, ASTNode &Result) {
         // Parameters are explicitly specified, and could be used in the body,
         // don't attempt recovery.
         return;
-      P.diagnose(CE->getBody()->getLBraceLoc(), diag::brace_stmt_invalid);
+      P.diagnose(CE->getBody()->getStartLoc(), diag::brace_stmt_invalid);
     }
   }
 }
@@ -334,8 +334,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       // Add the #if block itself as a TLCD if necessary
       if (Kind == BraceItemListKind::TopLevelCode) {
         auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
-        auto Brace = BraceStmt::create(Context, StartLoc,
-                                       {Result}, PreviousLoc);
+        auto Brace = BraceStmt::create(Context, SourceLoc(),
+                                       {Result}, SourceLoc(),
+                                       StartLoc, PreviousLoc,
+                                       /*implicit*/ false);
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
       } else {
@@ -372,7 +374,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserStatus Status = parseExprOrStmt(Result);
       if (Status.hasCodeCompletion() && isCodeCompletionFirstPass()) {
         consumeTopLevelDecl(BeginParserPosition, TLCD);
-        auto Brace = BraceStmt::create(Context, StartLoc, {}, Tok.getLoc());
+        auto Brace = BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+                                       StartLoc, Tok.getLoc(),
+                                       /*implicit*/ false);
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
         return Status;
@@ -386,11 +390,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       }
       diagnoseDiscardedClosure(*this, Result);
       if (!Result.isNull()) {
-        // NOTE: this is a 'virtual' brace statement which does not have
-        //       explicit '{' or '}', so the start and end locations should be
-        //       the same as those of the result node
-        auto Brace = BraceStmt::create(Context, Result.getStartLoc(),
-                                       Result, Result.getEndLoc());
+        auto Brace = BraceStmt::create(Context, SourceLoc(), Result, SourceLoc(),
+                                       Result.getStartLoc(),
+                                       Result.getEndLoc(), /*implicit*/ false);
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
       }
@@ -479,7 +481,8 @@ void Parser::parseTopLevelCodeDeclDelayed() {
 
   parseExprOrStmt(Result);
   if (!Result.isNull()) {
-    auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
+    auto Brace = BraceStmt::create(Context, SourceLoc(), Result, SourceLoc(),
+                                   StartLoc, Tok.getLoc(), /*implicit*/ false);
     TLCD->setBody(Brace);
   }
 }
@@ -592,14 +595,18 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 
   SmallVector<ASTNode, 16> Entries;
   SourceLoc RBLoc;
+  SourceLoc EndLoc;
 
   ParserStatus Status = parseBraceItems(Entries, BraceItemListKind::Brace,
                                         BraceItemListKind::Brace);
-  parseMatchingToken(tok::r_brace, RBLoc,
-                     diag::expected_rbrace_in_brace_stmt, LBLoc);
+  if (!parseMatchingToken(tok::r_brace, EndLoc,
+                     diag::expected_rbrace_in_brace_stmt, LBLoc)) {
+    RBLoc = EndLoc;
+  }
 
   return makeParserResult(Status,
-                          BraceStmt::create(Context, LBLoc, Entries, RBLoc));
+                          BraceStmt::create(Context, LBLoc, Entries, RBLoc,
+                                            LBLoc, EndLoc, /*implicit*/ false));
 }
 
 /// parseStmtBreak
@@ -1381,7 +1388,8 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
           Status,
           new (Context) IfStmt(
               LabelInfo, IfLoc, Condition,
-              BraceStmt::create(Context, EndLoc, {}, EndLoc, /*implicit=*/true),
+              BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+                                EndLoc, EndLoc, /*implicit=*/true),
               SourceLoc(), nullptr));
     };
 
@@ -1453,7 +1461,8 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
         Status,
         new (Context) GuardStmt(
             GuardLoc, Condition,
-            BraceStmt::create(Context, EndLoc, {}, EndLoc, /*implicit=*/true)));
+            BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+                              EndLoc, EndLoc, /*implicit=*/true)));
   };
 
   if (Tok.is(tok::l_brace)) {
@@ -1862,7 +1871,8 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
         Status,
         new (Context) WhileStmt(
             LabelInfo, WhileLoc, Condition,
-            BraceStmt::create(Context, EndLoc, {}, EndLoc, /*implicit=*/true)));
+            BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+                              EndLoc, EndLoc, /*implicit=*/true)));
   };
 
   if (Tok.is(tok::l_brace)) {
@@ -1903,7 +1913,8 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
   status |= body;
   if (body.isNull())
     body = makeParserResult(
-        body, BraceStmt::create(Context, repeatLoc, {}, PreviousLoc, true));
+        body, BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+                                repeatLoc, PreviousLoc, /*implicit*/true));
 
   SourceLoc whileLoc;
 
@@ -1946,7 +1957,8 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
   status |= body;
   if (body.isNull())
     body = makeParserResult(
-        body, BraceStmt::create(Context, doLoc, {}, PreviousLoc, true));
+        body, BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+                                doLoc, PreviousLoc, /*implicit*/ true));
 
   // If the next token is 'catch', this is a 'do'/'catch' statement.
   if (Tok.is(tok::kw_catch)) {
@@ -2033,8 +2045,11 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
   auto bodyResult = parseBraceItemList(diag::expected_lbrace_after_catch);
   status |= bodyResult;
   if (bodyResult.isNull()) {
-    bodyResult = makeParserErrorResult(BraceStmt::create(Context, PreviousLoc,
-                                                         {}, PreviousLoc,
+    bodyResult = makeParserErrorResult(BraceStmt::create(Context,
+                                                         SourceLoc(), {},
+                                                         SourceLoc(),
+                                                         PreviousLoc,
+                                                         PreviousLoc,
                                                          /*implicit=*/ true));
   }
 
@@ -2125,7 +2140,8 @@ static BraceStmt *ConvertClosureToBraceStmt(Expr *E, ASTContext &Ctx) {
   // more correctly handles the implicit ReturnStmt injected into single-expr
   // closures.
   ASTNode theCall = CallExpr::createImplicit(Ctx, CE, { }, { });
-  return BraceStmt::create(Ctx, CE->getStartLoc(), theCall, CE->getEndLoc(),
+  return BraceStmt::create(Ctx, SourceLoc(), theCall, SourceLoc(),
+                           CE->getStartLoc(), CE->getEndLoc(),
                            /*implicit*/true);
 }
 
@@ -2339,7 +2355,8 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
   Status |= Body;
   if (Body.isNull())
     Body = makeParserResult(
-        Body, BraceStmt::create(Context, PreviousLoc, {}, PreviousLoc, true));
+        Body, BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+                                PreviousLoc, PreviousLoc, /*implicit*/ true));
 
   return makeParserResult(
       Status,
@@ -2425,7 +2442,8 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
   Status |= Body;
   if (Body.isNull())
     Body = makeParserResult(
-        Body, BraceStmt::create(Context, ForLoc, {}, PreviousLoc, true));
+        Body, BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+                                ForLoc, PreviousLoc, /*implicit*/ true));
 
   return makeParserResult(
       Status,
@@ -2608,11 +2626,12 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
   }
   BraceStmt *Body;
   if (BodyItems.empty()) {
-    Body = BraceStmt::create(Context, PreviousLoc, ArrayRef<ASTNode>(),
-                             PreviousLoc, /*implicit=*/true);
+    Body = BraceStmt::create(Context,
+                             SourceLoc(), ArrayRef<ASTNode>(), SourceLoc(),
+                             PreviousLoc, PreviousLoc, /*implicit=*/true);
   } else {
-    Body = BraceStmt::create(Context, StartOfBody, BodyItems,
-                             PreviousLoc, /*implicit=*/true);
+    Body = BraceStmt::create(Context, SourceLoc(), BodyItems, SourceLoc(),
+                             StartOfBody, PreviousLoc, /*implicit=*/true);
   }
 
   return makeParserResult(

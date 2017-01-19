@@ -83,7 +83,8 @@ public:
   ~StmtBuilder() { assert(Body.empty() && "statements remain in builder?"); }
 
   BraceStmt *createBodyStmt(SourceLoc loc, SourceLoc endLoc) {
-    auto result = BraceStmt::create(Context, loc, Body, endLoc);
+    auto result = BraceStmt::create(Context, SourceLoc(), Body, SourceLoc(),
+                                    loc, endLoc, /*implicit*/ true);
     Body.clear();
     return result;
   }
@@ -276,8 +277,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
     return ;
 
   // Inject the call into the top level stream by wrapping it with a TLCD.
-  auto *BS = BraceStmt::create(Context, Loc, ASTNode(TheCall),
-                               EndLoc);
+  auto *BS = BraceStmt::create(Context,
+                               SourceLoc(), ASTNode(TheCall), SourceLoc(),
+                               Loc, EndLoc, /*implicit*/ true);
   newTopLevel->setBody(BS);
   TC.checkTopLevelErrorHandling(newTopLevel);
 
@@ -326,8 +328,10 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
 
   // Overwrite the body of the existing TopLevelCodeDecl.
   TLCD->setBody(BraceStmt::create(Context,
-                                  metavarBinding->getStartLoc(),
+                                  SourceLoc(),
                                   ASTNode(metavarBinding),
+                                  SourceLoc(),
+                                  metavarBinding->getStartLoc(),
                                   metavarBinding->getEndLoc(),
                                   /*implicit*/true));
 
@@ -399,9 +403,13 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
                                    PBD->getStartLoc(), metavarPat,
                                    patternEntry.getInit(), &SF);
     
-    auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),
+    auto MVBrace = BraceStmt::create(Context,
+                                     SourceLoc(),
                                      ASTNode(metavarBinding),
-                                     metavarBinding->getEndLoc());
+                                     SourceLoc(),
+                                     metavarBinding->getStartLoc(),
+                                     metavarBinding->getEndLoc(),
+                                     /*implicit*/ true);
     
     auto *MVTLCD = new (Context) TopLevelCodeDecl(&SF, MVBrace);
     SF.Decls.push_back(MVTLCD);

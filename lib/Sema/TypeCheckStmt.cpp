@@ -1474,7 +1474,9 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                             /*value*/nullptr,
                                             /*implicit*/true));
     body = BraceStmt::create(Context, body->getLBraceLoc(), Elts,
-                             body->getRBraceLoc(), body->isImplicit());
+                             body->getRBraceLoc(),
+                             body->getStartLoc(), body->getEndLoc(),
+                             body->isImplicit());
     ctor->setBody(body);
   }
   

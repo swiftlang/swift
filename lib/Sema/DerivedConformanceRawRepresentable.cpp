@@ -103,8 +103,9 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
     auto returnExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
 
-    auto body = BraceStmt::create(C, SourceLoc(),
-                                  ASTNode(returnStmt), SourceLoc());
+    auto body = BraceStmt::create(C,
+                                  SourceLoc(), ASTNode(returnStmt), SourceLoc(),
+                                  SourceLoc(), SourceLoc(), /*implicit*/ true);
 
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
@@ -114,9 +115,9 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
   auto selfRef = createSelfDeclRef(toRawDecl);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), selfRef,
                                        SourceLoc(), cases, SourceLoc(), C);
-  auto body = BraceStmt::create(C, SourceLoc(),
-                                ASTNode(switchStmt),
-                                SourceLoc());
+  auto body = BraceStmt::create(C,
+                                SourceLoc(), ASTNode(switchStmt), SourceLoc(),
+                                SourceLoc(), SourceLoc(), /*implicit*/ true);
   toRawDecl->setBody(body);
 }
 
@@ -214,8 +215,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
     auto assignment = new (C) AssignExpr(selfRef, SourceLoc(), valueExpr,
                                          /*implicit*/ true);
     
-    auto body = BraceStmt::create(C, SourceLoc(),
-                                  ASTNode(assignment), SourceLoc());
+    auto body = BraceStmt::create(C,
+                                  SourceLoc(), ASTNode(assignment), SourceLoc(),
+                                  SourceLoc(), SourceLoc(), /*implicit*/ true);
 
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
@@ -228,8 +230,10 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
     CaseLabelItem(/*IsDefault=*/true, anyPat, SourceLoc(), nullptr);
 
   auto dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
-  auto dfltBody = BraceStmt::create(C, SourceLoc(),
-                                    ASTNode(dfltReturnStmt), SourceLoc());
+  auto dfltBody =
+      BraceStmt::create(C,
+                        SourceLoc(), ASTNode(dfltReturnStmt), SourceLoc(),
+                        SourceLoc(), SourceLoc(), /*implicit*/ true);
   cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem,
                                    /*HasBoundDecls=*/false, SourceLoc(),
                                    dfltBody));
@@ -238,9 +242,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), rawRef,
                                        SourceLoc(), cases, SourceLoc(), C);
-  auto body = BraceStmt::create(C, SourceLoc(),
-                                ASTNode(switchStmt),
-                                SourceLoc());
+  auto body = BraceStmt::create(C,
+                                SourceLoc(), ASTNode(switchStmt), SourceLoc(),
+                                SourceLoc(), SourceLoc(), /*implicit*/ true);
   initDecl->setBody(body);
 }
 

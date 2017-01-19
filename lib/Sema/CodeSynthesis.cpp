@@ -685,7 +685,8 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
   ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit);
 
   SourceLoc loc = storage->getLoc();
-  getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
+  getter->setBody(BraceStmt::create(ctx, SourceLoc(), returnStmt, SourceLoc(),
+                                    loc, loc, /*implicit*/ true));
 
   maybeMarkTransparent(getter, storage, TC);
  
@@ -706,7 +707,8 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
   SmallVector<ASTNode, 1> setterBody;
   createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storage,
                                             setterBody, TC);
-  setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc, true));
+  setter->setBody(BraceStmt::create(ctx, SourceLoc(), setterBody, SourceLoc(),
+                                    loc, loc, /*implicit*/ true));
 
   maybeMarkTransparent(setter, storage, TC);
 
@@ -970,7 +972,8 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
       makeFinal(Ctx, didSet);
   }
 
-  Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc, true));
+  Set->setBody(BraceStmt::create(Ctx, SourceLoc(), SetterBody, SourceLoc(),
+                                 Loc, Loc, /*implicit*/ true));
 }
 
 namespace {
@@ -1109,8 +1112,8 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
 
   Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
 
-  Get->setBody(BraceStmt::create(Ctx, VD->getLoc(), Body, VD->getLoc(),
-                                 /*implicit*/true));
+  Get->setBody(BraceStmt::create(Ctx, SourceLoc(), Body, SourceLoc(),
+                                 VD->getLoc(), VD->getLoc(), /*implicit*/true));
 
   return Get;
 }
@@ -1383,7 +1386,8 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   auto Ret = new (Context) ReturnStmt(SourceLoc(), apply,
                                       /*implicit*/ true);
   auto Body = BraceStmt::create(Context, SourceLoc(), ASTNode(Ret),
-                                SourceLoc(), /*implicit*/ true);
+                                SourceLoc(), SourceLoc(), SourceLoc(),
+                                /*implicit*/ true);
   Parameter->setBody(Body);
   
   typeCheckDecl(Parameter, true);
@@ -1488,7 +1492,7 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                                /*implicit*/ true);
     bodyStmts.push_back(returnStmt);
     auto body = BraceStmt::create(Context, SourceLoc(), bodyStmts, SourceLoc(),
-                                  /*implicit*/ true);
+                                  SourceLoc(), SourceLoc(), /*implicit*/ true);
     getter->setBody(body);
     getter->setBodyTypeCheckedIfPresent();
   }
@@ -1518,7 +1522,7 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
     
     bodyStmts.push_back(assign);
     auto body = BraceStmt::create(Context, SourceLoc(), bodyStmts, SourceLoc(),
-                                  /*implicit*/ true);
+                                  SourceLoc(), SourceLoc(), /*implicit*/ true);
     setter->setBody(body);
     setter->setBodyTypeCheckedIfPresent();
   }
@@ -1965,10 +1969,9 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
                                                        /*Implicit=*/true);
   Expr *call = CallExpr::createImplicit(tc.Context, fn, { className },
                                         { tc.Context.Id_className });
-  ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
-                                  ASTNode(call),
-                                  SourceLoc(),
-                                  /*implicit=*/true));
+  ctor->setBody(BraceStmt::create(tc.Context,
+                                  SourceLoc(), ASTNode(call), SourceLoc(),
+                                  SourceLoc(), SourceLoc(), /*implicit=*/true));
 
   // Note that this is a stub implementation.
   ctor->setStubImplementation(true);
@@ -2128,10 +2131,9 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
                                   /*implicit=*/true);
   }
-  ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
-                                  ASTNode(superCall),
-                                  SourceLoc(),
-                                  /*implicit=*/true));
+  ctor->setBody(BraceStmt::create(tc.Context,
+                                  SourceLoc(), ASTNode(superCall), SourceLoc(),
+                                  SourceLoc(), SourceLoc(), /*implicit=*/true));
 
   return ctor;
 }
@@ -2151,7 +2153,8 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   typeCheckDecl(DD, /*isFirstPass=*/true);
 
   // Create an empty body for the destructor.
-  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc(), true));
+  DD->setBody(BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+                                CD->getLoc(), CD->getLoc(), /*implicit*/ true));
   CD->addMember(DD);
   CD->setHasDestructor();
 }

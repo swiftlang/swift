@@ -451,7 +451,8 @@ public:
     }
 
     return swift::BraceStmt::create(Context, BS->getLBraceLoc(), Elements,
-                                    BS->getRBraceLoc());
+                                    BS->getRBraceLoc(), BS->getStartLoc(),
+                                    BS->getEndLoc(), BS->isImplicit());
   }
 
   std::pair<PatternBindingDecl *, VarDecl *>
@@ -508,7 +509,9 @@ public:
 
     Elements.insert(Elements.begin(), {*Before, *After});
     return swift::BraceStmt::create(Context, BS->getLBraceLoc(), Elements,
-                                    BS->getRBraceLoc());
+                                    BS->getRBraceLoc(),
+                                    BS->getStartLoc(), BS->getEndLoc(),
+                                    BS->isImplicit());
   }
 
   // Takes an existing Expr and builds an expr that calls before, stores the
@@ -659,7 +662,8 @@ public:
     ASTNode Elements[] = {*Apply};
 
     BraceStmt *BS =
-        BraceStmt::create(Context, SourceLoc(), Elements, SourceLoc(), true);
+        BraceStmt::create(Context, SourceLoc(), Elements, SourceLoc(),
+                          SourceLoc(), SourceLoc(), /*implicit*/ true);
 
     return BS;
   }

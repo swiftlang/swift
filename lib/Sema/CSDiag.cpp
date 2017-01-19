@@ -7558,7 +7558,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       // starts the closure body.
       auto insertString = " () -> " + resultTypeStr + " " + "in ";
       diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type)
-        .fixItInsertAfter(closure->getBody()->getLBraceLoc(), insertString);
+        .fixItInsertAfter(closure->getBody()->getStartLoc(), insertString);
       return true;
     }
   }

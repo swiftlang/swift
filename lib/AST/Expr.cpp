@@ -1874,7 +1874,9 @@ FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
 void AutoClosureExpr::setBody(Expr *E) {
   auto &Context = getASTContext();
   auto *RS = new (Context) ReturnStmt(SourceLoc(), E);
-  Body = BraceStmt::create(Context, E->getStartLoc(), { RS }, E->getEndLoc());
+  Body = BraceStmt::create(Context, SourceLoc(), { RS }, SourceLoc(),
+                           E->getStartLoc(), E->getEndLoc(),
+                           /*implicit*/ false);
 }
 
 Expr *AutoClosureExpr::getSingleExpressionBody() const {

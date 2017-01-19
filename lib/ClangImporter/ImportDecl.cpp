@@ -404,6 +404,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto assign = new (C) AssignExpr(selfRef, SourceLoc(), reinterpreted,
                                    /*implicit*/ true);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assign), SourceLoc(),
+                                SourceLoc(), SourceLoc(),
                                 /*implicit*/ true);
   
   ctorDecl->setBody(body);
@@ -465,6 +466,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                                                 { selfRef }, { Identifier() });
   auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                SourceLoc(), SourceLoc(),
                                 /*implicit*/ true);
   
   getterDecl->setBody(body);
@@ -524,6 +526,7 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
   auto coerce = new (C) CoerceExpr(storedRef, {}, {nullptr, computedType});
   auto ret = new (C) ReturnStmt(SourceLoc(), coerce);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                SourceLoc(), SourceLoc(),
                                 /*implicit*/ true);
   
   getterDecl->setBody(body);
@@ -680,6 +683,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
 
     auto ret = new (C) ReturnStmt(SourceLoc(), expr);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                  SourceLoc(), SourceLoc(),
                                   /*implicit*/ true);
     getterDecl->setBody(body);
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
@@ -705,6 +709,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
     auto assign = new (C) AssignExpr(lhs, SourceLoc(), rhs, /*implicit*/true);
 
     auto body = BraceStmt::create(C, SourceLoc(), { assign }, SourceLoc(),
+                                  SourceLoc(), SourceLoc(),
                                   /*implicit*/ true);
     setterDecl->setBody(body);
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
@@ -766,6 +771,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
                                                   { Identifier() });
     auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                  SourceLoc(), SourceLoc(),
                                   /*implicit*/ true);
     getterDecl->setBody(body);
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
@@ -800,6 +806,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
                                                { newValueRef, selfPointer },
                                                { Identifier(), Identifier() });
     auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
+                                  SourceLoc(), SourceLoc(),
                                   /*implicit*/ true);
     setterDecl->setBody(body);
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
@@ -1062,7 +1069,8 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
                                            /*implicit*/ true);
 
     // Create the function body.
-    auto body = BraceStmt::create(context, SourceLoc(), {assign}, SourceLoc());
+    auto body = BraceStmt::create(context, SourceLoc(), {assign}, SourceLoc(),
+                                  SourceLoc(), SourceLoc(), /*implicit*/ true);
     constructor->setBody(body);
   });
 
@@ -1165,7 +1173,8 @@ createValueConstructor(ClangImporter::Implementation &Impl,
     }
 
     // Create the function body.
-    auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc());
+    auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc(),
+                                  SourceLoc(), SourceLoc(), /*implicit*/ true);
     constructor->setBody(body);
   }
 
@@ -1281,7 +1290,8 @@ static ConstructorDecl *createRawValueBridgingConstructor(
     // Add assignment.
     auto assign = new (cxt) AssignExpr(lhs, SourceLoc(), rhs,
                                        /*Implicit=*/true);
-    auto body = BraceStmt::create(cxt, SourceLoc(), {assign}, SourceLoc());
+    auto body = BraceStmt::create(cxt, SourceLoc(), {assign}, SourceLoc(),
+                                  SourceLoc(), SourceLoc(), /*implicit*/ true);
     init->setBody(body);
   }
 
@@ -1607,14 +1617,11 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
     return false;
   }
 
-  bool isStatic = true;
-  bool isImplicit = true;
-
   DeclRefExpr *domainDeclRef = new (C)
-      DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
+      DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, /*implicit*/ true);
   ParameterList *params[] = {
       ParameterList::createWithoutLoc(
-          ParamDecl::createSelf(SourceLoc(), swiftDecl, isStatic)),
+          ParamDecl::createSelf(SourceLoc(), swiftDecl, /*static*/ true)),
       ParameterList::createEmpty(C)};
   auto toStringTy = ParameterList::getFullInterfaceType(stringTy, params, C);
 
@@ -1629,7 +1636,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
-      /*IsStatic*/isStatic, /*IsLet*/false, /*IsCaptureList*/false,
+      /*IsStatic*/true, /*IsLet*/false, /*IsCaptureList*/false,
       SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setAccessibility(Accessibility::Public);
@@ -1642,12 +1649,13 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                                         SourceLoc());
 
   getterDecl->setImplicit();
-  getterDecl->setStatic(isStatic);
+  getterDecl->setStatic(true);
   getterDecl->setAccessibility(Accessibility::Public);
 
   auto ret = new (C) ReturnStmt(SourceLoc(), domainDeclRef);
   getterDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), {ret}, SourceLoc(), isImplicit));
+      BraceStmt::create(C, SourceLoc(), {ret}, SourceLoc(), SourceLoc(),
+                        SourceLoc(), /*implicit*/ true));
   importer.registerExternalDecl(getterDecl);
   return true;
 }
@@ -7276,7 +7284,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     // Finally, set the body.
     func->setBody(BraceStmt::create(C, SourceLoc(),
                                     ASTNode(ret),
-                                    SourceLoc()));
+                                    SourceLoc(), SourceLoc(), SourceLoc(),
+                                    /*implicit*/ true));
   }
 
   // Mark the function transparent so that we inline it away completely.

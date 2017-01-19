@@ -2404,7 +2404,8 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // Set the body of the closure.
   closure->setBody(BraceStmt::create(Context, leftBrace, bodyElements,
-                                     rightBrace),
+                                     rightBrace, leftBrace, rightBrace,
+                                     /*implicit*/ false),
                    hasSingleExpressionBody);
 
   // If the closure includes a capture list, create an AST node for it as well.

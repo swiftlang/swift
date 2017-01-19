@@ -318,7 +318,7 @@ public:
     //  }
     if (auto FD = dyn_cast_or_null<FuncDecl>(Start.getAsDecl())) {
       if (FD->isGetter() && FD->getAccessorKeywordLoc().isInvalid()) {
-        if (SM.getLineNumber(FD->getBody()->getLBraceLoc()) == Line)
+        if (SM.getLineNumber(FD->getBody()->getStartLoc()) == Line)
           return false;
       }
     }
@@ -662,8 +662,8 @@ class FormatWalker : public SourceEntityWalker {
       }
     } else if (auto Call = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
       if (auto Clo = dyn_cast<ClosureExpr>(Call->getFn())) {
-        if (Clo->getBody()->getLBraceLoc() == TargetLocation ||
-            Clo->getBody()->getRBraceLoc() == TargetLocation) {
+        if (Clo->getBody()->getStartLoc() == TargetLocation ||
+            Clo->getBody()->getEndLoc() == TargetLocation) {
           return true;
         }
       }

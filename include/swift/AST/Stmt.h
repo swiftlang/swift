@@ -114,19 +114,25 @@ class BraceStmt final : public Stmt,
   SourceLoc LBLoc;
   SourceLoc RBLoc;
 
+  SourceLoc StartLoc;
+  SourceLoc EndLoc;
+
   BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elements,SourceLoc rbloc,
+            SourceLoc startLoc, SourceLoc endLoc,
             Optional<bool> implicit);
 
 public:
   static BraceStmt *create(ASTContext &ctx, SourceLoc lbloc,
                            ArrayRef<ASTNode> elements,
                            SourceLoc rbloc,
-                           Optional<bool> implicit = None);
+                           SourceLoc startLoc,
+                           SourceLoc endLoc,
+                           Optional<bool> implicit);
 
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
-  
-  SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
+
+  SourceRange getSourceRange() const { return SourceRange(StartLoc, EndLoc); }
 
   unsigned getNumElements() const { return NumElements; }
 

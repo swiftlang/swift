@@ -687,15 +687,15 @@ static void diagnoseAndMigrateVarParameterToBody(ParamDecl *decl,
   std::string start;
   std::string end;
   
-  auto lBraceLine = SM.getLineNumber(declBody->getLBraceLoc());
-  auto rBraceLine = SM.getLineNumber(declBody->getRBraceLoc());
+  auto startLine = SM.getLineNumber(declBody->getStartLoc());
+  auto endLine = SM.getLineNumber(declBody->getEndLoc());
 
   if (!declBody->getNumElements()) {
     
     // Empty function body.
     insertionStartLoc = declBody->getRBraceLoc();
     
-    if (lBraceLine == rBraceLine) {
+    if (startLine == endLine) {
       // Same line braces, means we probably have something
       // like {} as the func body. Insert directly into body with spaces.
       start = " ";
@@ -709,7 +709,7 @@ static void diagnoseAndMigrateVarParameterToBody(ParamDecl *decl,
   } else {
     auto firstLine = declBody->getElement(0);
     insertionStartLoc = firstLine.getStartLoc();
-    if (lBraceLine == SM.getLineNumber(firstLine.getStartLoc())) {
+    if (startLine == SM.getLineNumber(firstLine.getStartLoc())) {
       // Function on same line, insert with semi-colon. Not ideal but
       // better than weird space alignment.
       start = "";

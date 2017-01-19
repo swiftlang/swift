@@ -51,8 +51,7 @@ namespace swift {
     /// \brief get the underlying entity as a decl context if it is one,
     /// otherwise, return nullptr;
     DeclContext *getAsDeclContext() const;
-  };
-  
+  };  
 } // namespace swift
 
 namespace llvm {

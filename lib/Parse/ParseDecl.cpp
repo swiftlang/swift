@@ -3624,9 +3624,8 @@ static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
 bool Parser::parseGetSetImpl(ParseDeclOptions Flags, ParameterList *Indices,
                              TypeLoc ElementTy, ParsedAccessors &accessors,
                              SourceLoc &LastValidLoc, SourceLoc StaticLoc,
-                             SourceLoc VarLBLoc,
+                             const SourceLoc VarLBLoc,
                              SmallVectorImpl<Decl *> &Decls) {
-
   // Properties in protocols use sufficiently limited syntax that we have a
   // special parsing loop for them.  SIL mode uses the same syntax.
   if (Flags.contains(PD_InProtocol) || isInSILMode()) {
@@ -3812,7 +3811,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, ParameterList *Indices,
     auto *ValueNamePattern =
       parseOptionalAccessorArgument(Loc, ElementTy, *this, Kind);
 
-    SourceLoc LBLoc = isImplicitGet ? VarLBLoc : Tok.getLoc();
+    SourceLoc StartLoc = isImplicitGet ? VarLBLoc : Tok.getLoc();
+
     // FIXME: Use outer '{' loc if isImplicitGet.
     bool ExternalAsmName = false;
     if (!isImplicitGet && !consumeIf(tok::l_brace)) {
@@ -3849,19 +3849,28 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, ParameterList *Indices,
         if (!isDelayedParsingEnabled())
           parseBraceItems(Entries);
         else
-          consumeGetSetBody(TheDecl, LBLoc);
+          consumeGetSetBody(TheDecl, VarLBLoc);
       }
 
       SourceLoc RBLoc;
+      SourceLoc EndLoc;
       if (!isImplicitGet) {
-        parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                           LBLoc);
+        if (!parseMatchingToken(tok::r_brace, EndLoc,
+                                diag::expected_rbrace_in_getset, VarLBLoc)) {
+          RBLoc = EndLoc;
+        }
       } else {
-        RBLoc = Tok.is(tok::r_brace) ? Tok.getLoc() : PreviousLoc;
+        if (Tok.is(tok::r_brace)) {
+          RBLoc = Tok.getLoc();
+        }
+
+        EndLoc = Tok.is(tok::r_brace) ? Tok.getLoc() : PreviousLoc;
       }
 
       if (!isDelayedParsingEnabled()) {
-        BraceStmt *Body = BraceStmt::create(Context, LBLoc, Entries, RBLoc);
+        BraceStmt *Body = BraceStmt::create(Context, VarLBLoc, Entries, RBLoc,
+                                            StartLoc, EndLoc,
+                                            /*implicit*/ false);
         TheDecl->setBody(Body);
       }
       LastValidLoc = RBLoc;
@@ -3927,7 +3936,9 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
   parseBraceItems(Entries);
   BraceStmt *Body =
       BraceStmt::create(Context, AccessorParserState->LBLoc, Entries,
-                        Tok.getLoc());
+                        Tok.is(tok::r_brace) ? Tok.getLoc() : SourceLoc(),
+                        AccessorParserState->LBLoc,
+                        Tok.getLoc(), /*implicit*/ false);
   AFD->setBody(Body);
 }
 
@@ -4283,8 +4294,10 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     if (topLevelDecl) {
       PBD->setDeclContext(topLevelDecl);
       auto range = PBD->getSourceRange();
-      topLevelDecl->setBody(BraceStmt::create(Context, range.Start,
-                                              ASTNode(PBD), range.End, true));
+      topLevelDecl->setBody(BraceStmt::create(Context, SourceLoc(),
+                                              ASTNode(PBD), SourceLoc(),
+                                              range.Start, range.End,
+                                              /*implicit*/ true));
       Decls.insert(Decls.begin()+NumDeclsInResult, topLevelDecl);
       return;
     }

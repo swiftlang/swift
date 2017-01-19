@@ -46,9 +46,8 @@ static void deriveBodyBridgedNSError_enum_nsErrorDomain(
 
   auto string = new (C) StringLiteralExpr(value, SourceRange(), /*implicit*/ true);
   auto ret = new (C) ReturnStmt(SourceLoc(), string, /*implicit*/ true);
-  auto body = BraceStmt::create(C, SourceLoc(),
-                                ASTNode(ret),
-                                SourceLoc());
+  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                SourceLoc(), SourceLoc(), /*implicit*/ true);
   domainDecl->setBody(body);
 }
 

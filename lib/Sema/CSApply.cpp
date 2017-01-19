@@ -5184,6 +5184,8 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
                                        closureExpr->getStartLoc(),
                                        elements,
                                        closureExpr->getEndLoc(),
+                                       closureExpr->getStartLoc(),
+                                       closureExpr->getEndLoc(),
                                        /*implicit*/true);
     
     closureExpr->setImplicit();
@@ -5222,6 +5224,8 @@ ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) 
     auto braceStmt = BraceStmt::create(tc.Context,
                                        closureExpr->getStartLoc(),
                                        elements,
+                                       closureExpr->getEndLoc(),
+                                       closureExpr->getStartLoc(),
                                        closureExpr->getEndLoc(),
                                        /*implicit*/true);
 

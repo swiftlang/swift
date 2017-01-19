@@ -587,7 +587,8 @@ public:
 
     return swift::BraceStmt::create(Context, BS->getLBraceLoc(),
                                     Context.AllocateCopy(Elements),
-                                    BS->getRBraceLoc());
+                                    BS->getRBraceLoc(), BS->getStartLoc(),
+                                    BS->getEndLoc(), BS->isImplicit());
   }
 
   // log*() functions return a newly-created log expression to be inserted
@@ -878,7 +879,8 @@ public:
     ASTNode Elements[] = {PV.first, PV.second, SendDataCall};
 
     BraceStmt *BS =
-        BraceStmt::create(Context, SourceLoc(), Elements, SourceLoc(), true);
+        BraceStmt::create(Context, SourceLoc(), Elements, SourceLoc(),
+                          SourceLoc(), SourceLoc(), /*implicit*/ true);
 
     return BS;
   }
