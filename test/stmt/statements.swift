@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 /* block comments */
 /* /* nested too */ */
@@ -504,17 +504,51 @@ func bad_if() {
   if (x: 1) {} // expected-error {{'(x: Int)' is not convertible to 'Bool'}}
 }
 
-enum Crasher28653 {
-  case A(Int, () -> Int)
-  case B(() -> Int)
-  case C(() -> Int)
+struct WithClosure : Equatable {
+  init(_ fn: () -> Int) {}
+  init(_: Int, _ fn: () -> Int) {}
+  static func A(_: Int, _ fn: () -> Int) -> WithClosure { return self.init(fn) }
+  static func B(_ fn: () -> Int) -> WithClosure { return self.init(fn) }
+  static func C(_ fn: () -> Int) -> WithClosure { return self.init(fn) }
+
+  static func ==(lhs: WithClosure, rhs: WithClosure) -> Bool {
+    return true;
+  }
 }
 
+// Trailing closure in expression pattern is allowed.
+func testStmtCaseWithTrailingClosure(x: WithClosure) {
+  typealias S = WithClosure
+  switch x {
+    case S(1) { 2 }: break // Ok.
+    case S() { 3 }: break // Ok.
+    case S { 4 }: break // Ok.
+    case S.A(1) { 2 }: break // Ok.
+    case S.B() { 3 }: break // Ok.
+    case S.C { 4 }: break // Ok.
+    default: break
+  }
+}
+
+enum Crasher28653 {
+  struct S {
+    static func ~=(pattern: () -> Int, val: S) -> Bool { return true }
+  }
+  case A(Int, S)
+  case B(S)
+  case C(S)
+}
+
+// Trailing closure as a pattern is not allowed.
 func testEnumPatternWithTrailingClosure(e: Crasher28653) {
+  typealias E = Crasher28653
   switch e {
-    case .A(1) { 2 }: break // expected-error {{expression pattern of type '() -> Int' cannot match values of type '() -> Int'}}
-    case .B() { 3 }: break // expected-error {{expression pattern of type '() -> Int' cannot match values of type '() -> Int'}}
-    case .C { 4 }: break // expected-error {{expression pattern of type '() -> Int' cannot match values of type '() -> Int'}}
+    case .A(1) { 2 }: break // expected-error {{trailing closure as a pattern is not allowed}}
+    case .B() { 3 }: break// expected-error {{trailing closure as a pattern is not allowed}}
+    case .C { 4 }: break // expected-error {{trailing closure as a pattern is not allowed}}
+    case E.A(1) { 2 }: break // expected-error {{trailing closure as a pattern is not allowed}}
+    case E.B() { 3 }: break // expected-error {{trailing closure as a pattern is not allowed}}
+    case E.C { 4 }: break // expected-error {{trailing closure as a pattern is not allowed}}
     default: break
   }
 }

@@ -399,9 +399,22 @@ public:
     // We the unresolved member has an argument, turn it into a subpattern.
     Pattern *subPattern = nullptr;
     if (auto arg = ume->getArgument()) {
+
+      if (ume->hasTrailingClosure() && !TC.Context.isSwiftVersion3()) {
+        // Emit an error for trailing closure in EnumElementPattern.
+        SourceLoc closureLoc;
+        if (auto PE = dyn_cast<ParenExpr>(arg))
+          closureLoc = PE->getSubExpr()->getLoc();
+        else if (auto TE = dyn_cast<TupleExpr>(arg))
+          closureLoc = TE->getElements().back()->getLoc();
+        else
+          llvm_unreachable("unexpected arg expr");
+        TC.diagnose(closureLoc, diag::trailing_closure_pattern);
+      }
+
       subPattern = getSubExprPattern(arg);
     }
-    
+
     // FIXME: Compound names.
     return new (TC.Context) EnumElementPattern(
                               TypeLoc(), ume->getDotLoc(),
@@ -571,7 +584,20 @@ public:
         .fixItRemove(generic->getAngleBrackets());
     }
 
-    auto *subPattern = getSubExprPattern(ce->getArg());
+    auto arg = ce->getArg();
+    if (ce->hasTrailingClosure() && !TC.Context.isSwiftVersion3()) {
+      // Emit an error for trailing closure in EnumElementPattern.
+      SourceLoc closureLoc;
+      if (auto PE = dyn_cast<ParenExpr>(arg))
+        closureLoc = PE->getSubExpr()->getLoc();
+      else if (auto TE = dyn_cast<TupleExpr>(arg))
+        closureLoc = TE->getElements().back()->getLoc();
+      else
+        llvm_unreachable("unexpected arg expr");
+      TC.diagnose(closureLoc, diag::trailing_closure_pattern);
+    }
+
+    auto *subPattern = getSubExprPattern(arg);
     return new (TC.Context) EnumElementPattern(loc,
                                                SourceLoc(),
                                                tailComponent->getIdLoc(),
