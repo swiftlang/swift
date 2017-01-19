@@ -39,11 +39,10 @@ func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 // CHECK-GENERIC-LABEL: .typoAssoc4@
 // CHECK-GENERIC-NEXT: Requirements:
 // CHECK-GENERIC-NEXT:   T : P2 [explicit
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2 == T[.P2].AssocP2 [redundant]
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2 : P1 [protocol
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc == T[.P2].AssocP2[.P1].Assoc [redundant
+// CHECK-GENERIC-NEXT:   T[.P2].AssocP2 == T[.P2].AssocP2 [redundant]
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc : P3 [explicit
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc == T[.P2].AssocP2[.P1].Assoc [redundant]
+// CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc == T[.P2].AssocP2[.P1].Assoc [redundant
 // CHECK-GENERIC-NEXT: Generic signature
 
 // <rdar://problem/19620340>
@@ -73,7 +72,6 @@ protocol Pattern {
   associatedtype Element : Equatable
   
   // FIXME: Diagnostics here are very poor
-  // expected-error@+4{{'C.Slice' does not have a member type named 'Iterator'; did you mean 'Slice'?}}
   // expected-error@+3{{'C' does not have a member type named 'Iterator'; did you mean 'Slice'?}}
   // expected-error@+2{{'C.Slice' does not have a member type named 'Element'; did you mean 'Slice'?}}
   // expected-error@+1{{'C.Slice' does not have a member type named 'Iterator'; did you mean 'Slice'?}}

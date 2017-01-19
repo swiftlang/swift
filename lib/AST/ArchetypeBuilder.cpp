@@ -402,35 +402,46 @@ static int compareDependentTypes(
       if (int compareProtocols
             = ProtocolType::compareProtocols(&protoa, &protob))
         return compareProtocols;
+
+      // Error case: if we have two associated types with the same name in the
+      // same protocol, just tie-break based on address.
+      if (aa != ab)
+        return aa < ab ? -1 : +1;
     } else {
       // A resolved archetype is always ordered before an unresolved one.
       return -1;
     }
+  } else {
+    // A resolved archetype is always ordered before an unresolved one.
+    if (b->getResolvedAssociatedType())
+      return +1;
   }
-
-  // A resolved archetype is always ordered before an unresolved one.
-  if (b->getResolvedAssociatedType())
-    return +1;
 
   // Make sure typealiases are properly ordered, to avoid crashers.
   // FIXME: Ideally we would eliminate typealiases earlier.
   if (auto *aa = a->getTypeAliasDecl()) {
     if (auto *ab = b->getTypeAliasDecl()) {
       // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
-      auto protoa = aa->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-      auto protob = ab->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      auto protoa =
+        aa->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      auto protob =
+        ab->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+
       if (int compareProtocols
             = ProtocolType::compareProtocols(&protoa, &protob))
         return compareProtocols;
+
+      // FIXME: Arbitrarily break the result here.
+      if (aa != ab)
+        return aa < ab ? -1 : +1;
+    } else {
+      // A resolved archetype is always ordered before an unresolved one.
+      return -1;
     }
-
+  } else if (b->getTypeAliasDecl()) {
     // A resolved archetype is always ordered before an unresolved one.
-    return -1;
-  }
-
-  // A resolved archetype is always ordered before an unresolved one.
-  if (b->getTypeAliasDecl())
     return +1;
+  }
 
   // Along the error path where one or both of the potential archetypes was
   // renamed due to typo correction,
@@ -567,6 +578,12 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   }
 
   return nested.front();
+}
+
+auto ArchetypeBuilder::PotentialArchetype::getNestedType(
+                            AssociatedTypeDecl *assocType,
+                            ArchetypeBuilder &builder) -> PotentialArchetype * {
+  return getNestedType(assocType->getName(), builder);
 }
 
 Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
@@ -913,6 +930,9 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
     if (!base)
       return nullptr;
 
+    if (auto assocType = dependentMember->getAssocType())
+      return base->getNestedType(assocType, *this);
+
     return base->getNestedType(dependentMember->getName(), *this);
   }
 
@@ -1003,7 +1023,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   for (auto Member : Proto->getMembers()) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
-      auto AssocPA = T->getNestedType(AssocType->getName(), *this);
+      auto AssocPA = T->getNestedType(AssocType, *this);
       if (AssocPA != T) {
         if (addAbstractTypeParamRequirements(AssocType, AssocPA,
                                              RequirementSource::Protocol,

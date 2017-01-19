@@ -389,10 +389,16 @@ getSubstitutions(TypeSubstitutionFn subs,
     for (auto req: reqs) {
       assert(req.getKind() == RequirementKind::Conformance);
       auto protoType = req.getSecondType()->castTo<ProtocolType>();
-      // TODO: Error handling for failed conformance lookup.
-      currentConformances.push_back(
-        *lookupConformance(depTy->getCanonicalType(), currentReplacement,
-                           protoType));
+      if (auto conformance = lookupConformance(depTy->getCanonicalType(),
+                                               currentReplacement,
+                                               protoType)) {
+        currentConformances.push_back(*conformance);
+      } else {
+        if (!currentReplacement->hasError())
+          currentReplacement = ErrorType::get(currentReplacement);
+        currentConformances.push_back(
+                                  ProtocolConformanceRef(protoType->getDecl()));
+      }
     }
 
     // Add it to the final substitution list.
@@ -605,21 +611,22 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type,
     return CanType(type);
 
   // Replace non-canonical type parameters.
-  type = type.transform([&](Type component) -> Type {
-    if (!component->isTypeParameter()) return component;
+  type = type.transformRec([&](TypeBase *component) -> Optional<Type> {
+    if (!isa<GenericTypeParamType>(component) &&
+        !isa<DependentMemberType>(component))
+      return None;
 
     // Resolve the potential archetype.  This can be null in nested generic
     // types, which we can't immediately canonicalize.
-    auto pa = builder.resolveArchetype(component);
-    if (!pa) return component;
+    auto pa = builder.resolveArchetype(Type(component));
+    if (!pa) return None;
 
     auto rep = pa->getArchetypeAnchor();
     if (rep->isConcreteType()) {
       return getCanonicalTypeInContext(rep->getConcreteType(), builder);
-    } else {
-      return rep->getDependentType(getGenericParams(),
-                                   /*allowUnresolved*/ false);
     }
+
+    return rep->getDependentType(getGenericParams(), /*allowUnresolved*/ false);
   });
   
   auto result = type->getCanonicalType();
