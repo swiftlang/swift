@@ -1496,6 +1496,7 @@ ${operationComment(x.operator)}
 }
 
 extension BinaryInteger {
+  @_transparent
   public init() {
     self = 0
   }
