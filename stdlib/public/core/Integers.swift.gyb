@@ -1003,7 +1003,7 @@ ${mutatingOperationComment(x.operator)}
 % end
 }
 
-% for Protocol in ['FloatingPoint']: #['Arithmetic', 'BinaryInteger', 'FloatingPoint']:
+% for Protocol in ['Arithmetic']:#, 'BinaryInteger', 'FloatingPoint']:
 % # Explicitly providing these operations for BinaryInteger and FloatingPoint
 % # protocols because Strideable conformance creates ambiguity if the
 % # operationsare only defined for Arithmetic
