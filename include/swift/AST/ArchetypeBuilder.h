@@ -640,17 +640,10 @@ public:
   /// Note that we already diagnosed this rename.
   void setAlreadyDiagnosedRename() { DiagnosedRename = true; }
 
-  /// Whether this potential archetype makes a better archetype anchor than
-  /// the given archetype anchor.
-  bool isBetterArchetypeAnchor(PotentialArchetype *other) const;
-
   void dump(llvm::raw_ostream &Out, SourceManager *SrcMgr,
             unsigned Indent);
 
   friend class ArchetypeBuilder;
-
-private:
-  bool hasConcreteTypeInPath() const;
 };
 
 } // end namespace swift
