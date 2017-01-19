@@ -2977,8 +2977,6 @@ static bool emitOptimizedOptionalEvaluation(OptionalEvaluationExpr *E,
                                         ->getSemanticsProvidingExpr());
   if (!BO || BO->getDepth() != 0) return false;
   
-  auto &optTL = SGF.getTypeLowering(E->getType());
-
   // If the subexpression type is exactly the same, then just peephole the
   // whole thing away.
   if (BO->getSubExpr()->getType()->isEqual(E->getType())) {
@@ -2997,17 +2995,7 @@ static bool emitOptimizedOptionalEvaluation(OptionalEvaluationExpr *E,
   // address only or because we have a contextual memory location to
   // initialize).
   if (optInit == nullptr) {
-    auto subMV = SGF.emitRValueAsSingleValue(BO->getSubExpr());
-    SILValue result;
-    if (optTL.isTrivial())
-      result = SGF.B.createUncheckedTrivialBitCast(E, subMV.forward(SGF),
-                                                   optTL.getLoweredType());
-    else
-      // The optional object type is the same, so we assume the optional types
-      // are layout identical, allowing the use of unchecked bit casts.
-      result = SGF.B.createUncheckedBitCast(E, subMV.forward(SGF),
-                                            optTL.getLoweredType());
-    LoadableResult = result;
+    LoadableResult = SGF.emitRValueAsSingleValue(BO->getSubExpr()).forward(SGF);
     return true;
   }
   
@@ -3017,11 +3005,7 @@ static bool emitOptimizedOptionalEvaluation(OptionalEvaluationExpr *E,
   SILValue optAddr = getAddressForInPlaceInitialization(optInit);
   assert(optAddr && "Caller should have provided a buffer");
   
-  auto &subTL = SGF.getTypeLowering(BO->getSubExpr()->getType());
-  SILValue subAddr = SGF.B.createUncheckedAddrCast(E, optAddr,
-                                 subTL.getLoweredType().getAddressType());
-  
-  KnownAddressInitialization subInit(subAddr);
+  KnownAddressInitialization subInit(optAddr);
   SGF.emitExprInto(BO->getSubExpr(), &subInit);
   optInit->finishInitialization(SGF);
   return true;
