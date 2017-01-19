@@ -78,7 +78,7 @@ static bool isOpenedAnyObject(Type type) {
 }
 
 Type Solution::computeSubstitutions(
-       Type origType, DeclContext *dc,
+       GenericSignature *sig,
        Type openedType,
        ConstraintLocator *locator,
        SmallVectorImpl<Substitution> &result) const {
@@ -95,13 +95,6 @@ Type Solution::computeSubstitutions(
   for (const auto &opened : openedTypes->second) {
     subs[opened.first->castTo<GenericTypeParamType>()] =
       getFixedType(opened.second);
-  }
-
-  GenericSignature *sig;
-  if (auto genericFn = origType->getAs<GenericFunctionType>()) {
-    sig = genericFn->getGenericSignature();
-  } else {
-    sig = dc->getGenericSignatureOfContext();
   }
 
   auto lookupConformanceFn =
@@ -483,11 +476,9 @@ namespace {
       // specialized reference to it.
       if (auto genericFn
             = decl->getInterfaceType()->getAs<GenericFunctionType>()) {
-        auto dc = decl->getInnermostDeclContext();
-
         SmallVector<Substitution, 4> substitutions;
         auto type = solution.computeSubstitutions(
-                      genericFn, dc, openedType,
+                      genericFn->getGenericSignature(), openedType,
                       getConstraintSystem().getConstraintLocator(locator),
                       substitutions);
         auto declRefExpr =
@@ -788,19 +779,14 @@ namespace {
       // reference itself.
       ConcreteDeclRef memberRef;
       Type refTy;
-      if (member->getInterfaceType()->is<GenericFunctionType>() ||
-          openedFullType->hasTypeVariable()) {
+      if (auto *sig = member->getInnermostDeclContext()
+              ->getGenericSignatureOfContext()) {
         // We require substitutions. Figure out what they are.
-
-        // Figure out the declaration context where we'll get the generic
-        // parameters.
-        auto dc = member->getInnermostDeclContext();
 
         // Build a reference to the generic member.
         SmallVector<Substitution, 4> substitutions;
         refTy = solution.computeSubstitutions(
-                  member->getInterfaceType(),
-                  dc,
+                  sig,
                   openedFullType,
                   getConstraintSystem().getConstraintLocator(memberLocator),
                   substitutions);
@@ -1316,14 +1302,12 @@ namespace {
       }
 
       // Handle subscripting of generics.
-      if (subscript->getDeclContext()->isGenericContext()) {
-        auto dc = subscript->getDeclContext();
-
+      auto *dc = subscript->getInnermostDeclContext();
+      if (auto *sig = dc->getGenericSignatureOfContext()) {
         // Compute the substitutions used to reference the subscript.
         SmallVector<Substitution, 4> substitutions;
         solution.computeSubstitutions(
-          subscript->getInterfaceType(),
-          dc,
+          sig,
           selected->openedFullType,
           getConstraintSystem().getConstraintLocator(
             locator.withPathElement(ConstraintLocator::SubscriptMember)),
@@ -1387,12 +1371,11 @@ namespace {
       // Compute the concrete reference.
       ConcreteDeclRef ref;
       Type resultTy;
-      if (ctor->getInitializerInterfaceType()->is<GenericFunctionType>()) {
+      if (auto *sig = ctor->getGenericSignature()) {
         // Compute the reference to the generic constructor.
         SmallVector<Substitution, 4> substitutions;
         resultTy = solution.computeSubstitutions(
-                     ctor->getInterfaceType(),
-                     ctor,
+                     sig,
                      openedFullType,
                      getConstraintSystem().getConstraintLocator(locator),
                      substitutions);
@@ -4078,12 +4061,11 @@ ConcreteDeclRef Solution::resolveLocatorToDecl(
             },
             [&](ValueDecl *decl, Type openedType, ConstraintLocator *locator)
                   -> ConcreteDeclRef {
-              if (decl->getInnermostDeclContext()->isGenericContext()) {
+              if (auto *sig = decl->getInnermostDeclContext()
+                      ->getGenericSignatureOfContext()) {
                 SmallVector<Substitution, 4> subs;
                 computeSubstitutions(
-                  decl->getInterfaceType(),
-                  decl->getInnermostDeclContext(),
-                  openedType, locator, subs);
+                  sig, openedType, locator, subs);
                 return ConcreteDeclRef(cs.getASTContext(), decl, subs);
               }
               

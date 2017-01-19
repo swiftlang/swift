@@ -1284,8 +1284,8 @@ matchWitness(TypeChecker &tc,
       auto witnessDC = witness->getInnermostDeclContext();
 
       // Compute the set of substitutions we'll need for the witness.
-      solution->computeSubstitutions(witness->getInterfaceType(),
-                                     witnessDC, openedFullWitnessType,
+      solution->computeSubstitutions(witnessDC->getGenericSignatureOfContext(),
+                                     openedFullWitnessType,
                                      witnessLocator,
                                      result.WitnessSubstitutions);
     }
