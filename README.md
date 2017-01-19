@@ -49,7 +49,7 @@ discussed below.
 
 ### System Requirements
 
-macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
+macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the currently
 supported host development operating systems.
 
 For macOS, you need [the latest Xcode](https://developer.apple.com/xcode/downloads/).
@@ -65,7 +65,7 @@ Ubuntu 14.04 LTS is no longer supported. Unsupported build instructions for Ubun
 
 ### Getting Sources for Swift and Related Projects
 
-First create a directory for all of the Swift sources:
+First, create a directory for all of the Swift sources:
 
     mkdir swift-source
     cd swift-source
