@@ -402,35 +402,46 @@ static int compareDependentTypes(
       if (int compareProtocols
             = ProtocolType::compareProtocols(&protoa, &protob))
         return compareProtocols;
+
+      // Error case: if we have two associated types with the same name in the
+      // same protocol, just tie-break based on address.
+      if (aa != ab)
+        return aa < ab ? -1 : +1;
     } else {
       // A resolved archetype is always ordered before an unresolved one.
       return -1;
     }
+  } else {
+    // A resolved archetype is always ordered before an unresolved one.
+    if (b->getResolvedAssociatedType())
+      return +1;
   }
-
-  // A resolved archetype is always ordered before an unresolved one.
-  if (b->getResolvedAssociatedType())
-    return +1;
 
   // Make sure typealiases are properly ordered, to avoid crashers.
   // FIXME: Ideally we would eliminate typealiases earlier.
   if (auto *aa = a->getTypeAliasDecl()) {
     if (auto *ab = b->getTypeAliasDecl()) {
       // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
-      auto protoa = aa->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-      auto protob = ab->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      auto protoa =
+        aa->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      auto protob =
+        ab->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+
       if (int compareProtocols
             = ProtocolType::compareProtocols(&protoa, &protob))
         return compareProtocols;
+
+      // FIXME: Arbitrarily break the result here.
+      if (aa != ab)
+        return aa < ab ? -1 : +1;
+    } else {
+      // A resolved archetype is always ordered before an unresolved one.
+      return -1;
     }
-
+  } else if (b->getTypeAliasDecl()) {
     // A resolved archetype is always ordered before an unresolved one.
-    return -1;
-  }
-
-  // A resolved archetype is always ordered before an unresolved one.
-  if (b->getTypeAliasDecl())
     return +1;
+  }
 
   // Along the error path where one or both of the potential archetypes was
   // renamed due to typo correction,
