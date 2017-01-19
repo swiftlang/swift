@@ -350,14 +350,6 @@ auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
   return Result;
 }
 
-bool ArchetypeBuilder::PotentialArchetype::hasConcreteTypeInPath() const {
-  for (auto pa = this; pa; pa = pa->getParent()) {
-    if (pa->isConcreteType()) return true;
-  }
-
-  return false;
-}
-
 /// Canonical ordering for dependent types in generic signatures.
 static int compareDependentTypes(
                              ArchetypeBuilder::PotentialArchetype * const* pa,
@@ -452,17 +444,31 @@ static int compareDependentTypes(
   llvm_unreachable("potential archetype total order failure");
 }
 
-bool ArchetypeBuilder::PotentialArchetype::isBetterArchetypeAnchor(
-       PotentialArchetype *other) const {
+/// Determine whether there is a concrete type anywhere in the path to the root.
+static bool hasConcreteTypeInPath(
+                               const ArchetypeBuilder::PotentialArchetype *pa) {
+  for (; pa; pa = pa->getParent()) {
+    if (pa->isConcreteType()) return true;
+  }
+
+  return false;
+}
+
+/// Whether this potential archetype makes a better archetype anchor than
+/// the given archetype anchor.
+static bool isBetterArchetypeAnchor(
+                              const ArchetypeBuilder::PotentialArchetype *pa,
+                              const ArchetypeBuilder::PotentialArchetype *pb) {
   // If one potential archetype has a concrete type in its path but the other
   // does not, prefer the one that does not.
-  auto concrete = hasConcreteTypeInPath();
-  auto otherConcrete = other->hasConcreteTypeInPath();
-  if (concrete != otherConcrete)
-    return otherConcrete;
+  auto aConcrete = hasConcreteTypeInPath(pa);
+  auto bConcrete = hasConcreteTypeInPath(pb);
+  if (aConcrete != bConcrete)
+    return bConcrete;
 
-  auto self = const_cast<PotentialArchetype *>(this);
-  return compareDependentTypes(&self, &other) < 0;
+  auto mutablePA = const_cast<ArchetypeBuilder::PotentialArchetype *>(pa);
+  auto mutablePB = const_cast<ArchetypeBuilder::PotentialArchetype *>(pb);
+  return compareDependentTypes(&mutablePA, &mutablePB) < 0;
 }
 
 auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
@@ -472,15 +478,15 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
   PotentialArchetype *rep = getRepresentative();
   auto best = rep;
   for (auto pa : rep->getEquivalenceClass()) {
-    if (pa->isBetterArchetypeAnchor(best))
+    if (isBetterArchetypeAnchor(pa, best))
       best = pa;
   }
 
 #ifndef NDEBUG
   // Make sure that we did, in fact, get one that is better than all others.
   for (auto pa : rep->getEquivalenceClass()) {
-    assert((pa == best || best->isBetterArchetypeAnchor(pa)) &&
-           !pa->isBetterArchetypeAnchor(best) &&
+    assert((pa == best || isBetterArchetypeAnchor(best, pa)) &&
+           !isBetterArchetypeAnchor(pa, best) &&
            "archetype anchor isn't a total order");
   }
 #endif
