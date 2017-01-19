@@ -85,7 +85,7 @@ Type Solution::computeSubstitutions(
   auto &tc = getConstraintSystem().getTypeChecker();
 
   // Produce the concrete form of the opened type.
-  Type type = simplifyType(tc, openedType);
+  Type type = simplifyType(openedType);
 
   // Gather the substitutions from dependent types to concrete types.
   auto openedTypes = OpenedTypes.find(locator);
@@ -816,7 +816,7 @@ namespace {
       Type containerTy =
           openedFullType->castTo<FunctionType>()
               ->getInput()->getRValueInstanceType();
-      containerTy = solution.simplifyType(tc, containerTy);
+      containerTy = solution.simplifyType(containerTy);
 
       // If we opened up an existential when referencing this member, update
       // the base accordingly.
@@ -1116,7 +1116,7 @@ namespace {
     /// \brief Simplify the given type by substituting all occurrences of
     /// type variables for their fixed types.
     Type simplifyType(Type type) {
-      return solution.simplifyType(cs.getTypeChecker(), type);
+      return solution.simplifyType(type);
     }
 
   public:
@@ -1316,7 +1316,7 @@ namespace {
         // Convert the base.
         auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
         auto openedBaseType = openedFullFnType->getInput();
-        containerTy = solution.simplifyType(tc, openedBaseType);
+        containerTy = solution.simplifyType(openedBaseType);
         base = coerceObjectArgumentToType(
             base, containerTy, subscript, AccessSemantics::Ordinary,
             locator.withPathElement(ConstraintLocator::MemberRefBase));
@@ -6890,7 +6890,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
 
   case FixKind::ForceOptional: {
     const Expr *unwrapped = affected->getValueProvidingExpr();
-    auto type = solution.simplifyType(TC, getType(affected))
+    auto type = solution.simplifyType(getType(affected))
                   ->getRValueObjectType();
 
     if (auto tryExpr = dyn_cast<OptionalTryExpr>(unwrapped)) {
@@ -6916,7 +6916,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   }
           
   case FixKind::OptionalChaining: {
-    auto type = solution.simplifyType(TC, getType(affected))
+    auto type = solution.simplifyType(getType(affected))
                 ->getRValueObjectType();
     auto diag = TC.diagnose(affected->getLoc(),
                             diag::missing_unwrap_optional, type);
@@ -6925,10 +6925,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   }
 
   case FixKind::ForceDowncast: {
-    auto fromType = solution.simplifyType(TC, getType(affected))
+    auto fromType = solution.simplifyType(getType(affected))
                       ->getRValueObjectType();
-    Type toType = solution.simplifyType(TC,
-                                        fix.first.getTypeArgument(*this));
+    Type toType = solution.simplifyType(fix.first.getTypeArgument(*this));
     bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
     bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType,
                                                         DC);
@@ -6963,7 +6962,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   }
 
   case FixKind::AddressOf: {
-    auto type = solution.simplifyType(TC, getType(affected))
+    auto type = solution.simplifyType(getType(affected))
                   ->getRValueObjectType();
     TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
       .fixItInsert(affected->getStartLoc(), "&");
@@ -6974,9 +6973,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
       Expr *subExpr = coerceExpr->getSubExpr();
       auto fromType =
-        solution.simplifyType(TC, getType(subExpr))->getRValueType();
+        solution.simplifyType(getType(subExpr))->getRValueType();
       auto toType =
-        solution.simplifyType(TC, coerceExpr->getCastTypeLoc().getType());
+        solution.simplifyType(coerceExpr->getCastTypeLoc().getType());
       auto castKind = TC.typeCheckCheckedCast(
                         fromType, toType, CheckedCastContextKind::None, DC,
                         coerceExpr->getLoc(), subExpr,
