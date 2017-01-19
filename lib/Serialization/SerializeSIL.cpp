@@ -373,11 +373,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   for (auto *SA : F.getSpecializeAttrs()) {
     unsigned specAttrAbbrCode = SILAbbrCodes[SILSpecializeAttrLayout::Code];
-
-    auto subs = SA->getSubstitutions();
-    SILSpecializeAttrLayout::emitRecord(
-      Out, ScratchRecord, specAttrAbbrCode, (unsigned)subs.size());
-    S.writeSubstitutions(subs, SILAbbrCodes);
+    SILSpecializeAttrLayout::emitRecord(Out, ScratchRecord, specAttrAbbrCode,
+                                        (unsigned)SA->isExported(),
+                                        (unsigned)SA->getSpecializationKind());
+    S.writeGenericRequirements(SA->getRequirements(), SILAbbrCodes);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -1942,6 +1941,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<decls_block::NormalProtocolConformanceIdLayout>();
   registerSILAbbr<decls_block::ProtocolConformanceXrefLayout>();
   registerSILAbbr<decls_block::GenericRequirementLayout>();
+  registerSILAbbr<decls_block::LayoutRequirementLayout>();
 
   for (const SILGlobalVariable &g : SILMod->getSILGlobals())
     writeSILGlobalVar(g);

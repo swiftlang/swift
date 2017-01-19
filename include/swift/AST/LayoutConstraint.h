@@ -48,7 +48,7 @@ enum class LayoutConstraintKind : unsigned char {
 /// This is a class representing the layout constraint.
 class LayoutConstraintInfo {
   // Alignment of the layout in bytes.
-  unsigned Alignment;
+  unsigned Alignment : 16;
   // Size of the layout in bits.
   unsigned SizeInBits : 24;
   // Kind of the layout.
@@ -258,7 +258,7 @@ public:
 /// Checks if ID is a name of a layout constraint and returns this
 /// constraint. If ID does not match any known layout constraint names,
 /// returns UnknownLayout.
-LayoutConstraintInfo getLayoutConstraintInfo(Identifier ID);
+LayoutConstraintInfo getLayoutConstraintInfo(Identifier ID, ASTContext &Ctx);
 
 } // end namespace swift
 

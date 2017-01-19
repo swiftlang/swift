@@ -1173,8 +1173,9 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   
   if (concrete1 && concrete2) {
     if (!concrete1->isEqual(concrete2)) {
+      StringRef Name = T1->getFullName();
       Diags.diagnose(Source.getLoc(), diag::requires_same_type_conflict,
-                     T1->getName(), concrete1, concrete2);
+                     Name, concrete1, concrete2);
       return true;
       
     }
@@ -1245,8 +1246,9 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   // problem.
   if (auto oldConcrete = T->getConcreteType()) {
     if (!oldConcrete->isEqual(Concrete)) {
+      StringRef Name = T->getFullName();
       Diags.diagnose(Source.getLoc(), diag::requires_same_type_conflict,
-                     T->getName(), oldConcrete, Concrete);
+                     Name, oldConcrete, Concrete);
       return true;
     }
     return false;

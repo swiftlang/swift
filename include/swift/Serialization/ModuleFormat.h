@@ -254,6 +254,18 @@ using GenericRequirementKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
+enum LayoutRequirementKind : uint8_t {
+  UnknownLayout = 0,
+  TrivialOfExactSize = 1,
+  TrivialOfAtMostSize = 2,
+  Trivial = 3,
+  RefCountedObject = 4,
+  NativeRefCountedObject = 5,
+};
+using LayoutRequirementKindField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
 enum Associativity : uint8_t {
   NonAssociative = 0,
   LeftAssociative,
@@ -1102,6 +1114,14 @@ namespace decls_block {
     TypeIDField                  // same-type; one for value witness marker)
   >;
 
+  using LayoutRequirementLayout = BCRecordLayout<
+    LAYOUT_REQUIREMENT,
+    LayoutRequirementKindField,  // requirement kind
+    TypeIDField,                 // type being constrained
+    BCFixed<24>,                 // size
+    BCFixed<32>                  // alignment
+  >;
+
   /// Specifies the private discriminator string for a private declaration. This
   /// identifies the declaration's original source file in some opaque way.
   using PrivateDiscriminatorLayout = BCRecordLayout<
@@ -1351,7 +1371,8 @@ namespace decls_block {
 
   using SpecializeDeclAttrLayout = BCRecordLayout<
     Specialize_DECL_ATTR,
-    BCArray<TypeIDField> // concrete types
+    BCFixed<1>, // exported flag
+    BCFixed<1> // specialization kind
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \

@@ -889,15 +889,6 @@ void ModuleFile::readGenericRequirements(
                                            subject, constraint));
         break;
       }
-      case GenericRequirementKind::Layout: {
-        auto subject = getType(rawTypeIDs[0]);
-        // TODO: Deserialize the layout constraint.
-        LayoutConstraint layoutConstraint;
-
-        requirements.push_back(Requirement(RequirementKind::Layout,
-                                           subject, layoutConstraint));
-        break;
-      }
       case GenericRequirementKind::Superclass: {
         auto subject = getType(rawTypeIDs[0]);
         auto constraint = getType(rawTypeIDs[1]);
@@ -919,6 +910,61 @@ void ModuleFile::readGenericRequirements(
         // an error so that we don't actually try to generate code.
         error();
       }
+      break;
+      }
+    case LAYOUT_REQUIREMENT: {
+      uint8_t rawKind;
+      uint64_t rawTypeID;
+      uint32_t size;
+      uint32_t alignment;
+      LayoutRequirementLayout::readRecord(scratch, rawKind, rawTypeID,
+                                          size, alignment);
+
+      auto first = getType(rawTypeID);
+      LayoutConstraintInfo layoutInfo;
+      LayoutConstraintKind kind = LayoutConstraintKind::UnknownLayout;
+      switch (rawKind) {
+      default: {
+        // Unknown layout requirement kind.
+        error();
+        break;
+      }
+      case LayoutRequirementKind::NativeRefCountedObject: {
+        kind = LayoutConstraintKind::NativeRefCountedObject;
+        break;
+      }
+      case LayoutRequirementKind::RefCountedObject: {
+        kind = LayoutConstraintKind::RefCountedObject;
+        break;
+      }
+      case LayoutRequirementKind::Trivial: {
+        kind = LayoutConstraintKind::Trivial;
+        break;
+      }
+      case LayoutRequirementKind::TrivialOfExactSize: {
+        kind = LayoutConstraintKind::TrivialOfExactSize;
+        break;
+      }
+      case LayoutRequirementKind::TrivialOfAtMostSize: {
+        kind = LayoutConstraintKind::TrivialOfAtMostSize;
+        break;
+      }
+      case LayoutRequirementKind::UnknownLayout: {
+        kind = LayoutConstraintKind::UnknownLayout;
+        break;
+      }
+      }
+
+      if (kind != LayoutConstraintKind::TrivialOfAtMostSize &&
+          kind != LayoutConstraintKind::TrivialOfExactSize)
+        layoutInfo = LayoutConstraintInfo(kind);
+      else
+        layoutInfo = LayoutConstraintInfo(kind, size, alignment);
+
+      auto layout = getContext().AllocateObjectCopy(layoutInfo);
+
+      requirements.push_back(
+          Requirement(RequirementKind::Layout, first, layout));
       break;
       }
     default:
@@ -2303,16 +2349,23 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       }
 
       case decls_block::Specialize_DECL_ATTR: {
-        ArrayRef<uint64_t> rawTypeIDs;
-        serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
-          scratch, rawTypeIDs);
+        unsigned exported;
+        SpecializeAttr::SpecializationKind specializationKind;
+        unsigned specializationKindVal;
+        SmallVector<Requirement, 8> requirements;
 
-        SmallVector<TypeLoc, 8> typeLocs;
-        for (auto tid : rawTypeIDs)
-          typeLocs.push_back(TypeLoc::withoutLoc(getType(tid)));
+        serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
+          scratch, exported, specializationKindVal);
+
+        specializationKind = specializationKindVal
+                                 ? SpecializeAttr::SpecializationKind::Partial
+                                 : SpecializeAttr::SpecializationKind::Full;
+
+        readGenericRequirements(requirements, DeclTypeCursor);
 
         Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
-                                      typeLocs);
+                                      requirements, exported != 0,
+                                      specializationKind);
         break;
       }
 
