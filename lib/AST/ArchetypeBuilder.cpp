@@ -459,17 +459,15 @@ static int compareDependentTypes(
 
 bool ArchetypeBuilder::PotentialArchetype::isBetterArchetypeAnchor(
        PotentialArchetype *other) const {
+  // If one potential archetype has a concrete type in its path but the other
+  // does not, prefer the one that does not.
   auto concrete = hasConcreteTypeInPath();
   auto otherConcrete = other->hasConcreteTypeInPath();
   if (concrete != otherConcrete)
     return otherConcrete;
 
-  // FIXME: Not a total order.
-  auto rootKey = getRootGenericParamKey();
-  auto otherRootKey = other->getRootGenericParamKey();
-  return std::make_tuple(+rootKey.Depth, +rootKey.Index, getNestingDepth())
-    < std::make_tuple(+otherRootKey.Depth, +otherRootKey.Index,
-                      other->getNestingDepth());
+  auto self = const_cast<PotentialArchetype *>(this);
+  return compareDependentTypes(&self, &other) < 0;
 }
 
 auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
@@ -486,7 +484,8 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
 #ifndef NDEBUG
   // Make sure that we did, in fact, get one that is better than all others.
   for (auto pa : rep->getEquivalenceClass()) {
-    assert(!pa->isBetterArchetypeAnchor(best) &&
+    assert((pa == best || best->isBetterArchetypeAnchor(pa)) &&
+           !pa->isBetterArchetypeAnchor(best) &&
            "archetype anchor isn't a total order");
   }
 #endif
