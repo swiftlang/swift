@@ -1,12 +1,10 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
-// RUN: %swift -target i386-apple-ios7.0 -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
-// RUN: %swift -target x86_64-apple-ios7.0 -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
-// RUN: %swift -target i386-apple-tvos9.0 -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
-// RUN: %swift -target x86_64-apple-tvos9.0 -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
-// RUN: %swift -target i386-apple-watchos2.0 -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
-// RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target armv7-apple-ios7.0 -module-name generic_metatypes -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
+// RUN: %swift -target arm64-apple-ios7.0 -emit-ir -module-name generic_metatypes -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target armv7-apple-tvos9.0 -emit-ir -module-name generic_metatypes -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
+// RUN: %swift -target arm64-apple-tvos9.0 -emit-ir -module-name generic_metatypes -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
+// RUN: %swift -target armv7k-apple-watchos2.0 -emit-ir -module-name generic_metatypes -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
 
-// REQUIRES: CODEGENERATOR=X86
+// REQUIRES: CODEGENERATOR=ARM
 
 // CHECK: define hidden %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque* noalias nocapture, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(_ x: T) -> T.Type {
