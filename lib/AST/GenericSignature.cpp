@@ -369,8 +369,6 @@ getSubstitutions(TypeSubstitutionFn subs,
                  GenericSignature::LookupConformanceFn lookupConformance,
                  SmallVectorImpl<Substitution> &result) const {
 
-  ArchetypeBuilder builder(getASTContext(), lookupConformance);
-
   // Enumerate all of the requirements that require substitution.
   enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement> reqs) {
     auto &ctx = getASTContext();
@@ -379,10 +377,6 @@ getSubstitutions(TypeSubstitutionFn subs,
     Type currentReplacement = depTy.subst(subs, lookupConformance);
     if (!currentReplacement)
       currentReplacement = ErrorType::get(depTy);
-
-    // Canonicalize the current replacement in context.
-    currentReplacement = const_cast<GenericSignature *>(this)
-        ->getCanonicalTypeInContext(currentReplacement, builder);
 
     // Collect the conformances.
     SmallVector<ProtocolConformanceRef, 4> currentConformances;
