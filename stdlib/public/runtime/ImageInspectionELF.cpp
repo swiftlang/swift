@@ -19,6 +19,8 @@
 #if defined(__ELF__) || defined(__ANDROID__)
 
 #include "ImageInspection.h"
+#include "../SwiftShims/Visibility.h"
+#include <atomic>
 #include <elf.h>
 #include <link.h>
 #include <dlfcn.h>
@@ -35,67 +37,124 @@ static const char ProtocolConformancesSymbol[] =
 static const char TypeMetadataRecordsSymbol[] =
   ".swift2_type_metadata_start";
 
+static std::atomic<bool> didInitializeProtocolConformanceLookup;
+static std::atomic<bool> didInitializeTypeMetadataLookup;
+
 /// Context arguments passed down from dl_iterate_phdr to its callback.
 struct InspectArgs {
   /// Symbol name to look up.
   const char *symbolName;
   /// Callback function to invoke with the metadata block.
   void (*addBlock)(const void *start, uintptr_t size);
+  /// Set to true when initialize*Lookup() is called.
+  std::atomic<bool> *didInitializeLookup;
 };
+
+static InspectArgs ProtocolConformanceArgs = {
+  ProtocolConformancesSymbol,
+  addImageProtocolConformanceBlockCallback,
+  &didInitializeProtocolConformanceLookup
+};
+
+static InspectArgs TypeMetadataRecordArgs = {
+  TypeMetadataRecordsSymbol,
+  addImageTypeMetadataRecordBlockCallback,
+  &didInitializeTypeMetadataLookup
+};
+
+
+// Extract the section information for a named section in an image. imageName
+// can be nullptr to specify the main executable.
+static SectionInfo getSectionInfo(const char *imageName,
+                                  const char *sectionName) {
+  SectionInfo sectionInfo = { 0, nullptr };
+  void *handle = dlopen(imageName, RTLD_LAZY);
+  if (handle) {
+    void *symbol = dlsym(handle, sectionName);
+    if (symbol) {
+      // Extract the size of the section data from the head of the section.
+      const char *section = reinterpret_cast<const char *>(symbol);
+      memcpy(&sectionInfo.size, section, sizeof(uint64_t));
+      sectionInfo.data = section + sizeof(uint64_t);
+    }
+    dlclose(handle);
+  }
+  return sectionInfo;
+}
 
 static int iteratePHDRCallback(struct dl_phdr_info *info,
                                size_t size, void *data) {
   const InspectArgs *inspectArgs = reinterpret_cast<const InspectArgs *>(data);
-  void *handle;
-  if (!info->dlpi_name || info->dlpi_name[0] == '\0') {
-    handle = dlopen(nullptr, RTLD_LAZY);
-  } else {
-    handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
-  }
+  const char *fname = info->dlpi_name;
 
-  if (!handle) {
-    // Not a shared library.
+  // While dl_iterate_phdr() is in progress it holds a lock to prevent other
+  // images being loaded. The initialize flag is set here inside the callback so
+  // that addNewDSOImage() sees a consistent state. If it was set outside the
+  // dl_interate_phdr() call then it could result in images being missed or
+  // added twice.
+  inspectArgs->didInitializeLookup->store(true, std::memory_order_release);
+
+  if (fname == nullptr || fname[0] == '\0') {
+    // The filename may be null for both the dynamic loader and main executable.
+    // So ignore null image name here and explictly add the main executable
+    // in initialize*Lookup() to avoid adding the data twice.
     return 0;
   }
 
-  const char *conformances =
-    reinterpret_cast<const char*>(dlsym(handle, inspectArgs->symbolName));
-
-  if (!conformances) {
-    // if there are no conformances, don't hold this handle open.
-    dlclose(handle);
-    return 0;
+  SectionInfo block = getSectionInfo(fname, inspectArgs->symbolName);
+  if (block.size > 0) {
+    inspectArgs->addBlock(block.data, block.size);
   }
-
-  // Extract the size of the conformances block from the head of the section.
-  uint64_t conformancesSize;
-  memcpy(&conformancesSize, conformances, sizeof(conformancesSize));
-  conformances += sizeof(conformancesSize);
-
-  inspectArgs->addBlock(conformances, conformancesSize);
-
-  dlclose(handle);
   return 0;
 }
 
-void swift::initializeProtocolConformanceLookup() {
+// Add the section information in an image specified by an address in that
+// image.
+static void addBlockInImage(const InspectArgs *inspectArgs, const void *addr) {
+  const char *fname = nullptr;
+  if (addr) {
+    Dl_info info;
+    if (dladdr(addr, &info) == 0 || info.dli_fname == nullptr) {
+      return;
+    }
+    fname = info.dli_fname;
+  }
+  SectionInfo block = getSectionInfo(fname, inspectArgs->symbolName);
+  if (block.size > 0) {
+    inspectArgs->addBlock(block.data, block.size);
+  }
+}
+
+static void initializeSectionLookup(InspectArgs *inspectArgs) {
+  // Add section data in the main executable.
+  addBlockInImage(inspectArgs, nullptr);
   // Search the loaded dls. This only searches the already
-  // loaded ones.
-  // FIXME: Find a way to have this continue to happen for dlopen-ed images.
-  // rdar://problem/19045112
-  InspectArgs ProtocolConformanceArgs = {
-    ProtocolConformancesSymbol,
-    addImageProtocolConformanceBlockCallback
-  };
-  dl_iterate_phdr(iteratePHDRCallback, &ProtocolConformanceArgs);
+  // loaded ones. Any images loaded after this are processed by
+  // addNewDSOImage() below.
+  dl_iterate_phdr(iteratePHDRCallback, reinterpret_cast<void *>(inspectArgs));
+}
+
+void swift::initializeProtocolConformanceLookup() {
+  initializeSectionLookup(&ProtocolConformanceArgs);
 }
 
 void swift::initializeTypeMetadataRecordLookup() {
-  InspectArgs TypeMetadataRecordArgs = {
-    TypeMetadataRecordsSymbol,
-    addImageTypeMetadataRecordBlockCallback
-  };
-  dl_iterate_phdr(iteratePHDRCallback, &TypeMetadataRecordArgs);
+  initializeSectionLookup(&TypeMetadataRecordArgs);
+}
+
+// As ELF images are loaded, ImageInspectionInit:sectionDataInit() will call
+// addNewDSOImage() with an address in the image that can later be used via
+// dladdr() to dlopen() the image after the appropiate initialize*Lookup()
+// function has been called.
+SWIFT_RUNTIME_EXPORT
+void swift::addNewDSOImage(const void *addr) {
+  if (didInitializeProtocolConformanceLookup.load(std::memory_order_acquire)) {
+    addBlockInImage(&ProtocolConformanceArgs, addr);
+  }
+
+  if (didInitializeTypeMetadataLookup.load(std::memory_order_acquire)) {
+    addBlockInImage(&TypeMetadataRecordArgs, addr);
+  }
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
