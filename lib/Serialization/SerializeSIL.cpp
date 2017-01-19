@@ -1024,10 +1024,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case ValueKind::CondFailInst:
   case ValueKind::RetainValueInst:
+  case ValueKind::UnmanagedRetainValueInst:
   case ValueKind::CopyValueInst:
   case ValueKind::CopyUnownedValueInst:
   case ValueKind::DestroyValueInst:
   case ValueKind::ReleaseValueInst:
+  case ValueKind::UnmanagedReleaseValueInst:
   case ValueKind::AutoreleaseValueInst:
   case ValueKind::SetDeallocatingInst:
   case ValueKind::DeallocStackInst:

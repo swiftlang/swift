@@ -297,6 +297,8 @@ ACCEPTS_ANY_OWNERSHIP_INST(SelectEnum)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedBitwiseCast) // Is this right?
 ACCEPTS_ANY_OWNERSHIP_INST(WitnessMethod)        // Is this right?
 ACCEPTS_ANY_OWNERSHIP_INST(ProjectBox)           // The result is a T*.
+ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedRetainValue)
+ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedReleaseValue)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
