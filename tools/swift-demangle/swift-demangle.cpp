@@ -14,10 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__FreeBSD__)
-#define _WITH_GETLINE
-#endif
-
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/ManglingMacros.h"
 #include "llvm/ADT/SmallString.h"
@@ -34,12 +30,7 @@
 #include <cstdlib>
 #endif
 
-#include <string>
-#if !defined(_MSC_VER) && !defined(__MINGW32__)
-#include <unistd.h>
-#else
-#include <io.h>
-#endif
+#include <iostream>
 
 static llvm::cl::opt<bool>
 ExpandMode("expand",
@@ -124,18 +115,9 @@ static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
   llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
 
-  while (true) {
-    char *inputLine = nullptr;
-    size_t size;
-    if (getline(&inputLine, &size, stdin) == -1 || size <= 0) {
-      if (errno == 0) {
-        break;
-      }
+  for (std::string mangled; std::getline(std::cin, mangled);) {
+    llvm::StringRef inputContents(mangled);
 
-      return EXIT_FAILURE;
-    }
-
-    llvm::StringRef inputContents(inputLine);
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       llvm::outs() << substrBefore(inputContents, matches.front());
@@ -143,8 +125,7 @@ static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
       inputContents = substrAfter(inputContents, matches.front());
     }
 
-    llvm::outs() << inputContents;
-    free(inputLine);
+    llvm::outs() << inputContents << '\n';
   }
 
   return EXIT_SUCCESS;
