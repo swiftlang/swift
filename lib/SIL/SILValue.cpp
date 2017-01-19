@@ -263,11 +263,12 @@ CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
 #undef CONSTANT_OWNERSHIP_INST
 
 #define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP, INST)                    \
-  ValueOwnershipKind ValueOwnershipKindVisitor::visit##INST##Inst(INST##Inst *I) { \
-    if (I->getType().isTrivial(I->getModule())) {                       \
-      return ValueOwnershipKind::Trivial;                               \
-    }                                                                   \
-    return ValueOwnershipKind::OWNERSHIP;                               \
+  ValueOwnershipKind ValueOwnershipKindVisitor::visit##INST##Inst(             \
+      INST##Inst *I) {                                                         \
+    if (I->getType().isTrivial(I->getModule())) {                              \
+      return ValueOwnershipKind::Trivial;                                      \
+    }                                                                          \
+    return ValueOwnershipKind::OWNERSHIP;                                      \
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)

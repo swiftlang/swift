@@ -57,6 +57,7 @@ static bool compatibleOwnershipKinds(ValueOwnershipKind K1,
 }
 
 static bool isValueAddressOrTrivial(SILValue V, SILModule &M) {
+  // TODO: Change this to use V->getOwnershipKind() == OwnershipKind::Trivial;
   return V->getType().isAddress() || V->getType().isTrivial(M);
 }
 
@@ -101,15 +102,6 @@ public:
     return getType().isTrivial(Mod);
   }
 
-  void error(SILInstruction *User) {
-    llvm::errs() << "Have operand with incompatible ownership?!\n"
-                 << "Value: " << *getValue() << "User: " << *User
-                 << "Conv: " << getOwnershipKind() << "\n";
-    if (PrintMessageInsteadOfAssert)
-      return;
-    llvm_unreachable("triggering standard assertion failure routine");
-  }
-
   OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I);
 
   /// Check if \p User as compatible ownership with the SILValue that we are
@@ -120,7 +112,13 @@ public:
   bool check(SILInstruction *User) {
     auto Result = visit(User);
     if (!Result.HasCompatibleOwnership) {
-      error(User);
+      llvm::errs() << "Function: '" << User->getFunction()->getName() << "'\n"
+                   << "Have operand with incompatible ownership?!\n"
+                   << "Value: " << *getValue() << "User: " << *User
+                   << "Conv: " << getOwnershipKind() << "\n";
+      if (PrintMessageInsteadOfAssert)
+        return false;
+      llvm_unreachable("triggering standard assertion failure routine");
     }
 
     assert((!Result.ShouldCheckForDataflowViolations ||
@@ -192,9 +190,6 @@ NO_OPERAND_INST(ValueMetatype)
     return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
-CONSTANT_OWNERSHIP_INST(Guaranteed, false, TupleExtract)
-CONSTANT_OWNERSHIP_INST(Guaranteed, false, StructExtract)
-CONSTANT_OWNERSHIP_INST(Guaranteed, false, UncheckedEnumData)
 CONSTANT_OWNERSHIP_INST(Owned, true, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocExistentialBox)
@@ -264,6 +259,30 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, UncheckedTrivialBitCast)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UnconditionalCheckedCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UnmanagedToRef)
 #undef CONSTANT_OWNERSHIP_INST
+
+#define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(                                    \
+    OWNERSHIP, SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS, INST)                     \
+  OwnershipUseCheckerResult                                                    \
+      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
+    assert(I->getNumOperands() && "Expected to have non-zero operands");       \
+    if (ValueOwnershipKind::OWNERSHIP != ValueOwnershipKind::Trivial &&        \
+        getOwnershipKind() == ValueOwnershipKind::Trivial) {                   \
+      assert(isAddressOrTrivialType() &&                                       \
+             "Trivial ownership requires a trivial type or an address");       \
+      return {true, false};                                                    \
+    }                                                                          \
+    if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
+      assert(isAddressOrTrivialType() &&                                       \
+             "Trivial ownership requires a trivial type or an address");       \
+    }                                                                          \
+                                                                               \
+    return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
+            SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
+  }
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, TupleExtract)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, StructExtract)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, UncheckedEnumData)
+#undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 #define ACCEPTS_ANY_OWNERSHIP_INST(INST)                                       \
   OwnershipUseCheckerResult                                                    \
@@ -622,6 +641,8 @@ private:
   /// were found to properly be post-dominated by a lifetime ending use.
   bool doesBlockContainUseAfterFree(SILInstruction *LifetimeEndingUser,
                                     SILBasicBlock *UserBlock);
+
+  bool checkValueWithoutLifetimeEndingUses();
 };
 
 } // end anonymous namespace
@@ -719,6 +740,65 @@ void SILValueOwnershipChecker::uniqueNonLifetimeEndingUsers(
   }
 }
 
+static bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg,
+                                                      SILModule &Mod) {
+  switch (Arg->getOwnershipKind()) {
+  case ValueOwnershipKind::Guaranteed:
+  case ValueOwnershipKind::Unowned:
+  case ValueOwnershipKind::Trivial:
+    return true;
+  case ValueOwnershipKind::Any:
+    llvm_unreachable(
+        "Function arguments should never have ValueOwnershipKind::Any");
+  case ValueOwnershipKind::Owned:
+    break;
+  }
+
+  llvm::errs() << "    Owned function parameter without life "
+                  "ending uses!\n"
+               << "Value: " << *Arg;
+  if (PrintMessageInsteadOfAssert)
+    return true;
+  llvm_unreachable("triggering standard assertion failure routine");
+}
+
+bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
+  DEBUG(llvm::dbgs() << "    No lifetime ending users?! Bailing early.\n");
+  if (auto *Arg = dyn_cast<SILFunctionArgument>(Value)) {
+    if (checkFunctionArgWithoutLifetimeEndingUses(Arg, Mod)) {
+      return true;
+    }
+  }
+
+  if (!isValueAddressOrTrivial(Value, Mod)) {
+    llvm::errs() << "Non trivial values, non address values, and non "
+                    "guaranteed function args must have at least one "
+                    "lifetime ending use?!\n"
+                 << "Value: " << *Value;
+    if (PrintMessageInsteadOfAssert)
+      return true;
+    llvm_unreachable("triggering standard assertion failure routine");
+  }
+
+  return true;
+}
+
+static bool isGuaranteedFunctionArgWithLifetimeEndingUses(
+    SILFunctionArgument *Arg,
+    const llvm::SmallVectorImpl<SILInstruction *> &LifetimeEndingUsers) {
+  if (Arg->getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+    return true;
+
+  llvm::errs() << "    Guaranteed function parameter with life ending uses!\n"
+               << "Value: " << *Arg;
+  for (auto *U : LifetimeEndingUsers) {
+    llvm::errs() << "    Lifetime Ending User: " << *U;
+  }
+  if (PrintMessageInsteadOfAssert)
+    return false;
+  llvm_unreachable("triggering standard assertion failure routine");
+}
+
 bool SILValueOwnershipChecker::checkUses() {
   DEBUG(llvm::dbgs() << "    Gathering and classifying uses!\n");
 
@@ -731,17 +811,34 @@ bool SILValueOwnershipChecker::checkUses() {
   llvm::SmallVector<SILInstruction *, 16> NonLifetimeEndingUsers;
   gatherUsers(LifetimeEndingUsers, NonLifetimeEndingUsers);
 
-  // If we do not have any lifetime ending users, there is nothing to
-  // check. This occurs with trivial types and addresses. Return false.
-  if (LifetimeEndingUsers.empty()) {
-    DEBUG(llvm::dbgs() << "    No lifetime ending users?! Bailing early.\n");
-    assert(isValueAddressOrTrivial(Value, Mod) &&
-           "Must always check the lifetime for non-trivial, non-address types");
+  // We can only have no lifetime ending uses if we have:
+  //
+  // 1. A trivial typed value.
+  // 2. An address type value.
+  // 3. A guaranteed function argument.
+  //
+  // In the first two cases, it is easy to see that there is nothing further to
+  // do but return false.
+  //
+  // In the case of a function argument, one must think about the issues a bit
+  // more. Specifically, we should have /no/ lifetime ending uses of a
+  // guaranteed function argument, since a guaranteed function argument should
+  // outlive the current function always.
+  if (LifetimeEndingUsers.empty() && checkValueWithoutLifetimeEndingUses()) {
     return false;
   }
 
   DEBUG(llvm::dbgs() << "    Found lifetime ending users! Performing initial "
                         "checks\n");
+
+  // See if we have a guaranteed function address. Guaranteed function addresses
+  // should never have any lifetime ending uses.
+  if (auto *Arg = dyn_cast<SILFunctionArgument>(Value)) {
+    if (!isGuaranteedFunctionArgWithLifetimeEndingUses(Arg,
+                                                       LifetimeEndingUsers)) {
+      return false;
+    }
+  }
 
   // Then add our non lifetime ending users and their blocks to the
   // BlocksWithNonLifetimeEndingUses map. While we do this, if we have multiple

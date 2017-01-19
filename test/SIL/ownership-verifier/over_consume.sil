@@ -72,3 +72,17 @@ bb5:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// We have a consume of a guaranteed argument
+// CHECK-LABEL: Function: 'consumed_guaranteed_arg'
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: User:   destroy_value %0 : $Builtin.NativeObject
+// CHECK: Conv: Guaranteed
+sil @consumed_guaranteed_arg : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
