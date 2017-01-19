@@ -393,18 +393,12 @@ static std::string getSpecializedName(SILFunction *F,
   NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
   auto fnConv = F->getConventions();
 
-  ArrayRef<SILParameterInfo> Parameters = fnConv.funcTy->getParameters();
-  auto NumIndirectResults = fnConv.getNumIndirectSILResults();
-
-  for (unsigned Index : indices(Parameters)) {
-    // The PromotableIndices index is expressed as the argument index (num
-    // indirect result + param index). Add back the num indirect results to get
-    // the arg index when working with PromotableIndices.
-    unsigned ArgIndex = Index + NumIndirectResults;
-    if (!PromotableIndices.count(ArgIndex))
+  for (unsigned argIdx = 0, endIdx = fnConv.getNumSILArguments();
+       argIdx < endIdx; ++argIdx) {
+    if (!PromotableIndices.count(argIdx))
       continue;
-    OldFSSM.setArgumentBoxToValue(Index);
-    NewFSSM.setArgumentBoxToValue(Index);
+    OldFSSM.setArgumentBoxToValue(argIdx);
+    NewFSSM.setArgumentBoxToValue(argIdx);
   }
 
   OldFSSM.mangle();

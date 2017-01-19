@@ -498,7 +498,7 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
   // original function except for the closure.
   CanSILFunctionType ClosureUserFunTy = ClosureUser->getLoweredFunctionType();
   auto ClosureUserConv = ClosureUser->getConventions();
-  unsigned Index = ClosureUserConv.getNumIndirectSILResults();
+  unsigned Index = ClosureUserConv.getSILArgIndexOfFirstParam();
   for (auto &param : ClosureUserConv.getParameters()) {
     if (Index != CallSiteDesc.getClosureIndex())
       NewParameterInfoList.push_back(param);
@@ -778,10 +778,10 @@ void ClosureSpecializer::gatherCallSites(
           continue;
         }
 
-        auto NumIndirectResults =
-            AI.getSubstCalleeConv().getNumIndirectSILResults();
-        assert(ClosureIndex.getValue() >= NumIndirectResults);
-        auto ClosureParamIndex = ClosureIndex.getValue() - NumIndirectResults;
+        unsigned firstParamArgIdx =
+            AI.getSubstCalleeConv().getSILArgIndexOfFirstParam();
+        assert(ClosureIndex.getValue() >= firstParamArgIdx);
+        auto ClosureParamIndex = ClosureIndex.getValue() - firstParamArgIdx;
 
         auto ParamInfo = AI.getSubstCalleeType()->getParameters();
         SILParameterInfo ClosureParamInfo = ParamInfo[ClosureParamIndex];
