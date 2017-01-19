@@ -2914,7 +2914,7 @@ using ProtocolConformanceRecord
 ///     return metadata
 ///   }
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C" const Metadata *
+const Metadata *
 swift_getGenericMetadata(GenericMetadata *pattern,
                          const void *arguments)
     SWIFT_CC(RegisterPreservingCC);
@@ -2952,7 +2952,7 @@ swift_allocateGenericValueMetadata(GenericMetadata *pattern,
 ///   is ultimately a statement about the user model of overlapping
 ///   conformances.
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C" const WitnessTable *
+const WitnessTable *
 swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                              const Metadata *type,
                              void * const *instantiationArgs)
@@ -3164,7 +3164,7 @@ swift_getExistentialMetatypeMetadata(const Metadata *instanceType);
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C" const ExistentialTypeMetadata *
+const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(size_t numProtocols,
                                  const ProtocolDescriptor **protocols)
     SWIFT_CC(RegisterPreservingCC);
@@ -3186,7 +3186,7 @@ swift_getExistentialTypeMetadata(size_t numProtocols,
 /// \return true if the cast succeeded. Depending on the flags,
 ///   swift_dynamicCast may fail rather than return false.
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C" bool
+bool
 swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
                   const Metadata *srcType,
                   const Metadata *targetType,
@@ -3201,7 +3201,7 @@ swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
 ///
 /// \returns the object if the cast succeeds, or null otherwise.
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C" const void *
+const void *
 swift_dynamicCastClass(const void *object, const ClassMetadata *targetType)
     SWIFT_CC(RegisterPreservingCC);
 

@@ -2770,7 +2770,7 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C" const WitnessTable *
+const WitnessTable *
 swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                                     const Metadata *type,
                                     void * const *instantiationArgs)

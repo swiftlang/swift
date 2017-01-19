@@ -42,7 +42,6 @@
 using namespace swift;
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 HeapObject *
 swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredSize,
@@ -196,14 +195,12 @@ _swift_release_dealloc(HeapObject *object) SWIFT_CC(RegisterPreservingCC_IMPL)
     __attribute__((__noinline__, __used__));
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_retain(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_ENTRY_REF(swift_retain)(object);
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_nonatomic_retain(HeapObject *object) {
   SWIFT_RT_ENTRY_REF(swift_nonatomic_retain)(object);
 }
@@ -215,7 +212,6 @@ void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain)(HeapObject *object) {
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_nonatomic_release(HeapObject *object) {
   return SWIFT_RT_ENTRY_REF(swift_nonatomic_release)(object);
 }
@@ -237,7 +233,6 @@ void SWIFT_RT_ENTRY_IMPL(swift_retain)(HeapObject *object)
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_retain_n(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_ENTRY_REF(swift_retain_n)(object, n);
@@ -253,7 +248,6 @@ void SWIFT_RT_ENTRY_IMPL(swift_retain_n)(HeapObject *object, uint32_t n)
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_ENTRY_REF(swift_nonatomic_retain_n)(object, n);
@@ -269,7 +263,6 @@ void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain_n)(HeapObject *object, uint32_t 
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_release(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_ENTRY_REF(swift_release)(object);
@@ -354,7 +347,6 @@ void swift::swift_unownedRelease(HeapObject *object)
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_unownedRetain_n(HeapObject *object, int n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   if (!object)
@@ -364,7 +356,6 @@ void swift::swift_unownedRetain_n(HeapObject *object, int n)
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_unownedRelease_n(HeapObject *object, int n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   if (!object)

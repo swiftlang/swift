@@ -56,9 +56,9 @@ void swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
 ///          returns a value greater than or equal to zero and less than
 ///          emptyCases.
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C" int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
-                                              const Metadata *payload,
-                                              unsigned emptyCases)
+int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
+                                   const Metadata *payload,
+                                   unsigned emptyCases)
   SWIFT_CC(RegisterPreservingCC);
 
 
@@ -75,10 +75,10 @@ extern "C" int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
 ///                    than emptyCases for an empty case.
 /// \param emptyCases - the number of empty cases in the enum.
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C" void swift_storeEnumTagSinglePayload(OpaqueValue *value,
-                                                 const Metadata *payload,
-                                                 int whichCase,
-                                                 unsigned emptyCases)
+void swift_storeEnumTagSinglePayload(OpaqueValue *value,
+                                     const Metadata *payload,
+                                     int whichCase,
+                                     unsigned emptyCases)
   SWIFT_CC(RegisterPreservingCC);
 
 /// \brief Initialize the value witness table for a generic, multi-payload
