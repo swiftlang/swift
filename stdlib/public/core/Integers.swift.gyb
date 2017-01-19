@@ -1003,7 +1003,7 @@ ${mutatingOperationComment(x.operator)}
 % end
 }
 
-% for Protocol in ['Arithmetic', 'BinaryInteger', 'FloatingPoint']:
+% for Protocol in ['FloatingPoint']: #['Arithmetic', 'BinaryInteger', 'FloatingPoint']:
 % # Explicitly providing these operations for BinaryInteger and FloatingPoint
 % # protocols because Strideable conformance creates ambiguity if the
 % # operationsare only defined for Arithmetic
@@ -2547,6 +2547,18 @@ public struct ${Self}
 
 %   end # if Self != 'Int'
 
+// FIXME(integers): pending compiler improvements.
+// Basically, most simple arithmetic expressions become too complex when `+`
+// gets defined on the protocol rather than on concrete type.
+%       for x in chain(*binaryArithmetic.values()):
+  @_transparent
+  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
+    return lhs
+  }
+%       end
+
 // FIXME(integers): penging optimizer work on handling the case where the
 // boolean value is wrapped into a two-case enum and then immediately
 // unwrapped. <rdar://problem/29004429>
@@ -3239,6 +3251,16 @@ public struct DoubleWidth<T : FixedWidthInteger>
 % end
 
 % for x in chain(*binaryArithmetic.values()):
+
+  // FIXME(integers): remove this once the operators are back to Arithmetic
+  public static func ${x.operator} (
+    lhs: DoubleWidth<T>, rhs: DoubleWidth<T>
+  ) -> DoubleWidth<T> {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
+    return lhs
+  }
+
   public static func ${x.operator}=(
     lhs: inout DoubleWidth<T>, rhs: DoubleWidth<T>
   ) {
