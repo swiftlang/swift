@@ -1992,9 +1992,15 @@ struct ASTNodeBase {};
         if (auto *FD = dyn_cast<FuncDecl>(member))
           if (FD->isAccessor())
             continue;
-        
+
+
         if (auto req = dyn_cast<ValueDecl>(member)) {
           if (!normal->hasWitness(req)) {
+            if (req->getAttrs().isUnavailable(Ctx) &&
+                proto->isObjC()) {
+              continue;
+            }
+
             dumpRef(decl);
             Out << " is missing witness for "
                 << conformance->getProtocol()->getName().str() 

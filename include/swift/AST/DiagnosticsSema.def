@@ -3143,6 +3143,11 @@ ERROR(objc_class_method_not_permitted,none,
       OBJC_DIAG_SELECT " defines Objective-C class method %2, which is "
       "not permitted by Swift", (unsigned, DeclName, ObjCSelector))
 
+WARNING(objc_class_method_not_permitted_swift3_compat_warning,none,
+      OBJC_DIAG_SELECT " defines Objective-C class method %2, which is "
+      "not guaranteed to be invoked by Swift and will be disallowed in future "
+      "versions", (unsigned, DeclName, ObjCSelector))
+
 ERROR(objc_witness_selector_mismatch,none,
       "Objective-C method %2 provided by " OBJC_DIAG_SELECT
       " does not match the requirement's selector (%3)",
