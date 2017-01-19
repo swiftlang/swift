@@ -28,7 +28,12 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"
 
+// For std::rand, to work around a bug if main()'s first function call passes
+// argv[0].
+#if defined(__CYGWIN__)
 #include <cstdlib>
+#endif
+
 #include <string>
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
 #include <unistd.h>
