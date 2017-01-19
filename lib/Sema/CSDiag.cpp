@@ -2430,6 +2430,12 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     }
   }
 
+  // If base type has unresolved generic parameters, such might mean
+  // that it's initializer with erroneous argument, otherwise this would
+  // be a simple ambigious archetype case, neither can be diagnosed here.
+  if (baseTy->hasTypeParameter() && baseTy->hasUnresolvedType())
+    return false;
+
   MemberLookupResult result = CS->performMemberLookup(
       constraint->getKind(), memberName, baseTy,
       constraint->getFunctionRefKind(), constraint->getLocator(),
