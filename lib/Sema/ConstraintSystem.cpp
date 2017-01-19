@@ -196,8 +196,6 @@ getDynamicResultSignature(ValueDecl *decl) {
 }
 
 LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
-  base = base->getCanonicalType();
-
   // Check whether we've already performed this lookup.
   auto knownMember = MemberLookups.find({base, name});
   if (knownMember != MemberLookups.end())
