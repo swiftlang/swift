@@ -27,7 +27,9 @@
         "swift-integration-tests": {
             "remote": { "id": "apple/swift-integration-tests" } },
         "swift-xcode-playground-support": {
-            "remote": { "id": "apple/swift-xcode-playground-support" } }
+            "remote": { "id": "apple/swift-xcode-playground-support" } },
+        "ninja": {
+            "remote": { "id": "ninja-build/ninja" } }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
@@ -46,7 +48,8 @@
                 "swift-corelibs-foundation": "master",
                 "swift-corelibs-libdispatch": "master",
                 "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master"
+                "swift-xcode-playground-support": "master",
+                "ninja": "release"
             }
         },
         "next" : {
@@ -64,7 +67,8 @@
                 "swift-corelibs-foundation": "master-next",
                 "swift-corelibs-libdispatch": "master-next",
                 "swift-integration-tests": "master-next",
-                "swift-xcode-playground-support": "master-next"
+                "swift-xcode-playground-support": "master-next",
+                "ninja": "release"
             }
         },
         "next-upstream" : {
@@ -82,7 +86,8 @@
                 "swift-corelibs-foundation": "master-next",
                 "swift-corelibs-libdispatch": "master-next",
                 "swift-integration-tests": "master-next",
-                "swift-xcode-playground-support": "master-next"
+                "swift-xcode-playground-support": "master-next",
+                "ninja": "release"
             }
         },
         "upstream": {
@@ -100,7 +105,8 @@
                 "swift-corelibs-foundation": "master",
                 "swift-corelibs-libdispatch": "master",
                 "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master"
+                "swift-xcode-playground-support": "master",
+                "ninja": "release"
             }
         },
         "swift-3.0-preview-1" : {
@@ -117,7 +123,8 @@
                 "swift-corelibs-xctest": "swift-3.0-preview-1-branch",
                 "swift-corelibs-foundation": "swift-3.0-preview-1-branch",
                 "swift-corelibs-libdispatch": "swift-3.0-preview-1-branch",
-                "swift-integration-tests": "swift-3.0-preview-1-branch"
+                "swift-integration-tests": "swift-3.0-preview-1-branch",
+                "ninja": "release"
             }
         },
         "swift-3.0-preview-2" : {
@@ -134,7 +141,8 @@
                 "swift-corelibs-xctest": "swift-3.0-preview-2-branch",
                 "swift-corelibs-foundation": "swift-3.0-preview-2-branch",
                 "swift-corelibs-libdispatch": "swift-3.0-preview-2-branch",
-                "swift-integration-tests": "swift-3.0-preview-2-branch"
+                "swift-integration-tests": "swift-3.0-preview-2-branch",
+                "ninja": "release"
             }
         },
         "swift-3.0-preview-3" : {
@@ -151,7 +159,8 @@
                 "swift-corelibs-xctest": "swift-3.0-preview-3-branch",
                 "swift-corelibs-foundation": "swift-3.0-preview-3-branch",
                 "swift-corelibs-libdispatch": "swift-3.0-preview-3-branch",
-                "swift-integration-tests": "swift-3.0-preview-3-branch"
+                "swift-integration-tests": "swift-3.0-preview-3-branch",
+                "ninja": "release"
             }
         },
         "swift-3.0-preview-4" : {
@@ -169,7 +178,8 @@
                 "swift-corelibs-foundation": "swift-3.0-preview-4-branch",
                 "swift-corelibs-libdispatch": "swift-3.0-preview-4-branch",
                 "swift-integration-tests": "swift-3.0-preview-4-branch",
-                "swift-xcode-playground-support": "swift-3.0-preview-4-branch"
+                "swift-xcode-playground-support": "swift-3.0-preview-4-branch",
+                "ninja": "release"
             }
         },
         "swift-3.0-preview-5" : {
@@ -187,7 +197,8 @@
                 "swift-corelibs-foundation": "swift-3.0-preview-5-branch",
                 "swift-corelibs-libdispatch": "swift-3.0-preview-5-branch",
                 "swift-integration-tests": "swift-3.0-preview-5-branch",
-                "swift-xcode-playground-support": "swift-3.0-preview-5-branch"
+                "swift-xcode-playground-support": "swift-3.0-preview-5-branch",
+                "ninja": "release"
             }
         },
         "swift-3.0-branch" : {
@@ -205,7 +216,8 @@
                 "swift-corelibs-foundation": "swift-3.0-branch",
                 "swift-corelibs-libdispatch": "swift-3.0-branch",
                 "swift-integration-tests": "swift-3.0-branch",
-                "swift-xcode-playground-support": "swift-3.0-branch"
+                "swift-xcode-playground-support": "swift-3.0-branch",
+                "ninja": "release"
             }
         },
         "swift-3.1-branch" : {
@@ -223,7 +235,8 @@
                 "swift-corelibs-foundation": "swift-3.1-branch",
                 "swift-corelibs-libdispatch": "swift-3.1-branch",
                 "swift-integration-tests": "swift-3.1-branch",
-                "swift-xcode-playground-support": "swift-3.1-branch"
+                "swift-xcode-playground-support": "swift-3.1-branch",
+                "ninja": "release"
             }
         }
     }
