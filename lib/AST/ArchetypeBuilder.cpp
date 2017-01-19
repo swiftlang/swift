@@ -352,12 +352,7 @@ auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
 
 bool ArchetypeBuilder::PotentialArchetype::hasConcreteTypeInPath() const {
   for (auto pa = this; pa; pa = pa->getParent()) {
-    // FIXME: The archetype check here is a hack because we're reusing
-    // archetypes from the outer context.
-    if (Type concreteType = pa->getConcreteType()) {
-      if (!concreteType->is<ArchetypeType>())
-        return true;
-    }
+    if (pa->isConcreteType()) return true;
   }
 
   return false;
