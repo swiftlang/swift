@@ -1274,6 +1274,10 @@ do {
 // with single 'Any' parameter
 func takesAny(_: Any) {}
 
+enum HasAnyCase {
+  case any(_: Any)
+}
+
 do {
   let fn: (Any) -> () = { _ in }
 
@@ -1282,4 +1286,7 @@ do {
 
   takesAny(123)
   takesAny(data: 123)
+
+  _ = HasAnyCase.any(123)
+  _ = HasAnyCase.any(data: 123)
 }
