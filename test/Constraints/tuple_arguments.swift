@@ -1283,8 +1283,23 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
   }
 
   f2.forEach { block in
-    block(p) // FIXME
-    block((c, c)) // FIXME
+  // expected-note@-1 2{{'block' declared here}}
+    block(p) // expected-error {{missing argument for parameter #2 in call}}
+    block((c, c)) // expected-error {{missing argument for parameter #2 in call}}
+    block(c, c)
+  }
+
+  f2.forEach { (block: ((Bool, Bool)) -> ()) in
+  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '((Bool, Bool) -> ()) -> Void'}}
+    block(p)
+    block((c, c))
+    block(c, c)
+  }
+
+  f2.forEach { (block: (Bool, Bool) -> ()) in
+  // expected-note@-1 2{{'block' declared here}}
+    block(p) // expected-error {{missing argument for parameter #2 in call}}
+    block((c, c)) // expected-error {{missing argument for parameter #2 in call}}
     block(c, c)
   }
 }
