@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;

@@ -26,6 +26,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"

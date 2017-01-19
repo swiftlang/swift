@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-dead-function-elimination"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/PatternMatch.h"

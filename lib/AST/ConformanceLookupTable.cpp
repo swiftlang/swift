@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;

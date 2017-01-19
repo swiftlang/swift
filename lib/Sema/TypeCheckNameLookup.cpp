@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/TopCollection.h"
 #include <algorithm>
 

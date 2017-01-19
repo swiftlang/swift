@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"

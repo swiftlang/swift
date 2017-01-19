@@ -19,6 +19,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/BCReadingExtras.h"
