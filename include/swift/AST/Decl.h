@@ -5385,9 +5385,6 @@ enum class CtorInitializerKind {
   /// object by delegating to another initializer (eventually reaching a
   /// designated initializer).
   ///
-  /// A convenience initializer is written with a return type of "Self" in
-  /// source code.
-  ///
   /// Convenience initializers are inherited into subclasses that override
   /// all of their superclass's designated initializers.
   Convenience,
