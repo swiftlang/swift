@@ -507,9 +507,17 @@ static AssociatedTypeDecl *
 getReferencedAssocTypeOfProtocol(Type type, ProtocolDecl *proto) {
   if (auto dependentMember = type->getAs<DependentMemberType>()) {
     if (auto assocType = dependentMember->getAssocType()) {
-      if (dependentMember->getBase()->isEqual(proto->getSelfInterfaceType()) &&
-          assocType->getProtocol() == proto) {
-        return assocType;
+      if (dependentMember->getBase()->isEqual(proto->getSelfInterfaceType())) {
+        // Exact match: this is our associated type.
+        if (assocType->getProtocol() == proto)
+          return assocType;
+
+        // Check whether there is an associated type of the same name in
+        // this protocol.
+        for (auto member : proto->lookupDirect(assocType->getFullName())) {
+          if (auto protoAssoc = dyn_cast<AssociatedTypeDecl>(member))
+            return protoAssoc;
+        }
       }
     }
   }

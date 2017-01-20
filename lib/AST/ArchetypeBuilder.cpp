@@ -557,6 +557,13 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         } else {
           nested.push_back(pa);
         }
+
+        // Produce a same-type constraint between the two same-named
+        // potential archetypes.
+        auto frontRep = nested.front()->getRepresentative();
+        pa->Representative = frontRep;
+        frontRep->EquivalenceClass.push_back(pa);
+        pa->SameTypeSource = redundantSource;
       } else
         nested.push_back(pa);
 
