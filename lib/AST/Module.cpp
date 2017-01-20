@@ -29,6 +29,8 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"

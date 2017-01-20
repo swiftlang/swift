@@ -19,6 +19,7 @@
 #define SWIFT_SIL_TYPESUBSTCLONER_H
 
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/DynamicCasts.h"

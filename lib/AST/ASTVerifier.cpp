@@ -24,6 +24,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"

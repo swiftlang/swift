@@ -22,6 +22,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/APFloat.h"

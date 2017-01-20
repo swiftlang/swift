@@ -14,6 +14,7 @@
 #include "Scope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/type_traits.h"

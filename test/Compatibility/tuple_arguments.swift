@@ -1290,3 +1290,37 @@ do {
   _ = HasAnyCase.any(123)
   _ = HasAnyCase.any(data: 123)
 }
+
+// rdar://problem/29739905 - protocol extension methods on Array had
+// ParenType sugar stripped off the element type
+typealias BoolPair = (Bool, Bool)
+
+func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
+                             f2: [(Bool, Bool) -> ()],
+                             c: Bool) {
+  let p = (c, c)
+
+  f1.forEach { block in
+    block(p)
+    block((c, c))
+    block(c, c)
+  }
+
+  f2.forEach { block in
+    block(p) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+    block((c, c))
+    block(c, c)
+  }
+
+  f2.forEach { (block: ((Bool, Bool)) -> ()) in
+    block(p)
+    block((c, c))
+    block(c, c)
+  }
+
+  f2.forEach { (block: (Bool, Bool) -> ()) in
+    block(p) // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+    block((c, c))
+    block(c, c)
+  }
+}

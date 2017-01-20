@@ -1676,7 +1676,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   // Get the expression's simplified type.
   auto &solution = viable[0];
-  Type exprType = solution.simplifyType(*this, expr->getType());
+  Type exprType = solution.simplifyType(expr->getType());
 
   assert(exprType && !exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
@@ -1791,8 +1791,8 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
     solution.dump(log);
   }
 
-  expr->setType(solution.simplifyType(*this, expr->getType()));
-  CCE->setType(solution.simplifyType(*this, CCE->getType()));
+  expr->setType(solution.simplifyType(expr->getType()));
+  CCE->setType(solution.simplifyType(CCE->getType()));
   return false;
 }
 
@@ -1892,7 +1892,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       // Figure out what type the constraints decided on.
       auto &cs = solution.getConstraintSystem();
       auto &tc = cs.getTypeChecker();
-      InitType = solution.simplifyType(tc, InitType);
+      InitType = solution.simplifyType(InitType);
 
       // Convert the initializer to the type of the pattern.
       // ignoreTopLevelInjection = Binding->isConditional()
@@ -2137,8 +2137,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // Figure out what types the constraints decided on.
       auto &cs = solution.getConstraintSystem();
       auto &tc = cs.getTypeChecker();
-      InitType = solution.simplifyType(tc, InitType);
-      SequenceType = solution.simplifyType(tc, SequenceType);
+      InitType = solution.simplifyType(InitType);
+      SequenceType = solution.simplifyType(SequenceType);
 
       // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
       if (tc.convertToType(expr, SequenceType, cs.DC)) {

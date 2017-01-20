@@ -16,6 +16,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/AssertImplements.h"
