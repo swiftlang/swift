@@ -1943,6 +1943,8 @@ public:
   bool diagnoseInlineableDeclRef(SourceLoc loc, const ValueDecl *D,
                                  const DeclContext *DC);
 
+  void diagnoseResilientValueConstructor(ConstructorDecl *ctor);
+
   /// \name Availability checking
   ///
   /// Routines that perform API availability checking and type checking of

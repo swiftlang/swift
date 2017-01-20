@@ -99,3 +99,33 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
 
   return false;
 }
+
+void TypeChecker::diagnoseResilientValueConstructor(ConstructorDecl *ctor) {
+  auto nominalDecl = ctor->getDeclContext()
+    ->getAsNominalTypeOrNominalTypeExtensionContext();
+
+  bool isDelegating =
+      (ctor->getDelegatingOrChainedInitKind(&Diags) ==
+       ConstructorDecl::BodyInitKind::Delegating);
+
+  if (!isDelegating &&
+      !nominalDecl->hasFixedLayout(ctor->getParentModule(),
+                                   ctor->getResilienceExpansion())) {
+    if (ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      // An @_inlineable designated initializer defined in a resilient type
+      // cannot initialize stored properties directly, and must chain to
+      // another initializer.
+      diagnose(ctor->getLoc(),
+               diag::designated_init_inlineable_resilient,
+               ctor->getDeclContext()->getDeclaredInterfaceType(),
+               getFragileFunctionKind(ctor));
+    } else {
+      // A designated initializer defined on an extension of a resilient
+      // type from a different resilience domain cannot initialize stored
+      // properties directly, and must chain to another initializer.
+      diagnose(ctor->getLoc(),
+               diag::designated_init_in_extension_resilient,
+               ctor->getDeclContext()->getDeclaredInterfaceType());
+    }
+  }
+}

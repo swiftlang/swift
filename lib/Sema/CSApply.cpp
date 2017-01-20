@@ -210,6 +210,11 @@ static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
        member->getDeclContext()->getDeclaredInterfaceType()))
     return false;
 
+  // If the storage is resilient, we cannot access it directly at all.
+  if (!member->hasFixedLayout(DC->getParentModule(),
+                              DC->getResilienceExpansion()))
+    return false;
+
   return true;
 }
 
@@ -222,12 +227,6 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   // accessors.  However, in the init and destructor methods for the type
   // immediately containing the property, accesses are done direct.
   if (shouldAccessStorageDirectly(base, member, DC)) {
-    // The storage better not be resilient.
-    assert(member->hasFixedLayout(DC->getParentModule(),
-                                  DC->getResilienceExpansion()) &&
-           "Designated initializers and destructors of resilient types "
-           "cannot be @_transparent or defined in extensions");
-
     // Access this directly instead of going through (e.g.) observing or
     // trivial accessors.
     return AccessSemantics::DirectToStorage;
