@@ -207,6 +207,19 @@ class C7g : P7 {
   }
 }
 
+class C7h : P7 {
+  @objc var prop: Int = 0 {
+    didSet {}
+  }
+}
+
+class C7i : P7 {
+  @objc var prop: Int {
+    unsafeAddress { fatalError() }
+    unsafeMutableAddress { fatalError() }
+  }
+}
+
 @objc protocol P8 {
   @objc optional var prop: Int {
     @objc(getTheProp) get
