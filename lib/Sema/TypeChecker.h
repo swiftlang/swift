@@ -1095,7 +1095,7 @@ public:
   void introduceLazyVarAccessors(VarDecl *var) override;
 
   // Not all protocol members are requirements.
-  bool isRequirement(ValueDecl *requirement);
+  bool isRequirement(const ValueDecl *requirement);
 
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);

@@ -79,6 +79,9 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
   auto expansion = DC->getResilienceExpansion();
   if (expansion == ResilienceExpansion::Minimal) {
     if (!isa<GenericTypeParamDecl>(D) &&
+        // Protocol requirements are not versioned because there's no
+        // global entry point
+        !(isa<ProtocolDecl>(D->getDeclContext()) && isRequirement(D)) &&
         // FIXME: Figure out what to do with typealiases
         !isa<TypeAliasDecl>(D) &&
         !D->getDeclContext()->isLocalContext() &&
