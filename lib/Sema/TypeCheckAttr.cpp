@@ -697,7 +697,6 @@ public:
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Effects)
     IGNORED_ATTR(Exported)
-    IGNORED_ATTR(FixedLayout)
     IGNORED_ATTR(GKInspectable)
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
@@ -764,6 +763,7 @@ public:
 
   void visitSpecializeAttr(SpecializeAttr *attr);
 
+  void visitFixedLayoutAttr(FixedLayoutAttr *attr);
   void visitVersionedAttr(VersionedAttr *attr);
   
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
@@ -1768,6 +1768,19 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   // Store converted requirements in the attribute so that they are
   // serialized later.
   attr->setRequirements(DC->getASTContext(), convertedRequirements);
+}
+
+void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
+  auto *VD = cast<ValueDecl>(D);
+
+  if (VD->getEffectiveAccess() < Accessibility::Public) {
+    TC.diagnose(attr->getLocation(),
+                diag::fixed_layout_attr_on_internal_type,
+                VD->getName(),
+                VD->getFormalAccess())
+        .fixItRemove(attr->getRangeWithAt());
+    attr->setInvalid();
+  }
 }
 
 void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
