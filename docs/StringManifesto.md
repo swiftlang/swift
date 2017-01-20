@@ -1130,7 +1130,7 @@ This proposal depends on two new features in the Swift language:
 1. **Generic subscripts**, to
    enable [unified slicing syntax](#unification-of-slicing-operations).
 
-2. **A [subtype relationship](#different-type--shared-storage)** between
+2. **A [subtype relationship](#different-type-shared-storage)** between
    `Substring` and `String`, enabling framework APIs to traffic solely in
    `String` while still making it possible to avoid copies by handling
    `Substring`s where necessary.
