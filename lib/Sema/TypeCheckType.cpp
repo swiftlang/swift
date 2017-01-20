@@ -495,8 +495,13 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
 
     // Don't add fixit on module type; that isn't the right type regardless
     // of whether it had generic arguments.
-    if (!type->is<ModuleType>())
-      diag.fixItRemove(generic->getAngleBrackets());
+    if (!type->is<ModuleType>()) {
+      // When turning a SourceRange into CharSourceRange the closing angle
+      // brackets on nested generics are lexed as one token.
+      SourceRange angles = generic->getAngleBrackets();
+      diag.fixItRemoveChars(angles.Start,
+                            angles.End.getAdvancedLocOrInvalid(1));
+    }
 
     generic->setInvalid();
     return type;
