@@ -3489,7 +3489,6 @@ std::string nameForMetadata(const Metadata *type,
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
 const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
 
 } // end namespace swift

@@ -2983,7 +2983,6 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
 id _swift_bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
                                                 const Metadata *srcType) {
   return bridgeAnythingNonVerbatimToObjectiveC(src, srcType, /*consume*/ true);
@@ -3044,7 +3043,7 @@ findBridgeWitness(const Metadata *T) {
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" const Metadata *_swift_getBridgedNonVerbatimObjectiveCType(
+const Metadata *_swift_getBridgedNonVerbatimObjectiveCType(
   const Metadata *value, const Metadata *T
 ) {
   // Classes and Objective-C existentials bridge verbatim.
@@ -3065,7 +3064,7 @@ extern "C" const Metadata *_swift_getBridgedNonVerbatimObjectiveCType(
 //     inout result: Any?
 // )
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void
+void
 _swift_bridgeNonVerbatimFromObjectiveCToAny(HeapObject *sourceValue,
                                             OpaqueValue *destValue);
 
@@ -3075,7 +3074,7 @@ _swift_bridgeNonVerbatimFromObjectiveCToAny(HeapObject *sourceValue,
 //     inout result: NativeType?
 // )
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void
+void
 _swift_bridgeNonVerbatimBoxedValue(const OpaqueValue *sourceValue,
                                    OpaqueValue *destValue,
                                    const Metadata *nativeType);
@@ -3120,7 +3119,7 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
 //     inout result: T?
 // )
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void
+void
 _swift_bridgeNonVerbatimFromObjectiveC(
   HeapObject *sourceValue,
   const Metadata *nativeType,
@@ -3163,7 +3162,7 @@ _swift_bridgeNonVerbatimFromObjectiveC(
 //   inout result: T?
 // ) -> Bool
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool
+bool
 _swift_bridgeNonVerbatimFromObjectiveCConditional(
   HeapObject *sourceValue,
   const Metadata *nativeType,
@@ -3207,7 +3206,7 @@ _swift_bridgeNonVerbatimFromObjectiveCConditional(
 
 // func _isBridgedNonVerbatimToObjectiveC<T>(x: T.Type) -> Bool
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool _swift_isBridgedNonVerbatimToObjectiveC(
+bool _swift_isBridgedNonVerbatimToObjectiveC(
   const Metadata *value, const Metadata *T
 ) {
   assert(!swift_isClassOrObjCExistentialTypeImpl(T));
@@ -3219,7 +3218,7 @@ extern "C" bool _swift_isBridgedNonVerbatimToObjectiveC(
 
 // func _isClassOrObjCExistential<T>(x: T.Type) -> Bool
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool _swift_isClassOrObjCExistentialType(const Metadata *value,
+bool _swift_isClassOrObjCExistentialType(const Metadata *value,
                                                     const Metadata *T) {
   return swift_isClassOrObjCExistentialTypeImpl(T);
 }
