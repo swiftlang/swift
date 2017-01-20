@@ -1087,12 +1087,20 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
   for (auto var : members) {
-    // TODO create value constructor with indirect fields instead of the
-    // generated __Anonymous_field.
-    if (var->hasClangNode() && isa<clang::IndirectFieldDecl>(var->getClangDecl()))
-      continue;
+    bool generateParamName = wantCtorParamNames;
 
-    Identifier argName = wantCtorParamNames ? var->getName() : Identifier();
+    if (var->hasClangNode()) {
+      // TODO create value constructor with indirect fields instead of the
+      // generated __Anonymous_field.
+      if (isa<clang::IndirectFieldDecl>(var->getClangDecl()))
+        continue;
+
+      if (auto clangField = dyn_cast<clang::FieldDecl>(var->getClangDecl()))
+        if (clangField->isAnonymousStructOrUnion())
+          generateParamName = false;
+    }
+
+    Identifier argName = generateParamName ? var->getName() : Identifier();
     auto param = new (context)
         ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), var->getType(), structDecl);
