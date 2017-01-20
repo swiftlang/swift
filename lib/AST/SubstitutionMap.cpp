@@ -25,8 +25,13 @@ using namespace swift;
 template<typename T>
 Optional<T> SubstitutionMap::forEachParent(
               CanType type,
+              llvm::SmallPtrSetImpl<CanType> &visitedParents,
               llvm::function_ref<Optional<T>(CanType,
                                              AssociatedTypeDecl *)> fn) const {
+  // If we've already visited the parents of this type, stop.
+  if (!visitedParents.insert(type).second)
+    return None;
+
   auto foundParents = parentMap.find(type.getPointer());
   if (foundParents != parentMap.end()) {
     for (auto parent : foundParents->second) {
@@ -47,9 +52,9 @@ Optional<T> SubstitutionMap::forEachParent(
 
 template<typename T>
 Optional<T> SubstitutionMap::forEachConformance(
-                CanType type,
-                llvm::function_ref<Optional<T>(ProtocolConformanceRef)> fn)
-              const {
+              CanType type,
+              llvm::SmallPtrSetImpl<CanType> &visitedParents,
+              llvm::function_ref<Optional<T>(ProtocolConformanceRef)> fn) const{
   // Check for conformances for the type that apply to the original
   // substituted archetype.
   auto foundReplacement = conformanceMap.find(type.getPointer());
@@ -61,11 +66,11 @@ Optional<T> SubstitutionMap::forEachConformance(
   }
 
   // Check if we have conformances from one of our parent types.
-  return forEachParent<ProtocolConformanceRef>(type,
+  return forEachParent<ProtocolConformanceRef>(type, visitedParents,
       [&](CanType parent, AssociatedTypeDecl *assocType)
          -> Optional<ProtocolConformanceRef> {
     auto *parentProto = assocType->getProtocol();
-    auto conformance = lookupConformance(parent, parentProto);
+    auto conformance = lookupConformance(parent, parentProto, &visitedParents);
 
     if (!conformance)
       return None;
@@ -90,18 +95,42 @@ Optional<T> SubstitutionMap::forEachConformance(
 }
 
 Optional<ProtocolConformanceRef>
-SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
-  return forEachConformance<ProtocolConformanceRef>(type,
-             [&](ProtocolConformanceRef conformance)
-               -> Optional<ProtocolConformanceRef> {
-           if (conformance.getRequirement() == proto)
-             return conformance;
+SubstitutionMap::lookupConformance(
+                         CanType type, ProtocolDecl *proto,
+                         llvm::SmallPtrSetImpl<CanType> *visitedParents) const {
+  // Local function to either record an abstract conformance or return a
+  // concrete conformance. This allows us to
+  Optional<ProtocolConformanceRef> abstractConformance;
+  auto recordOrReturn = [&](ProtocolConformanceRef conformance)
+      -> Optional<ProtocolConformanceRef> {
+    if (conformance.isAbstract()) {
+      if (!abstractConformance)
+        abstractConformance = conformance;
 
-           if (conformance.getRequirement()->inheritsFrom(proto))
-             return conformance.getInherited(proto);
+      return None;
+    }
 
-           return None;
-         });
+    return conformance;
+  };
+
+  llvm::SmallPtrSet<CanType, 4> visitedParentsStored;
+  if (!visitedParents)
+    visitedParents = &visitedParentsStored;
+
+  auto concreteConformance =
+    forEachConformance<ProtocolConformanceRef>(type, *visitedParents,
+        [&](ProtocolConformanceRef conformance)
+          -> Optional<ProtocolConformanceRef> {
+      if (conformance.getRequirement() == proto)
+        return recordOrReturn(conformance);
+
+      if (conformance.getRequirement()->inheritsFrom(proto))
+        return recordOrReturn(conformance.getInherited(proto));
+
+       return None;
+    });
+
+  return concreteConformance ? concreteConformance : abstractConformance;
 }
 
 void SubstitutionMap::

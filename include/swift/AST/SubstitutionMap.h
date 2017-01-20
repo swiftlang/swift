@@ -30,6 +30,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
@@ -53,6 +54,7 @@ class SubstitutionMap {
   template<typename T>
   Optional<T> forEachParent(
                 CanType type,
+                llvm::SmallPtrSetImpl<CanType> &visitedParents,
                 llvm::function_ref<Optional<T>(CanType,
                                                AssociatedTypeDecl *)> fn) const;
 
@@ -62,12 +64,15 @@ class SubstitutionMap {
   template<typename T>
   Optional<T> forEachConformance(
                   CanType type,
+                  llvm::SmallPtrSetImpl<CanType> &visitedParents,
                   llvm::function_ref<Optional<T>(ProtocolConformanceRef)> fn)
                 const;
 
 public:
   Optional<ProtocolConformanceRef>
-  lookupConformance(CanType type, ProtocolDecl *proto) const;
+  lookupConformance(
+                CanType type, ProtocolDecl *proto,
+                llvm::SmallPtrSetImpl<CanType> *visitedParents = nullptr) const;
 
   const llvm::DenseMap<SubstitutableType *, Type> &getMap() const {
     return subMap;
