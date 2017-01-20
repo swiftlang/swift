@@ -11,8 +11,7 @@ import Builtin
 // CHECK: Found over consume?!
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   destroy_value %0 : $Builtin.NativeObject
-// CHECK: Block
-// CHECK: bb0(
+// CHECK: Block: bb0
 sil @double_consume_same_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
@@ -27,8 +26,7 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK: Found over consume?!
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   destroy_value %0 : $Builtin.NativeObject
-// CHECK: Block:
-// CHECK: bb0(
+// CHECK: Block: bb0
 sil @double_consume_jump_thread_blocks : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
@@ -45,8 +43,7 @@ bb1:
 // CHECK-LABEL: Function: 'double_consume_loop_test'
 // CHECK: Found over consume?!
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK: Block:
-// CHECK: bb0(
+// CHECK: Block: bb0
 sil @double_consume_loop_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject

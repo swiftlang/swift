@@ -666,8 +666,8 @@ bool SILValueOwnershipChecker::doesBlockContainUseAfterFree(
                  << "Function: '" << Value->getFunction()->getName() << "'\n"
                  << "Value: " << *Value
                  << "Consuming User: " << *LifetimeEndingUser
-                 << "Non Consuming User: " << *Iter->second << "Block:\n"
-                 << *UserBlock << "\n";
+                 << "Non Consuming User: " << *Iter->second << "Block: bb"
+                 << UserBlock->getDebugID() << "\n";
     return true;
   }
 
@@ -688,7 +688,7 @@ bool SILValueOwnershipChecker::doesBlockDoubleConsume(
                << "Value: " << *Value;
   if (LifetimeEndingUser)
     llvm::errs() << "User: " << *LifetimeEndingUser;
-  llvm::errs() << "Block:\n" << *UserBlock << "\n";
+  llvm::errs() << "Block: bb" << UserBlock->getDebugID() << "\n\n";
 
   return true;
 }
@@ -758,7 +758,8 @@ static bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg,
 
   llvm::errs() << "    Owned function parameter without life "
                   "ending uses!\n"
-               << "Value: " << *Arg;
+               << "Function: '" << Arg->getFunction()->getName() << "'\n"
+               << "Value: " << *Arg << '\n';
   if (PrintMessageInsteadOfAssert)
     return true;
   llvm_unreachable("triggering standard assertion failure routine");
@@ -776,7 +777,8 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
     llvm::errs() << "Non trivial values, non address values, and non "
                     "guaranteed function args must have at least one "
                     "lifetime ending use?!\n"
-                 << "Value: " << *Value;
+                 << "Function: '" << Value->getFunction()->getName() << "'\n"
+                 << "Value: " << *Value << '\n';
     if (PrintMessageInsteadOfAssert)
       return true;
     llvm_unreachable("triggering standard assertion failure routine");
@@ -792,10 +794,12 @@ static bool isGuaranteedFunctionArgWithLifetimeEndingUses(
     return true;
 
   llvm::errs() << "    Guaranteed function parameter with life ending uses!\n"
-               << "Value: " << *Arg;
+               << "    Function: '" << Arg->getFunction()->getName() << "'\n"
+               << "    Value: " << *Arg;
   for (auto *U : LifetimeEndingUsers) {
     llvm::errs() << "    Lifetime Ending User: " << *U;
   }
+  llvm::errs() << '\n';
   if (PrintMessageInsteadOfAssert)
     return false;
   llvm_unreachable("triggering standard assertion failure routine");
@@ -922,7 +926,7 @@ void SILValueOwnershipChecker::checkDataflow() {
   while (!Worklist.empty()) {
     // Grab the next block to visit.
     SILBasicBlock *BB = Worklist.pop_back_val();
-    DEBUG(llvm::dbgs() << "    Visiting Block:\n" << *BB);
+    DEBUG(llvm::dbgs() << "    Visiting Block: bb" << BB->getDebugID() << '\n');
 
     // Since the block is on our worklist, we know already that it is not a
     // block with lifetime ending uses, due to the invariants of our loop.
@@ -982,8 +986,9 @@ void SILValueOwnershipChecker::checkDataflow() {
         << "Function: '" << Value->getFunction()->getName() << "'\n"
         << "    Value: " << *Value << "    Post Dominating Failure Blocks:\n";
     for (auto *BB : SuccessorBlocksThatMustBeVisited) {
-      llvm::errs() << *BB;
+      llvm::errs() << "bb" << BB->getDebugID();
     }
+    llvm::errs() << '\n';
     if (PrintMessageInsteadOfAssert)
       return;
     llvm_unreachable("triggering standard assertion failure routine");
@@ -998,8 +1003,8 @@ void SILValueOwnershipChecker::checkDataflow() {
         << "Function: '" << Value->getFunction()->getName() << "'\n"
         << "Value: " << *Value << "    Remaining Users:\n";
     for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
-      llvm::errs() << "User:" << *Pair.second << "Block:\n"
-                   << *Pair.first << "\n";
+      llvm::errs() << "User:" << *Pair.second << "Block: bb"
+                   << Pair.first->getDebugID() << "\n\n";
     }
     if (PrintMessageInsteadOfAssert)
       return;
