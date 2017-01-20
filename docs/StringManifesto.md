@@ -29,12 +29,12 @@ work that could be done in the Swift 4 timeframe.
 It's worth noting that ergonomics and correctness are mutually-reinforcing.  An
 API that is easy to use—but incorrectly—cannot be considered an ergonomic
 success.  Conversely, an API that's simply hard to use is also hard to use
-correctly.  Acheiving optimal performance without compromising ergonomics or
+correctly.  Achieving optimal performance without compromising ergonomics or
 correctness is a greater challenge.
 
 Consistency with the Swift language and idioms is also important for
 ergonomics. There are several places both in the standard library and in the
-foundation additions to `String` where patterns and practices found elsewhere
+Foundation additions to `String` where patterns and practices found elsewhere
 could be applied to improve usability and familiarity.
 
 ### API Surface Area
@@ -123,8 +123,8 @@ The first step in improving this situation is to regularize all localized
 operations as invocations of normal string operations with extra
 parameters. Among other things, this means:
 
-1. Doing away with `localizedXXX` methods 
-2. Providing a terse way to name the current locale as a parameter
+1. Doing away with `localizedXXX` methods.
+2. Providing a terse way to name the current locale as a parameter.
 3. Automatically [adjusting defaults](#operations-with-options) for options such
    as case sensitivity based on whether the operation is localized.
 4. Removing correctness traps like `localizedCaseInsensitiveCompare` (see
@@ -233,16 +233,16 @@ What Unicode says about collation—which is used in `<`, `==`, and hashing— t
 out to be quite interesting, once you pick it apart.  The full Unicode Collation
 Algorithm (UCA) works like this:
 
-1. Fully normalize both strings
-2. Convert each string to a sequence of numeric triples to form a collation key
+1. Fully normalize both strings.
+2. Convert each string to a sequence of numeric triples to form a collation key.
 3. “Flatten” the key by concatenating the sequence of first elements to the
-   sequence of second elements to the sequence of third elements
-4. Lexicographically compare the flattened keys 
+   sequence of second elements to the sequence of third elements.
+4. Lexicographically compare the flattened keys.
 
 While step 1 can usually
 be [done quickly](http://unicode.org/reports/tr15/#Description_Norm) and
 incrementally, step 2 uses a collation table that maps matching *sequences* of
-unicode scalars in the normalized string to *sequences* of triples, which get
+Unicode scalars in the normalized string to *sequences* of triples, which get
 accumulated into a collation key.  Predictably, this is where the real costs
 lie.
 
@@ -383,7 +383,7 @@ The benefits of restoring `Collection` conformance are substantial:
     from whole-string ordering comparison, equality comparison, and
     case-conversion, respectively.  `reverse` operates correctly on graphemes,
     keeping diacritics moored to their base characters and leaving emoji intact.
-    Other methods such as `indexOf` and `contains` make obvious sense. A few
+    Other methods such as `index(of:)` and `contains` make obvious sense. A few
     `Collection` methods, like `min` and `max`, may not be particularly useful
     on `String`, but we don't consider that to be a problem worth solving, in
     the same way that we wouldn't try to suppress `min` and `max` on a
@@ -412,9 +412,9 @@ The benefits of restoring `Collection` conformance are substantial:
     this:
     
     ```swift
-      extension String : BidirectionalCollection {
-        subscript(i: Index) -> Character { return characters[i] }
-      }
+    extension String : BidirectionalCollection {
+      subscript(i: Index) -> Character { return characters[i] }
+    }
     ```
     
     It would be much better to legitimize the conformance to `Collection` and
@@ -439,8 +439,8 @@ do any introspection, including interoperation with ASCII.  To fix this, we shou
    that contain 0 or 2+ graphemes).
  - (Lower priority) expose some operations, such as `func uppercase() ->
    String`, `var isASCII: Bool`, and, to the extent they can be sensibly
-   generalized, queries of unicode properties that should also be exposed on
-   `UnicodeScalar` such as `isAlphabetic` and `isGraphemeBase` .
+   generalized, queries of Unicode properties that should also be exposed on
+   `UnicodeScalar` such as `isAlphabetic` and `isGraphemeBase`.
 
 Despite its name, `CharacterSet` currently operates on the Swift `UnicodeScalar`
 type. This means it is usable on `String`, but only by going through the unicode
@@ -451,21 +451,21 @@ grapheme clusters. <sup id="a5">[5](#f5)</sup>
 
 ### Unification of Slicing Operations
 
-Creating substrings is a basic part of String processing, but the slicing
+Creating substrings is a basic part of string processing, but the slicing
 operations that we have in Swift are inconsistent in both their spelling and
-their naming: 
+their naming:
 
   * Slices with two explicit endpoints are done with subscript, and support
     in-place mutation:
     
     ```swift
-        s[i..<j].mutate()
+    s[i..<j].mutate()
     ```
 
   * Slicing from an index to the end, or from the start to an index, is done
     with a method and does not support in-place mutation:
     ```swift
-        s.prefix(upTo: i).readOnly()
+    s.prefix(upTo: i).readOnly()
     ```
 
 Prefix and suffix operations should be migrated to be subscripting operations
@@ -658,7 +658,7 @@ consistent rule that could be applied in the general case for detecting when a
 substring is truly being stored long-term.
 
 To avoid the cost of copying substrings under "same type, copied storage", the
-optimizer could be enhanced to to reduce the impact of some of those copies.
+optimizer could be enhanced to reduce the impact of some of those copies.
 For example, this code could be optimized to pull the invariant substring out
 of the loop:
 
@@ -811,7 +811,7 @@ protocols in protocols.
 
 #### Low-Level Textual Analysis
 
-We should provide convenient APIs processing strings by character.  For example,
+We should provide convenient APIs for processing strings by character.  For example,
 it should be easy to cleanly express, “if this string starts with `"f"`, process
 the rest of the string as follows…”  Swift is well-suited to expressing this
 common pattern beautifully, but we need to add the APIs.  Here are two examples
@@ -835,10 +835,10 @@ point is to make sure matching-and-consuming jobs are well-supported.
 Many of the current methods that do matching are overloaded to do the same
 logical operations in different ways, with the following axes:
 
-- Logical Operation: `find`, `split`, `replace`, match at start
-- Kind of pattern: `CharacterSet`, `String`, a regex, a closure
+- Logical Operation: `find`, `split`, `replace`, match at start.
+- Kind of pattern: `CharacterSet`, `String`, a regex, a closure.
 - Options, e.g. case/diacritic sensitivity, locale.  Sometimes a part of
-  the method name, and sometimes an argument
+  the method name, and sometimes an argument.
 - Whole string or subrange.
 
 We should represent these aspects as orthogonal, composable components,
@@ -878,7 +878,7 @@ forces.replace(oneOrMore([Float.nan]), [0.0])
 #### Regular Expressions
 
 Addressing regular expressions is out of scope for this proposal.
-That said, it is important that to note the pattern matching protocol mentioned
+That said, it is important to note that the pattern matching protocol mentioned
 above provides a suitable foundation for regular expressions, and types such as
 `NSRegularExpression` can easily be retrofitted to conform to it.  In the
 future, support for regular expression literals in the compiler could allow for
@@ -982,7 +982,7 @@ development.
 
 #### Printf-Style Formatting
 
-`String.format` is designed on the `printf` model: it takes a format string with
+`String(format:)` is designed on the `printf` model: it takes a format string with
 textual placeholders for substitution, and an arbitrary list of other arguments.
 The syntax and meaning of these placeholders has a long history in
 C, but for anyone who doesn't use them regularly they are cryptic and complex,
@@ -1011,7 +1011,7 @@ design pattern demands more from users than it should:
 
 These may seem like small issues, but the experience of Apple localization
 experts is that the total drag of these factors on programmers is such that they
-tend to reach for `String.format` instead.
+tend to reach for `String(format:)` instead.
 
 #### String Interpolation
 
@@ -1229,7 +1229,7 @@ This area will require some design work.
 
 ### `StaticString`
 
-`StaticString` was added as a byproduct of standard library developed and kept
+`StaticString` was added as a byproduct of standard library development and kept
 around because it seemed useful, but it was never truly *designed* for client
 programmers.  We need to decide what happens with it.  Presumably *something*
 should fill its role, and that should conform to `Unicode`.
