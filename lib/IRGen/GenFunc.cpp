@@ -1511,7 +1511,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   auto NSConcreteStackBlock =
       IGF.IGM.getModule()->getOrInsertGlobal("_NSConcreteStackBlock",
                                              IGF.IGM.ObjCClassStructTy);
-  if (IGF.IGM.Triple.isOSBinFormatCOFF())
+  if (IGF.IGM.useDllStorage())
     cast<llvm::GlobalVariable>(NSConcreteStackBlock)
         ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 

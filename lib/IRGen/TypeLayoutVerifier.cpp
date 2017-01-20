@@ -43,7 +43,7 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
                                               /*var arg*/ false);
   auto verifierFn = IGF.IGM.Module.getOrInsertFunction(
       "_swift_debug_verifyTypeLayoutAttribute", verifierFnTy);
-  if (IGF.IGM.Triple.isOSBinFormatCOFF())
+  if (IGF.IGM.useDllStorage()) 
     if (auto *F = dyn_cast<llvm::Function>(verifierFn))
       F->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 

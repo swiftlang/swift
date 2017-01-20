@@ -542,6 +542,8 @@ public:
   void fatal_unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
 
+  bool useDllStorage();
+
 private:
   Size PtrSize;
   llvm::Type *FixedBufferTy;          /// [N x i8], where N == 3 * sizeof(void*)
