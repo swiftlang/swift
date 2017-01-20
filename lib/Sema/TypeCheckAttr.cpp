@@ -1786,6 +1786,16 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
 void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
+  // FIXME: Once protocols can contain nominal types, do we want to allow
+  // these nominal types to have accessibility (and also @_versioned)?
+  if (isa<ProtocolDecl>(VD->getDeclContext())) {
+    TC.diagnose(attr->getLocation(),
+                diag::versioned_attr_in_protocol)
+        .fixItRemove(attr->getRangeWithAt());
+    attr->setInvalid();
+    return;
+  }
+
   if (VD->getFormalAccess() != Accessibility::Internal) {
     TC.diagnose(attr->getLocation(),
                 diag::versioned_attr_with_explicit_accessibility,
@@ -1793,6 +1803,7 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
                 VD->getFormalAccess())
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
+    return;
   }
 }
 

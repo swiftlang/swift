@@ -3338,6 +3338,9 @@ ERROR(versioned_attr_with_explicit_accessibility,
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
       (Identifier, Accessibility))
 
+ERROR(versioned_attr_in_protocol,none,
+      "'@_versioned' attribute cannot be used in protocols", ())
+
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inline(__always)' function|" \
