@@ -2309,7 +2309,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         Attr = new (ctx) AvailableAttr(
           SourceLoc(), SourceRange(),
           (PlatformKind)platform, message, rename,
-          Introduced, Deprecated, Obsoleted,
+          Introduced, SourceRange(),
+          Deprecated, SourceRange(),
+          Obsoleted, SourceRange(),
           platformAgnostic, isImplicit);
         break;
 

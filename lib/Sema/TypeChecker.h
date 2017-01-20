@@ -1964,9 +1964,11 @@ public:
 
   /// Returns an over-approximation of the range of operating system versions
   /// that could the passed-in location could be executing upon for
-  /// the target platform.
+  /// the target platform. If MostRefined != nullptr, set to the most-refined
+  /// TRC found while approximating.
   AvailabilityContext
-  overApproximateAvailabilityAtLocation(SourceLoc loc, const DeclContext *DC);
+  overApproximateAvailabilityAtLocation(SourceLoc loc, const DeclContext *DC,
+                                        const TypeRefinementContext **MostRefined=nullptr);
 
   /// Walk the AST to build the hierarchy of TypeRefinementContexts
   ///

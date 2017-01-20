@@ -589,15 +589,18 @@ public:
                    PlatformKind Platform,
                    StringRef Message, StringRef Rename,
                    const clang::VersionTuple &Introduced,
+                   SourceRange IntroducedRange,
                    const clang::VersionTuple &Deprecated,
+                   SourceRange DeprecatedRange,
                    const clang::VersionTuple &Obsoleted,
+                   SourceRange ObsoletedRange,
                    PlatformAgnosticAvailabilityKind PlatformAgnostic,
                    bool Implicit)
     : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
       Message(Message), Rename(Rename),
-      INIT_VER_TUPLE(Introduced),
-      INIT_VER_TUPLE(Deprecated),
-      INIT_VER_TUPLE(Obsoleted),
+      INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
+      INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
+      INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
       PlatformAgnostic(PlatformAgnostic),
       Platform(Platform)
   {}
@@ -618,11 +621,20 @@ public:
   /// Indicates when the symbol was introduced.
   const Optional<clang::VersionTuple> Introduced;
 
+  /// Indicates where the Introduced version was specified.
+  const SourceRange IntroducedRange;
+
   /// Indicates when the symbol was deprecated.
   const Optional<clang::VersionTuple> Deprecated;
 
+  /// Indicates where the Deprecated version was specified.
+  const SourceRange DeprecatedRange;
+
   /// Indicates when the symbol was obsoleted.
   const Optional<clang::VersionTuple> Obsoleted;
+
+  /// Indicates where the Obsoleted version was specified.
+  const SourceRange ObsoletedRange;
 
   /// Indicates if the declaration has platform-agnostic availability.
   const PlatformAgnosticAvailabilityKind PlatformAgnostic;
