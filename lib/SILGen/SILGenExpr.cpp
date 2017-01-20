@@ -1926,7 +1926,14 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
   // If we're emitting into an initialization, we can try shuffling the
   // elements of the initialization.
   if (Initialization *I = C.getEmitInto()) {
-    if (I->canSplitIntoTupleElements()) {
+    // In Swift 3 mode, we might be stripping off labels from a
+    // one-element tuple; the destination type is a ParenType in
+    // that case.
+    //
+    // FIXME: Remove this eventually.
+    if (I->canSplitIntoTupleElements() &&
+        !(isa<ParenType>(E->getType().getPointer()) &&
+          SGF.getASTContext().isSwiftVersion3())) {
       emitTupleShuffleExprInto(*this, E, I);
       return RValue();
     }
@@ -1943,10 +1950,13 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
   // Prepare a new tuple to hold the shuffled result.
   RValue result(E->getType()->getCanonicalType());
 
-  // In Swift 3 mode, we might have to shuffle off labels.
+  // In Swift 3 mode, we might be stripping off labels from a
+  // one-element tuple; the destination type is a ParenType in
+  // that case.
   //
   // FIXME: Remove this eventually.
-  if (isa<ParenType>(E->getType().getPointer())) {
+  if (isa<ParenType>(E->getType().getPointer()) &&
+      SGF.getASTContext().isSwiftVersion3()) {
     assert(E->getElementMapping().size() == 1);
     auto shuffleIndex = E->getElementMapping()[0];
     assert(shuffleIndex != TupleShuffleExpr::DefaultInitialize &&
