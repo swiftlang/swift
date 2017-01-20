@@ -41,10 +41,9 @@ struct TypeLayout;
 /// \param payload - type metadata for the payload case of the enum.
 /// \param emptyCases - the number of empty cases in the enum.
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_initEnumValueWitnessTableSinglePayload(
-                                                    ValueWitnessTable *vwtable,
-                                                    const TypeLayout *payload,
-                                                    unsigned emptyCases);
+void swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
+                                                  const TypeLayout *payload,
+                                                  unsigned emptyCases);
 
 /// \brief Faster variant of the above which avoids digging into the enum type
 /// metadata when the caller already has the payload information handy.
@@ -85,10 +84,10 @@ extern "C" void swift_storeEnumTagSinglePayload(OpaqueValue *value,
 /// \brief Initialize the value witness table for a generic, multi-payload
 ///        enum instance.
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
-                                       EnumMetadata *enumType,
-                                       unsigned numPayloads,
-                                       const TypeLayout * const *payloadTypes);
+void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
+                                        EnumMetadata *enumType,
+                                        unsigned numPayloads,
+                                        const TypeLayout * const *payloadTypes);
 
 /// \brief Return an integer value representing which case of a multi-payload
 ///        enum is inhabited.
@@ -98,15 +97,15 @@ extern "C" void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
 ///
 /// \returns The index of the enum case.
 SWIFT_RUNTIME_EXPORT
-extern "C" unsigned swift_getEnumCaseMultiPayload(const OpaqueValue *value,
-                                                  const EnumMetadata *enumType);
+unsigned swift_getEnumCaseMultiPayload(const OpaqueValue *value,
+                                       const EnumMetadata *enumType);
   
 /// \brief Store the tag value for the given case into a multi-payload enum,
 ///        whose associated payload (if any) has already been initialized.
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_storeEnumTagMultiPayload(OpaqueValue *value,
-                                               const EnumMetadata *enumType,
-                                               unsigned whichCase);
+void swift_storeEnumTagMultiPayload(OpaqueValue *value,
+                                    const EnumMetadata *enumType,
+                                    unsigned whichCase);
 
 }
 

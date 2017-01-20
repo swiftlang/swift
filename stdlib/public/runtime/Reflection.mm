@@ -1197,11 +1197,11 @@ MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
 /// \returns the demangled name. Returns nullptr if the input String is not a
 /// Swift mangled name.
 SWIFT_RUNTIME_EXPORT
-extern "C" char *swift_demangle(const char *mangledName,
-                                size_t mangledNameLength,
-                                char *outputBuffer,
-                                size_t *outputBufferSize,
-                                uint32_t flags) {
+char *swift_demangle(const char *mangledName,
+                     size_t mangledNameLength,
+                     char *outputBuffer,
+                     size_t *outputBufferSize,
+                     uint32_t flags) {
   if (flags != 0) {
     swift::fatalError(0, "Only 'flags' value of '0' is currently supported.");
   }

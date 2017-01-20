@@ -213,7 +213,7 @@ _swift_allocError_(const Metadata *type,
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_allocError = _swift_allocError_;
+auto *_swift_allocError = _swift_allocError_;
 
 BoxPair::Return
 swift::swift_allocError(const Metadata *type,
@@ -231,7 +231,7 @@ _swift_deallocError_(SwiftError *error,
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_deallocError = _swift_deallocError_;
+auto *_swift_deallocError = _swift_deallocError_;
 
 void
 swift::swift_deallocError(SwiftError *error, const Metadata *type) {
@@ -364,7 +364,7 @@ _swift_getErrorValue_(const SwiftError *errorObject,
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_getErrorValue = _swift_getErrorValue_;
+auto *_swift_getErrorValue = _swift_getErrorValue_;
 
 void
 swift::swift_getErrorValue(const SwiftError *errorObject,
@@ -475,7 +475,7 @@ static id _swift_bridgeErrorToNSError_(SwiftError *errorObject) {
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_bridgeErrorToNSError = _swift_bridgeErrorToNSError_;
+auto *_swift_bridgeErrorToNSError = _swift_bridgeErrorToNSError_;
 
 id
 swift::swift_bridgeErrorToNSError(SwiftError *errorObject) {
@@ -573,7 +573,7 @@ static SwiftError *_swift_errorRetain_(SwiftError *error) {
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_errorRetain = _swift_errorRetain_;
+auto *_swift_errorRetain = _swift_errorRetain_;
 
 SwiftError *swift::swift_errorRetain(SwiftError *error) {
   return _swift_errorRetain(error);
@@ -585,7 +585,7 @@ static void _swift_errorRelease_(SwiftError *error) {
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_errorRelease = _swift_errorRelease_;
+auto *_swift_errorRelease = _swift_errorRelease_;
 
 void swift::swift_errorRelease(SwiftError *error) {
   return _swift_errorRelease(error);
@@ -594,7 +594,7 @@ void swift::swift_errorRelease(SwiftError *error) {
 static void _swift_willThrow_(SwiftError *error) { }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_willThrow = _swift_willThrow_;
+auto *_swift_willThrow = _swift_willThrow_;
 
 void swift::swift_willThrow(SwiftError *error) {
   return _swift_willThrow(error);

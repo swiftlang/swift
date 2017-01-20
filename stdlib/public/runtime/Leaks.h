@@ -28,16 +28,16 @@ struct HeapObject;
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_leaks_startTrackingObjects(const char *)
+void swift_leaks_startTrackingObjects(const char *)
     __attribute__((__noinline__, __used__));
 SWIFT_RUNTIME_EXPORT
-extern "C" int swift_leaks_stopTrackingObjects(const char *)
+int swift_leaks_stopTrackingObjects(const char *)
     __attribute__((__noinline__, __used__));
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_leaks_startTrackingObject(swift::HeapObject *)
+void swift_leaks_startTrackingObject(swift::HeapObject *)
     __attribute__((__noinline__, __used__));
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_leaks_stopTrackingObject(swift::HeapObject *)
+void swift_leaks_stopTrackingObject(swift::HeapObject *)
     __attribute__((__noinline__, __used__));
 
 #define SWIFT_LEAKS_START_TRACKING_OBJECT(obj)                                 \

@@ -1818,7 +1818,7 @@ static SimpleGlobalCache<MetatypeCacheEntry> MetatypeTypes;
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
-extern "C" const MetatypeMetadata *
+const MetatypeMetadata *
 swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   return &MetatypeTypes.getOrInsert(instanceMetadata).first->Data;
 }
@@ -1941,7 +1941,7 @@ ExistentialMetatypeValueWitnessTableCacheEntry(unsigned numWitnessTables) {
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
-extern "C" const ExistentialMetatypeMetadata *
+const ExistentialMetatypeMetadata *
 swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
   return &ExistentialMetatypes.getOrInsert(instanceMetadata).first->Data;
 }
@@ -2614,7 +2614,6 @@ Metadata::getClassObject() const {
 
 #ifndef NDEBUG
 SWIFT_RUNTIME_EXPORT
-extern "C"
 void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
                                             const void *runtimeValue,
                                             const void *staticValue,

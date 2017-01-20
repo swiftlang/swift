@@ -100,7 +100,7 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.
 SWIFT_RUNTIME_EXPORT
-extern "C" HeapObject* swift_bufferAllocate(
+HeapObject* swift_bufferAllocate(
   HeapMetadata const* bufferType, size_t size, size_t alignMask)
 {
   return swift::SWIFT_RT_ENTRY_CALL(swift_allocObject)(bufferType, size,
@@ -108,7 +108,7 @@ extern "C" HeapObject* swift_bufferAllocate(
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" intptr_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
+intptr_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
 
 namespace {
 /// Heap object destructor for a generic box allocated with swift_allocBox.
@@ -448,7 +448,6 @@ HeapObject *SWIFT_RT_ENTRY_IMPL(swift_tryRetain)(HeapObject *object)
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C"
 bool swift_isDeallocating(HeapObject *object) {
   return SWIFT_RT_ENTRY_REF(swift_isDeallocating)(object);
 }
@@ -532,10 +531,10 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 
 /// Variant of the above used in constructor failure paths.
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_deallocPartialClassInstance(HeapObject *object,
-                                                  HeapMetadata const *metadata,
-                                                  size_t allocatedSize,
-                                                  size_t allocatedAlignMask) {
+void swift_deallocPartialClassInstance(HeapObject *object,
+                                       HeapMetadata const *metadata,
+                                       size_t allocatedSize,
+                                       size_t allocatedAlignMask) {
   if (!object)
     return;
 

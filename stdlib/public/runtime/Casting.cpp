@@ -612,7 +612,7 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
 
 #if SWIFT_OBJC_INTEROP
 SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
-extern "C" id
+id
 swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
   case MetadataKind::Class:
@@ -644,7 +644,7 @@ swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
 }
 
 SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
-extern "C" id
+id
 swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
   case MetadataKind::Class:
@@ -3232,11 +3232,11 @@ const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
 }
 
 SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
-extern "C" bool swift_isClassType(const Metadata *type) {
+bool swift_isClassType(const Metadata *type) {
   return Metadata::isAnyKindOfClass(type->getKind());
 }
 
 SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
-extern "C" bool swift_isOptionalType(const Metadata *type) {
+bool swift_isOptionalType(const Metadata *type) {
   return type->getKind() == MetadataKind::Optional;
 }
