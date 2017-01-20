@@ -43,15 +43,27 @@ class SubstitutionMap {
   using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
 
   llvm::DenseMap<SubstitutableType *, Type> subMap;
-  llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>> conformanceMap;
+  llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>>
+    conformanceMap;
   llvm::DenseMap<TypeBase *, SmallVector<ParentType, 1>> parentMap;
 
-  Optional<ProtocolConformanceRef>
-  lookupConformance(ProtocolDecl *proto,
-                    ArrayRef<ProtocolConformanceRef> conformances) const;
+  // Call the given function for each parent of the given type. The
+  // function \c fn should return an \c Optional<T>. \c forEachParent() will
+  // return the first non-empty \C Optional<T> returned by \c fn.
+  template<typename T>
+  Optional<T> forEachParent(
+                CanType type,
+                llvm::function_ref<Optional<T>(CanType,
+                                               AssociatedTypeDecl *)> fn) const;
 
-  template<typename Fn>
-  Optional<ProtocolConformanceRef> forEachParent(CanType type, Fn fn) const;
+  // Call the given function for each conformance of the given type. The
+  // function \c fn should return an \c Optional<T>. \c forEachConformance()
+  // will return the first non-empty \C Optional<T> returned by \c fn.
+  template<typename T>
+  Optional<T> forEachConformance(
+                  CanType type,
+                  llvm::function_ref<Optional<T>(ProtocolConformanceRef)> fn)
+                const;
 
 public:
   Optional<ProtocolConformanceRef>
