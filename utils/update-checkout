@@ -187,7 +187,7 @@ def obtain_all_additional_swift_sources(
                 continue
 
             if os.path.isdir(os.path.join(repo_name, ".git")):
-                print("Skipping clone of '" + repo_name + "', directory already eixsts")
+                print("Skipping clone of '" + repo_name + "', directory already exists")
                 continue
 
             # If we have a url override, use that url instead of
