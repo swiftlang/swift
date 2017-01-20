@@ -213,3 +213,51 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
 
   return subMap;
 }
+
+void SubstitutionMap::dump(llvm::raw_ostream &out) const {
+  out << "Substitutions:\n";
+  for (const auto &sub : subMap) {
+    out.indent(2);
+    sub.first->print(out);
+    out << " -> ";
+    sub.second->print(out);
+    out << "\n";
+  }
+
+  out << "\nConformance map:\n";
+  for (const auto &conformances : conformanceMap) {
+    out.indent(2);
+    conformances.first->print(out);
+    out << " -> [";
+    interleave(conformances.second.begin(), conformances.second.end(),
+               [&](ProtocolConformanceRef conf) {
+                 conf.dump(out);
+               },
+               [&] {
+                 out << ", ";
+               });
+    out << "]\n";
+  }
+
+  out << "\nParent map:\n";
+  for (const auto &parent : parentMap) {
+    out.indent(2);
+    parent.first->print(out);
+    out << " -> [";
+    interleave(parent.second.begin(), parent.second.end(),
+               [&](SubstitutionMap::ParentType parentType) {
+                 parentType.first->print(out);
+                 out << " @ ";
+                 out << parentType.second->getProtocol()->getName().str()
+                     << "." << parentType.second->getName().str();
+               },
+               [&] {
+                 out << ", ";
+               });
+    out << "]\n";
+  }
+}
+
+void SubstitutionMap::dump() const {
+  return dump(llvm::errs());
+}

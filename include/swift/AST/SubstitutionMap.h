@@ -94,6 +94,11 @@ public:
                            GenericSignature *derivedSig,
                            Optional<SubstitutionMap> derivedSubs,
                            LazyResolver *resolver);
+
+  /// Dump the contents of this substitution map for debugging purposes.
+  void dump(llvm::raw_ostream &out) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in the debugger");
 };
 
 } // end namespace swift
