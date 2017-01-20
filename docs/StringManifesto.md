@@ -185,9 +185,9 @@ sort ordering | locale, case/diacritic/width-insensitivity
 case conversion | locale
 pattern matching | locale, case/diacritic/width-insensitivity
 
-The defaults for case-, diacritic-, and width-insensitivity are different for
+The defaults for case-, diacritic-, and width-insensitivity are sometimes different for
 localized operations than for non-localized operations, so for example a
-localized sort should be case-insensitive by default, and a non-localized sort
+localized search should be case-insensitive by default, and a non-localized search
 should be case-sensitive by default.  We propose a standard “language” of
 defaulted parameters to be used for these purposes, with usage roughly like this:
 
