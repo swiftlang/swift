@@ -115,7 +115,7 @@ public:
       llvm::errs() << "Function: '" << User->getFunction()->getName() << "'\n"
                    << "Have operand with incompatible ownership?!\n"
                    << "Value: " << *getValue() << "User: " << *User
-                   << "Conv: " << getOwnershipKind() << "\n";
+                   << "Conv: " << getOwnershipKind() << "\n\n";
       if (PrintMessageInsteadOfAssert)
         return false;
       llvm_unreachable("triggering standard assertion failure routine");
@@ -662,8 +662,8 @@ bool SILValueOwnershipChecker::doesBlockContainUseAfterFree(
                    [&NonLifetimeEndingUser](const SILInstruction &I) -> bool {
                      return NonLifetimeEndingUser == &I;
                    }) != UserBlock->end()) {
-    llvm::errs() << "Found use after free?!\n"
-                 << "Function: '" << Value->getFunction()->getName() << "'\n"
+    llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
+                 << "Found use after free?!\n"
                  << "Value: " << *Value
                  << "Consuming User: " << *LifetimeEndingUser
                  << "Non Consuming User: " << *Iter->second << "Block: bb"
@@ -756,9 +756,9 @@ static bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg,
     break;
   }
 
-  llvm::errs() << "    Owned function parameter without life "
+  llvm::errs() << "Function: '" << Arg->getFunction()->getName() << "'\n"
+               << "    Owned function parameter without life "
                   "ending uses!\n"
-               << "Function: '" << Arg->getFunction()->getName() << "'\n"
                << "Value: " << *Arg << '\n';
   if (PrintMessageInsteadOfAssert)
     return true;
@@ -774,10 +774,10 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
   }
 
   if (!isValueAddressOrTrivial(Value, Mod)) {
-    llvm::errs() << "Non trivial values, non address values, and non "
+    llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
+                 << "Non trivial values, non address values, and non "
                     "guaranteed function args must have at least one "
                     "lifetime ending use?!\n"
-                 << "Function: '" << Value->getFunction()->getName() << "'\n"
                  << "Value: " << *Value << '\n';
     if (PrintMessageInsteadOfAssert)
       return true;
@@ -793,8 +793,8 @@ static bool isGuaranteedFunctionArgWithLifetimeEndingUses(
   if (Arg->getOwnershipKind() != ValueOwnershipKind::Guaranteed)
     return true;
 
-  llvm::errs() << "    Guaranteed function parameter with life ending uses!\n"
-               << "    Function: '" << Arg->getFunction()->getName() << "'\n"
+  llvm::errs() << "    Function: '" << Arg->getFunction()->getName() << "'\n"
+               << "    Guaranteed function parameter with life ending uses!\n"
                << "    Value: " << *Arg;
   for (auto *U : LifetimeEndingUsers) {
     llvm::errs() << "    Lifetime Ending User: " << *U;
@@ -982,8 +982,8 @@ void SILValueOwnershipChecker::checkDataflow() {
   // make sure we didn't leak.
   if (!SuccessorBlocksThatMustBeVisited.empty()) {
     llvm::errs()
-        << "Error! Found a leak due to a consuming post-dominance failure!\n"
         << "Function: '" << Value->getFunction()->getName() << "'\n"
+        << "Error! Found a leak due to a consuming post-dominance failure!\n"
         << "    Value: " << *Value << "    Post Dominating Failure Blocks:\n";
     for (auto *BB : SuccessorBlocksThatMustBeVisited) {
       llvm::errs() << "bb" << BB->getDebugID();
@@ -999,8 +999,8 @@ void SILValueOwnershipChecker::checkDataflow() {
   // blocks implying a use-after free.
   if (!BlocksWithNonLifetimeEndingUses.empty()) {
     llvm::errs()
-        << "Found use after free due to unvisited non lifetime ending uses?!\n"
         << "Function: '" << Value->getFunction()->getName() << "'\n"
+        << "Found use after free due to unvisited non lifetime ending uses?!\n"
         << "Value: " << *Value << "    Remaining Users:\n";
     for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
       llvm::errs() << "User:" << *Pair.second << "Block: bb"
