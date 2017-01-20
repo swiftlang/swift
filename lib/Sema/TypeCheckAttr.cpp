@@ -697,7 +697,6 @@ public:
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Effects)
     IGNORED_ATTR(Exported)
-    IGNORED_ATTR(FixedLayout)
     IGNORED_ATTR(GKInspectable)
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
@@ -764,6 +763,7 @@ public:
 
   void visitSpecializeAttr(SpecializeAttr *attr);
 
+  void visitFixedLayoutAttr(FixedLayoutAttr *attr);
   void visitVersionedAttr(VersionedAttr *attr);
   
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
@@ -1770,8 +1770,31 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   attr->setRequirements(DC->getASTContext(), convertedRequirements);
 }
 
+void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
+  auto *VD = cast<ValueDecl>(D);
+
+  if (VD->getEffectiveAccess() < Accessibility::Public) {
+    TC.diagnose(attr->getLocation(),
+                diag::fixed_layout_attr_on_internal_type,
+                VD->getName(),
+                VD->getFormalAccess())
+        .fixItRemove(attr->getRangeWithAt());
+    attr->setInvalid();
+  }
+}
+
 void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
+
+  // FIXME: Once protocols can contain nominal types, do we want to allow
+  // these nominal types to have accessibility (and also @_versioned)?
+  if (isa<ProtocolDecl>(VD->getDeclContext())) {
+    TC.diagnose(attr->getLocation(),
+                diag::versioned_attr_in_protocol)
+        .fixItRemove(attr->getRangeWithAt());
+    attr->setInvalid();
+    return;
+  }
 
   if (VD->getFormalAccess() != Accessibility::Internal) {
     TC.diagnose(attr->getLocation(),
@@ -1780,6 +1803,7 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
                 VD->getFormalAccess())
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
+    return;
   }
 }
 

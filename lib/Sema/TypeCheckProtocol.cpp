@@ -5649,7 +5649,7 @@ void DefaultWitnessChecker::recordWitness(
 }
 
 // Not all protocol members are requirements.
-bool TypeChecker::isRequirement(ValueDecl *requirement) {
+bool TypeChecker::isRequirement(const ValueDecl *requirement) {
   if (auto *FD = dyn_cast<FuncDecl>(requirement))
     if (FD->isAccessor())
       return false;
