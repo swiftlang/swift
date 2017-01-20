@@ -30,9 +30,9 @@
 
 using namespace swift;
 
+#if !defined(_MSC_VER)
 static std::mutex swiftOnceMutex;
 
-#if !defined(_MSC_VER)
 void swift::_swift_once_f(uintptr_t *predicate, void *context,
                           void (*function)(void *)) {
   // FIXME: This implementation does a global lock, which is much worse than
