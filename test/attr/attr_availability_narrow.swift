@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-
+// REQUIRES: OS=macosx
 // <rdar://problem/17669805> Suggest narrowing the range of bad availabile checks
 
 import Foundation
