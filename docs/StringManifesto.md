@@ -744,7 +744,7 @@ With `Substring` and `String` being distinct types and sharing almost all
 interface and semantics, and with the highest-performance string processing
 requiring knowledge of encoding and layout that the currency types can't
 provide, it becomes important to capture the common “string API” in a protocol.
-Since Unicode conformance is a key feature of string processing in swift, we
+Since Unicode conformance is a key feature of string processing in Swift, we
 call that protocol `Unicode`:
 
 **Note:** The following assumes several features that are planned but not yet implemented in
