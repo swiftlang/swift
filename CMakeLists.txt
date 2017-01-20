@@ -314,8 +314,22 @@ function(find_version cmd flag find_in_path)
   message(STATUS "")
 endfunction()
 
+set(SWIFT_BUILT_STANDALONE FALSE)
+if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
+  set(SWIFT_BUILT_STANDALONE TRUE)
+endif()
+
+if(SWIFT_BUILT_STANDALONE)
+  project(Swift C CXX ASM)
+endif()
+
+# Check if we're build with MSVC or Clang-cl, as these compilers have similar command line arguments.
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
+  set(SWIFT_COMPILER_IS_MSVC_LIKE TRUE)
+endif()
+
 # Print out path and version of any installed commands.
-# We migth be using the wrong version of a command, so record them all.
+# We might be using the wrong version of a command, so record them all.
 function(print_versions)
   find_version("cmake" "--version" TRUE)
   find_version(${CMAKE_COMMAND} "--version" FALSE)
@@ -333,21 +347,13 @@ function(print_versions)
     find_version("${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark" "--version" FALSE)
   endif()
 
-  find_version(${CMAKE_C_COMPILER} "--version" FALSE)
-  find_version(${CMAKE_CXX_COMPILER} "--version" FALSE)
+  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    find_version(${CMAKE_C_COMPILER} "--version" FALSE)
+    find_version(${CMAKE_CXX_COMPILER} "--version" FALSE)
+  endif()
 endfunction()
 
 print_versions()
-
-
-set(SWIFT_BUILT_STANDALONE FALSE)
-if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
-  set(SWIFT_BUILT_STANDALONE TRUE)
-endif()
-
-if(SWIFT_BUILT_STANDALONE)
-  project(Swift C CXX ASM)
-endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "")
   message(FATAL_ERROR "CMAKE_SYSTEM_NAME is empty!")
@@ -550,11 +556,6 @@ set(SWIFT_HOST_VARIANT_ARCH "${SWIFT_HOST_VARIANT_ARCH_default}" CACHE STRING
 # Enable additional warnings.
 #
 swift_common_cxx_warnings()
-
-# Check if we're build with MSVC or Clang-cl, as these compilers have similar command line arguments.
-if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
-  set(SWIFT_COMPILER_IS_MSVC_LIKE TRUE)
-endif()
 
 #
 # Configure SDKs.
