@@ -897,18 +897,21 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       for (auto *Spec : Specs) {
         PlatformKind Platform;
         clang::VersionTuple Version;
+        SourceRange VersionRange;
         PlatformAgnosticAvailabilityKind PlatformAgnostic;
 
         if (auto *PlatformVersionSpec =
             dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
           Platform = PlatformVersionSpec->getPlatform();
           Version = PlatformVersionSpec->getVersion();
+          VersionRange = PlatformVersionSpec->getVersionSrcRange();
           PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
         } else if (auto *LanguageVersionSpec =
                    dyn_cast<LanguageVersionConstraintAvailabilitySpec>(Spec)) {
           Platform = PlatformKind::none;
           Version = LanguageVersionSpec->getVersion();
+          VersionRange = LanguageVersionSpec->getVersionSrcRange();
           PlatformAgnostic =
             PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
 
@@ -922,8 +925,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                      /*Message=*/StringRef(),
                                      /*Rename=*/StringRef(),
                                      /*Introduced=*/Version,
+                                     /*IntroducedRange=*/VersionRange,
                                      /*Deprecated=*/clang::VersionTuple(),
+                                     /*DeprecatedRange=*/SourceRange(),
                                      /*Obsoleted=*/clang::VersionTuple(),
+                                     /*ObsoletedRange=*/SourceRange(),
                                      PlatformAgnostic,
                                      /*Implicit=*/true));
       }
@@ -941,6 +947,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     StringRef Message, Renamed;
     clang::VersionTuple Introduced, Deprecated, Obsoleted;
+    SourceRange IntroducedRange, DeprecatedRange, ObsoletedRange;
     auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
     bool AnyAnnotations = false;
     int ParamIndex = 0;
@@ -1060,8 +1067,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                            (ArgumentKind == IsDeprecated) ? Deprecated :
                                                             Obsoleted;
 
-        SourceRange VersionRange;
-        
+        auto &VersionRange = (ArgumentKind == IsIntroduced) ? IntroducedRange :
+                             (ArgumentKind == IsDeprecated) ? DeprecatedRange :
+                                                              ObsoletedRange;
+
         if (parseVersionTuple(
                 VersionArg, VersionRange,
                 Diagnostic(diag::attr_availability_expected_version,
@@ -1127,9 +1136,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                        AvailableAttr(AtLoc, AttrRange,
                                         PlatformKind.getValue(),
                                         Message, Renamed,
-                                        Introduced,
-                                        Deprecated,
-                                        Obsoleted,
+                                        Introduced, IntroducedRange,
+                                        Deprecated, DeprecatedRange,
+                                        Obsoleted, ObsoletedRange,
                                         PlatformAgnostic,
                                         /*Implicit=*/false));
       } else {

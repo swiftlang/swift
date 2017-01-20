@@ -620,7 +620,8 @@ TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
 
 AvailabilityContext
 TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
-                                                   const DeclContext *DC) {
+                                                   const DeclContext *DC,
+                                                   const TypeRefinementContext **MostRefined) {
   SourceFile *SF = DC->getParentSourceFile();
 
   // If our source location is invalid (this may be synthesized code), climb
@@ -663,6 +664,9 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
     TypeRefinementContext *TRC =
         rootTRC->findMostRefinedSubContext(loc, Context.SourceMgr);
     OverApproximateContext.constrainWith(TRC->getAvailabilityInfo());
+    if (MostRefined) {
+      *MostRefined = TRC;
+    }
   }
 
   return OverApproximateContext;
@@ -1187,6 +1191,54 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
       .fixItInsert(InsertLoc, AttrText);
 }
 
+/// In the special case of being in an existing, nontrivial type refinement
+/// context that's close but not quite narrow enough to satisfy requirements
+/// (i.e.  requirements are contained-in the existing TRC but off by a subminor
+/// version), emit a diagnostic and fixit that narrows the existing TRC
+/// condition to the required range.
+static bool fixAvailabilityByNarrowingNearbyVersionCheck(
+    SourceRange ReferenceRange,
+    const DeclContext *ReferenceDC,
+    const VersionRange &RequiredRange,
+    TypeChecker &TC,
+    InFlightDiagnostic &Err) {
+  const TypeRefinementContext *TRC = nullptr;
+  AvailabilityContext RunningOSOverApprox =
+    TC.overApproximateAvailabilityAtLocation(ReferenceRange.Start,
+                                             ReferenceDC, &TRC);
+  VersionRange RunningRange = RunningOSOverApprox.getOSVersion();
+  if (RunningRange.hasLowerEndpoint() &&
+      RequiredRange.hasLowerEndpoint() &&
+      AvailabilityContext(RequiredRange).isContainedIn(RunningOSOverApprox) &&
+      TRC && TRC->getReason() != TypeRefinementContext::Reason::Root) {
+
+    // Only fix situations that are "nearby" versions, meaning
+    // disagreement on a minor-or-less version for non-macOS,
+    // or disagreement on a subminor-or-less version for macOS.
+    auto RunningVers = RunningRange.getLowerEndpoint();
+    auto RequiredVers = RequiredRange.getLowerEndpoint();
+    auto Platform = targetPlatform(TC.Context.LangOpts);
+    if (RunningVers.getMajor() != RequiredVers.getMajor())
+      return false;
+    if ((Platform == PlatformKind::OSX ||
+         Platform == PlatformKind::OSXApplicationExtension) &&
+        !(RunningVers.getMinor().hasValue() &&
+          RequiredVers.getMinor().hasValue() &&
+          RunningVers.getMinor().getValue() ==
+          RequiredVers.getMinor().getValue()))
+      return false;
+
+    auto FixRange = TRC->getAvailabilityConditionVersionSourceRange(
+      Platform, RunningVers);
+    if (!FixRange.isValid())
+      return false;
+    // Have found a nontrivial type refinement context-introducer to narrow.
+    Err.fixItReplace(FixRange, RequiredVers.getAsString());
+    return true;
+  }
+  return false;
+}
+
 /// Emit a diagnostic note and Fix-It to add an if #available(...) { } guard
 /// that checks for the given version range around the given node.
 static void fixAvailabilityByAddingVersionCheck(
@@ -1289,12 +1341,21 @@ void TypeChecker::diagnosePotentialUnavailability(
     return;
   }
 
-  diagnose(ReferenceRange.Start, diag::availability_decl_only_version_newer,
-           Name, prettyPlatformString(targetPlatform(Context.LangOpts)),
-           Reason.getRequiredOSVersionRange().getLowerEndpoint());
+  auto RequiredRange = Reason.getRequiredOSVersionRange();
+  {
+    auto Err =
+      diagnose(ReferenceRange.Start, diag::availability_decl_only_version_newer,
+               Name, prettyPlatformString(targetPlatform(Context.LangOpts)),
+               Reason.getRequiredOSVersionRange().getLowerEndpoint());
 
-  fixAvailability(ReferenceRange, ReferenceDC,
-                  Reason.getRequiredOSVersionRange(), *this);
+    // Direct a fixit to the error if an existing guard is nearly-correct
+    if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
+                                                     ReferenceDC,
+                                                     RequiredRange, *this, Err))
+      return;
+  }
+
+  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, *this);
 }
 
 void TypeChecker::diagnosePotentialAccessorUnavailability(
@@ -1309,13 +1370,23 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
   auto &diag = ForInout ? diag::availability_inout_accessor_only_version_newer
                         : diag::availability_accessor_only_version_newer;
 
-  diagnose(ReferenceRange.Start, diag,
-           static_cast<unsigned>(Accessor->getAccessorKind()), Name,
-           prettyPlatformString(targetPlatform(Context.LangOpts)),
-           Reason.getRequiredOSVersionRange().getLowerEndpoint());
+  auto RequiredRange = Reason.getRequiredOSVersionRange();
+  {
+    auto Err =
+      diagnose(ReferenceRange.Start, diag,
+               static_cast<unsigned>(Accessor->getAccessorKind()), Name,
+               prettyPlatformString(targetPlatform(Context.LangOpts)),
+               Reason.getRequiredOSVersionRange().getLowerEndpoint());
 
-  fixAvailability(ReferenceRange, ReferenceDC,
-                  Reason.getRequiredOSVersionRange(), *this);
+
+    // Direct a fixit to the error if an existing guard is nearly-correct
+    if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
+                                                     ReferenceDC,
+                                                     RequiredRange, *this, Err))
+      return;
+  }
+
+  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, *this);
 }
 
 const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {

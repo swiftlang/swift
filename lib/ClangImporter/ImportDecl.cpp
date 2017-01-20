@@ -1556,8 +1556,11 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
                                       /*Message=*/StringRef(),
                                       /*Rename=*/StringRef(),
                                       info.getOSVersion().getLowerEndpoint(),
+                                      /*IntroducedRange*/SourceRange(),
                                       /*Deprecated=*/noVersion,
+                                      /*DeprecatedRange*/SourceRange(),
                                       /*Obsoleted=*/noVersion,
+                                      /*ObsoletedRange*/SourceRange(),
                                       PlatformAgnosticAvailabilityKind::None,
                                       /*Implicit=*/false);
 
@@ -6571,7 +6574,12 @@ void ClangImporter::Implementation::importAttributes(
       auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
                                           platformK.getValue(),
                                           message, swiftReplacement,
-                                          introduced, deprecated, obsoleted,
+                                          introduced,
+                                          /*IntroducedRange=*/SourceRange(),
+                                          deprecated,
+                                          /*DeprecatedRange=*/SourceRange(),
+                                          obsoleted,
+                                          /*ObsoletedRange=*/SourceRange(),
                                           PlatformAgnostic, /*Implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
