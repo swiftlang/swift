@@ -5374,8 +5374,24 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
   auto accessorKind = AccessorKind::NotAccessor;
   if (auto *fn = dyn_cast<FuncDecl>(witness)) {
     accessorKind = fn->getAccessorKind();
-    if (accessorKind != AccessorKind::NotAccessor) {
+    switch (accessorKind) {
+    case AccessorKind::IsAddressor:
+    case AccessorKind::IsMutableAddressor:
+    case AccessorKind::IsMaterializeForSet:
+      // These accessors are never exposed to Objective-C.
+      return result;
+    case AccessorKind::IsDidSet:
+    case AccessorKind::IsWillSet:
+      // These accessors are folded into the setter.
+      return result;
+    case AccessorKind::IsGetter:
+    case AccessorKind::IsSetter:
+      // These are found relative to the main decl.
       name = fn->getAccessorStorageDecl()->getFullName();
+      break;
+    case AccessorKind::NotAccessor:
+      // Do nothing.
+      break;
     }
   }
 
