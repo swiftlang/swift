@@ -242,6 +242,58 @@ class NoBracesClass2 // expected-error {{expected '{' in class}}
 protocol NoBracesProtocol2 // expected-error {{expected '{' in protocol type}}
 extension NoBracesStruct2 // expected-error {{expected '{' in extension}}
 
+//===--- Recovery for multiple identifiers in decls
+
+enum EE EE {}
+// expected-error @-1 {{found an unexpected second identifier in enum declaration; is there an accidental break?}} 
+// expected-note @-2 {{join the identifiers together}} {{6-11=EEEE}}
+
+struct SS SS {}
+// expected-error @-1 {{found an unexpected second identifier in struct declaration; is there an accidental break?}}
+// expected-note @-2 {{join the identifiers together}} {{8-13=SSSS}}
+
+class CC CC {}
+// expected-error @-1 {{found an unexpected second identifier in class declaration; is there an accidental break?}}
+// expected-note @-2 {{join the identifiers together}} {{7-12=CCCC}}
+// expected-note @-3 {{did you mean 'CC'}}
+
+enum EEE {
+  
+  case a a
+  // expected-error @-1 {{found an unexpected second identifier in enum case declaration; is there an accidental break?}} 
+  // expected-note @-2 {{join the identifiers together}} {{8-11=aa}}
+  // expected-note @-3 {{join the identifiers together with camel-case}} {{8-11=aA}}
+  
+  case b
+}
+
+struct AA {
+  
+  private var a b = 0
+  // expected-error @-1 {{found an unexpected second identifier in property declaration; is there an accidental break?}}
+  // expected-note @-2 {{join the identifiers together}} {{15-18=ab}}
+  // expected-note @-3 {{join the identifiers together with camel-case}} {{15-18=aB}}
+  // expected-error @-4 {{type annotation missing in pattern}}
+  
+  func f() {
+    var c d = 5
+    // expected-error @-1 {{found an unexpected second identifier in variable declaration; is there an accidental break?}}
+    // expected-note @-2 {{join the identifiers together}} {{9-12=cd}}
+    // expected-note @-3 {{join the identifiers together with camel-case}} {{9-12=cD}}
+    // expected-error @-4 {{type annotation missing in pattern}}
+    
+    let _ = 0
+  }
+}
+
+let e f = 5
+// expected-error @-1 {{found an unexpected second identifier in variable declaration; is there an accidental break?}}
+// expected-note @-2 {{join the identifiers together}} {{5-8=ef}}
+// expected-note @-3 {{join the identifiers together with camel-case}} {{5-8=eF}}
+// expected-error @-4 {{type annotation missing in pattern}}
+// expected-note @-5 * {{did you mean 'e'?}}
+
+
 //===--- Recovery for parse errors in types.
 
 struct ErrorTypeInVarDecl1 {
