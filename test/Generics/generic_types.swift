@@ -167,6 +167,7 @@ func useRangeOfPrintables(_ roi : RangeOfPrintables<[Int]>) {
 
 var dfail : Dictionary<Int> // expected-error{{generic type 'Dictionary' specialized with too few type parameters (got 1, but expected 2)}}
 var notgeneric : Int<Float> // expected-error{{cannot specialize non-generic type 'Int'}}{{21-28=}}
+var notgenericNested : Array<Int<Float>> // expected-error{{cannot specialize non-generic type 'Int'}}{{33-40=}}
 
 // Make sure that redundant typealiases (that map to the same
 // underlying type) don't break protocol conformance or use.
