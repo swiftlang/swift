@@ -25,7 +25,6 @@
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 
-#define CRASH_REPORTER_CLIENT_HIDDEN __attribute__((visibility("hidden")))
 #define CRASHREPORTER_ANNOTATIONS_VERSION 5
 #define CRASHREPORTER_ANNOTATIONS_SECTION "__crash_info"
 
@@ -41,7 +40,7 @@ struct crashreporter_annotations_t {
 };
 
 extern "C" {
-CRASH_REPORTER_CLIENT_HIDDEN
+LLVM_LIBRARY_VISIBILITY
 extern struct crashreporter_annotations_t gCRAnnotations;
 }
 
