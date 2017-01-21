@@ -818,7 +818,7 @@ common pattern beautifully, but we need to add the APIs.  Here are two examples
 of the sort of code that might be possible given such APIs:
 
 ```swift
-if let firstLetter = input.droppingPrefix(alphabeticCharacter) {
+if let firstLetter = input.dropPrefix(alphabeticCharacter) {
   somethingWith(input) // process the rest of input
 }
 
