@@ -121,7 +121,7 @@ public:
     if (programHeaders == nullptr) {
       return;
     }
-    // If a interpreter is set in the program headers then this is a
+    // If an interpreter is set in the program headers then this is a
     // dynamic executable and therefore not valid.
     for (size_t idx = 0; idx < elfHeader.e_phnum; idx++) {
       if (programHeaders[idx].p_type == PT_INTERP) {
