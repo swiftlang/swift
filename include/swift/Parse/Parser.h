@@ -861,7 +861,7 @@ public:
   ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID,
                                          bool HandleCodeCompletion = true);
 
-  // \brief Parse layout constraint. 
+  /// \brief Parse layout constraint.
   LayoutConstraintInfo parseLayoutConstraint(Identifier LayoutConstraintID);
 
   bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
