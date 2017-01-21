@@ -450,7 +450,8 @@ int main(int argc, char **argv) {
   if (VerifyMode) {
     HadError = verifyDiagnostics(CI.getSourceMgr(), CI.getInputBufferIDs(),
                                  /*autoApplyFixes*/false,
-                                 /*ignoreUnknown*/false);
+                                 /*ignoreUnknown*/false,
+                                 /*ConditionalVerifyFlags*/{});
     DiagnosticEngine &diags = CI.getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {

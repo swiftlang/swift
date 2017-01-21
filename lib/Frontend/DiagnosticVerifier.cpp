@@ -91,7 +91,8 @@ namespace {
     /// verifyFile - After the file has been processed, check to see if we
     /// got all of the expected diagnostics and check to see if there were any
     /// unexpected ones.
-    bool verifyFile(unsigned BufferID, bool autoApplyFixes);
+    bool verifyFile(unsigned BufferID, bool autoApplyFixes,
+                    ArrayRef<std::string> ConditionalVerifyFlags);
 
     /// diagnostics for '<unknown>:0' should be considered as unexpected.
     bool verifyUnknown();
@@ -200,8 +201,10 @@ static std::string renderFixits(ArrayRef<llvm::SMFixIt> fixits,
 /// \brief After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
-bool DiagnosticVerifier::verifyFile(unsigned BufferID,
-                                    bool shouldAutoApplyFixes) {
+bool
+DiagnosticVerifier::verifyFile(unsigned BufferID,
+                               bool shouldAutoApplyFixes,
+                               ArrayRef<std::string> ConditionalVerifyFlags) {
   using llvm::SMLoc;
   
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
@@ -246,6 +249,25 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       MatchStart = MatchStart.substr(strlen("expected-error"));
     } else
       continue;
+
+    // Conditional verification flag.
+    if (MatchStart.size() > 2 && MatchStart[0] == '(') {
+      size_t CondEnd = MatchStart.find(")");
+      if (CondEnd == StringRef::npos) {
+        addError(MatchStart.data(),
+            "didn't find ')' to match '(' in expected-warning/note/error line");
+        continue;
+      }
+      auto Flag = MatchStart.slice(1, CondEnd).trim();
+      bool IsNot = Flag[0] == '!';
+      if (IsNot)
+        Flag = Flag.substr(1);
+      bool FlagMatched = any_of(ConditionalVerifyFlags,
+                                [&](std::string F) { return Flag.equals(F); });
+      if (IsNot ? FlagMatched : !FlagMatched)
+        continue;
+      MatchStart = MatchStart.substr(CondEnd + 1);
+    }
 
     // Skip any whitespace before the {{.
     MatchStart = MatchStart.substr(MatchStart.find_first_not_of(" \t"));
@@ -711,14 +733,16 @@ void swift::enableDiagnosticVerifier(SourceManager &SM) {
 }
 
 bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
-                              bool autoApplyFixes, bool ignoreUnknown) {
+                              bool autoApplyFixes, bool ignoreUnknown,
+                              ArrayRef<std::string> ConditionalVerifyFlags) {
   auto *Verifier = (DiagnosticVerifier*)SM.getLLVMSourceMgr().getDiagContext();
   SM.getLLVMSourceMgr().setDiagHandler(nullptr, nullptr);
   
   bool HadError = false;
 
   for (auto &BufferID : BufferIDs)
-    HadError |= Verifier->verifyFile(BufferID, autoApplyFixes);
+    HadError |= Verifier->verifyFile(BufferID, autoApplyFixes,
+                                     ConditionalVerifyFlags);
   if (!ignoreUnknown)
     HadError |= Verifier->verifyUnknown();
 

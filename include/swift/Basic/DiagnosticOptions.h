@@ -13,7 +13,10 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 #define SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
@@ -58,6 +61,19 @@ public:
     // Nothing here that contributes anything significant when emitting the PCH.
     return llvm::hash_value(0);
   }
+
+  /// Add explicit verification flags, initialized via the '-D' compiler flag.
+  void addConditionalVerifyFlag(llvm::StringRef Name) {
+    assert(!Name.empty());
+    ConditionalVerifyFlags.push_back(Name);
+  }
+
+  /// Get Conditional verication flags.
+  llvm::ArrayRef<std::string>
+  getConditionalVerifyFlags() const { return ConditionalVerifyFlags; }
+
+private:
+  llvm::SmallVector<std::string, 2> ConditionalVerifyFlags;
 };
 
 } // end namespace swift

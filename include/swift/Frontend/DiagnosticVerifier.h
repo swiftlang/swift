@@ -19,6 +19,7 @@
 #define SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 
 #include "swift/Basic/LLVM.h"
+#include <string>
 
 namespace swift {
   class SourceManager;
@@ -33,7 +34,8 @@ namespace swift {
   ///
   /// This returns true if there are any mismatches found.
   bool verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
-                         bool autoApplyFixes, bool ignoreUnknown);
+                         bool autoApplyFixes, bool ignoreUnknown,
+                         ArrayRef<std::string> ConditionalVerifyFlags);
 }
 
 #endif
