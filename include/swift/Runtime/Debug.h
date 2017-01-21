@@ -19,6 +19,7 @@
 
 #include <llvm/Support/Compiler.h>
 #include <stdint.h>
+#include "swift/Basic/Unreachable.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 
@@ -70,13 +71,9 @@ LLVM_ATTRIBUTE_NORETURN
 LLVM_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
 static inline void crash(const char *message) {
   CRSetCrashLogMessage(message);
-  // __builtin_trap() doesn't always do the right thing due to GCC compatibility
-#if defined(__i386__) || defined(__x86_64__)
-  asm("int3");
-#else
-  __builtin_trap();
-#endif
-  __builtin_unreachable();
+
+  LLVM_BUILTIN_TRAP;
+  swift_unreachable("Expected compiler to crash.");
 }
 
 /// Report a corrupted type object.
