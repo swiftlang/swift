@@ -1383,7 +1383,7 @@ bool GenericRequirementsCheckListener::shouldCheck(RequirementKind kind,
 }
 
 void GenericRequirementsCheckListener::diagnosed(
-    const Requirement *withRequirement) {}
+    const Requirement *requirement) {}
 
 bool TypeChecker::
 solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
