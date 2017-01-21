@@ -42,10 +42,21 @@ using namespace swift;
 // prevent release builds from triggering spurious unused variable warnings.
 #ifndef NDEBUG
 
-llvm::cl::opt<bool> PrintMessageInsteadOfAssert(
-    "sil-ownership-verifier-do-not-assert",
-    llvm::cl::desc("Print out message instead of asserting. "
-                   "Meant for debugging"));
+// This is an option to put the SILOwnershipVerifier in testing mode. This
+// causes the following:
+//
+// 1. Instead of printing an error message and aborting, the verifier will print
+// the message and continue. This allows for FileCheck testing of the verifier.
+//
+// 2. SILInstruction::verifyOperandOwnership() is disabled. This is used for
+// verification in SILBuilder. This causes errors to be printed twice, once when
+// we build the IR and a second time when we perform a full verification of the
+// IR. For testing purposes, we just want the later.
+llvm::cl::opt<bool> IsSILOwnershipVerifierTestingEnabled(
+    "sil-ownership-verifier-enable-testing",
+    llvm::cl::desc("Put the sil ownership verifier in testing mode. See "
+                   "comment in SILOwnershipVerifier.cpp above option for more "
+                   "information."));
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -116,7 +127,7 @@ public:
                    << "Have operand with incompatible ownership?!\n"
                    << "Value: " << *getValue() << "User: " << *User
                    << "Conv: " << getOwnershipKind() << "\n\n";
-      if (PrintMessageInsteadOfAssert)
+      if (IsSILOwnershipVerifierTestingEnabled)
         return false;
       llvm_unreachable("triggering standard assertion failure routine");
     }
@@ -760,7 +771,7 @@ static bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg,
                << "    Owned function parameter without life "
                   "ending uses!\n"
                << "Value: " << *Arg << '\n';
-  if (PrintMessageInsteadOfAssert)
+  if (IsSILOwnershipVerifierTestingEnabled)
     return true;
   llvm_unreachable("triggering standard assertion failure routine");
 }
@@ -779,7 +790,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
                     "guaranteed function args must have at least one "
                     "lifetime ending use?!\n"
                  << "Value: " << *Value << '\n';
-    if (PrintMessageInsteadOfAssert)
+    if (IsSILOwnershipVerifierTestingEnabled)
       return true;
     llvm_unreachable("triggering standard assertion failure routine");
   }
@@ -800,7 +811,7 @@ static bool isGuaranteedFunctionArgWithLifetimeEndingUses(
     llvm::errs() << "    Lifetime Ending User: " << *U;
   }
   llvm::errs() << '\n';
-  if (PrintMessageInsteadOfAssert)
+  if (IsSILOwnershipVerifierTestingEnabled)
     return false;
   llvm_unreachable("triggering standard assertion failure routine");
 }
@@ -870,14 +881,14 @@ bool SILValueOwnershipChecker::checkUses() {
     // If the block does over consume, we either assert or return false. We only
     // return false when debugging.
     if (doesBlockDoubleConsume(UserBlock, User, true)) {
-      if (PrintMessageInsteadOfAssert)
+      if (IsSILOwnershipVerifierTestingEnabled)
         return false;
       llvm_unreachable("triggering standard assertion failure routine");
     }
 
     // Then check if the given block has a use after free.
     if (doesBlockContainUseAfterFree(User, UserBlock)) {
-      if (PrintMessageInsteadOfAssert)
+      if (IsSILOwnershipVerifierTestingEnabled)
         return false;
       llvm_unreachable("triggering standard assertion failure routine");
     }
@@ -907,7 +918,7 @@ bool SILValueOwnershipChecker::checkUses() {
     // Make sure that the predecessor is not in our
     // BlocksWithLifetimeEndingUses list.
     if (doesBlockDoubleConsume(PredBlock, User)) {
-      if (PrintMessageInsteadOfAssert)
+      if (IsSILOwnershipVerifierTestingEnabled)
         return false;
       llvm_unreachable("triggering standard assertion failure routine");
     }
@@ -965,7 +976,7 @@ void SILValueOwnershipChecker::checkDataflow() {
     // 2. We add the predecessor to the worklist if we have not visited it yet.
     for (auto *PredBlock : BB->getPredecessorBlocks()) {
       if (doesBlockDoubleConsume(PredBlock)) {
-        if (PrintMessageInsteadOfAssert)
+        if (IsSILOwnershipVerifierTestingEnabled)
           return;
         llvm_unreachable("triggering standard assertion failure routine");
       }
@@ -989,7 +1000,7 @@ void SILValueOwnershipChecker::checkDataflow() {
       llvm::errs() << "bb" << BB->getDebugID();
     }
     llvm::errs() << '\n';
-    if (PrintMessageInsteadOfAssert)
+    if (IsSILOwnershipVerifierTestingEnabled)
       return;
     llvm_unreachable("triggering standard assertion failure routine");
   }
@@ -1006,7 +1017,7 @@ void SILValueOwnershipChecker::checkDataflow() {
       llvm::errs() << "User:" << *Pair.second << "Block: bb"
                    << Pair.first->getDebugID() << "\n\n";
     }
-    if (PrintMessageInsteadOfAssert)
+    if (IsSILOwnershipVerifierTestingEnabled)
       return;
     llvm_unreachable("triggering standard assertion failure routine");
   }
@@ -1022,6 +1033,10 @@ void SILInstruction::verifyOperandOwnership() const {
 #ifndef NDEBUG
   // If SILOwnership is not enabled, do not perform verification.
   if (!getModule().getOptions().EnableSILOwnership)
+    return;
+  // If we are testing the verifier, bail so we only print errors once when
+  // performing a full verification, instead of additionally in the SILBuilder.
+  if (IsSILOwnershipVerifierTestingEnabled)
     return;
   auto *Self = const_cast<SILInstruction *>(this);
   for (const Operand &Op : getAllOperands()) {
