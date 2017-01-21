@@ -317,15 +317,20 @@ struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
 // CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
 // CHECK:   [[T2:%.*]] = bitcast %swift.type** [[T1]] to i8***
 // CHECK:   %T.ParentHasAssociatedType = load i8**, i8*** [[T2]],
+
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 1
-// CHECK:   [[T1:%.*]] = load i8*, i8** [[T0]],
-// CHECK:   [[T2:%.*]] = bitcast i8* [[T1]] to %swift.type* (%swift.type*, i8**)*
-// CHECK:   %T.Assoc = call %swift.type* [[T2]](%swift.type* %T, i8** %T.ParentHasAssociatedType)
+
+// CHECK: [[T0:%.*]] = load i8*, i8** %T.ParentHasAssociatedType
+// CHECK: [[T1:%.*]] = bitcast i8* [[T0]] to i8**
+// CHECK: [[T2:%.*]] = load i8*, i8** [[T1]], align 8, !invariant.load !10
+// CHECK: [[T3:%.*]] = bitcast i8* [[T2]] to %swift.type*
+// CHECK:   %T.Assoc = call %swift.type* [[T3]](%swift.type* %T, i8** [[T1]])
+
 // CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 2
 // CHECK:   [[T1:%.*]] = load i8*, i8** [[T0]],
 // CHECK:   [[T2:%.*]] = bitcast i8* [[T1]] to i8** (%swift.type*, %swift.type*, i8**)*
 // CHECK:   %T.Assoc.HasAssociatedType = call i8** [[T2]](%swift.type* %T.Assoc, %swift.type* %T, i8** %T.ParentHasAssociatedType)
+
 // CHECK:   [[T0:%.*]] = load i8*, i8** %T.Assoc.HasAssociatedType,
 // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to %swift.type* (%swift.type*, i8**)*
 // CHECK:   %T.Assoc.Assoc = call %swift.type* [[T1]](%swift.type* %T.Assoc, i8** %T.Assoc.HasAssociatedType)
