@@ -1,4 +1,4 @@
-//===- LayoutConstraint.cpp - Layout constraints types and APIs -*- C++ -*-===//
+//===--- LayoutConstraint.cpp - Layout constraints types and APIs ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
