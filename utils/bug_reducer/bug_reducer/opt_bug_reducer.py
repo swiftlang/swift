@@ -116,8 +116,8 @@ def pass_bug_reducer(tools, config, passes, sil_opt_invoker, reduce_sil):
     input_file = sil_opt_invoker.input_file
     nm = swift_tools.SILNMInvoker(config, tools)
     sil_extract_invoker = swift_tools.SILFuncExtractorInvoker(config,
-                                                                    tools,
-                                                                    input_file)
+                                                              tools,
+                                                              input_file)
 
     func_bug_reducer.function_bug_reducer(input_file, nm, sil_opt_invoker,
                                           sil_extract_invoker,

@@ -126,8 +126,8 @@ list of function given a specific pass that causes the perf pipeline to crash
     input_file = args.input_file
     extra_args = args.extra_args
     sil_opt_invoker = swift_tools.SILOptInvoker(config, tools,
-                                                      input_file,
-                                                      extra_args)
+                                                input_file,
+                                                extra_args)
 
     # Make sure that the base case /does/ crash.
     filename = sil_opt_invoker.get_suffixed_filename('base_case')
