@@ -13,6 +13,11 @@ import Builtin
 // Declarations //
 //////////////////
 
+enum Optional<T> {
+case some(T)
+case nome
+}
+
 struct TrivialStruct {
   var f1: Builtin.Int32
   var f2: Builtin.Int32
@@ -21,6 +26,11 @@ struct TrivialStruct {
 struct NonTrivialStructWithTrivialField {
   var owner: Builtin.NativeObject
   var payload: Builtin.Int32
+}
+
+struct TupleContainingNonTrivialStruct {
+  var t: (Builtin.NativeObject, Builtin.NativeObject)
+  var opt: Optional<Builtin.NativeObject>
 }
 
 ////////////////
@@ -69,4 +79,25 @@ sil @non_trivial_unowned_arg : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
+}
+
+/////////////////////
+// Aggregate Tests //
+/////////////////////
+
+// These tests make sure that we properly handle @owned forwarding of multiple
+// levels of aggregate.
+
+sil @owned_aggregates_simple : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> (@owned (Builtin.NativeObject, Builtin.NativeObject)) {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
+  return %2 : $(Builtin.NativeObject, Builtin.NativeObject)
+}
+
+sil @multiple_level_owned_aggregates : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> (@owned TupleContainingNonTrivialStruct) {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject, %2 : $Builtin.NativeObject):
+  %3 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
+  %4 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %2 : $Builtin.NativeObject
+  %5 = struct $TupleContainingNonTrivialStruct(%3 : $(Builtin.NativeObject, Builtin.NativeObject), %4 : $Optional<Builtin.NativeObject>)
+  return %5 : $TupleContainingNonTrivialStruct
 }
