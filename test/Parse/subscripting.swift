@@ -81,7 +81,7 @@ _ = y2[0] // expected-error{{cannot use mutating getter on immutable value: 'y2'
 
 // Parsing errors
 struct A0 {
-  subscript // expected-error {{subscripts cannot have a name}} {{5-7=}}
+  subscript // expected-error {{expected '(' for subscript parameters}}
     i : Int
      -> Int {
     get {
@@ -175,4 +175,23 @@ struct A8 {
       stored = value
     }
   }
+
+struct A9 {
+  subscript x() -> Int { // expected-error {{subscripts cannot have a name}} {{13-14=}}
+    return 0
+  }
+}
+
+struct A10 {
+  subscript x(i: Int) -> Int { // expected-error {{subscripts cannot have a name}} {{13-14=}}
+    return 0
+  }
+}
+
+struct A11 {
+  subscript x y : Int -> Int { // expected-error {{expected '(' for subscript parameters}}
+    return 0
+  }
+}
+
 } // expected-error{{extraneous '}' at top level}} {{1-3=}}

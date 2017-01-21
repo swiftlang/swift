@@ -483,12 +483,14 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
       diagID = diag::func_decl_without_paren;
       break;
     case ParameterContextKind::Subscript:
-      skipIdentifier = Tok.is(tok::identifier);
+      skipIdentifier = Tok.is(tok::identifier) &&
+                       peekToken().is(tok::l_paren);
       diagID = skipIdentifier ? diag::subscript_has_name
                               : diag::expected_lparen_subscript;
       break;
     case ParameterContextKind::Initializer:
-      skipIdentifier = Tok.is(tok::identifier);
+      skipIdentifier = Tok.is(tok::identifier) &&
+                       peekToken().is(tok::l_paren);
       diagID = skipIdentifier ? diag::initializer_has_name
                               : diag::expected_lparen_initializer;
       break;

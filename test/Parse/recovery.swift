@@ -541,6 +541,18 @@ struct InitializerWithName {
   init x() {} // expected-error {{initializers cannot have a name}} {{8-9=}}
 }
 
+struct InitializerWithNameAndParam {
+  init a(b: Int) {} // expected-error {{initializers cannot have a name}} {{8-9=}}
+}
+
+struct InitializerWithLabels {
+  init c d: Int {}
+  // expected-error @-1 {{expected '(' for initializer parameters}}
+  // expected-error @-2 {{expected declaration}}
+  // expected-error @-3 {{consecutive declarations on a line must be separated by ';'}}
+  // expected-note @-5 {{in declaration of 'InitializerWithLabels'}}
+}
+
 // rdar://20337695
 func f1() {
 

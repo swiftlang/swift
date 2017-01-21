@@ -5517,10 +5517,8 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     if (!Tok.is(tok::l_brace) && !isInSILMode()) {
       if (Tok.is(tok::identifier)) {
         diagnose(Tok, diag::destructor_has_name).fixItRemove(Tok.getLoc());
-      }
-      else {
+      } else
         diagnose(Tok, diag::expected_lbrace_destructor);
-      }
       return nullptr;
     }
   }
