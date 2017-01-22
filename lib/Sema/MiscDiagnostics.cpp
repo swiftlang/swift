@@ -1891,7 +1891,9 @@ public:
           VarDecls[param] = 0;
     
   }
-    
+
+  VarDeclUsageChecker(TypeChecker &TC, TopLevelCodeDecl *TLCD) : TC(TC) {}
+
   VarDeclUsageChecker(TypeChecker &TC, VarDecl *VD) : TC(TC) {
     // Track a specific VarDecl
     VarDecls[VD] = 0;
@@ -2388,6 +2390,11 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
   // Check for unused variables, as well as variables that are could be
   // declared as constants.
   AFD->getBody()->walk(VarDeclUsageChecker(TC, AFD));
+}
+
+void swift::performTopLevelDeclDiagnostics(TypeChecker &TC,
+                                           TopLevelCodeDecl *TLCD) {
+   TLCD->getBody()->walk(VarDeclUsageChecker(TC, TLCD));
 }
 
 /// Diagnose C style for loops.

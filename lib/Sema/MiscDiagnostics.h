@@ -22,6 +22,7 @@
 
 namespace swift {
   class AbstractFunctionDecl;
+  class TopLevelCodeDecl;
   class ApplyExpr;
   class CallExpr;
   class DeclContext;
@@ -41,6 +42,8 @@ void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
 void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
                                         AbstractFunctionDecl *AFD);
+
+void performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD);
   
 /// Emit a fix-it to set the accessibility of \p VD to \p desiredAccess.
 ///
