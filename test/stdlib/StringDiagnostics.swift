@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -D RUNTIME_%target-runtime
 
-// XFAIL: linux
-
+#if _runtime(_ObjC)
 import Foundation
+#endif
 
 // Common pitfall: trying to subscript a string with integers.
 func testIntSubscripting(s: String, i: Int) {
@@ -38,29 +38,32 @@ func testNonAmbiguousStringComparisons() {
   x = s1 as String > s2
 }
 
+#if _runtime(_ObjC)
 func testAmbiguousStringComparisons(s: String) {
   let nsString = s as NSString
   let a1 = s as NSString == nsString
   let a2 = s as NSString != nsString
-  let a3 = s < nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{24-24= as String}}
-  let a4 = s <= nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{25-25= as String}}
-  let a5 = s >= nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{25-25= as String}}
-  let a6 = s > nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{24-24= as String}}
+  let a3 = s < nsString // expected-error(RUNTIME_objc){{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{24-24= as String}}
+  let a4 = s <= nsString // expected-error(RUNTIME_objc){{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{25-25= as String}}
+  let a5 = s >= nsString // expected-error(RUNTIME_objc){{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{25-25= as String}}
+  let a6 = s > nsString // expected-error(RUNTIME_objc){{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{24-24= as String}}
   // now the other way
   let a7 = nsString == s as NSString
   let a8 = nsString != s as NSString
-  let a9 = nsString < s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{20-20= as String}}
-  let a10 = nsString <= s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
-  let a11 = nsString >= s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
-  let a12 = nsString > s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
+  let a9 = nsString < s // expected-error(RUNTIME_objc){{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{20-20= as String}}
+  let a10 = nsString <= s // expected-error(RUNTIME_objc){{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
+  let a11 = nsString >= s // expected-error(RUNTIME_objc){{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
+  let a12 = nsString > s // expected-error(RUNTIME_objc){{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
 }
+#endif
 
 func testStringDeprecation(hello: String) {
-  let hello2 = hello
-    .addingPercentEscapes(using: .utf8) // expected-warning{{'addingPercentEscapes(using:)' is deprecated}}
-
-  _ = hello2?
-    .replacingPercentEscapes(using: .utf8) // expected-warning{{'replacingPercentEscapes(using:)' is deprecated}}
+  _ = hello
+    .addingPercentEscapes(using: .utf8) // expected-warning(RUNTIME_objc){{'addingPercentEscapes(using:)' is deprecated}}
+                                        // expected-error(!RUNTIME_objc)@-2{{value of type 'String' has no member 'addingPercentEscapes'}}
+  _ = hello
+    .replacingPercentEscapes(using: .utf8) // expected-warning(RUNTIME_objc){{'replacingPercentEscapes(using:)' is deprecated}}
+                                           // expected-error(!RUNTIME_objc)@-2{{value of type 'String' has no member 'replacingPercentEscapes'}}
 }
 
 // Positive and negative tests for String collection types. Testing the complete
