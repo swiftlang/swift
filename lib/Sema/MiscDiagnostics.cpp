@@ -1892,7 +1892,7 @@ public:
     
   }
 
-  VarDeclUsageChecker(TypeChecker &TC, TopLevelCodeDecl *TLCD) : TC(TC) {}
+  VarDeclUsageChecker(TypeChecker &TC) : TC(TC) {}
 
   VarDeclUsageChecker(TypeChecker &TC, VarDecl *VD) : TC(TC) {
     // Track a specific VarDecl
@@ -2393,8 +2393,13 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
 }
 
 void swift::performTopLevelDeclDiagnostics(TypeChecker &TC,
-                                           TopLevelCodeDecl *TLCD) {
-   TLCD->getBody()->walk(VarDeclUsageChecker(TC, TLCD));
+                                           ArrayRef<Decl*> topLevel) {
+  VarDeclUsageChecker checker(TC);
+  for (auto D : topLevel) {
+    if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      TLCD->getBody()->walk(checker);
+    }
+  }
 }
 
 /// Diagnose C style for loops.

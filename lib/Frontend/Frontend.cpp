@@ -501,7 +501,8 @@ void CompilerInstance::performSema() {
       if (mainIsPrimary) {
         performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
                             TypeCheckOptions, CurTUElem,
-                            options.WarnLongFunctionBodies);
+                            options.WarnLongFunctionBodies,
+                            /*DiagnoseTopLevelCode*/ Done);
       }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);

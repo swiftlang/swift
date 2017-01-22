@@ -1585,5 +1585,4 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   StmtChecker(*this, TLCD).typeCheckStmt(Body);
   TLCD->setBody(Body);
   checkTopLevelErrorHandling(TLCD);
-  performTopLevelDeclDiagnostics(*this, TLCD);
 }

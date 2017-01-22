@@ -17,6 +17,7 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "MiscDiagnostics.h"
 #include "GenericTypeResolver.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -594,7 +595,8 @@ void swift::typeCheckExternalDefinitions(SourceFile &SF) {
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 OptionSet<TypeCheckingFlags> Options,
                                 unsigned StartElem,
-                                unsigned WarnLongFunctionBodies) {
+                                unsigned WarnLongFunctionBodies,
+                                bool DiagnoseTopLevelCode) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
@@ -681,6 +683,9 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     }
 
     if (hasTopLevelCode) {
+      if (DiagnoseTopLevelCode) {
+        performTopLevelDeclDiagnostics(TC, llvm::makeArrayRef(SF.Decls));
+      }
       TC.contextualizeTopLevelCode(TLC,
                              llvm::makeArrayRef(SF.Decls).slice(StartElem));
     }

@@ -176,10 +176,15 @@ namespace swift {
   ///
   /// \param WarnLongFunctionBodies If non-zero, warn when a function body takes
   /// longer than this many milliseconds to type-check
+  ///
+  /// \param DiagnoseTopLevelCode If true, perform diagnostics on all of the SF
+  /// top level declarations. This should only be done when parseIntoSourceFile
+  /// is done.
   void performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                            OptionSet<TypeCheckingFlags> Options,
                            unsigned StartElem = 0,
-                           unsigned WarnLongFunctionBodies = 0);
+                           unsigned WarnLongFunctionBodies = 0,
+                           bool DiagnoseTopLevelCode = false);
 
   /// Once type checking is complete, this walks protocol requirements
   /// to resolve default witnesses.
