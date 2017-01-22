@@ -843,8 +843,8 @@ namespace {
 
   template <typename T>
   struct OperatorLookup {
-  	// Don't fold this into the static_assert: this would trigger an MSVC bug
-  	// that causes the assertion to fail.
+    // Don't fold this into the static_assert: this would trigger an MSVC bug
+    // that causes the assertion to fail.
     static constexpr T* ptr = static_cast<T*>(nullptr);
     static_assert(ptr, "Only usable with operators");
   };
