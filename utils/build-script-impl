@@ -720,7 +720,6 @@ function set_build_options_for_host() {
 
 
     llvm_cmake_options+=(
-        -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
         -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
         -DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING:BOOL=TRUE
     )
@@ -1986,13 +1985,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=(llvm-tblgen clang-headers)
                 fi
 
-                # Note: we set the variable:
-                #
-                # LLVM_TOOL_SWIFT_BUILD
-                #
-                # below because this script builds swift separately, and people
-                # often have reasons to symlink the swift directory into
-                # llvm/tools, e.g. to build LLDB.
                 cmake_options=(
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
@@ -2000,7 +1992,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
-                    -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     "${llvm_cmake_options[@]}"
