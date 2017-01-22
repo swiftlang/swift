@@ -412,7 +412,7 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
     // If we do have a trivial value ownership kind, see if our result type is
     // trivial or non-trivial. If it is trivial, then we have trivial
     // ownership. Otherwise, we have unowned ownership since from an ownership
-    // perspective, the value has instantaneously come into existance and
+    // perspective, the value has instantaneously come into existence and
     // nothing has taken ownership of it.
     if (ResultTypeIsTrivial) {
       return ValueOwnershipKind::Trivial;

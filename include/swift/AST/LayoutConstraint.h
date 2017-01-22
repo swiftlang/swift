@@ -223,7 +223,7 @@ template <class X> inline X dyn_cast_or_null(LayoutConstraint LC) {
 }
 
 /// LayoutConstraintLoc - Provides source location information for a
-/// parsed layout constaint.
+/// parsed layout constraint.
 struct LayoutConstraintLoc {
 private:
   LayoutConstraint Layout;

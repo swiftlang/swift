@@ -1478,7 +1478,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Subtype constraints are subject for edge contraction,
       // which is inappropriate in this case, because it's going to
       // erase/lose 'inout' modifier after merging equivalence classes
-      // (if inout containts type var, see ConstraintGraph::contractEdges()),
+      // (if inout constraints type var, see ConstraintGraph::contractEdges()),
       // since right-hand side type variable must not be materializable
       // it can simply get left-hand side as a fixed binding, otherwise fail.
       if (type1->is<InOutType>() &&
@@ -1490,7 +1490,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (typeVar2->getImpl().mustBeMaterializable())
           return SolutionKind::Error;
 
-        // Constriants like `inout T0 subtype T1` where (T0 must be
+        // Constraints like `inout T0 subtype T1` where (T0 must be
         // materializable) are created when closures are part of the generic
         // function parameters e.g. `func foo<T>(_ t: T, (inout T) -> Void) {}`
         // so when such function gets called e.g.

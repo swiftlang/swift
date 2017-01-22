@@ -643,7 +643,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
 
   // Reverse scan of the members because indirect field are generated just
   // after the corresponding anonymous type, so a reverse scan allows
-  // swiftching from O(n) to O(1) here.
+  // switching from O(n) to O(1) here.
   for (auto decl : reverse(members)) {
     if (decl->getClangDecl() == containingField) {
       anonymousFieldDecl = cast<VarDecl>(decl);

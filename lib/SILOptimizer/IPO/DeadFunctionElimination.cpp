@@ -199,7 +199,7 @@ protected:
       makeAlive(F);
   }
 
-  /// Marks a witnes table as alive if it is not alive yet.
+  /// Marks a witness table as alive if it is not alive yet.
   void ensureAliveConformance(const ProtocolConformance *C) {
     SILWitnessTable *WT = Module->lookUpWitnessTable(C,
                                                  /*deserializeLazily*/ false);
@@ -296,7 +296,7 @@ protected:
     DEBUG(llvm::dbgs() << "    scan function " << F->getName() << '\n');
 
     size_t ExistingNumConfs = FoundConformances.getUsedConformances().size();
-    size_t EsistingMetaTypes = FoundConformances.getEscapingMetaTypes().size();
+    size_t ExistingMetaTypes = FoundConformances.getEscapingMetaTypes().size();
 
     // First scan all instructions of the function.
     for (SILBasicBlock &BB : *F) {
@@ -329,7 +329,7 @@ protected:
     // All conformances of a type for which the meta-type escapes, must stay
     // alive.
     auto UsedMTs = FoundConformances.getEscapingMetaTypes();
-    for (size_t Idx = EsistingMetaTypes; Idx < UsedMTs.size(); ++Idx) {
+    for (size_t Idx = ExistingMetaTypes; Idx < UsedMTs.size(); ++Idx) {
       const NominalTypeDecl *NT = UsedMTs[Idx];
       auto Confs = NT->getAllConformances();
       for (ProtocolConformance *C : Confs) {
@@ -548,7 +548,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
       CanType ConformingTy = C->getType()->getCanonicalType();
       if (ConformingTy.isAnyClassReferenceType()) {
         // We are very conservative with class conformances. Even if a private/
-        // internal class is never instanciated, it might be created via
+        // internal class is never instantiated, it might be created via
         // reflection by using the stdlib's _getTypeByMangledName function.
         makeAlive(&WT);
       } else {

@@ -692,7 +692,7 @@ ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
 
 //------------------------------------------------------------------------------
-// Layout constaints diagnostics
+// Layout constraint diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(layout_size_should_be_positive,none,

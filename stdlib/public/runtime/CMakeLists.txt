@@ -76,7 +76,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   set(static_binary_lnk_file_list)
   string(TOLOWER "${sdk}" lowercase_sdk)
 
-  # These two libaries are only used with the static swiftcore
+  # These two libraries are only used with the static swiftcore
   add_library(swiftImageInspectionStatic STATIC
               ImageInspectionStatic.cpp
               StaticBinaryELF.cpp)

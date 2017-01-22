@@ -346,7 +346,7 @@ public:
   /// \param first The left-hand side type assigned to the requirement,
   /// possibly represented by its generic substitute.
   ///
-  /// \param second The right-hand side type assinged to the requirement,
+  /// \param second The right-hand side type assigned to the requirement,
   /// possibly represented by its generic substitute.
   ///
   ///

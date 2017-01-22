@@ -410,7 +410,7 @@ namespace {
 
     /// How should address_to_pointer be handled?
     ///
-    /// In DefinitInitialization it is considered as an inout parameter to get
+    /// In DefiniteInitialization it is considered as an inout parameter to get
     /// diagnostics about passing a let variable to an inout mutable-pointer
     /// argument.
     /// In PredictableMemOpt it is considered as an escape point to be
