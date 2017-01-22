@@ -762,7 +762,7 @@ protocol Unicode
   var codeUnits: CodeUnits { get }
   
   associatedtype UnicodeScalars 
-    : BidirectionalCollection  where Element == UnicodeScalar
+    : BidirectionalCollection where Element == UnicodeScalar
   var unicodeScalars: UnicodeScalars { get }
 
   associatedtype ExtendedASCII 

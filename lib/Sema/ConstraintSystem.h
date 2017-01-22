@@ -866,11 +866,11 @@ private:
   unsigned TypeCounter = 0;
 
   /// \brief The number of scopes created so far during the solution
-  /// of this constriant system.
+  /// of this constraint system.
   ///
   /// This is a measure of complexity of the solution space. A new
   /// scope is created every time we attempt a type variable binding
-  /// or explore an option in a disjuction.
+  /// or explore an option in a disjunction.
   unsigned CountScopes = 0;
 
   /// \brief Cached member lookups.

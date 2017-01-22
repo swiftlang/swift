@@ -980,7 +980,7 @@ public:
   /// \brief Construct a new layout-constraint requirement.
   ///
   /// \param Subject The type that must conform to the given layout 
-  /// requirment.
+  /// requirement.
   /// \param ColonLoc The location of the ':', or an invalid location if
   /// this requirement was implied.
   /// \param Layout The layout requirement to which the

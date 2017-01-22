@@ -202,7 +202,7 @@ public:
   /// \param trackParsedSymbols If true, tracks decls and macros that were
   ///        parsed from the bridging header.
   /// \param implicitImport If true, indicates that this import was implicit
-  ///        from a reference in a module file (deprecated behaviour).
+  ///        from a reference in a module file (deprecated behavior).
   ///
   /// \returns true if there was an error importing the header.
   ///

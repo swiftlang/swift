@@ -2433,7 +2433,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
 
   // If base type has unresolved generic parameters, such might mean
   // that it's initializer with erroneous argument, otherwise this would
-  // be a simple ambigious archetype case, neither can be diagnosed here.
+  // be a simple ambiguous archetype case, neither can be diagnosed here.
   if (baseTy->hasTypeParameter() && baseTy->hasUnresolvedType())
     return false;
 
@@ -5740,7 +5740,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
       if (isUnresolvedOrTypeVarType(argType) || argType->hasError())
         return false;
 
-      // Record substituation from generic parameter to the argument type.
+      // Record substitution from generic parameter to the argument type.
       substitutions[env->mapTypeOutOfContext(archetype)
                         ->getCanonicalType()
                         ->castTo<SubstitutableType>()] = argType;
