@@ -471,52 +471,58 @@ public:
                [&] { *this << '\n'; });
   }
 
+  void printBlockArgumentUses(const SILBasicBlock *BB) {
+    if (BB->args_empty())
+      return;
+
+    for (SILValue V : BB->getArguments()) {
+      if (V->use_empty())
+        continue;
+      *this << "// " << getID(V);
+      PrintState.OS.PadToColumn(50);
+      *this << "// user";
+      if (std::next(V->use_begin()) != V->use_end())
+        *this << 's';
+      *this << ": ";
+
+      llvm::SmallVector<ID, 32> UserIDs;
+      for (auto *Op : V->getUses())
+        UserIDs.push_back(getID(Op->getUser()));
+
+      // Display the user ids sorted to give a stable use order in the
+      // printer's output if we are asked to do so. This makes diffing large
+      // sections of SIL significantly easier at the expense of not showing
+      // the _TRUE_ order of the users in the use list.
+      if (Ctx.sortSIL()) {
+        std::sort(UserIDs.begin(), UserIDs.end());
+      }
+
+      interleave(UserIDs.begin(), UserIDs.end(),
+                 [&] (ID id) { *this << id; },
+                 [&] { *this << ", "; });
+      *this << '\n';
+    }
+  }
+
+  void printBlockArguments(const SILBasicBlock *BB) {
+    if (BB->args_empty())
+      return;
+    *this << '(';
+    ArrayRef<SILArgument *> Args = BB->getArguments();
+    *this << getIDAndType(Args[0]);
+    for (SILArgument *Arg : Args.drop_front()) {
+      *this << ", " << getIDAndType(Arg);
+    }
+    *this << ')';
+  }
+
   void print(const SILBasicBlock *BB) {
-    // Output uses for BB arguments.
-    if (!BB->args_empty()) {
-      for (auto I = BB->args_begin(), E = BB->args_end(); I != E; ++I) {
-        SILValue V = *I;
-        if (V->use_empty())
-          continue;
-        *this << "// " << getID(V);
-        PrintState.OS.PadToColumn(50);
-        *this << "// user";
-        if (std::next(V->use_begin()) != V->use_end())
-          *this << 's';
-        *this << ": ";
+    // Output uses for BB arguments. These are put into place as comments before
+    // the block header.
+    printBlockArgumentUses(BB);
 
-        llvm::SmallVector<ID, 32> UserIDs;
-        for (auto *Op : V->getUses())
-          UserIDs.push_back(getID(Op->getUser()));
-
-        // Display the user ids sorted to give a stable use order in the
-        // printer's output if we are asked to do so. This makes diffing large
-        // sections of SIL significantly easier at the expense of not showing
-        // the _TRUE_ order of the users in the use list.
-        if (Ctx.sortSIL()) {
-          std::sort(UserIDs.begin(), UserIDs.end());
-        }
-
-        interleave(UserIDs.begin(), UserIDs.end(),
-            [&] (ID id) { *this << id; },
-            [&] { *this << ", "; });
-        *this << '\n';
-      }
-    }
-
-    *this << getID(BB);
-
-    if (!BB->args_empty()) {
-      *this << '(';
-      for (auto I = BB->args_begin(), E = BB->args_end(); I != E; ++I) {
-        if (I != BB->args_begin())
-          *this << ", ";
-        *this << getIDAndType(*I);
-      }
-      *this << ')';
-    }
-
-    *this << ":";
+    // Then print the name of our block, the arguments, and the block colon.
+    *this << getID(BB); printBlockArguments(BB); *this << ":";
 
     if (!BB->pred_empty()) {
       PrintState.OS.PadToColumn(50);
