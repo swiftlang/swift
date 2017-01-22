@@ -684,6 +684,10 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, SUCheckedConversion)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, USCheckedConversion)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IntToFPWithOverflow)
 
+// This is surprising, Builtin.unreachable returns a "Never" value which is
+// trivially typed.
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Unreachable)
+
 /// AtomicRMW has type (Builtin.RawPointer, T) -> T. But it provides overloads
 /// for integer or rawpointer, so it should be trivial.
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AtomicRMW)
@@ -702,7 +706,6 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, CanBeObjCClass)
     llvm_unreachable("Should never get a SILValue to a Builtin "               \
                      "without result");                                        \
   }
-NO_OWNERSHIP_BUILTIN(Unreachable)
 NO_OWNERSHIP_BUILTIN(DestroyArray)
 NO_OWNERSHIP_BUILTIN(CopyArray)
 NO_OWNERSHIP_BUILTIN(TakeArrayFrontToBack)

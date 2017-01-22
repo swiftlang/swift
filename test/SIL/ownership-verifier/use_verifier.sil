@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all=0 -o /dev/null 2>&1  %s
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all=0 -module-name Swift -o /dev/null 2>&1  %s
 // REQUIRES: asserts
 
 // This file is meant to contain tests that previously the verifier treated
@@ -12,6 +12,8 @@ import Builtin
 //////////////////
 // Declarations //
 //////////////////
+
+enum Never {}
 
 enum Optional<T> {
 case some(T)
@@ -79,6 +81,12 @@ sil @non_trivial_unowned_arg : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
+}
+
+sil @builtin_unreachable_has_a_return_value : $@convention(thin) () -> () {
+bb0:
+  %0 = builtin "unreachable"() : $Never
+  unreachable
 }
 
 /////////////////////
