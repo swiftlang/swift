@@ -3,12 +3,12 @@ import md5
 import os
 import sys
 
-import swift_tools
-
 import list_reducer
 from list_reducer import TESTRESULT_KEEPPREFIX
 from list_reducer import TESTRESULT_KEEPSUFFIX
 from list_reducer import TESTRESULT_NOFAILURE
+
+import swift_tools
 
 
 class ReduceMiscompilingFunctions(list_reducer.ListReducer):

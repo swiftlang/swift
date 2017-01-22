@@ -3,14 +3,14 @@ import json
 import md5
 import subprocess
 
-import swift_tools
-
 import func_bug_reducer
 
 import list_reducer
 from list_reducer import TESTRESULT_KEEPPREFIX
 from list_reducer import TESTRESULT_KEEPSUFFIX
 from list_reducer import TESTRESULT_NOFAILURE
+
+import swift_tools
 
 
 class ReduceMiscompilingPasses(list_reducer.ListReducer):
