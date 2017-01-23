@@ -1131,8 +1131,8 @@ void SILValueOwnershipChecker::checkDataflow() {
     BlocksWithNonLifetimeEndingUses.erase(BB);
 
     // Ok, now we know that we do not have an overconsume. So now we need to
-    // update our state for our successors to make sure by the end of the block,
-    // we visit them.
+    // update our state for our successors to make sure by the end of the
+    // traversal we visit them.
     for (SILBasicBlock *SuccBlock : BB->getSuccessorBlocks()) {
       // If we already visited the successor, there is nothing to do since we
       // already visited the successor.
@@ -1144,6 +1144,13 @@ void SILValueOwnershipChecker::checkDataflow() {
       // algorithm.
       SuccessorBlocksThatMustBeVisited.insert(SuccBlock);
     }
+
+    // If we are at the dominating block of our walk, continue. There is nothing
+    // further to do since we do not want to visit the predecessors of our
+    // dominating block. On the other hand, we do want to add its successors to
+    // the SuccessorBlocksThatMustBeVisited set.
+    if (BB == Value->getParentBlock())
+      continue;
 
     // Then for each predecessor of this block:
     //
