@@ -1078,6 +1078,13 @@ bool SILValueOwnershipChecker::checkUses() {
     VisitedBlocks.insert(I->getParent());
   }
 
+  // Make sure not to add predecessors to our worklist if we only have 1
+  // lifetime ending user and it is in the same block as our def.
+  if (LifetimeEndingUsers.size() == 1 &&
+      LifetimeEndingUsers[0]->getParent() == Value->getParentBlock()) {
+    return true;
+  }
+
   // Now that we have marked all of our producing blocks, we go through our
   // PredsToAddToWorklist list and add our preds, making sure that none of these
   // preds are in BlocksWithLifetimeEndingUses.
@@ -1168,7 +1175,7 @@ void SILValueOwnershipChecker::checkDataflow() {
         << "Error! Found a leak due to a consuming post-dominance failure!\n"
         << "    Value: " << *Value << "    Post Dominating Failure Blocks:\n";
     for (auto *BB : SuccessorBlocksThatMustBeVisited) {
-      llvm::errs() << "bb" << BB->getDebugID();
+      llvm::errs() << "        bb" << BB->getDebugID();
     }
     llvm::errs() << '\n';
     if (IsSILOwnershipVerifierTestingEnabled)
