@@ -416,6 +416,46 @@ extension Float {
 }
 
 //===----------------------------------------------------------------------===//
+// Standard Operator Table
+//===----------------------------------------------------------------------===//
+
+//  TODO: These should not be necessary, since they're already provided by
+//  <T: FloatingPoint>, but in practice they are currently needed to
+//  disambiguate overloads.  We should find a way to remove them, either by
+//  tweaking the overload resolution rules, or by removing the other
+//  definitions in the standard lib, or both.
+
+extension CGFloat {
+  @_transparent
+  public static func +(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+    var lhs = lhs
+    lhs += rhs
+    return lhs
+  }
+
+  @_transparent
+  public static func -(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+    var lhs = lhs
+    lhs -= rhs
+    return lhs
+  }
+
+  @_transparent
+  public static func *(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+    var lhs = lhs
+    lhs *= rhs
+    return lhs
+  }
+
+  @_transparent
+  public static func /(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+    var lhs = lhs
+    lhs /= rhs
+    return lhs
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
 

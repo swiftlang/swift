@@ -922,6 +922,44 @@ extension ${Self} {
 }
 
 //===----------------------------------------------------------------------===//
+// Standard Operator Table
+//===----------------------------------------------------------------------===//
+
+//  TODO: These should not be necessary, since they're already provided by
+//  <T: FloatingPoint>, but in practice they are currently needed to
+//  disambiguate overloads.  We should find a way to remove them, either by
+//  tweaking the overload resolution rules, or by removing the other
+//  definitions in the standard lib, or both.
+
+@_transparent
+public func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+  var lhs = lhs
+  lhs += rhs
+  return lhs
+}
+
+@_transparent
+public func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+  var lhs = lhs
+  lhs -= rhs
+  return lhs
+}
+
+@_transparent
+public func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+  var lhs = lhs
+  lhs *= rhs
+  return lhs
+}
+
+@_transparent
+public func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+  var lhs = lhs
+  lhs /= rhs
+  return lhs
+}
+
+//===----------------------------------------------------------------------===//
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
 

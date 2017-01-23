@@ -1003,7 +1003,10 @@ ${mutatingOperationComment(x.operator)}
 % end
 }
 
-% for Protocol in ['Arithmetic']:#, 'BinaryInteger', 'FloatingPoint']:
+% # FIXME(integers): uncomment once the compilation time improves.
+% # Don't forget to remove similar definitions from concrete integer types,
+% # floating point types, CGFloat, and Decimal in Foundation.
+% for Protocol in []: # !!! FIXME !!! ['Arithmetic', 'BinaryInteger', 'FloatingPoint']:
 % # Explicitly providing these operations for BinaryInteger and FloatingPoint
 % # protocols because Strideable conformance creates ambiguity if the
 % # operationsare only defined for Arithmetic
@@ -2552,7 +2555,7 @@ public struct ${Self}
 // gets defined on the protocol rather than on concrete type.
 %       for x in chain(*binaryArithmetic.values()):
   @_transparent
-  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
+  public static func ${x.operator}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs ${x.operator}= rhs
     return lhs
