@@ -1259,6 +1259,10 @@ do {
 // with single 'Any' parameter
 func takesAny(_: Any) {}
 
+enum HasAnyCase {
+  case any(_: Any)
+}
+
 do {
   let fn: (Any) -> () = { _ in }
 
@@ -1267,4 +1271,42 @@ do {
 
   takesAny(123)
   takesAny(data: 123) // expected-error {{extraneous argument label 'data:' in call}}
+
+  _ = HasAnyCase.any(123)
+  _ = HasAnyCase.any(data: 123) // expected-error {{extraneous argument label 'data:' in call}}
+}
+
+// rdar://problem/29739905 - protocol extension methods on Array had
+// ParenType sugar stripped off the element type
+func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
+                             f2: [(Bool, Bool) -> ()],
+                             c: Bool) {
+  let p = (c, c)
+
+  f1.forEach { block in
+    block(p)
+    block((c, c))
+    block(c, c) // expected-error {{extra argument in call}}
+  }
+
+  f2.forEach { block in
+  // expected-note@-1 2{{'block' declared here}}
+    block(p) // expected-error {{missing argument for parameter #2 in call}}
+    block((c, c)) // expected-error {{missing argument for parameter #2 in call}}
+    block(c, c)
+  }
+
+  f2.forEach { (block: ((Bool, Bool)) -> ()) in
+  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '((Bool, Bool) -> ()) -> Void'}}
+    block(p)
+    block((c, c))
+    block(c, c)
+  }
+
+  f2.forEach { (block: (Bool, Bool) -> ()) in
+  // expected-note@-1 2{{'block' declared here}}
+    block(p) // expected-error {{missing argument for parameter #2 in call}}
+    block((c, c)) // expected-error {{missing argument for parameter #2 in call}}
+    block(c, c)
+  }
 }
