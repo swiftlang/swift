@@ -48,10 +48,10 @@ func basictest() {
   _ = x8 + 1
   _ = 0 + x8
   1.0 + x8 // expected-error{{binary operator '+' cannot be applied to operands of type 'Double' and 'Int8'}}
-  // expected-note @-1 {{expected an argument list of type '(Self, Self)'}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
 
 
-  var x9 : Int16 = x8 + 1 // expected-error {{cannot convert value of type 'Int8' to expected argument type 'Int16'}}
+  var x9 : Int16 = x8 + 1 // expected-error {{cannot convert value of type 'Int8' to specified type 'Int16'}}
 
   // Various tuple types.
   var tuple1 : ()

@@ -12,19 +12,21 @@
 // RUN: %target-typecheck-verify-swift
 
 
+// Mixed-type arithmetic operators on Strideable were deprecated in Swift 3.1
+
 func mixedTypeArithemtics() {
-  _ = (42 as Int64) + (0 as Int) // expected-warning {{'+' is deprecated:}}
+  _ = (42 as Int64) + (0 as Int) // expected-error {{binary operator '+' cannot be applied to operands of type 'Int64' and 'Int'}} expected-note {{overloads for '+' exist}}
 
   do {
     var x = Int8()
-    x += (42 as Int) // expected-warning {{'+=' is deprecated:}}
+    x += (42 as Int) // expected-error {{binary operator '+=' cannot be applied to operands of type 'Int8' and 'Int'}} expected-note {{overloads for '+=' exist}}
   }
 
-  _ = (42 as Int32) - (0 as Int) // expected-warning {{'-' is deprecated:}}
+  _ = (42 as Int32) - (0 as Int) // expected-error {{binary operator '-' cannot be applied to operands of type 'Int32' and 'Int'}} expected-note {{overloads for '-' exist}}
 
   do {
     var x = Int16()
-    x -= (42 as Int) // expected-warning {{'-=' is deprecated:}}
+    x -= (42 as Int) // expected-error {{binary operator '-=' cannot be applied to operands of type 'Int16' and 'Int'}} expected-note {{overloads for '-=' exist}}
   }
 
   // With Int on both sides should NOT result in warning

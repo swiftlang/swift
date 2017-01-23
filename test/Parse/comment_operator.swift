@@ -16,7 +16,7 @@ _ = 1 +/*hi*/2
 // These are wrapped in functions to allow the parser to recover before the next test case.
 func test1() { _ = foo/* */?.description }    // expected-error {{expected ':' after '? ...' in ternary expression}}
 func test2() { _ = foo/* */! }                // expected-error {{expected expression after operator}}
-func test3() { _ = 1/**/+2 }                  // expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{ambiguous use of operator '+'}}
+func test3() { _ = 1/**/+2 }                  // expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{result of operator '+' is unused}}
 func test4() { _ = 1+/**/2 }                  // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{integer literal is unused}}
 
 // Continue to be errors

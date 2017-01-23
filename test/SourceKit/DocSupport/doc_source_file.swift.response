@@ -1081,6 +1081,13 @@
     key.length: 3
   },
   {
+    key.kind: source.lang.swift.ref.function.operator.infix,
+    key.name: "+(_:_:)",
+    key.usr: "s:ZFSioi1pFTSiSi_Si",
+    key.offset: 1217,
+    key.length: 1
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.number,
     key.offset: 1218,
     key.length: 1

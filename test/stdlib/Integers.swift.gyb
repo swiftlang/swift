@@ -544,13 +544,19 @@ tests.test("DoubleWidthMultiplyAndDivide/Int8") {
 }
 
 tests.test("Remainder/DividingBy0") {
+  func f(_ x: Int, _ y: Int) -> Int {
+    return x % y
+  }
   expectCrashLater()
-  _ = 42 % 0
+  _ = f(42, 0)
 }
 
 tests.test("Division/By0") {
+  func f(_ x: Int, _ y: Int) -> Int {
+    return x / y
+  }
   expectCrashLater()
-  _ = 42 / 0
+  _ = f(42, 0)
 }
 
 tests.test("DivideMinByMinusOne") {

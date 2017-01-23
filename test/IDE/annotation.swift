@@ -18,7 +18,7 @@ struct S {
 typealias TypealiasForS = S
 
 func test6(p: S) {
-  // CHECK: <Param@[[@LINE-1]]:12>p</Param>.<Var@[[@LINE-8]]:7>x</Var> + 0
+  // CHECK: <Param@[[@LINE-1]]:12>p</Param>.<Var@[[@LINE-8]]:7>x</Var> <iFunc@>+</iFunc> 0
   p.x + 0
 }
 
@@ -81,13 +81,13 @@ class SubCls : MyCls, Prot {
   var protocolProperty2 = 0
 }
 
-// CHECK: func <Func>genFn</Func><<GenericTypeParam>T</GenericTypeParam> : <Protocol@64:10>Prot</Protocol>> where <GenericTypeParam@85:12>T</GenericTypeParam>.<AssociatedType@65:18>Blarg</AssociatedType> : <Protocol@71:10>Prot2</Protocol>(_ p : T) -> Int {}
-func genFn<T : Prot> where T.Blarg : Prot2(_ p : T) -> Int {}
+// CHECK: func <Func>genFn</Func><<GenericTypeParam>T</GenericTypeParam> : <Protocol@64:10>Prot</Protocol> where <GenericTypeParam@85:12>T</GenericTypeParam>.<AssociatedType@65:18>Blarg</AssociatedType> : <Protocol@71:10>Prot2</Protocol>>(_ <Param>p</Param> : <GenericTypeParam@85:12>T</GenericTypeParam>) -> <iStruct@>Int</iStruct> {}{{$}}
+func genFn<T : Prot where T.Blarg : Prot2>(_ p : T) -> Int {}
 
 func test(_ x: Int) {
-  // CHECK: <Func@[[@LINE-3]]:6>genFn</Func>(<Class@[[@LINE-11]]:7>SubCls</Class>())
+  // CHECK: <Func@[[@LINE-3]]:6>genFn</Func>(<Ctor@[[@LINE-11]]:28-Class@[[@LINE-11]]:7>SubCls</Ctor>())
   genFn(SubCls())
-  // CHECK: "This is string \(<Func@[[@LINE-5]]:6>genFn</Func>({(<Param>a</Param>:<iStruct@>Int</iStruct>) in <Class@[[@LINE-13]]:7>SubCls</Class>()}(<Param@[[@LINE-3]]:13>x</Param>))) interpolation"
+  // CHECK: "This is string \(<Func@[[@LINE-5]]:6>genFn</Func>({(<Param>a</Param>:<iStruct@>Int</iStruct>) in <Ctor@[[@LINE-13]]:28-Class@[[@LINE-13]]:7>SubCls</Ctor>()}(<Param@[[@LINE-3]]:13>x</Param>))) interpolation"
   "This is string \(genFn({(a:Int) in SubCls()}(x))) interpolation"
 }
 
@@ -117,12 +117,12 @@ class GenCls<T> {
   // CHECK: <Subscript>subscript</Subscript> (<Param>i</Param> : <iStruct@>Int</iStruct>, <Param>j</Param> : <iStruct@>Int</iStruct>) -> <iStruct@>Int</iStruct> {
   subscript (i : Int, j : Int) -> Int {
     get {
-      // CHECK: return <Param@[[@LINE-2]]:14>i</Param> + <Param@[[@LINE-2]]:23>j</Param>
+      // CHECK: return <Param@[[@LINE-2]]:14>i</Param> <iFunc@>+</iFunc> <Param@[[@LINE-2]]:23>j</Param>
       return i + j
     }
     // CHECK: set(<Param>v</Param>) {
     set(v) {
-      // CHECK: <Param@[[@LINE-1]]:9>v</Param> + <Param@[[@LINE-7]]:14>i</Param> - <Param@[[@LINE-7]]:23>j</Param>
+      // CHECK: <Param@[[@LINE-1]]:9>v</Param> <iFunc@>+</iFunc> <Param@[[@LINE-7]]:14>i</Param> <iFunc@>-</iFunc> <Param@[[@LINE-7]]:23>j</Param>
       v + i - j
     }
   }
