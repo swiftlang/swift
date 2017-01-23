@@ -208,6 +208,10 @@ public:
   
   SILType getType() const { return getValue()->getType(); }
 
+  ValueOwnershipKind getOwnershipKind() const {
+    return getValue().getOwnershipKind();
+  }
+
   /// Transform the given ManagedValue, replacing the underlying value, but
   /// keeping the same cleanup.
   ///
