@@ -53,25 +53,24 @@ enum _XCTThrowableBlockResult {
 /// and if it does consume the exception and return information about it.
 func _XCTRunThrowableBlock(_ block: () throws -> Void) -> _XCTThrowableBlockResult {
   var blockErrorOptional: Error?
-  
-  let d = _XCTRunThrowableBlockBridge({
+
+  let exceptionResult = _XCTRunThrowableBlockBridge({
     do {
       try block()
     } catch {
       blockErrorOptional = error
     }
   })
-  
+
   if let blockError = blockErrorOptional {
     return .failedWithError(error: blockError)
-  } else if d.count > 0 {
-    let t: String = d["type"]!
-    
-    if t == "objc" {
+  } else if let exceptionResult = exceptionResult {
+
+    if exceptionResult["type"] == "objc" {
       return .failedWithException(
-        className: d["className"]!,
-        name: d["name"]!,
-        reason: d["reason"]!)
+        className: exceptionResult["className"]!,
+        name: exceptionResult["name"]!,
+        reason: exceptionResult["reason"]!)
     } else {
       return .failedWithUnknownException
     }

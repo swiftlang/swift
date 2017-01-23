@@ -19,7 +19,7 @@
 
 XCTestCase * _Nonnull _XCTCurrentTestCase(void);
 
-NSDictionary<NSString *, NSString *> * _Nonnull
+NSDictionary<NSString *, NSString *> * _Nullable
 _XCTRunThrowableBlockBridge(void (^ _Nonnull NS_NOESCAPE block)());
 
 #endif // SWIFT_STDLIB_SHIMS_XCTEST_OVERLAY_H
