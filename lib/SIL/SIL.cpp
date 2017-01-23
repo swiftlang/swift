@@ -22,6 +22,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/AST/Attr.h"
@@ -129,14 +130,9 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
       && conformanceModule == typeUnit->getParentModule())
     return SILLinkage::Shared;
 
-  // If we're building with -sil-serialize-all, give the conformance public
-  // linkage.
-  if (conformanceModule->getResilienceStrategy()
-      == ResilienceStrategy::Fragile)
-    return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
-
-  // FIXME: This should be using std::min(protocol's access, type's access).
-  switch (C->getProtocol()->getEffectiveAccess()) {
+  Accessibility accessibility = std::min(C->getProtocol()->getEffectiveAccess(),
+                                         typeDecl->getEffectiveAccess());
+  switch (accessibility) {
     case Accessibility::Private:
     case Accessibility::FilePrivate:
       return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);

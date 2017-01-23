@@ -20,6 +20,11 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* [SE-0080][]:
+
+  Adds a new family of conversion initializers to all numeric types that
+  either complete successfully without loss of information or return nil.
+
 * Swift will now warn when an `NSObject` subclass attempts to override the
   class `initialize` method. Swift doesn't guarantee that references to class
   names trigger Objective-C class realization if they have no other
@@ -44,7 +49,7 @@ Swift 3.1
   the compiler will prevent them from being used in the first place.
 
 * Indirect fields from C structures and unions are now always imported, while
-  they previously weren't imported if they belonged to an union. This is done by
+  they previously weren't imported if they belonged to a union. This is done by
   naming anonymous fields. For example:
 
   ```c
@@ -78,7 +83,7 @@ Swift 3.1
 
 * The `withoutActuallyEscaping` function from [SE-0103][] has been implemented.
   To pass off a non-escaping closure to an API that formally takes an
-  `@escaping` closure, but which is used in a way that will not in fact 
+  `@escaping` closure, but which is used in a way that will not in fact
   escape it in practice, use `withoutActuallyEscaping` to get an escapable
   copy of the closure and delimit its expected lifetime. For example:
 

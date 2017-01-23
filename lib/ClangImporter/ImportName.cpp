@@ -572,10 +572,6 @@ getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
       return FactoryAsInitKind::AsClassMethod;
   }
 
-  if (method->hasAttr<clang::SwiftSuppressFactoryAsInitAttr>()) {
-    return FactoryAsInitKind::AsClassMethod;
-  }
-
   return FactoryAsInitKind::Infer;
 }
 

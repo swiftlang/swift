@@ -1864,7 +1864,7 @@ function(_add_swift_executable_single name)
       dependency_target
       unused_module_dependency_target
       unused_sib_dependency_target
-      unusged_sibopt_dependency_target
+      unused_sibopt_dependency_target
       unused_sibgen_dependency_target
       SWIFTEXE_SINGLE_SOURCES SWIFTEXE_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS

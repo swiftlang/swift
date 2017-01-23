@@ -23,6 +23,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;

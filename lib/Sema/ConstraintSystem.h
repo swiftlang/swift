@@ -29,6 +29,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "llvm/ADT/ilist.h"
@@ -552,7 +553,7 @@ public:
 
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
-  Type simplifyType(TypeChecker &tc, Type type) const;
+  Type simplifyType(Type type) const;
 
   /// \brief Coerce the given expression to the given type.
   ///
@@ -609,17 +610,10 @@ public:
   /// Compute the set of substitutions required to map the given type
   /// to the provided "opened" type.
   ///
-  /// Either the generic type (\c origType) must be a \c GenericFunctionType,
-  /// in which case it's generic requirements will be used to compute the
-  /// required substitutions, or \c dc must be a generic context, in which
-  /// case it's generic requirements will be used.
-  ///
-  /// \param origType The generic type.
+  /// \param sig The generic signature.
   ///
   /// \param openedType The type to which this reference to the given
   /// generic function type was opened.
-  ///
-  /// \param dc The declaration context that owns the generic type
   ///
   /// \param locator The locator that describes where the substitutions came
   /// from.
@@ -628,8 +622,7 @@ public:
   /// to be applied to the generic function type.
   ///
   /// \returns The opened type after applying the computed substitutions.
-  Type computeSubstitutions(Type origType,
-                            DeclContext *dc,
+  Type computeSubstitutions(GenericSignature *sig,
                             Type openedType,
                             ConstraintLocator *locator,
                             SmallVectorImpl<Substitution> &substitutions) const;
@@ -873,11 +866,11 @@ private:
   unsigned TypeCounter = 0;
 
   /// \brief The number of scopes created so far during the solution
-  /// of this constriant system.
+  /// of this constraint system.
   ///
   /// This is a measure of complexity of the solution space. A new
   /// scope is created every time we attempt a type variable binding
-  /// or explore an option in a disjuction.
+  /// or explore an option in a disjunction.
   unsigned CountScopes = 0;
 
   /// \brief Cached member lookups.

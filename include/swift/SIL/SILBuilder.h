@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_SILBUILDER_H
 #define SWIFT_SIL_SILBUILDER_H
 
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -520,6 +521,12 @@ public:
         getSILDebugLocation(Loc), BorrowedValue, OriginalValue));
   }
 
+  EndBorrowArgumentInst *createEndBorrowArgument(SILLocation Loc,
+                                                 SILValue Arg) {
+    return insert(new (F.getModule()) EndBorrowArgumentInst(
+        getSILDebugLocation(Loc), cast<SILArgument>(Arg)));
+  }
+
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
     return insert(new (F.getModule())
                       AssignInst(getSILDebugLocation(Loc), Src, DestAddr));
@@ -801,6 +808,20 @@ public:
     assert(isParsing || F.hasUnqualifiedOwnership());
     return insert(new (F.getModule()) ReleaseValueInst(getSILDebugLocation(Loc),
                                                        operand, atomicity));
+  }
+
+  UnmanagedRetainValueInst *createUnmanagedRetainValue(SILLocation Loc,
+                                                       SILValue operand) {
+    assert(F.hasQualifiedOwnership());
+    return insert(new (F.getModule()) UnmanagedRetainValueInst(
+        getSILDebugLocation(Loc), operand));
+  }
+
+  UnmanagedReleaseValueInst *createUnmanagedReleaseValue(SILLocation Loc,
+                                                         SILValue operand) {
+    assert(F.hasQualifiedOwnership());
+    return insert(new (F.getModule()) UnmanagedReleaseValueInst(
+        getSILDebugLocation(Loc), operand));
   }
 
   CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {

@@ -174,7 +174,7 @@ sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6
 ### 4. Upgrade CMake
 Install the latest version of CMake - Swift uses new CMake features such as `IN_LIST` and won't build without these features.
 ```bash
-wget http://www.cmake.org/files/v3.5/cmake-3.6.2.tar.gz
+wget http://www.cmake.org/files/v3.6/cmake-3.6.2.tar.gz
 tar xf cmake-3.6.2.tar.gz
 cd cmake-3.6.2
 ./configure

@@ -228,7 +228,7 @@ public:
   /// If at any time the function returns a null type, the null will be
   /// propagated out.
   ///
-  /// If the the function returns \c None, the transform operation will
+  /// If the function returns \c None, the transform operation will
   ///
   /// \param fn A function object with the signature
   /// \c Optional<Type>(TypeBase *), which accepts a type pointer and returns a

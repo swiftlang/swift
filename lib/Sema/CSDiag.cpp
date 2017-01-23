@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Defer.h"
@@ -2429,6 +2430,12 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
       baseTy = MetatypeType::get(baseTy, CS->getASTContext());
     }
   }
+
+  // If base type has unresolved generic parameters, such might mean
+  // that it's initializer with erroneous argument, otherwise this would
+  // be a simple ambiguous archetype case, neither can be diagnosed here.
+  if (baseTy->hasTypeParameter() && baseTy->hasUnresolvedType())
+    return false;
 
   MemberLookupResult result = CS->performMemberLookup(
       constraint->getKind(), memberName, baseTy,
@@ -5733,7 +5740,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
       if (isUnresolvedOrTypeVarType(argType) || argType->hasError())
         return false;
 
-      // Record substituation from generic parameter to the argument type.
+      // Record substitution from generic parameter to the argument type.
       substitutions[env->mapTypeOutOfContext(archetype)
                         ->getCanonicalType()
                         ->castTo<SubstitutableType>()] = argType;

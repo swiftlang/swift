@@ -27,6 +27,8 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/Types.h"
+#include "swift/Basic/Range.h"
 
 using namespace swift;
 

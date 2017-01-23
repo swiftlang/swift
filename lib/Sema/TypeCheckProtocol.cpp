@@ -506,13 +506,10 @@ static SmallVector<TupleTypeElt, 4> decomposeIntoTupleElements(Type type) {
 static AssociatedTypeDecl *
 getReferencedAssocTypeOfProtocol(Type type, ProtocolDecl *proto) {
   if (auto dependentMember = type->getAs<DependentMemberType>()) {
-    if (auto genericParam 
-          = dependentMember->getBase()->getAs<GenericTypeParamType>()) {
-      if (genericParam->getDepth() == 0 && genericParam->getIndex() == 0) {
-        if (auto assocType = dependentMember->getAssocType()) {
-          if (assocType->getDeclContext() == proto)
-            return assocType;
-        }
+    if (auto assocType = dependentMember->getAssocType()) {
+      if (dependentMember->getBase()->isEqual(proto->getSelfInterfaceType()) &&
+          assocType->getProtocol() == proto) {
+        return assocType;
       }
     }
   }
@@ -1287,8 +1284,8 @@ matchWitness(TypeChecker &tc,
       auto witnessDC = witness->getInnermostDeclContext();
 
       // Compute the set of substitutions we'll need for the witness.
-      solution->computeSubstitutions(witness->getInterfaceType(),
-                                     witnessDC, openedFullWitnessType,
+      solution->computeSubstitutions(witnessDC->getGenericSignatureOfContext(),
+                                     openedFullWitnessType,
                                      witnessLocator,
                                      result.WitnessSubstitutions);
     }
@@ -2158,7 +2155,7 @@ ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
   // signature.
   auto &assocTypes = ReferencedAssociatedTypes[req];
   llvm::SmallPtrSet<AssociatedTypeDecl *, 4> knownAssocTypes;
-  req->getInterfaceType().visit([&](Type type) {
+  req->getInterfaceType()->getCanonicalType().visit([&](Type type) {
       if (auto assocType = getReferencedAssocTypeOfProtocol(type, Proto)) {
         if (knownAssocTypes.insert(assocType).second) {
           assocTypes.push_back(assocType);
@@ -5377,8 +5374,24 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
   auto accessorKind = AccessorKind::NotAccessor;
   if (auto *fn = dyn_cast<FuncDecl>(witness)) {
     accessorKind = fn->getAccessorKind();
-    if (accessorKind != AccessorKind::NotAccessor) {
+    switch (accessorKind) {
+    case AccessorKind::IsAddressor:
+    case AccessorKind::IsMutableAddressor:
+    case AccessorKind::IsMaterializeForSet:
+      // These accessors are never exposed to Objective-C.
+      return result;
+    case AccessorKind::IsDidSet:
+    case AccessorKind::IsWillSet:
+      // These accessors are folded into the setter.
+      return result;
+    case AccessorKind::IsGetter:
+    case AccessorKind::IsSetter:
+      // These are found relative to the main decl.
       name = fn->getAccessorStorageDecl()->getFullName();
+      break;
+    case AccessorKind::NotAccessor:
+      // Do nothing.
+      break;
     }
   }
 
@@ -5636,7 +5649,7 @@ void DefaultWitnessChecker::recordWitness(
 }
 
 // Not all protocol members are requirements.
-bool TypeChecker::isRequirement(ValueDecl *requirement) {
+bool TypeChecker::isRequirement(const ValueDecl *requirement) {
   if (auto *FD = dyn_cast<FuncDecl>(requirement))
     if (FD->isAccessor())
       return false;

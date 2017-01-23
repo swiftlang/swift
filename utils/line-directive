@@ -246,12 +246,12 @@ def run():
         sources = sys.argv[1:dashes]
 
         # The first argument of command_args is the process to open.
-        # subprocess.Popen doesn't normalise arguments. This means that trying
-        # to open a non-normalised file (e.g. C:/swift/./bin/swiftc.exe) on
+        # subprocess.Popen doesn't normalize arguments. This means that trying
+        # to open a non-normalized file (e.g. C:/swift/./bin/swiftc.exe) on
         # Windows results in file/directory not found errors, as Popen delegates
-        # to the Win32 CreateProcess API. Unix systems handle non-normalised
+        # to the Win32 CreateProcess API. Unix systems handle non-normalized
         # paths, so don't have this problem.
-        # Arguments passed to the process are normalised by the process.
+        # Arguments passed to the process are normalized by the process.
         command_args = sys.argv[dashes + 1:]
         command_args[0] = os.path.normpath(command_args[0])
 

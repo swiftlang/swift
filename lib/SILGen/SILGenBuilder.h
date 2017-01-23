@@ -1,4 +1,4 @@
-//===--- SILGenBuilder.h --------------------------------------------------===//
+//===--- SILGenBuilder.h ----------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -18,7 +18,6 @@
 namespace swift {
 namespace Lowering {
 
-class SILGenBuilder;
 class SILGenFunction;
 
 /// A subclass of SILBuilder that tracks used protocol conformances and will
@@ -27,7 +26,7 @@ class SILGenFunction;
 /// The goal is to make this eventually composed with SILBuilder so that all
 /// APIs only vend ManagedValues.
 class SILGenBuilder : public SILBuilder {
-  SILGenModule &SGM;
+  SILGenFunction &gen;
 
 public:
   SILGenBuilder(SILGenFunction &gen);
@@ -49,7 +48,7 @@ public:
                 SILBasicBlock::iterator insertInst)
       : SILGenBuilder(gen, &*insertBB, insertInst) {}
 
-  SILGenModule &getSILGenModule() const { return SGM; }
+  SILGenModule &getSILGenModule() const;
 
   // Metatype instructions use the conformances necessary to instantiate the
   // type.

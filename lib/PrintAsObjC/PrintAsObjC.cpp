@@ -17,6 +17,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Comment.h"
 #include "swift/Basic/StringExtras.h"

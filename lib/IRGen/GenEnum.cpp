@@ -304,7 +304,7 @@ namespace {
     emitValueCaseTest(IRGenFunction &IGF,
                       Explosion &value,
                       EnumElementDecl *Case) const override {
-      value.claim(getExplosionSize());
+      (void)value.claim(getExplosionSize());
       return IGF.Builder.getInt1(true);
     }
     llvm::Value *
@@ -330,7 +330,7 @@ namespace {
                          ArrayRef<std::pair<EnumElementDecl*,
                                             llvm::BasicBlock*>> dests,
                          llvm::BasicBlock *defaultDest) const override {
-      value.claim(getExplosionSize());
+      (void)value.claim(getExplosionSize());
       emitSingletonSwitch(IGF, dests, defaultDest);
     }
 
@@ -788,7 +788,7 @@ namespace {
                           EnumElementDecl *elt,
                           Explosion &out) const override {
       // All of the cases project an empty explosion.
-      in.claim(getExplosionSize());
+      (void)in.claim(getExplosionSize());
     }
 
     void emitValueInjection(IRGenFunction &IGF,
@@ -1498,7 +1498,7 @@ namespace {
         auto &loadableTI = getLoadablePayloadTypeInfo();
         loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
         loadableTI.copy(IGF, payloadValue, payloadCopy, Atomicity::Atomic);
-        payloadCopy.claimAll(); // FIXME: repack if not bit-identical
+        (void)payloadCopy.claimAll(); // FIXME: repack if not bit-identical
       }
 
       IGF.Builder.CreateBr(endBB);
@@ -2003,7 +2003,7 @@ namespace {
       // Only the payload case has anything to project. The other cases are
       // empty.
       if (theCase != getPayloadElement()) {
-        inEnum.claim(getExplosionSize());
+        (void)inEnum.claim(getExplosionSize());
         return;
       }
 
@@ -2286,7 +2286,7 @@ namespace {
 
       switch (CopyDestroyKind) {
       case POD:
-        src.claim(getExplosionSize());
+        (void)src.claim(getExplosionSize());
         return;
 
       case Normal: {
@@ -2316,7 +2316,7 @@ namespace {
 
       switch (CopyDestroyKind) {
       case POD:
-        src.claim(getExplosionSize());
+        (void)src.claim(getExplosionSize());
         return;
 
       case Normal: {
@@ -2912,7 +2912,7 @@ namespace {
 
         Explosion tmp;
         lti.copy(IGF, value, tmp, Atomicity::Atomic);
-        tmp.claimAll(); // FIXME: repack if not bit-identical
+        (void)tmp.claimAll(); // FIXME: repack if not bit-identical
       });
 
       IGF.Builder.CreateRetVoid();
@@ -3659,7 +3659,7 @@ namespace {
 
       // Non-payload cases project to an empty explosion.
       if (foundPayload == ElementsWithPayload.end()) {
-        inValue.claim(getExplosionSize());
+        (void)inValue.claim(getExplosionSize());
         return;
       }
 
@@ -3964,7 +3964,7 @@ namespace {
       assert(TIK >= Loadable);
       switch (CopyDestroyKind) {
       case POD:
-        src.claim(getExplosionSize());
+        (void)src.claim(getExplosionSize());
         return;
 
       case BitwiseTakable:
@@ -3997,7 +3997,7 @@ namespace {
 
       switch (CopyDestroyKind) {
       case POD:
-        src.claim(getExplosionSize());
+        (void)src.claim(getExplosionSize());
         return;
 
       case BitwiseTakable:

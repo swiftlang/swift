@@ -39,23 +39,21 @@ using namespace swift;
 using namespace swift::NewMangling;
 
 std::string NewMangling::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
-  if (useNewMangling()) {
-    ASTMangler NewMangler(/* DWARF */ true);
-    return NewMangler.mangleTypeForDebugger(Ty, DC);
-  }
   Mangle::Mangler OldMangler(/* DWARF */ true);
   OldMangler.mangleTypeForDebugger(Ty, DC);
-  return OldMangler.finalize();
+  std::string Old = OldMangler.finalize();
+  ASTMangler NewMangler(/* DWARF */ true);
+  std::string New = NewMangler.mangleTypeForDebugger(Ty, DC);
+  return selectMangling(Old, New);
 }
 
 std::string NewMangling::mangleTypeAsUSR(Type Ty) {
-  if (useNewMangling()) {
-    ASTMangler NewMangler;
-    return NewMangler.mangleTypeAsUSR(Ty);
-  }
   Mangle::Mangler OldMangler;
   OldMangler.mangleType(Ty, /*uncurry*/ 0);
-  return OldMangler.finalize();
+  std::string Old = OldMangler.finalize();
+  ASTMangler NewMangler;
+  std::string New = NewMangler.mangleTypeAsUSR(Ty);
+  return selectMangling(Old, New);
 }
 
 
@@ -592,8 +590,6 @@ void ASTMangler::appendType(Type type) {
       const DeclContext *DC = DeclCtx;
       auto GTPT = DC->mapTypeOutOfContext(archetype)
           ->castTo<GenericTypeParamType>();
-
-      Buffer << 'q' << Index(GTPT->getIndex());
 
       // The DWARF output created by Swift is intentionally flat,
       // therefore archetypes are emitted with their DeclContext if

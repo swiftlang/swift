@@ -692,7 +692,7 @@ ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
 
 //------------------------------------------------------------------------------
-// Layout constaints diagnostics
+// Layout constraint diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(layout_size_should_be_positive,none,
@@ -1391,6 +1391,9 @@ ERROR(unexpected_version_comparison_operator,none,
       ())
 ERROR(unsupported_conditional_compilation_expression_type,none,
       "invalid conditional compilation expression", ())
+WARNING(swift3_unsupported_conditional_compilation_expression_type,none,
+        "ignoring invalid conditional compilation expression, "
+        "which will be rejected in future version of Swift", ())
 ERROR(unsupported_conditional_compilation_integer,none,
       "'%0' is not a valid conditional compilation expression, use '%1'",
       (StringRef, StringRef))

@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-module"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Substitution.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -216,6 +217,13 @@ SILDefaultWitnessTable *
 SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
                                                 SILLinkage Linkage) {
   return SILDefaultWitnessTable::create(*this, Linkage, Protocol);
+}
+
+void SILModule::deleteWitnessTable(SILWitnessTable *Wt) {
+  NormalProtocolConformance *Conf = Wt->getConformance();
+  assert(lookUpWitnessTable(Conf, false) == Wt);
+  WitnessTableMap.erase(Conf);
+  witnessTables.erase(Wt);
 }
 
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,

@@ -116,12 +116,16 @@ public func -(time: DispatchTime, interval: DispatchTimeInterval) -> DispatchTim
 }
 
 public func +(time: DispatchTime, seconds: Double) -> DispatchTime {
-	let t = __dispatch_time(time.rawValue, Int64(seconds * Double(NSEC_PER_SEC)))
+	let interval = seconds * Double(NSEC_PER_SEC)
+	let t = __dispatch_time(time.rawValue,
+		interval.isInfinite || interval.isNaN ? Int64.max : Int64(interval))
 	return DispatchTime(rawValue: t)
 }
 
 public func -(time: DispatchTime, seconds: Double) -> DispatchTime {
-	let t = __dispatch_time(time.rawValue, Int64(-seconds * Double(NSEC_PER_SEC)))
+	let interval = -seconds * Double(NSEC_PER_SEC)
+	let t = __dispatch_time(time.rawValue,
+		interval.isInfinite || interval.isNaN ? Int64.min : Int64(interval))
 	return DispatchTime(rawValue: t)
 }
 
@@ -136,11 +140,15 @@ public func -(time: DispatchWallTime, interval: DispatchTimeInterval) -> Dispatc
 }
 
 public func +(time: DispatchWallTime, seconds: Double) -> DispatchWallTime {
-	let t = __dispatch_time(time.rawValue, Int64(seconds * Double(NSEC_PER_SEC)))
+	let interval = seconds * Double(NSEC_PER_SEC)
+	let t = __dispatch_time(time.rawValue,
+		interval.isInfinite || interval.isNaN ? Int64.max : Int64(interval))
 	return DispatchWallTime(rawValue: t)
 }
 
 public func -(time: DispatchWallTime, seconds: Double) -> DispatchWallTime {
-	let t = __dispatch_time(time.rawValue, Int64(-seconds * Double(NSEC_PER_SEC)))
+	let interval = -seconds * Double(NSEC_PER_SEC)
+	let t = __dispatch_time(time.rawValue,
+		interval.isInfinite || interval.isNaN ? Int64.min : Int64(interval))
 	return DispatchWallTime(rawValue: t)
 }

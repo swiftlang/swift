@@ -1,4 +1,4 @@
-//===-- StaticBinaryELF.cpp -------------------------------------*- C++ -*-===//
+//===--- StaticBinaryELF.cpp ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -44,7 +44,7 @@ typedef Elf64_Shdr Elf_Shdr;
 typedef Elf64_Phdr Elf_Phdr;
 typedef Elf64_Addr Elf_Addr;
 typedef Elf64_Word Elf_Word;
-typedef Elf64_Sym  Elf_Sym;
+typedef Elf64_Sym Elf_Sym;
 typedef Elf64_Section Elf_Section;
 #define ELF_ST_TYPE(x) ELF64_ST_TYPE(x)
 #else
@@ -54,7 +54,7 @@ typedef Elf32_Shdr Elf_Shdr;
 typedef Elf32_Phdr Elf_Phdr;
 typedef Elf32_Addr Elf_Addr;
 typedef Elf32_Word Elf_Word;
-typedef Elf32_Sym  Elf_Sym;
+typedef Elf32_Sym Elf_Sym;
 typedef Elf32_Section Elf_Section;
 #define ELF_ST_TYPE(x) ELF32_ST_TYPE(x)
 #endif
@@ -121,7 +121,7 @@ public:
     if (programHeaders == nullptr) {
       return;
     }
-    // If a interpreter is set in the program headers then this is a
+    // If an interpreter is set in the program headers then this is a
     // dynamic executable and therefore not valid.
     for (size_t idx = 0; idx < elfHeader.e_phnum; idx++) {
       if (programHeaders[idx].p_type == PT_INTERP) {
@@ -186,7 +186,7 @@ private:
   // This is Linux specific - find the full path of the executable
   // by looking in /proc/self/maps for a mapping holding the current
   // address space. For a static binary it should only be mapping one
-  // file anyway. Dont use /proc/self/exe as the symlink will be removed
+  // file anyway. Don't use /proc/self/exe as the symlink will be removed
   // if the main thread terminates - see proc(5).
   void getExecutablePathName() {
     uintptr_t address = (uintptr_t)&elfHeader;

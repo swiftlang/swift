@@ -980,7 +980,7 @@ public:
   /// \brief Construct a new layout-constraint requirement.
   ///
   /// \param Subject The type that must conform to the given layout 
-  /// requirment.
+  /// requirement.
   /// \param ColonLoc The location of the ':', or an invalid location if
   /// this requirement was implied.
   /// \param Layout The layout requirement to which the
@@ -5384,9 +5384,6 @@ enum class CtorInitializerKind {
   /// A convenience initializer is an initializer that initializes a complete
   /// object by delegating to another initializer (eventually reaching a
   /// designated initializer).
-  ///
-  /// A convenience initializer is written with a return type of "Self" in
-  /// source code.
   ///
   /// Convenience initializers are inherited into subclasses that override
   /// all of their superclass's designated initializers.

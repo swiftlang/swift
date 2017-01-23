@@ -2,6 +2,7 @@
 import hashlib
 import subprocess
 
+
 def call_fingerprint(args, echo_stderr=False, echo_stdout=False):
     p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (stdoutdata, stderrdata) = p.communicate()
@@ -17,5 +18,3 @@ def call_fingerprint(args, echo_stderr=False, echo_stdout=False):
     fingerprint = h.hexdigest()
 
     return {'exit_code': exit_code, 'fingerprint': fingerprint}
-
-

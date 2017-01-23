@@ -28,6 +28,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/SmallString.h"
 #include <iterator>

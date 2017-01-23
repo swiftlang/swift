@@ -7,4 +7,4 @@
 
 // REQUIRES: asserts
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-Array(.n).init(
+class C{@_fixed_layout public struct P

@@ -297,8 +297,8 @@ public func XCTAssertEqual<T : Equatable>(_ expression1: @autoclosure () throws 
             let expressionValueStr1 = String(describing: expressionValue1Optional)
             let expressionValueStr2 = String(describing: expressionValue2Optional)
 
-            // FIXME: this file seems to use `as NSString` unnecesarily a lot,
-            // unlesss I'm missing something.
+            // FIXME: this file seems to use `as NSString` unnecessarily a lot,
+            // unless I'm missing something.
             _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
         }
 

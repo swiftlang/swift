@@ -1451,7 +1451,7 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
 bool ConstraintSystem::Candidate::solve() {
   // Don't attempt to solve candidate if there is closure
   // expression involved, because it's handled specially
-  // by parent constaint system (e.g. parameter lists).
+  // by parent constraint system (e.g. parameter lists).
   bool containsClosure = false;
   E->forEachChildExpr([&](Expr *childExpr) -> Expr * {
     if (isa<ClosureExpr>(childExpr)) {
@@ -1616,7 +1616,7 @@ void ConstraintSystem::shrink(Expr *expr) {
       }
 
       // Let's not attempt to type-check closures or expressions
-      // which containt closures, because they require special handling
+      // which constrain closures, because they require special handling
       // when dealing with context and parameters declarations.
       if (isa<ClosureExpr>(expr)) {
         return {false, expr};

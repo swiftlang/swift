@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -O %s | %FileCheck %s
 
-// REQUIRES: 30043258
 // XFAIL: linux
 
 import Darwin
@@ -37,6 +36,20 @@ public func test3(d : Double) -> Double {
 
 public func test4(f : Float) -> Float {
   return sqrt(f)
+}
+
+// CHECK-LABEL: define {{.*}}test3a
+// CHECK: call double @remainder
+
+public func test3a(d : Double) -> Double {
+  return remainder(1,d)
+}
+
+// CHECK-LABEL: define {{.*}}test4a
+// CHECK: call float @remainder
+
+public func test4a(f : Float) -> Float {
+  return remainder(1,f)
 }
 
 // CHECK-LABEL: define {{.*}}test5

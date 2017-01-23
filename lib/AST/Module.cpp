@@ -29,6 +29,8 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -841,8 +843,8 @@ namespace {
 
   template <typename T>
   struct OperatorLookup {
-  	// Don't fold this into the static_assert: this would trigger an MSVC bug
-  	// that causes the assertion to fail.
+    // Don't fold this into the static_assert: this would trigger an MSVC bug
+    // that causes the assertion to fail.
     static constexpr T* ptr = static_cast<T*>(nullptr);
     static_assert(ptr, "Only usable with operators");
   };

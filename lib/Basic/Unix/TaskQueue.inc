@@ -341,7 +341,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       }
 
       PollFds.push_back({ T->getPipe(), POLLIN | POLLPRI | POLLHUP, 0 });
-      // We should also poll T->getErrorPipe(), but this intrroduces timing
+      // We should also poll T->getErrorPipe(), but this introduces timing
       // issues with shutting down the task after reading getPipe().
       ExecutingTasks[Pid] = std::move(T);
     }
