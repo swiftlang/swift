@@ -262,7 +262,7 @@ func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
   _ = x.filter { ($0 + y)  > 42 }  // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt'}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (UInt, UInt), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 }
 
 

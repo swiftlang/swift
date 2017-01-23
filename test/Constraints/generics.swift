@@ -231,10 +231,10 @@ class Whatever<A: Arithmetic, B: Arithmetic> {  // expected-note 2 {{'A' declare
   static func bar() {}
 
 }
-Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: IntegerArithmetic#>, <#B: IntegerArithmetic#>>}}
+Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Arithmetic#>, <#B: Arithmetic#>>}}
 
 // <rdar://problem/21718955> Swift useless error: cannot invoke 'foo' with no arguments
-Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: IntegerArithmetic#>, <#B: IntegerArithmetic#>>}}
+Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Arithmetic#>, <#B: Arithmetic#>>}}
 
 // <rdar://problem/27515965> Type checker doesn't enforce same-type constraint if associated type is Any
 protocol P27515965 {

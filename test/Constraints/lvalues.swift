@@ -28,7 +28,6 @@ var x : X
 var y : Y
 
 func +=(lhs: inout X, rhs : X) {}
-func +=(lhs: inout Double, rhs : Double) {}
 prefix operator +++
 prefix func +++(rhs: inout X) {}
 
