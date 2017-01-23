@@ -2165,6 +2165,27 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
 }
 
+ManagedValue SILGenFunction::emitConversionToSemanticRValue(
+    SILLocation loc, ManagedValue src, const TypeLowering &valueTL) {
+  // Weak storage types are handled with their underlying type.
+  assert(!src.getType().is<WeakStorageType>() &&
+         "weak pointers are always the right optional types");
+
+  // For @unowned(safe) types, we need to generate a strong retain and
+  // strip the unowned box.
+  if (src.getType().is<UnownedStorageType>()) {
+    return B.createCopyUnownedValue(loc, src);
+  }
+
+  // For @unowned(unsafe) types, we need to strip the unmanaged box
+  // and then do an (unsafe) retain.
+  if (src.getType().is<UnmanagedStorageType>()) {
+    return B.createUnsafeCopyUnownedValue(loc, src);
+  }
+
+  llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
+}
+
 /// Given that the type-of-rvalue differs from the type-of-storage,
 /// and given that the type-of-rvalue is loadable, produce a +1 scalar
 /// of the type-of-rvalue.

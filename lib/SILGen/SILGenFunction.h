@@ -964,6 +964,9 @@ public:
   SILValue emitConversionToSemanticRValue(SILLocation loc, SILValue value,
                                           const TypeLowering &valueTL);
 
+  ManagedValue emitConversionToSemanticRValue(SILLocation loc,
+                                              ManagedValue value,
+                                              const TypeLowering &valueTL);
 
   /// Emit the empty tuple value by emitting
   SILValue emitEmptyTuple(SILLocation loc);

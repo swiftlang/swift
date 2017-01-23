@@ -4,7 +4,15 @@
 sil_stage raw
 
 import Builtin
-import Swift
+
+enum Optional<T> {
+case some(T)
+case none
+}
+
+struct Bool {
+  var value: Builtin.Int1
+}
 
 // This file is meant to contain tests that previously the verifier treated
 // incorrectly. This is important to ensure that the verifier does not
@@ -14,39 +22,39 @@ import Swift
 // interesting from an ownership perspective. So I took it and reused it to get
 // coverage here.
 
-sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
-sil @makesInt : $@convention(thin) () -> Int
+sil @takes_Int_inout : $@convention(thin) (@inout Builtin.Int32) -> ()
+sil @makesInt : $@convention(thin) () -> Builtin.Int32
 
-// func used_by_inout(a : Int) -> (Int, Int) {
+// func used_by_inout(a : Builtin.Int32) -> (Builtin.Int32, Builtin.Int32) {
 //  var t = a
 //  takes_Int_inout(&a)
 //  return (t, a)
 //}
-sil @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
-bb0(%0 : @trivial $Int):
-  %91 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
-  %91a = project_box %91 : $<τ_0_0> { var τ_0_0 } <Int>, 0
-  %1 = mark_uninitialized [var] %91a : $*Int
-  %2 = store %0 to [trivial] %1 : $*Int
-  %3 = load [trivial] %1 : $*Int
-  %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
-  %6 = apply %5(%1) : $@convention(thin) (@inout Int) -> ()
-  %7 = load [trivial] %1 : $*Int
-  %8 = tuple (%3 : $Int, %7 : $Int)
-  destroy_value %91 : $<τ_0_0> { var τ_0_0 } <Int>
-  return %8 : $(Int, Int)
+sil @used_by_inout : $@convention(thin) (Builtin.Int32) -> (Builtin.Int32, Builtin.Int32) {
+bb0(%0 : @trivial $Builtin.Int32):
+  %91 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %91a = project_box %91 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %1 = mark_uninitialized [var] %91a : $*Builtin.Int32
+  %2 = store %0 to [trivial] %1 : $*Builtin.Int32
+  %3 = load [trivial] %1 : $*Builtin.Int32
+  %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Builtin.Int32) -> ()
+  %6 = apply %5(%1) : $@convention(thin) (@inout Builtin.Int32) -> ()
+  %7 = load [trivial] %1 : $*Builtin.Int32
+  %8 = tuple (%3 : $Builtin.Int32, %7 : $Builtin.Int32)
+  destroy_value %91 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  return %8 : $(Builtin.Int32, Builtin.Int32)
 }
 
 struct AddressOnlyStruct {
   var a : Any
-  var b : Int
+  var b : Builtin.Int32
 }
 
 /// returns_generic_struct - This returns a struct by reference.
 sil @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
 
 // There should be no error in this function.
-sil @call_struct_return_function : $@convention(thin) () -> Int {
+sil @call_struct_return_function : $@convention(thin) () -> Builtin.Int32 {
 bb0:
   %0 = alloc_box $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>
   %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>, 0
@@ -54,9 +62,9 @@ bb0:
   %2 = function_ref @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
   %3 = apply %2(%1) : $@convention(thin) () -> @out AddressOnlyStruct
   %4 = struct_element_addr %1 : $*AddressOnlyStruct, #AddressOnlyStruct.b
-  %5 = load [trivial] %4 : $*Int
+  %5 = load [trivial] %4 : $*Builtin.Int32
   destroy_value %0 : $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>
-  return %5 : $Int
+  return %5 : $Builtin.Int32
 }
 
 sil @copy_addr1 : $@convention(thin) <T> (@in T) -> @out T {
@@ -76,22 +84,22 @@ class SomeClass {}
 sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
 sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
 
-sil @assign_test_trivial : $@convention(thin) (Int) -> Int {
-bb0(%0 : @trivial $Int):
-  %7 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
-  %7a = project_box %7 : $<τ_0_0> { var τ_0_0 } <Int>, 0
-  %1 = mark_uninitialized [var] %7a : $*Int
+sil @assign_test_trivial : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : @trivial $Builtin.Int32):
+  %7 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %7a = project_box %7 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %1 = mark_uninitialized [var] %7a : $*Builtin.Int32
 
   // These assigns are a mix of init + store forms, but because Int is trivial,
   // they all turn into stores.
-  assign %0 to %1 : $*Int
-  assign %0 to %1 : $*Int
-  assign %0 to %1 : $*Int
+  assign %0 to %1 : $*Builtin.Int32
+  assign %0 to %1 : $*Builtin.Int32
+  assign %0 to %1 : $*Builtin.Int32
 
-  %2 = load [trivial] %1 : $*Int
-  destroy_value %7 : $<τ_0_0> { var τ_0_0 } <Int>
+  %2 = load [trivial] %1 : $*Builtin.Int32
+  destroy_value %7 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
 
-  return %2 : $Int
+  return %2 : $Builtin.Int32
 }
 
 sil @assign_test_nontrivial : $@convention(thin) () -> () {
@@ -156,7 +164,7 @@ bb0:
 
 
 struct ContainsNativeObject {
-  var x : Int
+  var x : Builtin.Int32
   var y : Builtin.NativeObject
 }
 
@@ -186,21 +194,21 @@ bb0(%0 : @trivial $*SomeClass, %1 : @owned $SomeClass):
   return %9 : $()
 }
 
-sil_global @int_global : $Int
+sil_global @int_global : $Builtin.Int32
 
 // CHECK-LABEL: sil @test_tlc
 // CHECK-NOT: mark_uninitialized
 // CHECK: return
 sil @test_tlc : $() -> () {
-  %0 = global_addr @int_global : $*Int
-  %1 = mark_uninitialized [var] %0 : $*Int
+  %0 = global_addr @int_global : $*Builtin.Int32
+  %1 = mark_uninitialized [var] %0 : $*Builtin.Int32
 
   %9 = tuple ()
   return %9 : $()
 }
 
 
-struct XYStruct { var x, y : Int }
+struct XYStruct { var x, y : Builtin.Int32 }
 sil @init_xy_struct : $@convention(thin) () -> XYStruct
 
 
@@ -292,34 +300,34 @@ bb2:
 }
 
 class RootClassWithIVars {
-  var x: Int
-  var y: Int
-  var z: (Int, Int)
+  var x: Builtin.Int32
+  var y: Builtin.Int32
+  var z: (Builtin.Int32, Builtin.Int32)
   init()
 }
 
 /// Root class tests.
-sil @rootclass_test1 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
-bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Int):
+sil @rootclass_test1 : $@convention(method) (@owned RootClassWithIVars, Builtin.Int32) -> @owned RootClassWithIVars {
+bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Builtin.Int32):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
   %10 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.x
-  assign %1 to %10 : $*Int
+  assign %1 to %10 : $*Builtin.Int32
 
   %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
-  assign %1 to %11 : $*Int
+  assign %1 to %11 : $*Builtin.Int32
 
   %12 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.z
-  %13 = tuple_element_addr %12 : $*(Int, Int), 0
-  assign %1 to %13 : $*Int
-  %14 = tuple_element_addr %12 : $*(Int, Int), 1
-  assign %1 to %14 : $*Int
+  %13 = tuple_element_addr %12 : $*(Builtin.Int32, Builtin.Int32), 0
+  assign %1 to %13 : $*Builtin.Int32
+  %14 = tuple_element_addr %12 : $*(Builtin.Int32, Builtin.Int32), 1
+  assign %1 to %14 : $*Builtin.Int32
 
   return %3 : $RootClassWithIVars
 }
 
 class DerivedClassWithIVars : RootClassWithIVars {
-  var a: Int
+  var a: Builtin.Int32
   override init()
 }
 
@@ -334,13 +342,13 @@ bb0(%0 : @owned $DerivedClassWithIVars):
   store %0 to [init] %3 : $*DerivedClassWithIVars
 
   // Get an int
-  %5 = function_ref @makesInt : $@convention(thin) () -> Int
-  %7 = apply %5() : $@convention(thin) () -> Int
+  %5 = function_ref @makesInt : $@convention(thin) () -> Builtin.Int32
+  %7 = apply %5() : $@convention(thin) () -> Builtin.Int32
 
   // Initialize the 'a' ivar with the int.
   %8 = load_borrow %3 : $*DerivedClassWithIVars
   %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
-  assign %7 to %9 : $*Int
+  assign %7 to %9 : $*Builtin.Int32
   end_borrow %8 from %3 : $DerivedClassWithIVars, $*DerivedClassWithIVars
 
   %11 = load [take] %3 : $*DerivedClassWithIVars
@@ -357,8 +365,8 @@ bb0(%0 : @owned $DerivedClassWithIVars):
 
 struct MyStruct : P {}
 
-sil @self_init_assert_instruction : $@convention(thin) (Int, @thin MyStruct.Type) -> MyStruct {
-bb0(%0 : @trivial $Int, %1 : @trivial $@thin MyStruct.Type):
+sil @self_init_assert_instruction : $@convention(thin) (Builtin.Int32, @thin MyStruct.Type) -> MyStruct {
+bb0(%0 : @trivial $Builtin.Int32, %1 : @trivial $@thin MyStruct.Type):
   %2 = alloc_stack $MyStruct, var, name "sf"
   %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct
   %6 = function_ref @selfinit : $@convention(thin) () -> MyStruct
@@ -489,8 +497,8 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   return %13 : $()
 }
 
-sil @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Int) -> @owned DerivedClassWithIVars {
-bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Int):
+sil @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Builtin.Int32) -> @owned DerivedClassWithIVars {
+bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Builtin.Int32):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
   %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
@@ -498,13 +506,13 @@ bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Int):
 
   %8 = load_borrow %3 : $*DerivedClassWithIVars
   %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
-  assign %i to %9 : $*Int
+  assign %i to %9 : $*Builtin.Int32
   end_borrow %8 from %3 : $DerivedClassWithIVars, $*DerivedClassWithIVars
 
   %a = load [take] %3 : $*DerivedClassWithIVars
   %b = upcast %a : $DerivedClassWithIVars to $RootClassWithIVars
   %c = ref_element_addr %b : $RootClassWithIVars, #RootClassWithIVars.x
-  load [trivial] %c : $*Int
+  load [trivial] %c : $*Builtin.Int32
   %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%b) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 

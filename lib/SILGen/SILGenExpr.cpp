@@ -735,17 +735,15 @@ RValue SILGenFunction::emitRValueForPropertyLoad(
     return emitLoadOfLValue(loc, std::move(LV), C, isGuaranteedValid);
   }
 
-  ManagedValue Result;
+  ManagedValue result;
   if (!base.getType().isAddress()) {
     // For non-address-only structs, we emit a struct_extract sequence.
-    SILValue Scalar = B.createStructExtract(loc, base.getValue(), field);
-    Result = ManagedValue::forUnmanaged(Scalar);
+    result = B.createStructExtract(loc, base, field);
 
-    if (Result.getType().is<ReferenceStorageType>()) {
+    if (result.getType().is<ReferenceStorageType>()) {
       // For weak and unowned types, convert the reference to the right
       // pointer, producing a +1.
-      Scalar = emitConversionToSemanticRValue(loc, Scalar, lowering);
-      Result = emitManagedRValueWithCleanup(Scalar, lowering);
+      result = emitConversionToSemanticRValue(loc, result, lowering);
 
     } else if (hasAbstractionChange ||
                (!C.isImmediatePlusZeroOk() &&
@@ -754,7 +752,7 @@ RValue SILGenFunction::emitRValueForPropertyLoad(
       // +1, then emit a RetainValue. If we know that our base will stay alive,
       // we can emit at +0 for a guaranteed consumer. Otherwise, since we do not
       // have enough information, we can only emit at +0 for immediate clients.
-      Result = Result.copyUnmanaged(*this, loc);
+      result = result.copyUnmanaged(*this, loc);
     }
   } else {
     // For address-only sequences, the base is in memory.  Emit a
@@ -763,16 +761,16 @@ RValue SILGenFunction::emitRValueForPropertyLoad(
     SILValue ElementPtr =
       B.createStructElementAddr(loc, base.getValue(), field);
 
-    Result = emitLoad(loc, ElementPtr, abstractedTL,
+    result = emitLoad(loc, ElementPtr, abstractedTL,
                       hasAbstractionChange ? SGFContext() : C, IsNotTake);
   }
 
   // If we're accessing this member with an abstraction change, perform that
   // now.
   if (hasAbstractionChange)
-    Result = emitOrigToSubstValue(loc, Result, origFormalType,
-                                  substFormalType, C);
-  return RValue(*this, loc, substFormalType, Result);
+    result =
+        emitOrigToSubstValue(loc, result, origFormalType, substFormalType, C);
+  return RValue(*this, loc, substFormalType, result);
 }
 
 

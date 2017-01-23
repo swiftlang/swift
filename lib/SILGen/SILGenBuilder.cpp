@@ -146,3 +146,40 @@ AllocExistentialBoxInst *SILGenBuilder::createAllocExistentialBox(
   return SILBuilder::createAllocExistentialBox(Loc, ExistentialType,
                                                ConcreteType, Conformances);
 }
+
+ManagedValue SILGenBuilder::createStructExtract(SILLocation Loc,
+                                                ManagedValue Base,
+                                                VarDecl *Decl) {
+  ManagedValue BorrowedBase = gen.emitManagedBeginBorrow(Loc, Base.getValue());
+  SILValue StructExtract =
+      SILBuilder::createStructExtract(Loc, BorrowedBase.getValue(), Decl);
+  return ManagedValue::forUnmanaged(StructExtract);
+}
+
+ManagedValue SILGenBuilder::createCopyValue(SILLocation Loc,
+                                            ManagedValue OriginalValue) {
+  SILValue Result = SILBuilder::createCopyValue(Loc, OriginalValue.getValue());
+  return gen.emitManagedRValueWithCleanup(Result);
+}
+
+ManagedValue SILGenBuilder::createCopyUnownedValue(SILLocation Loc,
+                                                   ManagedValue OriginalValue) {
+  auto UnownedType = OriginalValue.getType().castTo<UnownedStorageType>();
+  assert(UnownedType->isLoadable(ResilienceExpansion::Maximal));
+  (void)UnownedType;
+
+  SILValue Result =
+      SILBuilder::createCopyUnownedValue(Loc, OriginalValue.getValue());
+  return gen.emitManagedRValueWithCleanup(Result);
+}
+
+ManagedValue
+SILGenBuilder::createUnsafeCopyUnownedValue(SILLocation Loc,
+                                            ManagedValue OriginalValue) {
+  auto UnmanagedType = OriginalValue.getType().getAs<UnmanagedStorageType>();
+  SILValue Result = SILBuilder::createUnmanagedToRef(
+      Loc, OriginalValue.getValue(),
+      SILType::getPrimitiveObjectType(UnmanagedType.getReferentType()));
+  SILBuilder::createUnmanagedRetainValue(Loc, Result);
+  return gen.emitManagedRValueWithCleanup(Result);
+}
