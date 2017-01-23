@@ -2043,12 +2043,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
     return IfConfigResult;
   }
 
-  Decl* LastDecl = nullptr;
-  auto InternalHandler  = [&](Decl *D) {
-    LastDecl = D;
-    Handler(D);
-  };
-
   ParserPosition BeginParserPosition;
   if (isCodeCompletionFirstPass())
     BeginParserPosition = getParserPosition();
@@ -2244,7 +2238,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
                                 StaticSpelling, tryLoc);
       StaticLoc = SourceLoc();   // we handled static if present.
       MayNeedOverrideCompletion = true;
-      std::for_each(Entries.begin(), Entries.end(), InternalHandler);
+      std::for_each(Entries.begin(), Entries.end(), Handler);
       if (auto *D = DeclResult.getPtrOrNull())
         markWasHandled(D);
       break;
@@ -2262,7 +2256,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
     case tok::kw_case: {
       llvm::SmallVector<Decl *, 4> Entries;
       DeclResult = parseDeclEnumCase(Flags, Attributes, Entries);
-      std::for_each(Entries.begin(), Entries.end(), InternalHandler);
+      std::for_each(Entries.begin(), Entries.end(), Handler);
       if (auto *D = DeclResult.getPtrOrNull())
         markWasHandled(D);
       break;
@@ -2300,7 +2294,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
       llvm::SmallVector<Decl *, 4> Entries;
       DeclResult = parseDeclSubscript(Flags, Attributes, Entries);
-      std::for_each(Entries.begin(), Entries.end(), InternalHandler);
+      std::for_each(Entries.begin(), Entries.end(), Handler);
       MayNeedOverrideCompletion = true;
       if (auto *D = DeclResult.getPtrOrNull())
         markWasHandled(D);
@@ -2375,7 +2369,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
   if (DeclResult.isNonNull()) {
     Decl *D = DeclResult.get();
     if (!declWasHandledAlready(D))
-      InternalHandler(DeclResult.get());
+      Handler(DeclResult.get());
   }
 
   if (!DeclResult.isParseError()) {
