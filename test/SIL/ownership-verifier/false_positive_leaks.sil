@@ -19,7 +19,7 @@ sil @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObjec
 ///////////
 
 sil @leak_loop_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
   %2 = begin_borrow %0 : $Builtin.NativeObject
   store_borrow %2 to %1 : $*Builtin.NativeObject

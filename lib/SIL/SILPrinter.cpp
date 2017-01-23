@@ -140,9 +140,17 @@ static raw_ostream &operator<<(raw_ostream &OS, ID i) {
 }
 
 /// IDAndType - Used when a client wants to print something like "%0 : $Int".
-struct IDAndType {
-  ID id;
-  SILType Ty;
+struct SILValuePrinterInfo {
+  ID ValueID;
+  SILType Type;
+  Optional<ValueOwnershipKind> OwnershipKind;
+
+  SILValuePrinterInfo(ID ValueID) : ValueID(ValueID), Type(), OwnershipKind() {}
+  SILValuePrinterInfo(ID ValueID, SILType Type)
+      : ValueID(ValueID), Type(Type), OwnershipKind() {}
+  SILValuePrinterInfo(ID ValueID, SILType Type,
+                      ValueOwnershipKind OwnershipKind)
+      : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind) {}
 };
 
 /// Return the fully qualified dotted path for DeclContext.
@@ -411,13 +419,21 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   SIMPLE_PRINTER(QuotedString)
   SIMPLE_PRINTER(SILDeclRef)
   SIMPLE_PRINTER(APInt)
+  SIMPLE_PRINTER(ValueOwnershipKind)
 #undef SIMPLE_PRINTER
-  
-  SILPrinter &operator<<(IDAndType i) {
+
+  SILPrinter &operator<<(SILValuePrinterInfo i) {
     SILColor C(PrintState.OS, SC_Type);
-    return *this << i.id << " : " << i.Ty;
+    *this << i.ValueID;
+    if (!i.Type)
+      return *this;
+    *this << " : ";
+    if (i.OwnershipKind) {
+      *this << "@" << i.OwnershipKind.getValue() << " ";
+    }
+    return *this << i.Type;
   }
-  
+
   SILPrinter &operator<<(Type t) {
     // Print the type using our print options.
     t.print(PrintState.OS, PrintState.ASTOptions);
@@ -443,8 +459,11 @@ public:
 
   ID getID(const SILBasicBlock *B);
   ID getID(SILValue V);
-  IDAndType getIDAndType(SILValue V) {
+  SILValuePrinterInfo getIDAndType(SILValue V) {
     return { getID(V), V->getType() };
+  }
+  SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
+    return {getID(V), V->getType(), V.getOwnershipKind()};
   }
 
   //===--------------------------------------------------------------------===//
@@ -509,6 +528,18 @@ public:
       return;
     *this << '(';
     ArrayRef<SILArgument *> Args = BB->getArguments();
+
+    // If SIL ownership is enabled, print out ownership of SILArguments.
+    if (BB->getModule().getOptions().EnableSILOwnership) {
+      *this << getIDAndTypeAndOwnership(Args[0]);
+      for (SILArgument *Arg : Args.drop_front()) {
+        *this << ", " << getIDAndTypeAndOwnership(Arg);
+      }
+      *this << ')';
+      return;
+    }
+
+    // Otherwise, fall back to the old behavior
     *this << getIDAndType(Args[0]);
     for (SILArgument *Arg : Args.drop_front()) {
       *this << ", " << getIDAndType(Arg);

@@ -38,7 +38,7 @@ sil @guaranteed_use_of_nativeobject : $@convention(thin) (@guaranteed Builtin.Na
 
 // NEGATIVE-TEST-NOT: Function: 'value_subobject_without_corresponding_end_borrow'
 sil @value_subobject_without_corresponding_end_borrow : $@convention(thin) (@owned B) -> () {
-bb0(%0 : $B):
+bb0(%0 : @owned $B):
   %1 = begin_borrow %0 : $B
   %2 = struct_extract %1 : $B, #B.a1
   %3 = struct_extract %2 : $A, #A.ptr
@@ -60,7 +60,7 @@ bb0(%0 : $B):
 // CHECK: Non Consuming User:   %4 = struct_extract %2 : $A, #A.ptr
 // CHECK: Block: bb0
 sil @value_subobject_with_use_after_end_borrow : $@convention(thin) (@owned B) -> () {
-bb0(%0 : $B):
+bb0(%0 : @owned $B):
   %1 = begin_borrow %0 : $B
   %2 = struct_extract %1 : $B, #B.a1
   end_borrow %1 from %0 : $B, $B
@@ -79,14 +79,14 @@ bb0(%0 : $B):
 // CHECK: Value:   %5 = tuple_extract %4 : $(Builtin.NativeObject, Builtin.NativeObject), 1
 // CHECK: BaseValue:   %1 = begin_borrow %0 : $B
 // CHECK: User:   destroy_value %5 : $Builtin.NativeObject
-// CHECK: Conv: Guaranteed
+// CHECK: Conv: guaranteed
 
 // Make sure we only see one failure here. We should process recursively from
 // the borrow root, not from each of the subobjects of the borrow.
 // NEGATIVE-TEST: Function: 'value_subobject_with_destroy_of_subobject'
 // NEGATIVE-TEST-NOT: Function: 'value_subobject_with_destroy_of_subobject'
 sil @value_subobject_with_destroy_of_subobject : $@convention(thin) (@owned B) -> () {
-bb0(%0 : $B):
+bb0(%0 : @owned $B):
   %1 = begin_borrow %0 : $B
   %2 = struct_extract %1 : $B, #B.a1
   %3 = struct_extract %2 : $A, #A.ptr2
@@ -106,7 +106,7 @@ bb0(%0 : $B):
 // CHECK: Non Consuming User:   %6 = tuple_extract %4 : $(Builtin.NativeObject, Builtin.NativeObject), 1
 // CHECK: Block: bb0
 sil @value_different_subobject_kinds_multiple_levels : $@convention(thin) (@owned B) -> () {
-bb0(%0 : $B):
+bb0(%0 : @owned $B):
   %1 = begin_borrow %0 : $B
   %2 = struct_extract %1 : $B, #B.a1
   %3 = struct_extract %2 : $A, #A.ptr2
@@ -124,7 +124,7 @@ bb0(%0 : $B):
 
 // NEGATIVE-TEST-NOT: Function: 'funcarg_subobject_basic_test'
 sil @funcarg_subobject_basic_test : $@convention(thin) (@guaranteed B) -> () {
-bb0(%0 : $B):
+bb0(%0 : @guaranteed $B):
   %2 = struct_extract %0 : $B, #B.a1
   %3 = struct_extract %2 : $A, #A.ptr
   %4 = function_ref @guaranteed_use_of_nativeobject : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
@@ -142,9 +142,9 @@ bb0(%0 : $B):
 // CHECK: Value:   %4 = tuple_extract %3 : $(Builtin.NativeObject, Builtin.NativeObject), 1
 // CHECK: BaseValue:   %0 = argument of bb0 : $B
 // CHECK: User:   destroy_value %4 : $Builtin.NativeObject
-// CHECK: Conv: Guaranteed
+// CHECK: Conv: guaranteed
 sil @funcarg_subobject_with_destroy_of_subobject : $@convention(thin) (@guaranteed B) -> () {
-bb0(%0 : $B):
+bb0(%0 : @guaranteed $B):
   %2 = struct_extract %0 : $B, #B.a1
   %3 = struct_extract %2 : $A, #A.ptr2
   %4 = unchecked_enum_data %3 : $Optional<(Builtin.NativeObject, Builtin.NativeObject)>, #Optional.some!enumelt.1

@@ -227,6 +227,32 @@ namespace {
       TypeLoc = P.Tok.getLoc();
       return parseASTType(result);
     }
+    bool parseSILOwnership(Optional<ValueOwnershipKind> &OwnershipKind) {
+      // We pare here @ <identifier>.
+      if (P.consumeIf(tok::at_sign) && P.Tok.isNot(tok::identifier)) {
+        // Add error here.
+        return true;
+      }
+
+      OwnershipKind =
+          llvm::StringSwitch<Optional<ValueOwnershipKind>>(P.Tok.getText())
+              .Case("trivial",
+                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Trivial))
+              .Case("unowned",
+                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Unowned))
+              .Case("owned",
+                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Owned))
+              .Case("guaranteed", Optional<ValueOwnershipKind>(
+                                      ValueOwnershipKind::Guaranteed))
+              .Default(None);
+
+      if (OwnershipKind.hasValue()) {
+        P.consumeToken();
+        return false;
+      }
+
+      return true;
+    }
     bool parseSILType(SILType &Result,
                       GenericEnvironment *&genericEnv,
                       bool IsFuncDecl = false);
@@ -4049,18 +4075,34 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     if (P.consumeIf(tok::l_paren)) {
       do {
         SILType Ty;
+        Optional<ValueOwnershipKind> OwnershipKind;
         SourceLoc NameLoc;
         StringRef Name = P.Tok.getText();
         if (P.parseToken(tok::sil_local_name, NameLoc,
                          diag::expected_sil_value_name) ||
-            P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-            parseSILType(Ty))
+            P.parseToken(tok::colon, diag::expected_sil_colon_value_ref))
           return true;
+
+        // If SILOwnership is enabled and we are not assuming that we are
+        // parsing unqualified SIL, look for printed value ownership kinds.
+        if (!F->getModule()
+                 .getOptions()
+                 .AssumeUnqualifiedOwnershipWhenParsing &&
+            F->getModule().getOptions().EnableSILOwnership &&
+            parseSILOwnership(OwnershipKind))
+          return true;
+
+        if (parseSILType(Ty))
+          return true;
+
         SILArgument *Arg;
-        if (IsEntry)
+        if (IsEntry) {
           Arg = BB->createFunctionArgument(Ty);
-        else
-          Arg = BB->createPHIArgument(Ty, ValueOwnershipKind::Any);
+        } else {
+          Arg = BB->createPHIArgument(
+              Ty, OwnershipKind.getValueOr(
+                      ValueOwnershipKind(ValueOwnershipKind::Any)));
+        }
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));
       

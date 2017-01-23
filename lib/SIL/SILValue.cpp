@@ -104,15 +104,15 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
                                      ValueOwnershipKind Kind) {
   switch (Kind) {
   case ValueOwnershipKind::Trivial:
-    return os << "Trivial";
+    return os << "trivial";
   case ValueOwnershipKind::Unowned:
-    return os << "Unowned";
+    return os << "unowned";
   case ValueOwnershipKind::Owned:
-    return os << "Owned";
+    return os << "owned";
   case ValueOwnershipKind::Guaranteed:
-    return os << "Guaranteed";
+    return os << "guaranteed";
   case ValueOwnershipKind::Any:
-    return os << "Any";
+    return os << "any";
   }
 
   llvm_unreachable("Unhandled ValueOwnershipKind in switch.");
@@ -452,30 +452,7 @@ ValueOwnershipKindVisitor::visitSILPHIArgument(SILPHIArgument *Arg) {
 
 ValueOwnershipKind
 ValueOwnershipKindVisitor::visitSILFunctionArgument(SILFunctionArgument *Arg) {
-  // Discover our ownership kind from our function signature.
-  switch (Arg->getArgumentConvention()) {
-  // These involve addresses and from an ownership perspective, addresses are
-  // trivial. This is distinct from the ownership properties of the values that
-  // they may contain.
-  case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Guaranteed:
-  case SILArgumentConvention::Indirect_Inout:
-  case SILArgumentConvention::Indirect_InoutAliasable:
-  case SILArgumentConvention::Indirect_Out:
-    return ValueOwnershipKind::Trivial;
-  case SILArgumentConvention::Direct_Owned:
-    return ValueOwnershipKind::Owned;
-  case SILArgumentConvention::Direct_Unowned:
-    if (Arg->getType().isTrivial(Arg->getModule()))
-      return ValueOwnershipKind::Trivial;
-    return ValueOwnershipKind::Unowned;
-  case SILArgumentConvention::Direct_Guaranteed:
-    return ValueOwnershipKind::Guaranteed;
-  case SILArgumentConvention::Direct_Deallocating:
-    llvm_unreachable("No ownership associated with deallocating");
-  }
-
-  llvm_unreachable("Unhandled SILArgumentConvention in switch.");
+  return Arg->getOwnershipKind();
 }
 
 // This is a forwarding instruction through only one of its arguments.

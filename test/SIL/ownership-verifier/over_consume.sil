@@ -15,7 +15,7 @@ sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> 
 // CHECK: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Block: bb0
 sil @double_consume_same_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
@@ -30,7 +30,7 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Block: bb0
 sil @double_consume_jump_thread_blocks : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   br bb1
 
@@ -47,7 +47,7 @@ bb1:
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: Block: bb0
 sil @double_consume_loop_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
   store %0 to [init] %1 : $*Builtin.NativeObject
   destroy_addr %1 : $*Builtin.NativeObject
@@ -77,9 +77,9 @@ bb5:
 // CHECK: Have operand with incompatible ownership?!
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   destroy_value %0 : $Builtin.NativeObject
-// CHECK: Conv: Guaranteed
+// CHECK: Conv: guaranteed
 sil @consumed_guaranteed_arg : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @guaranteed $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -95,7 +95,7 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK: Non Consuming User:   %4 = apply %2(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: Block: bb0
 sil @use_after_end_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
@@ -115,7 +115,7 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK: Non Consuming User:   end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
 // CHECK: Block: bb0
 sil @destroy_before_end_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %0 : $Builtin.NativeObject
