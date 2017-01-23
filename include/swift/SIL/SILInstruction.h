@@ -1835,6 +1835,17 @@ public:
   }
 };
 
+/// Represents the end of a borrow scope for an argument. The reason why this is
+/// seperate from end_borrow is that an argument is not borrowed from a
+/// specific SSA value. Instead it is borrowed from potentially many different
+/// incoming values.
+class EndBorrowArgumentInst
+    : public UnaryInstructionBase<ValueKind::EndBorrowArgumentInst> {
+  friend class SILBuilder;
+
+  EndBorrowArgumentInst(SILDebugLocation DebugLoc, SILArgument *Arg);
+};
+
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in
 /// Raw SIL.
@@ -4855,6 +4866,36 @@ public:
   /// Get the operands to the false BB.
   ArrayRef<Operand> getFalseOperands() const;
   MutableArrayRef<Operand> getFalseOperands();
+
+  bool isConditionOperandIndex(unsigned OpIndex) const {
+    assert(OpIndex < getNumOperands() &&
+           "OpIndex must be an index for an actual operand");
+    return OpIndex == ConditionIdx;
+  }
+
+  /// Is \p OpIndex an operand associated with the true case?
+  bool isTrueOperandIndex(unsigned OpIndex) const {
+    assert(OpIndex < getNumOperands() &&
+           "OpIndex must be an index for an actual operand");
+    if (NumTrueArgs == 0)
+      return false;
+
+    auto Operands = getTrueOperands();
+    return Operands.front().getOperandNumber() <= OpIndex &&
+           Operands.back().getOperandNumber() <= OpIndex;
+  }
+
+  /// Is \p OpIndex an operand associated with the false case?
+  bool isFalseOperandIndex(unsigned OpIndex) const {
+    assert(OpIndex < getNumOperands() &&
+           "OpIndex must be an index for an actual operand");
+    if (NumFalseArgs == 0)
+      return false;
+
+    auto Operands = getFalseOperands();
+    return Operands.front().getOperandNumber() <= OpIndex &&
+           Operands.back().getOperandNumber() <= OpIndex;
+  }
 
   /// Returns the argument on the cond_br terminator that will be passed to
   /// DestBB in A.

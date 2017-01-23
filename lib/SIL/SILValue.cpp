@@ -104,15 +104,15 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
                                      ValueOwnershipKind Kind) {
   switch (Kind) {
   case ValueOwnershipKind::Trivial:
-    return os << "Trivial";
+    return os << "trivial";
   case ValueOwnershipKind::Unowned:
-    return os << "Unowned";
+    return os << "unowned";
   case ValueOwnershipKind::Owned:
-    return os << "Owned";
+    return os << "owned";
   case ValueOwnershipKind::Guaranteed:
-    return os << "Guaranteed";
+    return os << "guaranteed";
   case ValueOwnershipKind::Any:
-    return os << "Any";
+    return os << "any";
   }
 
   llvm_unreachable("Unhandled ValueOwnershipKind in switch.");
@@ -293,6 +293,7 @@ NO_RESULT_OWNERSHIP_INST(DeallocValueBuffer)
 NO_RESULT_OWNERSHIP_INST(DeallocBox)
 NO_RESULT_OWNERSHIP_INST(DeallocExistentialBox)
 NO_RESULT_OWNERSHIP_INST(EndBorrow)
+NO_RESULT_OWNERSHIP_INST(EndBorrowArgument)
 NO_RESULT_OWNERSHIP_INST(Store)
 NO_RESULT_OWNERSHIP_INST(StoreWeak)
 NO_RESULT_OWNERSHIP_INST(StoreUnowned)
@@ -451,30 +452,7 @@ ValueOwnershipKindVisitor::visitSILPHIArgument(SILPHIArgument *Arg) {
 
 ValueOwnershipKind
 ValueOwnershipKindVisitor::visitSILFunctionArgument(SILFunctionArgument *Arg) {
-  // Discover our ownership kind from our function signature.
-  switch (Arg->getArgumentConvention()) {
-  // These involve addresses and from an ownership perspective, addresses are
-  // trivial. This is distinct from the ownership properties of the values that
-  // they may contain.
-  case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Guaranteed:
-  case SILArgumentConvention::Indirect_Inout:
-  case SILArgumentConvention::Indirect_InoutAliasable:
-  case SILArgumentConvention::Indirect_Out:
-    return ValueOwnershipKind::Trivial;
-  case SILArgumentConvention::Direct_Owned:
-    return ValueOwnershipKind::Owned;
-  case SILArgumentConvention::Direct_Unowned:
-    if (Arg->getType().isTrivial(Arg->getModule()))
-      return ValueOwnershipKind::Trivial;
-    return ValueOwnershipKind::Unowned;
-  case SILArgumentConvention::Direct_Guaranteed:
-    return ValueOwnershipKind::Guaranteed;
-  case SILArgumentConvention::Direct_Deallocating:
-    llvm_unreachable("No ownership associated with deallocating");
-  }
-
-  llvm_unreachable("Unhandled SILArgumentConvention in switch.");
+  return Arg->getOwnershipKind();
 }
 
 // This is a forwarding instruction through only one of its arguments.
@@ -684,6 +662,10 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, SUCheckedConversion)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, USCheckedConversion)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IntToFPWithOverflow)
 
+// This is surprising, Builtin.unreachable returns a "Never" value which is
+// trivially typed.
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Unreachable)
+
 /// AtomicRMW has type (Builtin.RawPointer, T) -> T. But it provides overloads
 /// for integer or rawpointer, so it should be trivial.
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AtomicRMW)
@@ -702,7 +684,6 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, CanBeObjCClass)
     llvm_unreachable("Should never get a SILValue to a Builtin "               \
                      "without result");                                        \
   }
-NO_OWNERSHIP_BUILTIN(Unreachable)
 NO_OWNERSHIP_BUILTIN(DestroyArray)
 NO_OWNERSHIP_BUILTIN(CopyArray)
 NO_OWNERSHIP_BUILTIN(TakeArrayFrontToBack)

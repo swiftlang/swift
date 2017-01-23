@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all=0 -o /dev/null 2>&1  %s
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all=0 -module-name Swift -o /dev/null 2>&1  %s
 // REQUIRES: asserts
 
 // This file is meant to contain tests that previously the verifier treated
@@ -12,6 +12,8 @@ import Builtin
 //////////////////
 // Declarations //
 //////////////////
+
+enum Never {}
 
 enum Optional<T> {
 case some(T)
@@ -39,13 +41,13 @@ struct TupleContainingNonTrivialStruct {
 
 // Make sure that guaranteed args do not have a consuming use.
 sil @direct_guaranteed_arg_doesnt_have_consuming_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @guaranteed $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
 
 sil @store_borrow_result : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
   %2 = store_borrow %0 to %1 : $*Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
@@ -54,21 +56,21 @@ bb0(%0 : $Builtin.NativeObject):
 }
 
 sil @trivial_struct_extract_from_non_trivial : $@convention(thin) (@guaranteed NonTrivialStructWithTrivialField) -> () {
-bb0(%0 : $NonTrivialStructWithTrivialField):
+bb0(%0 : @guaranteed $NonTrivialStructWithTrivialField):
   %1 = struct_extract %0 : $NonTrivialStructWithTrivialField, #NonTrivialStructWithTrivialField.payload
   %9999 = tuple()
   return %9999 : $()
 }
 
 sil @trivial_struct_extract_from_trivial : $@convention(thin) (TrivialStruct) -> () {
-bb0(%0 : $TrivialStruct):
+bb0(%0 : @trivial $TrivialStruct):
   %1 = struct_extract %0 : $TrivialStruct, #TrivialStruct.f1
   %9999 = tuple()
   return %9999 : $()
 }
 
 sil @in_address_arg : $@convention(thin) (@in Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject):
+bb0(%0 : @trivial $*Builtin.NativeObject):
   destroy_addr %0 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -76,7 +78,37 @@ bb0(%0 : $*Builtin.NativeObject):
 
 // We shouldn't assert given an unowned argument that is never used.
 sil @non_trivial_unowned_arg : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @unowned $Builtin.NativeObject):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @builtin_unreachable_has_a_return_value : $@convention(thin) () -> () {
+bb0:
+  %0 = builtin "unreachable"() : $Never
+  unreachable
+}
+
+//////////////////////
+// Terminator Tests //
+//////////////////////
+
+sil @simple_branch : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  // Simple branch without an argument.
+  br bb1
+
+bb1:
+  // Branch with multiple trivial arguments
+  %1 = integer_literal $Builtin.Int32, 0
+  br bb2(%1 : $Builtin.Int32, %1 : $Builtin.Int32)
+
+bb2(%2 : @trivial $Builtin.Int32, %3 : @trivial $Builtin.Int32):
+  // Branch with mixed trivial and owned argument
+  br bb3(%1 : $Builtin.Int32, %0 : $Builtin.NativeObject, %2 : $Builtin.Int32)
+
+bb3(%4 : @trivial $Builtin.Int32, %5 : @owned $Builtin.NativeObject, %6 : @trivial $Builtin.Int32):
+  destroy_value %5 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }
@@ -89,13 +121,13 @@ bb0(%0 : $Builtin.NativeObject):
 // levels of aggregate.
 
 sil @owned_aggregates_simple : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> (@owned (Builtin.NativeObject, Builtin.NativeObject)) {
-bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   %2 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
   return %2 : $(Builtin.NativeObject, Builtin.NativeObject)
 }
 
 sil @multiple_level_owned_aggregates : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> (@owned TupleContainingNonTrivialStruct) {
-bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject, %2 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %2 : @owned $Builtin.NativeObject):
   %3 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
   %4 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %2 : $Builtin.NativeObject
   %5 = struct $TupleContainingNonTrivialStruct(%3 : $(Builtin.NativeObject, Builtin.NativeObject), %4 : $Optional<Builtin.NativeObject>)

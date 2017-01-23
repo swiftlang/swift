@@ -197,6 +197,8 @@ public:
   }
 
   OwnershipUseCheckerResult visitCallee(CanSILFunctionType SubstCalleeType);
+  OwnershipUseCheckerResult
+  checkTerminatorArgumentMatchesDestBB(SILBasicBlock *DestBB, unsigned OpIndex);
 
 // Create declarations for all instructions, so we get a warning at compile
 // time if any instructions do not have an implementation.
@@ -253,6 +255,7 @@ NO_OPERAND_INST(ValueMetatype)
     return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
+CONSTANT_OWNERSHIP_INST(Guaranteed, true, EndBorrowArgument)
 CONSTANT_OWNERSHIP_INST(Owned, true, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocExistentialBox)
@@ -402,7 +405,6 @@ FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
 FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
-FORWARD_ANY_OWNERSHIP_INST(Branch)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
@@ -432,27 +434,44 @@ FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, StructExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, UncheckedEnumData)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
-// This ANY_should be based off of the argument.
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::checkTerminatorArgumentMatchesDestBB(
+    SILBasicBlock *DestBB, unsigned OpIndex) {
+  // Make sure that the ValueOwnershipKind of the branch argument that we are
+  // verifying matches the ownership kind of the corresponding argument of the
+  // destination block.
+  ValueOwnershipKind DestBlockArgOwnershipKind =
+      DestBB->getArgument(OpIndex)->getOwnershipKind();
+  return {DestBlockArgOwnershipKind.merge(getOwnershipKind()).hasValue(),
+          getOwnershipKind() == ValueOwnershipKind::Owned};
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitBranchInst(BranchInst *BI) {
+  return checkTerminatorArgumentMatchesDestBB(BI->getDestBB(),
+                                              getOperandIndex());
+}
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitCondBranchInst(CondBranchInst *CBI) {
-  ValueOwnershipKind Base = getOwnershipKind();
+  // If our conditional branch is the condition, it is trivial. Check that the
+  // ownership kind is trivial.
+  if (CBI->isConditionOperandIndex(getOperandIndex()))
+    return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
 
-  for (SILValue TrueArg : CBI->getTrueArgs()) {
-    auto MergedValue = Base.merge(TrueArg.getOwnershipKind());
-    if (!MergedValue.hasValue())
-      return {false, true};
-    Base = MergedValue.getValue();
+  // Otherwise, make sure that our operand matches the
+  if (CBI->isTrueOperandIndex(getOperandIndex())) {
+    unsigned TrueOffset = 1;
+    return checkTerminatorArgumentMatchesDestBB(CBI->getTrueBB(),
+                                                getOperandIndex() - TrueOffset);
   }
 
-  for (SILValue FalseArg : CBI->getFalseArgs()) {
-    auto MergedValue = Base.merge(FalseArg.getOwnershipKind());
-    if (!MergedValue.hasValue())
-      return {false, true};
-    Base = MergedValue.getValue();
-  }
-
-  return {true, !isAddressOrTrivialType()};
+  assert(CBI->isFalseOperandIndex(getOperandIndex()) &&
+         "If an operand is not the condition index or a true operand index, it "
+         "must be a false operand index");
+  unsigned FalseOffset = 1 + CBI->getTrueOperands().size();
+  return checkTerminatorArgumentMatchesDestBB(CBI->getFalseBB(),
+                                              getOperandIndex() - FalseOffset);
 }
 
 OwnershipUseCheckerResult
@@ -906,6 +925,10 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
       Value.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
     return true;
 
+  // If we have an unowned value, then again there is nothing left to do.
+  if (Value.getOwnershipKind() == ValueOwnershipKind::Unowned)
+    return true;
+
   if (!isValueAddressOrTrivial(Value, Mod)) {
     llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
                  << "Non trivial values, non address values, and non "
@@ -1187,6 +1210,13 @@ void SILInstruction::verifyOperandOwnership() const {
   // performing a full verification, instead of additionally in the SILBuilder.
   if (IsSILOwnershipVerifierTestingEnabled)
     return;
+
+  // If this is a terminator instruction, do not verify in SILBuilder. This is
+  // because when building a new function, one must create the destination block
+  // first which is an unnatural pattern and pretty brittle.
+  if (isa<TermInst>(this))
+    return;
+
   auto *Self = const_cast<SILInstruction *>(this);
   for (const Operand &Op : getAllOperands()) {
     OwnershipCompatibilityUseChecker(getModule(), Op, Op.get()).check(Self);
