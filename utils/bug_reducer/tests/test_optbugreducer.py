@@ -109,9 +109,9 @@ class OptBugReducerTestCase(unittest.TestCase):
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 1)
-        # Make sure our final output command does not have -emit-sib in the
-        # output. We want users to get sil output when they type in the relevant
-        # command.
+        # Make sure our final output command does not have -emit-sib in
+        # the output. We want users to get sil output when they type in
+        # the relevant command.
         self.assertEquals([], [o for o in output if '-emit-sib' in o])
 
     def test_suffix_in_need_of_prefix(self):
@@ -139,8 +139,8 @@ class OptBugReducerTestCase(unittest.TestCase):
             1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 0)
         # Make sure our final output command does not have -emit-sib in the
-        # output. We want users to get sil output when they type in the relevant
-        # command.
+        # output. We want users to get sil output when they type in the
+        # relevant command.
         self.assertEquals([], [o for o in output if '-emit-sib' in o])
 
     def test_reduce_function(self):
@@ -172,8 +172,8 @@ class OptBugReducerTestCase(unittest.TestCase):
             1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 1)
         # Make sure our final output command does not have -emit-sib in the
-        # output. We want users to get sil output when they type in the relevant
-        # command.
+        # output. We want users to get sil output when they type in the
+        # relevant command.
         self.assertEquals([], [o for o in output if '-emit-sib' in o])
 
 
