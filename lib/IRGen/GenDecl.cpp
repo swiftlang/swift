@@ -1890,6 +1890,8 @@ void IRGenModule::checkEligibleMetaType(NominalTypeDecl *NT) {
       case ValueKind::SelectEnumAddrInst:
       case ValueKind::IndexAddrInst:
       case ValueKind::RefElementAddrInst:
+      case ValueKind::RefTailAddrInst:
+      case ValueKind::TailAddrInst:
       case ValueKind::AllocValueBufferInst:
       case ValueKind::ProjectValueBufferInst:
       case ValueKind::ProjectBoxInst:
