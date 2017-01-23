@@ -28,3 +28,29 @@ func bar() {
   // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
   foo foo foo
 }
+
+// CHECK-LABEL: (enum_decl trailing_semi "TrailingSemi"
+enum TrailingSemi {
+
+  // CHECK-LABEL: (enum_case_decl trailing_semi
+  // CHECK-NOT:   (enum_element_decl{{.*}}trailing_semi
+  // CHECK:       (enum_element_decl "A")
+  // CHECK:       (enum_element_decl "B")
+  case A,B;
+
+  // CHECK-LABEL: (subscript_decl trailing_semi
+  // CHECK-NOT:   (func_decl trailing_semi 'anonname={{.*}}' getter_for=subscript(_:)
+  // CHECK:       (func_decl 'anonname={{.*}}' getter_for=subscript(_:)
+  subscript(x: Int) -> Int {
+    // CHECK-LABEL: (pattern_binding_decl trailing_semi
+    // CHECK-NOT:   (var_decl trailing_semi "y"
+    // CHECK:       (var_decl "y"
+    var y = 1;
+
+    // CHECK-LABEL: (sequence_expr {{.*}} trailing_semi
+    y += 1;
+
+    // CHECK-LABEL: (return_stmt trailing_semi
+    return y;
+  };
+};
