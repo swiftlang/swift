@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_SILBUILDER_H
 #define SWIFT_SIL_SILBUILDER_H
 
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -518,6 +519,12 @@ public:
                                  SILValue OriginalValue) {
     return insert(new (F.getModule()) EndBorrowInst(
         getSILDebugLocation(Loc), BorrowedValue, OriginalValue));
+  }
+
+  EndBorrowArgumentInst *createEndBorrowArgument(SILLocation Loc,
+                                                 SILValue Arg) {
+    return insert(new (F.getModule()) EndBorrowArgumentInst(
+        getSILDebugLocation(Loc), cast<SILArgument>(Arg)));
   }
 
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {

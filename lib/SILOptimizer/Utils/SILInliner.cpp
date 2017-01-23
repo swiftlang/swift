@@ -227,6 +227,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::StringLiteralInst:
     case ValueKind::FixLifetimeInst:
     case ValueKind::EndBorrowInst:
+    case ValueKind::EndBorrowArgumentInst:
     case ValueKind::BeginBorrowInst:
     case ValueKind::MarkDependenceInst:
     case ValueKind::FunctionRefInst:

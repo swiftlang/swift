@@ -1835,6 +1835,17 @@ public:
   }
 };
 
+/// Represents the end of a borrow scope for an argument. The reason why this is
+/// seperate from end_borrow is that an argument is not borrowed from a
+/// specific SSA value. Instead it is borrowed from potentially many different
+/// incoming values.
+class EndBorrowArgumentInst
+    : public UnaryInstructionBase<ValueKind::EndBorrowArgumentInst> {
+  friend class SILBuilder;
+
+  EndBorrowArgumentInst(SILDebugLocation DebugLoc, SILArgument *Arg);
+};
+
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in
 /// Raw SIL.

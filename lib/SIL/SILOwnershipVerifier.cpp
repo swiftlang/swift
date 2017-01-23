@@ -253,6 +253,7 @@ NO_OPERAND_INST(ValueMetatype)
     return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
+CONSTANT_OWNERSHIP_INST(Guaranteed, true, EndBorrowArgument)
 CONSTANT_OWNERSHIP_INST(Owned, true, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocExistentialBox)

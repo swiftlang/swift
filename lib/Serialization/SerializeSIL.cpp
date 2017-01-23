@@ -1026,6 +1026,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::CondFailInst:
   case ValueKind::RetainValueInst:
   case ValueKind::UnmanagedRetainValueInst:
+  case ValueKind::EndBorrowArgumentInst:
   case ValueKind::CopyValueInst:
   case ValueKind::CopyUnownedValueInst:
   case ValueKind::DestroyValueInst:
