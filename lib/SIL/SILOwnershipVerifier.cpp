@@ -554,8 +554,7 @@ OwnershipCompatibilityUseChecker::visitEndBorrowInst(EndBorrowInst *I) {
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitThrowInst(ThrowInst *I) {
-  // Error objects are trivial? If this fails, fix this.
-  return {true, false};
+  return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
 }
 
 OwnershipUseCheckerResult
