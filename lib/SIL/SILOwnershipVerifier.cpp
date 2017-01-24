@@ -400,6 +400,8 @@ OwnershipCompatibilityUseChecker::visitForwardingInst(SILInstruction *I) {
   ArrayRef<Operand> Ops = I->getAllOperands();
   ValueOwnershipKind Base = getOwnershipKind();
   for (const Operand &Op : Ops) {
+    if (I->isTypeDependentOperand(Op))
+      continue;
     auto MergedValue = Base.merge(Op.get().getOwnershipKind());
     if (!MergedValue.hasValue())
       return {false, true};
@@ -836,8 +838,13 @@ void SILValueOwnershipChecker::gatherUsers(
 
   while (!Users.empty()) {
     Operand *Op = Users.pop_back_val();
-
     auto *User = Op->getUser();
+
+    // If this op is a type dependent operand, skip it. It is not interesting
+    // from an ownership perspective.
+    if (User->isTypeDependentOperand(*Op))
+      continue;
+
     if (OwnershipCompatibilityUseChecker(Mod, *Op, Value).check(User)) {
       DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *User);
       LifetimeEndingUsers.push_back(User);
@@ -1251,6 +1258,8 @@ void SILInstruction::verifyOperandOwnership() const {
 
   auto *Self = const_cast<SILInstruction *>(this);
   for (const Operand &Op : getAllOperands()) {
+    if (isTypeDependentOperand(Op))
+      continue;
     OwnershipCompatibilityUseChecker(getModule(), Op, Op.get()).check(Self);
   }
 #endif

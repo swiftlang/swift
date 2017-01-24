@@ -51,6 +51,11 @@ class X {
   @objc func f() { }
   @objc class func g() {}
 }
+
+protocol SwiftKlassP : class {
+  func foo()
+}
+
 ////////////////
 // Test Cases //
 ////////////////
@@ -389,4 +394,23 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %2 : @
   %4 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %2 : $Builtin.NativeObject
   %5 = struct $TupleContainingNonTrivialStruct(%3 : $(Builtin.NativeObject, Builtin.NativeObject), %4 : $Optional<Builtin.NativeObject>)
   return %5 : $TupleContainingNonTrivialStruct
+}
+
+//////////////////////////
+// Dependent Type Tests //
+//////////////////////////
+
+// Make sure that we are properly ignoring type dependent operands. These do not
+// have parameter conventions.
+sil @dependent_type : $@convention(thin) (@owned SwiftKlassP) -> () {
+bb0(%0 : @owned $SwiftKlassP):
+  %1 = begin_borrow %0 : $SwiftKlassP
+  %2 = open_existential_ref %1 : $SwiftKlassP to $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP
+  %cast = unchecked_ref_cast %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP to $Builtin.NativeObject
+  %3 = witness_method $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP, #SwiftKlassP.foo!1, %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP : $@convention(witness_method) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
+  apply %3<@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
+  end_borrow %1 from %0 : $SwiftKlassP, $SwiftKlassP
+  destroy_value %0 : $SwiftKlassP
+  %9999 = tuple()
+  return %9999 : $()
 }

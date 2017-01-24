@@ -350,7 +350,9 @@ ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I) {
   // Find the first index where we have a trivial value.
   auto Iter =
     find_if(Ops,
-            [](const Operand &Op) -> bool {
+            [&I](const Operand &Op) -> bool {
+              if (I->isTypeDependentOperand(Op))
+                return false;
               return Op.get().getOwnershipKind() != ValueOwnershipKind::Trivial;
             });
   // All trivial.
@@ -360,7 +362,9 @@ ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I) {
 
   // See if we have any Any. If we do, just return that for now.
   if (any_of(Ops,
-             [](const Operand &Op) -> bool {
+             [&I](const Operand &Op) -> bool {
+               if (I->isTypeDependentOperand(Op))
+                 return false;
                return Op.get().getOwnershipKind() == ValueOwnershipKind::Any;
              }))
     return ValueOwnershipKind::Any;
@@ -369,6 +373,8 @@ ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I) {
   ValueOwnershipKind Base = Ops[Index].get().getOwnershipKind();
 
   for (const Operand &Op : Ops.slice(Index+1)) {
+    if (I->isTypeDependentOperand(Op))
+      continue;
     auto OpKind = Op.get().getOwnershipKind();
     if (OpKind.merge(ValueOwnershipKind::Trivial))
       continue;
