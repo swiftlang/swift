@@ -222,8 +222,6 @@ public:
 NO_OPERAND_INST(AllocBox)
 NO_OPERAND_INST(AllocExistentialBox)
 NO_OPERAND_INST(AllocGlobal)
-NO_OPERAND_INST(AllocRef)
-NO_OPERAND_INST(AllocRefDynamic)
 NO_OPERAND_INST(AllocStack)
 NO_OPERAND_INST(FloatLiteral)
 NO_OPERAND_INST(FunctionRef)
@@ -456,6 +454,21 @@ FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, TupleExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, StructExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, UncheckedEnumData)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitAllocRefInst(AllocRefInst *I) {
+  assert(I->getNumOperands() != 0
+         && "If we reach this point, we must have a tail operand");
+  return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitAllocRefDynamicInst(
+    AllocRefDynamicInst *I) {
+  assert(I->getNumOperands() != 0 &&
+         "If we reach this point, we must have a tail operand");
+  return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+}
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::checkTerminatorArgumentMatchesDestBB(

@@ -64,6 +64,15 @@ protocol SwiftKlassP : class {
 
 sil @nontrivial_unowned_user : $@convention(thin) (Builtin.NativeObject) -> ()
 
+struct Val {
+}
+class Ref {
+}
+struct Aleph {
+  var a:Ref
+  var b:Val
+}
+
 ////////////////
 // Test Cases //
 ////////////////
@@ -169,6 +178,18 @@ bb0(%0 : @owned $SomeError):
   return %9999 : $()
 }
 
+sil @tail_allocated_alloc_ref : $@convention(thin) (Builtin.Word, Builtin.Word, @thick SuperKlass.Type) -> () {
+bb0(%0 : @trivial $Builtin.Word, %1 : @trivial $Builtin.Word, %2 : @trivial $@thick SuperKlass.Type):
+  %3 = alloc_ref [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] $SuperKlass
+  dealloc_ref %3 : $SuperKlass
+
+  %4 = alloc_ref_dynamic [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] %2 : $@thick SuperKlass.Type, $SuperKlass
+  // CHECK: dealloc_ref %3 : $Class1
+  dealloc_ref %4 : $SuperKlass
+
+  %9999 = tuple()
+  return %9999 : $()
+}
 //////////////////////
 // Terminator Tests //
 //////////////////////
