@@ -1832,7 +1832,7 @@ extension BinaryInteger {
     let overshift = Self.isSigned
       ? (lhs < (0 as Self) ? ~(0 as Self) : 0 )
       : 0
-    if rhs > lhs.bitWidth {
+    if rhs >= lhs.bitWidth {
       lhs = overshift
       return
     }
