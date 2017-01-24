@@ -327,3 +327,18 @@ bb0(%0 : $AnyObject):
   return %7 : $()
 }
 
+// Test cases where there are dead address instructions.
+// CHECK-LABEL: sil @dead_use
+// CHECK-NOT: alloc_stack
+sil @dead_use : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int64
+  %1 = struct_element_addr %0 : $*Int64, #Int64._value
+  dealloc_stack %0 : $*Int64
+  %2 = alloc_stack $(Int64, Int64)
+  %3 = tuple_element_addr %2 : $*(Int64, Int64), 0
+  dealloc_stack %2 : $*(Int64, Int64)
+  // CHECK: [[VAL:%.*]] = tuple ()
+  %4 = tuple ()
+  // CHECK: return [[VAL]]
+  return %4 : $()
+}
