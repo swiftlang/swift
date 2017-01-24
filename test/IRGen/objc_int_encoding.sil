@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -new-mangling-for-tests %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 
 // CHECK: [[SELECTOR:@.*]] = private global {{.*}} c"fooWithX:\00"
@@ -6,7 +6,7 @@
 // CHECK-64: [[INT_UINT_METHOD_ENCODING:@.*]] = private unnamed_addr constant {{.*}} c"Q24@0:8q16\00"
 // CHECK-32: [[INT_UINT_METHOD_ENCODING:@.*]] = private unnamed_addr constant {{.*}} c"I12@0:4i8\00"
 
-// CHECK: @_INSTANCE_METHODS__TtC17objc_int_encoding3Foo = private constant {{.*}} [[SELECTOR]], {{.*}} [[INT_UINT_METHOD_ENCODING]], {{.*}} @_TToFC17objc_int_encoding3Foo3foofT1xSi_Su
+// CHECK: @_INSTANCE_METHODS__TtC17objc_int_encoding3Foo = private constant {{.*}} [[SELECTOR]], {{.*}} [[INT_UINT_METHOD_ENCODING]], {{.*}} @_T017objc_int_encoding3FooC3fooSuSi1x_tFTo
 
 sil_stage canonical
 
@@ -20,11 +20,11 @@ class Foo: NSObject {
   @objc func foo(x: Int) -> UInt
 }
 
-sil hidden @_TToFC17objc_int_encoding3Foo3foofT1xSi_Su : $@convention(objc_method) (Int, @guaranteed Foo) -> UInt {
+sil hidden @_T017objc_int_encoding3FooC3fooSuSi1x_tFTo : $@convention(objc_method) (Int, @guaranteed Foo) -> UInt {
 entry(%0 : $Int, %1 : $Foo):
   unreachable
 }
-sil @_TToFC17objc_int_encoding3FoocfT_S0_ : $@convention(objc_method) (@owned Foo) -> @owned Foo {
+sil @_T017objc_int_encoding3FooCACycfcTo : $@convention(objc_method) (@owned Foo) -> @owned Foo {
 entry(%1 : $Foo):
   unreachable
 }

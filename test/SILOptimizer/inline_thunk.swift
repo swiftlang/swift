@@ -1,16 +1,16 @@
-// RUN: %target-swift-frontend -primary-file %s -parse-as-library -emit-ir -O | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -parse-as-library -emit-ir -O | %FileCheck %s
 
 // Two thunks are generated:
 // 1. from function signature opts
 // 2. the witness thunk
 // Both should not inline the testit function and should set the noinline-attribute for llvm.
 
-// CHECK-LABEL: define hidden i32 @_TFV{{.*}}testit
-// CHECK: call i32 @_TTS{{.*}}testit{{.*}} #[[ATTR:[0-9]+]]
+// CHECK-LABEL: define hidden i32 @{{.*}}testit{{.*}}F(i32)
+// CHECK: call i32 @{{.*}}testit{{.*}}Tf{{.*}} #[[ATTR:[0-9]+]]
 // CHECK: ret
 
-// CHECK-LABEL: define hidden i32 @_TTW{{.*}}testit
-// CHECK: call i32 @_TTS{{.*}}testit{{.*}} #[[ATTR]]
+// CHECK-LABEL: define hidden i32 @{{.*}}testit{{.*}}FTW(i32
+// CHECK: call i32 @{{.*}}testit{{.*}}Tf{{.*}} #[[ATTR]]
 // CHECK: ret
 
 // CHECK: attributes #[[ATTR]] = { noinline }

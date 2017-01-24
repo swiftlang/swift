@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen -I %S/Inputs/custom-modules %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -Xllvm -new-mangling-for-tests -emit-silgen -I %S/Inputs/custom-modules %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -9,7 +9,7 @@ import nullability
 import Foundation
 
 // null_resettable properties.
-// CHECK-LABEL: sil hidden @_TF18nullability_silgen18testNullResettable
+// CHECK-LABEL: sil hidden @_T018nullability_silgen18testNullResettable{{[_0-9a-zA-Z]*}}F
 func testNullResettable(_ sc: SomeClass) {
   sc.defaultedProperty = nil
   sc.defaultedProperty = "hello"

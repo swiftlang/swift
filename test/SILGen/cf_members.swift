@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -6,7 +6,7 @@ import ImportAsMember
 
 func makeMetatype() -> Struct1.Type { return Struct1.self }
 
-// CHECK-LABEL: sil @_TF10cf_members17importAsUnaryInitFT_T_
+// CHECK-LABEL: sil @_T010cf_members17importAsUnaryInityyF
 public func importAsUnaryInit() {
   // CHECK: function_ref @CCPowerSupplyCreateDangerous : $@convention(c) () -> @owned CCPowerSupply
   var a = CCPowerSupply(dangerous: ())
@@ -14,7 +14,7 @@ public func importAsUnaryInit() {
   a = f()
 }
 
-// CHECK-LABEL: sil @_TF10cf_members3foo
+// CHECK-LABEL: sil @_T010cf_members3foo{{[_0-9a-zA-Z]*}}F
 public func foo(_ x: Double) {
 // CHECK: bb0([[X:%.*]] : $Double):
   // CHECK: [[GLOBALVAR:%.*]] = global_addr @IAMStruct1GlobalVar
@@ -31,12 +31,12 @@ public func foo(_ x: Double) {
   // The metatype expression should still be evaluated even if it isn't
   // used.
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1CreateSimple
-  // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_TF10cf_members12makeMetatype
+  // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_T010cf_members12makeMetatype{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[MAKE_METATYPE]]()
   // CHECK: apply [[FN]]([[X]])
   z = makeMetatype().init(value: x)
 
-  // CHECK: [[THUNK:%.*]] = function_ref @_TTOFVSC7Struct1CFT5valueSd_S_
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1VABSd5value_tcfCTcTO
   // CHECK: [[SELF_META:%.*]] = metatype $@thin Struct1.Type
   // CHECK: [[A:%.*]] = apply [[THUNK]]([[SELF_META]])
   // CHECK: [[A_COPY:%.*]] = copy_value [[A]]
@@ -58,7 +58,7 @@ public func foo(_ x: Double) {
   // CHECK: apply [[FN]]([[ZTMP]], [[X]])
   z = z.translate(radians: x)
 
-  // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME:@_TTOFVSC7Struct19translateFT7radiansSd_S_]]
+  // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME:@_T0SC7Struct1V9translateABSd7radians_tFTcTO]]
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: [[C:%.*]] = apply [[THUNK]]([[ZVAL]])
   // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
@@ -82,14 +82,14 @@ public func foo(_ x: Double) {
   // CHECK: apply [[FN]]([[ZVAL]], [[X]])
   z = z.scale(x)
 
-  // CHECK: [[THUNK:%.*]] = function_ref @_TTOFVSC7Struct15scaleFSdS_
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V5scaleABSdFTcTO
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: [[F:%.*]] = apply [[THUNK]]([[ZVAL]])
   // CHECK: [[F_COPY:%.*]] = copy_value [[F]]
   let f = z.scale
   // CHECK: apply [[F_COPY]]([[X]])
   z = f(x)
-  // CHECK: [[THUNK:%.*]] = function_ref @_TTOFVSC7Struct15scaleFSdS_
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V5scaleABSdFTcTO
   // CHECK: thin_to_thick_function [[THUNK]]
   let g = Struct1.scale
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
@@ -126,7 +126,7 @@ public func foo(_ x: Double) {
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1StaticMethod
   // CHECK: apply [[FN]]()
   var y = Struct1.staticMethod()
-  // CHECK: [[THUNK:%.*]] = function_ref @_TTOZFVSC7Struct112staticMethodFT_Vs5Int32 
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V12staticMethods5Int32VyFZTcTO
   // CHECK: [[SELF:%.*]] = metatype
   // CHECK: [[I:%.*]] = apply [[THUNK]]([[SELF]])
   // CHECK: [[I_COPY:%.*]] = copy_value [[I]]
@@ -148,17 +148,17 @@ public func foo(_ x: Double) {
   // CHECK: apply [[GET]]()
   _ = Struct1.getOnlyProperty
 
-  // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_TF10cf_members12makeMetatype
+  // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_T010cf_members12makeMetatype{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[MAKE_METATYPE]]()
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1StaticGetProperty
   // CHECK: apply [[GET]]()
   _ = makeMetatype().property
-  // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_TF10cf_members12makeMetatype
+  // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_T010cf_members12makeMetatype{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[MAKE_METATYPE]]()
   // CHECK: [[SET:%.*]] = function_ref @IAMStruct1StaticSetProperty
   // CHECK: apply [[SET]](%{{[0-9]+}})
   makeMetatype().property = y
-  // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_TF10cf_members12makeMetatype
+  // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_T010cf_members12makeMetatype{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[MAKE_METATYPE]]()
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1StaticGetOnlyProperty
   // CHECK: apply [[GET]]()
@@ -192,44 +192,44 @@ public func foo(_ x: Double) {
   //   = Struct1.selfComesThird(a:b:x:)
   // p(z, y, 0, x)
 }
-// CHECK: } // end sil function '_TF10cf_members3foo{{.*}}'
+// CHECK: } // end sil function '_T010cf_members3foo{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct1CfT5valueSd_S_
+// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1VABSd5value_tcfCTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1CreateSimple
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct19translatefT7radiansSd_S_
+// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1V9translateABSd7radians_tFTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         store [[SELF]] to [trivial] [[TMP:%.*]] :
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Rotate
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[TMP]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct15scalefSdS_
+// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1V5scaleABSdFTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Scale
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[SELF]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [thunk] @_TTOZFVSC7Struct112staticMethodfT_Vs5Int32
+// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1V12staticMethods5Int32VyFZTO
 // CHECK:       bb0([[SELF:%.*]] : $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1StaticMethod
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]()
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct113selfComesLastfT1xSd_T_
+// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1V13selfComesLastySd1x_tFTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesLast
 // CHECK:         apply [[CFUNC]]([[X]], [[SELF]])
 
-// CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct114selfComesThirdfT1aVs5Int321bSf1xSd_T_
+// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1V14selfComesThirdys5Int32V1a_Sf1bSd1xtFTO
 // CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesThird
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])
 
-// CHECK-LABEL: sil @_TF10cf_members3bar
+// CHECK-LABEL: sil @_T010cf_members3bar{{[_0-9a-zA-Z]*}}F
 public func bar(_ x: Double) {
   // CHECK: function_ref @CCPowerSupplyCreate : $@convention(c) (Double) -> @owned CCPowerSupply
   let ps = CCPowerSupply(watts: x)
@@ -250,7 +250,7 @@ public func bar(_ x: Double) {
   c()
 }
 
-// CHECK-LABEL: sil @_TF10cf_members28importGlobalVarsAsProperties
+// CHECK-LABEL: sil @_T010cf_members28importGlobalVarsAsProperties{{[_0-9a-zA-Z]*}}F
 public func importGlobalVarsAsProperties()
     -> (Double, CCPowerSupply, CCPowerSupply?) {
   // CHECK: global_addr @kCCPowerSupplyDC

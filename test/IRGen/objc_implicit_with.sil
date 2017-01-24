@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -22,27 +22,27 @@ class SwiftGizmo : Gizmo {
 }
 sil_vtable SwiftGizmo {}
 
-sil @_TToFC18objc_implicit_with10SwiftGizmocfT3redSf5greenSf4blueSf_S0_ : $@convention(objc_method) (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_T018objc_implicit_with10SwiftGizmoCACSf3red_Sf5greenSf4bluetcfcTo : $@convention(objc_method) (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $SwiftGizmo):
   return %3 : $SwiftGizmo
 }
 
-sil @_TToFC18objc_implicit_with10SwiftGizmocfT7bellsOnSi_GSQS0__ : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
+sil @_T018objc_implicit_with10SwiftGizmoCSQyACGSi7bellsOn_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
 bb0(%0 : $Int, %1 : $SwiftGizmo):
   unreachable
 }
 
-sil @_TToFC18objc_implicit_with10SwiftGizmocfT_S0_ : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_T018objc_implicit_with10SwiftGizmoCACycfcTo : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @_TToFC18objc_implicit_with10SwiftGizmo5colorfT3redSf5greenSf4blueSf_T_ : $@convention(objc_method) (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_T018objc_implicit_with10SwiftGizmoC5colorySf3red_Sf5greenSf4bluetFTo : $@convention(objc_method) (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $SwiftGizmo):
   return %3 : $SwiftGizmo
 }
 
-sil @_TToFC18objc_implicit_with10SwiftGizmo13otherColorForfT3redSf5greenSf4blueSf_T_ : $@convention(objc_method) (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_T018objc_implicit_with10SwiftGizmoC13otherColorForySf3red_Sf5greenSf4bluetFTo : $@convention(objc_method) (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $SwiftGizmo):
   return %3 : $SwiftGizmo
 }

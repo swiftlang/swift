@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -generic-specializer -module-name inherit | %FileCheck %s
+// RUN: %target-sil-opt -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -generic-specializer -module-name inherit | %FileCheck %s
 
 import Builtin
 import Swift
@@ -27,7 +27,7 @@ bb0(%0 : $Int, %1 : $Int):
 
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack $MMString
   %37 = alloc_stack $MMString
-  // CHECK: [[ID:%[0-9]+]] = function_ref @_TTSg5C7inherit8MMStringCS_8MMObjects8HashableS__GSQCS_6MMFont___callee : $@convention(method) (@owned MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool
+  // CHECK: [[ID:%[0-9]+]] = function_ref @_T06callee7inherit8MMStringC_SQyAB6MMFontCGTg5 : $@convention(method) (@owned MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool
   %34 = function_ref @callee : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in τ_0_0, Int, @owned MMStorage<τ_0_0, τ_0_1>) -> Bool
   // CHECK: [[LOAD:%[0-9]+]] = load [[STACK]]
   // CHECK: apply [[ID]]([[LOAD]], %1, %{{[0-9]+}}) : $@convention(method) (@owned MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool
@@ -37,7 +37,7 @@ bb0(%0 : $Int, %1 : $Int):
   return %14 : $MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>
 }
 
-// CHECK-LABEL: @_TTSg5C7inherit8MMStringCS_8MMObjects8HashableS__GSQCS_6MMFont___callee : $@convention(method) (@owned MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool {
+// CHECK-LABEL: @_T06callee7inherit8MMStringC_SQyAB6MMFontCGTg5 : $@convention(method) (@owned MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool {
 // CHECK: [[META:%[0-9]+]] = metatype $@thick MMString.Type
 // CHECK: [[ID3:%[0-9]+]] = witness_method $MMString, #Equatable."=="!1 :
 // CHECK: [[STACK2:%[0-9]+]] = alloc_stack $MMString

@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend  -parse-as-library -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-astscope-lookup  -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -enable-astscope-lookup  -parse-as-library -emit-silgen %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden @_TF15local_recursion15local_recursionFTSi1ySi_T_ : $@convention(thin) (Int, Int) -> () {
+// CHECK-LABEL: sil hidden @_T015local_recursionAAySi_Si1ytF : $@convention(thin) (Int, Int) -> () {
 // CHECK:       bb0([[X:%0]] : $Int, [[Y:%1]] : $Int):
 func local_recursion(_ x: Int, y: Int) {
   func self_recursive(_ a: Int) {
@@ -9,7 +9,7 @@ func local_recursion(_ x: Int, y: Int) {
   }
 
   // Invoke local functions by passing all their captures.
-  // CHECK: [[SELF_RECURSIVE_REF:%.*]] = function_ref [[SELF_RECURSIVE:@_TFF15local_recursion15local_recursionFTSi1ySi_T_L_14self_recursivefSiT_]]
+  // CHECK: [[SELF_RECURSIVE_REF:%.*]] = function_ref [[SELF_RECURSIVE:@_T015local_recursionAAySi_Si1ytF14self_recursiveL_ySiF]]
   // CHECK: apply [[SELF_RECURSIVE_REF]]([[X]], [[X]])
   self_recursive(x)
 
@@ -27,7 +27,7 @@ func local_recursion(_ x: Int, y: Int) {
     mutually_recursive_1(y + b)
   }
 
-  // CHECK: [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_1:@_TFF15local_recursion15local_recursionFTSi1ySi_T_L_20mutually_recursive_1fSiT_]]
+  // CHECK: [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_1:@_T015local_recursionAAySi_Si1ytF20mutually_recursive_1L_ySiF]]
   // CHECK: apply [[MUTUALLY_RECURSIVE_REF]]([[X]], [[Y]], [[X]])
   mutually_recursive_1(x)
 
@@ -41,7 +41,7 @@ func local_recursion(_ x: Int, y: Int) {
     return transitive_capture_1(y + b)
   }
 
-  // CHECK: [[TRANS_CAPTURE_REF:%.*]] = function_ref [[TRANS_CAPTURE:@_TFF15local_recursion15local_recursionFTSi1ySi_T_L_20transitive_capture_2fSiSi]]
+  // CHECK: [[TRANS_CAPTURE_REF:%.*]] = function_ref [[TRANS_CAPTURE:@_T015local_recursionAAySi_Si1ytF20transitive_capture_2L_SiSiF]]
   // CHECK: apply [[TRANS_CAPTURE_REF]]([[X]], [[X]], [[Y]])
   transitive_capture_2(x)
 
@@ -52,14 +52,14 @@ func local_recursion(_ x: Int, y: Int) {
   // CHECK: apply [[CLOSURE_COPY]]([[X]])
   tc(x)
 
-  // CHECK: [[CLOSURE_REF:%.*]] = function_ref @_TFF15local_recursion15local_recursionFTSi1ySi_T_U_FSiT_
+  // CHECK: [[CLOSURE_REF:%.*]] = function_ref @_T015local_recursionAAySi_Si1ytFySicfU_
   // CHECK: apply [[CLOSURE_REF]]([[X]], [[X]], [[Y]])
   let _: Void = {
     self_recursive($0)
     transitive_capture_2($0)
   }(x)
 
-  // CHECK: [[CLOSURE_REF:%.*]] = function_ref @_TFF15local_recursion15local_recursionFTSi1ySi_T_U0_FSiT_
+  // CHECK: [[CLOSURE_REF:%.*]] = function_ref @_T015local_recursionAAySi_Si1ytFySicfU0_
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[CLOSURE_REF]]([[X]], [[Y]])
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[CLOSURE]]
   // CHECK: apply [[CLOSURE_COPY]]([[X]])
@@ -77,7 +77,7 @@ func local_recursion(_ x: Int, y: Int) {
 
 // CHECK: sil shared [[MUTUALLY_RECURSIVE_1]]
 // CHECK: bb0([[A:%0]] : $Int, [[Y:%1]] : $Int, [[X:%2]] : $Int):
-// CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_2:@_TFF15local_recursion15local_recursionFTSi1ySi_T_L_20mutually_recursive_2fSiT_]]
+// CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_2:@_T015local_recursionAAySi_Si1ytF20mutually_recursive_2L_ySiF]]
 // CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[X]], [[Y]])
 // CHECK: sil shared [[MUTUALLY_RECURSIVE_2]]
 // CHECK: bb0([[B:%0]] : $Int, [[X:%1]] : $Int, [[Y:%2]] : $Int):
@@ -85,7 +85,7 @@ func local_recursion(_ x: Int, y: Int) {
 // CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[Y]], [[X]])
 
 
-// CHECK: sil shared [[TRANS_CAPTURE_1:@_TFF15local_recursion15local_recursionFTSi1ySi_T_L_20transitive_capture_1fSiSi]]
+// CHECK: sil shared [[TRANS_CAPTURE_1:@_T015local_recursionAAySi_Si1ytF20transitive_capture_1L_SiSiF]]
 // CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : $Int):
 
 // CHECK: sil shared [[TRANS_CAPTURE]]
