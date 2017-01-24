@@ -1555,7 +1555,7 @@ Enumerators:
 - Name: NSXMLTextKind
   SwiftName: text
 - Name: NSXMLDTDKind
-  SwiftName: dtd
+  SwiftName: DTDKind
 - Name: NSXMLEntityDeclarationKind
   SwiftName: entityDeclaration
 - Name: NSXMLAttributeDeclarationKind
