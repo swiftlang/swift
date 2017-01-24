@@ -70,8 +70,8 @@ static bool compatibleOwnershipKinds(ValueOwnershipKind K1,
 }
 
 static bool isValueAddressOrTrivial(SILValue V, SILModule &M) {
-  // TODO: Change this to use V->getOwnershipKind() == OwnershipKind::Trivial;
-  return V->getType().isAddress() || V->getType().isTrivial(M);
+  return V->getType().isAddress() ||
+         V.getOwnershipKind() == ValueOwnershipKind::Trivial;
 }
 
 static bool isOwnershipForwardingValueKind(ValueKind K) {
