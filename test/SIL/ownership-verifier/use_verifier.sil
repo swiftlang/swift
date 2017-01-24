@@ -610,6 +610,25 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject, %
   return %9999 : $()
 }
 
+// Make sure that we have a minimal verification as a non-lifetime ending use
+// for mark_dependence. Eventually once we have a model of valid uses from the
+// result of mark_dependence to move into the non-lifetime ending use set of the
+// base object, this test should be extended with a negative use-after-free test
+// in over-consume.
+sil @mark_dependence_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.Int32
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = integer_literal $Builtin.Int32, 1
+  store %2 to [trivial] %1 : $*Builtin.Int32
+  %4 = mark_dependence %1 : $*Builtin.Int32 on %0 : $Builtin.NativeObject
+  store %3 to [trivial] %1 : $*Builtin.Int32
+  dealloc_stack %1 : $*Builtin.Int32
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 //////////////////////////
 // Dependent Type Tests //
 //////////////////////////

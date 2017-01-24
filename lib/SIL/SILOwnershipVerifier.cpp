@@ -765,9 +765,13 @@ OwnershipCompatibilityUseChecker::visitStoreInst(StoreInst *I) {
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
-    MarkDependenceInst *I) {
-  // This needs to be updated.
-  llvm_unreachable("Not implemented");
+    MarkDependenceInst *MDI) {
+  // I need to talk with John about this. The proper thing to do is treat uses
+  // of the result as uses of the base. For now, we just treat the mark
+  // dependence as a use of the base.
+  if (getValue() == MDI->getValue())
+    return {true, false};
+  return {compatibleWithOwnership(ValueOwnershipKind::Owned), false};
 }
 
 //===----------------------------------------------------------------------===//
