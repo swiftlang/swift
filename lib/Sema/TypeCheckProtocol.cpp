@@ -2950,6 +2950,23 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   return ResolveWitnessResult::ExplicitFailed;
 }
 
+static bool associatedTypesAreSameEquivalenceClass(AssociatedTypeDecl *a,
+                                                   AssociatedTypeDecl *b) {
+  if (a == b)
+    return true;
+  
+  // TODO: Do a proper equivalence check here by looking for some relationship
+  // between a and b's protocols. In practice today, it's unlikely that
+  // two same-named associated types can currently be independent, since we
+  // don't have anything like `@implements(P.foo)` to rename witnesses (and
+  // we still fall back to name lookup for witnesses in more cases than we
+  // should).
+  if (a->getName() == b->getName())
+    return true;
+
+  return false;
+}
+
 InferredAssociatedTypesByWitnesses
 ConformanceChecker::inferTypeWitnessesViaValueWitnesses(ValueDecl *req) {
   InferredAssociatedTypesByWitnesses result;
@@ -2974,6 +2991,27 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(ValueDecl *req) {
                                          result.second->getCanonicalType()})
                              .second)
                          return true;
+                       
+                       // Filter out circular possibilities, e.g. that
+                       // AssocType == S.AssocType or
+                       // AssocType == Foo<S.AssocType>.
+                       bool containsTautologicalType =
+                         result.second.findIf([&](Type t) -> bool {
+                           auto dmt = t->getAs<DependentMemberType>();
+                           if (!dmt)
+                             return false;
+                           if (!associatedTypesAreSameEquivalenceClass(
+                                dmt->getAssocType(), result.first))
+                             return false;
+                           if (!dmt->getBase()->isEqual(Conformance->getType()))
+                             return false;
+                           
+                           return true;
+                         });
+                       
+                       if (containsTautologicalType) {
+                         return true;
+                       }
 
                        // Check that the type witness meets the
                        // requirements on the associated type.
