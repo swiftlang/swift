@@ -137,6 +137,15 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
+sil @alloc_value_buffer_dealloc_value_buffer : $@convention(thin) (@inout Builtin.UnsafeValueBuffer, Builtin.Int32) -> () {
+bb0(%0 : @trivial $*Builtin.UnsafeValueBuffer, %1 : @trivial $Builtin.Int32):
+  %2 = alloc_value_buffer $Builtin.Int32 in %0 : $*Builtin.UnsafeValueBuffer
+  store %1 to [trivial] %2 : $*Builtin.Int32
+  dealloc_value_buffer $Builtin.Int32 in %0 : $*Builtin.UnsafeValueBuffer
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 //////////////////////
 // Terminator Tests //
 //////////////////////
