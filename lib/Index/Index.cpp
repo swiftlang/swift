@@ -860,7 +860,19 @@ static NominalTypeDecl *getNominalParent(ValueDecl *D) {
   return Ty->getAnyNominal();
 }
 
-static bool isTestCandidate(ValueDecl *D) {
+/// \returns true if \c D is a subclass of 'XCTestCase'.
+static bool isUnitTestCase(const ClassDecl *D) {
+  if (!D)
+    return false;
+  while (auto *SuperD = D->getSuperclassDecl()) {
+    if (SuperD->getNameStr() == "XCTestCase")
+      return true;
+    D = SuperD;
+  }
+  return false;
+}
+
+static bool isUnitTest(ValueDecl *D) {
   if (!D->hasName())
     return false;
 
@@ -872,11 +884,13 @@ static bool isTestCandidate(ValueDecl *D) {
   if (!D->isInstanceMember())
     return false;
 
-  // 2. ...on a class or extension (not a struct)...
+  // 2. ...on a class or extension (not a struct) subclass of XCTestCase...
   auto parentNTD = getNominalParent(D);
   if (!parentNTD)
     return false;
   if (!isa<ClassDecl>(parentNTD))
+    return false;
+  if (!isUnitTestCase(cast<ClassDecl>(parentNTD)))
     return false;
 
   // 3. ...that returns void...
@@ -909,7 +923,7 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(ValueDecl *D,
   if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
 
-  if (isTestCandidate(D))
+  if (isUnitTest(D))
     Info.symInfo.Properties |= SymbolProperty::UnitTest;
 
   if (auto Group = D->getGroupName())
