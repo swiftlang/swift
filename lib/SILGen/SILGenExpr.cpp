@@ -154,8 +154,8 @@ struct EndBorrowCleanup : Cleanup {
 #ifndef NDEBUG
     llvm::errs() << "EndBorrowCleanup "
                  << "State:" << getState() << "\n"
-                 << "original:" << originalValue << "\n"
-                 << "borrowed:" << borrowedValue << "\n";
+                 << "original:" << originalValue << "borrowed:" << borrowedValue
+                 << "\n";
 #endif
   }
 };

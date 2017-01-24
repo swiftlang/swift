@@ -398,6 +398,7 @@ public:
   }
   
   SILFunction &getFunction() { return F; }
+  SILModule &getModule() { return F.getModule(); }
   SILGenBuilder &getBuilder() { return B; }
   
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst) {

@@ -132,10 +132,15 @@ public:
                         ArrayRef<ManagedValue> elementCountOperands);
 
   using SILBuilder::createTupleExtract;
+
   ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
                                   unsigned index, SILType type);
   ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
                                   unsigned index);
+
+  using SILBuilder::createLoadBorrow;
+  ManagedValue createLoadBorrow(SILLocation loc, ManagedValue base);
+  ManagedValue createFormalAccessLoadBorrow(SILLocation loc, ManagedValue base);
 };
 
 } // namespace Lowering
