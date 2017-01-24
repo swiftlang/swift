@@ -3490,7 +3490,7 @@ namespace {
             prop->getSetterMethodDecl() != decl)
           return nullptr;
         type = Impl.importAccessorMethodType(dc, prop, decl,
-                                             isInSystemModule(dc),
+                                             isInSystemModule(dc), importedName,
                                              &bodyParams.back());
       } else {
         type = Impl.importMethodType(dc, decl, decl->parameters(),

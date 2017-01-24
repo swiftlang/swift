@@ -1018,6 +1018,9 @@ public:
   /// \param clangDecl The underlying declaration.
   /// \param isFromSystemModule Whether to apply special rules that only apply
   ///   to system APIs.
+  /// \param importedName How to import the name of the method. This is still
+  ///   important to satisfy the AST verifier, even though the method is an
+  ///   accessor.
   /// \param[out] params The patterns visible inside the function body.
   ///
   /// \returns the imported function type, or null if the type cannot be
@@ -1026,6 +1029,7 @@ public:
                                 const clang::ObjCPropertyDecl *property,
                                 const clang::ObjCMethodDecl *clangDecl,
                                 bool isFromSystemModule,
+                                importer::ImportedName importedName,
                                 ParameterList **params);
 
   /// \brief Determine whether the given typedef-name is "special", meaning
