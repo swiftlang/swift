@@ -56,6 +56,8 @@ protocol SwiftKlassP : class {
   func foo()
 }
 
+sil @nontrivial_unowned_user : $@convention(thin) (Builtin.NativeObject) -> ()
+
 ////////////////
 // Test Cases //
 ////////////////
@@ -108,6 +110,21 @@ sil @builtin_unreachable_has_a_return_value : $@convention(thin) () -> () {
 bb0:
   %0 = builtin "unreachable"() : $Never
   unreachable
+}
+
+// Make sure that we can pass an owned, guaranteed, and unowned argument as
+// unowned parameters such that the use is viewed as a non-lifetime ending use.
+sil @call_func_with_nontrivial_unowned_user_arg : $@convention(thin) (@owned Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject):
+  %2 = function_ref @nontrivial_unowned_user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %2(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %3 = begin_borrow %0 : $Builtin.NativeObject
+  apply %2(%3) : $@convention(thin) (Builtin.NativeObject) -> ()
+  end_borrow %3 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
 }
 
 //////////////////////

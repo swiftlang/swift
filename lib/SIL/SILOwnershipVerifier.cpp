@@ -614,7 +614,8 @@ OwnershipCompatibilityUseChecker::visitApplyInst(ApplyInst *I) {
   case SILArgumentConvention::Direct_Unowned:
     if (isAddressOrTrivialType())
       return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
-    return {compatibleWithOwnership(ValueOwnershipKind::Unowned), false};
+    // We accept unowned, owned, and guaranteed in unowned positions.
+    return {true, false};
   case SILArgumentConvention::Direct_Guaranteed:
     return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed), false};
   case SILArgumentConvention::Direct_Deallocating:
@@ -642,7 +643,8 @@ OwnershipCompatibilityUseChecker::visitTryApplyInst(TryApplyInst *I) {
   case SILArgumentConvention::Direct_Unowned:
     if (isAddressOrTrivialType())
       return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
-    return {compatibleWithOwnership(ValueOwnershipKind::Unowned), false};
+    // We accept unowned, owned, and guaranteed in unowned positions.
+    return {true, false};
   case SILArgumentConvention::Direct_Guaranteed:
     return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed), false};
   case SILArgumentConvention::Direct_Deallocating:
