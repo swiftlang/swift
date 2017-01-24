@@ -300,7 +300,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, OpenExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, false, PointerToAddress)
 CONSTANT_OWNERSHIP_INST(Trivial, false, PointerToThinFunction)
 CONSTANT_OWNERSHIP_INST(Trivial, false, ProjectBlockStorage)
-CONSTANT_OWNERSHIP_INST(Trivial, false, ProjectExistentialBox)
 CONSTANT_OWNERSHIP_INST(Trivial, false, ProjectValueBuffer)
 CONSTANT_OWNERSHIP_INST(Trivial, false, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Trivial, false, SelectEnumAddr)
@@ -390,6 +389,7 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, SetDeallocating)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, StrongPin)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, UnownedToRef)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyUnownedValue)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ProjectExistentialBox)
 #undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP
 
 OwnershipUseCheckerResult

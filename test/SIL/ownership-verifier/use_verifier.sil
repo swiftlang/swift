@@ -19,6 +19,10 @@ public protocol AnyObject : class {}
 
 public protocol Error {}
 
+struct SomeError: Error {
+  var ptr: Builtin.NativeObject
+}
+
 enum Never {}
 
 enum Optional<T> {
@@ -151,6 +155,18 @@ bb0(%0 : @trivial $*Builtin.UnsafeValueBuffer, %1 : @trivial $Builtin.Int32):
 sil @throws_test : $@convention(thin) (@owned Error) -> ((), @error Error) {
 bb0(%0 : @owned $Error):
   throw %0 : $Error
+}
+
+sil @existential_box_test : $@convention(thin) (@owned SomeError) -> () {
+bb0(%0 : @owned $SomeError):
+  %1 = alloc_existential_box $Error, $SomeError
+  %2 = project_existential_box $SomeError in %1 : $Error
+  store %0 to [init] %2 : $*SomeError
+  %4 = open_existential_box %1 : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  dealloc_existential_box %1 : $Error, $SomeError
+  %9999 = tuple()
+  return %9999 : $()
 }
 
 //////////////////////
