@@ -456,6 +456,116 @@ bb6:
   return %9999 : $()
 }
 
+sil @enum_cases_with_trivial_owned_cases_arg_into_phi : $@convention(thin) (@owned Builtin.NativeObject) -> @owned ThreeDifferingPayloadEnum {
+bb0(%0 : @owned $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  %1 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
+  destroy_value %0 : $Builtin.NativeObject
+  br bb5(%1 : $ThreeDifferingPayloadEnum)
+
+bb3:
+  %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt.1, %0 : $Builtin.NativeObject
+  br bb5(%2 : $ThreeDifferingPayloadEnum)
+
+bb4:
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt.1, %3 : $Builtin.Int32
+  destroy_value %0 : $Builtin.NativeObject
+  br bb5(%4 : $ThreeDifferingPayloadEnum)
+
+bb5(%5 : @owned $ThreeDifferingPayloadEnum):
+  return %5 : $ThreeDifferingPayloadEnum
+}
+
+sil @enum_cases_with_trivial_unowned_cases_arg_into_phi : $@convention(thin) (Builtin.NativeObject) -> ThreeDifferingPayloadEnum {
+bb0(%0 : @unowned $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  %1 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
+  br bb5(%1 : $ThreeDifferingPayloadEnum)
+
+bb3:
+  %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt.1, %0 : $Builtin.NativeObject
+  br bb5(%2 : $ThreeDifferingPayloadEnum)
+
+bb4:
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt.1, %3 : $Builtin.Int32
+  br bb5(%4 : $ThreeDifferingPayloadEnum)
+
+bb5(%5 : @unowned $ThreeDifferingPayloadEnum):
+  return %5 : $ThreeDifferingPayloadEnum
+}
+
+sil @enum_cases_with_trivial_guaranteed_cases_arg_into_phi : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned ThreeDifferingPayloadEnum {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  %1 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
+  br bb5(%1 : $ThreeDifferingPayloadEnum)
+
+bb3:
+  %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt.1, %0 : $Builtin.NativeObject
+  br bb5(%2 : $ThreeDifferingPayloadEnum)
+
+bb4:
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt.1, %3 : $Builtin.Int32
+  br bb5(%4 : $ThreeDifferingPayloadEnum)
+
+bb5(%5 : @guaranteed $ThreeDifferingPayloadEnum):
+  %6 = copy_value %5 : $ThreeDifferingPayloadEnum
+  end_borrow_argument %5 : $ThreeDifferingPayloadEnum
+  return %6 : $ThreeDifferingPayloadEnum
+}
+
+sil @enum_cases_with_trivial_guaranteed_cases_value_into_phi : $@convention(thin) (@owned Builtin.NativeObject) -> @owned ThreeDifferingPayloadEnum {
+bb0(%0 : @owned $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb2:
+  %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
+  br bb6(%2 : $ThreeDifferingPayloadEnum)
+
+bb3:
+  %3 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt.1, %1 : $Builtin.NativeObject
+  br bb5(%3 : $ThreeDifferingPayloadEnum)
+
+bb4:
+  %4 = integer_literal $Builtin.Int32, 0
+  %5 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt.1, %4 : $Builtin.Int32
+  br bb5(%5 : $ThreeDifferingPayloadEnum)
+
+bb5(%6 : @guaranteed $ThreeDifferingPayloadEnum):
+  %7 = copy_value %6 : $ThreeDifferingPayloadEnum
+  end_borrow_argument %6 : $ThreeDifferingPayloadEnum
+  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  br bb6(%7 : $ThreeDifferingPayloadEnum)
+
+bb6(%8 : @owned $ThreeDifferingPayloadEnum):
+  destroy_value %0 : $Builtin.NativeObject
+  return %8 : $ThreeDifferingPayloadEnum
+}
+
+
+
 /////////////////////
 // Aggregate Tests //
 /////////////////////

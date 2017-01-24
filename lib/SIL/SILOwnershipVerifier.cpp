@@ -473,13 +473,48 @@ OwnershipCompatibilityUseChecker::visitAllocRefDynamicInst(
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::checkTerminatorArgumentMatchesDestBB(
     SILBasicBlock *DestBB, unsigned OpIndex) {
-  // Make sure that the ValueOwnershipKind of the branch argument that we are
-  // verifying matches the ownership kind of the corresponding argument of the
-  // destination block.
+  // Grab the ownership kind of the destination block.
   ValueOwnershipKind DestBlockArgOwnershipKind =
       DestBB->getArgument(OpIndex)->getOwnershipKind();
-  return {DestBlockArgOwnershipKind.merge(getOwnershipKind()).hasValue(),
-          getOwnershipKind() == ValueOwnershipKind::Owned};
+
+  // Then if we do not have an enum, make sure that the conventions match.
+  EnumDecl *E = getType().getEnumOrBoundGenericEnum();
+  if (!E) {
+    return {compatibleWithOwnership(DestBlockArgOwnershipKind),
+            getOwnershipKind() == ValueOwnershipKind::Owned};
+  }
+
+  // Otherwise, first see if the enum is completely trivial. In such a case, we
+  // need an argument with a trivial convention. If we have an enum with at
+  // least 1 non-trivial case, then we need an argument with a non-trivial
+  // convention. If our parameter is trivial, then we just let it through in
+  // such a case. Otherwise we need to make sure that the non-trivial ownership
+  // convention matches the one on the argument parameter.
+
+  // Check if this enum has at least one case that is non-trivially typed.
+  bool HasNonTrivialCase =
+      llvm::any_of(E->getAllElements(), [this](EnumElementDecl *E) -> bool {
+        if (!E->hasArgumentType())
+          return false;
+        SILType EnumEltType = getType().getEnumElementType(E, Mod);
+        return !EnumEltType.isTrivial(Mod);
+      });
+
+  // If we have all trivial cases, make sure we are compatible with a trivial
+  // ownership kind.
+  if (!HasNonTrivialCase) {
+    return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+  }
+
+  // Otherwise, if this value is a trivial ownership kind, return.
+  if (compatibleWithOwnership(ValueOwnershipKind::Trivial)) {
+    return {true, false};
+  }
+
+  // And finally finish by making sure that if we have a non-trivial ownership
+  // kind that it matches the argument's convention.
+  return {compatibleWithOwnership(DestBlockArgOwnershipKind),
+          compatibleWithOwnership(ValueOwnershipKind::Owned)};
 }
 
 OwnershipUseCheckerResult
