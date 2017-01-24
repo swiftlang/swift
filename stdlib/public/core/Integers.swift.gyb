@@ -63,21 +63,6 @@ infix operator &>> : BitwiseShiftPrecedence
 infix operator &>>= : AssignmentPrecedence
 
 //===----------------------------------------------------------------------===//
-//===--- Bits for the Stdlib ----------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-
-// FIXME(integers): This should go in the stdlib separately, probably.
-extension ExpressibleByIntegerLiteral
-  where Self : _ExpressibleByBuiltinIntegerLiteral {
-  /// Create an instance initialized to `value`.
-  @_transparent
-  public init(integerLiteral value: Self) {
-    self = value
-  }
-}
-
-//===----------------------------------------------------------------------===//
 //===--- Arithmetic -------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
