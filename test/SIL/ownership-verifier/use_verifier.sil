@@ -163,6 +163,7 @@ bb0(%0 : @trivial $*Builtin.UnsafeValueBuffer, %1 : @trivial $Builtin.Int32):
 
 sil @throws_test : $@convention(thin) (@owned Error) -> ((), @error Error) {
 bb0(%0 : @owned $Error):
+  builtin "willThrow"(%0 : $Error) : $()
   throw %0 : $Error
 }
 
