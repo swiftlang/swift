@@ -360,7 +360,7 @@ private:
 
   bool initIndexSymbol(ValueDecl *D, SourceLoc Loc, bool IsRef,
                        IndexSymbol &Info);
-  bool initFuncDeclIndexSymbol(ValueDecl *D, IndexSymbol &Info);
+  bool initFuncDeclIndexSymbol(FuncDecl *D, IndexSymbol &Info);
   bool initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
                               SourceLoc Loc, IndexSymbol &Info);
   bool initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc,
@@ -556,8 +556,8 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
     return false;
 
   IndexSymbol Info;
-  if (isa<FuncDecl>(D)) {
-    if (initFuncDeclIndexSymbol(D, Info))
+  if (auto FD = dyn_cast<FuncDecl>(D)) {
+    if (initFuncDeclIndexSymbol(FD, Info))
       return false;
   } else {
     if (initIndexSymbol(D, Loc, /*IsRef=*/false, Info))
@@ -918,13 +918,26 @@ static bool isUnitTest(ValueDecl *D) {
   return false;
 }
 
-bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(ValueDecl *D,
+bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
                                                   IndexSymbol &Info) {
   if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
 
   if (isUnitTest(D))
     Info.symInfo.Properties |= SymbolProperty::UnitTest;
+
+  if (D->getAttrs().hasAttribute<IBActionAttr>()) {
+    // Relate with type of the first parameter using RelationIBTypeOf.
+    if (D->getParameterLists().size() >= 2) {
+      auto paramList = D->getParameterList(1);
+      if (!paramList->getArray().empty()) {
+        auto param = paramList->get(0);
+        if (auto nominal = param->getType()->getAnyNominal()) {
+          addRelation(Info, (SymbolRoleSet) SymbolRole::RelationIBTypeOf, nominal);
+        }
+      }
+    }
+  }
 
   if (auto Group = D->getGroupName())
     Info.group = Group.getValue();

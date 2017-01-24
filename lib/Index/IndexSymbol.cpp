@@ -19,6 +19,9 @@ using namespace swift::index;
 static void setFuncSymbolInfo(const FuncDecl *FD, SymbolInfo &sym) {
   sym.Kind = SymbolKind::Function;
 
+  if (FD->getAttrs().hasAttribute<IBActionAttr>())
+    sym.Properties |= SymbolProperty::IBAnnotated;
+
   if (FD->getDeclContext()->isTypeContext()) {
     if (FD->isStatic()) {
       if (FD->getCorrectStaticSpelling() == StaticSpellingKind::KeywordClass)
@@ -118,6 +121,10 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
       break;
     case DeclKind::Var:
       info.Kind = getVarSymbolKind(cast<VarDecl>(D));
+      if (D->getAttrs().hasAttribute<IBOutletAttr>())
+        info.Properties |= SymbolProperty::IBAnnotated;
+      if (D->getAttrs().hasAttribute<GKInspectableAttr>())
+        info.Properties |= SymbolProperty::GKInspectable;
       break;
 
     default:
