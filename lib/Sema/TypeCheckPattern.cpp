@@ -1590,12 +1590,13 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   // the closure argument is also one to avoid the tuple splat
   // from happening.
   if (!hadError && isa<ParenType>(paramListType.getPointer())) {
-    auto underlyingTy = paramListType->getCanonicalType();
+    auto underlyingTy = cast<ParenType>(paramListType.getPointer())
+      ->getUnderlyingType();
     
-    if (underlyingTy->is<TupleType>()) {
-      if (P->size() == 1) {
+    if (underlyingTy->is<TupleType>() &&
+        !underlyingTy->castTo<TupleType>()->getVarArgsBaseType()) {
+      if (P->size() == 1)
         return handleParameter(P->get(0), underlyingTy);
-      }
     }
     
     //pass
@@ -1614,9 +1615,11 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   // The number of elements must match exactly.
   // TODO: incomplete tuple patterns, with some syntax.
   if (!hadError && tupleTy->getNumElements() != P->size()) {
-    auto fnType = FunctionType::get(paramListType->getDesugaredType(), FN->getResult());
+    auto fnType = FunctionType::get(paramListType->getDesugaredType(),
+                                    FN->getResult());
     diagnose(P->getStartLoc(), diag::closure_argument_list_tuple,
-             fnType, tupleTy->getNumElements(), P->size(), (P->size() == 1));
+             fnType, tupleTy->getNumElements(),
+             P->size(), (P->size() == 1));
     hadError = true;
   }
 
