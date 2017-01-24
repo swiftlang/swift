@@ -583,6 +583,10 @@ bool GenericSignature::isCanonicalTypeInContext(Type type,
   if (!type->hasTypeParameter())
     return true;
 
+#if false
+  // FIXME: This is broken because resolveArchetype() doesn't take the
+  // actual associated types into account.
+
   // Look for non-canonical type parameters.
   return !type.findIf([&](Type component) -> bool {
     if (!component->isTypeParameter()) return false;
@@ -593,6 +597,9 @@ bool GenericSignature::isCanonicalTypeInContext(Type type,
     auto rep = pa->getArchetypeAnchor();
     return (rep->isConcreteType() || pa != rep);
   });
+#else
+  return getCanonicalTypeInContext(type, builder)->isEqual(type);
+#endif
 }
 
 CanType GenericSignature::getCanonicalTypeInContext(Type type,
@@ -624,7 +631,12 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type,
   });
   
   auto result = type->getCanonicalType();
+#if false
+  // FIXME: Bring this back when isCanonicalTypeInContext() doesn't call
+  // getCanonicalTypeInContext().
   assert(isCanonicalTypeInContext(result, builder));
+#endif
+
   return result;
 }
 

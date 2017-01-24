@@ -350,19 +350,6 @@ auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
   return Result;
 }
 
-bool ArchetypeBuilder::PotentialArchetype::hasConcreteTypeInPath() const {
-  for (auto pa = this; pa; pa = pa->getParent()) {
-    // FIXME: The archetype check here is a hack because we're reusing
-    // archetypes from the outer context.
-    if (Type concreteType = pa->getConcreteType()) {
-      if (!concreteType->is<ArchetypeType>())
-        return true;
-    }
-  }
-
-  return false;
-}
-
 /// Canonical ordering for dependent types in generic signatures.
 static int compareDependentTypes(
                              ArchetypeBuilder::PotentialArchetype * const* pa,
@@ -457,19 +444,31 @@ static int compareDependentTypes(
   llvm_unreachable("potential archetype total order failure");
 }
 
-bool ArchetypeBuilder::PotentialArchetype::isBetterArchetypeAnchor(
-       PotentialArchetype *other) const {
-  auto concrete = hasConcreteTypeInPath();
-  auto otherConcrete = other->hasConcreteTypeInPath();
-  if (concrete != otherConcrete)
-    return otherConcrete;
+/// Determine whether there is a concrete type anywhere in the path to the root.
+static bool hasConcreteTypeInPath(
+                               const ArchetypeBuilder::PotentialArchetype *pa) {
+  for (; pa; pa = pa->getParent()) {
+    if (pa->isConcreteType()) return true;
+  }
 
-  // FIXME: Not a total order.
-  auto rootKey = getRootGenericParamKey();
-  auto otherRootKey = other->getRootGenericParamKey();
-  return std::make_tuple(+rootKey.Depth, +rootKey.Index, getNestingDepth())
-    < std::make_tuple(+otherRootKey.Depth, +otherRootKey.Index,
-                      other->getNestingDepth());
+  return false;
+}
+
+/// Whether this potential archetype makes a better archetype anchor than
+/// the given archetype anchor.
+static bool isBetterArchetypeAnchor(
+                              const ArchetypeBuilder::PotentialArchetype *pa,
+                              const ArchetypeBuilder::PotentialArchetype *pb) {
+  // If one potential archetype has a concrete type in its path but the other
+  // does not, prefer the one that does not.
+  auto aConcrete = hasConcreteTypeInPath(pa);
+  auto bConcrete = hasConcreteTypeInPath(pb);
+  if (aConcrete != bConcrete)
+    return bConcrete;
+
+  auto mutablePA = const_cast<ArchetypeBuilder::PotentialArchetype *>(pa);
+  auto mutablePB = const_cast<ArchetypeBuilder::PotentialArchetype *>(pb);
+  return compareDependentTypes(&mutablePA, &mutablePB) < 0;
 }
 
 auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
@@ -479,14 +478,15 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
   PotentialArchetype *rep = getRepresentative();
   auto best = rep;
   for (auto pa : rep->getEquivalenceClass()) {
-    if (pa->isBetterArchetypeAnchor(best))
+    if (isBetterArchetypeAnchor(pa, best))
       best = pa;
   }
 
 #ifndef NDEBUG
   // Make sure that we did, in fact, get one that is better than all others.
   for (auto pa : rep->getEquivalenceClass()) {
-    assert(!pa->isBetterArchetypeAnchor(best) &&
+    assert((pa == best || isBetterArchetypeAnchor(best, pa)) &&
+           !isBetterArchetypeAnchor(pa, best) &&
            "archetype anchor isn't a total order");
   }
 #endif
