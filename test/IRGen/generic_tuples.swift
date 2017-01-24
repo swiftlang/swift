@@ -63,6 +63,12 @@ func callDupC(_ c: C) { _ = dupC(c) }
 // CHECK-NEXT: [[TUPLE:%.*]] = call { %C14generic_tuples1C*, %C14generic_tuples1C* } @_TF14generic_tuples4dupCuRxCS_1CrFxTxx_(%C14generic_tuples1C* %0, %swift.type* [[METATYPE]])
 // CHECK-NEXT: [[LEFT:%.*]] = extractvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUPLE]], 0
 // CHECK-NEXT: [[RIGHT:%.*]] = extractvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUPLE]], 1
+// CHECK-NEXT: [[LEFT_CAST:%.*]] = bitcast %C14generic_tuples1C* [[LEFT]] to %swift.refcounted*
+// CHECK-NEXT: call void @swift_rt_swift_retain(%swift.refcounted* [[LEFT_CAST]]
+// CHECK-NEXT: [[RIGHT_CAST:%.*]] = bitcast %C14generic_tuples1C* [[RIGHT]] to %swift.refcounted*
+// CHECK-NEXT: call void @swift_rt_swift_retain(%swift.refcounted* [[RIGHT_CAST]]
+// CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%C14generic_tuples1C*)*)(%C14generic_tuples1C* [[LEFT]])
+// CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%C14generic_tuples1C*)*)(%C14generic_tuples1C* [[RIGHT]])
 // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%C14generic_tuples1C*)*)(%C14generic_tuples1C* [[RIGHT]])
 // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%C14generic_tuples1C*)*)(%C14generic_tuples1C* [[LEFT]])
 // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%C14generic_tuples1C*)*)(%C14generic_tuples1C* %0)
