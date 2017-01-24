@@ -407,7 +407,10 @@ OwnershipCompatibilityUseChecker::visitForwardingInst(SILInstruction *I) {
       return {false, true};
     Base = MergedValue.getValue();
   }
-  return {true, !isAddressOrTrivialType()};
+
+  // We only need to treat a forwarded instruction as a lifetime ending use of
+  // it is owned.
+  return {true, Base == ValueOwnershipKind::Owned};
 }
 
 #define FORWARD_ANY_OWNERSHIP_INST(INST)                                       \
