@@ -1632,20 +1632,30 @@ extension BinaryInteger {
 
     if lhsNegative != rhsNegative { return false }
 
-    // Here we know both values are non-negative, so if one type is strictly
-    // wider than the other we can convert to that type
+    // Here we know the values are of the same sign.
+    //
+    // There are a few possible scenarios from here:
+    //
+    // 1. Both values are negative
+    //  - If one value is strictly wider than the other, then it is safe to
+    //    convert to the wider type.
+    //  - If the values are of the same width, it does not matter which type we
+    //    choose to convert to as the values are already negative, and thus
+    //    include the sign bit if two's complement representation already.
+    // 2. Both values are non-negative
+    //  - If one value is strictly wider than the other, then it is safe to
+    //    convert to the wider type.
+    //  - If the values are of the same width, than signedness matters, as not
+    //    unsigned types are 'wider' in a sense they don't need to 'waste' the
+    //    sign bit. Therefore it is safe to convert to the unsigned type.
+
     if lhs.bitWidth < rhs.bitWidth {
       return Other(extendingOrTruncating: lhs) == rhs
     }
-    // same argument as above but in other direction
     if lhs.bitWidth > rhs.bitWidth {
       return lhs == Self(extendingOrTruncating: rhs)
     }
 
-    // If the types are of the same width, though, like UInt and Int, and both
-    // values are non-negative, we should extend to the unsigned type.
-    // If the types are of the same signness and width, it does not matter
-    // to which the other gets converted.
     if Self.isSigned {
       return Other(extendingOrTruncating: lhs) == rhs
     }
