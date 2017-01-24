@@ -134,6 +134,7 @@ public:
   using SILBuilder::createTupleExtract;
   ManagedValue createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index,
                                   SILType Type);
+  ManagedValue createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index);
 };
 
 } // namespace Lowering

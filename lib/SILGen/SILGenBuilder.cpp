@@ -231,3 +231,8 @@ ManagedValue SILGenBuilder::createTupleExtract(SILLocation Loc, ManagedValue Bas
     SILBuilder::createTupleExtract(Loc, BorrowedBase.getValue(), Index, Type);
   return ManagedValue::forUnmanaged(TupleExtract);
 }
+
+ManagedValue SILGenBuilder::createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index) {
+  SILType Type = Value.getType().getTupleElementType(Index);
+  return createTupleExtract(Loc, Value, Index, Type);
+}
