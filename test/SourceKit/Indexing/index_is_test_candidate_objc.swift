@@ -11,12 +11,12 @@ func test_takesNoParams_andReturnsVoid_butIsNotAnInstanceMethod() {}
 struct MyStruct {
   func test_startsWithTest_takesNoParams_returnsVoid_butIsDefinedOnAStruct() {}
 }
-
-private class MyPrivateClass {
+class XCTestCase {}
+private class MyPrivateClass : XCTestCase {
   func test_startsWithTest_takesNoParams_returnsVoid_andIsPrivate() {}
 }
 
-public class MyClass {
+public class MyClass : XCTestCase {
   func doesNotStartWithTest() {}
   func test_startsWithTest_butTakesAParam(param: Int) {}
   func test_startsWithTest_andTakesNoParams_butReturnsNonVoid() -> Int {}

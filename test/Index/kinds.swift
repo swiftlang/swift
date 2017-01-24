@@ -175,5 +175,24 @@ postfix func ++(a: AStruct) -> AStruct { return a }
 func +(a: AStruct, b: AStruct) -> AStruct { return a }
 // CHECK: [[@LINE-1]]:6 | function/infix-operator/Swift | +(_:_:) | s:F14swift_ide_testoi1pFTVS_7AStructS0__S0_ | Def | rel: 0
 
-
-// TODO: UnitTest
+class XCTestCase {}
+class MyTestCase : XCTestCase {
+  func testMe() {}
+  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testMe() |
+  func testResult() -> Int? { return nil }
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | testResult() |
+  func test(withInt: Int) {}
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | test(withInt:) |
+}
+class SubTestCase : MyTestCase {
+  func testIt2() {}
+  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testIt2() |
+}
+extension SubTestCase {
+  func testIt3() {}
+  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testIt3() |
+}
+class NonTestCase {
+  func testMeNot() {}
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | testMeNot() |
+}
