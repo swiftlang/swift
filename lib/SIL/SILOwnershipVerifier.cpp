@@ -395,20 +395,41 @@ OwnershipCompatibilityUseChecker::visitForwardingInst(SILInstruction *I) {
   assert(I->getNumOperands() && "Expected to have non-zero operands");
   assert(isOwnershipForwardingInst(I) &&
          "Expected to have an ownership forwarding inst");
+
   ArrayRef<Operand> Ops = I->getAllOperands();
-  ValueOwnershipKind Base = getOwnershipKind();
-  for (const Operand &Op : Ops) {
+
+  // Find the first index where we have a trivial value.
+  auto Iter = find_if(Ops, [&I](const Operand &Op) -> bool {
+    if (I->isTypeDependentOperand(Op))
+      return false;
+    return Op.get().getOwnershipKind() != ValueOwnershipKind::Trivial;
+  });
+
+  // All trivial.
+  if (Iter == Ops.end()) {
+    return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+  }
+
+  unsigned Index = std::distance(Ops.begin(), Iter);
+  ValueOwnershipKind Base = Ops[Index].get().getOwnershipKind();
+
+  for (const Operand &Op : Ops.slice(Index + 1)) {
     if (I->isTypeDependentOperand(Op))
       continue;
-    auto MergedValue = Base.merge(Op.get().getOwnershipKind());
-    if (!MergedValue.hasValue())
+    auto OpKind = Op.get().getOwnershipKind();
+    if (OpKind.merge(ValueOwnershipKind::Trivial))
+      continue;
+
+    auto MergedValue = Base.merge(OpKind.Value);
+    if (!MergedValue.hasValue()) {
       return {false, true};
+    }
     Base = MergedValue.getValue();
   }
 
   // We only need to treat a forwarded instruction as a lifetime ending use of
   // it is owned.
-  return {true, Base == ValueOwnershipKind::Owned};
+  return {true, compatibleWithOwnership(ValueOwnershipKind::Owned)};
 }
 
 #define FORWARD_ANY_OWNERSHIP_INST(INST)                                       \

@@ -73,6 +73,9 @@ struct Aleph {
   var b:Val
 }
 
+sil @borrow_tuple_user : $@convention(thin) (@guaranteed (Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
+sil @unowned_tuple_user : $@convention(thin) ((Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
+
 ////////////////
 // Test Cases //
 ////////////////
@@ -565,7 +568,6 @@ bb6(%8 : @owned $ThreeDifferingPayloadEnum):
 }
 
 
-
 /////////////////////
 // Aggregate Tests //
 /////////////////////
@@ -585,6 +587,27 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %2 : @
   %4 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %2 : $Builtin.NativeObject
   %5 = struct $TupleContainingNonTrivialStruct(%3 : $(Builtin.NativeObject, Builtin.NativeObject), %4 : $Optional<Builtin.NativeObject>)
   return %5 : $TupleContainingNonTrivialStruct
+}
+
+sil @aggregates_with_mixed_trivial_nontrivial_types : $@convention(thin) (@owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject, %2 : @unowned $Builtin.NativeObject):
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = copy_value %0 : $Builtin.NativeObject
+  %5 = copy_value %2 : $Builtin.NativeObject
+  %6 = tuple(%3 : $Builtin.Int32, %4 : $Builtin.NativeObject, %3 : $Builtin.Int32, %5 : $Builtin.NativeObject)
+  destroy_value %6 : $(Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)
+
+  %7 = tuple(%3 : $Builtin.Int32, %1 : $Builtin.NativeObject, %3 : $Builtin.Int32, %1 : $Builtin.NativeObject)
+  %8 = function_ref @borrow_tuple_user : $@convention(thin) (@guaranteed (Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
+  apply %8(%7) : $@convention(thin) (@guaranteed (Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
+
+  %9 = tuple(%3 : $Builtin.Int32, %2 : $Builtin.NativeObject, %3 : $Builtin.Int32, %2 : $Builtin.NativeObject)
+  %10 = function_ref @unowned_tuple_user : $@convention(thin) ((Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
+  apply %10(%9) : $@convention(thin) ((Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
+
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
 }
 
 //////////////////////////
