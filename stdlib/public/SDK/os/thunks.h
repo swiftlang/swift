@@ -30,6 +30,10 @@
 #define MIN(a, b)  (((a)<(b))?(a):(b))
 #endif
 
+#ifndef MAX
+#define MAX(a, b)  (((a)>(b))?(a):(b))
+#endif
+
 #ifndef OS_TRACE_INTERNAL_CRASH
 #define OS_TRACE_INTERNAL_CRASH(_ptr, _message) _swift_os_log_reportError(0, _message)
 #endif

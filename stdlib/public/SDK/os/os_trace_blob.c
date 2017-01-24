@@ -81,7 +81,7 @@ os_trace_blob_grow(os_trace_blob_t ob, size_t hint)
     } else if (os_mul_overflow(ob->ob_size, 2, &size)) {
         size = ob->ob_maxsize;
     } else {
-        size = MIN(ob->ob_maxsize, MAX(minsize, size));
+        size = MIN((uint32_t)ob->ob_maxsize, MAX(minsize, size));
     }
     if (size > ob->ob_size) {
         if (ob->ob_flags & OS_TRACE_BLOB_NEEDS_FREE) {
