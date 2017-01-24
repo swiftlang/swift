@@ -1831,6 +1831,9 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
 }
 
 void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
+  if (!var->hasType())
+    return;
+
   if (auto *attr = var->getAttrs().getAttribute<OwnershipAttr>())
     checkOwnershipAttr(var, attr);
   if (auto *attr = var->getAttrs().getAttribute<AutoClosureAttr>()) {
@@ -1858,7 +1861,7 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
 void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
   // The paramdecl should have function type, and we restrict it to functions
   // taking ().
-  auto *FTy = PD->getType()->getAs<FunctionType>();
+  auto *FTy = PD->getInterfaceType()->getAs<FunctionType>();
   if (!FTy) {
     diagnose(attr->getLocation(), diag::autoclosure_function_type);
     attr->setInvalid();
@@ -1912,7 +1915,7 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
 
 void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   // The paramdecl should have function type.
-  auto *FTy = PD->getType()->getAs<FunctionType>();
+  auto *FTy = PD->getInterfaceType()->getAs<FunctionType>();
   if (FTy == nullptr) {
     diagnose(attr->getLocation(), diag::noescape_function_type);
     attr->setInvalid();

@@ -523,9 +523,9 @@ func testInOut(_ arg: inout Int) {
   takesExplicitInt(&x)
   takesInt(&x) // expected-error{{'&' used with non-inout argument of type 'Int'}}
   var y = &x // expected-error{{'&' can only appear immediately in a call argument list}} \
-             // expected-error {{type 'inout Int' of variable is not materializable}}
+             // expected-error {{variable has type 'inout Int' which includes nested inout parameters}}
   var z = &arg // expected-error{{'&' can only appear immediately in a call argument list}} \
-             // expected-error {{type 'inout Int' of variable is not materializable}}
+             // expected-error {{variable has type 'inout Int' which includes nested inout parameters}}
 
   takesExplicitInt(5) // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 }
@@ -810,7 +810,7 @@ func inoutTests(_ arr: inout Int) {
   (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
   // expected-warning @-1 {{expression of type 'inout Int' is unused}}
   let a = (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
-  // expected-error @-1 {{type 'inout Int' of variable is not materializable}}
+  // expected-error @-1 {{variable has type 'inout Int' which includes nested inout parameters}}
 
   inoutTests(true ? &x : &y);  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
 

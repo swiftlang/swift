@@ -6265,7 +6265,8 @@ public:
     // Require the carried type to be materializable.
     if (EED->getArgumentType() &&
         !EED->getArgumentType()->isMaterializable()) {
-      TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable);
+      TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable,
+                  EED->getArgumentType());
       EED->setInterfaceType(ErrorType::get(TC.Context));
       EED->setInvalid();
     }
