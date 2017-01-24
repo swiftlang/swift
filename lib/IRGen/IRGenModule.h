@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/SuccessorMap.h"
@@ -367,7 +368,14 @@ public:
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
   llvm::SmallString<128> OutputFilename;
-  
+
+#ifndef NDEBUG
+  // Used for testing ConformanceCollector.
+  ConformanceCollector EligibleConfs;
+  SILInstruction *CurrentInst = nullptr;
+  SILWitnessTable *CurrentWitnessTable = nullptr;
+#endif
+
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
@@ -533,6 +541,8 @@ public:
   LLVM_ATTRIBUTE_NORETURN
   void fatal_unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
+
+  bool useDllStorage();
 
 private:
   Size PtrSize;
@@ -1000,6 +1010,9 @@ private:
                                         llvm::Type *defaultType,
                                         DebugTypeInfo debugType,
                                         SymbolReferenceKind refKind);
+
+  void checkEligibleConf(const ProtocolConformance *Conf);
+  void checkEligibleMetaType(NominalTypeDecl *NT);
 
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(CanType type);

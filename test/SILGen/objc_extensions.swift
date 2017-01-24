@@ -63,7 +63,6 @@ extension Sub {
 
     // CHECK: bb3([[OLD_NSSTRING_BRIDGED:%.*]] : $Optional<String>):
     // This next line is completely not needed. But we are emitting it now.
-    // CHECK:   [[OLD_NSSTRING_BRIDGED_CAST:%.*]] = unchecked_bitwise_cast [[OLD_NSSTRING_BRIDGED]]
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
@@ -74,11 +73,10 @@ extension Sub {
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
     // CHECK:    destroy_value [[SELF_COPY]]
     // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @_TFC15objc_extensions3SubW4propGSQSS_ : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> ()
-    // CHECK:    [[COPIED_OLD_NSSTRING_BRIDGED_CAST:%.*]] = copy_value [[OLD_NSSTRING_BRIDGED_CAST]]
+    // CHECK:    [[COPIED_OLD_NSSTRING_BRIDGED:%.*]] = copy_value [[OLD_NSSTRING_BRIDGED]]
     // This is an identity cast that should be eliminated by SILGen peepholes.
-    // CHECK:    [[COPIED_OLD_NSSTRING_BRIDGED_CAST2:%.*]] = unchecked_bitwise_cast [[COPIED_OLD_NSSTRING_BRIDGED_CAST]]
-    // CHECK:    apply [[DIDSET_NOTIFIER]]([[COPIED_OLD_NSSTRING_BRIDGED_CAST2]], [[SELF]])
-    // CHECK:    destroy_value [[OLD_NSSTRING_BRIDGED_CAST]]
+    // CHECK:    apply [[DIDSET_NOTIFIER]]([[COPIED_OLD_NSSTRING_BRIDGED]], [[SELF]])
+    // CHECK:    destroy_value [[OLD_NSSTRING_BRIDGED]]
     // CHECK:    destroy_value [[NEW_VALUE]]
     // CHECK: } // end sil function '_TFC15objc_extensions3Subs4propGSQSS_'
 

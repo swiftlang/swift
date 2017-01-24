@@ -247,7 +247,7 @@ public:
     for (Entry &entry : Entries) {
       if (entry.getKind() == WitnessKind::Method) {
         const MethodWitness &MW = entry.getMethodWitness();
-        if (predicate(MW)) {
+        if (MW.Witness && predicate(MW)) {
           entry.removeWitnessMethod();
         }
       }

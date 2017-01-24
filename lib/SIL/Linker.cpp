@@ -17,6 +17,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/FormalLinkage.h"
 #include <functional>
 

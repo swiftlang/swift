@@ -18,18 +18,11 @@
 #ifndef SWIFT_BASIC_UNREACHABLE_H
 #define SWIFT_BASIC_UNREACHABLE_H
 
+#include "llvm/Support/Compiler.h"
 #include <assert.h>
 #include <stdlib.h>
 
-#ifdef __GNUC__
-#define SWIFT_ATTRIBUTE_NORETURN __attribute__((noreturn))
-#elif defined(_MSC_VER)
-#define SWIFT_ATTRIBUTE_NORETURN __declspec(noreturn)
-#else
-#define SWIFT_ATTRIBUTE_NORETURN
-#endif
-
-SWIFT_ATTRIBUTE_NORETURN
+LLVM_ATTRIBUTE_NORETURN
 inline static void swift_unreachable(const char* msg) {
   assert(false && msg);
   (void)msg;

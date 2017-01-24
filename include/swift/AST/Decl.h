@@ -237,8 +237,12 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// \brief Whether this declaration is currently being validated.
     unsigned BeingValidated : 1;
+
+    /// \brief Whether this declaration was added to the surrounding
+    /// DeclContext of an active #if config clause.
+    unsigned EscapedFromIfConfig : 1;
   };
-  enum { NumDeclBits = 11 };
+  enum { NumDeclBits = 12 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
 
   class PatternBindingDeclBitfields {
@@ -649,6 +653,7 @@ protected:
     DeclBits.FromClang = false;
     DeclBits.EarlyAttrValidation = false;
     DeclBits.BeingValidated = false;
+    DeclBits.EscapedFromIfConfig = false;
   }
 
   ClangNode getClangNodeImpl() const {
@@ -744,6 +749,8 @@ public:
   /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;
 
+  SourceLoc TrailingSemiLoc;
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -802,6 +809,14 @@ public:
   void setIsBeingValidated(bool ibv = true) {
     assert(DeclBits.BeingValidated != ibv);
     DeclBits.BeingValidated = ibv;
+  }
+
+  bool escapedFromIfConfig() const {
+    return DeclBits.EscapedFromIfConfig;
+  }
+
+  void setEscapedFromIfConfig(bool Escaped) {
+    DeclBits.EscapedFromIfConfig = Escaped;
   }
 
   /// \returns the unparsed comment attached to this declaration.
@@ -980,7 +995,7 @@ public:
   /// \brief Construct a new layout-constraint requirement.
   ///
   /// \param Subject The type that must conform to the given layout 
-  /// requirment.
+  /// requirement.
   /// \param ColonLoc The location of the ':', or an invalid location if
   /// this requirement was implied.
   /// \param Layout The layout requirement to which the
@@ -5384,9 +5399,6 @@ enum class CtorInitializerKind {
   /// A convenience initializer is an initializer that initializes a complete
   /// object by delegating to another initializer (eventually reaching a
   /// designated initializer).
-  ///
-  /// A convenience initializer is written with a return type of "Self" in
-  /// source code.
   ///
   /// Convenience initializers are inherited into subclasses that override
   /// all of their superclass's designated initializers.

@@ -346,7 +346,7 @@ public:
   /// \param first The left-hand side type assigned to the requirement,
   /// possibly represented by its generic substitute.
   ///
-  /// \param second The right-hand side type assinged to the requirement,
+  /// \param second The right-hand side type assigned to the requirement,
   /// possibly represented by its generic substitute.
   ///
   ///
@@ -1095,7 +1095,7 @@ public:
   void introduceLazyVarAccessors(VarDecl *var) override;
 
   // Not all protocol members are requirements.
-  bool isRequirement(ValueDecl *requirement);
+  bool isRequirement(const ValueDecl *requirement);
 
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
@@ -1943,6 +1943,8 @@ public:
   bool diagnoseInlineableDeclRef(SourceLoc loc, const ValueDecl *D,
                                  const DeclContext *DC);
 
+  void diagnoseResilientValueConstructor(ConstructorDecl *ctor);
+
   /// \name Availability checking
   ///
   /// Routines that perform API availability checking and type checking of
@@ -1964,9 +1966,11 @@ public:
 
   /// Returns an over-approximation of the range of operating system versions
   /// that could the passed-in location could be executing upon for
-  /// the target platform.
+  /// the target platform. If MostRefined != nullptr, set to the most-refined
+  /// TRC found while approximating.
   AvailabilityContext
-  overApproximateAvailabilityAtLocation(SourceLoc loc, const DeclContext *DC);
+  overApproximateAvailabilityAtLocation(SourceLoc loc, const DeclContext *DC,
+                                        const TypeRefinementContext **MostRefined=nullptr);
 
   /// Walk the AST to build the hierarchy of TypeRefinementContexts
   ///

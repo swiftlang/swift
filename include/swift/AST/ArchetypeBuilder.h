@@ -574,6 +574,9 @@ public:
   PotentialArchetype *getNestedType(Identifier Name,
                                     ArchetypeBuilder &builder);
 
+  /// \brief Retrieve (or create) a nested type with a known associated type.
+  PotentialArchetype *getNestedType(AssociatedTypeDecl *assocType,
+                                    ArchetypeBuilder &builder);
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype within the given generic environment.

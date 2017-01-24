@@ -15,6 +15,7 @@
 #include "Serialization.h"
 #include "swift/Strings.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
@@ -373,11 +374,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   for (auto *SA : F.getSpecializeAttrs()) {
     unsigned specAttrAbbrCode = SILAbbrCodes[SILSpecializeAttrLayout::Code];
-
-    auto subs = SA->getSubstitutions();
-    SILSpecializeAttrLayout::emitRecord(
-      Out, ScratchRecord, specAttrAbbrCode, (unsigned)subs.size());
-    S.writeSubstitutions(subs, SILAbbrCodes);
+    SILSpecializeAttrLayout::emitRecord(Out, ScratchRecord, specAttrAbbrCode,
+                                        (unsigned)SA->isExported(),
+                                        (unsigned)SA->getSpecializationKind());
+    S.writeGenericRequirements(SA->getRequirements(), SILAbbrCodes);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -1025,10 +1025,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case ValueKind::CondFailInst:
   case ValueKind::RetainValueInst:
+  case ValueKind::UnmanagedRetainValueInst:
+  case ValueKind::EndBorrowArgumentInst:
   case ValueKind::CopyValueInst:
   case ValueKind::CopyUnownedValueInst:
   case ValueKind::DestroyValueInst:
   case ValueKind::ReleaseValueInst:
+  case ValueKind::UnmanagedReleaseValueInst:
   case ValueKind::AutoreleaseValueInst:
   case ValueKind::SetDeallocatingInst:
   case ValueKind::DeallocStackInst:
@@ -1301,15 +1304,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned abbrCode = SILAbbrCodes[SILTwoOperandsLayout::Code];
     unsigned Attr = 0;
     auto *EBI = cast<EndBorrowInst>(&SI);
-    SILValue Src = EBI->getSrc();
-    SILValue Dest = EBI->getDest();
+    SILValue BorrowedValue = EBI->getBorrowedValue();
+    SILValue OriginalValue = EBI->getOriginalValue();
 
     SILTwoOperandsLayout::emitRecord(
         Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), Attr,
-        S.addTypeRef(Src->getType().getSwiftRValueType()),
-        (unsigned)Src->getType().getCategory(), addValueRef(Src),
-        S.addTypeRef(Dest->getType().getSwiftRValueType()),
-        (unsigned)Dest->getType().getCategory(), addValueRef(Dest));
+        S.addTypeRef(BorrowedValue->getType().getSwiftRValueType()),
+        (unsigned)BorrowedValue->getType().getCategory(),
+        addValueRef(BorrowedValue),
+        S.addTypeRef(OriginalValue->getType().getSwiftRValueType()),
+        (unsigned)OriginalValue->getType().getCategory(),
+        addValueRef(OriginalValue));
     break;
   }
 
@@ -1940,6 +1945,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<decls_block::NormalProtocolConformanceIdLayout>();
   registerSILAbbr<decls_block::ProtocolConformanceXrefLayout>();
   registerSILAbbr<decls_block::GenericRequirementLayout>();
+  registerSILAbbr<decls_block::LayoutRequirementLayout>();
 
   for (const SILGlobalVariable &g : SILMod->getSILGlobals())
     writeSILGlobalVar(g);

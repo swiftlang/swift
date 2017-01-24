@@ -338,6 +338,8 @@ ERROR(subscript_decl_wrong_scope,none,
       "'subscript' functions may only be declared within a type", ())
 ERROR(expected_lparen_subscript,PointsToFirstBadToken,
       "expected '(' for subscript parameters", ())
+ERROR(subscript_has_name,PointsToFirstBadToken,
+      "subscripts cannot have a name", ())
 ERROR(expected_arrow_subscript,PointsToFirstBadToken,
       "expected '->' for subscript element type", ())
 ERROR(expected_type_subscript,PointsToFirstBadToken,
@@ -360,12 +362,17 @@ ERROR(initializer_decl_wrong_scope,none,
       "initializers may only be declared within a type", ())
 ERROR(expected_lparen_initializer,PointsToFirstBadToken,
       "expected '(' for initializer parameters", ())
+ERROR(initializer_has_name,PointsToFirstBadToken,
+      "initializers cannot have a name", ())
 
 // Destructor
 ERROR(destructor_decl_outside_class,none,
       "deinitializers may only be declared within a class", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
+ERROR(destructor_has_name,PointsToFirstBadToken,
+      "deinitializers cannot have a name", ())
+
 ERROR(opened_destructor_expected_rparen,none,
       "expected ')' to close parameter list", ())
 ERROR(destructor_params,none,
@@ -690,6 +697,19 @@ ERROR(sil_box_expected_r_brace,none,
       "expected '}' to complete SIL box field type list", ())
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
+
+//------------------------------------------------------------------------------
+// Layout constraint diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(layout_size_should_be_positive,none,
+      "expected non-negative size to be specified in layout constraint", ())
+ERROR(layout_alignment_should_be_positive,none,
+      "expected non-negative alignment to be specified in layout constraint", ())
+ERROR(expected_rparen_layout_constraint,none,
+      "expected ')' to complete layout constraint", ())
+ERROR(layout_constraints_only_inside_specialize_attr,none,
+      "layout constraints are only allowed inside '_specialize' attributes", ())
 
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
@@ -1298,6 +1318,28 @@ ERROR(attr_warn_unused_result_expected_rparen,none,
 ERROR(attr_escaping_conflicts_noescape,none,
       "@escaping conflicts with @noescape", ())
 
+// _specialize
+ERROR(attr_specialize_missing_colon,none,
+      "missing ':' after %0 in '_specialize' attribute", (StringRef))
+
+ERROR(attr_specialize_missing_comma,none,
+      "missing ',' in '_specialize' attribute", ())
+
+ERROR(attr_specialize_unknown_parameter_name,none,
+      "unknown parameter %0 in '_specialize attribute'", (StringRef))
+
+ERROR(attr_specialize_expected_bool_value,none,
+      "expected a boolean true or false value in '_specialize' attribute", ())
+
+ERROR(attr_specialize_missing_parameter_label_or_where_clause,none,
+      "expected a parameter label or a where clause in '_specialize' attribute", ())
+
+ERROR(attr_specialize_parameter_already_defined,none,
+      "parameter '%0' was already defined in '_specialize' attribute", (StringRef))
+
+ERROR(attr_specialize_expected_partial_or_full,none,
+      "expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1356,6 +1398,9 @@ ERROR(unexpected_version_comparison_operator,none,
       ())
 ERROR(unsupported_conditional_compilation_expression_type,none,
       "invalid conditional compilation expression", ())
+WARNING(swift3_unsupported_conditional_compilation_expression_type,none,
+        "ignoring invalid conditional compilation expression, "
+        "which will be rejected in future version of Swift", ())
 ERROR(unsupported_conditional_compilation_integer,none,
       "'%0' is not a valid conditional compilation expression, use '%1'",
       (StringRef, StringRef))

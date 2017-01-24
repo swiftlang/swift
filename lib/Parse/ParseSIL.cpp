@@ -13,6 +13,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
@@ -93,7 +94,9 @@ namespace {
   };
 
   struct ParsedSpecAttr {
-    SmallVector<ParsedSubstitution, 4> subs;
+    ArrayRef<RequirementRepr> requirements;
+    bool exported;
+    SILSpecializeAttr::SpecializationKind kind;
   };
 
   class SILParser {
@@ -122,9 +125,13 @@ namespace {
     /// A callback to be invoked every time a type was deserialized.
     std::function<void(Type)> ParsedTypeCallback;
 
-
     bool performTypeLocChecking(TypeLoc &T, bool IsSILType,
-                                GenericEnvironment *GenericEnv=nullptr);
+                                GenericEnvironment *GenericEnv = nullptr,
+                                DeclContext *DC = nullptr);
+
+    void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
+                             SmallVectorImpl<Requirement> &To);
+
     ProtocolConformance *
     parseProtocolConformanceHelper(ProtocolDecl *&proto,
                                    GenericEnvironment *GenericEnv,
@@ -219,6 +226,32 @@ namespace {
     bool parseASTType(CanType &result, SourceLoc &TypeLoc) {
       TypeLoc = P.Tok.getLoc();
       return parseASTType(result);
+    }
+    bool parseSILOwnership(Optional<ValueOwnershipKind> &OwnershipKind) {
+      // We pare here @ <identifier>.
+      if (P.consumeIf(tok::at_sign) && P.Tok.isNot(tok::identifier)) {
+        // Add error here.
+        return true;
+      }
+
+      OwnershipKind =
+          llvm::StringSwitch<Optional<ValueOwnershipKind>>(P.Tok.getText())
+              .Case("trivial",
+                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Trivial))
+              .Case("unowned",
+                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Unowned))
+              .Case("owned",
+                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Owned))
+              .Case("guaranteed", Optional<ValueOwnershipKind>(
+                                      ValueOwnershipKind::Guaranteed))
+              .Default(None);
+
+      if (OwnershipKind.hasValue()) {
+        P.consumeToken();
+        return false;
+      }
+
+      return true;
     }
     bool parseSILType(SILType &Result,
                       GenericEnvironment *&genericEnv,
@@ -683,6 +716,79 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
   return false;
 }
 
+namespace {
+  /// A helper class to perform lookup of IdentTypes in the
+  /// current parser scope.
+  class IdentTypeReprLookup : public ASTWalker {
+    Parser &P;
+  public:
+    IdentTypeReprLookup(Parser &P) : P(P) {}
+
+    bool walkToTypeReprPre(TypeRepr *Ty) {
+      auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty);
+      auto Comp = T->getComponentRange().front();
+      if (auto Entry = P.lookupInScope(Comp->getIdentifier()))
+        if (isa<TypeDecl>(Entry)) {
+          Comp->setValue(Entry);
+          return false;
+        }
+      return true;
+    }
+  };
+} // end anonymous namespace
+
+/// Remap RequirementReps to Requirements.
+void SILParser::convertRequirements(SILFunction *F,
+                                    ArrayRef<RequirementRepr> From,
+                                    SmallVectorImpl<Requirement> &To) {
+  if (From.empty()) {
+    To.clear();
+    return;
+  }
+
+  auto *GenericEnv = F->getGenericEnvironment();
+  assert(GenericEnv);
+
+  IdentTypeReprLookup PerformLookup(P);
+  // Use parser lexical scopes to resolve references
+  // to the generic parameters.
+  auto ResolveToInterfaceType = [&](TypeLoc Ty) -> Type {
+    Ty.getTypeRepr()->walk(PerformLookup);
+    performTypeLocChecking(Ty, /* IsSIL */ false);
+    assert(Ty.getType());
+    return GenericEnv->mapTypeOutOfContext(Ty.getType()->getCanonicalType());
+  };
+
+  for (auto &Req : From) {
+    if (Req.getKind() == RequirementReprKind::SameType) {
+      auto FirstType = ResolveToInterfaceType(Req.getFirstTypeLoc());
+      auto SecondType = ResolveToInterfaceType(Req.getSecondTypeLoc());
+      Requirement ConvertedRequirement(RequirementKind::SameType, FirstType,
+                                       SecondType);
+      To.push_back(ConvertedRequirement);
+      continue;
+    }
+
+    if (Req.getKind() == RequirementReprKind::TypeConstraint) {
+      auto FirstType = ResolveToInterfaceType(Req.getFirstTypeLoc());
+      auto SecondType = ResolveToInterfaceType(Req.getSecondTypeLoc());
+      Requirement ConvertedRequirement(RequirementKind::Conformance, FirstType,
+                                       SecondType);
+      To.push_back(ConvertedRequirement);
+      continue;
+    }
+
+    if (Req.getKind() == RequirementReprKind::LayoutConstraint) {
+      auto Subject = ResolveToInterfaceType(Req.getSubjectLoc());
+      Requirement ConvertedRequirement(RequirementKind::Layout, Subject,
+                                       Req.getLayoutConstraint());
+      To.push_back(ConvertedRequirement);
+      continue;
+    }
+    llvm_unreachable("Unsupported requirement kind");
+  }
+}
+
 static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
                                  IsThunk_t *isThunk, bool *isGlobalInit,
                                  Inline_t *inlineStrategy, bool *isLet,
@@ -736,19 +842,30 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       continue;
     }
     else if (SpecAttrs && SP.P.Tok.getText() == "_specialize") {
-      SP.P.consumeToken(tok::identifier);
+      SourceLoc AtLoc = SP.P.Tok.getLoc();
+      SourceLoc Loc(AtLoc);
 
-      /// Parse a specialized attributed, building a parsed substitution list
-      /// and pushing a new ParsedSpecAttr on the SpecAttrs list. Conformances
-      /// cannot be generated until the function declaration is fully parsed so
-      /// that the function's generic signature can be consulted.
+      // Parse a _specialized attribute, building a parsed substitution list
+      // and pushing a new ParsedSpecAttr on the SpecAttrs list. Conformances
+      // cannot be generated until the function declaration is fully parsed so
+      // that the function's generic signature can be consulted.
       ParsedSpecAttr SpecAttr;
-      if (SP.parseSubstitutions(SpecAttr.subs))
+      SpecAttr.requirements = {};
+      SpecAttr.exported = false;
+      SpecAttr.kind = SILSpecializeAttr::SpecializationKind::Full;
+      SpecializeAttr *Attr;
+
+      if (!SP.P.parseSpecializeAttribute(tok::r_square, AtLoc, Loc, Attr))
         return true;
 
+      // Convert SpecializeAttr into ParsedSpecAttr.
+      SpecAttr.requirements = Attr->getTrailingWhereClause()->getRequirements();
+      SpecAttr.kind = Attr->getSpecializationKind() ==
+                              swift::SpecializeAttr::SpecializationKind::Full
+                          ? SILSpecializeAttr::SpecializationKind::Full
+                          : SILSpecializeAttr::SpecializationKind::Partial;
+      SpecAttr.exported = Attr->isExported();
       SpecAttrs->emplace_back(SpecAttr);
-
-      SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
     }
     else if (ClangDecl && SP.P.Tok.getText() == "clang") {
@@ -770,7 +887,8 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
 }
 
 bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
-                                       GenericEnvironment *GenericEnv) {
+                                       GenericEnvironment *GenericEnv,
+                                       DeclContext *DC) {
   // Do some type checking / name binding for the parsed type.
   assert(P.SF.ASTStage == SourceFile::Parsing &&
          "Unexpected stage during parsing!");
@@ -778,9 +896,12 @@ bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
   if (GenericEnv == nullptr)
     GenericEnv = this->GenericEnv;
 
+  if (!DC)
+    DC = &P.SF;
+
   return swift::performTypeLocChecking(P.Context, T,
                                        /*isSILMode=*/true, IsSILType,
-                                       GenericEnv, &P.SF);
+                                       GenericEnv, DC);
 }
 
 /// Find the top-level ValueDecl or Module given a name.
@@ -1910,6 +2031,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     UNARY_INSTRUCTION(CopyUnownedValue)
     UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(CondFail)
+    UNARY_INSTRUCTION(EndBorrowArgument)
+    UNARY_INSTRUCTION(UnmanagedReleaseValue)
+    UNARY_INSTRUCTION(UnmanagedRetainValue)
     REFCOUNTING_INSTRUCTION(StrongPin)
     REFCOUNTING_INSTRUCTION(StrongRetain)
     REFCOUNTING_INSTRUCTION(StrongRelease)
@@ -2420,19 +2544,19 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   }
 
   case ValueKind::EndBorrowInst: {
-    UnresolvedValueName BorrowDestName, BorrowSourceName;
+    UnresolvedValueName BorrowedFromName, BorrowedValueName;
     SourceLoc ToLoc;
     Identifier ToToken;
-    SILType BorrowDestTy, BorrowSourceTy;
+    SILType BorrowedFromTy, BorrowedValueTy;
 
-    if (parseValueName(BorrowDestName) ||
+    if (parseValueName(BorrowedValueName) ||
         parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
                            "from") ||
-        parseValueName(BorrowSourceName) ||
+        parseValueName(BorrowedFromName) ||
         P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-        parseSILType(BorrowDestTy) ||
+        parseSILType(BorrowedValueTy) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(BorrowSourceTy) || parseSILDebugLocation(InstLoc, B))
+        parseSILType(BorrowedFromTy) || parseSILDebugLocation(InstLoc, B))
       return true;
 
     if (ToToken.str() != "from") {
@@ -2440,12 +2564,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       return true;
     }
 
-    SILValue BorrowDest =
-        getLocalValue(BorrowDestName, BorrowDestTy, InstLoc, B);
-    SILValue BorrowSource =
-        getLocalValue(BorrowSourceName, BorrowSourceTy, InstLoc, B);
+    SILValue BorrowedValue =
+        getLocalValue(BorrowedValueName, BorrowedValueTy, InstLoc, B);
+    SILValue BorrowedFrom =
+        getLocalValue(BorrowedFromName, BorrowedFromTy, InstLoc, B);
 
-    ResultVal = B.createEndBorrow(InstLoc, BorrowDest, BorrowSource);
+    ResultVal = B.createEndBorrow(InstLoc, BorrowedValue, BorrowedFrom);
     break;
   }
 
@@ -3951,18 +4075,34 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     if (P.consumeIf(tok::l_paren)) {
       do {
         SILType Ty;
+        Optional<ValueOwnershipKind> OwnershipKind;
         SourceLoc NameLoc;
         StringRef Name = P.Tok.getText();
         if (P.parseToken(tok::sil_local_name, NameLoc,
                          diag::expected_sil_value_name) ||
-            P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-            parseSILType(Ty))
+            P.parseToken(tok::colon, diag::expected_sil_colon_value_ref))
           return true;
+
+        // If SILOwnership is enabled and we are not assuming that we are
+        // parsing unqualified SIL, look for printed value ownership kinds.
+        if (!F->getModule()
+                 .getOptions()
+                 .AssumeUnqualifiedOwnershipWhenParsing &&
+            F->getModule().getOptions().EnableSILOwnership &&
+            parseSILOwnership(OwnershipKind))
+          return true;
+
+        if (parseSILType(Ty))
+          return true;
+
         SILArgument *Arg;
-        if (IsEntry)
+        if (IsEntry) {
           Arg = BB->createFunctionArgument(Ty);
-        else
-          Arg = BB->createPHIArgument(Ty, ValueOwnershipKind::Any);
+        } else {
+          Arg = BB->createPHIArgument(
+              Ty, OwnershipKind.getValueOr(
+                      ValueOwnershipKind(ValueOwnershipKind::Any)));
+        }
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));
       
@@ -4070,23 +4210,25 @@ bool Parser::parseDeclSIL() {
 
     bool isDefinition = false;
     SourceLoc LBraceLoc = Tok.getLoc();
+
     if (consumeIf(tok::l_brace)) {
       isDefinition = true;
-      
+
       FunctionState.GenericEnv = GenericEnv;
       FunctionState.F->setGenericEnvironment(GenericEnv);
 
-      // Resolve specialization attributes after setting GenericEnv.
-      for (auto &Attr : SpecAttrs) {
-        SmallVector<Substitution, 4> Subs;
-        if (getApplySubstitutionsFromParsed(FunctionState, GenericEnv,
-                                            Attr.subs, Subs)) {
-          return true;
+      if (GenericEnv && !SpecAttrs.empty()) {
+        for (auto &Attr : SpecAttrs) {
+          SmallVector<Requirement, 4> requirements;
+          // Resolve types and convert requirements.
+          FunctionState.convertRequirements(FunctionState.F,
+                                            Attr.requirements, requirements);
+          FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
+              FunctionState.F->getModule(), requirements, Attr.exported,
+              Attr.kind));
         }
-        FunctionState.F->addSpecializeAttr(
-          SILSpecializeAttr::create(FunctionState.F->getModule(), Subs));
       }
-      
+
       // Parse the basic block list.
       FunctionState.OwnershipEvaluator.reset(FunctionState.F);
       SILOpenedArchetypesTracker OpenedArchetypesTracker(*FunctionState.F);

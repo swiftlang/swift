@@ -16,6 +16,7 @@
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
@@ -55,7 +56,7 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
   assert(archetype && "Bad generic context nesting?");
   
   return archetype
-           ->getNestedType(assocType->getName(), Builder)
+           ->getNestedType(assocType, Builder)
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/true);
 }
 
@@ -214,7 +215,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 Type CompleteGenericTypeResolver::resolveSelfAssociatedType(
        Type selfTy, AssociatedTypeDecl *assocType) {
   return Builder.resolveArchetype(selfTy)
-           ->getNestedType(assocType->getName(), Builder)
+           ->getNestedType(assocType, Builder)
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/false);
 }
 

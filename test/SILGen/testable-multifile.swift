@@ -58,7 +58,7 @@ public class PublicSub: Base {
 
 
 
-// CHECK-LABEL: sil_witness_table FooImpl: Fooable module main {
+// CHECK-LABEL: sil_witness_table hidden FooImpl: Fooable module main {
 // CHECK-NEXT:  method #Fooable.foo!1: @_TTWV4main7FooImplS_7FooableS_FS1_3foofT_T_
 // CHECK-NEXT: }
 

@@ -5,8 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-protocol a:RangeReplaceableCollection
-class a
-A{(a).a
+// RUN: not --crash %target-swift-frontend %s -emit-ir
+class C{@_fixed_layout public struct P

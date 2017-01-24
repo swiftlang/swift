@@ -497,10 +497,13 @@ swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
   }
 
   // Create a target machine.
-  llvm::TargetMachine *TargetMachine
-    = Target->createTargetMachine(Triple.str(), CPU,
-                                  targetFeatures, TargetOpts, Reloc::PIC_,
-                                  CodeModel::Default, OptLevel);
+  auto cmodel = CodeModel::Default;
+  if (Triple.isWindowsCygwinEnvironment())
+    cmodel = CodeModel::Large;
+
+  llvm::TargetMachine *TargetMachine =
+      Target->createTargetMachine(Triple.str(), CPU, targetFeatures, TargetOpts,
+                                  Reloc::PIC_, cmodel, OptLevel);
   if (!TargetMachine) {
     Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
                        Triple.str(), "no LLVM target machine");

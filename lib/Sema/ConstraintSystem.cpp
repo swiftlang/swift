@@ -196,8 +196,6 @@ getDynamicResultSignature(ValueDecl *decl) {
 }
 
 LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
-  base = base->getCanonicalType();
-
   // Check whether we've already performed this lookup.
   auto knownMember = MemberLookups.find({base, name});
   if (knownMember != MemberLookups.end())
@@ -1547,39 +1545,23 @@ Type ConstraintSystem::lookThroughImplicitlyUnwrappedOptionalType(Type type) {
   return Type();
 }
 
-Type ConstraintSystem::simplifyType(Type type) {
+template <typename Fn>
+Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
   return type.transform([&](Type type) -> Type {
-    if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
-      tvt = getRepresentative(tvt);
-      if (auto fixed = getFixedType(tvt)) {
-        return simplifyType(fixed);
-      }
-      
-      return tvt;
-    }
+    if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer()))
+      return getFixedTypeFn(tvt);
 
     // If this is a dependent member type for which we end up simplifying
     // the base to a non-type-variable, perform lookup.
     if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
       // Simplify the base.
-      Type newBase = simplifyType(depMemTy->getBase());
-      if (!newBase) return type;
+      Type newBase = simplifyTypeImpl(cs, depMemTy->getBase(), getFixedTypeFn);
 
       // If nothing changed, we're done.
       if (newBase.getPointer() == depMemTy->getBase().getPointer())
         return type;
 
       Type lookupBaseType = newBase->getLValueOrInOutObjectType();
-
-      // If the new base is still something we can't handle, just build a
-      // new dependent member type.
-      if (lookupBaseType->is<TypeVariableType>() ||
-          lookupBaseType->is<UnresolvedType>()) {
-        if (auto assocType = depMemTy->getAssocType())
-          return DependentMemberType::get(newBase, assocType);
-        else
-          return DependentMemberType::get(newBase, assocType);
-      }
 
       // Dependent member types should only be created for associated types.
       auto assocType = depMemTy->getAssocType();
@@ -1588,7 +1570,7 @@ Type ConstraintSystem::simplifyType(Type type) {
       if (!lookupBaseType->mayHaveMembers()) return type;
 
       auto result = assocType->getDeclaredInterfaceType()
-          .subst(DC->getParentModule(),
+          .subst(cs.DC->getParentModule(),
                  lookupBaseType->getContextSubstitutions(
                     assocType->getDeclContext()));
 
@@ -1601,78 +1583,45 @@ Type ConstraintSystem::simplifyType(Type type) {
     // If this is a FunctionType and we inferred new function attributes, apply
     // them.
     if (auto ft = dyn_cast<FunctionType>(type.getPointer())) {
-      auto it = extraFunctionAttrs.find(ft);
-      if (it != extraFunctionAttrs.end()) {
+      auto it = cs.extraFunctionAttrs.find(ft);
+      if (it != cs.extraFunctionAttrs.end()) {
         auto extInfo = ft->getExtInfo();
         if (it->second.isNoEscape())
           extInfo = extInfo.withNoEscape();
         if (it->second.throws())
           extInfo = extInfo.withThrows();
-        return FunctionType::get(ft->getInput(), ft->getResult(), extInfo);
+        return FunctionType::get(
+            simplifyTypeImpl(cs, ft->getInput(), getFixedTypeFn),
+            simplifyTypeImpl(cs, ft->getResult(), getFixedTypeFn),
+            extInfo);
       }
     }
     
-
     return type;
   });
 }
 
-Type Solution::simplifyType(TypeChecker &tc, Type type) const {
-  // FIXME: Nearly identical to ConstraintSystem::simplifyType().
-  return type.transform([&](Type type) -> Type {
-    if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
-      auto known = typeBindings.find(tvt);
-      assert(known != typeBindings.end());
-      return known->second;
-    }
+Type ConstraintSystem::simplifyType(Type type) {
+  // Map type variables down to the fixed types of their representatives.
+  return simplifyTypeImpl(
+      *this, type,
+      [&](TypeVariableType *tvt) -> Type {
+        tvt = getRepresentative(tvt);
+        if (auto fixed = getFixedType(tvt)) {
+          return simplifyType(fixed);
+        }
 
-    // If this is a dependent member type for which we end up simplifying
-    // the base to a non-type-variable, perform lookup.
-    if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
-      // Simplify the base.
-      Type newBase = simplifyType(tc, depMemTy->getBase());
-      if (!newBase) return type;
+        return tvt;
+      });
+}
 
-      // If nothing changed, we're done.
-      if (newBase.getPointer() == depMemTy->getBase().getPointer())
-        return type;
-
-      Type lookupBaseType = newBase;
-
-      // Look through an inout type.
-      if (auto inout = lookupBaseType->getAs<InOutType>())
-        lookupBaseType = inout->getObjectType();
-
-      // Look through a metatype.
-      if (auto metatype = lookupBaseType->getAs<AnyMetatypeType>())
-        lookupBaseType = metatype->getInstanceType();
-
-      // Dependent member types should only be created for associated types.
-      auto assocType = depMemTy->getAssocType();
-      assert(depMemTy->getAssocType());
-
-      return lookupBaseType->getTypeOfMember(
-               getConstraintSystem().DC->getParentModule(), assocType, &tc,
-               assocType->getDeclaredInterfaceType());
-    }
-
-    // If this is a FunctionType and we inferred new function attributes, apply
-    // them.
-    if (auto ft = dyn_cast<FunctionType>(type.getPointer())) {
-      auto &CS = getConstraintSystem();
-      auto it = CS.extraFunctionAttrs.find(ft);
-      if (it != CS.extraFunctionAttrs.end()) {
-        auto extInfo = ft->getExtInfo();
-        if (it->second.isNoEscape())
-          extInfo = extInfo.withNoEscape();
-        if (it->second.throws())
-          extInfo = extInfo.withThrows();
-        return FunctionType::get(simplifyType(tc, ft->getInput()),
-                                 simplifyType(tc, ft->getResult()),
-                                 extInfo);
-      }
-    }
-
-    return type;
-  });
+Type Solution::simplifyType(Type type) const {
+  // Map type variables to fixed types from bindings.
+  return simplifyTypeImpl(
+      getConstraintSystem(), type,
+      [&](TypeVariableType *tvt) -> Type {
+        auto known = typeBindings.find(tvt);
+        assert(known != typeBindings.end());
+        return known->second;
+      });
 }

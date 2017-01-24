@@ -272,7 +272,8 @@ private:
     CheckUnowned = M.getOrInsertFunction("swift_checkUnowned", AttrList,
                                          Type::getVoidTy(M.getContext()),
                                          ObjectPtrTy, nullptr);
-    if (llvm::Triple(M.getTargetTriple()).isOSBinFormatCOFF())
+    if (llvm::Triple(M.getTargetTriple()).isOSBinFormatCOFF() &&
+        !llvm::Triple(M.getTargetTriple()).isOSCygMing())
       if (auto *F = llvm::dyn_cast<llvm::Function>(CheckUnowned.get()))
         F->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
     return CheckUnowned.get();

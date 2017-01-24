@@ -20,6 +20,8 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Dwarf.h"
@@ -983,6 +985,7 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
     return;
 
   auto reqAbbrCode = abbrCodes[GenericRequirementLayout::Code];
+  auto layoutReqAbbrCode = abbrCodes[LayoutRequirementLayout::Code];
   for (const auto &req : requirements) {
     if (req.getKind() != RequirementKind::Layout)
       GenericRequirementLayout::emitRecord(
@@ -990,7 +993,17 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
           getRawStableRequirementKind(req.getKind()),
           addTypeRef(req.getFirstType()), addTypeRef(req.getSecondType()));
     else {
-      // TODO: write layout requirement here.
+      // Write layout requirement.
+      auto layout = req.getLayoutConstraint();
+      unsigned size = 0;
+      unsigned alignment = 0;
+      if (layout->isKnownSizeTrivial()) {
+        size = layout->getTrivialSizeInBits();
+        alignment = layout->getAlignment();
+      }
+      LayoutRequirementLayout::emitRecord(
+          Out, ScratchRecord, layoutReqAbbrCode, (unsigned)layout->getKind(),
+          addTypeRef(req.getFirstType()), size, alignment);
     }
   }
 }
@@ -1968,11 +1981,12 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 
   case DAK_Specialize: {
     auto abbrCode = DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
-    SmallVector<TypeID, 8> typeIDs;
-    for (auto tl : cast<SpecializeAttr>(DA)->getTypeLocs())
-      typeIDs.push_back(addTypeRef(tl.getType()));
+    auto SA = cast<SpecializeAttr>(DA);
 
-    SpecializeDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode, typeIDs);
+    SpecializeDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                         (unsigned)SA->isExported(),
+                                         (unsigned)SA->getSpecializationKind());
+    writeGenericRequirements(SA->getRequirements(), DeclTypeAbbrCodes);
     return;
   }
   }
@@ -4184,10 +4198,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
     for (auto TD : localTypeDecls) {
       hasLocalTypes = true;
-
-      Mangle::Mangler DebugMangler(false);
-      DebugMangler.mangleType(TD->getDeclaredInterfaceType(), 0);
-      auto MangledName = DebugMangler.finalize();
+      std::string MangledName = NewMangling::mangleTypeAsUSR(
+                                              TD->getDeclaredInterfaceType());
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {
         addDeclRef(TD), TD->getLocalDiscriminator()

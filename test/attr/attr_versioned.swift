@@ -22,3 +22,16 @@
 
 @_versioned extension S {}
 // expected-error@-1 {{@_versioned cannot be applied to this declaration}}
+
+@_versioned
+protocol VersionedProtocol {
+  associatedtype T
+
+  func requirement() -> T
+
+  public func publicRequirement() -> T
+  // expected-error@-1 {{'public' modifier cannot be used in protocols}}
+
+  @_versioned func versionedRequirement() -> T
+  // expected-error@-1 {{'@_versioned' attribute cannot be used in protocols}}
+}

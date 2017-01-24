@@ -759,7 +759,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     // value, which we don't need.
     // TODO: In existential-to-existential casts, we should carry over common
     // witness tables from the source to the destination.
-    value.claimAll();
+    (void)value.claimAll();
 
     SmallVector<ProtocolDecl*, 1> protocols;
 

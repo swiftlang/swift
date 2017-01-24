@@ -20,7 +20,6 @@
 #include "llvm/Support/DataTypes.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -43,6 +42,7 @@
 namespace clang {
   class Decl;
   class MacroInfo;
+  class Module;
   class ObjCInterfaceDecl;
 }
 
@@ -58,11 +58,16 @@ namespace swift {
   class ForeignRepresentationInfo;
   class FuncDecl;
   class InFlightDiagnostic;
+  class IterableDeclContext;
   class LazyAbstractFunctionData;
+  class LazyGenericTypeData;
+  class LazyContextData;
+  class LazyMemberLoader;
   class LazyIterableDeclContextData;
   class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
+  class SourceFile;
   class SourceLoc;
   class Type;
   class TypeVariableType;
@@ -75,6 +80,12 @@ namespace swift {
   class ModuleDecl;
   class ModuleLoader;
   class NominalTypeDecl;
+  class NormalProtocolConformance;
+  class InheritedProtocolConformance;
+  class SpecializedProtocolConformance;
+  enum class ProtocolConformanceState;
+  class Pattern;
+  enum PointerTypeKind : unsigned;
   class PrecedenceGroupDecl;
   class TupleTypeElt;
   class EnumElementDecl;
@@ -86,8 +97,11 @@ namespace swift {
   class DiagnosticEngine;
   class Substitution;
   class TypeCheckerDebugConsumer;
+  struct RawComment;
   class DocComment;
   class SILBoxType;
+  class TypeAliasDecl;
+  class VarDecl;
 
   enum class KnownProtocolKind : uint8_t;
 

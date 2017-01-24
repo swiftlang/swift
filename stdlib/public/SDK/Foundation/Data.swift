@@ -973,10 +973,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
 
-    /// Initialze a `Data` with a repeating byte pattern
+    /// Initialize a `Data` with a repeating byte pattern
     ///
-    /// - parameter repeatedValue: A byte to initialze the pattern
-    /// - parameter count: The number of bytes the data initially contains initialzed to the repeatedValue
+    /// - parameter repeatedValue: A byte to initialize the pattern
+    /// - parameter count: The number of bytes the data initially contains initialized to the repeatedValue
     public init(repeating repeatedValue: UInt8, count: Int) {
         self.init(count: count)
         withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt8>) -> Void in

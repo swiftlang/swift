@@ -1157,7 +1157,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
     // The object is local, but we cannot determine its type.
     return false;
   }
-  // If Ty is a an optional, its deallocation is equivalent to the deallocation
+  // If Ty is an optional, its deallocation is equivalent to the deallocation
   // of its payload.
   // TODO: Generalize it. Destructor of an aggregate type is equivalent to calling
   // destructors for its components.

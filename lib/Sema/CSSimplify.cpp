@@ -1193,6 +1193,71 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
   return false;
 }
 
+/// Determine whether this is an implicitly unwrapped optional type.
+static OptionalTypeKind classifyAsOptionalType(Type type) {
+  if (auto boundGeneric = type->getAs<BoundGenericType>())
+    return boundGeneric->getDecl()->classifyAsOptionalType();
+
+  return OTK_None;
+}
+
+/// Determine whether the first type with the given number of optionals
+/// is potentially more optional than the second type with its number of
+/// optionals.
+static bool isPotentiallyMoreOptionalThan(Type objType1,
+                                          unsigned numOptionals1,
+                                          Type objType2,
+                                          unsigned numOptionals2) {
+  if (numOptionals1 <= numOptionals2 && !objType1->isTypeVariableOrMember())
+    return false;
+
+  return true;
+}
+
+/// Enumerate all of the applicable optional conversion restrictions
+static void enumerateOptionalConversionRestrictions(
+                    Type type1, Type type2,
+                    ConstraintKind kind,
+                    llvm::function_ref<void(ConversionRestrictionKind)> fn) {
+  SmallVector<Type, 2> optionals1;
+  Type objType1 = type1->lookThroughAllAnyOptionalTypes(optionals1);
+
+  SmallVector<Type, 2> optionals2;
+  Type objType2 = type2->lookThroughAllAnyOptionalTypes(optionals2);
+
+  if (optionals1.empty() && optionals2.empty())
+    return;
+
+  // Optional-to-optional.
+  if (!optionals1.empty() && !optionals2.empty()) {
+    auto optionalKind1 = classifyAsOptionalType(optionals1.front());
+    auto optionalKind2 = classifyAsOptionalType(optionals2.front());
+
+    // Break cyclic conversions between T? and U! by only allowing it for
+    // conversion constraints.
+    if (kind >= ConstraintKind::Conversion ||
+        !(optionalKind1 == OTK_Optional &&
+          optionalKind2 == OTK_ImplicitlyUnwrappedOptional))
+      fn(ConversionRestrictionKind::OptionalToOptional);
+  }
+
+  // Inject a value into an optional.
+  if (isPotentiallyMoreOptionalThan(objType2, optionals2.size(),
+                                    objType1, optionals1.size())) {
+    fn(ConversionRestrictionKind::ValueToOptional);
+  }
+
+  // Unwrap an implicitly-unwrapped optional.
+  if (!optionals1.empty() &&
+      classifyAsOptionalType(optionals1.front())
+        == OTK_ImplicitlyUnwrappedOptional &&
+      kind >= ConstraintKind::Conversion &&
+      isPotentiallyMoreOptionalThan(objType1, optionals1.size(),
+                                    objType2, optionals2.size())) {
+    fn(ConversionRestrictionKind::ForceUnchecked);
+  }
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
@@ -1413,7 +1478,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Subtype constraints are subject for edge contraction,
       // which is inappropriate in this case, because it's going to
       // erase/lose 'inout' modifier after merging equivalence classes
-      // (if inout containts type var, see ConstraintGraph::contractEdges()),
+      // (if inout constraints type var, see ConstraintGraph::contractEdges()),
       // since right-hand side type variable must not be materializable
       // it can simply get left-hand side as a fixed binding, otherwise fail.
       if (type1->is<InOutType>() &&
@@ -1425,7 +1490,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (typeVar2->getImpl().mustBeMaterializable())
           return SolutionKind::Error;
 
-        // Constriants like `inout T0 subtype T1` where (T0 must be
+        // Constraints like `inout T0 subtype T1` where (T0 must be
         // materializable) are created when closures are part of the generic
         // function parameters e.g. `func foo<T>(_ t: T, (inout T) -> Void) {}`
         // so when such function gets called e.g.
@@ -1985,57 +2050,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  // A value of type T can be converted to type U? if T is convertible to U.
-  // A value of type T? can be converted to type U? if T is convertible to U.
-  // The above conversions also apply to implicitly unwrapped optional types,
-  // except that there is no implicit conversion from T? to T!.
-  {
-    BoundGenericType *boundGenericType2;
-    
-    if (concrete && kind >= ConstraintKind::Subtype &&
-        (boundGenericType2 = type2->getAs<BoundGenericType>())) {
-      auto decl2 = boundGenericType2->getDecl();
-      if (auto optionalKind2 = decl2->classifyAsOptionalType()) {
-        assert(boundGenericType2->getGenericArgs().size() == 1);
-        
-        BoundGenericType *boundGenericType1 = type1->getAs<BoundGenericType>();
-        if (boundGenericType1) {
-          auto decl1 = boundGenericType1->getDecl();
-          if (decl1 == decl2) {
-            assert(boundGenericType1->getGenericArgs().size() == 1);
-            conversionsOrFixes.push_back(
-                                ConversionRestrictionKind::OptionalToOptional);
-          } else if (optionalKind2 == OTK_Optional &&
-                     decl1 == TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
-            assert(boundGenericType1->getGenericArgs().size() == 1);
-            conversionsOrFixes.push_back(
-                       ConversionRestrictionKind::OptionalToOptional);
-          } else if (optionalKind2 == OTK_ImplicitlyUnwrappedOptional &&
-                     kind >= ConstraintKind::Conversion &&
-                     decl1 == TC.Context.getOptionalDecl()) {
-            assert(boundGenericType1->getGenericArgs().size() == 1);
-            conversionsOrFixes.push_back(
-                       ConversionRestrictionKind::OptionalToOptional);
-          }
-        }
-        
-        conversionsOrFixes.push_back(
-            ConversionRestrictionKind::ValueToOptional);
-      }
-    }
+  // A value of type T! can be converted to type U if T is convertible
+  // to U by force-unwrapping the source value.
+  // A value of type T, T?, or T! can be converted to type U? or U! if
+  // T is convertible to U.
+  if (concrete && kind >= ConstraintKind::Subtype) {
+    enumerateOptionalConversionRestrictions(type1, type2, kind,
+      [&](ConversionRestrictionKind restriction) {
+        conversionsOrFixes.push_back(restriction);
+    });
   }
 
-  // A value of type T! can be (unsafely) forced to U if T
-  // is convertible to U.
-  {
-    Type objectType1;
-    if (concrete && kind >= ConstraintKind::Conversion &&
-        (objectType1 = lookThroughImplicitlyUnwrappedOptionalType(type1))) {
-      conversionsOrFixes.push_back(
-                          ConversionRestrictionKind::ForceUnchecked);
-    }
-  }
-  
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
   // literals.
   if (auto elt = locator.last()) {
@@ -3743,7 +3768,21 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       increaseScore(SK_FunctionConversion);
     }
   };
-  
+
+  // Local function to form an unsolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::createRestricted(
+          *this, matchKind, restriction, type1, type2,
+          getConstraintLocator(locator)));
+
+      return SolutionKind::Solved;
+    }
+    
+    return SolutionKind::Unsolved;
+  };
+
   // We'll apply user conversions for operator arguments at the application
   // site.
   if (matchKind == ConstraintKind::OperatorArgumentConversion) {
@@ -3806,10 +3845,18 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     increaseScore(SK_ValueToOptional);
 
     assert(matchKind >= ConstraintKind::Subtype);
-    auto generic2 = type2->castTo<BoundGenericType>();
-    assert(generic2->getDecl()->classifyAsOptionalType());
-    return matchTypes(type1, generic2->getGenericArgs()[0],
-                      matchKind, (subflags | TMF_UnwrappingOptional), locator);
+    if (type2->isTypeVariableOrMember())
+      return formUnsolved();
+
+    if (auto generic2 = type2->getAs<BoundGenericType>()) {
+      if (generic2->getDecl()->classifyAsOptionalType()) {
+        return matchTypes(type1, generic2->getGenericArgs()[0],
+                          matchKind, (subflags | TMF_UnwrappingOptional),
+                          locator);
+      }
+    }
+
+    return SolutionKind::Error;
   }
 
   // for $< in { <, <c, <oc }:
@@ -3820,16 +3867,24 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //   T <c U ===> T? <c U!
   case ConversionRestrictionKind::OptionalToOptional: {
     addContextualScore();
+
+    if (type1->isTypeVariableOrMember() || type2->isTypeVariableOrMember())
+      return formUnsolved();
+
     assert(matchKind >= ConstraintKind::Subtype);
-    auto generic1 = type1->castTo<BoundGenericType>();
-    auto generic2 = type2->castTo<BoundGenericType>();
-    assert(generic1->getDecl()->classifyAsOptionalType());
-    assert(generic2->getDecl()->classifyAsOptionalType());
-    return matchTypes(generic1->getGenericArgs()[0],
-                      generic2->getGenericArgs()[0],
-                      matchKind, subflags,
-                      locator.withPathElement(
-                        LocatorPathElt::getGenericArgument(0)));
+    if (auto generic1 = type1->getAs<BoundGenericType>()) {
+      if (auto generic2 = type2->getAs<BoundGenericType>()) {
+        if (generic1->getDecl()->classifyAsOptionalType() &&
+            generic2->getDecl()->classifyAsOptionalType())
+          return matchTypes(generic1->getGenericArgs()[0],
+                            generic2->getGenericArgs()[0],
+                            matchKind, subflags,
+                            locator.withPathElement(
+                              LocatorPathElt::getGenericArgument(0)));
+      }
+    }
+
+    return SolutionKind::Error;
   }
 
   // T <c U ===> T! <c U
@@ -3843,16 +3898,24 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::ForceUnchecked: {
     addContextualScore();
     assert(matchKind >= ConstraintKind::Conversion);
-    auto boundGenericType1 = type1->castTo<BoundGenericType>();
-    assert(boundGenericType1->getDecl()->classifyAsOptionalType()
-             == OTK_ImplicitlyUnwrappedOptional);
-    assert(boundGenericType1->getGenericArgs().size() == 1);
-    Type valueType1 = boundGenericType1->getGenericArgs()[0];
-    increaseScore(SK_ForceUnchecked);
-    return matchTypes(valueType1, type2,
-                      matchKind, subflags,
-                      locator.withPathElement(
-                        LocatorPathElt::getGenericArgument(0)));
+
+    if (type1->isTypeVariableOrMember())
+      return formUnsolved();
+
+    if (auto boundGenericType1 = type1->getAs<BoundGenericType>()) {
+      if (boundGenericType1->getDecl()->classifyAsOptionalType()
+            == OTK_ImplicitlyUnwrappedOptional) {
+        assert(boundGenericType1->getGenericArgs().size() == 1);
+        Type valueType1 = boundGenericType1->getGenericArgs()[0];
+        increaseScore(SK_ForceUnchecked);
+        return matchTypes(valueType1, type2,
+                          matchKind, subflags,
+                          locator.withPathElement(
+                            LocatorPathElt::getGenericArgument(0)));
+      }
+    }
+
+    return SolutionKind::Error;
   }
       
   case ConversionRestrictionKind::ClassMetatypeToAnyObject:

@@ -1,0 +1,20 @@
+// RUN: %target-sil-opt -enable-sil-ownership %s | %target-sil-opt -enable-sil-ownership | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: sil @simple : $@convention(thin) (@owned Builtin.NativeObject, Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
+// CHECK: bb0({{%.*}} : @owned $Builtin.NativeObject, {{%.*}} : @unowned $Builtin.NativeObject, {{%.*}} : @guaranteed $Builtin.NativeObject, {{%.*}} : @trivial $Builtin.Int32):
+// CHECK: bb1({{%[0-9][0-9]*}} : @owned $Builtin.NativeObject, {{%[0-9][0-9]*}} : @unowned $Builtin.NativeObject, {{%[0-9][0-9]*}} : @guaranteed $Builtin.NativeObject, {{%[0-9][0-9]*}} : @trivial $Builtin.Int32):
+
+sil @simple : $@convention(thin) (@owned Builtin.NativeObject, Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject, %2 : @guaranteed $Builtin.NativeObject, %3 : @trivial $Builtin.Int32):
+  br bb1(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject, %2 : $Builtin.NativeObject, %3 : $Builtin.Int32)
+
+bb1(%4 : @owned $Builtin.NativeObject, %5 : @unowned $Builtin.NativeObject, %6 : @guaranteed $Builtin.NativeObject, %7 : @trivial $Builtin.Int32):
+  destroy_value %4 : $Builtin.NativeObject
+  end_borrow_argument %6 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
@@ -471,7 +472,9 @@ getSubstitutionsForCallee(SILModule &M,
         subMap.addSubstitution(cast<SubstitutableType>(canTy),
                                sub.getReplacement());
       }
-      subMap.addConformances(canTy, sub.getConformances());
+
+      for (auto conformance : sub.getConformances())
+        subMap.addConformance(canTy, conformance);
     }
     assert(origSubs.empty());
   }
@@ -849,7 +852,8 @@ static void getWitnessMethodSubstitutions(
     auto gp = cast<GenericTypeParamType>(witnessThunkSig->getGenericParams()
                                                  .front()->getCanonicalType());
     subMap.addSubstitution(gp, origSubs.front().getReplacement());
-    subMap.addConformances(gp, origSubs.front().getConformances());
+    for (auto conformance : origSubs.front().getConformances())
+      subMap.addConformance(gp, conformance);
 
     // For default witnesses, innermost generic parameters are always at
     // depth 1.
@@ -916,7 +920,8 @@ static void getWitnessMethodSubstitutions(
         subMap.addSubstitution(cast<SubstitutableType>(canTy),
                                sub.getReplacement());
       }
-      subMap.addConformances(canTy, sub.getConformances());
+      for (auto conformance : sub.getConformances())
+        subMap.addConformance(canTy, conformance);
     }
     assert(subs.empty() && "Did not consume all substitutions");
   }

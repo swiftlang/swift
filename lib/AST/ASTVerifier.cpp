@@ -24,6 +24,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -1992,9 +1993,15 @@ struct ASTNodeBase {};
         if (auto *FD = dyn_cast<FuncDecl>(member))
           if (FD->isAccessor())
             continue;
-        
+
+
         if (auto req = dyn_cast<ValueDecl>(member)) {
           if (!normal->hasWitness(req)) {
+            if (req->getAttrs().isUnavailable(Ctx) &&
+                proto->isObjC()) {
+              continue;
+            }
+
             dumpRef(decl);
             Out << " is missing witness for "
                 << conformance->getProtocol()->getName().str() 

@@ -224,6 +224,10 @@ public:
   /// Get the sugared form of a generic parameter type.
   GenericTypeParamType *getSugaredType(GenericTypeParamType *type) const;
 
+  /// Get the sugared form of a type by substituting any
+  /// generic parameter types by their sugared form.
+  Type getSugaredType(Type type) const;
+
   /// Derive a contextual type substitution map from a substitution array.
   /// This is just like GenericSignature::getSubstitutionMap(), except
   /// with contextual types instead of interface types.

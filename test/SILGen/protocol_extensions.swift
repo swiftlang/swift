@@ -69,7 +69,7 @@ class C : P1 {
 }
 
 //   (materializeForSet test from above)
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWC19protocol_extensions1CS_2P1S_FS1_m9subscriptFSiSi
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC19protocol_extensions1CS_2P1S_FS1_m9subscriptFSiSi
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*C):
 // CHECK: function_ref @_TFE19protocol_extensionsPS_2P1g9subscriptFSiSi
 // CHECK: return
@@ -101,9 +101,11 @@ func testD(_ m: MetaHolder, dd: D.Type, d: D) {
   // CHECK: [[D2:%[0-9]+]] = alloc_box ${ var D }
   // CHECK: [[RESULT:%.*]] = project_box [[D2]]
   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelf{{.*}}
-  // CHECK: [[DCOPY:%[0-9]+]] = alloc_stack $D
-  // CHECK: store [[D]] to [init] [[DCOPY]] : $*D
-  // CHECK: apply [[FN]]<D>([[RESULT]], [[DCOPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // CHECK: [[MATERIALIZED_BORROWED_D:%[0-9]+]] = alloc_stack $D
+  // CHECK: [[BORROWED_D:%.*]] = begin_borrow [[D]]
+  // CHECK: store_borrow [[BORROWED_D]] to [[MATERIALIZED_BORROWED_D]]
+  // CHECK: apply [[FN]]<D>([[RESULT]], [[MATERIALIZED_BORROWED_D]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // CHECK-NEXT: end_borrow [[BORROWED_D]] from [[D]]
   var d2: D = d.returnsSelf()
 
   // CHECK: metatype $@thick D.Type

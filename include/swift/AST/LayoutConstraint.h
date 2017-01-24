@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -48,7 +48,7 @@ enum class LayoutConstraintKind : unsigned char {
 /// This is a class representing the layout constraint.
 class LayoutConstraintInfo {
   // Alignment of the layout in bytes.
-  unsigned Alignment;
+  unsigned Alignment : 16;
   // Size of the layout in bits.
   unsigned SizeInBits : 24;
   // Kind of the layout.
@@ -223,7 +223,7 @@ template <class X> inline X dyn_cast_or_null(LayoutConstraint LC) {
 }
 
 /// LayoutConstraintLoc - Provides source location information for a
-/// parsed layout constaint.
+/// parsed layout constraint.
 struct LayoutConstraintLoc {
 private:
   LayoutConstraint Layout;
@@ -258,7 +258,7 @@ public:
 /// Checks if ID is a name of a layout constraint and returns this
 /// constraint. If ID does not match any known layout constraint names,
 /// returns UnknownLayout.
-LayoutConstraintInfo getLayoutConstraintInfo(Identifier ID);
+LayoutConstraintInfo getLayoutConstraintInfo(Identifier ID, ASTContext &Ctx);
 
 } // end namespace swift
 

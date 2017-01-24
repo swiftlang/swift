@@ -318,6 +318,18 @@ GenericTypeParamType *GenericEnvironment::getSugaredType(
   llvm_unreachable("missing generic parameter");
 }
 
+Type GenericEnvironment::getSugaredType(Type type) const {
+  if (!type->hasTypeParameter())
+    return type;
+
+  return type.transform([this](Type Ty) -> Type {
+    if (auto GP = dyn_cast<GenericTypeParamType>(Ty.getPointer())) {
+      return Type(getSugaredType(GP));
+    }
+    return Ty;
+  });
+}
+
 ArrayRef<Substitution>
 GenericEnvironment::getForwardingSubstitutions() const {
   auto lookupConformanceFn =
@@ -357,7 +369,8 @@ getSubstitutionMap(ModuleDecl *mod,
     // Record the replacement type and its conformances.
     if (auto *archetype = contextTy->getAs<ArchetypeType>()) {
       result.addSubstitution(CanArchetypeType(archetype), sub.getReplacement());
-      result.addConformances(CanType(archetype), sub.getConformances());
+      for (auto conformance : sub.getConformances())
+        result.addConformance(CanType(archetype), conformance);
       continue;
     }
 

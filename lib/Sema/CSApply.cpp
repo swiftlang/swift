@@ -78,14 +78,14 @@ static bool isOpenedAnyObject(Type type) {
 }
 
 Type Solution::computeSubstitutions(
-       Type origType, DeclContext *dc,
+       GenericSignature *sig,
        Type openedType,
        ConstraintLocator *locator,
        SmallVectorImpl<Substitution> &result) const {
   auto &tc = getConstraintSystem().getTypeChecker();
 
   // Produce the concrete form of the opened type.
-  Type type = simplifyType(tc, openedType);
+  Type type = simplifyType(openedType);
 
   // Gather the substitutions from dependent types to concrete types.
   auto openedTypes = OpenedTypes.find(locator);
@@ -95,13 +95,6 @@ Type Solution::computeSubstitutions(
   for (const auto &opened : openedTypes->second) {
     subs[opened.first->castTo<GenericTypeParamType>()] =
       getFixedType(opened.second);
-  }
-
-  GenericSignature *sig;
-  if (auto genericFn = origType->getAs<GenericFunctionType>()) {
-    sig = genericFn->getGenericSignature();
-  } else {
-    sig = dc->getGenericSignatureOfContext();
   }
 
   auto lookupConformanceFn =
@@ -217,6 +210,11 @@ static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
        member->getDeclContext()->getDeclaredInterfaceType()))
     return false;
 
+  // If the storage is resilient, we cannot access it directly at all.
+  if (!member->hasFixedLayout(DC->getParentModule(),
+                              DC->getResilienceExpansion()))
+    return false;
+
   return true;
 }
 
@@ -229,12 +227,6 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   // accessors.  However, in the init and destructor methods for the type
   // immediately containing the property, accesses are done direct.
   if (shouldAccessStorageDirectly(base, member, DC)) {
-    // The storage better not be resilient.
-    assert(member->hasFixedLayout(DC->getParentModule(),
-                                  DC->getResilienceExpansion()) &&
-           "Designated initializers and destructors of resilient types "
-           "cannot be @_transparent or defined in extensions");
-
     // Access this directly instead of going through (e.g.) observing or
     // trivial accessors.
     return AccessSemantics::DirectToStorage;
@@ -483,11 +475,9 @@ namespace {
       // specialized reference to it.
       if (auto genericFn
             = decl->getInterfaceType()->getAs<GenericFunctionType>()) {
-        auto dc = decl->getInnermostDeclContext();
-
         SmallVector<Substitution, 4> substitutions;
         auto type = solution.computeSubstitutions(
-                      genericFn, dc, openedType,
+                      genericFn->getGenericSignature(), openedType,
                       getConstraintSystem().getConstraintLocator(locator),
                       substitutions);
         auto declRefExpr =
@@ -788,19 +778,14 @@ namespace {
       // reference itself.
       ConcreteDeclRef memberRef;
       Type refTy;
-      if (member->getInterfaceType()->is<GenericFunctionType>() ||
-          openedFullType->hasTypeVariable()) {
+      if (auto *sig = member->getInnermostDeclContext()
+              ->getGenericSignatureOfContext()) {
         // We require substitutions. Figure out what they are.
-
-        // Figure out the declaration context where we'll get the generic
-        // parameters.
-        auto dc = member->getInnermostDeclContext();
 
         // Build a reference to the generic member.
         SmallVector<Substitution, 4> substitutions;
         refTy = solution.computeSubstitutions(
-                  member->getInterfaceType(),
-                  dc,
+                  sig,
                   openedFullType,
                   getConstraintSystem().getConstraintLocator(memberLocator),
                   substitutions);
@@ -830,7 +815,7 @@ namespace {
       Type containerTy =
           openedFullType->castTo<FunctionType>()
               ->getInput()->getRValueInstanceType();
-      containerTy = solution.simplifyType(tc, containerTy);
+      containerTy = solution.simplifyType(containerTy);
 
       // If we opened up an existential when referencing this member, update
       // the base accordingly.
@@ -1130,7 +1115,7 @@ namespace {
     /// \brief Simplify the given type by substituting all occurrences of
     /// type variables for their fixed types.
     Type simplifyType(Type type) {
-      return solution.simplifyType(cs.getTypeChecker(), type);
+      return solution.simplifyType(type);
     }
 
   public:
@@ -1316,14 +1301,12 @@ namespace {
       }
 
       // Handle subscripting of generics.
-      if (subscript->getDeclContext()->isGenericContext()) {
-        auto dc = subscript->getDeclContext();
-
+      auto *dc = subscript->getInnermostDeclContext();
+      if (auto *sig = dc->getGenericSignatureOfContext()) {
         // Compute the substitutions used to reference the subscript.
         SmallVector<Substitution, 4> substitutions;
         solution.computeSubstitutions(
-          subscript->getInterfaceType(),
-          dc,
+          sig,
           selected->openedFullType,
           getConstraintSystem().getConstraintLocator(
             locator.withPathElement(ConstraintLocator::SubscriptMember)),
@@ -1332,7 +1315,7 @@ namespace {
         // Convert the base.
         auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
         auto openedBaseType = openedFullFnType->getInput();
-        containerTy = solution.simplifyType(tc, openedBaseType);
+        containerTy = solution.simplifyType(openedBaseType);
         base = coerceObjectArgumentToType(
             base, containerTy, subscript, AccessSemantics::Ordinary,
             locator.withPathElement(ConstraintLocator::MemberRefBase));
@@ -1387,12 +1370,11 @@ namespace {
       // Compute the concrete reference.
       ConcreteDeclRef ref;
       Type resultTy;
-      if (ctor->getInitializerInterfaceType()->is<GenericFunctionType>()) {
+      if (auto *sig = ctor->getGenericSignature()) {
         // Compute the reference to the generic constructor.
         SmallVector<Substitution, 4> substitutions;
         resultTy = solution.computeSubstitutions(
-                     ctor->getInterfaceType(),
-                     ctor,
+                     sig,
                      openedFullType,
                      getConstraintSystem().getConstraintLocator(locator),
                      substitutions);
@@ -2683,6 +2665,8 @@ namespace {
       }
 
       Type argType = TupleType::get(typeElements, tc.Context);
+      assert(isa<TupleType>(argType.getPointer()));
+
       Expr *arg =
           TupleExpr::create(tc.Context, SourceLoc(),
                             expr->getElements(),
@@ -2760,6 +2744,8 @@ namespace {
       }
 
       Type argType = TupleType::get(typeElements, tc.Context);
+      assert(isa<TupleType>(argType.getPointer()));
+
       Expr *arg =
             TupleExpr::create(tc.Context, expr->getLBracketLoc(),
                               expr->getElements(),
@@ -4074,12 +4060,11 @@ ConcreteDeclRef Solution::resolveLocatorToDecl(
             },
             [&](ValueDecl *decl, Type openedType, ConstraintLocator *locator)
                   -> ConcreteDeclRef {
-              if (decl->getInnermostDeclContext()->isGenericContext()) {
+              if (auto *sig = decl->getInnermostDeclContext()
+                      ->getGenericSignatureOfContext()) {
                 SmallVector<Substitution, 4> subs;
                 computeSubstitutions(
-                  decl->getInterfaceType(),
-                  decl->getInnermostDeclContext(),
-                  openedType, locator, subs);
+                  sig, openedType, locator, subs);
                 return ConcreteDeclRef(cs.getASTContext(), decl, subs);
               }
               
@@ -4714,81 +4699,42 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   return cs.cacheType(new (ctx) ErasureExpr(expr, toType, conformances));
 }
 
-static unsigned getOptionalBindDepth(const BoundGenericType *bgt) {
-  
-  if (bgt->getDecl()->classifyAsOptionalType()) {
-    auto tyarg = bgt->getGenericArgs()[0];
-    
-    unsigned innerDepth = 0;
-    
-    if (auto wrappedBGT = tyarg->getAs<BoundGenericType>())
-      innerDepth = getOptionalBindDepth(wrappedBGT);
-
-    return 1 + innerDepth;
-  }
-  
-  return 0;
-}
-
-static Type getOptionalBaseType(Type type) {
-  
-  if (auto bgt = type->getAs<BoundGenericType>()) {
-    if (bgt->getDecl()->classifyAsOptionalType()) {
-      return getOptionalBaseType(bgt->getGenericArgs()[0]);
-    }
-  }
-  
-  return type;
-}
-
 Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
                                              ConstraintLocatorBuilder locator,
                                           Optional<Pattern*> typeFromPattern) {
   auto &tc = cs.getTypeChecker();
   Type fromType = cs.getType(expr);
   
-  auto fromGenericType = fromType->castTo<BoundGenericType>();
-  auto toGenericType = toType->castTo<BoundGenericType>();
-  assert(fromGenericType->getDecl()->classifyAsOptionalType());
-  assert(toGenericType->getDecl()->classifyAsOptionalType());
   tc.requireOptionalIntrinsics(expr->getLoc());
-  
-  Type fromValueType = fromGenericType->getGenericArgs()[0];
-  Type toValueType = toGenericType->getGenericArgs()[0];
 
-  
-  // If the option kinds are the same, and the wrapped types are the same,
-  // but the arities are different, we can peephole the optional-to-optional
-  // conversion into a series of nested injections.
-  auto toDepth = getOptionalBindDepth(toGenericType);
-  auto fromDepth = getOptionalBindDepth(fromGenericType);
-  
-  if (toDepth > fromDepth) {
-    
-    auto toBaseType = getOptionalBaseType(toGenericType);
-    auto fromBaseType = getOptionalBaseType(fromGenericType);
-    
-    if ((toGenericType->getDecl() == fromGenericType->getDecl()) &&
-        toBaseType->isEqual(fromBaseType)) {
-    
-      auto diff = toDepth - fromDepth;
-      auto isIUO = fromGenericType->getDecl()->
-                    classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional;
-      
-      while (diff) {
-        const Type &t = cs.getType(expr);
-        const Type &wrapped = isIUO ?
-                                Type(ImplicitlyUnwrappedOptionalType::get(t)) :
-                                Type(OptionalType::get(t));
-        expr =
-          cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, wrapped));
-        diagnoseOptionalInjection(cast<InjectIntoOptionalExpr>(expr));
-        diff--;
-      }
-      
-      return expr;
+  SmallVector<Type, 4> fromOptionals;
+  (void)fromType->lookThroughAllAnyOptionalTypes(fromOptionals);
+
+  SmallVector<Type, 4> toOptionals;
+  (void)toType->lookThroughAllAnyOptionalTypes(toOptionals);
+
+  assert(!toOptionals.empty());
+  assert(!fromOptionals.empty());
+
+  // If we are adding optionals but the types are equivalent up to the common
+  // depth, peephole the optional-to-optional conversion into a series of nested
+  // injections.
+  auto toDepth = toOptionals.size();
+  auto fromDepth = fromOptionals.size();
+  if (toDepth > fromDepth &&
+      toOptionals[toOptionals.size() - fromDepth]->isEqual(fromType)) {
+    auto diff = toDepth - fromDepth;
+    while (diff--) {
+      Type type = toOptionals[diff];
+      expr = cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, type));
+      diagnoseOptionalInjection(cast<InjectIntoOptionalExpr>(expr));
     }
+
+    return expr;
   }
+
+  Type fromValueType = fromType->getAnyOptionalObjectType();
+  Type toValueType = toType->getAnyOptionalObjectType();
 
   expr =
     cs.cacheType(new (tc.Context) BindOptionalExpr(expr,
@@ -5064,9 +5010,9 @@ Expr *ExprRewriter::coerceCallArguments(
     auto paramType = param.Ty;
     if (argType->isEqual(paramType)) {
       toSugarFields.push_back(
-          TupleTypeElt(argType, param.Label, param.parameterFlags));
+          TupleTypeElt(argType, getArgLabel(argIdx), param.parameterFlags));
       fromTupleExprFields[argIdx] =
-          TupleTypeElt(paramType, param.Label, param.parameterFlags);
+          TupleTypeElt(paramType, getArgLabel(argIdx), param.parameterFlags);
       fromTupleExpr[argIdx] = arg;
       continue;
     }
@@ -5123,6 +5069,8 @@ Expr *ExprRewriter::coerceCallArguments(
 
     // If anything about the TupleExpr changed, rebuild a new one.
     Type argTupleType = TupleType::get(fromTupleExprFields, tc.Context);
+    assert(isa<TupleType>(argTupleType.getPointer()));
+
     if (anyChanged || !cs.getType(argTuple)->isEqual(argTupleType)) {
       auto EltNames = argTuple->getElementNames();
       auto EltNameLocs = argTuple->getElementNameLocs();
@@ -6941,7 +6889,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
 
   case FixKind::ForceOptional: {
     const Expr *unwrapped = affected->getValueProvidingExpr();
-    auto type = solution.simplifyType(TC, getType(affected))
+    auto type = solution.simplifyType(getType(affected))
                   ->getRValueObjectType();
 
     if (auto tryExpr = dyn_cast<OptionalTryExpr>(unwrapped)) {
@@ -6967,7 +6915,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   }
           
   case FixKind::OptionalChaining: {
-    auto type = solution.simplifyType(TC, getType(affected))
+    auto type = solution.simplifyType(getType(affected))
                 ->getRValueObjectType();
     auto diag = TC.diagnose(affected->getLoc(),
                             diag::missing_unwrap_optional, type);
@@ -6976,10 +6924,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   }
 
   case FixKind::ForceDowncast: {
-    auto fromType = solution.simplifyType(TC, getType(affected))
+    auto fromType = solution.simplifyType(getType(affected))
                       ->getRValueObjectType();
-    Type toType = solution.simplifyType(TC,
-                                        fix.first.getTypeArgument(*this));
+    Type toType = solution.simplifyType(fix.first.getTypeArgument(*this));
     bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
     bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType,
                                                         DC);
@@ -7014,7 +6961,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   }
 
   case FixKind::AddressOf: {
-    auto type = solution.simplifyType(TC, getType(affected))
+    auto type = solution.simplifyType(getType(affected))
                   ->getRValueObjectType();
     TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
       .fixItInsert(affected->getStartLoc(), "&");
@@ -7025,9 +6972,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
       Expr *subExpr = coerceExpr->getSubExpr();
       auto fromType =
-        solution.simplifyType(TC, getType(subExpr))->getRValueType();
+        solution.simplifyType(getType(subExpr))->getRValueType();
       auto toType =
-        solution.simplifyType(TC, coerceExpr->getCastTypeLoc().getType());
+        solution.simplifyType(coerceExpr->getCastTypeLoc().getType());
       auto castKind = TC.typeCheckCheckedCast(
                         fromType, toType, CheckedCastContextKind::None, DC,
                         coerceExpr->getLoc(), subExpr,

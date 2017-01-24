@@ -6,4 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-nil as Int!as?Int?!
+{ struct A{
+p.init(UInt=1 + 1 as?Int){

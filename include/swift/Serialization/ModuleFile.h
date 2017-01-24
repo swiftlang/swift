@@ -13,7 +13,6 @@
 #ifndef SWIFT_SERIALIZATION_MODULEFILE_H
 #define SWIFT_SERIALIZATION_MODULEFILE_H
 
-#include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
@@ -37,6 +36,9 @@ namespace llvm {
 }
 
 namespace swift {
+class Decl;
+class FileUnit;
+class ModuleDecl;
 class Pattern;
 class ProtocolConformance;
 

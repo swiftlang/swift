@@ -714,7 +714,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   } else {
     SubstitutionMap Subs;
     Subs.addSubstitution(CanArchetypeType(OpenedArchetype), ConcreteType);
-    Subs.addConformances(CanType(OpenedArchetype), Conformance);
+    Subs.addConformance(CanType(OpenedArchetype), Conformance);
     NewSubstCalleeType = SubstCalleeType.subst(AI.getModule(), Subs);
   }
 

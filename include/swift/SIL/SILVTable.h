@@ -58,7 +58,7 @@ public:
 
     /// The linkage of the implementing function.
     ///
-    /// This is usuallly the same as
+    /// This is usually the same as
     ///   stripExternalFromLinkage(Implementation->getLinkage())
     /// except if Implementation is a thunk (which has private or shared
     /// linkage).

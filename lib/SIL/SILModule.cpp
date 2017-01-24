@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-module"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Substitution.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -218,6 +219,13 @@ SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
   return SILDefaultWitnessTable::create(*this, Linkage, Protocol);
 }
 
+void SILModule::deleteWitnessTable(SILWitnessTable *Wt) {
+  NormalProtocolConformance *Conf = Wt->getConformance();
+  assert(lookUpWitnessTable(Conf, false) == Wt);
+  WitnessTableMap.erase(Conf);
+  witnessTables.erase(Wt);
+}
+
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             StringRef name,
                                             SILLinkage linkage,
@@ -376,8 +384,12 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     for (auto *A :
            Attrs.getAttributes<SpecializeAttr, false /*AllowInvalid*/>()) {
       auto *SA = cast<SpecializeAttr>(A);
-      auto subs = SA->getConcreteDecl().getSubstitutions();
-      F->addSpecializeAttr(SILSpecializeAttr::create(*this, subs));
+      auto kind = SA->getSpecializationKind() ==
+                          SpecializeAttr::SpecializationKind::Full
+                      ? SILSpecializeAttr::SpecializationKind::Full
+                      : SILSpecializeAttr::SpecializationKind::Partial;
+      F->addSpecializeAttr(SILSpecializeAttr::create(
+          *this, SA->getRequirements(), SA->isExported(), kind));
     }
   }
 

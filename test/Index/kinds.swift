@@ -175,5 +175,36 @@ postfix func ++(a: AStruct) -> AStruct { return a }
 func +(a: AStruct, b: AStruct) -> AStruct { return a }
 // CHECK: [[@LINE-1]]:6 | function/infix-operator/Swift | +(_:_:) | s:F14swift_ide_testoi1pFTVS_7AStructS0__S0_ | Def | rel: 0
 
+class XCTestCase {}
+class MyTestCase : XCTestCase {
+  func testMe() {}
+  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testMe() |
+  func testResult() -> Int? { return nil }
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | testResult() |
+  func test(withInt: Int) {}
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | test(withInt:) |
+}
+class SubTestCase : MyTestCase {
+  func testIt2() {}
+  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testIt2() |
+}
+extension SubTestCase {
+  func testIt3() {}
+  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testIt3() |
+}
+class NonTestCase {
+  func testMeNot() {}
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | testMeNot() |
+}
 
-// TODO: UnitTest
+@objc class TargetForIBAction {}
+// CHECK: [[@LINE-1]]:13 | class/Swift | TargetForIBAction | [[TargetForIBAction_USR:.*]] | Def |
+class AttrAnnots {
+  @IBOutlet var iboutletString: AnyObject?
+  // CHECK: [[@LINE-1]]:17 | instance-property(IB)/Swift | iboutletString |
+  @IBAction func someibaction(o: TargetForIBAction) {}
+  // CHECK: [[@LINE-1]]:18 | instance-method(IB)/Swift | someibaction(o:) | {{.*}} | Def,RelChild,RelIBType | rel: 2
+  // CHECK-NEXT: RelIBType | TargetForIBAction | [[TargetForIBAction_USR]]
+  @GKInspectable var gkString = "gk"
+  // CHECK: [[@LINE-1]]:22 | instance-property(GKI)/Swift | gkString |
+}

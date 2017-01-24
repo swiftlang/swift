@@ -40,7 +40,7 @@
 #define UNCHECKED_EXPR(Id, Parent) EXPR(Id, Parent)
 #endif
 
-/// An literal expression node represents a literal value, such as a number,
+/// A literal expression node represents a literal value, such as a number,
 /// boolean, string, etc.
 ///
 /// By default, these are treated like any other expression.

@@ -535,6 +535,9 @@ public:
   createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
                                        SILLinkage Linkage);
 
+  /// Deletes a dead witness table.
+  void deleteWitnessTable(SILWitnessTable *Wt);
+
   /// \brief Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }
 

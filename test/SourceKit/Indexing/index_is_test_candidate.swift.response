@@ -35,11 +35,34 @@
     },
     {
       key.kind: source.lang.swift.decl.class,
+      key.name: "XCTestCase",
+      key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+      key.line: 15,
+      key.column: 7
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
       key.name: "MyPrivateClass",
       key.usr: "s:C23index_is_test_candidateP33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B914MyPrivateClass",
       key.line: 16,
       key.column: 15,
+      key.related: [
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "XCTestCase",
+          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.line: 16,
+          key.column: 32
+        }
+      ],
       key.entities: [
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "XCTestCase",
+          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.line: 16,
+          key.column: 32
+        },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "test_startsWithTest_takesNoParams_returnsVoid_butIsPrivate()",
@@ -55,7 +78,23 @@
       key.usr: "s:C23index_is_test_candidate7MyClass",
       key.line: 20,
       key.column: 14,
+      key.related: [
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "XCTestCase",
+          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.line: 20,
+          key.column: 24
+        }
+      ],
       key.entities: [
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "XCTestCase",
+          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.line: 20,
+          key.column: 24
+        },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "doesNotStartWithTest()",

@@ -1,5 +1,5 @@
 // RUN: %swift -target thumbv7--windows-itanium -emit-ir -parse-as-library -parse-stdlib -module-name dllimport %s -o - -enable-source-import -I %S | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-OPT
-// RUN: %swift -target thumbv7--windows-itanium -O -emit-ir -parse-as-library -parse-stdlib -module-name dllimport %s -o - -enable-source-import -I %S | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT
+// RUN: %swift -target thumbv7--windows-itanium -O -emit-ir -parse-as-library -parse-stdlib -module-name dllimport -primary-file %s -o - -enable-source-import -I %S | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT
 
 // REQUIRES: CODEGENERATOR=ARM
 
@@ -65,7 +65,6 @@ public func g() {
 // CHECK-OPT-DAG: declare dllimport %swift.type* @_TMaC9dllexport1c()
 // CHECK-OPT-DAG: declare dllimport void @swift_deallocClassInstance(%swift.refcounted*, i32, i32)
 // CHECK-OPT-DAG: declare dllimport %swift.refcounted* @_TFC9dllexport1cd(%C9dllexport1c*)
-// CHECK-OPT-DAG: declare dllimport void @swift_deletedMethodError()
 // CHECK-OPT-DAG: define linkonce_odr hidden i8* @swift_rt_swift_slowAlloc(i32, i32)
 // CHECK-OPT-DAG: define linkonce_odr hidden void @swift_rt_swift_slowDealloc(i8*, i32, i32)
 

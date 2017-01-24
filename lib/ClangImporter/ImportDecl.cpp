@@ -30,6 +30,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
@@ -642,7 +643,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
 
   // Reverse scan of the members because indirect field are generated just
   // after the corresponding anonymous type, so a reverse scan allows
-  // swiftching from O(n) to O(1) here.
+  // switching from O(n) to O(1) here.
   for (auto decl : reverse(members)) {
     if (decl->getClangDecl() == containingField) {
       anonymousFieldDecl = cast<VarDecl>(decl);
@@ -1087,12 +1088,20 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
   for (auto var : members) {
-    // TODO create value constructor with indirect fields instead of the
-    // generated __Anonymous_field.
-    if (var->hasClangNode() && isa<clang::IndirectFieldDecl>(var->getClangDecl()))
-      continue;
+    bool generateParamName = wantCtorParamNames;
 
-    Identifier argName = wantCtorParamNames ? var->getName() : Identifier();
+    if (var->hasClangNode()) {
+      // TODO create value constructor with indirect fields instead of the
+      // generated __Anonymous_field.
+      if (isa<clang::IndirectFieldDecl>(var->getClangDecl()))
+        continue;
+
+      if (auto clangField = dyn_cast<clang::FieldDecl>(var->getClangDecl()))
+        if (clangField->isAnonymousStructOrUnion())
+          generateParamName = false;
+    }
+
+    Identifier argName = generateParamName ? var->getName() : Identifier();
     auto param = new (context)
         ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), var->getType(), structDecl);
@@ -1556,8 +1565,11 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
                                       /*Message=*/StringRef(),
                                       /*Rename=*/StringRef(),
                                       info.getOSVersion().getLowerEndpoint(),
+                                      /*IntroducedRange*/SourceRange(),
                                       /*Deprecated=*/noVersion,
+                                      /*DeprecatedRange*/SourceRange(),
                                       /*Obsoleted=*/noVersion,
+                                      /*ObsoletedRange*/SourceRange(),
                                       PlatformAgnosticAvailabilityKind::None,
                                       /*Implicit=*/false);
 
@@ -3457,10 +3469,21 @@ namespace {
       Optional<ForeignErrorConvention> errorConvention;
       bodyParams.push_back(nullptr);
       Type type;
+
+      // If we have a property accessor, find the corresponding property
+      // declaration.
+      const clang::ObjCPropertyDecl *prop = nullptr;
       if (decl->isPropertyAccessor()) {
-        const clang::ObjCPropertyDecl *prop = decl->findPropertyDecl();
-        if (!prop)
-          return nullptr;
+        prop = decl->findPropertyDecl();
+        if (!prop) return nullptr;
+
+        // If we're importing just the accessors (not the property), ignore
+        // the property.
+        if (shouldImportPropertyAsAccessors(prop))
+          prop = nullptr;
+      }
+
+      if (prop) {
         // If the matching property is in a superclass, or if the getter and
         // setter are redeclared in a potentially incompatible way, bail out.
         if (prop->getGetterMethodDecl() != decl &&
@@ -6560,7 +6583,12 @@ void ClangImporter::Implementation::importAttributes(
       auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
                                           platformK.getValue(),
                                           message, swiftReplacement,
-                                          introduced, deprecated, obsoleted,
+                                          introduced,
+                                          /*IntroducedRange=*/SourceRange(),
+                                          deprecated,
+                                          /*DeprecatedRange=*/SourceRange(),
+                                          obsoleted,
+                                          /*ObsoletedRange=*/SourceRange(),
                                           PlatformAgnostic, /*Implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
