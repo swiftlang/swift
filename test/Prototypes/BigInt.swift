@@ -1185,10 +1185,281 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
   }
 }
 
-// MARK: - Tests
+//===--- Bit --------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+/// A one-bit fixed width integer.
+struct Bit : FixedWidthInteger, UnsignedInteger {
+  typealias Magnitude = Bit
+
+  var value: UInt8 = 0
+
+  // Initializers
+
+  init(integerLiteral value: Int) {
+    self = Bit(value)
+  }
+
+  init(bigEndian value: Bit) {
+    self = value
+  }
+
+  init(littleEndian value: Bit) {
+    self = value
+  }
+
+  init?<T: FloatingPoint>(exactly source: T) {
+    switch source {
+    case T(0): value = 0
+    case T(1): value = 1
+    default:
+      return nil
+    }
+  }
+
+  init<T: FloatingPoint>(_ source: T) {
+    self = Bit(exactly: source.rounded(.down))!
+  }
+
+  init<T: BinaryInteger>(_ source: T) {
+    switch source {
+    case 0: value = 0
+    case 1: value = 1
+    default:
+      fatalError("Can't represent \(source) as a Bit")
+    }
+  }
+
+  init<T: BinaryInteger>(extendingOrTruncating source: T) {
+    value = UInt8(source & 1)
+  }
+
+  init(_truncatingBits bits: UInt) {
+    value = UInt8(bits & 1)
+  }
+
+  init<T: BinaryInteger>(clamping source: T)  {
+    value = source >= 1 ? 1 : 0
+  }
+
+  // FixedWidthInteger, BinaryInteger
+
+  static var bitWidth: Int {
+    return 1
+  }
+
+  var bitWidth: Int {
+    return 1
+  }
+
+  var trailingZeros: Int {
+    return value.trailingZeros
+  }
+
+  static var max: Bit {
+    return 1
+  }
+
+  static var min: Bit {
+    return 0
+  }
+
+  static var isSigned: Bool {
+    return false
+  }
+
+  var popcount: Int {
+    return value.popcount
+  }
+
+  var leadingZeros: Int {
+    return value.popcount - 7
+  }
+
+  var bigEndian: Bit {
+    return self
+  }
+
+  var littleEndian: Bit {
+    return self
+  }
+
+  var byteSwapped: Bit {
+    return self
+  }
+
+  func word(at n: Int) -> UInt {
+    return UInt(value)
+  }
+
+  // Hashable, CustomStringConvertible
+
+  var hashValue: Int {
+    return Int(value)
+  }
+
+  var description: String {
+    return "\(value)"
+  }
+
+  // Arithmetic Operations / Operators
+
+  func _checkOverflow(_ v: UInt8) -> ArithmeticOverflow {
+    let mask: UInt8 = ~0 << 1
+    return v & mask == 0 ? .none : .overflow
+  }
+  
+  func addingWithOverflow(_ rhs: Bit) ->
+    (partialValue: Bit, overflow: ArithmeticOverflow) {
+      let result = value &+ rhs.value
+      return (Bit(result & 1), _checkOverflow(result))
+  }
+
+  func subtractingWithOverflow(_ rhs: Bit) ->
+    (partialValue: Bit, overflow: ArithmeticOverflow) {
+      let result = value &- rhs.value
+      return (Bit(result & 1), _checkOverflow(result))
+  }
+
+  func multipliedWithOverflow(by rhs: Bit) ->
+    (partialValue: Bit, overflow: ArithmeticOverflow) {
+      let result = value &* rhs.value
+      return (Bit(result), .none)
+  }
+
+  func dividedWithOverflow(by rhs: Bit) ->
+    (partialValue: Bit, overflow: ArithmeticOverflow) {
+      return rhs == 0 ? (self, .none) : (self, .overflow)
+  }
+
+  static func +=(lhs: inout Bit, rhs: Bit) {
+    let result = lhs.addingWithOverflow(rhs)
+    assert(result.overflow == .none, "Addition overflow")
+    lhs = result.partialValue
+  }
+
+  static func -=(lhs: inout Bit, rhs: Bit) {
+    let result = lhs.subtractingWithOverflow(rhs)
+    assert(result.overflow == .none, "Subtraction overflow")
+    lhs = result.partialValue
+  }
+
+  static func *=(lhs: inout Bit, rhs: Bit) {
+    let result = lhs.multipliedWithOverflow(by: rhs)
+    assert(result.overflow == .none, "Multiplication overflow")
+    lhs = result.partialValue
+  }
+
+  static func /=(lhs: inout Bit, rhs: Bit) {
+    let result = lhs.dividedWithOverflow(by: rhs)
+    assert(result.overflow == .none, "Division overflow")
+    lhs = result.partialValue
+  }
+
+  static func %=(lhs: inout Bit, rhs: Bit) {
+    assert(rhs != 0, "Modulo sum overflow")
+    lhs.value = 0 // No remainders with bit division!
+  }
+
+  static func doubleWidthMultiply(_ lhs: Bit, _ rhs: Bit) ->
+    (high: Bit, low: Bit) {
+      return (0, lhs * rhs)
+  }
+
+  static func doubleWidthDivide(_ lhs: (high: Bit, low: Bit), _ rhs: Bit) ->
+    (quotient: Bit, remainder: Bit) {
+      assert(rhs != 0, "Division overflow")
+      assert(lhs.high == 0, "Quotient overflow")
+      return (lhs.low, 0)
+  }
+
+  // FIXME: Remove once default implementations are provided:
+
+  public static func +(_ lhs: Bit, _ rhs: Bit) -> Bit {
+    var lhs = lhs
+    lhs += rhs
+    return lhs
+  }
+
+  public static func -(_ lhs: Bit, _ rhs: Bit) -> Bit {
+    var lhs = lhs
+    lhs -= rhs
+    return lhs
+  }
+
+  public static func *(_ lhs: Bit, _ rhs: Bit) -> Bit {
+    var lhs = lhs
+    lhs *= rhs
+    return lhs
+  }
+
+  public static func /(_ lhs: Bit, _ rhs: Bit) -> Bit {
+    var lhs = lhs
+    lhs /= rhs
+    return lhs
+  }
+
+  public static func %(_ lhs: Bit, _ rhs: Bit) -> Bit {
+    var lhs = lhs
+    lhs %= rhs
+    return lhs
+  }
+
+  // Bitwise operators
+
+  static prefix func ~(x: Bit) -> Bit {
+    return Bit(~x.value & 1)
+  }
+
+  // Why doesn't the type checker complain about these being missing?
+  static func &=(lhs: inout Bit, rhs: Bit) {
+    lhs.value &= rhs.value
+  }
+
+  static func |=(lhs: inout Bit, rhs: Bit) {
+    lhs.value |= rhs.value
+  }
+
+  static func ^=(lhs: inout Bit, rhs: Bit) {
+    lhs.value ^= rhs.value
+  }
+
+  static func ==(lhs: Bit, rhs: Bit) -> Bool {
+    return lhs.value == rhs.value
+  }
+
+  static func <(lhs: Bit, rhs: Bit) -> Bool {
+    return lhs.value < rhs.value
+  }
+
+  static func <<(lhs: Bit, rhs: Bit) -> Bit {
+    return rhs == 0 ? lhs : 0
+  }
+
+  static func >>(lhs: Bit, rhs: Bit) -> Bit {
+    return rhs == 0 ? lhs : 0
+  }
+
+  static func <<=(lhs: inout Bit, rhs: Bit) {
+    if rhs != 0 {
+      lhs = 0
+    }
+  }
+
+  static func >>=(lhs: inout Bit, rhs: Bit) {
+    if rhs != 0 {
+      lhs = 0
+    }
+  }
+}
+
+//===--- Tests ------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 typealias BigInt = _BigInt<UInt>
 typealias BigInt8 = _BigInt<UInt8>
+
+typealias BigIntBit = _BigInt<Bit>
 
 func testBinaryInit<T: BinaryInteger>(_ x: T) -> BigInt {
   return BigInt(x)
@@ -1196,6 +1467,29 @@ func testBinaryInit<T: BinaryInteger>(_ x: T) -> BigInt {
 
 func randomBitLength() -> Int {
   return Int(arc4random_uniform(1000) + 2)
+}
+
+var BitTests = TestSuite("Bit")
+
+BitTests.test("Basics") {
+  let x = Bit.max
+  let y = Bit.min
+
+  expectTrue(x == 1 as Int)
+  expectTrue(y == 0 as Int)
+  expectTrue(x < Int.max)
+
+  expectGT(x, y)
+  expectEqual(x, x)
+  expectEqual(x, x ^ 0)
+  expectGT(x, x & 0)
+  expectEqual(x, x | 0)
+  expectLT(y, y | 1)
+  expectEqual(x, ~y)
+  expectEqual(y, ~x)
+
+  expectEqual(x, x + y)
+  expectGT(x, x &+ x)
 }
 
 var BigIntTests = TestSuite("BigInt")
@@ -1511,6 +1805,55 @@ BigInt8Tests.test("Bitwise").forEach(in: [
   }
 }
 
+var BigIntBitTests = TestSuite("BigInt<Bit>")
+
+BigIntBitTests.test("Randomized arithmetic").forEach(in: Array(1...10)) { _ in
+  // Test x == (x / y) * x + (x % y)
+  let (x, y) = (
+    BigIntBit(randomBits: randomBitLength() % 100),
+    BigIntBit(randomBits: randomBitLength() % 100))
+  if !y.isZero {
+    let (q, r) = x.quotientAndRemainder(dividingBy: y)
+    expectEqual(q * y + r, x)
+    expectEqual(q * y, x - r)
+  }
+
+  // Test (x0 + y0)(x1 + y1) == x0x1 + x0y1 + y0x1 + y0y1
+  let (x0, y0, x1, y1) = (
+    BigIntBit(randomBits: randomBitLength() % 100),
+    BigIntBit(randomBits: randomBitLength() % 100),
+    BigIntBit(randomBits: randomBitLength() % 100),
+    BigIntBit(randomBits: randomBitLength() % 100))
+  let r1 = (x0 + y0) * (x1 + y1)
+  let r2 = ((x0 * x1) + (x0 * y1), (y0 * x1) + (y0 * y1))
+  expectEqual(r1, r2.0 + r2.1)
+}
+
+BigIntBitTests.test("Conformances") {
+  // Comparable
+  let x = BigIntBit(Int.max)
+  let y = x * x * x * x * x
+  expectLT(y, y + 1)
+  expectGT(y, y - 1)
+  expectGT(y, 0)
+
+  let z = -y
+  expectLT(z, z + 1)
+  expectGT(z, z - 1)
+  expectLT(z, 0)
+
+  expectEqual(-z, y)
+  expectEqual(y + z, 0)
+
+  // Hashable
+  expectNotEqual(x.hashValue, y.hashValue)
+  expectNotEqual(y.hashValue, z.hashValue)
+
+  let set = Set([x, y, z])
+  expectTrue(set.contains(x))
+  expectTrue(set.contains(y))
+  expectTrue(set.contains(z))
+  expectFalse(set.contains(-x))
 }
 
 runAllTests()
