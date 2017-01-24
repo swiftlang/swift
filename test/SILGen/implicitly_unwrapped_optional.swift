@@ -8,8 +8,10 @@ func foo(f f: (() -> ())!) {
 // CHECK: bb0([[T0:%.*]] : $Optional<@callee_owned () -> ()>):
 // CHECK:   [[F:%.*]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
 // CHECK:   [[PF:%.*]] = project_box [[F]]
-// CHECK:   [[T0_COPY:%.*]] = copy_value [[T0]]
+// CHECK:   [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK:   [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK:   store [[T0_COPY]] to [init] [[PF]]
+// CHECK:   end_borrow [[BORROWED_T0]] from [[T0]]
 // CHECK:   [[T1:%.*]] = select_enum_addr [[PF]]
 // CHECK:   cond_br [[T1]], bb1, bb3
 //   If it does, project and load the value out of the implicitly unwrapped
@@ -65,8 +67,11 @@ func sr3758() {
   // Verify that there are no additional reabstractions introduced.
   // CHECK: [[CLOSURE:%.+]] = function_ref @_T029implicitly_unwrapped_optional6sr3758yyFySQyypGcfU_ : $@convention(thin) (@in Optional<Any>) -> ()
   // CHECK: [[F:%.+]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (@in Optional<Any>) -> () to $@callee_owned (@in Optional<Any>) -> ()
-  // CHECK: [[CALLEE:%.+]] = copy_value [[F]] : $@callee_owned (@in Optional<Any>) -> ()
+  // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
+  // CHECK: [[CALLEE:%.+]] = copy_value [[BORROWED_F]] : $@callee_owned (@in Optional<Any>) -> ()
   // CHECK: = apply [[CALLEE]]({{%.+}}) : $@callee_owned (@in Optional<Any>) -> ()
+  // CHECK: end_borrow [[BORROWED_F]] from [[F]]
+  // CHECK: destroy_value [[F]]
   let f: ((Any?) -> Void) = { (arg: Any!) in }
   f(nil)
 } // CHECK: end sil function '_T029implicitly_unwrapped_optional6sr3758yyF'

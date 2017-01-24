@@ -5,6 +5,7 @@
 import CoreCooling
 
 // CHECK: sil hidden @_T02cf8useEmAllySo16CCMagnetismModelCF :
+// CHECK: bb0([[ARG:%.*]] : $CCMagnetismModel):
 func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: function_ref @CCPowerSupplyGetDefault : $@convention(c) () -> @autoreleased Optional<CCPowerSupply>
   let power = CCPowerSupplyGetDefault()
@@ -27,22 +28,28 @@ func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: function_ref @CCRefrigeratorDestroy : $@convention(c) (@owned Optional<CCRefrigerator>) -> ()
   CCRefrigeratorDestroy(clone)
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.refrigerator!1.foreign : (CCMagnetismModel) -> () -> Unmanaged<CCRefrigerator>!, $@convention(objc_method) (CCMagnetismModel) -> Optional<Unmanaged<CCRefrigerator>>
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: class_method [volatile] [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.refrigerator!1.foreign : (CCMagnetismModel) -> () -> Unmanaged<CCRefrigerator>!, $@convention(objc_method) (CCMagnetismModel) -> Optional<Unmanaged<CCRefrigerator>>
   let f0 = model.refrigerator()
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.getRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator!, $@convention(objc_method) (CCMagnetismModel) -> @autoreleased Optional<CCRefrigerator>
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: class_method [volatile] [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.getRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator!, $@convention(objc_method) (CCMagnetismModel) -> @autoreleased Optional<CCRefrigerator>
   let f1 = model.getRefrigerator()
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.takeRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator!, $@convention(objc_method) (CCMagnetismModel) -> @owned Optional<CCRefrigerator>
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: class_method [volatile] [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.takeRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator!, $@convention(objc_method) (CCMagnetismModel) -> @owned Optional<CCRefrigerator>
   let f2 = model.takeRefrigerator()
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.borrowRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator!, $@convention(objc_method) (CCMagnetismModel) -> @autoreleased Optional<CCRefrigerator>
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: class_method [volatile] [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.borrowRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator!, $@convention(objc_method) (CCMagnetismModel) -> @autoreleased Optional<CCRefrigerator>
   let f3 = model.borrowRefrigerator()
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.setRefrigerator!1.foreign : (CCMagnetismModel) -> (CCRefrigerator!) -> (), $@convention(objc_method) (Optional<CCRefrigerator>, CCMagnetismModel) -> ()
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: class_method [volatile] [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.setRefrigerator!1.foreign : (CCMagnetismModel) -> (CCRefrigerator!) -> (), $@convention(objc_method) (Optional<CCRefrigerator>, CCMagnetismModel) -> ()
   model.setRefrigerator(copy)
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.giveRefrigerator!1.foreign : (CCMagnetismModel) -> (CCRefrigerator!) -> (), $@convention(objc_method) (@owned Optional<CCRefrigerator>, CCMagnetismModel) -> ()
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: class_method [volatile] [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.giveRefrigerator!1.foreign : (CCMagnetismModel) -> (CCRefrigerator!) -> (), $@convention(objc_method) (@owned Optional<CCRefrigerator>, CCMagnetismModel) -> ()
   model.giveRefrigerator(copy)
 
   // rdar://16846555

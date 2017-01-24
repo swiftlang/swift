@@ -14,8 +14,10 @@ func optionalMethodGeneric<T : P1>(t t : T) {
   // CHECK: bb0([[T:%[0-9]+]] : $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
+  // CHECK:   [[T_BORROW:%.*]] = begin_borrow [[T]]
+  // CHECK:   [[T_COPY:%.*]] = copy_value [[T_BORROW]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
+  // CHECK:   end_borrow [[T_BORROW]] from [[T]]
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_owned (Int) -> ()> }
   // CHECK:   project_box [[OPT_BOX]]
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[PT]] : $*T
@@ -31,8 +33,10 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
   // CHECK: bb0([[T:%[0-9]+]] : $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
+  // CHECK:   [[T_BORROW:%.*]] = begin_borrow [[T]]
+  // CHECK:   [[T_COPY:%.*]] = copy_value [[T_BORROW]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
+  // CHECK:   end_borrow [[T_BORROW]] from [[T]]
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<Int> }
   // CHECK:   project_box [[OPT_BOX]]
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[PT]] : $*T
@@ -48,8 +52,10 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   // CHECK: bb0([[T:%[0-9]+]] : $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
+  // CHECK:   [[T_BORROW:%.*]] = begin_borrow [[T]]
+  // CHECK:   [[T_COPY:%.*]] = copy_value [[T_BORROW]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
+  // CHECK:   end_borrow [[T_BORROW]] from [[T]]
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<Int> }
   // CHECK:   project_box [[OPT_BOX]]
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[PT]] : $*T

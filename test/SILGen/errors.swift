@@ -99,7 +99,9 @@ func dont_return<T>(_ argument: T) throws -> T {
 //   Catch HomeworkError.CatAteIt.
 // CHECK:    [[MATCH]]([[T0:%.*]] : $Cat):
 // CHECK-NEXT: debug_value
-// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0]]
+// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
+// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
 // CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
@@ -306,8 +308,10 @@ func testForceTry(_ fn: () -> Int) {
 // CHECK-LABEL: sil hidden @_TF6errors12testForceTryFFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> ()
 // CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> Int):
 // CHECK: [[FUNC:%.*]] = function_ref @_TF6errors9createIntFzFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @error Error
-// CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK: try_apply [[FUNC]]([[ARG_COPY]])
+// CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK: destroy_value [[ARG]]
 // CHECK: return
 // CHECK: builtin "unexpectedError"
@@ -422,7 +426,8 @@ func test_variadic(_ cat: Cat) throws {
 //   Element 1.
 // CHECK-NEXT:    [[T0:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK-NEXT:    [[ELT1:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
-// CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:    [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK-NEXT:    store [[ARG_COPY]] to [init] [[ELT1]]
 //   Element 2.
 // CHECK-NEXT:    [[T0:%.*]] = integer_literal $Builtin.Word, 2
@@ -443,17 +448,20 @@ func test_variadic(_ cat: Cat) throws {
 //   Complete the call and return.
 // CHECK-NEXT:    try_apply [[TAKE_FN]]([[ARRAY]]) : $@convention(thin) (@owned Array<Cat>) -> @error Error, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
 // CHECK:       [[NORM_CALL]]([[T0:%.*]] : $()):
-// CHECK-NEXT:    destroy_value %0 : $Cat
+// CHECK-NEXT:    end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK-NEXT:    destroy_value [[ARG]] : $Cat
 // CHECK-NEXT:    [[T0:%.*]] = tuple ()
 // CHECK-NEXT:    return
 //   Failure from element 0.
 // CHECK:       [[ERR_0]]([[ERROR:%.*]] : $Error):
+// CHECK-NOT:     end_borrow
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @_TFs29_deallocateUninitializedArray
 // CHECK-NEXT:    apply [[T0]]<Cat>([[ARRAY]])
 // CHECK-NEXT:    br [[RETHROW:.*]]([[ERROR]] : $Error)
 //   Failure from element 2.
 // CHECK:       [[ERR_2]]([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK-NEXT:    destroy_addr [[ELT1]]
 // CHECK-NEXT:    destroy_addr [[ELT0]]
 // CHECK-NEXT:    // function_ref
@@ -463,6 +471,7 @@ func test_variadic(_ cat: Cat) throws {
 //   Failure from element 3.
 // CHECK:       [[ERR_3]]([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    destroy_addr [[ELT2]]
+// CHECK-NEXT:    end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK-NEXT:    destroy_addr [[ELT1]]
 // CHECK-NEXT:    destroy_addr [[ELT0]]
 // CHECK-NEXT:    // function_ref
@@ -471,10 +480,11 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:    br [[RETHROW]]([[ERROR]] : $Error)
 //   Failure from call.
 // CHECK:       [[ERR_CALL]]([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK-NEXT:    br [[RETHROW]]([[ERROR]] : $Error)
 //   Rethrow.
 // CHECK:       [[RETHROW]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    destroy_value %0 : $Cat
+// CHECK-NEXT:    destroy_value [[ARG]] : $Cat
 // CHECK-NEXT:    throw [[ERROR]]
 // CHECK: } // end sil function '_TF6errors13test_variadicFzCS_3CatT_'
 
@@ -545,34 +555,38 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
   try b[name].support()
 }
 // CHECK-LABEL: sil hidden @_TF6errors16supportStructure
-// CHECK: [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
-// CHECK: [[INDEX_COPY:%.*]] = copy_value [[INDEX:%1]] : $String
-// CHECK: [[MATBUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
-// CHECK: [[BUFFER:%.*]] = alloc_stack $B.Structure
-// CHECK: [[BUFFER_CAST:%.*]] = address_to_pointer [[BUFFER]] : $*B.Structure to $Builtin.RawPointer
-// CHECK: [[MAT:%.*]] = witness_method $B, #Buildable.subscript!materializeForSet.1 :
-// CHECK: [[T1:%.*]] = apply [[MAT]]<B>([[BUFFER_CAST]], [[MATBUFFER]], [[INDEX_COPY]], [[BASE:%[0-9]*]])
-// CHECK: [[T2:%.*]] = tuple_extract [[T1]] : {{.*}}, 0
-// CHECK: [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
-// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*B.Structure
-// CHECK: [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
-// CHECK: try_apply [[SUPPORT]]<B.Structure>([[T4]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+// CHECK: bb0({{.*}}, [[INDEX:%.*]] : $String):
+// CHECK:   [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
+// CHECK:   [[BORROWED_INDEX:%.*]] = begin_borrow [[INDEX]]
+// CHECK:   [[INDEX_COPY:%.*]] = copy_value [[BORROWED_INDEX]] : $String
+// CHECK:   [[MATBUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
+// CHECK:   [[BUFFER:%.*]] = alloc_stack $B.Structure
+// CHECK:   [[BUFFER_CAST:%.*]] = address_to_pointer [[BUFFER]] : $*B.Structure to $Builtin.RawPointer
+// CHECK:   [[MAT:%.*]] = witness_method $B, #Buildable.subscript!materializeForSet.1 :
+// CHECK:   [[T1:%.*]] = apply [[MAT]]<B>([[BUFFER_CAST]], [[MATBUFFER]], [[INDEX_COPY]], [[BASE:%[0-9]*]])
+// CHECK:   [[T2:%.*]] = tuple_extract [[T1]] : {{.*}}, 0
+// CHECK:   [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
+// CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*B.Structure
+// CHECK:   [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
+// CHECK:   try_apply [[SUPPORT]]<B.Structure>([[T4]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
 // CHECK: [[BB_NORMAL]]
-// CHECK: switch_enum [[CALLBACK]]
-// CHECK: apply
-// CHECK: dealloc_stack [[BUFFER]]
-// CHECK: dealloc_stack [[MATBUFFER]]
-// CHECK: destroy_value [[INDEX]] : $String
-// CHECK: return
+// CHECK:   switch_enum [[CALLBACK]]
+// CHECK:   apply
+// CHECK:   dealloc_stack [[BUFFER]]
+// CHECK:   dealloc_stack [[MATBUFFER]]
+// CHECK:   end_borrow [[BORROWED_INDEX]] from [[INDEX]]
+// CHECK:   destroy_value [[INDEX]] : $String
+// CHECK:   return
 
 // CHECK: [[BB_ERROR]]([[ERROR:%.*]] : $Error):
-// CHECK: switch_enum [[CALLBACK]]
-// CHECK: apply
-// CHECK: dealloc_stack [[BUFFER]]
-// CHECK: dealloc_stack [[MATBUFFER]]
-// CHECK: destroy_value [[INDEX]] : $String
-// CHECK: throw [[ERROR]]
+// CHECK:   switch_enum [[CALLBACK]]
+
+// CHECK:   apply
+// CHECK:   dealloc_stack [[BUFFER]]
+// CHECK:   dealloc_stack [[MATBUFFER]]
+// CHECK:   destroy_value [[INDEX]] : $String
+// CHECK:   throw [[ERROR]]
 
 struct Pylon {
   var name: String
@@ -593,7 +607,8 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK:    sil hidden @_TF6errors16supportStructureFzTRVS_6Bridge4nameSS_T_ : $@convention(thin) (@inout Bridge, @owned String) -> @error Error {
 // CHECK:    bb0([[ARG1:%.*]] : $*Bridge, [[ARG2:%.*]] : $String):
 // CHECK:      [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7support
-// CHECK-NEXT: [[INDEX_COPY_1:%.*]] = copy_value [[ARG2]] : $String
+// CHECK-NEXT: [[BORROWED_ARG2:%.*]] = begin_borrow [[ARG2]]
+// CHECK-NEXT: [[INDEX_COPY_1:%.*]] = copy_value [[BORROWED_ARG2]] : $String
 // CHECK-NEXT: [[INDEX_COPY_2:%.*]] = copy_value [[INDEX_COPY_1]] : $String
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Pylon
 // CHECK-NEXT: [[BASE:%.*]] = load [copy] [[ARG1]] : $*Bridge
@@ -610,6 +625,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @_TFV6errors6Bridges9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX_COPY_2]], [[ARG1]])
 // CHECK-NEXT: dealloc_stack [[TEMP]]
+// CHECK-NEXT: end_borrow [[BORROWED_INDEX]] from [[INDEX]]
 // CHECK-NEXT: destroy_value [[INDEX]] : $String
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
@@ -626,6 +642,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: dealloc_stack [[TEMP]]
 // ==> SEMANTIC ARC TODO: INDEX_COPY_2 on the next line should be INDEX_COPY_2_COPY
 // CHECK-NEXT: destroy_value [[INDEX_COPY_2]] : $String
+// CHECK-NEXT: end_borrow [[BORROWED_INDEX]] from [[INDEX]]
 // CHECK-NEXT: destroy_value [[INDEX]] : $String
 // CHECK-NEXT: throw [[ERROR]]
 // CHECK: } // end sil function '_TF6errors16supportStructureFzTRVS_6Bridge4nameSS_T_'
@@ -643,7 +660,8 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK:    sil hidden @_TF6errors16supportStructureFzTRVS_11OwnedBridge4nameSS_T_ :
 // CHECK:    bb0([[ARG1:%.*]] : $*OwnedBridge, [[ARG2:%.*]] : $String):
 // CHECK:      [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7support
-// CHECK:      [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $String
+// CHECK:      [[BORROWED_ARG2:%.*]] = begin_borrow [[ARG2]]
+// CHECK:      [[ARG2_COPY:%.*]] = copy_value [[BORROWED_ARG2]] : $String
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_TFV6errors11OwnedBridgeaO9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[ARG1]])
@@ -659,11 +677,13 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 // CHECK:    [[BB_NORMAL]]
 // CHECK-NEXT: destroy_value [[OWNER]] : $Builtin.UnknownObject
+// CHECK-NEXT: end_borrow [[BORROWED_ARG2]] from [[ARG2]]
 // CHECK-NEXT: destroy_value [[ARG2]] : $String
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $Error):
 // CHECK-NEXT: destroy_value [[OWNER]] : $Builtin.UnknownObject
+// CHECK-NEXT: end_borrow [[BORROWED_ARG2]] from [[ARG2]]
 // CHECK-NEXT: destroy_value [[ARG2]] : $String
 // CHECK-NEXT: throw [[ERROR]]
 // CHECK: } // end sil function '_TF6errors16supportStructureFzTRVS_11OwnedBridge4nameSS_T_'
@@ -681,7 +701,8 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK:      sil hidden @_TF6errors16supportStructureFzTRVS_12PinnedBridge4nameSS_T_ :
 // CHECK:      bb0([[ARG1:%.*]] : $*PinnedBridge, [[ARG2:%.*]] : $String):
 // CHECK:        [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7support
-// CHECK:        [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $String
+// CHECK:        [[BORROWED_ARG2:%.*]] = begin_borrow [[ARG2]]
+// CHECK:        [[ARG2_COPY:%.*]] = copy_value [[BORROWED_ARG2]] : $String
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:   [[ADDRESSOR:%.*]] = function_ref @_TFV6errors12PinnedBridgeap9subscriptFSSVS_5Pylon :
 // CHECK-NEXT:   [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[ARG1]])
@@ -697,6 +718,7 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK-NEXT:   try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 // CHECK:      [[BB_NORMAL]]
 // CHECK-NEXT:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK-NEXT:   end_borrow [[BORROWED_ARG2]] from [[ARG2]]
 // CHECK-NEXT:   destroy_value [[ARG2]] : $String
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
@@ -704,6 +726,7 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK-NEXT:   [[OWNER_COPY:%.*]] = copy_value [[OWNER]]
 // CHECK-NEXT:   strong_unpin [[OWNER_COPY]] : $Optional<Builtin.NativeObject>
 // CHECK-NEXT:   destroy_value [[OWNER]]
+// CHECK-NEXT:   end_borrow [[BORROWED_ARG2]] from [[ARG2]]
 // CHECK-NEXT:   destroy_value [[ARG2]] : $String
 // CHECK-NEXT:   throw [[ERROR]]
 // CHECK: } // end sil function '_TF6errors16supportStructureFzTRVS_12PinnedBridge4nameSS_T_'

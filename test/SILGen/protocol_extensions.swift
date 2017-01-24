@@ -101,10 +101,11 @@ func testD(_ m: MetaHolder, dd: D.Type, d: D) {
   // CHECK: [[D2:%[0-9]+]] = alloc_box ${ var D }
   // CHECK: [[RESULT:%.*]] = project_box [[D2]]
   // CHECK: [[FN:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE11returnsSelf{{[_0-9a-zA-Z]*}}F
-  // CHECK: [[MATERIALIZED_BORROWED_D:%[0-9]+]] = alloc_stack $D
   // CHECK: [[BORROWED_D:%.*]] = begin_borrow [[D]]
+  // CHECK: [[MATERIALIZED_BORROWED_D:%[0-9]+]] = alloc_stack $D
   // CHECK: store_borrow [[BORROWED_D]] to [[MATERIALIZED_BORROWED_D]]
   // CHECK: apply [[FN]]<D>([[RESULT]], [[MATERIALIZED_BORROWED_D]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // CHECK-NEXT: dealloc_stack [[MATERIALIZED_BORROWED_D]]
   // CHECK-NEXT: end_borrow [[BORROWED_D]] from [[D]]
   var d2: D = d.returnsSelf()
 
@@ -646,18 +647,21 @@ extension CP1 {
 func plusOneCP1() -> CP1 {}
 
 // CHECK-LABEL: sil hidden @_T019protocol_extensions37test_open_existential_semantics_class{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[ARG0:%.*]] : $CP1, [[ARG1:%.*]] : $CP1):
 func test_open_existential_semantics_class(_ guaranteed: CP1,
                                            immediate: CP1) {
   var immediate = immediate
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var CP1 }
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
 
-  // CHECK-NOT: copy_value %0
-  // CHECK: [[VALUE:%.*]] = open_existential_ref %0
+  // CHECK-NOT: copy_value [[ARG0]]
+  // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+  // CHECK: [[VALUE:%.*]] = open_existential_ref [[BORROWED_ARG0]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
+  // CHECK-NEXT: end_borrow [[BORROWED_ARG0]] from [[ARG0]]
   // CHECK-NOT: destroy_value [[VALUE]]
-  // CHECK-NOT: destroy_value %0
+  // CHECK-NOT: destroy_value [[ARG0]]
   guaranteed.f1()
 
   // CHECK: [[IMMEDIATE:%.*]] = load [copy] [[PB]]
@@ -687,9 +691,11 @@ extension InitRequirement {
   // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   init(d: D) {
     // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
-  // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
-  // CHECK:         [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
-  // CHECK:         apply [[DELEGATEE]]<Self>({{%.*}}, [[ARG_COPY_CAST]], [[SELF_TYPE]])
+  // CHECK:           [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:           [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK:           [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
+  // CHECK:           apply [[DELEGATEE]]<Self>({{%.*}}, [[ARG_COPY_CAST]], [[SELF_TYPE]])
+  // CHECK:           end_borrow [[BORROWED_ARG]] from [[ARG]]
     self.init(c: d)
   }
   // CHECK: } // end sil function '_T019protocol_extensions15InitRequirementPAAE{{[_0-9a-zA-Z]*}}fC'
@@ -710,9 +716,12 @@ extension ClassInitRequirement {
   // CHECK-LABEL: sil hidden @_T019protocol_extensions20ClassInitRequirementPAAE{{[_0-9a-zA-Z]*}}fC : $@convention(method) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator.1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
-  // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:         [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:         [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:         [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
   // CHECK:         apply [[DELEGATEE]]<Self>([[ARG_COPY_CAST]], [[SELF_TYPE]])
+  // CHECK:         end_borrow [[BORROWED_ARG]] from [[ARG]]
+  
   // CHECK: } // end sil function '_T019protocol_extensions20ClassInitRequirementPAAE{{[_0-9a-zA-Z]*}}fC'
   init(d: D) {
     self.init(c: d)
@@ -736,11 +745,15 @@ extension ObjCInitRequirement {
   // CHECK:         [[OBJC_SELF_TYPE:%.*]] = thick_to_objc_metatype [[SELF_TYPE]]
   // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic [objc] [[OBJC_SELF_TYPE]] : $@objc_metatype Self.Type, $Self
   // CHECK:         [[WITNESS:%.*]] = witness_method [volatile] $Self, #ObjCInitRequirement.init!initializer.1.foreign : {{.*}} : $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjCInitRequirement> (OC, OC, @owned τ_0_0) -> @owned τ_0_0
-  // CHECK:         [[ARG_COPY_1:%.*]] = copy_value [[ARG]]
+  // CHECK:         [[BORROWED_ARG_1:%.*]] = begin_borrow [[ARG]]
+  // CHECK:         [[ARG_COPY_1:%.*]] = copy_value [[BORROWED_ARG_1]]
   // CHECK:         [[ARG_COPY_1_UPCAST:%.*]] = upcast [[ARG_COPY_1]]
-  // CHECK:         [[ARG_COPY_2:%.*]] = copy_value [[ARG]]
+  // CHECK:         [[BORROWED_ARG_2:%.*]] = begin_borrow [[ARG]]
+  // CHECK:         [[ARG_COPY_2:%.*]] = copy_value [[BORROWED_ARG_2]]
   // CHECK:         [[ARG_COPY_2_UPCAST:%.*]] = upcast [[ARG_COPY_2]]
   // CHECK:         apply [[WITNESS]]<Self>([[ARG_COPY_1_UPCAST]], [[ARG_COPY_2_UPCAST]], [[SELF]])
+  // CHECK:         end_borrow [[BORROWED_ARG_2]] from [[ARG]]
+  // CHECK:         end_borrow [[BORROWED_ARG_1]] from [[ARG]]
   // CHECK: } // end sil function '_T019protocol_extensions19ObjCInitRequirementPAAE{{[_0-9a-zA-Z]*}}fC'
   init(d: OD) {
     self.init(c: d, d: d)

@@ -126,18 +126,20 @@ func reftype_return() -> Ref {
 }
 
 // CHECK-LABEL: sil hidden @_T08lifetime11reftype_argyAA3RefCF : $@convention(thin) (@owned Ref) -> () {
+// CHECK: bb0([[A:%[0-9]+]] : $Ref):
+// CHECK:   [[AADDR:%[0-9]+]] = alloc_box ${ var Ref }
+// CHECK:   [[PA:%[0-9]+]] = project_box [[AADDR]]
+// CHECK:   [[BORROWED_A:%.*]] = begin_borrow [[A]]
+// CHECK:   [[A_COPY:%.*]] = copy_value [[BORROWED_A]]
+// CHECK:   store [[A_COPY]] to [init] [[PA]]
+// CHECK:   end_borrow [[BORROWED_A]] from [[A]]
+// CHECK:   destroy_value [[AADDR]]
+// CHECK:   destroy_value [[A]]
+// CHECK:   return
+// CHECK: } // end sil function '_T08lifetime11reftype_argyAA3RefCF'
 func reftype_arg(_ a: Ref) {
     var a = a
-    // CHECK: bb0([[A:%[0-9]+]] : $Ref):
-    // CHECK: [[AADDR:%[0-9]+]] = alloc_box ${ var Ref }
-    // CHECK: [[PA:%[0-9]+]] = project_box [[AADDR]]
-    // CHECK: [[A_COPY:%.*]] = copy_value [[A]]
-    // CHECK: store [[A_COPY]] to [init] [[PA]]
-    // CHECK: destroy_value [[AADDR]]
-    // CHECK: destroy_value [[A]]
-    // CHECK: return
 }
-// CHECK: } // end sil function '_T08lifetime11reftype_argyAA3RefCF'
 
 // CHECK-LABEL: sil hidden @_T08lifetime26reftype_call_ignore_returnyyF
 func reftype_call_ignore_return() {
@@ -175,22 +177,24 @@ func reftype_call_arg() {
 }
 
 // CHECK-LABEL: sil hidden @_T08lifetime21reftype_call_with_arg{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[A1:%[0-9]+]] : $Ref):
+// CHECK:   [[AADDR:%[0-9]+]] = alloc_box ${ var Ref }
+// CHECK:   [[PB:%.*]] = project_box [[AADDR]]
+// CHECK:   [[BORROWED_A1:%.*]] = begin_borrow [[A1]]
+// CHECK:   [[A1_COPY:%.*]] = copy_value [[BORROWED_A1]]
+// CHECK:   store [[A1_COPY]] to [init] [[PB]]
+// CHECK:   end_borrow [[BORROWED_A1]] from [[A1]]
+// CHECK:   [[RFWA:%[0-9]+]] = function_ref @_T08lifetime21reftype_func_with_arg{{[_0-9a-zA-Z]*}}F
+// CHECK:   [[A2:%[0-9]+]] = load [copy] [[PB]]
+// CHECK:   [[RESULT:%.*]] = apply [[RFWA]]([[A2]])
+// CHECK:   destroy_value [[RESULT]]
+// CHECK:   destroy_value [[AADDR]]
+// CHECK:   destroy_value [[A1]]
+// CHECK:   return
 func reftype_call_with_arg(_ a: Ref) {
     var a = a
-    // CHECK: bb0([[A1:%[0-9]+]] : $Ref):
-    // CHECK: [[AADDR:%[0-9]+]] = alloc_box ${ var Ref }
-    // CHECK: [[PB:%.*]] = project_box [[AADDR]]
-    // CHECK: [[A1_COPY:%.*]] = copy_value [[A1]]
-    // CHECK: store [[A1_COPY]] to [init] [[PB]]
 
     reftype_func_with_arg(a)
-    // CHECK: [[RFWA:%[0-9]+]] = function_ref @_T08lifetime21reftype_func_with_arg{{[_0-9a-zA-Z]*}}F
-    // CHECK: [[A2:%[0-9]+]] = load [copy] [[PB]]
-    // CHECK: [[RESULT:%.*]] = apply [[RFWA]]([[A2]])
-    // CHECK: destroy_value [[RESULT]]
-    // CHECK: destroy_value [[AADDR]]
-    // CHECK: destroy_value [[A1]]
-    // CHECK: return
 }
 
 // CHECK-LABEL: sil hidden @_T08lifetime16reftype_reassign{{[_0-9a-zA-Z]*}}F
@@ -399,16 +403,38 @@ class Foo<T> {
     // CHECK: bb0([[THISIN:%[0-9]+]] : $Foo<T>):
     // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
 
-    // initialization for y
+    // -- initialization for y
     // CHECK: [[Y_INIT:%[0-9]+]] = function_ref @_T08lifetime3FooC1ySi_AA3RefCtvfi : $@convention(thin) <τ_0_0> () -> (Int, @owned Ref)
     // CHECK: [[Y_VALUE:%[0-9]+]] = apply [[Y_INIT]]<T>()
+    // CHECK: [[BORROWED_Y_VALUE:%.*]] = begin_borrow [[Y_VALUE]]
+    // CHECK: [[Y_EXTRACTED_0:%.*]] = tuple_extract [[BORROWED_Y_VALUE]] : $(Int, Ref), 0
+    // CHECK: [[Y_EXTRACTED_1:%.*]] = tuple_extract [[BORROWED_Y_VALUE]] : $(Int, Ref), 1
+    // CHECK: [[COPIED_Y_EXTRACTED_1:%.*]] = copy_value [[Y_EXTRACTED_1]]
+    // CHECK: end_borrow [[BORROWED_Y_VALUE]] from [[Y_VALUE]]
+    // CHECK: destroy_value [[Y_VALUE]]
+    // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+    // CHECK: [[THIS_Y:%.*]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.y
+    // CHECK: [[THIS_Y_0:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 0
+    // CHECK: assign [[Y_EXTRACTED_0]] to [[THIS_Y_0]]
+    // CHECK: [[THIS_Y_1:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 1
+    // CHECK: assign [[COPIED_Y_EXTRACTED_1]] to [[THIS_Y_1]]
+    // CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
 
-    x = bar()
-    // CHECK: function_ref @_T08lifetime3barSiyF : $@convention(thin) () -> Int
+    // -- Initialization for w
+    // CHECK: [[Z_FUNC:%.*]] = function_ref @_T{{.*}}8lifetime3FooC1wAA3RefCvfi : $@convention(thin) <τ_0_0> () -> @owned Ref
+    // CHECK: [[Z_RESULT:%.*]] = apply [[Z_FUNC]]<T>()
+    // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+    // CHECK: [[THIS_Z:%.*]] = ref_element_addr [[BORROWED_THIS]]
+    // CHECK: assign [[Z_RESULT]] to [[THIS_Z]]
+    // CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
+
+    // -- Initialization for x
     // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
     // CHECK: [[THIS_X:%[0-9]+]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.x
     // CHECK: assign {{.*}} to [[THIS_X]]
     // CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
+
+    x = bar()
 
     z = Foo<T>.makeT()
     // CHECK: [[FOOMETA:%[0-9]+]] = metatype $@thick Foo<T>.Type

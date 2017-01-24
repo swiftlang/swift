@@ -96,9 +96,10 @@ extension Error {
 
 // CHECK-LABEL: sil hidden @_T019existential_erasure12errorHandlers5Error_psAC_pKF
 func errorHandler(_ e: Error) throws -> Error {
-// CHECK: bb0(%0 : $Error):
-// CHECK:  debug_value %0 : $Error
-// CHECK:  [[OPEN:%.*]] = open_existential_box %0 : $Error to $*[[OPEN_TYPE:@opened\(.*\) Error]]
+// CHECK: bb0([[ARG:%.*]] : $Error):
+// CHECK:  debug_value [[ARG]] : $Error
+// CHECK:  [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:  [[OPEN:%.*]] = open_existential_box [[BORROWED_ARG]] : $Error to $*[[OPEN_TYPE:@opened\(.*\) Error]]
 // CHECK:  [[RESULT:%.*]] = alloc_existential_box $Error, $[[OPEN_TYPE]]
 // CHECK:  [[ADDR:%.*]] = project_existential_box $[[OPEN_TYPE]] in [[RESULT]] : $Error
 // CHECK:  [[FUNC:%.*]] = function_ref @_T0s5ErrorP19existential_erasureE17returnOrThrowSelf{{[_0-9a-zA-Z]*}}F
