@@ -313,6 +313,11 @@ public func == (lhs: CGVector, rhs: CGVector) -> Bool {
   return lhs.dx == rhs.dx  &&  lhs.dy == rhs.dy
 }
 
+extension CGVector : CustomDebugStringConvertible {
+  public var debugDescription : String {
+    return "(\(dx), \(dy))"
+  }
+}
 
 public extension CGRect {
   static var zero: CGRect {
