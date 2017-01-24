@@ -2705,6 +2705,22 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                                  ResyncP1, Diagnostic(ID, Args...));
 }
 
+/// Add a fix-it to remove the space in consecutive identifiers.
+/// Add a camel-cased option if it is different than the first option.
+void Parser::diagnoseConsecutiveIDs(Token First, Token Second) {
+  auto Joined = (First.getText() + Second.getText()).str();
+  SourceRange Range(First.getLoc(), Second.getLoc());
+  diagnose(Second.getLoc(), diag::join_identifiers).fixItReplace(Range, Joined);
+  
+  SmallString<8> Scratch;
+  auto SentenceCased = camel_case::toSentencecase(Tok.getText(), Scratch);
+  auto CamelCased = (First.getText() + SentenceCased).str();
+  if (Joined != CamelCased) {
+    diagnose(Second.getLoc(), diag::join_identifiers_camel_case)
+      .fixItReplace(Range, CamelCased);
+  }
+}
+
 /// Parse a Decl item in decl list.
 static ParserStatus parseDeclItem(Parser &P,
                                   bool &PreviousHadSemi,
@@ -2722,9 +2738,20 @@ static ParserStatus parseDeclItem(Parser &P,
   // If the previous declaration didn't have a semicolon and this new
   // declaration doesn't start a line, complain.
   if (!PreviousHadSemi && !P.Tok.isAtStartOfLine() && !P.Tok.is(tok::unknown)) {
-    auto endOfPrevious = P.getEndOfPreviousLoc();
-    P.diagnose(endOfPrevious, diag::declaration_same_line_without_semi)
-      .fixItInsert(endOfPrevious, ";");
+    // Add a fix-it to remove the space in consecutive identifiers
+    // in a property or enum case decl.
+    auto PreviousTok = P.L->getTokenAt(P.PreviousLoc);
+    if (P.Tok.is(tok::identifier) && PreviousTok.is(tok::identifier)) {
+      auto enumContext = P.CurDeclContext->getAsEnumOrEnumExtensionContext();
+      auto TypeName = enumContext ? "enum case" : "property";
+      P.diagnose(P.Tok.getLoc(), diag::repeated_identifier, TypeName);
+      P.diagnoseConsecutiveIDs(PreviousTok, P.Tok);
+      P.skipUntilDeclRBrace(tok::semi, tok::pound_endif);
+    } else {
+      auto endOfPrevious = P.getEndOfPreviousLoc();
+      P.diagnose(endOfPrevious, diag::declaration_same_line_without_semi)
+        .fixItInsert(endOfPrevious, ";");
+    }
   }
 
   auto Result = P.parseDecl(Options, handler);
@@ -4661,26 +4688,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     // space or newline accidentally.
     if (Tok.isIdentifierOrUnderscore() && SimpleName.str().back() != '<') {
       diagnose(Tok.getLoc(), diag::repeated_identifier, "function");
-
-      SourceRange DoubleIdentifierRange(NameLoc, Tok.getLoc());
-
-      // Provide two fix-its: a direct concatenation of the two identifiers
-      // and a camel-cased version.
-
-      auto DirectConcatenation = NameTok.getText().str() + Tok.getText().str();
-
-      diagnose(Tok.getLoc(), diag::join_identifiers)
-        .fixItReplace(DoubleIdentifierRange, DirectConcatenation);
-
-      SmallString<8> CapitalizedScratch;
-      auto Capitalized = camel_case::toSentencecase(Tok.getText(),
-                                                    CapitalizedScratch);
-      auto CamelCaseConcatenation = NameTok.getText().str() + Capitalized.str();
-
-      if (DirectConcatenation != CamelCaseConcatenation)
-        diagnose(Tok.getLoc(), diag::join_identifiers_camel_case)
-          .fixItReplace(DoubleIdentifierRange, CamelCaseConcatenation);
-
+      diagnoseConsecutiveIDs(NameTok, Tok);
       consumeToken();
     }
   }
@@ -4941,6 +4949,14 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     ED->setGenericParams(GenericParams);
   }
 
+  // Add a fix-it to remove the space in consecutive identifiers
+  // in an enum decl.
+  if (Tok.is(tok::identifier)) {
+    diagnose(Tok.getLoc(), diag::repeated_identifier, "enum");
+    diagnoseConsecutiveIDs(L->getTokenAt(EnumNameLoc), Tok);
+    consumeToken();
+  }
+
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
     LBLoc = PreviousLoc;
@@ -5196,6 +5212,14 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     SD->setGenericParams(GenericParams);
   }
 
+  // Add a fix-it to remove the space in consecutive identifiers
+  // in a struct decl.
+  if (Tok.is(tok::identifier)) {
+    diagnose(Tok.getLoc(), diag::repeated_identifier, "struct");
+    diagnoseConsecutiveIDs(L->getTokenAt(StructNameLoc), Tok);
+    consumeToken();
+  }
+  
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
     LBLoc = PreviousLoc;
@@ -5277,6 +5301,14 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
     if (whereStatus.shouldStopParsing())
       return whereStatus;
     CD->setGenericParams(GenericParams);
+  }
+
+  // Add a fix-it to remove the space in consecutive identifiers
+  // in a class decl.
+  if (Tok.is(tok::identifier)) {
+    diagnose(Tok.getLoc(), diag::repeated_identifier, "class");
+    diagnoseConsecutiveIDs(L->getTokenAt(ClassNameLoc), Tok);
+    consumeToken();
   }
 
   SourceLoc LBLoc, RBLoc;
