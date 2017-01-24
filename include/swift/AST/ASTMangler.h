@@ -121,6 +121,11 @@ public:
 
   std::string mangleDeclAsUSR(ValueDecl *Decl, StringRef USRPrefix);
 
+  std::string mangleAccessorEntityAsUSR(AccessorKind kind,
+                                        AddressorKind addressorKind,
+                                        const ValueDecl *decl,
+                                        StringRef USRPrefix);
+
 protected:
 
   void appendSymbolKind(SymbolKind SKind);

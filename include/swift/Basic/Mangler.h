@@ -35,7 +35,8 @@ bool useNewMangling();
 /// Also performs test to check if the demangling of both string yield the same
 /// demangling tree.
 /// TODO: remove this function when the old mangling is removed.
-std::string selectMangling(const std::string &Old, const std::string &New);
+std::string selectMangling(const std::string &Old, const std::string &New,
+                           bool compareTrees = true);
 
 void printManglingStats();
 

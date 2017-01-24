@@ -44,7 +44,10 @@ std::string NewMangling::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   std::string Old = OldMangler.finalize();
   ASTMangler NewMangler(/* DWARF */ true);
   std::string New = NewMangler.mangleTypeForDebugger(Ty, DC);
-  return selectMangling(Old, New);
+
+  // The old mangling is broken in some cases, so we don't check if the new
+  // mangling is equivalent to the old mangling.
+  return selectMangling(Old, New, /*compareTrees*/ false);
 }
 
 std::string NewMangling::mangleTypeAsUSR(Type Ty) {
@@ -297,6 +300,16 @@ std::string ASTMangler::mangleDeclAsUSR(ValueDecl *Decl, StringRef USRPrefix) {
   }
   return finalize();
 }
+
+std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
+                                                  AddressorKind addressorKind,
+                                                  const ValueDecl *decl,
+                                                  StringRef USRPrefix) {
+  Buffer << USRPrefix;
+  appendAccessorEntity(kind, addressorKind, decl, /*isStatic*/ false);
+  return finalize();
+}
+
 
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
