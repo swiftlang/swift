@@ -297,9 +297,8 @@ private:
   /// FIXME: Horrible, horrible hack for \c loadModule().
   unsigned ImportCounter = 0;
 
-  /// \brief The value of \c ImportCounter last time when imported modules were
-  /// verified.
-  unsigned VerifiedImportCounter = 0;
+  /// \brief Used to avoid running the AST verifier over the same declarations.
+  size_t VerifiedDeclsCounter = 0;
 
   /// \brief Clang compiler invocation.
   std::shared_ptr<clang::CompilerInvocation> Invocation;
