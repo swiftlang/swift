@@ -19,7 +19,9 @@ protocol ProtocolB {
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[BORROWED_ARG]]
 // CHECK:   [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
 // CHECK:   [[WITNESS_METHOD:%.*]] = witness_method $@opened({{.*}}) ProtocolA, #ProtocolA.intProp!getter.1 : {{.*}}, [[PROJECTION]]
-// CHECK:   [[RESULT:%.*]] = apply [[WITNESS_METHOD]]<@opened{{.*}}>([[PROJECTION_COPY]])
+// CHECK:   [[BORROWED_PROJECTION_COPY:%.*]] = begin_borrow [[PROJECTION_COPY]]
+// CHECK:   [[RESULT:%.*]] = apply [[WITNESS_METHOD]]<@opened{{.*}}>([[BORROWED_PROJECTION_COPY]])
+// CHECK:   end_borrow [[BORROWED_PROJECTION_COPY]] from [[PROJECTION_COPY]]
 // CHECK:   destroy_value [[PROJECTION_COPY]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
@@ -35,7 +37,9 @@ func getIntPropExistential(_ a: ProtocolA) -> Int {
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[BORROWED_ARG]]
 // CHECK:   [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
 // CHECK:   [[WITNESS_METHOD:%.*]] = witness_method $@opened({{.*}}) ProtocolA, #ProtocolA.intProp!setter.1 : {{.*}}, [[PROJECTION]]
-// CHECK:   apply [[WITNESS_METHOD]]<@opened{{.*}}>({{%.*}}, [[PROJECTION_COPY]])
+// CHECK:   [[BORROWED_PROJECTION_COPY:%.*]] = begin_borrow [[PROJECTION_COPY]]
+// CHECK:   apply [[WITNESS_METHOD]]<@opened{{.*}}>({{%.*}}, [[BORROWED_PROJECTION_COPY]])
+// CHECK:   end_borrow [[BORROWED_PROJECTION_COPY]] from [[PROJECTION_COPY]]
 // CHECK:   destroy_value [[PROJECTION_COPY]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]

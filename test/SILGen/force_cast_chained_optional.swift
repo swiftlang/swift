@@ -25,9 +25,11 @@ class D: C {}
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<Bar>
 // CHECK:   [[BAR:%.*]] = load [copy] [[PAYLOAD_ADDR]]
 // CHECK:   [[METHOD:%.*]] = class_method [[BAR]] : $Bar, #Bar.bas!getter.1 : (Bar) -> () -> C!, $@convention(method) (@guaranteed Bar) ->
-// CHECK:   apply [[METHOD]]([[BAR]])
-// CHECK:   destroy_value [[BAR]]
+// CHECK:   [[BORROWED_BAR:%.*]] = begin_borrow [[BAR]]
+// CHECK:   apply [[METHOD]]([[BORROWED_BAR]])
+// CHECK:   end_borrow [[BORROWED_BAR]] from [[BAR]]
 // CHECK:   unconditional_checked_cast {{%.*}} : $C to $D
+// CHECK:   destroy_value [[BAR]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 //
 // CHECK: [[TRAP]]:
