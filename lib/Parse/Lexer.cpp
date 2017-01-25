@@ -678,6 +678,19 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
   }
 }
 
+static bool rangeContainsPlaceholderEnd(const char *CurPtr,
+                                        const char *End) {
+  while (CurPtr++ < End - 1) {
+    if (*CurPtr== '\n') {
+      return false;
+    }
+    if (CurPtr[0] == '#' && CurPtr[1] == '>') {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// lexOperatorIdentifier - Match identifiers formed out of punctuation.
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
@@ -697,6 +710,10 @@ void Lexer::lexOperatorIdentifier() {
     // started with a '.'.
     if (*CurPtr == '.' && *TokStart != '.')
       break;
+    if (Identifier::isEditorPlaceholder(StringRef(CurPtr, 2)) &&
+        rangeContainsPlaceholderEnd(CurPtr + 2, BufferEnd)) {
+      break;
+    }
   } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
   if (CurPtr-TokStart > 2) {
