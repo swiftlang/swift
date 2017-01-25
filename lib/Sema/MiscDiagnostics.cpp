@@ -2826,6 +2826,19 @@ parseObjCSelector(ASTContext &ctx, StringRef string) {
   return ObjCSelector(ctx, pieces.size(), pieces);
 }
 
+// Prevents type names from appearing in selector fixits when the target
+// function is accessible in the current context without an explicit type name.
+static bool shouldAddTypeNameToSelectorFixit(const DeclContext *DC,
+                                             const AbstractFunctionDecl *method) {
+  if (auto innerDC = DC->getInnermostTypeContext()) {
+    if (auto innerClass = innerDC->getAsClassOrClassExtensionContext()) {
+      if (innerClass->findImplementingMethod(method)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
 
 namespace {
 
@@ -3121,21 +3134,8 @@ public:
 
         // Only print the type name if the function is implemented outside the
         // current class.
-        {
-          auto shouldAddNominalTypeName = [&]() {
-            if (auto innerDC = DC->getInnermostTypeContext()) {
-              if (auto innerClass = innerDC->getAsClassOrClassExtensionContext()) {
-                if (innerClass->findImplementingMethod(bestMethod)) {
-                  return false;
-                }
-              }
-            }
-            return true;
-          };
-
-          if (shouldAddNominalTypeName()) {
-            out << nominal->getName().str() << ".";
-          }
+        if (shouldAddTypeNameToSelectorFixit(DC, bestMethod)) {
+          out << nominal->getName().str() << ".";
         }
 
         out << name.getBaseName().str();
