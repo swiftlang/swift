@@ -28,6 +28,7 @@ namespace swift {
   class Expr;
   class InFlightDiagnostic;
   class Stmt;
+  class SourceFile;
   class TypeChecker;
   class ValueDecl;
 
@@ -41,6 +42,9 @@ void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
 void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
                                         AbstractFunctionDecl *AFD);
+
+/// Perform diagnostics on the top level code.
+void performTopLevelDeclDiagnostics(SourceFile &MainFile);
   
 /// Emit a fix-it to set the accessibility of \p VD to \p desiredAccess.
 ///
