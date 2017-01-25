@@ -2,7 +2,6 @@
 // -- Check that we can successfully round-trip.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -D IRGEN -emit-ir %s >/dev/null
 
-// REQUIRES: SR-3713
 // REQUIRES: objc_interop
 
 import Foundation
