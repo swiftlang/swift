@@ -2,7 +2,7 @@
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule -module-name resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule -module-name resilient_class %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
 
@@ -32,11 +32,11 @@ public class Parent {
 }
 
 public class Child : Parent {
-  // CHECK-LABEL: sil @_TFC5super5Childg8propertySS : $@convention(method) (@guaranteed Child) -> @owned String {
+  // CHECK-LABEL: sil @_T05super5ChildC8propertySSfg : $@convention(method) (@guaranteed Child) -> @owned String {
   // CHECK:       bb0([[SELF:%.*]] : $Child):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $Child to $Parent
-  // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @_TFC5super6Parentg8propertySS : $@convention(method) (@guaranteed Parent) -> @owned String
+  // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @_T05super6ParentC8propertySSfg : $@convention(method) (@guaranteed Parent) -> @owned String
   // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
   // CHECK:         destroy_value [[CASTED_SELF_COPY]]
   // CHECK:         return [[RESULT]]
@@ -44,11 +44,11 @@ public class Child : Parent {
     return super.property
   }
 
-  // CHECK-LABEL: sil @_TFC5super5Childg13otherPropertySS : $@convention(method) (@guaranteed Child) -> @owned String {
+  // CHECK-LABEL: sil @_T05super5ChildC13otherPropertySSfg : $@convention(method) (@guaranteed Child) -> @owned String {
   // CHECK:       bb0([[SELF:%.*]] : $Child):
   // CHECK:         [[COPIED_SELF:%.*]] = copy_value [[SELF]]
   // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[COPIED_SELF]] : $Child to $Parent
-  // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @_TFC5super6Parentg13finalPropertySS
+  // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @_T05super6ParentC13finalPropertySSfg
   // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
   // CHECK:         destroy_value [[CASTED_SELF_COPY]]
   // CHECK:         return [[RESULT]]
@@ -58,25 +58,25 @@ public class Child : Parent {
 }
 
 public class Grandchild : Child {
-  // CHECK-LABEL: sil @_TFC5super10Grandchild16onlyInGrandchildfT_T_
+  // CHECK-LABEL: sil @_T05super10GrandchildC06onlyInB0yyF
   public func onlyInGrandchild() {
-    // CHECK: function_ref @_TFC5super6Parent18methodOnlyInParentfT_T_ : $@convention(method) (@guaranteed Parent) -> ()
+    // CHECK: function_ref @_T05super6ParentC012methodOnlyInB0yyF : $@convention(method) (@guaranteed Parent) -> ()
     super.methodOnlyInParent()
-    // CHECK: function_ref @_TFC5super6Parent23finalMethodOnlyInParentfT_T_
+    // CHECK: function_ref @_T05super6ParentC017finalMethodOnlyInB0yyF
     super.finalMethodOnlyInParent()
   }
 
-  // CHECK-LABEL: sil @_TFC5super10Grandchild6methodfT_T_
+  // CHECK-LABEL: sil @_T05super10GrandchildC6methodyyF
   public override func method() {
-    // CHECK: function_ref @_TFC5super6Parent6methodfT_T_ : $@convention(method) (@guaranteed Parent) -> ()
+    // CHECK: function_ref @_T05super6ParentC6methodyyF : $@convention(method) (@guaranteed Parent) -> ()
     super.method()
   }
 }
 
 public class GreatGrandchild : Grandchild {
-  // CHECK-LABEL: sil @_TFC5super15GreatGrandchild6methodfT_T_
+  // CHECK-LABEL: sil @_T05super15GreatGrandchildC6methodyyF
   public override func method() {
-    // CHECK: function_ref @_TFC5super10Grandchild6methodfT_T_ : $@convention(method) (@guaranteed Grandchild) -> ()
+    // CHECK: function_ref @_T05super10GrandchildC6methodyyF : $@convention(method) (@guaranteed Grandchild) -> ()
     super.method()
   }
 }

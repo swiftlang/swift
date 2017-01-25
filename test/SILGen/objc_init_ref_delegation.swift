@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import gizmo
 
 extension Gizmo {
-  // CHECK-LABEL: sil hidden @_TFE24objc_init_ref_delegationCSo5Gizmoc
+  // CHECK-LABEL: sil hidden @_T0So5GizmoC24objc_init_ref_delegationE{{[_0-9a-zA-Z]*}}fc
   convenience init(int i: Int) {
     // CHECK: bb0([[I:%[0-9]+]] : $Int, [[ORIG_SELF:%[0-9]+]] : $Gizmo):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Gizmo }

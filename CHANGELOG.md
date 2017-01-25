@@ -17,6 +17,28 @@ CHANGELOG
 
 </details>
 
+* More types of C macros which define integer constants are supported by the
+  importer. Specifically the `+, -, *, /, ^, >>, ==, <, <=, >, >=` operators
+  are now recognised, and the previously-supported `<<, &&, ||, &, |` 
+  operators always look through importable macros on each side of the operator.
+  Logical AND and OR macros (`&&` and `||`) are now imported as Boolean 
+  constants, rather than integers of value 0 or 1.
+
+  ```c
+  #define HIGHER    (5 + 5)
+  #define THE_EDGE  (INT64_MAX - 1)
+  #define FORTY_TWO (6 * 9)
+  #define SPLIT     (THE_EDGE / FORTY_TWO)
+
+  #define HALF_AND_HALF (UINT64_MAX ^ UINT32_MAX)
+
+  #define SMALL   (BITWIDTH == 32)
+  #define TINY    (BITWIDTH <= 16)
+  #define LIMITED (SMALL || TINY)   // now imported as Bool.
+  ```
+
+  **Add new entries to the top of this file, not here!**
+
 Swift 3.1
 ---------
 
@@ -143,8 +165,6 @@ Swift 3.1
   satisfying a predicate.  `drop(while:)` requests the remaining
   subsequence after dropping the longest subsequence satisfying a
   predicate.
-
-**Add new entries to the top of this file, not here!**
 
 Swift 3.0
 ---------

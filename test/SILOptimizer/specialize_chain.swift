@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -O -Xllvm -sil-disable-pass="Function Signature Optimization" -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -O -Xllvm -sil-disable-pass="Function Signature Optimization" -emit-sil -primary-file %s | %FileCheck %s
 
 // We can't deserialize apply_inst with subst lists. When radar://14443304
 // is fixed then we should convert this test to a SIL test.
@@ -35,16 +35,16 @@ func exp1() {
   var II = YYY<Int>(t: 5)
   print(II.AAA9(t: 4), terminator: "")
 }
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA9
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA8
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA7
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA6
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA5
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA4
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA3
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA2
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA1
+//CHECK: sil shared [noinline] @_T016specialize_chain3YYYV4AAA9{{[_0-9a-zA-Z]*}}FSi_Tg5
+//CHECK: sil shared [noinline] @_T016specialize_chain3YYYV4AAA8{{[_0-9a-zA-Z]*}}FSi_Tg5
+//CHECK: sil shared [noinline] @_T016specialize_chain3YYYV4AAA7{{[_0-9a-zA-Z]*}}FSi_Tg5
+//CHECK: sil shared [noinline] @_T016specialize_chain3YYYV4AAA6{{[_0-9a-zA-Z]*}}FSi_Tg5
+//CHECK: sil shared [noinline] @_T016specialize_chain3YYYV4AAA5{{[_0-9a-zA-Z]*}}FSi_Tg5
+//CHECK: sil shared [noinline] @_T016specialize_chain3YYYV4AAA4{{[_0-9a-zA-Z]*}}FSi_Tg5
+//CHECK: sil shared [noinline] @_T016specialize_chain3YYYV4AAA3{{[_0-9a-zA-Z]*}}FSi_Tg5
+//CHECK: sil shared [noinline] @_T016specialize_chain3YYYV4AAA2{{[_0-9a-zA-Z]*}}FSi_Tg5
+//CHECK: sil shared [noinline] @_T016specialize_chain3YYYV4AAA1{{[_0-9a-zA-Z]*}}FSi_Tg5
 //CHECK: exp1
-//CHECK: function_ref @_TTSg5Si___TFV16specialize_chain3YYYC
-//CHECK: function_ref @_TTSg5Si___TFV16specialize_chain3YYY4AAA9
+//CHECK: function_ref @_T016specialize_chain3YYYV{{[_0-9a-zA-Z]*}}fCSi_Tg5
+//CHECK: function_ref @_T016specialize_chain3YYYV4AAA9{{[_0-9a-zA-Z]*}}FSi_Tg5
 //CHECK: return

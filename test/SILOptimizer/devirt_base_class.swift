@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil %s | %FileCheck %s
 
 public class Base1 { @inline(never) func f() -> Int { return 0 } }
 
@@ -34,7 +34,7 @@ private func foo(_ a: A) -> Int {
 
 // Check that invocation of addConstraint() gets completely devirtualized and inlined
 //
-// CHECK-LABEL: sil private [noinline] @{{.*}}_TFC17devirt_base_classP33_C1ED27807F941A622F32D66AB60A15CD2F24test
+// CHECK-LABEL: sil private [noinline] @_T017devirt_base_class2F233_{{.*}}4test
 // CHECK-NOT: class_method
 // CHECK-NOT: function_ref
 // CHECK: return

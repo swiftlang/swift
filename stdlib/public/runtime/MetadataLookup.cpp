@@ -231,7 +231,6 @@ _typeByMangledName(const llvm::StringRef typeName) {
 /// by swift_getTypeName() is non-unique, so we used mangled names
 /// internally.
 SWIFT_RUNTIME_EXPORT
-extern "C"
 const Metadata *
 swift_getTypeByMangledName(const char *typeName, size_t typeNameLength) {
   llvm::StringRef name(typeName, typeNameLength);

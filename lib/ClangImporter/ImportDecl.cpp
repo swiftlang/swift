@@ -7177,8 +7177,14 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     // Create the expression node.
     StringRef printedValueCopy(context.AllocateCopy(printedValue));
     if (value.getKind() == clang::APValue::Int) {
-      expr = new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
-                                              /*Implicit=*/true);
+      if (type->getCanonicalType()->isBool()) {
+        expr = new (context) BooleanLiteralExpr(value.getInt().getBoolValue(),
+                                                SourceLoc(),
+                                                /**Implicit=*/true);
+      } else {
+        expr = new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
+                                                /*Implicit=*/true);
+      }
     } else {
       expr = new (context) FloatLiteralExpr(printedValueCopy, SourceLoc(),
                                             /*Implicit=*/true);

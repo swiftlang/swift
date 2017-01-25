@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend %s -O -emit-sil -enable-testing | %FileCheck -check-prefix=CHECK-TESTING %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -emit-sil -enable-testing | %FileCheck -check-prefix=CHECK-TESTING %s
 
 // Check if cycles are removed.
 
@@ -22,7 +22,7 @@ class Base {
 	}
 
 	@inline(never)
-	func deadMethod() {
+	func DeadMethod() {
 		// introduces a cycle
 		testClasses(self)
 	}
@@ -55,7 +55,7 @@ class Derived : Base {
 	}
 
 	@inline(never)
-	override func deadMethod() {
+	override func DeadMethod() {
 	}
 
 	@inline(never)
@@ -105,7 +105,7 @@ func testWithOther(_ o: Other) {
 
 // Check if dead methods of classes with higher visibility are removed.
 
-public class PublicClass {
+public class PublicCl {
 	func publicClassMethod() {
 	}
 }
@@ -115,7 +115,7 @@ public class PublicClass {
 protocol Prot {
 	func aliveWitness()
 
-	func deadWitness()
+	func DeadWitness()
 }
 
 struct Adopt : Prot {
@@ -124,7 +124,7 @@ struct Adopt : Prot {
 	}
 
 	@inline(never)
-	func deadWitness() {
+	func DeadWitness() {
 	}
 }
 
@@ -151,50 +151,50 @@ internal func donotEliminate() {
 
 // CHECK-NOT: sil {{.*}}inCycleA
 // CHECK-NOT: sil {{.*}}inCycleB
-// CHECK-NOT: sil {{.*}}deadMethod
-// CHECK-NOT: sil {{.*}}deadWitness
+// CHECK-NOT: sil {{.*}}DeadMethod
+// CHECK-NOT: sil {{.*}}DeadWitness
 // CHECK-NOT: sil {{.*}}publicClassMethod
 
 // CHECK-TESTING: sil {{.*}}inCycleA
 // CHECK-TESTING: sil {{.*}}inCycleB
-// CHECK-TESTING: sil {{.*}}deadMethod
+// CHECK-TESTING: sil {{.*}}DeadMethod
 // CHECK-TESTING: sil {{.*}}publicClassMethod
-// CHECK-TESTING: sil {{.*}}deadWitness
+// CHECK-TESTING: sil {{.*}}DeadWitness
 
-// CHECK-LABEL: @_TF25dead_function_elimination14donotEliminateFT_T_
+// CHECK-LABEL: @_T025dead_function_elimination14donotEliminateyyF
 
 // CHECK-LABEL: sil_vtable Base
 // CHECK: aliveMethod
 // CHECK: calledWithSuper
-// CHECK-NOT: deadMethod
+// CHECK-NOT: DeadMethod
 // CHECK-NOT: baseNotCalled
 // CHECK: notInDerived
 // CHECK-NOT: notInOther
 
 // CHECK-TESTING-LABEL: sil_vtable Base
-// CHECK-TESTING: deadMethod
+// CHECK-TESTING: DeadMethod
 
 // CHECK-LABEL: sil_vtable Derived
 // CHECK: aliveMethod
-// CHECK-NOT: deadMethod
+// CHECK-NOT: DeadMethod
 // CHECK: baseNotCalled
 // CHECK: notInDerived
 // CHECK: notInOther
 
 // CHECK-TESTING-LABEL: sil_vtable Derived
-// CHECK-TESTING: deadMethod
+// CHECK-TESTING: DeadMethod
 
 // CHECK-LABEL: sil_vtable Other
 // CHECK: aliveMethod
-// CHECK-NOT: deadMethod
+// CHECK-NOT: DeadMethod
 // CHECK: baseNotCalled
 // CHECK: notInDerived
 // CHECK: notInOther
 
 // CHECK-LABEL: sil_witness_table hidden Adopt: Prot
 // CHECK: aliveWitness!1: @{{.*}}aliveWitness
-// CHECK: deadWitness!1: nil
+// CHECK: DeadWitness!1: nil
 
 // CHECK-TESTING-LABEL: sil_witness_table [fragile] Adopt: Prot
-// CHECK-TESTING: deadWitness{{.*}}: @{{.*}}deadWitness
+// CHECK-TESTING: DeadWitness{{.*}}: @{{.*}}DeadWitness
 

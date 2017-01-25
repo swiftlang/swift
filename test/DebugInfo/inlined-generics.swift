@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-inline-generics=true %s -O -emit-sil -g -o - -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-inline-generics=true %s -O -emit-sil -g -o - -emit-ir | %FileCheck %s
 public protocol P {
   associatedtype DT1
   func getDT() -> DT1
@@ -10,7 +10,7 @@ func foo1<T:P>(_ t: T, _ dt: T.DT1) -> T.DT1 {
   return dttmp
 }
 
-// CHECK: define {{.*}}@_TF4main4foo2uRxS_1PrFxT_
+// CHECK: define {{.*}}@_T04main4foo2yxAA1PRzlF
 public func foo2<S:P>(_ s: S) {
   // CHECK: call void @llvm.dbg.value(metadata %swift.type* %S.DT1, i64 0,
   // CHECK-SAME:                     metadata ![[META:[0-9]+]]

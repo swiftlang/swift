@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 class Foo {
-  // CHECK-LABEL: sil hidden @_TFC30dynamic_self_reference_storage3Foo11dynamicSelf
+  // CHECK-LABEL: sil hidden @_T030dynamic_self_reference_storage3FooC0A4Self{{[_0-9a-zA-Z]*}}F
   func dynamicSelf() -> Self {
     // CHECK: debug_value {{%.*}} : $Foo
     let managedSelf = self

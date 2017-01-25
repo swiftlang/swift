@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 class C {
   init(x: Int) {}
@@ -20,47 +20,47 @@ extension P {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TF18partial_apply_init24class_init_partial_apply
+// CHECK-LABEL: sil hidden @_T018partial_apply_init06class_c1_a1_B0{{[_0-9a-zA-Z]*}}F
 func class_init_partial_apply(c: C.Type) {
   // Partial applications at the static metatype use the direct (_TTd) thunk.
-  // CHECK: function_ref @_TTdFC18partial_apply_init1CC
+  // CHECK: function_ref @_T018partial_apply_init1CC{{[_0-9a-zA-Z]*}}fCTcTd
   let xC: (Int) -> C = C.init
-  // CHECK: function_ref @_TTdFC18partial_apply_init1CC
+  // CHECK: function_ref @_T018partial_apply_init1CC{{[_0-9a-zA-Z]*}}fCTcTd
   let requiredC: (Double) -> C = C.init
 
   // Partial applications to a dynamic metatype must be dynamically dispatched and use
   // the normal thunk.
-  // CHECK: function_ref @_TFC18partial_apply_init1CC
+  // CHECK: function_ref @_T018partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
   let requiredM: (Double) -> C = c.init
 }
 
-// CHECK-LABEL: sil shared [thunk] @_TTdFC18partial_apply_init1CC
-// CHECK:         function_ref @_TFC18partial_apply_init1CC
-// CHECK-LABEL: sil shared [thunk] @_TTdFC18partial_apply_init1CC
-// CHECK:         function_ref @_TFC18partial_apply_init1CC
-// CHECK-LABEL: sil shared [thunk] @_TFC18partial_apply_init1CC
+// CHECK-LABEL: sil shared [thunk] @_T018partial_apply_init1CC{{[_0-9a-zA-Z]*}}fCTcTd
+// CHECK:         function_ref @_T018partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
+// CHECK-LABEL: sil shared [thunk] @_T018partial_apply_init1CC{{[_0-9a-zA-Z]*}}fCTcTd
+// CHECK:         function_ref @_T018partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
+// CHECK-LABEL: sil shared [thunk] @_T018partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
 // CHECK:         class_method %0 : $@thick C.Type, #C.init!allocator.1
 
-// CHECK-LABEL: sil hidden @_TF18partial_apply_init28archetype_init_partial_apply
+// CHECK-LABEL: sil hidden @_T018partial_apply_init010archetype_c1_a1_B0{{[_0-9a-zA-Z]*}}F
 func archetype_init_partial_apply<T: C where T: P>(t: T.Type) {
   // Archetype initializations are always dynamic, whether applied to the type or a metatype.
-  // CHECK: function_ref @_TFC18partial_apply_init1CC
+  // CHECK: function_ref @_T018partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
   let requiredT: (Double) -> T = T.init
-  // CHECK: function_ref @_TFP18partial_apply_init1PC
+  // CHECK: function_ref @_T018partial_apply_init1PP{{[_0-9a-zA-Z]*}}fC
   let protoT: (String) -> T = T.init
-  // CHECK: function_ref @_TFE18partial_apply_initPS_1PC
+  // CHECK: function_ref @_T018partial_apply_init1PPAAE{{[_0-9a-zA-Z]*}}fC
   let protoExtT: (Float) -> T = T.init
 
-  // CHECK: function_ref @_TFC18partial_apply_init1CC
+  // CHECK: function_ref @_T018partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
   let requiredM: (Double) -> T = t.init
-  // CHECK: function_ref @_TFP18partial_apply_init1PC
+  // CHECK: function_ref @_T018partial_apply_init1PP{{[_0-9a-zA-Z]*}}fC
   let protoM: (String) -> T = t.init
-  // CHECK: function_ref @_TFE18partial_apply_initPS_1PC
+  // CHECK: function_ref @_T018partial_apply_init1PPAAE{{[_0-9a-zA-Z]*}}fC
   let protoExtM: (Float) -> T = t.init
 }
 
-// CHECK-LABEL: sil shared [thunk] @_TFP18partial_apply_init1PC
+// CHECK-LABEL: sil shared [thunk] @_T018partial_apply_init1PP{{[_0-9a-zA-Z]*}}fC
 // CHECK:         witness_method $Self, #P.init!allocator.1
-// CHECK-LABEL: sil shared [thunk] @_TFE18partial_apply_initPS_1PC
-// CHECK:         function_ref @_TFE18partial_apply_initPS_1PC
+// CHECK-LABEL: sil shared [thunk] @_T018partial_apply_init1PPAAE{{[_0-9a-zA-Z]*}}fC
+// CHECK:         function_ref @_T018partial_apply_init1PPAAE{{[_0-9a-zA-Z]*}}fC
 

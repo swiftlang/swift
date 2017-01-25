@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 class Foo {
   var bar: Bar!
@@ -11,7 +11,7 @@ class Bar {
 class C {}
 class D: C {}
 
-// CHECK-LABEL: sil hidden @_TF27force_cast_chained_optional4testFCS_3FooCS_1D
+// CHECK-LABEL: sil hidden @_T027force_cast_chained_optional4testAA1DCAA3FooCF
 // CHECK:         class_method %0 : $Foo, #Foo.bar!getter.1 : (Foo) -> () -> Bar! , $@convention(method) (@guaranteed Foo) ->
 // CHECK:         select_enum_addr
 // CHECK:         cond_br {{%.*}}, [[SOME_BAR:bb[0-9]+]], [[NO_BAR:bb[0-9]+]]

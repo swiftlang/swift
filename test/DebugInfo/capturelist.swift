@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
 class C {
   func withClosure(_ : () -> ()) -> () {}
 
   func f() {
-    // CHECK: define{{.*}}_TFFC11capturelist1C1fFT_T_U_FT_T_
+    // CHECK: define{{.*}}_T011capturelist1CC1fyyFyycfU_
     // There should not be a local weak variable "self" shadowing the
     // implicit self argument.
     // let self

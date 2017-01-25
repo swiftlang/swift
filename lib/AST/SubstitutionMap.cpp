@@ -22,23 +22,16 @@
 
 using namespace swift;
 
-Optional<ProtocolConformanceRef> SubstitutionMap::
-lookupConformance(ProtocolDecl *proto,
-                  ArrayRef<ProtocolConformanceRef> conformances) const {
-  for (ProtocolConformanceRef found : conformances) {
-    auto foundProto = found.getRequirement();
-    if (foundProto == proto)
-      return found;
-    if (foundProto->inheritsFrom(proto))
-      return found.getInherited(proto);
-  }
+template<typename T>
+Optional<T> SubstitutionMap::forEachParent(
+              CanType type,
+              llvm::SmallPtrSetImpl<CanType> &visitedParents,
+              llvm::function_ref<Optional<T>(CanType,
+                                             AssociatedTypeDecl *)> fn) const {
+  // If we've already visited the parents of this type, stop.
+  if (!visitedParents.insert(type).second)
+    return None;
 
-  return None;
-}
-
-template<typename Fn>
-Optional<ProtocolConformanceRef>
-SubstitutionMap::forEachParent(CanType type, Fn fn) const {
   auto foundParents = parentMap.find(type.getPointer());
   if (foundParents != parentMap.end()) {
     for (auto parent : foundParents->second) {
@@ -57,36 +50,118 @@ SubstitutionMap::forEachParent(CanType type, Fn fn) const {
   return None;
 }
 
-Optional<ProtocolConformanceRef>
-SubstitutionMap::lookupConformance(CanType type,
-                                   ProtocolDecl *proto) const {
+template<typename T>
+Optional<T> SubstitutionMap::forEachConformance(
+              CanType type,
+              llvm::SmallPtrSetImpl<CanType> &visitedParents,
+              llvm::function_ref<Optional<T>(ProtocolConformanceRef)> fn) const{
   // Check for conformances for the type that apply to the original
   // substituted archetype.
   auto foundReplacement = conformanceMap.find(type.getPointer());
   if (foundReplacement != conformanceMap.end()) {
-    auto substReplacement = foundReplacement->second;
-    if (auto conformance = lookupConformance(proto, substReplacement))
-      return conformance;
+    for (auto conformance : foundReplacement->second) {
+      if (auto found = fn(conformance))
+        return found;
+    }
   }
 
-  // Check if we have substitutions from one of our parent types.
-  return forEachParent(type, [&](CanType parent, AssociatedTypeDecl *assocType)
-      -> Optional<ProtocolConformanceRef> {
+  // Local function to performance a (recursive) search for an associated type
+  // of the given name in the given conformance and all inherited conformances.
+  std::function<Optional<T>(ProtocolConformanceRef, DeclName,
+                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &)>
+    searchInConformance;
+  searchInConformance =
+      [&](ProtocolConformanceRef conformance,
+          DeclName associatedTypeName,
+          llvm::SmallPtrSetImpl<ProtocolDecl *> &visited) -> Optional<T> {
+    // Only visit a particular protocol once.
+    auto proto = conformance.getRequirement();
+    if (!visited.insert(proto).second) return None;
 
-    auto *parentProto = assocType->getProtocol();
-    auto conformance = lookupConformance(parent, parentProto);
+    // Check whether this protocol has an associated type with the
+    // same name as the one we're looking for.
+    AssociatedTypeDecl *protoAssocType = nullptr;
+    for (auto member : proto->lookupDirect(associatedTypeName)) {
+      protoAssocType = dyn_cast<AssociatedTypeDecl>(member);
+      if (protoAssocType) break;
+    }
 
-    if (!conformance)
-      return None;
+    if (protoAssocType) {
+      if (conformance.isAbstract()) {
+        for (auto assocProto : protoAssocType->getConformingProtocols()) {
+          if (auto found = fn(ProtocolConformanceRef(assocProto)))
+            return found;
+        }
+      } else {
+       auto sub = conformance.getConcrete()->getTypeWitnessSubstAndDecl(
+                                           protoAssocType, nullptr).first;
+       for (auto subConformance : sub.getConformances()) {
+         if (auto found = fn(subConformance))
+           return found;
+       }
+      }
+    }
 
-    if (!conformance->isConcrete())
-      return ProtocolConformanceRef(proto);
+    // Search inherited conformances.
+    for (auto inherited : proto->getInheritedProtocols(nullptr)) {
+      if (auto found = searchInConformance(conformance.getInherited(inherited),
+                                           associatedTypeName,
+                                           visited))
+        return found;
+    }
+    return None;
+  };
 
-    auto sub = conformance->getConcrete()->getTypeWitnessSubstAndDecl(
-        assocType, nullptr).first;
-
-    return lookupConformance(proto, sub.getConformances());
+  // Check if we have conformances from one of our parent types.
+  return forEachParent<ProtocolConformanceRef>(type, visitedParents,
+      [&](CanType parent, AssociatedTypeDecl *assocType)
+         -> Optional<ProtocolConformanceRef> {
+    return forEachConformance<T>(parent, visitedParents,
+        [&](ProtocolConformanceRef conformance) -> Optional<T> {
+      llvm::SmallPtrSet<ProtocolDecl *, 4> visited;
+      return searchInConformance(conformance, assocType->getFullName(),
+                                 visited);
+    });
   });
+}
+
+Optional<ProtocolConformanceRef>
+SubstitutionMap::lookupConformance(
+                         CanType type, ProtocolDecl *proto,
+                         llvm::SmallPtrSetImpl<CanType> *visitedParents) const {
+  // Local function to either record an abstract conformance or return a
+  // concrete conformance. This allows us to
+  Optional<ProtocolConformanceRef> abstractConformance;
+  auto recordOrReturn = [&](ProtocolConformanceRef conformance)
+      -> Optional<ProtocolConformanceRef> {
+    if (conformance.isAbstract()) {
+      if (!abstractConformance)
+        abstractConformance = conformance;
+
+      return None;
+    }
+
+    return conformance;
+  };
+
+  llvm::SmallPtrSet<CanType, 4> visitedParentsStored;
+  if (!visitedParents)
+    visitedParents = &visitedParentsStored;
+
+  auto concreteConformance =
+    forEachConformance<ProtocolConformanceRef>(type, *visitedParents,
+        [&](ProtocolConformanceRef conformance)
+          -> Optional<ProtocolConformanceRef> {
+      if (conformance.getRequirement() == proto)
+        return recordOrReturn(conformance);
+
+      if (conformance.getRequirement()->inheritsFrom(proto))
+        return recordOrReturn(conformance.getInherited(proto));
+
+       return None;
+    });
+
+  return concreteConformance ? concreteConformance : abstractConformance;
 }
 
 void SubstitutionMap::
@@ -212,4 +287,52 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
   }
 
   return subMap;
+}
+
+void SubstitutionMap::dump(llvm::raw_ostream &out) const {
+  out << "Substitutions:\n";
+  for (const auto &sub : subMap) {
+    out.indent(2);
+    sub.first->print(out);
+    out << " -> ";
+    sub.second->print(out);
+    out << "\n";
+  }
+
+  out << "\nConformance map:\n";
+  for (const auto &conformances : conformanceMap) {
+    out.indent(2);
+    conformances.first->print(out);
+    out << " -> [";
+    interleave(conformances.second.begin(), conformances.second.end(),
+               [&](ProtocolConformanceRef conf) {
+                 conf.dump(out);
+               },
+               [&] {
+                 out << ", ";
+               });
+    out << "]\n";
+  }
+
+  out << "\nParent map:\n";
+  for (const auto &parent : parentMap) {
+    out.indent(2);
+    parent.first->print(out);
+    out << " -> [";
+    interleave(parent.second.begin(), parent.second.end(),
+               [&](SubstitutionMap::ParentType parentType) {
+                 parentType.first->print(out);
+                 out << " @ ";
+                 out << parentType.second->getProtocol()->getName().str()
+                     << "." << parentType.second->getName().str();
+               },
+               [&] {
+                 out << ", ";
+               });
+    out << "]\n";
+  }
+}
+
+void SubstitutionMap::dump() const {
+  return dump(llvm::errs());
 }

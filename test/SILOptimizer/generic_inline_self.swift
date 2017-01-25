@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -primary-file %s | %FileCheck %s
 
 // Test to ensure that mandatory inlining of generics with a dynamic Self
 // substitution works correctly with thick_metatype instructions and SIL
@@ -25,9 +25,9 @@ protocol P {
 class C : P {
   required init() {}
 
-// CHECK-LABEL: sil hidden @_TFC19generic_inline_self1C18returnsNewInstancefT_DS0_ : $@convention(method) (@guaranteed C) -> @owned C
+// CHECK-LABEL: sil hidden @_T019generic_inline_self1CC18returnsNewInstanceACXDyF : $@convention(method) (@guaranteed C) -> @owned C
 // CHECK:       bb0(%0 : $C):
-// CHECK:         [[FN:%.*]] = function_ref @_TF19generic_inline_self12makeInstanceuRxCS_1CrFMxx : $@convention(thin) <τ_0_0 where τ_0_0 : C> (@thick τ_0_0.Type) -> @owned τ_0_0
+// CHECK:         [[FN:%.*]] = function_ref @_T019generic_inline_self12makeInstancexxmAA1CCRbzlF : $@convention(thin) <τ_0_0 where τ_0_0 : C> (@thick τ_0_0.Type) -> @owned τ_0_0
 // CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self C.Type, %0 : $C
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]<@dynamic_self C>([[METATYPE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : C> (@thick τ_0_0.Type) -> @owned τ_0_0
 // CHECK-NEXT:    return [[RESULT]] : $C
@@ -35,7 +35,7 @@ class C : P {
     return makeInstance(type(of: self))
   }
 
-// CHECK-LABEL: sil hidden @_TFC19generic_inline_self1C29returnsNewInstanceTransparentfT_DS0_ : $@convention(method) (@guaranteed C) -> @owned C
+// CHECK-LABEL: sil hidden @_T019generic_inline_self1CC29returnsNewInstanceTransparentACXDyF : $@convention(method) (@guaranteed C) -> @owned C
 // CHECK:       bb0(%0 : $C):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thick @dynamic_self C.Type
 // CHECK-NEXT:    [[STATIC_METATYPE:%.*]] = upcast [[METATYPE]] : $@thick @dynamic_self C.Type to $@thick C.Type
@@ -47,7 +47,7 @@ class C : P {
     return makeInstanceTransparent(type(of: self))
   }
 
-// CHECK-LABEL: sil hidden @_TFC19generic_inline_self1C37returnsNewInstanceTransparentProtocolfT_DS0_ : $@convention(method) (@guaranteed C) -> @owned C
+// CHECK-LABEL: sil hidden @_T019generic_inline_self1CC37returnsNewInstanceTransparentProtocolACXDyF : $@convention(method) (@guaranteed C) -> @owned C
 // CHECK:       bb0(%0 : $C):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thick @dynamic_self C.Type
 // CHECK-NEXT:    [[STATIC_METATYPE:%.*]] = upcast [[METATYPE]] : $@thick @dynamic_self C.Type to $@thick C.Type
