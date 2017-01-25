@@ -424,6 +424,48 @@ func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) ->
   return f
 }
 
+// CHECK-LABEL: sil hidden @_TF19function_conversion25convTupleToOptionalDirectFFSiTSiSi_FSiGSqTSiSi__ : $@convention(thin) (@owned @callee_owned (Int) -> (Int, Int)) -> @owned @callee_owned (Int) -> Optional<(Int, Int)>
+// CHECK:         bb0(%0 : $@callee_owned (Int) -> (Int, Int)):
+// CHECK:           [[FN:%.*]] = copy_value %0
+// CHECK:           [[THUNK_FN:%.*]] = function_ref @_TTRXFo_dSi_dSidSi_XFo_dSi_dGSqTSiSi___
+// CHECK-NEXT:      [[THUNK:%.*]] = partial_apply [[THUNK_FN]]([[FN]])
+// CHECK-NEXT:      destroy_value %0
+// CHECK-NEXT:      return [[THUNK]]
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dSi_dSidSi_XFo_dSi_dGSqTSiSi___ : $@convention(thin) (Int, @owned @callee_owned (Int) -> (Int, Int)) -> Optional<(Int, Int)>
+// CHECK:         bb0(%0 : $Int, %1 : $@callee_owned (Int) -> (Int, Int)):
+// CHECK:           [[RESULT:%.*]] = apply %1(%0)
+// CHECK-NEXT:      [[LEFT:%.*]] = tuple_extract [[RESULT]]
+// CHECK-NEXT:      [[RIGHT:%.*]] = tuple_extract [[RESULT]]
+// CHECK-NEXT:      [[RESULT:%.*]] = tuple ([[LEFT]] : $Int, [[RIGHT]] : $Int)
+// CHECK-NEXT:      [[OPTIONAL:%.*]] = enum $Optional<(Int, Int)>, #Optional.some!enumelt.1, [[RESULT]]
+// CHECK-NEXT:      return [[OPTIONAL]]
+
+func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (Int, Int)? {
+  return f
+}
+
+// CHECK-LABEL: sil hidden @_TF19function_conversion27convTupleToOptionalIndirecturFFxTxx_FxGSqTxx__ : $@convention(thin) <T> (@owned @callee_owned (@in T) -> (@out T, @out T)) -> @owned @callee_owned (@in T) -> @out Optional<(T, T)>
+// CHECK:       bb0(%0 : $@callee_owned (@in T) -> (@out T, @out T)):
+// CHECK:         [[FN:%.*]] = copy_value %0
+// CHECK:         [[THUNK_FN:%.*]] = function_ref @_TTRGrXFo_ix_ixix_XFo_ix_iGSqTxx___
+// CHECK-NEXT:    [[THUNK:%.*]] = partial_apply [[THUNK_FN]]<T>([[FN]])
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    return [[THUNK]]
+
+// CHECK:       sil shared [transparent] [reabstraction_thunk] @_TTRGrXFo_ix_ixix_XFo_ix_iGSqTxx___ : $@convention(thin) <T> (@in T, @owned @callee_owned (@in T) -> (@out T, @out T)) -> @out Optional<(T, T)>
+// CHECK:       bb0(%0 : $*Optional<(T, T)>, %1 : $*T, %2 : $@callee_owned (@in T) -> (@out T, @out T)):
+// CHECK:         [[OPTIONAL:%.*]] = init_enum_data_addr %0 : $*Optional<(T, T)>, #Optional.some!enumelt.1
+// CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr %3 : $*(T, T), 0
+// CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr %3 : $*(T, T), 1
+// CHECK-NEXT:    apply %2([[LEFT]], [[RIGHT]], %1)
+// CHECK-NEXT:    inject_enum_addr %0 : $*Optional<(T, T)>, #Optional.some!enumelt.1
+// CHECK:         return
+
+func convTupleToOptionalIndirect<T>(_ f: @escaping (T) -> (T, T)) -> (T) -> (T, T)? {
+  return f
+}
+
 // ==== Make sure we support AnyHashable erasure
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion15convAnyHashableuRxs8HashablerFT1tx_T_
