@@ -52,7 +52,7 @@ bb0:
 // CHECK: G global_var
 sil_global [fragile] @global_var : $Builtin.Int32, @globalinit : $@convention(thin) () -> ()
 
-// CHECK: W _TWPurGV4main23ConformingGenericStructx_S_17ResilientProtocolS_
+// CHECK: W _T04main23ConformingGenericStructVyxGAA17ResilientProtocolAAlWP
 // DEMANGLE: W protocol witness table for <A> main.ConformingGenericStruct<A> : main.ResilientProtocol in main
 sil_witness_table <T> ConformingGenericStruct<T> : ResilientProtocol module protocol_resilience {
   method #ResilientProtocol.defaultA!1: @defaultA

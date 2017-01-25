@@ -14,29 +14,29 @@ class C {
 
 // CHECK: [[C:%T6vtable1CC]] = type <{ %swift.refcounted }>
 
-sil @_TFC6vtable1CCfMS0_FT_S0_ : $@convention(method) (@thick C.Type) -> @owned C
-sil @_TFC6vtable1CcfMS0_FT_S0_ : $@convention(method) (@owned C) -> @owned C
-sil @_TFC6vtable1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject
-sil @_TFC6vtable1CD : $@convention(method) (@owned C) -> ()
+sil @_T06vtable1CCACycACmcfC : $@convention(method) (@thick C.Type) -> @owned C
+sil @_T06vtable1CCACycACmcfc : $@convention(method) (@owned C) -> @owned C
+sil @_T06vtable1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject
+sil @_T06vtable1CCfD : $@convention(method) (@owned C) -> ()
 
-// CHECK-objc: @_TMfC6vtable1C = internal global [[C_METADATA_T:<{.*\* }>]] <{
-// CHECK-objc: void ([[C]]*)* @_TFC6vtable1CD,
-// CHECK-objc: i8** @_TWVBo,
-// CHECK-objc: i64 ptrtoint (%objc_class* @_TMmC6vtable1C to i64),
+// CHECK-objc: @_T06vtable1CCMf = internal global [[C_METADATA_T:<{.*\* }>]] <{
+// CHECK-objc: void ([[C]]*)* @_T06vtable1CCfD,
+// CHECK-objc: i8** @_T0BoWV,
+// CHECK-objc: i64 ptrtoint (%objc_class* @_T06vtable1CCMm to i64),
 // CHECK-objc: %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK-objc: %swift.opaque* @_objc_empty_cache,
 // CHECK-objc: %swift.opaque* null,
 // CHECK-objc: i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, i8*, i8*, i8*, i8*, i8* }* @_DATA__TtC6vtable1C to i64), i64 1),
 // CHECK-objc: i32 3, i32 0, i32 16, i16 7, i16 0,
 // CHECK-objc: i32 112, i32 16,
-// CHECK-objc: @_TMnC6vtable1C
-// CHECK-objc: [[C]]* (%swift.type*)* @_TFC6vtable1CCfMS0_FT_S0_,
-// CHECK-objc: [[C]]* ([[C]]*)* @_TFC6vtable1CcfMS0_FT_S0_
+// CHECK-objc: @_T06vtable1CCMn
+// CHECK-objc: [[C]]* (%swift.type*)* @_T06vtable1CCACycACmcfC,
+// CHECK-objc: [[C]]* ([[C]]*)* @_T06vtable1CCACycACmcfc
 // CHECK-objc: }>
 
-// CHECK-native: @_TMfC6vtable1C = internal global [[C_METADATA_T:<{.*\* }>]] <{
-// CHECK-native: void ([[C]]*)* @_TFC6vtable1CD,
-// CHECK-native: i8** @_TWVBo,
+// CHECK-native: @_T06vtable1CCMf = internal global [[C_METADATA_T:<{.*\* }>]] <{
+// CHECK-native: void ([[C]]*)* @_T06vtable1CCfD,
+// CHECK-native: i8** @_T0BoWV,
 // CHECK-native: i64 0,
 // CHECK-native: %swift.type* null,
 // CHECK-native: %swift.opaque* null,
@@ -44,12 +44,12 @@ sil @_TFC6vtable1CD : $@convention(method) (@owned C) -> ()
 // CHECK-native: i64 1,
 // CHECK-native: i32 3, i32 0, i32 16, i16 7, i16 0,
 // CHECK-native: i32 112, i32 16,
-// CHECK-native: @_TMnC6vtable1C
-// CHECK-native: [[C]]* (%swift.type*)* @_TFC6vtable1CCfMS0_FT_S0_,
-// CHECK-native: [[C]]* ([[C]]*)* @_TFC6vtable1CcfMS0_FT_S0_
+// CHECK-native: @_T06vtable1CCMn
+// CHECK-native: [[C]]* (%swift.type*)* @_T06vtable1CCACycACmcfC,
+// CHECK-native: [[C]]* ([[C]]*)* @_T06vtable1CCACycACmcfc
 // CHECK-native: }>
 
 sil_vtable C {
-  #C.init!allocator.1: _TFC6vtable1CCfMS0_FT_S0_
-  #C.init!initializer.1: _TFC6vtable1CcfMS0_FT_S0_
+  #C.init!allocator.1: _T06vtable1CCACycACmcfC
+  #C.init!initializer.1: _T06vtable1CCACycACmcfc
 }

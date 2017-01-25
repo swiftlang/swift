@@ -4,9 +4,9 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -I %t -linker -inline %s -o - | %FileCheck %s
 
 // CHECK: sil private @top_level_code
-// CHECK: sil public_external [fragile] @{{.*}}_TFVs1XCfT_S_
-// CHECK: sil public_external [fragile] @{{.*}}_TFs17the_thing_it_doesFT1xVs1X_T_
-// CHECK: sil shared_external [fragile] [noinline] @{{.*}}_TTSgq5Vs1X___TFs9the_thingurFT1tx_T_
+// CHECK: sil public_external [fragile] @_T0s1XVABycfC{{.*}}
+// CHECK: sil public_external [fragile] @_T0s17the_thing_it_doesys1XV1x_tF{{.*}}
+// CHECK: sil shared_external [fragile] [noinline] @_T0s9the_thingyx1t_tlFs1XV_Tgq5{{.*}}
 
 sil_stage canonical
 
@@ -20,12 +20,12 @@ sil private @top_level_code : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @x : $*X                       // users: %4, %6
   // function_ref Swift.X.init (Swift.X.Type)() -> Swift.X
-  %1 = function_ref @_TFVs1XCfT_S_ : $@convention(method) (@thin X.Type) -> X // user: %3
+  %1 = function_ref @_T0s1XVABycfC : $@convention(method) (@thin X.Type) -> X // user: %3
   %2 = metatype $@thin X.Type                     // user: %3
   %3 = apply %1(%2) : $@convention(method) (@thin X.Type) -> X  // user: %4
   store %3 to %0 : $*X                            // id: %4
   // function_ref Swift.the_thing_it_does (x : Swift.X) -> ()
-  %5 = function_ref @_TFs17the_thing_it_doesFT1xVs1X_T_ : $@convention(thin) (X) -> () // user: %7
+  %5 = function_ref @_T0s17the_thing_it_doesys1XV1x_tF : $@convention(thin) (X) -> () // user: %7
   %6 = load %0 : $*X                              // user: %7
   %7 = apply %5(%6) : $@convention(thin) (X) -> ()
   %8 = tuple ()                                   // user: %9
@@ -33,9 +33,9 @@ bb0:
 }
 
 // Swift.X.init (Swift.X.Type)() -> Swift.X
-sil @_TFVs1XCfT_S_ : $@convention(method) (@thin X.Type) -> X
+sil @_T0s1XVABycfC : $@convention(method) (@thin X.Type) -> X
 
 // Swift.the_thing_it_does (x : Swift.X) -> ()
-sil @_TFs17the_thing_it_doesFT1xVs1X_T_ : $@convention(thin) (X) -> ()
+sil @_T0s17the_thing_it_doesys1XV1x_tF : $@convention(thin) (X) -> ()
 
 
