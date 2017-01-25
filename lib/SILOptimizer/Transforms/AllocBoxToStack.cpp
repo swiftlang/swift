@@ -547,7 +547,7 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
 
   // Generate a new parameter list with deleted parameters removed.
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
-  unsigned Index = OrigFTI->getNumIndirectResults();
+  unsigned Index = 0;
   for (auto &param : OrigFTI->getParameters()) {
     if (count(PromotedParamIndices, Index)) {
       auto boxTy = param.getType()->castTo<SILBoxType>();
