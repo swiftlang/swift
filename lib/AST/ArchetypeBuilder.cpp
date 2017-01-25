@@ -63,6 +63,10 @@ void RequirementSource::dump(llvm::raw_ostream &out,
   case Inherited:
     out << "inherited";
     break;
+
+  case ProtocolRequirementSignatureSelf:
+    out << "protocol_requirement_signature_self";
+    break;
   }
 
   if (srcMgr && getLoc().isValid()) {
@@ -753,6 +757,7 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
     case RequirementSource::Protocol:
+    case RequirementSource::ProtocolRequirementSignatureSelf:
     case RequirementSource::Redundant:
       Protos.push_back(conforms.first);
       break;
@@ -1002,8 +1007,14 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   if (!T->addConformance(Proto, /*updateExistingSource=*/true, Source, *this))
     return false;
 
-  RequirementSource InnerSource(RequirementSource::Redundant, Source.getLoc());
-  
+  // Conformances to inherit protocols are explicit in a protocol requirement
+  // signature, but inferred from this conformance otherwise.
+  auto InnerKind =
+      Source.getKind() == RequirementSource::ProtocolRequirementSignatureSelf
+          ? RequirementSource::Explicit
+          : RequirementSource::Redundant;
+  RequirementSource InnerSource(InnerKind, Source.getLoc());
+
   bool inserted = Visited.insert(Proto).second;
   assert(inserted);
   (void) inserted;
@@ -1024,10 +1035,15 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
       auto AssocPA = T->getNestedType(AssocType, *this);
+      // Requirements introduced by the main protocol are explicit in a protocol
+      // requirement signature, but inferred from this conformance otherwise.
+      auto Kind = Source.getKind() ==
+                          RequirementSource::ProtocolRequirementSignatureSelf
+                      ? RequirementSource::Explicit
+                      : RequirementSource::Protocol;
+
       if (AssocPA != T) {
-        if (addAbstractTypeParamRequirements(AssocType, AssocPA,
-                                             RequirementSource::Protocol,
-                                             Visited))
+        if (addAbstractTypeParamRequirements(AssocType, AssocPA, Kind, Visited))
           return true;
       }
 
@@ -2060,7 +2076,7 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
 
 void ArchetypeBuilder::addGenericSignature(GenericSignature *sig) {
   if (!sig) return;
-  
+
   RequirementSource::Kind sourceKind = RequirementSource::Explicit;
   for (auto param : sig->getGenericParams())
     addGenericParameter(param);
@@ -2090,6 +2106,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
     case RequirementSource::Protocol:
     case RequirementSource::Redundant:
     case RequirementSource::Inherited:
+    case RequirementSource::ProtocolRequirementSignatureSelf:
       // The requirement was redundant, drop it.
       return;
     }
