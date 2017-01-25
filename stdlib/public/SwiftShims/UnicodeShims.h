@@ -30,7 +30,7 @@ namespace swift { extern "C" {
 #endif
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern const __swift_uint8_t *_swift_stdlib_GraphemeClusterBreakPropertyTrie;
+const __swift_uint8_t *_swift_stdlib_GraphemeClusterBreakPropertyTrie;
 
 struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy {
   unsigned BMPFirstLevelIndexBits;
@@ -55,11 +55,11 @@ struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy {
 };
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern const struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy
+const struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy
 _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadata;
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern const __swift_uint16_t *
+const __swift_uint16_t *
 _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix;
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
