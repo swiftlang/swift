@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -parse-stdlib %s | %FileCheck %s
 
 protocol P {
   init()
@@ -10,7 +10,7 @@ struct S: P {
   static func staticMethod() -> S { return S() }
 }
 
-// CHECK-LABEL: sil hidden @_TF21existential_metatypes19existentialMetatypeFPS_1P_T_
+// CHECK-LABEL: sil hidden @_T021existential_metatypes0A8MetatypeyAA1P_pF
 // CHECK: bb0([[X:%.*]] : $*P):
 func existentialMetatype(_ x: P) {
   // CHECK: [[TYPE1:%.*]] = existential_metatype $@thick P.Type, [[X]]
@@ -36,7 +36,7 @@ func existentialMetatype(_ x: P) {
 protocol PP: P {}
 protocol Q {}
 
-// CHECK-LABEL: sil hidden @_TF21existential_metatypes26existentialMetatypeUpcast1FPMPS_2PP_PMPS_1P_
+// CHECK-LABEL: sil hidden @_T021existential_metatypes0A15MetatypeUpcast1AA1P_pXpAA2PP_pXpF
 // CHECK:         [[OPENED:%.*]] = open_existential_metatype %0
 // CHECK:         [[NEW:%.*]] = init_existential_metatype [[OPENED]]
 // CHECK:         return [[NEW]]
@@ -44,7 +44,7 @@ func existentialMetatypeUpcast1(_ x: PP.Type) -> P.Type {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF21existential_metatypes26existentialMetatypeUpcast2FPMPS_1PS_1Q_PMPS0__
+// CHECK-LABEL: sil hidden @_T021existential_metatypes0A15MetatypeUpcast2AA1P_pXpAaC_AA1QpXpF
 // CHECK:         [[OPENED:%.*]] = open_existential_metatype %0
 // CHECK:         [[NEW:%.*]] = init_existential_metatype [[OPENED]]
 // CHECK:         return [[NEW]]

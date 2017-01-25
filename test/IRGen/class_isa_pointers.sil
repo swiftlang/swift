@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -55,15 +55,15 @@ entry(%0 : $Mongrel):
 
 // ObjC stubs expected by ObjC metadata emission
 
-sil private @_TToFC18class_isa_pointers7Mongrel6methodfT_T_ : $@convention(objc_method) (Purebred) -> () {
+sil private @_T018class_isa_pointers7MongrelC6methodyyFTo : $@convention(objc_method) (Purebred) -> () {
 entry(%0 : $Purebred):
   unreachable
 }
-sil private @_TToFC18class_isa_pointers7MongrelcfT7bellsOnSi_GSQS0__ : $@convention(objc_method) (Int, Purebred) -> () {
+sil private @_T018class_isa_pointers7MongrelCSQyACGSi7bellsOn_tcfcTo : $@convention(objc_method) (Int, Purebred) -> () {
 entry(%0 : $Int, %1 : $Purebred):
   unreachable
 }
-sil private @_TToFC18class_isa_pointers7MongrelcfT_S0_ : $@convention(objc_method) (Purebred) -> () {
+sil private @_T018class_isa_pointers7MongrelCACycfcTo : $@convention(objc_method) (Purebred) -> () {
 entry(%0 : $Purebred):
   unreachable
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil %s | %FileCheck %s
 
 // Check that this Church Numerals inspired example does not hang
 // a compiler in the generic specializer.
@@ -27,7 +27,7 @@ func computeNat<T: Nat>(_ v : Int32, _ t: T) -> Int32 {
   return computeNat(v - 1, PlusOne<T>())
 }
 
-// CHECK-LABEL: sil @_TF24specialize_deep_generics14testComputeNatFT_Vs5Int32
+// CHECK-LABEL: sil @_T024specialize_deep_generics14testComputeNats5Int32VyF
 public func testComputeNat() -> Int32 {
  return computeNat(8, Zero())
 }

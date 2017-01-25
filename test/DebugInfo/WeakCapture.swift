@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
 class A {
     init(handler: (() -> ())) { }
 }
 
 class B { }
 
-// CHECK: define {{.*}} @_TF11WeakCapture8functionFT_T_()
+// CHECK: define {{.*}} @_T011WeakCapture8functionyyF()
 func function() {
     let b = B()
 

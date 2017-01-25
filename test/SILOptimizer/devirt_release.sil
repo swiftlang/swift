@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -release-devirtualizer -module-name=test | %FileCheck %s
+// RUN: %target-sil-opt -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -release-devirtualizer -module-name=test | %FileCheck %s
 
 sil_stage canonical
 
@@ -13,7 +13,7 @@ class B {
 // CHECK: [[A:%[0-9]+]] = alloc_ref
 // CHECK-NEXT: set_deallocating [[A]]
 // CHECK-NOT: strong_release
-// CHECK: [[D:%[0-9]+]] = function_ref @_TFC4test1BD
+// CHECK: [[D:%[0-9]+]] = function_ref @_T04test1BCfD
 // CHECK-NEXT: apply [[D]]([[A]])
 // CHECK-NEXT: dealloc_ref [stack] [[A]]
 // CHECK: return
@@ -78,7 +78,7 @@ bb0(%0 : $B):
 // CHECK: [[A:%[0-9]+]] = alloc_ref
 // CHECK-NEXT: set_deallocating [[A]]
 // CHECK-NOT: strong_release
-// CHECK: [[D:%[0-9]+]] = function_ref @_TFC4test1BD
+// CHECK: [[D:%[0-9]+]] = function_ref @_T04test1BCfD
 // CHECK-NEXT: apply [[D]]([[A]])
 // CHECK-NEXT: dealloc_ref [stack] [[A]]
 // CHECK: return
@@ -97,12 +97,12 @@ bb0:
 sil @unknown_func : $@convention(thin) () -> ()
 
 // test.B.__deallocating_deinit
-sil hidden @_TFC4test1BD : $@convention(method) (@owned B) -> () {
+sil hidden @_T04test1BCfD : $@convention(method) (@owned B) -> () {
 // %0                                             // users: %1, %3
 bb0(%0 : $B):
   debug_value %0 : $B, let, name "self" // id: %1
   // function_ref test.B.deinit
-  %2 = function_ref @_TFC4test1Bd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %3
+  %2 = function_ref @_T04test1BCfd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %3
   %3 = apply %2(%0) : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %4
   %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $B // user: %5
   dealloc_ref %4 : $B                             // id: %5
@@ -111,7 +111,7 @@ bb0(%0 : $B):
 }
 
 // test.B.deinit
-sil hidden @_TFC4test1Bd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject {
+sil hidden @_T04test1BCfd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject {
 // %0                                             // users: %1, %2
 bb0(%0 : $B):
   debug_value %0 : $B, let, name "self" // id: %1
@@ -120,7 +120,7 @@ bb0(%0 : $B):
 }
 
 // test.B.init () -> test.B
-sil hidden @_TFC4test1BcfT_S0_ : $@convention(method) (@owned B) -> @owned B {
+sil hidden @_T04test1BCACycfc : $@convention(method) (@owned B) -> @owned B {
 // %0                                             // users: %1, %2
 bb0(%0 : $B):
   debug_value %0 : $B, let, name "self" // id: %1
@@ -128,7 +128,7 @@ bb0(%0 : $B):
 }
 
 sil_vtable B {
-  #B.deinit!deallocator: _TFC4test1BD	// test.B.__deallocating_deinit
-  #B.init!initializer.1: _TFC4test1BcfT_S0_	// test.B.init () -> test.B
+  #B.deinit!deallocator: _T04test1BCfD	// test.B.__deallocating_deinit
+  #B.init!initializer.1: _T04test1BCACycfc	// test.B.init () -> test.B
 }
 

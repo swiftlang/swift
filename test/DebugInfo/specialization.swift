@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -O %s -disable-llvm-optzns -emit-sil -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O %s -disable-llvm-optzns -emit-sil -g -o - | %FileCheck %s
 
-// CHECK: sil shared [noinline] @_TTSg5V14specialization7AddableS0_S_5ProtoS____TF14specialization3sumuRxS_5ProtorFTxx_x
+// CHECK: sil shared [noinline] @_T014specialization3sumxx_xtAA5ProtoRzlFAA7AddableV_Tg5
 // CHECK-SAME: $@convention(thin) (Addable, Addable) -> Addable {
 // CHECK: bb0(%0 : $Addable, %1 : $Addable):
 // CHECK:  debug_value %0 : $Addable, let, name "i", argno 1

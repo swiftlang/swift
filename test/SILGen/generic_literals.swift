@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden @_TF16generic_literals21genericIntegerLitera
+// CHECK-LABEL: sil hidden @_T016generic_literals0A14IntegerLiteralyx1x_ts013ExpressibleBycD0RzlF
 func genericIntegerLiteral<T : ExpressibleByIntegerLiteral>(x: T) {
   var x = x
   // CHECK: [[TCONV:%.*]] = witness_method $T, #ExpressibleByIntegerLiteral.init!allocator.1
@@ -16,7 +16,7 @@ func genericIntegerLiteral<T : ExpressibleByIntegerLiteral>(x: T) {
   x = 17
 }
 
-// CHECK-LABEL: sil hidden @_TF16generic_literals22genericFloatingLiteral
+// CHECK-LABEL: sil hidden @_T016generic_literals0A15FloatingLiteral{{[_0-9a-zA-Z]*}}F
 func genericFloatingLiteral<T : ExpressibleByFloatLiteral>(x: T) {
   var x = x
   // CHECK: [[CONV:%.*]] = witness_method $T, #ExpressibleByFloatLiteral.init!allocator.1

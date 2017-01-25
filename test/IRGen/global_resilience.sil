@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | %FileCheck %s
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
@@ -105,7 +105,7 @@ bb0:
 
 sil @testOtherGlobal : $@convention(thin) () -> () {
 bb0:
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct4Size()
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @_T016resilient_struct4SizeVMa()
 
   // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
   // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1

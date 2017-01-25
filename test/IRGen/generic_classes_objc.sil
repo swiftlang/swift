@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=i386_or_x86_64
 // REQUIRES: objc_interop
@@ -9,7 +9,7 @@ import Builtin
 import Swift
 import gizmo
 
-// CHECK: @_TMPC20generic_classes_objc19GenericInheritsObjC
+// CHECK: @_T020generic_classes_objc19GenericInheritsObjCCMP
 
 class GenericInheritsObjC<D> : Gizmo {
   var a : Int
@@ -21,23 +21,23 @@ class GenericInheritsObjC<D> : Gizmo {
 sil_vtable GenericInheritsObjC {}
 
 // __deallocating_deinit
-sil @_TFC20generic_classes_objc19GenericInheritsObjCD : $@convention(method) <T> (GenericInheritsObjC<T>) -> () {
+sil @_T020generic_classes_objc19GenericInheritsObjCCfD : $@convention(method) <T> (GenericInheritsObjC<T>) -> () {
 bb0(%0 : $GenericInheritsObjC<T>):
   unreachable
 }
 
 // @objc init
-sil @_TToFC20generic_classes_objc19GenericInheritsObjCcfT_GS0_x_ : $@convention(objc_method) <T> (@owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
+sil @_T020generic_classes_objc19GenericInheritsObjCCACyxGycfcTo : $@convention(objc_method) <T> (@owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
 bb0(%0 : $GenericInheritsObjC<T>):
   unreachable
 }
 
-sil @_TToFC20generic_classes_objc19GenericInheritsObjCcfT7bellsOnSi_GSQGS0_x__ : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
+sil @_T020generic_classes_objc19GenericInheritsObjCCSQyACyxGGSi7bellsOn_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
 bb0(%0 : $Int, %1 : $GenericInheritsObjC<T>):
   unreachable
 }
 
-// CHECK: @_TMPC20generic_classes_objc20GenericInheritsObjC2
+// CHECK: @_T020generic_classes_objc20GenericInheritsObjC2CMP
 
 class GenericInheritsObjC2<E> : Gizmo {
   var x : UInt8
@@ -49,18 +49,18 @@ class GenericInheritsObjC2<E> : Gizmo {
 sil_vtable GenericInheritsObjC2 {}
 
 // __deallocating_deinit
-sil @_TFC20generic_classes_objc20GenericInheritsObjC2D : $@convention(method) <T> (GenericInheritsObjC2<T>) -> () {
+sil @_T020generic_classes_objc20GenericInheritsObjC2CfD : $@convention(method) <T> (GenericInheritsObjC2<T>) -> () {
 bb0(%0 : $GenericInheritsObjC2<T>):
   unreachable
 }
 
 // @objc init
-sil @_TToFC20generic_classes_objc20GenericInheritsObjC2cfT_GS0_x_ : $@convention(objc_method) <T> (@owned GenericInheritsObjC2<T>) -> @owned GenericInheritsObjC2<T> {
+sil @_T020generic_classes_objc20GenericInheritsObjC2CACyxGycfcTo : $@convention(objc_method) <T> (@owned GenericInheritsObjC2<T>) -> @owned GenericInheritsObjC2<T> {
 bb0(%0 : $GenericInheritsObjC2<T>):
   unreachable
 }
 
-sil @_TToFC20generic_classes_objc20GenericInheritsObjC2cfT7bellsOnSi_GSQGS0_x__ : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
+sil @_T020generic_classes_objc20GenericInheritsObjC2CSQyACyxGGSi7bellsOn_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
 bb0(%0 : $Int, %1 : $GenericInheritsObjC<T>):
   unreachable
 }

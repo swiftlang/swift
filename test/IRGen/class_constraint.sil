@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s
 
 protocol P {}
 class A : P {}
@@ -23,4 +23,4 @@ bb0(%0 : $T):
   return %3 : $()
 }
 // CHECK: define {{.*}}void @foo(%C16class_constraint1A*, %swift.type* %T)
-// CHECK: store i8** @_TWPC16class_constraint1AS_1PS_,
+// CHECK: store i8** @_T016class_constraint1ACAA1PAAWP,

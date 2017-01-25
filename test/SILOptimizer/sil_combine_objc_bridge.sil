@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -179,7 +179,7 @@ bb0(%0 : $AnNSArray):
 }
 
 // CHECK-LABEL: sil shared @bridge_from_swift_array_to_NSObject_cast
-// CHECK: function_ref @_TFE10FoundationSa19_bridgeToObjectiveC
+// CHECK: function_ref @_T0Sa10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
 // CHECK-NOT: retain
 // CHECK: apply
 // CHECK: release_value

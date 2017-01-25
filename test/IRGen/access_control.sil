@@ -1,31 +1,31 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 import Builtin
 import Swift
 
 public struct PublicStruct { var x: Int }
-// CHECK: @_TWVV14access_control12PublicStruct = {{(protected )?}}constant
-// CHECK: @_TMnV14access_control12PublicStruct = {{(protected )?}}constant
-// CHECK: @_TMfV14access_control12PublicStruct = internal constant
+// CHECK: @_T014access_control12PublicStructVWV = {{(protected )?}}constant
+// CHECK: @_T014access_control12PublicStructVMn = {{(protected )?}}constant
+// CHECK: @_T014access_control12PublicStructVMf = internal constant
 
 internal struct InternalStruct { var x: Int }
-// CHECK: @_TWVV14access_control14InternalStruct = hidden constant
-// CHECK: @_TMnV14access_control14InternalStruct = hidden constant
-// CHECK: @_TMfV14access_control14InternalStruct = internal constant
+// CHECK: @_T014access_control14InternalStructVWV = hidden constant
+// CHECK: @_T014access_control14InternalStructVMn = hidden constant
+// CHECK: @_T014access_control14InternalStructVMf = internal constant
 
 private struct PrivateStruct { var x: Int }
-// CHECK: @_TWVV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = hidden constant
-// CHECK: @_TMnV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = hidden constant
-// CHECK: @_TMfV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = internal constant
+// CHECK: @_T014access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVWV = hidden constant
+// CHECK: @_T014access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVMn = hidden constant
+// CHECK: @_T014access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVMf = internal constant
 
 func local() {
   struct LocalStruct { var x: Int }
-  // CHECK: @_TWVVF14access_control5localFT_T_L_11LocalStruct = hidden constant
-  // CHECK: @_TMnVF14access_control5localFT_T_L_11LocalStruct = hidden constant
-  // CHECK: @_TMfVF14access_control5localFT_T_L_11LocalStruct = internal constant
+  // CHECK: @_T014access_control5localyyF11LocalStructL_VWV = hidden constant
+  // CHECK: @_T014access_control5localyyF11LocalStructL_VMn = hidden constant
+  // CHECK: @_T014access_control5localyyF11LocalStructL_VMf = internal constant
 }
 
-// CHECK: @_TMV14access_control12PublicStruct = {{(protected )?}}alias
-// CHECK: @_TMV14access_control14InternalStruct = hidden alias
-// CHECK: @_TMV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = hidden alias
-// CHECK: @_TMVF14access_control5localFT_T_L_11LocalStruct = hidden alias
+// CHECK: @_T014access_control12PublicStructVN = {{(protected )?}}alias
+// CHECK: @_T014access_control14InternalStructVN = hidden alias
+// CHECK: @_T014access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVN = hidden alias
+// CHECK: @_T014access_control5localyyF11LocalStructL_VN = hidden alias

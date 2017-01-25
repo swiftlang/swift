@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s
 //
 // REQUIRES: CPU=x86_64
 
@@ -17,10 +17,10 @@ sil_vtable TestClass {}
 
 // CHECK-LABEL: define{{( protected)?}} void @alloc_on_stack
 // CHECK:      %reference.raw = alloca i8, i32 28, align 8
-// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_TMa[[C:[a-zA-Z0-9_]+]]()
+// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast i8* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
-// CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
+// CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C:.*TestClass.*]]*
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %[[C]]* [[R]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.end(i64 -1, i8* [[O2]])
 // CHECK-NEXT: ret void
@@ -34,9 +34,9 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_on_heap
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_TMa[[C:[a-zA-Z0-9_]+]]()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[M]], i64 28, i64 7) #5
-// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C]]*
+// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
 sil @alloc_on_heap : $@convention(thin) () -> @owned TestClass {
 bb0:
@@ -46,9 +46,9 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_3_on_heap
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_TMa[[C:[a-zA-Z0-9_]+]]()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}CMa()
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[M]], i64 40, i64 7) #5
-// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C]]*
+// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
 sil @alloc_3_on_heap : $@convention(thin) () -> @owned TestClass {
 bb0:
@@ -60,11 +60,11 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_non_const_count
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_TMa[[C:[a-zA-Z0-9_]+]]()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
 // CHECK-NEXT: [[S:%[0-9]+]] = mul i64 4, %0
 // CHECK-NEXT: [[A:%[0-9]+]] = add i64 20, [[S]]
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[M]], i64 [[A]], i64 7) #5
-// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C]]*
+// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
 sil @alloc_non_const_count : $@convention(thin) (Builtin.Word) -> @owned TestClass {
 bb0(%c : $Builtin.Word):
@@ -73,7 +73,7 @@ bb0(%c : $Builtin.Word):
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_2_non_const_count
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_TMa[[C:[a-zA-Z0-9_]+]]()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
 // CHECK-NEXT: [[S1:%[0-9]+]] = mul i64 1, %0
 // CHECK-NEXT: [[S2:%[0-9]+]] = add i64 17, [[S1]]
 // CHECK-NEXT: [[S3:%[0-9]+]] = add i64 [[S2]], 3
@@ -81,7 +81,7 @@ bb0(%c : $Builtin.Word):
 // CHECK-NEXT: [[S5:%[0-9]+]] = mul i64 4, %1
 // CHECK-NEXT: [[S6:%[0-9]+]] = add i64 [[S4]], [[S5]]
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[M]], i64 [[S6]], i64 7) #5
-// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C]]*
+// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
 sil @alloc_2_non_const_count : $@convention(thin) (Builtin.Word, Builtin.Word) -> @owned TestClass {
 bb0(%c1 : $Builtin.Word, %c2 : $Builtin.Word):

@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-reflection-names -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-reflection-metadata -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -disable-reflection-names -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -disable-reflection-metadata -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
 
 // STRIP_REFLECTION_NAMES_DAG: {{.*}}swift3_reflect
 // STRIP_REFLECTION_NAMES_DAG: {{.*}}swift3_fieldmd
@@ -10,7 +10,7 @@
 // STRIP_REFLECTION_NAMES-NOT: {{.*}}swift3_reflstr
 // STRIP_REFLECTION_NAMES-NOT: {{.*}}swift3_builtin
 
-// STRIP_REFLECTION_NAMES-DAG: @_TMRfP19reflection_metadata10MyProtocol_ = internal constant {{.*}}swift3_fieldmd
+// STRIP_REFLECTION_NAMES-DAG: @_T019reflection_metadata10MyProtocol_pMF = internal constant {{.*}}swift3_fieldmd
 
 // STRIP_REFLECTION_METADATA-NOT: {{.*}}swift3_reflect
 // STRIP_REFLECTION_METADATA-NOT: {{.*}}swift3_fieldmd
@@ -39,14 +39,14 @@
 
 // CHECK-DAG: @"\01l__swift3_reflection_descriptor" = private constant <{ {{.*}} }> <{ i32 1, i32 1, i32 2, {{.*}} }>
 
-// CHECK-DAG: @_TMRfP19reflection_metadata10MyProtocol_ = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_TMRfC19reflection_metadata7MyClass = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_TMRaV19reflection_metadata11ConformanceS_10MyProtocolS_ = internal constant {{.*}}swift3_assocty
-// CHECK-DAG: @_TMRfV19reflection_metadata8MyStruct = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_TMRfO19reflection_metadata6MyEnum = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_TMRfC19reflection_metadata14MyGenericClass = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_TMRfV19reflection_metadata15MyGenericStruct = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_TMRfO19reflection_metadata13MyGenericEnum = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_T019reflection_metadata10MyProtocol_pMF = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_T019reflection_metadata7MyClassCMF = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_T019reflection_metadata11ConformanceVAA10MyProtocolAAMA = internal constant {{.*}}swift3_assocty
+// CHECK-DAG: @_T019reflection_metadata8MyStructVMF = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_T019reflection_metadata6MyEnumOMF = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_T019reflection_metadata14MyGenericClassCMF = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_T019reflection_metadata15MyGenericStructVMF = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_T019reflection_metadata13MyGenericEnumOMF = internal constant {{.*}}swift3_fieldmd
 
 public protocol MyProtocol {
   associatedtype Inner
