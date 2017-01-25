@@ -70,8 +70,8 @@ static bool compatibleOwnershipKinds(ValueOwnershipKind K1,
 }
 
 static bool isValueAddressOrTrivial(SILValue V, SILModule &M) {
-  // TODO: Change this to use V->getOwnershipKind() == OwnershipKind::Trivial;
-  return V->getType().isAddress() || V->getType().isTrivial(M);
+  return V->getType().isAddress() ||
+         V.getOwnershipKind() == ValueOwnershipKind::Trivial;
 }
 
 static bool isOwnershipForwardingValueKind(ValueKind K) {
@@ -266,8 +266,6 @@ CONSTANT_OWNERSHIP_INST(Owned, true, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, ReleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, StrongRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, StrongUnpin)
-CONSTANT_OWNERSHIP_INST(Owned, true, SwitchEnum)
-CONSTANT_OWNERSHIP_INST(Owned, true, CheckedCastBranch)
 CONSTANT_OWNERSHIP_INST(Owned, true, UnownedRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Trivial, false, AddressToPointer)
@@ -325,6 +323,27 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, UnconditionalCheckedCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UnmanagedToRef)
 #undef CONSTANT_OWNERSHIP_INST
 
+/// Instructions whose arguments are always compatible with one convention.
+#define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP,                                     \
+                                SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS, INST)    \
+  OwnershipUseCheckerResult                                                    \
+      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
+    assert(I->getNumOperands() && "Expected to have non-zero operands");       \
+    if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
+      assert(isAddressOrTrivialType() &&                                       \
+             "Trivial ownership requires a trivial type or an address");       \
+    }                                                                          \
+                                                                        \
+    if (compatibleWithOwnership(ValueOwnershipKind::Trivial)) {         \
+      return {true, false};                                             \
+    }                                                                   \
+    return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
+            SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
+  }
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastBranch)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, SwitchEnum)
+#undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
+
 #define ACCEPTS_ANY_OWNERSHIP_INST(INST)                                       \
   OwnershipUseCheckerResult                                                    \
       OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
@@ -340,6 +359,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(WitnessMethod)        // Is this right?
 ACCEPTS_ANY_OWNERSHIP_INST(ProjectBox)           // The result is a T*.
 ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedRetainValue)
 ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedReleaseValue)
+ACCEPTS_ANY_OWNERSHIP_INST(DynamicMethodBranch)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
@@ -359,8 +379,6 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, BridgeObjectToWord)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ClassMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, DynamicMethod)
-// DynamicMethodBranch: Is this right? I think this is taken at +1.
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, DynamicMethodBranch)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ExistentialMetatype)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBox)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefElementAddr)
