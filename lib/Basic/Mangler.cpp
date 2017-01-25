@@ -218,7 +218,7 @@ std::string NewMangling::selectMangling(const std::string &Old,
                          Demangle::Node::Kind::DependentAssociatedTypeRef) ||
             // Does the mangling contain an identifier which is the name of
             // an old-mangled function?
-            New.find("_T") != std::string::npos) {
+            New.find("_T", 2) != std::string::npos) {
           NodePointer RemangledNode = demangleSymbolAsNode(Remangled);
           isEqual = areTreesEqual(NewNode, RemangledNode);
         }
