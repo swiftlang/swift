@@ -322,7 +322,7 @@ struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
 
 // CHECK: [[T0:%.*]] = load i8*, i8** %T.ParentHasAssociatedType
 // CHECK: [[T1:%.*]] = bitcast i8* [[T0]] to i8**
-// CHECK: [[T2:%.*]] = load i8*, i8** [[T1]], align 8, !invariant.load !10
+// CHECK: [[T2:%.*]] = load i8*, i8** [[T1]], align 8, !invariant.load
 // CHECK: [[T3:%.*]] = bitcast i8* [[T2]] to %swift.type*
 // CHECK:   %T.Assoc = call %swift.type* [[T3]](%swift.type* %T, i8** [[T1]])
 

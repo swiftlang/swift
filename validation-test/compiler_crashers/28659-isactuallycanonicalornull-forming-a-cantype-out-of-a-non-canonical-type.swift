@@ -6,5 +6,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // REQUIRES: asserts
+// REQUIRES: deterministic-behavior
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 {func b(UInt=1 + 1 as?Int){f
