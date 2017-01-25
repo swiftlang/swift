@@ -12,7 +12,7 @@ import ObjectiveC
 
 @objc protocol OP {}
 
-// CHECK-LABEL: define{{( protected)?}} %CSo8Protocol* @protocol_conversion() {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc %CSo8Protocol* @protocol_conversion() {{.*}} {
 // CHECK:         %0 = load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP24objc_protocol_conversion2OP_", align 8
 // CHECK:         %1 = bitcast i8* %0 to %CSo8Protocol*
 // CHECK:         ret %CSo8Protocol* %1
@@ -26,7 +26,7 @@ entry:
 
 // The Protocol class has been hidden in newer ObjC APIs, so when we need its
 // metadata, we treat it like a foreign class.
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @protocol_metatype()
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @protocol_metatype()
 sil @protocol_metatype : $@convention(thin) () -> @thick Protocol.Type {
 entry:
   // CHECK: call %objc_class* @objc_lookUpClass

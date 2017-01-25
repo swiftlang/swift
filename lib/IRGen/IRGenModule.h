@@ -393,6 +393,9 @@ public:
   /// Should we add value names to local IR values?
   bool EnableValueNames = false;
 
+  // Is swifterror returned in a register by the target ABI.
+  bool IsSwiftErrorInRegister;
+
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
@@ -591,7 +594,6 @@ public:
   ExplosionSchema getSchema(SILType T);
   unsigned getExplosionSize(SILType T);
   llvm::PointerType *isSingleIndirectValue(SILType T);
-  llvm::PointerType *requiresIndirectResult(SILType T);
   bool isPOD(SILType type, ResilienceExpansion expansion);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);

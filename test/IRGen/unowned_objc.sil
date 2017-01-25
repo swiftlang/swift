@@ -33,12 +33,12 @@ bb0(%0 : $@sil_unowned C):
   %3 = tuple ()
   %4 = return %3 : $()
 }
-// CHECK:    define{{( protected)?}} void @test_weak_rr_class([[C]]*) {{.*}} {
+// CHECK:    define{{( protected)?}} swiftcc void @test_weak_rr_class([[C]]*) {{.*}} {
 // CHECK:      call void bitcast (void ([[REF]]*)* @swift_rt_swift_unownedRetain to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_rt_swift_unownedRelease to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: ret void
 
-// CHECK:    define{{( protected)?}} void @test_unknown_unowned_copies([[UNKNOWN]]*, i8**, [[UNKNOWN]]*, i8**)
+// CHECK:    define{{( protected)?}} swiftcc void @test_unknown_unowned_copies([[UNKNOWN]]*, i8**, [[UNKNOWN]]*, i8**)
 sil @test_unknown_unowned_copies : $@convention(thin) (@owned P, @owned P) -> () {
 bb0(%p : $P, %q : $P):
 

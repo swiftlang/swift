@@ -4,7 +4,7 @@ import Builtin
 
 sil_stage canonical
 
-// CHECK: define hidden void @irgen_identity(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden swiftcc void @irgen_identity(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T)
 // CHECK: entry:
 // CHECK-NOT: call
 // CHECK: %{{.*}} = call %swift.opaque* %initializeWithTake(%swift.opaque* %0, %swift.opaque* %1, %swift.type* %T)

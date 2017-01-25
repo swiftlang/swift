@@ -52,7 +52,7 @@ sil_global hidden @fixedGlobal : $LargeResilientStruct
 // CHECK: @otherGlobal = {{(protected )?}}global [[BUFFER]] zeroinitializer
 sil_global [let] @otherGlobal : $Size
 
-// CHECK-LABEL: define{{( protected)?}} void @testSmallGlobal()
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testSmallGlobal()
 sil @testSmallGlobal : $@convention(thin) () -> () {
 bb0:
   // This is just a no-op
@@ -70,7 +70,7 @@ bb0:
   return %tuple : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @testLargeGlobal()
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testLargeGlobal()
 sil @testLargeGlobal : $@convention(thin) () -> () {
 bb0:
   // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc([[INT]] 32, [[INT]] 7)
@@ -86,7 +86,7 @@ bb0:
   return %tuple : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @testFixedGlobal()
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testFixedGlobal()
 sil @testFixedGlobal : $@convention(thin) () -> () {
 bb0:
   alloc_global @fixedGlobal

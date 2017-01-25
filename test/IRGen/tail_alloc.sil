@@ -15,7 +15,7 @@ class TestClass {
 
 sil_vtable TestClass {}
 
-// CHECK-LABEL: define{{( protected)?}} void @alloc_on_stack
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @alloc_on_stack
 // CHECK:      %reference.raw = alloca i8, i32 28, align 8
 // CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast i8* %reference.raw to %swift.refcounted*
@@ -123,7 +123,7 @@ bb0(%0 : $@thick TestClass.Type):
   return %o : $TestClass
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8* @project_tail_byte
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @project_tail_byte
 // CHECK: getelementptr inbounds i8, i8* %{{[0-9]+}}, i64 17
 // CHECK: ret
 sil @project_tail_byte : $@convention(thin) (TestClass) -> Builtin.RawPointer {
@@ -133,7 +133,7 @@ bb0(%0 : $TestClass):
   return %p : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @project_tail_int
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @project_tail_int
 // CHECK: [[S:%[0-9]+]] = getelementptr inbounds i8, i8* %{{[0-9]+}}, i64 20
 // CHECK: bitcast i8* [[S]] to %Vs5Int32*
 // CHECK: ret
@@ -145,7 +145,7 @@ bb0(%0 : $TestClass, %1 : $Int32):
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8* @project_tail_generic
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @project_tail_generic
 // CHECK:      [[S1:%[0-9]+]] = add i64 17, %flags.alignmentMask
 // CHECK-NEXT: [[S2:%[0-9]+]] = xor i64 %flags.alignmentMask, -1
 // CHECK-NEXT: [[S3:%[0-9]+]] = and i64 [[S1]], [[S2]]
@@ -164,7 +164,7 @@ struct Str<T> {
   var t: T
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8* @project_tail_generic_struct
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @project_tail_generic_struct
 // CHECK:      [[S1:%[0-9]+]] = add i64 17, %flags.alignmentMask
 // CHECK-NEXT: [[S2:%[0-9]+]] = xor i64 %flags.alignmentMask, -1
 // CHECK-NEXT: [[S3:%[0-9]+]] = and i64 [[S1]], [[S2]]
@@ -179,7 +179,7 @@ bb0(%0 : $TestClass, %1 : $@thick T.Type):
   return %p : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @project_tail_index_byte_to_int
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @project_tail_index_byte_to_int
 // CHECK:      [[S1:%[0-9]+]] = bitcast i8* %0 to %Vs4Int8*
 // CHECK-NEXT: [[S2:%[0-9]+]] = getelementptr inbounds %Vs4Int8, %Vs4Int8* [[S1]], i64 2
 // CHECK-NEXT: [[S3:%[0-9]+]] = ptrtoint %Vs4Int8* [[S2]] to i64
@@ -198,7 +198,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Int32):
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8* @project_tail_index_generic_struct
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @project_tail_index_generic_struct
 // CHECK: call %swift.type* @{{.*Str.*}}(%swift.type* %T)
 // CHECK: load
 // CHECK: and
@@ -220,7 +220,7 @@ class EmptyClass {
 
 sil_vtable EmptyClass {}
 
-// CHECK-LABEL: define{{( protected)?}} i8 @test_align_1_int8
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8 @test_align_1_int8
 // CHECK: load i8, i8* %{{.*}}, align 1
 // CHECK: ret
 sil @test_align_1_int8 : $@convention(thin) (EmptyClass) -> Int8 {
@@ -232,7 +232,7 @@ bb0(%0 : $EmptyClass):
   return %l : $Int8
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8 @test_align_2_int8
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8 @test_align_2_int8
 // CHECK: load i8, i8* %{{.*}}, align 2
 // CHECK: ret
 sil @test_align_2_int8 : $@convention(thin) (EmptyClass) -> Int8 {
@@ -244,7 +244,7 @@ bb0(%0 : $EmptyClass):
   return %l : $Int8
 }
 
-// CHECK-LABEL: define{{( protected)?}} i32 @test_align_int32
+// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @test_align_int32
 // CHECK: load i32, i32* %{{.*}}, align 4
 // CHECK: ret
 sil @test_align_int32 : $@convention(thin) (EmptyClass, Builtin.Word) -> Int32 {

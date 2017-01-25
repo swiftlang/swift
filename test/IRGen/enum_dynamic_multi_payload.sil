@@ -24,15 +24,15 @@ sil_vtable C {}
 
 // -- The runtime doesn't track spare bits, so fixed instances of the dynamic
 //    type can't use them.
-// CHECK-64-LABEL: define{{( protected)?}} { i64, i1 } @fixed_instances_dont_use_spare_bits(i64, i1)
-// CHECK-32-LABEL: define{{( protected)?}} { i32, i1 } @fixed_instances_dont_use_spare_bits(i32, i1)
+// CHECK-64-LABEL: define{{( protected)?}} swiftcc { i64, i8 } @fixed_instances_dont_use_spare_bits(i64, i8)
+// CHECK-32-LABEL: define{{( protected)?}} swiftcc { i32, i8 } @fixed_instances_dont_use_spare_bits(i32, i8)
 sil @fixed_instances_dont_use_spare_bits : $@convention(thin) (@owned Either<C, C>) -> @owned Either<C, C> {
 entry(%e : $Either<C, C>):
   return %e : $Either<C, C>
 }
 
 // -- Handle case where all of the payloads become empty.
-// CHECK-LABEL: define{{( protected)?}} void @empty_instance(i1) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @empty_instance(i8) {{.*}} {
 sil @empty_instance : $@convention(thin) (Either<(), ()>) -> () {
 // CHECK-NEXT: entry:
 entry(%e : $Either<(), ()>):
@@ -42,6 +42,7 @@ entry(%e : $Either<(), ()>):
   fix_lifetime %e : $Either<(), ()>
 
   // CHECK-NEXT: alloca
+  // CHECK-NEXT: trunc i8 {{.*}} to i1
   // CHECK-NEXT: bitcast
   // CHECK-NEXT: llvm.lifetime.start
   %s = alloc_stack $Either<(), ()>
@@ -58,11 +59,11 @@ entry(%e : $Either<(), ()>):
   %a = unchecked_enum_data %l : $Either<(), ()>, #Either.Left!enumelt.1
   %b = unchecked_enum_data %r : $Either<(), ()>, #Either.Right!enumelt.1
 
-  // CHECK-NEXT: br i1 {{%.*}}, label %6, label %5
-  // CHECK:      <label>:5
-  // CHECK:        br label %7
+  // CHECK-NEXT: br i1 {{%.*}}, label %7, label %6
   // CHECK:      <label>:6
   // CHECK:        br label %8
+  // CHECK:      <label>:7
+  // CHECK:        br label %9
   switch_enum %e : $Either<(), ()>,
     case #Either.Left!enumelt.1: left,
     case #Either.Right!enumelt.1: right
@@ -75,13 +76,13 @@ right(%y : $()):
   %1 = integer_literal $Builtin.Int8, 1
   br next(%1 : $Builtin.Int8)
 
-  // CHECK:        phi i8 [ 1, %8 ], [ 0, %7 ]
+  // CHECK:        phi i8 [ 1, %9 ], [ 0, %8 ]
 next(%z : $Builtin.Int8):
   dealloc_stack %s : $*Either<(), ()>
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @empty_instance2(i8) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @empty_instance2(i8) {{.*}} {
 sil @empty_instance2 : $@convention(thin) (EitherOr<(), ()>) -> () {
 // CHECK-NEXT: entry:
 entry(%e : $EitherOr<(), ()>):
@@ -155,8 +156,8 @@ next(%z : $Builtin.Int8):
 
 sil hidden_external @consume_case_test_result : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1) -> ()
 
-// CHECK-LABEL: define{{( protected)?}} void @static_multi_payload_case_test
-// CHECK:         call void @consume_case_test_result(i1 true, i1 true, i1 true, i1 true)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @static_multi_payload_case_test
+// CHECK:         call swiftcc void @consume_case_test_result(i1 true, i1 true, i1 true, i1 true)
 sil @static_multi_payload_case_test : $@convention(thin) () -> () {
 entry:
   %0 = integer_literal $Builtin.Int64, 0
@@ -192,8 +193,8 @@ entry:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @static_multi_payload_case_test_empty
-// CHECK:         call void @consume_case_test_result(i1 true, i1 true, i1 true, i1 true)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @static_multi_payload_case_test_empty
+// CHECK:         call swiftcc void @consume_case_test_result(i1 true, i1 true, i1 true, i1 true)
 sil @static_multi_payload_case_test_empty : $@convention(thin) () -> () {
 entry:
   %t = integer_literal $Builtin.Int1, 1
@@ -228,7 +229,7 @@ entry:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @dynamic_multi_payload_case_test
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_multi_payload_case_test
 sil @dynamic_multi_payload_case_test : $@convention(thin) <T, U> () -> () {
 entry:
   %t = integer_literal $Builtin.Int1, 1
@@ -256,7 +257,7 @@ entry:
     case #EitherOr.Center!enumelt: %t,
     default %f : $Builtin.Int1
 
-  // CHECK: call void @consume_case_test_result(i1 [[LEFT]], i1 [[RIGHT]], i1 [[MIDDLE]], i1 [[CENTER]])
+  // CHECK: call swiftcc void @consume_case_test_result(i1 [[LEFT]], i1 [[RIGHT]], i1 [[MIDDLE]], i1 [[CENTER]])
   %g = function_ref @consume_case_test_result : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1) -> ()
   %r = apply %g(%x, %y, %z, %w) : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1) -> ()
 
@@ -264,7 +265,7 @@ entry:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @dynamic_inject
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_inject
 // CHECK:         ([[EITHER_OR:%O26enum_dynamic_multi_payload8EitherOr.*]]* noalias nocapture sret, %swift.type* %T)
 sil @dynamic_inject : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
@@ -280,7 +281,7 @@ entry(%e : $*EitherOr<T, Builtin.Int64>):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @dynamic_project
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_project
 // CHECK:         ([[EITHER_OR]]* noalias nocapture sret, %swift.type* %T)
 sil @dynamic_project : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
@@ -292,7 +293,7 @@ entry(%e : $*EitherOr<T, Builtin.Int64>):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @dynamic_switch
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_switch
 // CHECK:         ([[EITHER_OR]]* noalias nocapture sret, %swift.type* %T)
 sil @dynamic_switch : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
@@ -333,7 +334,7 @@ next(%x : $Builtin.Int8):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @dynamic_value_semantics
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_value_semantics
 // CHECK:         ([[EITHER_OR]]* noalias nocapture sret, [[EITHER_OR]]* noalias nocapture, %swift.type* %T)
 sil @dynamic_value_semantics : $@convention(thin) <T> (@in EitherOr<T, Builtin.Int64>) -> @out EitherOr<T, Builtin.Int64> {
 entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
@@ -367,7 +368,7 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @dynamic_value_semantics2
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_value_semantics2
 // CHECK:         ([[EITHER_OR:%O26enum_dynamic_multi_payload8EitherOr.*]]* noalias nocapture sret, [[EITHER_OR]]* noalias nocapture, %swift.type* %T)
 sil @dynamic_value_semantics2 : $@convention(thin) <T> (@in EitherOr<T, C>) -> @out EitherOr<T, C> {
 entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):

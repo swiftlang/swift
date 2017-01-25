@@ -9,8 +9,8 @@ class X {
 public func ifelseexpr() -> Int64 {
   var x = X(i:0) 
   // CHECK: [[META:%.*]] = call %swift.type* @_T06return1XCMa()
-  // CHECK: [[X:%.*]] = call %C6return1X* @_T06return1XCACs5Int64V1i_tcfC(
-  // CHECK-SAME:                                  i64 0, %swift.type* [[META]])
+  // CHECK: [[X:%.*]] = call {{.*}}%C6return1X* @_T06return1XCACs5Int64V1i_tcfC(
+  // CHECK-SAME:                                  i64 0, %swift.type* swiftself [[META]])
   // CHECK:  @swift_rt_swift_release to void (%C6return1X*)*)(%C6return1X* [[X]])
   if true {
     x.x += 1

@@ -10,7 +10,7 @@ func main() -> Void
     var out_only = 2013
 
     var backward_ptr  =
-    // CHECK: define linkonce_odr hidden i1 @_T04mainAAyyFSbSS_SStcfU_(
+    // CHECK: define linkonce_odr hidden {{.*}} i1 @_T04mainAAyyFSbSS_SStcfU_(
     // CHECK: %[[RANDOM_STR_ADDR:.*]] = alloca %SS*, align {{(4|8)}}
     // CHECK: store %SS* %{{.*}}, %SS** %[[RANDOM_STR_ADDR]], align {{(4|8)}}
     // CHECK-NEXT: call void @llvm.dbg.declare(metadata %SS** %[[RANDOM_STR_ADDR]], metadata !{{.*}}, metadata !{{[0-9]+}}), !dbg

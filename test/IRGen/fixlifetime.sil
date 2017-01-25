@@ -8,7 +8,7 @@
 // unnecessary.
 // ONONE-NOT: @__swift_fixLifetime
 
-// CHECK-objc-LABEL: define{{( protected)?}} void @test(%C11fixlifetime1C*, %objc_object*, i8**, i8*, %swift.refcounted*, %V11fixlifetime3Agg* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-objc-LABEL: define{{( protected)?}} swiftcc void @test(%C11fixlifetime1C*, %objc_object*, i8**, i8*, %swift.refcounted*, %V11fixlifetime3Agg* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-objc: entry:
 // CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%C11fixlifetime1C*)*)(%C11fixlifetime1C*
 // CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%objc_object*)*)(%objc_object*
@@ -18,7 +18,7 @@
 // CHECK-objc:  call void @__swift_fixLifetime(%swift.refcounted*
 // CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%C11fixlifetime1C**)*)(%C11fixlifetime1C**
 
-// CHECK-native-LABEL: define{{( protected)?}} void @test(%C11fixlifetime1C*, %swift.refcounted*, i8**, i8*, %swift.refcounted*, %V11fixlifetime3Agg* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-native-LABEL: define{{( protected)?}} swiftcc void @test(%C11fixlifetime1C*, %swift.refcounted*, i8**, i8*, %swift.refcounted*, %V11fixlifetime3Agg* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-native: entry:
 // CHECK-native:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%C11fixlifetime1C*)*)(%C11fixlifetime1C*
 // CHECK-native:  call void @__swift_fixLifetime(%swift.refcounted*

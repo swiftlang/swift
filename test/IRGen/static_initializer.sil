@@ -39,7 +39,7 @@ bb0:
   return %4 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8* @_TF2cha1xSi() {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @_TF2cha1xSi() {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret i8* bitcast (%Vs5Int32* @_Tv2ch1xSi to i8*)
 sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
@@ -49,7 +49,7 @@ bb0:
   return %1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define{{( protected)?}} i32 @_TF2ch1fFT_Si() {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_TF2ch1fFT_Si() {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load i32, i32* getelementptr inbounds (%Vs5Int32, %Vs5Int32* @_Tv2ch1xSi, i32 0, i32 0)
 // CHECK-NEXT: ret
@@ -76,7 +76,7 @@ bb0:
   return %10 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8* @_TF6nesteda1xVS_2S2() {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @_TF6nesteda1xVS_2S2() {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret i8* bitcast (%V18static_initializer2S2* @_Tv6nested1xVS_2S2 to i8*)
 sil [global_init] @_TF6nesteda1xVS_2S2 : $@convention(thin) () -> Builtin.RawPointer {
@@ -86,9 +86,9 @@ bb0:
   return %1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define{{( protected)?}} { i32, i32, i32 } @_TF6nested1fFT_VS_2S2() {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i64, i32 } @_TF6nested1fFT_VS_2S2() {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2, %V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 0, i32 0)
+// CHECK: load i32, i32* getelementptr inbounds (%V18static_initializer2S2, %V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 0, i32 0)
 // CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2, %V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 1, i32 0)
 // CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2, %V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 2, i32 0, i32 0)
 sil @_TF6nested1fFT_VS_2S2 : $@convention(thin) () -> S2 {

@@ -36,7 +36,7 @@
 #ifdef __s390x__
 #define SWIFT_USE_SWIFTCALL 1
 #else
-#define SWIFT_USE_SWIFTCALL 0
+#define SWIFT_USE_SWIFTCALL 1
 #endif
 #endif
 

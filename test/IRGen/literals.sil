@@ -16,7 +16,7 @@ bb0:
   %0 = string_literal utf8 "help\tme"
   return %0 : $Builtin.RawPointer
 }
-// CHECK: define{{( protected)?}} i8* @utf8_literal() {{.*}} {
+// CHECK: define{{( protected)?}} swiftcc i8* @utf8_literal() {{.*}} {
 // CHECK:   ret i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[U8_0]], i64 0, i64 0)
 
 sil @utf8_literal_with_nul : $@convention(thin) () -> Builtin.RawPointer {
@@ -24,7 +24,7 @@ bb0:
   %0 = string_literal utf8 "\u{00}x\u{01ab}"
   return %0 : $Builtin.RawPointer
 }
-// CHECK: define{{( protected)?}} i8* @utf8_literal_with_nul() {{.*}} {
+// CHECK: define{{( protected)?}} swiftcc i8* @utf8_literal_with_nul() {{.*}} {
 // CHECK:   ret i8* getelementptr inbounds ([5 x i8], [5 x i8]* [[U8_1]], i64 0, i64 0)
 
 sil @utf16_literal : $@convention(thin) () -> Builtin.RawPointer {
@@ -32,7 +32,7 @@ bb0:
   %0 = string_literal utf16 "help\tme"
   return %0 : $Builtin.RawPointer
 }
-// CHECK: define{{( protected)?}} i8* @utf16_literal() {{.*}} {
+// CHECK: define{{( protected)?}} swiftcc i8* @utf16_literal() {{.*}} {
 // CHECK:   ret i8* bitcast ([8 x i16]* [[U16_0]] to i8*)
 
 sil @utf16_literal_with_nul : $@convention(thin) () -> Builtin.RawPointer {
@@ -40,6 +40,6 @@ bb0:
   %0 = string_literal utf16 "\u{00}x\u{01ab}"
   return %0 : $Builtin.RawPointer
 }
-// CHECK: define{{( protected)?}} i8* @utf16_literal_with_nul() {{.*}} {
+// CHECK: define{{( protected)?}} swiftcc i8* @utf16_literal_with_nul() {{.*}} {
 // CHECK:   ret i8* bitcast ([4 x i16]* [[U16_1]] to i8*)
 

@@ -188,6 +188,18 @@ void irgen::emitDeallocatePartialClassInstance(IRGenFunction &IGF,
                          {object, metadata, size, alignMask});
 }
 
+/// TODO: Fix copy'and'paste of this function. Probably move it to IRGenFunction.h/.cpp?
+static void addSwiftSelfAttributes(IRGenModule &IGM,
+                                   llvm::AttributeSet &attrs,
+                                   unsigned argIndex) {
+  static const llvm::Attribute::AttrKind attrKinds[] = {
+    llvm::Attribute::SwiftSelf,
+  };
+  auto argAttrs =
+      llvm::AttributeSet::get(IGM.LLVMContext, argIndex + 1, attrKinds);
+  attrs = attrs.addAttributes(IGM.LLVMContext, argIndex + 1, argAttrs);
+}
+
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
 static llvm::Function *createDtorFn(IRGenModule &IGM,
@@ -196,7 +208,11 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     llvm::Function::Create(IGM.DeallocatingDtorTy,
                            llvm::Function::PrivateLinkage,
                            "objectdestroy", &IGM.Module);
-  fn->setAttributes(IGM.constructInitialAttributes());
+  auto attrs = IGM.constructInitialAttributes();
+  addSwiftSelfAttributes(IGM, attrs, 0);
+  fn->setAttributes(attrs);
+  // TODO: Introduce and use IGM.SwiftCC here.
+  fn->setCallingConv(llvm::CallingConv::Swift);
 
   IRGenFunction IGF(IGM, fn);
   if (IGM.DebugInfo)
