@@ -1258,8 +1258,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Obviously, this must not happen at the top level, or the
       // algorithm would not terminate.
       addUnsolvedConstraint(Constraint::create(*this, kind, type1, type2,
-                                               DeclName(),
-                                               FunctionRefKind::Compound,
                                                getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
@@ -2195,6 +2193,7 @@ commit_to_conversions:
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConstructionConstraint(
     Type valueType, FunctionType *fnType, TypeMatchOptions flags,
+    DeclContext *useDC,
     FunctionRefKind functionRefKind, ConstraintLocator *locator) {
 
   // Desugar the value type.
@@ -2269,9 +2268,9 @@ ConstraintSystem::simplifyConstructionConstraint(
   }
 
   NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
-  if (isa<AbstractFunctionDecl>(DC))
+  if (isa<AbstractFunctionDecl>(useDC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto ctors = TC.lookupConstructors(DC, valueType, lookupOptions);
+  auto ctors = TC.lookupConstructors(useDC, valueType, lookupOptions);
   if (!ctors)
     return SolutionKind::Error;
 
@@ -2288,7 +2287,8 @@ ConstraintSystem::simplifyConstructionConstraint(
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
   addValueMemberConstraint(MetatypeType::get(valueType, TC.Context), name,
-                           FunctionType::get(tv, resultType), functionRefKind,
+                           FunctionType::get(tv, resultType),
+                           useDC, functionRefKind,
                            getConstraintLocator(
                              fnLocator, 
                              ConstraintLocator::ConstructorMember));
@@ -2330,7 +2330,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
         Constraint::create(*this, kind, type, protocol->getDeclaredType(),
-                           DeclName(), FunctionRefKind::Compound,
                            getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
@@ -2423,8 +2422,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
         Constraint::create(*this, ConstraintKind::CheckedCast, fromType,
-                           toType, DeclName(), FunctionRefKind::Compound,
-                           getConstraintLocator(locator)));
+                           toType, getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
 
@@ -2554,8 +2552,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
         Constraint::create(*this, ConstraintKind::OptionalObject, optLValueTy,
-                           second, DeclName(), FunctionRefKind::Compound,
-                           getConstraintLocator(locator)));
+                           second, getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
 
@@ -3123,6 +3120,7 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
                                            Type baseTy, DeclName member,
                                            Type memberTy,
+                                           DeclContext *useDC,
                                            FunctionRefKind functionRefKind,
                                            TypeMatchOptions flags,
                                            ConstraintLocatorBuilder locatorB) {
@@ -3154,8 +3152,8 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
     // If requested, generate a constraint.
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
-        Constraint::create(*this, kind, baseTy, memberTy, member,
-                           functionRefKind, locator));
+        Constraint::createMember(*this, kind, baseTy, memberTy, member, useDC,
+                                 functionRefKind, locator));
       return SolutionKind::Solved;
     }
 
@@ -3171,7 +3169,7 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
 
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
-    addOverloadSet(memberTy, result.ViableCandidates, locator,
+    addOverloadSet(memberTy, result.ViableCandidates, useDC, locator,
                    result.getFavoredChoice());
     
     return SolutionKind::Solved;
@@ -3209,7 +3207,7 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
     
     // Look through one level of optional.
     addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
-                             member, memberTy, functionRefKind, locator);
+                             member, memberTy, useDC, functionRefKind, locator);
     return SolutionKind::Solved;
   }
   return SolutionKind::Error;
@@ -3226,7 +3224,6 @@ ConstraintSystem::simplifyDefaultableConstraint(
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
         Constraint::create(*this, ConstraintKind::Defaultable, first, second,
-                           DeclName(), FunctionRefKind::Compound,
                            getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
@@ -3251,7 +3248,6 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
         Constraint::create(*this, ConstraintKind::DynamicTypeOf, type1, type2,
-                           DeclName(), FunctionRefKind::Compound,
                            getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
@@ -3313,8 +3309,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
         Constraint::create(*this, ConstraintKind::BridgingConversion, type1,
-                           type2, DeclName(), FunctionRefKind::Compound,
-                           getConstraintLocator(locator)));
+                           type2, getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
     
@@ -3538,9 +3533,7 @@ ConstraintSystem::simplifyEscapableFunctionOfConstraint(
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
         Constraint::create(*this, ConstraintKind::EscapableFunctionOf,
-                           type1, type2,
-                           DeclName(), FunctionRefKind::Compound,
-                           getConstraintLocator(locator)));
+                           type1, type2, getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
 
@@ -3613,8 +3606,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
         Constraint::create(*this, ConstraintKind::ApplicableFunction, type1,
-                           type2, DeclName(), FunctionRefKind::Compound,
-                           getConstraintLocator(locator)));
+                           type2, getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
     
@@ -3684,6 +3676,7 @@ retry:
 
     // Construct the instance from the input arguments.
     return simplifyConstructionConstraint(instance2, func1, subflags,
+                                          /*FIXME?*/ DC,
                                           FunctionRefKind::SingleApply,
                                           getConstraintLocator(outerLocator));
   }
@@ -3900,18 +3893,12 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       if (flags.contains(TMF_GenerateConstraints)) {
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                        baseType2, TC.getInt8Type(DC),
-                                       DeclName(),
-                                       FunctionRefKind::Compound,
                                        getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
                                         baseType2, TC.getUInt8Type(DC),
-                                        DeclName(),
-                                        FunctionRefKind::Compound,
                                         getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
                                         baseType2, TC.Context.TheEmptyTupleType,
-                                        DeclName(),
-                                        FunctionRefKind::Compound,
                                         getConstraintLocator(locator));
         
         Constraint *disjunctionChoices[] = {int8Con, uint8Con, voidCon};
@@ -4240,8 +4227,7 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
   case SolutionKind::Error:
     // Add a failing constraint, if needed.
     if (shouldAddNewFailingConstraint()) {
-      auto c = Constraint::create(*this, kind, first, second, DeclName(),
-                                  FunctionRefKind::Compound,
+      auto c = Constraint::create(*this, kind, first, second,
                                   getConstraintLocator(locator));
       if (isFavored) c->setFavored();
       addNewFailingConstraint(c);
@@ -4267,9 +4253,7 @@ void ConstraintSystem::addExplicitConversionConstraint(
   // Coercion (the common case).
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,
-                       fromType, toType, DeclName(),
-                       FunctionRefKind::Compound,
-                       locatorPtr);
+                       fromType, toType, locatorPtr);
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
 
@@ -4278,9 +4262,7 @@ void ConstraintSystem::addExplicitConversionConstraint(
     // The source type can be explicitly converted to the destination type.
     Constraint *bridgingConstraint =
       Constraint::create(*this, ConstraintKind::BridgingConversion,
-                         fromType, toType, DeclName(),
-                         FunctionRefKind::Compound,
-                         locatorPtr);
+                         fromType, toType, locatorPtr);
     constraints.push_back(bridgingConstraint);
   }
 
@@ -4358,7 +4340,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::BindOverload:
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),
-                    constraint.getOverloadChoice());
+                    constraint.getOverloadChoice(),
+                    constraint.getOverloadUseDC());
     return SolutionKind::Solved;
 
   case ConstraintKind::ConformsTo:
@@ -4402,6 +4385,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                     constraint.getFirstType(),
                                     constraint.getMember(),
                                     constraint.getSecondType(),
+                                    constraint.getMemberUseDC(),
                                     constraint.getFunctionRefKind(),
                                     TMF_GenerateConstraints,
                                     constraint.getLocator());
