@@ -283,19 +283,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     // If the previous statement didn't have a semicolon and this new
     // statement doesn't start a line, complain.
     if (!PreviousHadSemi && !Tok.isAtStartOfLine()) {
-      // Add a fix-it to remove the space in consecutive identifiers
-      // in a variable decl.
-      if (isSecondVarIdentifier()) {
-        diagnose(Tok.getLoc(), diag::repeated_identifier, "variable");
-        auto Previous = L->getTokenAt(PreviousLoc);
-        diagnoseConsecutiveIDs(Previous, Tok);
-        skipUntilDeclRBrace(tok::semi, tok::pound_endif);
-      } else {
-        SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
-        diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
-          .fixItInsert(EndOfPreviousLoc, ";");
-        // FIXME: Add semicolon to the AST?
-      }
+      SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
+      diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
+        .fixItInsert(EndOfPreviousLoc, ";");
+      // FIXME: Add semicolon to the AST?
     }
 
     ParserPosition BeginParserPosition;
