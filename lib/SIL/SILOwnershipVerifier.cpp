@@ -89,6 +89,7 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::TupleExtractInst:
   case ValueKind::StructExtractInst:
   case ValueKind::UncheckedEnumDataInst:
+  case ValueKind::MarkUninitializedInst:
     return true;
   default:
     return false;
@@ -288,7 +289,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, LoadBorrow)
 CONSTANT_OWNERSHIP_INST(Trivial, false, LoadUnowned)
 CONSTANT_OWNERSHIP_INST(Trivial, false, LoadWeak)
 CONSTANT_OWNERSHIP_INST(Trivial, false, MarkFunctionEscape)
-CONSTANT_OWNERSHIP_INST(Trivial, false, MarkUninitialized)
 CONSTANT_OWNERSHIP_INST(Trivial, false, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, false, ObjCExistentialMetatypeToObject)
 CONSTANT_OWNERSHIP_INST(Trivial, false, ObjCMetatypeToObject)
@@ -378,7 +378,8 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, DynamicMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ExistentialMetatype)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBox)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefElementAddr)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(
+    false, RefElementAddr) // TODO: Make this accept a borrowed value.
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefTailAddr)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefToRawPointer)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefToUnmanaged)
@@ -447,6 +448,7 @@ FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
 FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
+FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.

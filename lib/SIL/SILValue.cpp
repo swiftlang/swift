@@ -221,7 +221,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, IsNonnull)
 CONSTANT_OWNERSHIP_INST(Trivial, IsUnique)
 CONSTANT_OWNERSHIP_INST(Trivial, IsUniqueOrPinned)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkFunctionEscape)
-CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitialized)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, Metatype)
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCProtocol)           // Is this right?
@@ -406,6 +405,7 @@ FORWARDING_OWNERSHIP_INST(Tuple)
 FORWARDING_OWNERSHIP_INST(UncheckedRefCast)
 FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
+FORWARDING_OWNERSHIP_INST(MarkUninitialized)
 #undef FORWARDING_OWNERSHIP_INST
 
 ValueOwnershipKind
