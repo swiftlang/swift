@@ -5371,7 +5371,9 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
   }
 
   // Bridging from a Swift type to an Objective-C class type.
-  if (toType->isBridgeableObjectType()) {
+  if (toType->isAnyObject() ||
+      (fromType->getRValueType()->isPotentiallyBridgedValueType() &&
+       (toType->isBridgeableObjectType() || toType->isExistentialType()))) {
     // Bridging to Objective-C.
     Expr *objcExpr = bridgeToObjectiveC(expr);
     if (!objcExpr)
