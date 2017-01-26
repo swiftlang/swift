@@ -27,31 +27,17 @@ SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
                        bool External, uint64_t Hash,
                        ArrayRef<MappedRegion> MappedRegions,
                        ArrayRef<CounterExpression> Expressions) {
-  void *Buf = M.allocate(sizeof(SILCoverageMap), alignof(SILCoverageMap));
+  auto *Buf = M.allocate<SILCoverageMap>(1);
   SILCoverageMap *CM = ::new (Buf) SILCoverageMap(Hash, External);
 
-  // Store a copy of the name so that we own the lifetime.
-  char *AllocatedName = (char *)M.allocate(Filename.size(), alignof(char));
-  memcpy(AllocatedName, Filename.data(), Filename.size());
-  CM->Filename = StringRef(AllocatedName, Filename.size());
-
-  AllocatedName = (char *)M.allocate(Name.size(), alignof(char));
-  memcpy(AllocatedName, Name.data(), Name.size());
-  CM->Name = StringRef(AllocatedName, Name.size());
+  // Store a copy of the names so that we own the lifetime.
+  CM->Filename = M.allocateCopy(Filename);
+  CM->Name = M.allocateCopy(Name);
 
   // Since we have two arrays, we need to manually tail allocate each of them,
   // rather than relying on the flexible array trick.
-  size_t MappedRegionsSize = sizeof(MappedRegion) * MappedRegions.size();
-  CM->MappedRegions =
-      (MappedRegion *)M.allocate(MappedRegionsSize, alignof(MappedRegion));
-  CM->NumMappedRegions = MappedRegions.size();
-  memcpy(CM->MappedRegions, MappedRegions.begin(), MappedRegionsSize);
-
-  size_t ExpressionsSize = sizeof(CounterExpression) * Expressions.size();
-  CM->Expressions = (CounterExpression *)M.allocate(ExpressionsSize,
-                                                    alignof(CounterExpression));
-  CM->NumExpressions = Expressions.size();
-  memcpy(CM->Expressions, Expressions.begin(), ExpressionsSize);
+  CM->MappedRegions = M.allocateCopy(MappedRegions);
+  CM->Expressions = M.allocateCopy(Expressions);
 
   M.coverageMaps.push_back(CM);
   return CM;

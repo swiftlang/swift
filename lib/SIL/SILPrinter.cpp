@@ -2317,7 +2317,7 @@ void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
      << " " << getHash() << " {\t// " << demangleSymbol(getName())
      << "\n";
   if (PrintCtx.sortSIL())
-    std::sort(MappedRegions, MappedRegions + NumMappedRegions,
+    std::sort(MappedRegions.begin(), MappedRegions.end(),
               [](const MappedRegion &LHS, const MappedRegion &RHS) {
       return std::tie(LHS.StartLine, LHS.StartCol, LHS.EndLine, LHS.EndCol) <
              std::tie(RHS.StartLine, RHS.StartCol, RHS.EndLine, RHS.EndCol);
