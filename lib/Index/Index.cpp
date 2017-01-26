@@ -667,7 +667,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     // AbstractStorageDecl.
     assert(getParentDecl() == D);
     auto PreviousTop = EntitiesStack.pop_back_val();
-    bool initCallFailed = initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info);
+    bool initCallFailed = initCallRefIndexSymbol(getCurrentExpr(), getParentExpr(), D, Loc, Info);
     EntitiesStack.push_back(PreviousTop);
 
     if (initCallFailed)
@@ -809,11 +809,10 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
   }
 
   // Report the accessors that were utilized.
-  if (isa<AbstractStorageDecl>(D)) {
+  if (AbstractStorageDecl *ASD = dyn_cast<AbstractStorageDecl>(D)) {
     bool UsesGetter = Info.roles & (SymbolRoleSet)SymbolRole::Read;
     bool UsesSetter = Info.roles & (SymbolRoleSet)SymbolRole::Write;
 
-    AbstractStorageDecl *ASD = cast<AbstractStorageDecl>(D);
     if (UsesGetter)
       if (!reportPseudoAccessor(ASD, AccessorKind::IsGetter, /*IsRef=*/true,
                                 Loc))
@@ -977,10 +976,18 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
 bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
                                                  ValueDecl *D, SourceLoc Loc,
                                                  IndexSymbol &Info) {
-  if (!ParentE)
-    return true;
 
   if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
+    return true;
+
+  if (!CurrentE)
+    return false;
+
+  // FIXME: the below check maintains existing indexing behaviour with
+  // pseudo/accessor output but seems incorrect. E.g otherGlobal in:
+  // let global = otherGlobal
+  // will not have a parent expression so no accessor call is reported
+  if (!ParentE)
     return true;
 
   Info.roles |= (unsigned)SymbolRole::Call;
@@ -1022,10 +1029,13 @@ bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
 
 bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc, IndexSymbol &Info) {
 
-  if (!(CurrentE->getReferencedDecl() == D))
+  if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
 
-  if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
+  if (!CurrentE)
+    return false;
+
+  if (!(CurrentE->getReferencedDecl() == D))
     return true;
 
   AccessKind Kind = CurrentE->hasLValueAccessKind() ? CurrentE->getLValueAccessKind() : AccessKind::Read;
