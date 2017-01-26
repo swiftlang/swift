@@ -2395,14 +2395,10 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigStmt *ICS) {
 
 /// Apply the warnings managed by VarDeclUsageChecker to the top level
 /// code declarations that haven't been checked yet.
-void swift::performTopLevelDeclDiagnostics(SourceFile &MainFile) {
-  // The AST doesn't have TLCD in sil or library code, so don't diagnose.
-  if (!MainFile.isScriptMode())
-    return;
-  VarDeclUsageChecker checker(MainFile.getASTContext().Diags);
-  for (auto D : MainFile.Decls) {
-    D->walk(checker);
-  }
+void swift::
+performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl &TLCD) {
+  VarDeclUsageChecker checker(TC.Diags);
+  TLCD.walk(checker);
 }
 
 /// Perform diagnostics for func/init/deinit declarations.

@@ -692,7 +692,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       TC.processREPLTopLevel(SF, TLC, StartElem);
 
     typeCheckFunctionsAndExternalDecls(TC);
-    performTopLevelDeclDiagnostics(SF);
   }
 
   // Checking that benefits from having the whole module available.
