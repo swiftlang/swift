@@ -783,6 +783,8 @@ public struct ${Self}<Element>
   }
 
   // FIXME(ABI)#12 : move to an initializer on _Buffer.
+  // Make sure the compiler does not inline _copyBuffer to reduce code size.
+  @inline(never)
   static internal func _copyBuffer(_ buffer: inout _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
