@@ -2711,6 +2711,9 @@ enum class ParameterConvention {
   Direct_Guaranteed,
 };
 
+// Does this parameter convention require indirect storage? This reflects a
+// SILFunctionType's formal (immutable) conventions, as opposed to the transient
+// SIL conventions that dictate SILValue types.
 inline bool isIndirectFormalParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
@@ -2778,6 +2781,9 @@ public:
   ParameterConvention getConvention() const {
     return Convention;
   }
+  // Does this parameter convention require indirect storage? This reflects a
+  // SILFunctionType's formal (immutable) conventions, as opposed to the
+  // transient SIL conventions that dictate SILValue types.
   bool isFormalIndirect() const {
     return isIndirectFormalParameter(getConvention());
   }
@@ -2806,10 +2812,13 @@ public:
     return isGuaranteedParameter(getConvention());
   }
 
-  /// The formal SIL type determines reabstraction but may not correspond to
-  /// actual SIL argument types. Opaque values are formally indirect but
-  /// passed directly in canonical SIL.
-  SILType getFormalSILType() const; // in SILType.h
+  /// The SIL storage type determines the ABI for arguments based purely on the
+  /// formal parameter conventions. The actual SIL type for the argument values
+  /// may differ in canonical SIL. In particular, opaque values require indirect
+  /// storage. Therefore they will be passed using an indirect formal
+  /// convention, and this method will return an address type. However, in
+  /// canonical SIL the opaque arguments might not have an address type.
+  SILType getSILStorageType() const; // in SILType.h
 
   /// Return a version of this parameter info with the type replaced.
   SILParameterInfo getWithType(CanType type) const {
@@ -2879,7 +2888,7 @@ enum class ResultConvention {
   Autoreleased,
 };
 
-// Is this result passed indirectly for the purpos of reabstraction.
+// Does this result require indirect storage for the purpose of reabstraction?
 inline bool isIndirectFormalResult(ResultConvention convention) {
   return convention == ResultConvention::Indirect;
 }
@@ -2900,13 +2909,22 @@ public:
   ResultConvention getConvention() const {
     return TypeAndConvention.getInt();
   }
-  SILType getFormalSILType() const; // in SILType.h
+  /// The SIL storage type determines the ABI for arguments based purely on the
+  /// formal result conventions. The actual SIL type for the result values may
+  /// differ in canonical SIL. In particular, opaque values require indirect
+  /// storage. Therefore they will be returned using an indirect formal
+  /// convention, and this method will return an address type. However, in
+  /// canonical SIL the opaque results might not have an address type.
+  SILType getSILStorageType() const; // in SILType.h
 
   /// Return a version of this result info with the type replaced.
   SILResultInfo getWithType(CanType type) const {
     return SILResultInfo(type, getConvention());
   }
 
+  // Does this result convention require indirect storage? This reflects a
+  // SILFunctionType's formal (immutable) conventions, as opposed to the
+  // transient SIL conventions that dictate SILValue types.
   bool isFormalIndirect() const {
     return isIndirectFormalResult(getConvention());
   }

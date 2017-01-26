@@ -349,8 +349,8 @@ public:
 
       _require(result1.getConvention() == result2.getConvention(), what,
                complain("Different return value conventions"));
-      _require(areABICompatibleParamsOrReturns(result1.getFormalSILType(),
-                                               result2.getFormalSILType()),
+      _require(areABICompatibleParamsOrReturns(result1.getSILStorageType(),
+                                               result2.getSILStorageType()),
                what, complain("ABI-incompatible return values"));
     }
 
@@ -362,8 +362,8 @@ public:
       auto error2 = type2->getErrorResult();
       _require(error1.getConvention() == error2.getConvention(), what,
                complain("Different error result conventions"));
-      _require(areABICompatibleParamsOrReturns(error1.getFormalSILType(),
-                                               error2.getFormalSILType()),
+      _require(areABICompatibleParamsOrReturns(error1.getSILStorageType(),
+                                               error2.getSILStorageType()),
                what, complain("ABI-incompatible error results"));
     }
 
@@ -381,8 +381,8 @@ public:
                complainBy([=] {
                  llvm::dbgs() << "Different conventions for parameter " << i;
                }));
-      _require(areABICompatibleParamsOrReturns(param1.getFormalSILType(),
-                                               param2.getFormalSILType()),
+      _require(areABICompatibleParamsOrReturns(param1.getSILStorageType(),
+                                               param2.getSILStorageType()),
                what, complainBy([=] {
                  llvm::dbgs() << "ABI-incompatible types for parameter " << i;
                }));

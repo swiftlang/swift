@@ -2553,7 +2553,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     auto Self = getLocalValue(SelfName, SelfTy, InstLoc, B);
 
     auto PropTy = SubstInitStorageTy->getParameters()[0]
-                      .getFormalSILType()
+                      .getSILStorageType()
                       .getAddressType();
 
     ResultVal = B.createMarkUninitializedBehavior(InstLoc,

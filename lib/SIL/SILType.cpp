@@ -593,7 +593,7 @@ SILResultInfo::getOwnershipKind(SILModule &M,
                                 CanGenericSignature signature) const {
   if (signature)
     M.Types.pushGenericContext(signature);
-  bool IsTrivial = getFormalSILType().isTrivial(M);
+  bool IsTrivial = getSILStorageType().isTrivial(M);
   if (signature)
     M.Types.popGenericContext(signature);
   switch (getConvention()) {

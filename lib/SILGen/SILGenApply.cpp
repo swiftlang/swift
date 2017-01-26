@@ -2191,7 +2191,7 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
     // there are no abstraction differences, then just do it.
     if (initAddr && result.isFormalIndirect()
         && !hasAbstractionDifference(Rep, initAddr->getType(),
-                                     result.getFormalSILType())) {
+                                     result.getSILStorageType())) {
       IndirectResultAddrs.push_back(initAddr);
       return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
     }

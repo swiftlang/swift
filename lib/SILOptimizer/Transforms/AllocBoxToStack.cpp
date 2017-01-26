@@ -549,7 +549,7 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
   unsigned Index = Orig->getConventions().getSILArgIndexOfFirstParam();
   for (auto &param : OrigFTI->getParameters()) {
     if (count(PromotedArgIndices, Index)) {
-      auto boxTy = param.getFormalSILType().castTo<SILBoxType>();
+      auto boxTy = param.getSILStorageType().castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented");
       SILType paramTy;

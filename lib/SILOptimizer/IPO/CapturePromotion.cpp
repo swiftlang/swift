@@ -364,7 +364,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
     // Perform the proper conversions and then add it to the new parameter list
     // for the type.
     assert(!param.isFormalIndirect());
-    auto paramTy = param.getFormalSILType();
+    auto paramTy = param.getSILStorageType();
     auto paramBoxTy = paramTy.castTo<SILBoxType>();
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");

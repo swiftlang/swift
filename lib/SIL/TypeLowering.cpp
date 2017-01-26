@@ -2281,8 +2281,8 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
     if (result1.getConvention() != result2.getConvention())
       return ABIDifference::NeedsThunk;
 
-    if (checkForABIDifferences(result1.getFormalSILType(),
-                               result2.getFormalSILType())
+    if (checkForABIDifferences(result1.getSILStorageType(),
+                               result2.getSILStorageType())
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
   }
@@ -2296,8 +2296,8 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
     if (error1.getConvention() != error2.getConvention())
       return ABIDifference::NeedsThunk;
 
-    if (checkForABIDifferences(error1.getFormalSILType(),
-                               error2.getFormalSILType())
+    if (checkForABIDifferences(error1.getSILStorageType(),
+                               error2.getSILStorageType())
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
   }
@@ -2312,8 +2312,8 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
     // make sure to flip the relation around.
     std::swap(param1, param2);
 
-    if (checkForABIDifferences(param1.getFormalSILType(),
-                               param2.getFormalSILType())
+    if (checkForABIDifferences(param1.getSILStorageType(),
+                               param2.getSILStorageType())
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
   }

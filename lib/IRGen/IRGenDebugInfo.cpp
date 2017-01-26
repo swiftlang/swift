@@ -575,7 +575,7 @@ void IRGenDebugInfo::createParameterType(
 // ways.
 static SILType getResultTypeForDebugInfo(CanSILFunctionType fnTy) {
   if (fnTy->getNumResults() == 1) {
-    return fnTy->getResults()[0].getFormalSILType();
+    return fnTy->getResults()[0].getSILStorageType();
   } else if (!fnTy->getNumIndirectFormalResults()) {
     return fnTy->getDirectFormalResultsType();
   } else {

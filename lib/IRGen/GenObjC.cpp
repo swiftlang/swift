@@ -862,8 +862,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     }
     // Otherwise, we have a loadable type that can either be passed directly or
     // indirectly.
-    assert(info.getFormalSILType().isObject());
-    auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(info.getFormalSILType()));
+    assert(info.getSILStorageType().isObject());
+    auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(info.getSILStorageType()));
     auto schema = ti.getSchema();
 
     // Load the indirectly passed parameter.

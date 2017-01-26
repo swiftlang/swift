@@ -118,7 +118,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
   // a SubstitutedType's SIL argument index.
   unsigned IdxForParam = NumFormalIndirectResults;
   for (SILParameterInfo PI : SubstitutedType->getParameters()) {
-    if (PI.getFormalSILType().isLoadable(M)
+    if (PI.getSILStorageType().isLoadable(M)
         && PI.getConvention() == ParameterConvention::Indirect_In) {
       Conversions.set(IdxForParam);
     }

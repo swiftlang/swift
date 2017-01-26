@@ -726,10 +726,10 @@ clang::CanQualType IRGenModule::getClangType(SILType type) {
 }
 
 clang::CanQualType IRGenModule::getClangType(SILParameterInfo params) {
-  auto clangType = getClangType(params.getFormalSILType());
+  auto clangType = getClangType(params.getSILStorageType());
   // @block_storage types must be @inout_aliasable and have
   // special lowering
-  if (!params.getFormalSILType().is<SILBlockStorageType>()) {
+  if (!params.getSILStorageType().is<SILBlockStorageType>()) {
     if (params.isIndirectMutating()) {
       return getClangASTContext().getPointerType(clangType);
     }

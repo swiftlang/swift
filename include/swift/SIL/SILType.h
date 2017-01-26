@@ -881,11 +881,11 @@ inline SILType SILModuleConventions::getSILResultType(SILResultInfo result,
              : SILType::getPrimitiveObjectType(result.getType());
 }
 
-inline SILType SILParameterInfo::getFormalSILType() const {
+inline SILType SILParameterInfo::getSILStorageType() const {
   return SILModuleConventions::getSILParamType(*this, true);
 }
 
-inline SILType SILResultInfo::getFormalSILType() const {
+inline SILType SILResultInfo::getSILStorageType() const {
   return SILModuleConventions::getSILResultType(*this, true);
 }
 
