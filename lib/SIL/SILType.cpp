@@ -591,11 +591,8 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
 ValueOwnershipKind
 SILResultInfo::getOwnershipKind(SILModule &M,
                                 CanGenericSignature signature) const {
-  if (signature)
-    M.Types.pushGenericContext(signature);
+  GenericContextScope GCS(M.Types, signature);
   bool IsTrivial = getSILStorageType().isTrivial(M);
-  if (signature)
-    M.Types.popGenericContext(signature);
   switch (getConvention()) {
   case ResultConvention::Indirect:
     return SILModuleConventions(M).isSILIndirect(*this)
