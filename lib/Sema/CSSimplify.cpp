@@ -2032,22 +2032,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // Instance type check for the above. We are going to check conformance once
   // we hit commit_to_conversions below, but we have to add a token restriction
   // to ensure we wrap the metatype value in a metatype erasure.
-
-  // Disallow direct IUO-to-Any conversions. This will allow us to
-  // force-unwrap the IUO before attempting to convert, which makes it
-  // possible to disambiguate certain cases where we would otherwise
-  // consider an IUO or plain optional to be equally desirable choices
-  // where we really want the IUO to decay to a plain optional.
-  {
-    bool disallowExistentialConversion = false;
-    if (type2->isAny() &&
-        type1->getRValueType()->getImplicitlyUnwrappedOptionalObjectType())
-      disallowExistentialConversion = true;
-
-    if (concrete && !disallowExistentialConversion &&
-        type2->isExistentialType() && kind >= ConstraintKind::Subtype) {
-      conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
-    }
+  if (concrete && type2->isExistentialType() &&
+      kind >= ConstraintKind::Subtype) {
+    conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
   }
 
   // A value of type T! can be converted to type U if T is convertible
