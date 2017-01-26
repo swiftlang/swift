@@ -36,9 +36,16 @@ llvm::cl::opt<bool> PrintSwiftManglingStats(
     llvm::cl::desc("Print statistics about Swift symbol mangling"));
 
 static bool containsNonSwiftModule(Demangle::NodePointer Nd) {
-  if (Nd->getKind() == Demangle::Node::Kind::Module) {
-    if (Nd->getText() != "Swift")
-    return true;
+  switch (Nd->getKind()) {
+    case Demangle::Node::Kind::Module:
+      if (Nd->getText() != "Swift")
+        return true;
+      break;
+    case Demangle::Node::Kind::ReabstractionThunk:
+    case Demangle::Node::Kind::ReabstractionThunkHelper:
+      return true;
+    default:
+      break;
   }
 
   for (auto Child : *Nd) {
