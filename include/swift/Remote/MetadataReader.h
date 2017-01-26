@@ -763,7 +763,7 @@ public:
     }
     }
 
-    swift_unreachable("Unhandled MetadataKind in switch");
+    swift_runtime_unreachable("Unhandled MetadataKind in switch");
   }
 
   BuiltType readTypeFromMangledName(const char *MangledTypeName,

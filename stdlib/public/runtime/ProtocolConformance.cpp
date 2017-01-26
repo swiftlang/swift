@@ -118,7 +118,7 @@ const {
     return nullptr;
   }
 
-  swift_unreachable("Unhandled TypeMetadataRecordKind in switch.");
+  swift_runtime_unreachable("Unhandled TypeMetadataRecordKind in switch.");
 }
 
 template<>
@@ -133,7 +133,8 @@ const {
     return getWitnessTableAccessor()(type);
   }
 
-  swift_unreachable("Unhandled ProtocolConformanceReferenceKind in switch.");
+  swift_runtime_unreachable(
+      "Unhandled ProtocolConformanceReferenceKind in switch.");
 }
 
 namespace {

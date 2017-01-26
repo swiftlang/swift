@@ -186,7 +186,7 @@ public:
     }
     }
 
-    swift_unreachable("Bad TypeInfo kind");
+    swift_runtime_unreachable("Bad TypeInfo kind");
   }
 };
 
@@ -1043,7 +1043,7 @@ public:
       return nullptr;
     }
 
-    swift_unreachable("Unhandled FieldDescriptorKind in switch.");
+    swift_runtime_unreachable("Unhandled FieldDescriptorKind in switch.");
   }
 
   const TypeInfo *visitNominalTypeRef(const NominalTypeRef *N) {
@@ -1074,7 +1074,7 @@ public:
       return TC.getTypeInfo(TC.getThinFunctionTypeRef());
     }
 
-    swift_unreachable("Unhandled FunctionMetadataConvention in switch.");
+    swift_runtime_unreachable("Unhandled FunctionMetadataConvention in switch.");
   }
 
   const TypeInfo *visitProtocolTypeRef(const ProtocolTypeRef *P) {
@@ -1102,7 +1102,7 @@ public:
       return TC.getTypeInfo(TC.getAnyMetatypeTypeRef());
     }
 
-    swift_unreachable("Unhandled MetatypeRepresentation in switch.");
+    swift_runtime_unreachable("Unhandled MetatypeRepresentation in switch.");
   }
 
   const TypeInfo *
@@ -1285,7 +1285,7 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
     return nullptr;
   }
 
-  swift_unreachable("Unhandled FieldDescriptorKind in switch.");
+  swift_runtime_unreachable("Unhandled FieldDescriptorKind in switch.");
 }
 
 } // namespace reflection

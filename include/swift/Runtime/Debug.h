@@ -72,7 +72,7 @@ static inline void crash(const char *message) {
   CRSetCrashLogMessage(message);
 
   LLVM_BUILTIN_TRAP;
-  swift_unreachable("Expected compiler to crash.");
+  swift_runtime_unreachable("Expected compiler to crash.");
 }
 
 /// Report a corrupted type object.

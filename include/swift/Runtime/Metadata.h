@@ -1160,7 +1160,7 @@ public:
       return false;
     }
     
-    swift_unreachable("Unhandled MetadataKind in switch.");
+    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Is this metadata for an existential type?
@@ -1186,7 +1186,7 @@ public:
       return false;
     }
 
-    swift_unreachable("Unhandled MetadataKind in switch.");
+    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Is this either type metadata or a class object for any kind of class?
@@ -1267,7 +1267,7 @@ public:
       return RelativeDirectPointerNullPtrRef;
     }
 
-    swift_unreachable("Unhandled MetadataKind in switch.");
+    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Get the generic metadata pattern from which this generic type instance was

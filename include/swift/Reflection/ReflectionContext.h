@@ -454,7 +454,7 @@ private:
       return true;
     }
 
-    swift_unreachable("Unhandled MetadataSourceKind in switch.");
+    swift_runtime_unreachable("Unhandled MetadataSourceKind in switch.");
   }
 
   /// Read metadata for a captured generic type from a closure context.

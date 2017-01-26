@@ -1013,7 +1013,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   }
   }
 
-  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
+  swift_runtime_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 /******************************************************************************/
@@ -1276,7 +1276,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     return origSourceType;
   }
 
-  swift_unreachable("Unhandled MetadataKind in switch.");
+  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 const Metadata *
@@ -1388,7 +1388,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     return origSourceType;
   }
 
-  swift_unreachable("Unhandled MetadataKind in switch.");
+  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 /******************************************************************************/
@@ -1523,7 +1523,8 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
   }
   }
 
-  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
+  swift_runtime_unreachable(
+      "Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 static void unwrapExistential(OpaqueValue *src,
@@ -1994,7 +1995,7 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
     return _fail(src, srcType, targetType, flags);
   }
 
-  swift_unreachable("Unhandled MetadataKind in switch.");
+  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 /******************************************************************************/

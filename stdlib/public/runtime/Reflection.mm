@@ -1100,7 +1100,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
     swift::crash("Swift mirror lookup failure");
   }
 
-  swift_unreachable("Unhandled MetadataKind in switch.");
+  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 /// MagicMirror ownership-taking whole-value constructor.

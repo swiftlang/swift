@@ -381,7 +381,7 @@ public:
       return true;
     }
 
-    swift_unreachable("Unhandled ProtocolDispatchStrategy in switch.");
+    swift_runtime_unreachable("Unhandled ProtocolDispatchStrategy in switch.");
   }
   
   /// Return the identifier if this is a special runtime-known protocol.

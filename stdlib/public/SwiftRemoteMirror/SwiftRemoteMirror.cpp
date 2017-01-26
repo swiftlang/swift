@@ -177,7 +177,7 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   }
   }
 
-  swift_unreachable("Unhandled TypeInfoKind in switch");
+  swift_runtime_unreachable("Unhandled TypeInfoKind in switch");
 }
 
 static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {

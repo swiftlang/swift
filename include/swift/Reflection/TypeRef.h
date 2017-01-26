@@ -783,7 +783,7 @@ public:
 #include "swift/Reflection/TypeRefs.def"
     }
 
-    swift_unreachable("Unhandled TypeRefKind in switch.");
+    swift_runtime_unreachable("Unhandled TypeRefKind in switch.");
   }
 };
 
