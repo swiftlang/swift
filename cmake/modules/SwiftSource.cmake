@@ -451,12 +451,21 @@ function(_compile_swift_files
 
   # Then we can compile both the object files and the swiftmodule files
   # in parallel in this target for the object file, and ...
+
+  # Windows doesn't support long command line paths, of 8191 chars or over.
+  # We need to work around this by avoiding long command line arguments. This can be
+  # achieved by writing the list of file paths to a file, then reading that list
+  # in the Python script.
+  string(RANDOM file_name)
+  set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
+  file(WRITE "${file_path}" "${source_files}")
+  
   add_custom_command_target(
       dependency_target
       COMMAND
-        "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "${source_files}" --
+        "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
         "${swift_compiler_tool}" "${main_command}" ${swift_flags}
-        ${output_option} ${embed_bitcode_option} "${source_files}"
+        ${output_option} ${embed_bitcode_option} "@${file_path}"
       ${command_touch_standard_outputs}
       OUTPUT ${standard_outputs}
       DEPENDS
@@ -485,9 +494,9 @@ function(_compile_swift_files
     add_custom_command_target(
         module_dependency_target
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "${source_files}" --
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}" ${swift_flags}
-          "${source_files}"
+          "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS
@@ -502,9 +511,9 @@ function(_compile_swift_files
     add_custom_command_target(
         sib_dependency_target
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "${source_files}" --
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-sib" "-o" "${sib_file}" ${swift_flags} -Onone
-          "${source_files}"
+          "@${file_path}"
         ${command_touch_sib_outputs}
         OUTPUT ${sib_outputs}
         DEPENDS
@@ -518,9 +527,9 @@ function(_compile_swift_files
     add_custom_command_target(
         sibopt_dependency_target
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "${source_files}" --
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-sib" "-o" "${sibopt_file}" ${swift_flags} -O
-          "${source_files}"
+          "@${file_path}"
         ${command_touch_sibopt_outputs}
         OUTPUT ${sibopt_outputs}
         DEPENDS
@@ -535,9 +544,9 @@ function(_compile_swift_files
     add_custom_command_target(
         sibgen_dependency_target
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "${source_files}" --
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-sibgen" "-o" "${sibgen_file}" ${swift_flags}
-          "${source_files}"
+          "@${file_path}"
         ${command_touch_sibgen_outputs}
         OUTPUT ${sibgen_outputs}
         DEPENDS
