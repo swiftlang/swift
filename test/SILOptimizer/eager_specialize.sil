@@ -225,7 +225,7 @@ bb2:                                              // Preds: bb0
 // CHECK:   throw %{{.*}} : $Error
 
 // CHECK: bb4:                                              // Preds: bb1
-// CHECK:   %{{.*}} = witness_method $T, #IntegerArithmetic."/"!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : IntegerArithmetic> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   %{{.*}} = witness_method $T, #IntegerArithmetic."/"!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : IntegerArithmetic> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   apply %{{.*}}<T>({{.*}}) : $@convention(witness_method) <τ_0_0 where τ_0_0 : IntegerArithmetic> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   br bb5
 

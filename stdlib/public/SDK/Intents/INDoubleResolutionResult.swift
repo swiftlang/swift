@@ -13,8 +13,8 @@
 @_exported import Intents
 import Foundation
 
-#if os(iOS)
-@available(iOS 10.0, *)
+#if os(iOS) || os(watchOS)
+@available(iOS 10.0, watchOS 3.2, *)
 extension INDoubleResolutionResult {
     @nonobjc public
     static func confirmationRequired(with valueToConfirm: Double?) -> Self {

@@ -149,7 +149,7 @@ public class public_derived : public_base {
 sil private [noinline] @call_private : $@convention(thin) (@owned private_base) -> () {
 bb0(%0 : $private_base):
   debug_value %0 : $private_base
-  %2 = class_method %0 : $private_base, #private_base.foo!1 : (private_base) -> () -> () , $@convention(method) (@guaranteed private_base) -> ()
+  %2 = class_method %0 : $private_base, #private_base.foo!1 : (private_base) -> () -> (), $@convention(method) (@guaranteed private_base) -> ()
   %3 = apply %2(%0) : $@convention(method) (@guaranteed private_base) -> ()
   strong_release %0 : $private_base
   %5 = tuple ()
@@ -175,9 +175,9 @@ bb0(%0 : $private_base):
 sil hidden [noinline] @call_internal : $@convention(thin) (@owned internal_base) -> () {
 bb0(%0 : $internal_base):
   debug_value %0 : $internal_base
-  %2 = class_method %0 : $internal_base, #internal_base.foo!1 : (internal_base) -> () -> () , $@convention(method) (@guaranteed internal_base) -> ()
+  %2 = class_method %0 : $internal_base, #internal_base.foo!1 : (internal_base) -> () -> (), $@convention(method) (@guaranteed internal_base) -> ()
   %3 = apply %2(%0) : $@convention(method) (@guaranteed internal_base) -> ()
-  %4 = class_method %0 : $internal_base, #internal_base.bar!1 : (internal_base) -> () -> () , $@convention(method) (@guaranteed internal_base) -> ()
+  %4 = class_method %0 : $internal_base, #internal_base.bar!1 : (internal_base) -> () -> (), $@convention(method) (@guaranteed internal_base) -> ()
   %5 = apply %4(%0) : $@convention(method) (@guaranteed internal_base) -> ()
   strong_release %0 : $internal_base
   %7 = tuple ()
@@ -216,11 +216,11 @@ bb0(%0 : $internal_derived):
 sil hidden [noinline] @call_public : $@convention(thin) (@owned public_base) -> () {
 bb0(%0 : $public_base):
   debug_value %0 : $public_base
-  %2 = class_method %0 : $public_base, #public_base.foo!1 : (public_base) -> () -> () , $@convention(method) (@guaranteed public_base) -> ()
+  %2 = class_method %0 : $public_base, #public_base.foo!1 : (public_base) -> () -> (), $@convention(method) (@guaranteed public_base) -> ()
   %3 = apply %2(%0) : $@convention(method) (@guaranteed public_base) -> ()
-  %4 = class_method %0 : $public_base, #public_base.bar!1 : (public_base) -> () -> () , $@convention(method) (@guaranteed public_base) -> ()
+  %4 = class_method %0 : $public_base, #public_base.bar!1 : (public_base) -> () -> (), $@convention(method) (@guaranteed public_base) -> ()
   %5 = apply %4(%0) : $@convention(method) (@guaranteed public_base) -> ()
-  %6 = class_method %0 : $public_base, #public_base.baz!1 : (public_base) -> () -> () , $@convention(method) (@guaranteed public_base) -> ()
+  %6 = class_method %0 : $public_base, #public_base.baz!1 : (public_base) -> () -> (), $@convention(method) (@guaranteed public_base) -> ()
   %7 = apply %6(%0) : $@convention(method) (@guaranteed public_base) -> ()
   strong_release %0 : $public_base
   %9 = tuple ()
@@ -357,7 +357,7 @@ sil private [transparent] [thunk] @private_proto_1_private_class_witness : $@con
 bb0(%0 : $*private_proto_private_class):
   %1 = load %0 : $*private_proto_private_class
   strong_retain %1 : $private_proto_private_class
-  %3 = class_method %1 : $private_proto_private_class, #private_proto_private_class.theMethod!1 : (private_proto_private_class) -> () -> () , $@convention(method) (@guaranteed private_proto_private_class) -> ()
+  %3 = class_method %1 : $private_proto_private_class, #private_proto_private_class.theMethod!1 : (private_proto_private_class) -> () -> (), $@convention(method) (@guaranteed private_proto_private_class) -> ()
   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_private_class) -> ()
   strong_release %1 : $private_proto_private_class
   return %4 : $()
@@ -384,7 +384,7 @@ sil private [transparent] [thunk] @private_proto_2_internal_class_witness : $@co
 bb0(%0 : $*private_proto_internal_class):
   %1 = load %0 : $*private_proto_internal_class
   strong_retain %1 : $private_proto_internal_class
-  %3 = class_method %1 : $private_proto_internal_class, #private_proto_internal_class.theMethod!1 : (private_proto_internal_class) -> () -> () , $@convention(method) (@guaranteed private_proto_internal_class) -> ()
+  %3 = class_method %1 : $private_proto_internal_class, #private_proto_internal_class.theMethod!1 : (private_proto_internal_class) -> () -> (), $@convention(method) (@guaranteed private_proto_internal_class) -> ()
   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_internal_class) -> ()
   strong_release %1 : $private_proto_internal_class
   return %4 : $()
@@ -414,7 +414,7 @@ sil private [transparent] [thunk] @private_proto_3_public_class_witness : $@conv
 bb0(%0 : $*private_proto_public_class):
   %1 = load %0 : $*private_proto_public_class
   strong_retain %1 : $private_proto_public_class
-  %3 = class_method %1 : $private_proto_public_class, #private_proto_public_class.theMethod!1 : (private_proto_public_class) -> () -> () , $@convention(method) (@guaranteed private_proto_public_class) -> ()
+  %3 = class_method %1 : $private_proto_public_class, #private_proto_public_class.theMethod!1 : (private_proto_public_class) -> () -> (), $@convention(method) (@guaranteed private_proto_public_class) -> ()
   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_public_class) -> ()
   strong_release %1 : $private_proto_public_class
   return %4 : $()
@@ -442,7 +442,7 @@ sil private [transparent] [thunk] @private_proto_4_public_class_private_method_w
 bb0(%0 : $*private_proto_public_class_private_method):
   %1 = load %0 : $*private_proto_public_class_private_method
   strong_retain %1 : $private_proto_public_class_private_method
-  %3 = class_method %1 : $private_proto_public_class_private_method, #private_proto_public_class_private_method.theMethod!1 : (private_proto_public_class_private_method) -> () -> () , $@convention(method) (@guaranteed private_proto_public_class_private_method) -> ()
+  %3 = class_method %1 : $private_proto_public_class_private_method, #private_proto_public_class_private_method.theMethod!1 : (private_proto_public_class_private_method) -> () -> (), $@convention(method) (@guaranteed private_proto_public_class_private_method) -> ()
   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_public_class_private_method) -> ()
   strong_release %1 : $private_proto_public_class_private_method
   return %4 : $()

@@ -43,7 +43,7 @@ bb0(%0 : $ChildToResilientParent):
   debug_value %0 : $ChildToResilientParent, let, name "self", argno 1
   strong_retain %0 : $ChildToResilientParent
   %3 = upcast %0 : $ChildToResilientParent to $ResilientOutsideParent
-  %4 = super_method %0 : $ChildToResilientParent, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> () , $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
+  %4 = super_method %0 : $ChildToResilientParent, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   %5 = apply %4(%3) : $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   strong_release %3 : $ResilientOutsideParent
   %7 = tuple ()
@@ -63,7 +63,7 @@ sil @_T05super22ChildToResilientParentC11classMethodyyFZ : $@convention(method) 
 bb0(%0 : $@thick ChildToResilientParent.Type):
   debug_value %0 : $@thick ChildToResilientParent.Type, let, name "self", argno 1
   %2 = upcast %0 : $@thick ChildToResilientParent.Type to $@thick ResilientOutsideParent.Type
-  %3 = super_method %0 : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> () , $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
+  %3 = super_method %0 : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   %4 = apply %3(%2) : $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   %5 = tuple ()
   return %5 : $()
@@ -90,7 +90,7 @@ bb0(%0 : $ChildToFixedParent):
   debug_value %0 : $ChildToFixedParent, let, name "self", argno 1
   strong_retain %0 : $ChildToFixedParent
   %3 = upcast %0 : $ChildToFixedParent to $OutsideParent
-  %4 = super_method %0 : $ChildToFixedParent, #OutsideParent.method!1 : (OutsideParent) -> () -> () , $@convention(method) (@guaranteed OutsideParent) -> ()
+  %4 = super_method %0 : $ChildToFixedParent, #OutsideParent.method!1 : (OutsideParent) -> () -> (), $@convention(method) (@guaranteed OutsideParent) -> ()
   %5 = apply %4(%3) : $@convention(method) (@guaranteed OutsideParent) -> ()
   strong_release %3 : $OutsideParent
   %7 = tuple ()
@@ -110,7 +110,7 @@ sil @_T05super18ChildToFixedParentC11classMethodyyFZ : $@convention(method) (@th
 bb0(%0 : $@thick ChildToFixedParent.Type):
   debug_value %0 : $@thick ChildToFixedParent.Type, let, name "self", argno 1
   %2 = upcast %0 : $@thick ChildToFixedParent.Type to $@thick OutsideParent.Type
-  %3 = super_method %0 : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> () , $@convention(method) (@thick OutsideParent.Type) -> ()
+  %3 = super_method %0 : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> (), $@convention(method) (@thick OutsideParent.Type) -> ()
   %4 = apply %3(%2) : $@convention(method) (@thick OutsideParent.Type) -> ()
   %5 = tuple ()
   return %5 : $()
@@ -131,7 +131,7 @@ bb0(%0 : $ResilientOutsideChild):
   debug_value %0 : $ResilientOutsideChild, let, name "self", argno 1
   strong_retain %0 : $ResilientOutsideChild
   %3 = upcast %0 : $ResilientOutsideChild to $ResilientOutsideParent
-  %4 = super_method %0 : $ResilientOutsideChild, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> () , $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
+  %4 = super_method %0 : $ResilientOutsideChild, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   %5 = apply %4(%3) : $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   strong_release %3 : $ResilientOutsideParent
   %7 = tuple ()
@@ -155,7 +155,7 @@ sil @_T015resilient_class21ResilientOutsideChildC5superE20callSuperClassMethodyy
 bb0(%0 : $@thick ResilientOutsideChild.Type):
   debug_value %0 : $@thick ResilientOutsideChild.Type, let, name "self", argno 1
   %2 = upcast %0 : $@thick ResilientOutsideChild.Type to $@thick ResilientOutsideParent.Type
-  %3 = super_method %0 : $@thick ResilientOutsideChild.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> () , $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
+  %3 = super_method %0 : $@thick ResilientOutsideChild.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   %4 = apply %3(%2) : $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   %5 = tuple ()
   return %5 : $()
@@ -180,5 +180,39 @@ sil_vtable ChildToResilientParent {
 sil_vtable ChildToFixedParent {
   #OutsideParent.method!1: _T05super18ChildToFixedParentC6methodyyF	// super.ChildToFixedParent.method () -> ()
   #OutsideParent.classMethod!1: _T05super18ChildToFixedParentC11classMethodyyFZ	// static super.ChildToFixedParent.classMethod () -> ()
+}
+
+protocol Proto {
+}
+
+public class Base<T: Proto> {
+  func Method() { }
+}
+
+struct Str : Proto {
+}
+
+public class Derived : Base<Str> {
+  override func Method()
+}
+
+sil_vtable Base {
+}
+
+sil_vtable Derived {
+}
+
+// CHECK-LABEL: define{{.*}} @test_super_method_of_generic_base
+// CHECK: [[METADATA:%[0-9]+]] = call %swift.type* @_T05super4BaseCyAA3StrVGMa()
+// CHECK: [[BASEMETADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to void (%C5super4Base*)**
+// CHECK: [[GEP:%[0-9]+]] = getelementptr inbounds void (%C5super4Base*)*, void (%C5super4Base*)** %2, i64 12
+// CHECK: [[SUPERMT:%[0-9]+]] = load void (%C5super4Base*)*, void (%C5super4Base*)** [[GEP]]
+// CHECK: bitcast void (%C5super4Base*)* [[SUPERMT]] to i8*
+// CHECK: ret void
+sil @test_super_method_of_generic_base : $@convention(method) (@guaranteed Derived) -> () {
+bb0(%0 : $Derived):
+  %4 = super_method %0 : $Derived, #Base.Method!1 : <T where T : Proto> (Base<T>) -> () -> () , $@convention(method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed Base<τ_0_0>) -> ()
+  %7 = tuple ()
+  return %7 : $()
 }
 

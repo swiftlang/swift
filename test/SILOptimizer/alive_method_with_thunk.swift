@@ -15,10 +15,10 @@ public class DerivedClass: BaseClass<Double> {
 }
 
 // CHECK: sil_vtable BaseClass {
-// CHECK:  #BaseClass.doSomething!1: _{{.*}}// BaseClass.doSomething(A) -> Int
+// CHECK:  #BaseClass.doSomething!1: {{.*}} : _{{.*}}// BaseClass.doSomething(A) -> Int
 // CHECK: }
 
 // CHECK: sil_vtable DerivedClass {
-// CHECK:  #BaseClass.doSomething!1: public _{{.*}}// override DerivedClass.doSomething(Double) -> Int
+// CHECK:  #BaseClass.doSomething!1: {{.*}} : public _{{.*}}// override DerivedClass.doSomething(Double) -> Int
 // CHECK: }
 

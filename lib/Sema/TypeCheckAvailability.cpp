@@ -1405,10 +1405,11 @@ const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
 
 /// Returns true if some declaration lexically enclosing the reference
 /// matches the passed in predicate and false otherwise.
-static bool someEnclosingDeclMatches(SourceRange ReferenceRange,
-                                     const DeclContext *ReferenceDC,
-                                     TypeChecker &TC,
-                                     std::function<bool(const Decl *)> Pred) {
+static bool
+someEnclosingDeclMatches(SourceRange ReferenceRange,
+                         const DeclContext *ReferenceDC,
+                         TypeChecker &TC,
+                         llvm::function_ref<bool(const Decl *)> Pred) {
   ASTContext &Ctx = TC.Context;
 
   // Climb the DeclContext hierarchy to see if any of the containing
@@ -1500,7 +1501,7 @@ bool TypeChecker::isInsideUnavailableDeclaration(
 
 bool TypeChecker::isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
                                                 const DeclContext *ReferenceDC){
-  std::function<bool(const Decl *)> IsDeprecated = [](const Decl *D) {
+  auto IsDeprecated = [](const Decl *D) {
     return D->getAttrs().getDeprecated(D->getASTContext());
   };
 

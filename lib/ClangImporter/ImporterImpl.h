@@ -271,6 +271,7 @@ public:
   const bool ImportForwardDeclarations;
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
+  const bool BridgingHeaderExplicitlyRequested;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
@@ -410,37 +411,12 @@ public:
   LookupTableMap &getLookupTables() { return LookupTables; }
 
 private:
-  class EnumConstantDenseMapInfo {
-  public:
-    using PairTy = std::pair<const clang::EnumDecl *, llvm::APSInt>;
-    using PointerInfo = llvm::DenseMapInfo<const clang::EnumDecl *>;
-    static inline PairTy getEmptyKey() {
-      return {PointerInfo::getEmptyKey(), llvm::APSInt(/*bitwidth=*/1)};
-    }
-    static inline PairTy getTombstoneKey() {
-      return {PointerInfo::getTombstoneKey(), llvm::APSInt(/*bitwidth=*/1)};
-    }
-    static unsigned getHashValue(const PairTy &pair) {
-      return llvm::combineHashValue(PointerInfo::getHashValue(pair.first),
-                                    llvm::hash_value(pair.second));
-    }
-    static bool isEqual(const PairTy &lhs, const PairTy &rhs) {
-      return lhs == rhs;
-    }
-  };
-
   /// A mapping from imported declarations to their "alternate" declarations,
   /// for cases where a single Clang declaration is imported to two
   /// different Swift declarations.
   llvm::DenseMap<Decl *, TinyPtrVector<ValueDecl *>> AlternateDecls;
 
 public:
-  /// \brief Keep track of enum constant values that have been imported.
-  llvm::DenseMap<std::pair<const clang::EnumDecl *, llvm::APSInt>,
-                 EnumElementDecl *,
-                 EnumConstantDenseMapInfo>
-    EnumConstantValues;
-
   /// \brief Keep track of initializer declarations that correspond to
   /// imported methods.
   llvm::DenseMap<

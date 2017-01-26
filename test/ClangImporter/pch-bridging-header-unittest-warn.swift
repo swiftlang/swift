@@ -7,9 +7,6 @@
 // Should get a warning when we PCH-in the unit test header and then implicitly import the app header.
 // RUN: %target-swiftc_driver -D UNIT_TESTS -typecheck -Xfrontend -verify -enable-bridging-pch -import-objc-header %S/Inputs/unit-test-bridging-header-to-pch.h -I %t %s
 
-// Should get a warning when skip the unit test header entirely and implicitly import the app header.
-// RUN: %target-swiftc_driver -typecheck -Xfrontend -verify -I %t %s
-
 import App // expected-warning{{implicit import of bridging header 'app-bridging-header-to-pch.h' via module 'App' is deprecated and will be removed in a later version of Swift}}
 
 func test_all() {

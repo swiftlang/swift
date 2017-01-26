@@ -31,7 +31,7 @@ public func demo() {
 demo()
 
 // At -O0, we should have a single aggregate argument.
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s --check-prefix=CHECK-O0
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s --check-prefix=CHECK-O0
 // Verify that a reabstraction thunk does not have a line number.
 // CHECK-O0-NOT: DW_OP_bit_piece
 // CHECK-O0-NOT: DW_OP_bit_piece
@@ -39,4 +39,4 @@ demo()
 // CHECK-O0-NOT: DW_OP_bit_piece
 // CHECK-O0: !DILocalVariable(name: "b", arg: 2{{.*}} line: 17,
 // CHECK-O0-NOT: DW_OP_bit_piece
-// CHECK-O0: !DISubprogram(linkageName: "_TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_",
+// CHECK-O0: !DISubprogram(linkageName: "_T0SSSSSbIxxxd_SSSSSbIxiid_TR",

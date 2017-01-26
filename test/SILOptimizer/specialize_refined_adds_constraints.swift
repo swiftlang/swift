@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
 
 protocol P { }
 
@@ -22,7 +22,7 @@ struct X : R {
   func assoc() -> Assoc { return Assoc() }
 }
 
-// CHECK-LABEL: sil shared @_TTSg5V35specialize_refined_adds_constraints1XS0_S_1RS____TF35specialize_refined_adds_constraints1guRxS_1RrFxT_ :
+// CHECK-LABEL: sil shared @_T035specialize_refined_adds_constraints1gyxAA1RRzlFAA1XV_Tg5 :
 func test(x: X) {
   g(x)
 }

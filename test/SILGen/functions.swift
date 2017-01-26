@@ -191,7 +191,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
   // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
   // CHECK: [[K:%[0-9]+]] = load [trivial] [[KADDR]]
-  // CHECK: [[GETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!getter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 , $@convention(method) (Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> Builtin.Int64
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!getter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64) -> Builtin.Int64, $@convention(method) (Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> Builtin.Int64
   // CHECK: apply [[GETTER]]([[J]], [[K]], [[C]])
   // CHECK: destroy_value [[C]]
   i = c[j, k]
@@ -200,7 +200,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
   // CHECK: [[K:%[0-9]+]] = load [trivial] [[KADDR]]
-  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> () , $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> (), $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
   // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[C]])
   // CHECK: destroy_value [[C]]
   c[i, j] = k

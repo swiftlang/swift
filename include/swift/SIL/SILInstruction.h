@@ -220,10 +220,10 @@ public:
     return i >= getNumOperands() - getNumTypeDependentOperands();
   }
 
-  bool isTypeDependentOperand(Operand &O) const {
-    assert(O.getUser() == this &&
+  bool isTypeDependentOperand(const Operand &Op) const {
+    assert(Op.getUser() == this &&
            "Operand does not belong to a SILInstruction");
-    return isTypeDependentOperand(O.getOperandNumber());
+    return isTypeDependentOperand(Op.getOperandNumber());
   }
 
   SILValue getOperand(unsigned Num) const {

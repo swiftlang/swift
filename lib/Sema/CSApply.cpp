@@ -5371,7 +5371,9 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
   }
 
   // Bridging from a Swift type to an Objective-C class type.
-  if (toType->isBridgeableObjectType()) {
+  if (toType->isAnyObject() ||
+      (fromType->getRValueType()->isPotentiallyBridgedValueType() &&
+       (toType->isBridgeableObjectType() || toType->isExistentialType()))) {
     // Bridging to Objective-C.
     Expr *objcExpr = bridgeToObjectiveC(expr);
     if (!objcExpr)
@@ -7182,7 +7184,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Form a reference to the witness itself.
   Type openedFullType, openedType;
   std::tie(openedFullType, openedType)
-    = cs.getTypeOfMemberReference(base->getType(), witness,
+    = cs.getTypeOfMemberReference(base->getType(), witness, dc,
                                   /*isTypeReference=*/false,
                                   /*isDynamicResult=*/false,
                                   FunctionRefKind::DoubleApply,

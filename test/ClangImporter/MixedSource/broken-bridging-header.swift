@@ -19,7 +19,7 @@
 
 // REQUIRES: objc_interop
 
-import HasBridgingHeader // expected-error {{failed to import bridging header}} expected-error {{failed to load module 'HasBridgingHeader'}} expected-warning {{implicit import of bridging header}}
+import HasBridgingHeader // expected-error {{failed to import bridging header}} expected-error {{failed to load module 'HasBridgingHeader'}}
 
 // MISSING-HEADER: error: bridging header '{{.*}}/fake.h' does not exist
 // MISSING-HEADER-NOT: error:

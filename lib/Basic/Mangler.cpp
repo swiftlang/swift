@@ -28,17 +28,21 @@ using namespace NewMangling;
 
 llvm::cl::opt<bool> NewManglingForTests(
                        "new-mangling-for-tests", llvm::cl::init(false),
-                       llvm::cl::desc("Use new mangling for compielr tests"));
+                       llvm::cl::desc("Use new mangling for compiler tests"));
 
-#ifndef NDEBUG
-llvm::cl::opt<bool> PrintSwiftManglingStats(
-    "print-swift-mangling-stats", llvm::cl::init(false),
-    llvm::cl::desc("Print statistics about Swift symbol mangling"));
+#ifndef USE_NEW_MANGLING
 
 static bool containsNonSwiftModule(Demangle::NodePointer Nd) {
-  if (Nd->getKind() == Demangle::Node::Kind::Module) {
-    if (Nd->getText() != "Swift")
-    return true;
+  switch (Nd->getKind()) {
+    case Demangle::Node::Kind::Module:
+      if (Nd->getText() != "Swift")
+        return true;
+      break;
+    case Demangle::Node::Kind::ReabstractionThunk:
+    case Demangle::Node::Kind::ReabstractionThunkHelper:
+      return true;
+    default:
+      break;
   }
 
   for (auto Child : *Nd) {
@@ -47,6 +51,8 @@ static bool containsNonSwiftModule(Demangle::NodePointer Nd) {
   }
   return false;
 }
+
+#endif // USE_NEW_MANGLING
 
 bool swift::useNewMangling(Demangle::NodePointer Node) {
 #ifdef USE_NEW_MANGLING
@@ -57,6 +63,12 @@ bool swift::useNewMangling(Demangle::NodePointer Node) {
   return false;
 #endif
 }
+
+#ifndef NDEBUG
+
+llvm::cl::opt<bool> PrintSwiftManglingStats(
+    "print-swift-mangling-stats", llvm::cl::init(false),
+    llvm::cl::desc("Print statistics about Swift symbol mangling"));
 
 namespace {
 
@@ -175,17 +187,18 @@ void Mangler::recordOpStatImpl(StringRef op, size_t OldPos) {
 std::string NewMangling::selectMangling(const std::string &Old,
                                         const std::string &New,
                                         bool compareTrees) {
+  using namespace Demangle;
+
+  NodePointer NewNode = demangleSymbolAsNode(New);
+
 #ifndef NDEBUG
 #ifdef CHECK_MANGLING_AGAINST_OLD
 
   static int numCmp = 0;
-  using namespace Demangle;
 
   NodePointer OldNode;
   if (compareTrees)
     OldNode = demangleSymbolAsNode(Old);
-
-  NodePointer NewNode = demangleSymbolAsNode(New);
 
   if (StringRef(New).startswith(MANGLING_PREFIX_STR) &&
       (!NewNode || treeContains(NewNode, Demangle::Node::Kind::Suffix))) {
