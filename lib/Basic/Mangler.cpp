@@ -175,17 +175,18 @@ void Mangler::recordOpStatImpl(StringRef op, size_t OldPos) {
 std::string NewMangling::selectMangling(const std::string &Old,
                                         const std::string &New,
                                         bool compareTrees) {
+  using namespace Demangle;
+
+  NodePointer NewNode = demangleSymbolAsNode(New);
+
 #ifndef NDEBUG
 #ifdef CHECK_MANGLING_AGAINST_OLD
 
   static int numCmp = 0;
-  using namespace Demangle;
 
   NodePointer OldNode;
   if (compareTrees)
     OldNode = demangleSymbolAsNode(Old);
-
-  NodePointer NewNode = demangleSymbolAsNode(New);
 
   if (StringRef(New).startswith(MANGLING_PREFIX_STR) &&
       (!NewNode || treeContains(NewNode, Demangle::Node::Kind::Suffix))) {
