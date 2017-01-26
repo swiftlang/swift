@@ -232,7 +232,7 @@ struct DoomedStruct : Doomed {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*DoomedClass
-// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $DoomedClass, #DoomedClass.check!1 : (DoomedClass) -> () throws -> () , $@convention(method) (@guaranteed DoomedClass) -> @error Error
+// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $DoomedClass, #DoomedClass.check!1 : (DoomedClass) -> () throws -> (), $@convention(method) (@guaranteed DoomedClass) -> @error Error
 // CHECK-NEXT: try_apply [[T0]]([[SELF]])
 // CHECK:    bb1([[T0:%.*]] : $()):
 // CHECK:      [[T0:%.*]] = tuple ()
@@ -265,7 +265,7 @@ struct HappyStruct : Doomed {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*HappyClass
-// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> () , $@convention(method) (@guaranteed HappyClass) -> ()
+// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> (), $@convention(method) (@guaranteed HappyClass) -> ()
 // CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:      [[T1:%.*]] = tuple ()
 // CHECK:      destroy_value [[SELF]] : $HappyClass
@@ -894,13 +894,13 @@ func testOptionalTryNeverFailsAddressOnlyVar<T>(_ obj: T) {
 class SomeErrorClass : Error { }
 
 // CHECK-LABEL: sil_vtable SomeErrorClass
-// CHECK-NEXT:   #SomeErrorClass.deinit!deallocator: _TFC6errors14SomeErrorClassD
-// CHECK-NEXT:   #SomeErrorClass.init!initializer.1: _TFC6errors14SomeErrorClasscfT_S0_
+// CHECK-NEXT:   #SomeErrorClass.deinit!deallocator: {{.*}} : _TFC6errors14SomeErrorClassD
+// CHECK-NEXT:   #SomeErrorClass.init!initializer.1: {{.*}} : _TFC6errors14SomeErrorClasscfT_S0_
 // CHECK-NEXT: }
 
 class OtherErrorSub : OtherError { }
 
 // CHECK-LABEL: sil_vtable OtherErrorSub {
-// CHECK-NEXT:  #OtherError.init!initializer.1: _TFC6errors13OtherErrorSubcfT_S0_     // OtherErrorSub.init() -> OtherErrorSub
-// CHECK-NEXT:  #OtherErrorSub.deinit!deallocator: _TFC6errors13OtherErrorSubD        // OtherErrorSub.__deallocating_deinit
+// CHECK-NEXT:  #OtherError.init!initializer.1: {{.*}} : _TFC6errors13OtherErrorSubcfT_S0_     // OtherErrorSub.init() -> OtherErrorSub
+// CHECK-NEXT:  #OtherErrorSub.deinit!deallocator: {{.*}} : _TFC6errors13OtherErrorSubD        // OtherErrorSub.__deallocating_deinit
 // CHECK-NEXT:}

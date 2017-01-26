@@ -126,7 +126,7 @@ func test10(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
   // CHECK:      [[G_COPY:%.*]] = copy_value [[G]]
   // CHECK-NEXT: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY]] : $Gizmo to $NSObject
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G_COPY]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type! , $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G_COPY]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type!, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
   // CHECK:      select_enum [[OPT_OBJC]]
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
@@ -144,7 +144,7 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
   // CHECK: [[G_COPY:%.*]] = copy_value [[G]]
   // CHECK: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY:%[0-9]+]] : $Gizmo to $NSObject
-  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G_COPY]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type! , $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G_COPY]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type!, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
   // CHECK:      select_enum [[OPT_OBJC]]
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
@@ -188,7 +188,7 @@ func useInnerPointer(_ p: UnsafeMutableRawPointer) {}
 // CHECK-LABEL: sil hidden @_T026objc_ownership_conventions18innerPointerMethodySo5GizmoCF : $@convention(thin) (@owned Gizmo) -> () {
 // CHECK: bb0([[ARG:%.*]] : $Gizmo):
 // CHECK:         [[USE:%.*]] = function_ref @_T026objc_ownership_conventions15useInnerPointer{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] [[ARG]] : $Gizmo, #Gizmo.getBytes!1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer , $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] [[ARG]] : $Gizmo, #Gizmo.getBytes!1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer, $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
 // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // SEMANTIC ARC TODO: The apply below /should/ be on ARG_COPY
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]]([[ARG]])
@@ -202,7 +202,7 @@ func innerPointerMethod(_ g: Gizmo) {
 // CHECK-LABEL: sil hidden @_T026objc_ownership_conventions20innerPointerPropertyySo5GizmoCF : $@convention(thin) (@owned Gizmo) -> () {
 // CHECK:       bb0([[ARG:%.*]] : $Gizmo):
 // CHECK:         [[USE:%.*]] = function_ref @_T026objc_ownership_conventions15useInnerPointer{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] [[ARG]] : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer , $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] [[ARG]] : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer, $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
 // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // SEMANTIC ARC TODO: The apply below should be on ARG_COPY
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]]([[ARG]])

@@ -812,7 +812,7 @@ bb1:
 // CHECK-NOT: strong_retain
   %17 = load %0 : $*Test
   strong_retain %17 : $Test
-  %19 = class_method %17 : $Test, #Test.testing!1 : (Test) -> () -> UInt64 , $@convention(method) (@guaranteed Test) -> UInt64
+  %19 = class_method %17 : $Test, #Test.testing!1 : (Test) -> () -> UInt64, $@convention(method) (@guaranteed Test) -> UInt64
   %20 = load %7 : $*UInt64
   checked_cast_br [exact] %17 : $Test to $Test, bb3, bb4
 bb2:
