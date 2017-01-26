@@ -20,13 +20,12 @@
 #include "ImageInspection.h"
 #include <memory>
 
-using namespace swift;
-
 // This is called at startup and by each shared object as it is dlopen()'d to
 // allow the section data for the object to be loaded.
 __attribute__((constructor))
 static void sectionDataInit() {
-  addNewDSOImage(reinterpret_cast<void *>(std::addressof(sectionDataInit)));
+  void *addr = reinterpret_cast<void *>(std::addressof(sectionDataInit));
+  swift_addNewDSOImage(addr);
 }
 
 #endif

@@ -18,6 +18,8 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
+set(section_magic_compile_flags ${swift_runtime_compile_flags})
+
 list(APPEND swift_runtime_compile_flags
      "-D__SWIFT_CURRENT_DYLIB=swiftCore")
 
@@ -132,19 +134,19 @@ endforeach()
 
 add_swift_library(section_magic_loader OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     ImageInspectionInit.cpp
-    C_COMPILE_FLAGS ${swift_runtime_compile_flags}
+    C_COMPILE_FLAGS ${section_magic_compile_flags}
     TARGET_SDKS "${ELFISH_SDKS}"
     LINK_FLAGS ${swift_runtime_linker_flags}
     INSTALL_IN_COMPONENT never_install)
 add_swift_library(section_magic_begin OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
-    C_COMPILE_FLAGS ${swift_runtime_compile_flags} "-DSWIFT_BEGIN"
+    C_COMPILE_FLAGS ${section_magic_compile_flags} "-DSWIFT_BEGIN"
     TARGET_SDKS "${ELFISH_SDKS}"
     LINK_FLAGS ${swift_runtime_linker_flags}
     INSTALL_IN_COMPONENT never_install)
 add_swift_library(section_magic_end OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
-    C_COMPILE_FLAGS ${swift_runtime_compile_flags} "-DSWIFT_END"
+    C_COMPILE_FLAGS ${section_magic_compile_flags} "-DSWIFT_END"
     LINK_FLAGS ${swift_runtime_linker_flags}
     TARGET_SDKS "${ELFISH_SDKS}"
     INSTALL_IN_COMPONENT never_install)

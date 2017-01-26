@@ -19,11 +19,9 @@
 #if defined(__ELF__) || defined(__ANDROID__)
 
 #include "ImageInspection.h"
-#include "../SwiftShims/Visibility.h"
-#include <atomic>
+#include <dlfcn.h>
 #include <elf.h>
 #include <link.h>
-#include <dlfcn.h>
 #include <string.h>
 
 using namespace swift;
@@ -37,9 +35,6 @@ static const char ProtocolConformancesSymbol[] =
 static const char TypeMetadataRecordsSymbol[] =
   ".swift2_type_metadata_start";
 
-static std::atomic<bool> didInitializeProtocolConformanceLookup;
-static std::atomic<bool> didInitializeTypeMetadataLookup;
-
 /// Context arguments passed down from dl_iterate_phdr to its callback.
 struct InspectArgs {
   /// Symbol name to look up.
@@ -47,19 +42,19 @@ struct InspectArgs {
   /// Callback function to invoke with the metadata block.
   void (*addBlock)(const void *start, uintptr_t size);
   /// Set to true when initialize*Lookup() is called.
-  std::atomic<bool> *didInitializeLookup;
+  bool didInitializeLookup;
 };
 
 static InspectArgs ProtocolConformanceArgs = {
   ProtocolConformancesSymbol,
   addImageProtocolConformanceBlockCallback,
-  &didInitializeProtocolConformanceLookup
+  false
 };
 
 static InspectArgs TypeMetadataRecordArgs = {
   TypeMetadataRecordsSymbol,
   addImageTypeMetadataRecordBlockCallback,
-  &didInitializeTypeMetadataLookup
+  false
 };
 
 
@@ -84,7 +79,7 @@ static SectionInfo getSectionInfo(const char *imageName,
 
 static int iteratePHDRCallback(struct dl_phdr_info *info,
                                size_t size, void *data) {
-  const InspectArgs *inspectArgs = reinterpret_cast<const InspectArgs *>(data);
+  InspectArgs *inspectArgs = reinterpret_cast<InspectArgs *>(data);
   const char *fname = info->dlpi_name;
 
   // While dl_iterate_phdr() is in progress it holds a lock to prevent other
@@ -92,7 +87,7 @@ static int iteratePHDRCallback(struct dl_phdr_info *info,
   // that addNewDSOImage() sees a consistent state. If it was set outside the
   // dl_interate_phdr() call then it could result in images being missed or
   // added twice.
-  inspectArgs->didInitializeLookup->store(true, std::memory_order_release);
+  inspectArgs->didInitializeLookup = true;
 
   if (fname == nullptr || fname[0] == '\0') {
     // The filename may be null for both the dynamic loader and main executable.
@@ -147,12 +142,12 @@ void swift::initializeTypeMetadataRecordLookup() {
 // dladdr() to dlopen() the image after the appropiate initialize*Lookup()
 // function has been called.
 SWIFT_RUNTIME_EXPORT
-void swift::addNewDSOImage(const void *addr) {
-  if (didInitializeProtocolConformanceLookup.load(std::memory_order_acquire)) {
+void swift_addNewDSOImage(const void *addr) {
+  if (ProtocolConformanceArgs.didInitializeLookup) {
     addBlockInImage(&ProtocolConformanceArgs, addr);
   }
 
-  if (didInitializeTypeMetadataLookup.load(std::memory_order_acquire)) {
+  if (TypeMetadataRecordArgs.didInitializeLookup) {
     addBlockInImage(&TypeMetadataRecordArgs, addr);
   }
 }

@@ -19,6 +19,7 @@
 #ifndef SWIFT_RUNTIME_IMAGE_INSPECTION_H
 #define SWIFT_RUNTIME_IMAGE_INSPECTION_H
 
+#include "ImageInspectionELF.h"
 #include <cstdint>
 
 namespace swift {
@@ -29,18 +30,6 @@ namespace swift {
     const char *symbolName;
     void *symbolAddress;
   };
-
-#if defined(__ELF__) || defined(__ANDROID__)
-
-struct SectionInfo {
-  uint64_t size;
-  const char *data;
-};
-
-// Called by injected constructors when a dynamic library is loaded.
-void addNewDSOImage(const void *addr);
-
-#endif // defined(__ELF__) || defined(__ANDROID__)
 
 /// Load the metadata from the image necessary to find a type's
 /// protocol conformance.
