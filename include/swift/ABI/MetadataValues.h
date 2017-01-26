@@ -20,7 +20,7 @@
 #define SWIFT_ABI_METADATAVALUES_H
 
 #include "swift/AST/Ownership.h"
-#include "swift/Basic/Unreachable.h"
+#include "swift/Runtime/Unreachable.h"
 
 #include <stdlib.h>
 #include <stdint.h>

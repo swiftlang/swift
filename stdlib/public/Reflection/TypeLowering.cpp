@@ -19,9 +19,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Reflection/TypeLowering.h"
-#include "swift/Basic/Unreachable.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/Runtime/Unreachable.h"
 
 #include <iostream>
 

@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_UNREACHABLE_H
-#define SWIFT_BASIC_UNREACHABLE_H
+#ifndef SWIFT_RUNTIME_UNREACHABLE_H
+#define SWIFT_RUNTIME_UNREACHABLE_H
 
 #include "llvm/Support/Compiler.h"
 #include <assert.h>
@@ -29,4 +29,4 @@ inline static void swift_unreachable(const char* msg) {
   abort();
 }
 
-#endif // SWIFT_BASIC_UNREACHABLE_H
+#endif // SWIFT_RUNTIME_UNREACHABLE_H

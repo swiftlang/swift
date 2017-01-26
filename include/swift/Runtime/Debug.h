@@ -19,9 +19,9 @@
 
 #include <llvm/Support/Compiler.h>
 #include <stdint.h>
-#include "swift/Basic/Unreachable.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Unreachable.h"
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 

@@ -21,7 +21,7 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Unreachable.h"
+#include "swift/Runtime/Unreachable.h"
 
 #include <vector>
 #include <unordered_map>
