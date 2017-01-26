@@ -193,8 +193,46 @@ foreach(sdk ${ELFISH_SDKS})
         "${section_magic_${arch_suffix}_end_object}")
 
     swift_install_in_component(stdlib
-        FILES "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o" "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-        DESTINATION "lib/swift/${arch_subdir}")
+        FILES
+            "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
+            "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
+        DESTINATION
+            "lib/swift/${arch_subdir}")
+
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      # Static lib versions of swift_begin.o and swift_end.o
+      add_custom_command_target(static_section_magic_${arch_suffix}_begin_object
+        COMMAND
+            "${CMAKE_COMMAND}" -E copy
+            "${section_magic_begin_obj}"
+            "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_begin.o"
+        OUTPUT
+            "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_begin.o"
+        DEPENDS
+            "${section_magic_begin_obj}")
+
+      add_custom_command_target(static_section_magic_${arch_suffix}_end_object
+        COMMAND
+            "${CMAKE_COMMAND}" -E copy
+            "${section_magic_end_obj}"
+            "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_end.o"
+        OUTPUT
+            "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_end.o"
+        DEPENDS
+            "${section_magic_end_obj}")
+
+      list(APPEND object_target_list
+            "${static_section_magic_${arch_suffix}_begin_object}"
+            "${static_section_magic_${arch_suffix}_end_object}")
+
+      swift_install_in_component(stdlib
+          FILES
+              "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_begin.o"
+              "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_end.o"
+          DESTINATION
+              "lib/swift_static/${arch_subdir}")
+    endif()
+
   endforeach()
 endforeach()
 

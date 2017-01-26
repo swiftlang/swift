@@ -28,11 +28,6 @@ extern const Section typeMetadataStart asm(".swift2_type_metadata_start");
 
 using namespace swift;
 
-// Called from ImageInspectionInit
-void
-swift::addNewDSOImage(const void *addr) {
-}
-
 static SectionInfo
 getSectionInfo(const Section *section) {
   SectionInfo info;
