@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
-
-// FIXME: rdar://30181104 SILOptimizer/swap_refcnt.swift fails on linux.
-// UNSUPPORTED: OS=linux-gnu
+// REQUIRES: rdar:30181104 SILOptimizer/swap_refcnt.swift fails on linux.
 
 // Make sure we can swap two values in an array without retaining anything.
 
