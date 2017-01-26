@@ -381,6 +381,15 @@ typedef NS_ENUM(unsigned char, NSAliasesEnum) {
   NSAliasesDifferentValue = 2
 };
 
+typedef NS_ENUM(unsigned char, NSUnavailableAliasesEnum) {
+  NSUnavailableAliasesOriginalAU = 0,
+  NSUnavailableAliasesAliasAU __attribute__((unavailable)) = 0,
+  NSUnavailableAliasesOriginalUA __attribute__((unavailable)) = 1,
+  NSUnavailableAliasesAliasUA = 1,
+  NSUnavailableAliasesOriginalUU __attribute__((unavailable)) = 2,
+  NSUnavailableAliasesAliasUU __attribute__((unavailable)) = 2,
+};
+
 NS_ENUM(NSInteger, NSMalformedEnumMissingTypedef) {
   NSMalformedEnumMissingTypedefValue
 };
