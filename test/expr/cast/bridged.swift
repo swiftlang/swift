@@ -39,6 +39,10 @@ struct BridgedStruct : _ObjectiveCBridgeable {
   }
 }
 
+protocol P { }
+
+extension NSObject : P { }
+
 func testBridgeDowncast(_ obj: AnyObject, objOpt: AnyObject?, 
                         objImplicitOpt: AnyObject!) -> BridgedStruct? {
   let s1Opt = obj as? BridgedStruct
@@ -95,4 +99,13 @@ func testExplicitBridging(_ object: BridgedClass, value: BridgedStruct) {
 func testBridgingFromSubclass(_ obj: SubclassOfBridgedClass) {
   _ = obj as! BridgedStruct // expected-warning{{forced cast from 'SubclassOfBridgedClass' to 'BridgedStruct' always succeeds; did you mean to use 'as'?}} {{11-14=as}}
   _ = obj as BridgedStruct
+}
+
+// rdar://problem/30195862
+func testCVarArg(bs: BridgedStruct, bsOpt: BridgedStruct?,
+                 bsIUO: BridgedStruct!) {
+	_ = bs as P
+  _ = bsOpt! as P
+  _ = bsIUO! as P
+  _ = bsIUO as P
 }
