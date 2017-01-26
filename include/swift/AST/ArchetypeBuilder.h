@@ -83,6 +83,10 @@ public:
     ///
     /// These are dropped when building the GenericSignature.
     Inherited,
+
+    /// The requirement is the Self: Protocol requirement, when computing a
+    /// protocol's requirement signature.
+    ProtocolRequirementSignatureSelf,
   };
 
   RequirementSource(Kind kind, SourceLoc loc) : StoredKind(kind), Loc(loc) { }

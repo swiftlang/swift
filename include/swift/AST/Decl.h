@@ -3575,6 +3575,15 @@ public:
   /// created yet.
   void createGenericParamsIfMissing();
 
+  /// Retrieve the generic signature representing the requirements introduced by
+  /// this protocol.
+  ///
+  /// These are the requirements like any inherited protocols and conformances
+  /// for associated types that are mentioned literally in this
+  /// decl. Requirements implied via inheritance are not mentioned, nor is the
+  /// conformance of Self to this protocol.
+  GenericSignature *getRequirementSignature();
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Protocol;
