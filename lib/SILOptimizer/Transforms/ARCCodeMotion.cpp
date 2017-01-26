@@ -189,7 +189,7 @@ protected:
   /// Return the rc-identity root of the RC instruction, i.e.
   /// retain or release.
   SILValue getRCRoot(SILInstruction *I) {
-    assert(isRetainInstruction(I) || isReleaseInstruction(I) &&
+    assert((isRetainInstruction(I) || isReleaseInstruction(I)) &&
            "Extracting RC root from invalid instruction");
     return getRCRoot(I->getOperand(0));
   }

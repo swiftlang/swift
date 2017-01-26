@@ -257,7 +257,8 @@ private:
     ++SuccessImportAsInstanceComputedProperty;
     IAMAccessorKind kind =
         propSpec == "Get" ? IAMAccessorKind::Getter : IAMAccessorKind::Setter;
-    assert(kind == IAMAccessorKind::Getter || pairedAccessor && "no set-only");
+    assert((kind == IAMAccessorKind::Getter || pairedAccessor) &&
+           "no set-only");
 
     return {formDeclName(name), kind, selfIdx, effectiveDC};
   }
@@ -287,7 +288,8 @@ private:
     ++SuccessImportAsStaticComputedProperty;
     IAMAccessorKind kind =
         propSpec == "Get" ? IAMAccessorKind::Getter : IAMAccessorKind::Setter;
-    assert(kind == IAMAccessorKind::Getter || pairedAccessor && "no set-only");
+    assert((kind == IAMAccessorKind::Getter || pairedAccessor) &&
+           "no set-only");
 
     return {formDeclName(name), kind, effectiveDC};
   }

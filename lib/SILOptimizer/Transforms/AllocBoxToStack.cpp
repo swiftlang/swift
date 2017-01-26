@@ -239,7 +239,8 @@ static FunctionRefInst *getDirectCallee(SILInstruction *Call) {
 /// return the index of the parameter used in the body of the function
 /// to represent this operand.
 static size_t getParameterIndexForOperand(Operand *O) {
-  assert(isa<ApplyInst>(O->getUser()) || isa<PartialApplyInst>(O->getUser()) &&
+  assert((isa<ApplyInst>(O->getUser()) ||
+          isa<PartialApplyInst>(O->getUser())) &&
          "Expected apply or partial_apply!");
 
   auto OperandIndex = O->getOperandNumber();

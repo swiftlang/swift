@@ -303,9 +303,8 @@ private:
       return;
     }
 
-    assert(Array ||
-           K == ArrayCallKind::kNone &&
-               "Need to have an array for array semantic functions");
+    assert((Array || K == ArrayCallKind::kNone) &&
+           "Need to have an array for array semantic functions");
 
     // We need to make sure that the array container is not aliased in ways
     // that we don't understand.

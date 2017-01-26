@@ -90,8 +90,8 @@ public:
     } else if (auto fDecl = dyn_cast<clang::FunctionDecl>(dc)) {
       DC = fDecl->getCanonicalDecl();
     } else {
-      assert(isa<clang::TranslationUnitDecl>(dc) ||
-             isa<clang::ObjCContainerDecl>(dc) &&
+      assert((isa<clang::TranslationUnitDecl>(dc) ||
+              isa<clang::ObjCContainerDecl>(dc)) &&
                  "No other kinds of effective Clang contexts");
       DC = dc;
     }

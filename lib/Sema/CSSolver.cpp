@@ -215,9 +215,10 @@ Solution ConstraintSystem::finalize(
 
   // Remember the opened existential types.
   for (const auto &openedExistential : OpenedExistentialTypes) {
-    assert(solution.OpenedExistentialTypes.count(openedExistential.first) == 0||
+    assert((solution.OpenedExistentialTypes.count(openedExistential.first)
+             == 0 ||
            solution.OpenedExistentialTypes[openedExistential.first]
-             == openedExistential.second &&
+             == openedExistential.second) &&
            "Already recorded");
     solution.OpenedExistentialTypes.insert(openedExistential);
   }

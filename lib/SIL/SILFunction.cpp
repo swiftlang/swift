@@ -515,7 +515,8 @@ bool SILFunction::hasSelfMetadataParam() const {
 
   auto metaTy = dyn_cast<MetatypeType>(silTy.getSwiftRValueType());
   (void)metaTy;
-  assert(!metaTy || metaTy->getRepresentation() != MetatypeRepresentation::Thin
+  assert((!metaTy ||
+          metaTy->getRepresentation() != MetatypeRepresentation::Thin)
          && "Class metatypes are never thin.");
   return true;
 }

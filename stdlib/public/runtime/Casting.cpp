@@ -453,7 +453,7 @@ isAnyObjectExistentialType(const ExistentialTypeMetadata *targetType) {
   bool isAnyObjectProtocol =
       protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject;
   // Assert that AnyObject does not need any witness tables. We rely on this.
-  assert(!isAnyObjectProtocol || !protocol->Flags.needsWitnessTable() &&
+  assert((!isAnyObjectProtocol || !protocol->Flags.needsWitnessTable()) &&
          "AnyObject should not require witness tables");
   return isAnyObjectProtocol;
 }

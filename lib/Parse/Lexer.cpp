@@ -894,7 +894,7 @@ void Lexer::lexHexNumber() {
   }
   
   // [pP][+-]?[0-9][0-9_]*
-  assert(*CurPtr == 'p' || *CurPtr == 'P' && "not at a hex float exponent?!");
+  assert((*CurPtr == 'p' || *CurPtr == 'P') && "not at a hex float exponent?!");
   ++CurPtr;
   
   bool signedExponent = false;
