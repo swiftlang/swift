@@ -1800,6 +1800,26 @@ applyPropertyOwnership(VarDecl *prop,
 }
 
 namespace {
+  /// Customized llvm::DenseMapInfo for storing borrowed APSInts.
+  struct APSIntRefDenseMapInfo {
+    static inline const llvm::APSInt *getEmptyKey() {
+      return llvm::DenseMapInfo<const llvm::APSInt *>::getEmptyKey();
+    }
+    static inline const llvm::APSInt *getTombstoneKey() {
+      return llvm::DenseMapInfo<const llvm::APSInt *>::getTombstoneKey();
+    }
+    static unsigned getHashValue(const llvm::APSInt *ptrVal) {
+      assert(ptrVal != getEmptyKey() && ptrVal != getTombstoneKey());
+      return llvm::hash_value(*ptrVal);
+    }
+    static bool isEqual(const llvm::APSInt *lhs, const llvm::APSInt *rhs) {
+      if (lhs == rhs) return true;
+      if (lhs == getEmptyKey() || rhs == getEmptyKey()) return false;
+      if (lhs == getTombstoneKey() || rhs == getTombstoneKey()) return false;
+      return *lhs == *rhs;
+    }
+  };
+
   /// \brief Convert Clang declarations into the corresponding Swift
   /// declarations.
   class SwiftDeclConverter
@@ -2481,35 +2501,86 @@ namespace {
         addEnumeratorsAsMembers = true;
         break;
       }
-      
-      for (auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
-           ec != ecEnd; ++ec) {
+
+      llvm::SmallDenseMap<const llvm::APSInt *,
+                          PointerUnion<const clang::EnumConstantDecl *,
+                                       EnumElementDecl *>, 8,
+                          APSIntRefDenseMapInfo> canonicalEnumConstants;
+
+      if (enumKind == EnumKind::Enum) {
+        for (auto constant : decl->enumerators()) {
+          if (Impl.isUnavailableInSwift(constant))
+            continue;
+          canonicalEnumConstants.insert({&constant->getInitVal(), constant});
+        }
+      }
+
+      for (auto constant : decl->enumerators()) {
         Decl *enumeratorDecl;
         Decl *swift2EnumeratorDecl = nullptr;
         switch (enumKind) {
         case EnumKind::Constants:
         case EnumKind::Unknown:
-          enumeratorDecl = Impl.importDecl(*ec, getActiveSwiftVersion());
+          enumeratorDecl = Impl.importDecl(constant, getActiveSwiftVersion());
           swift2EnumeratorDecl =
-              Impl.importDecl(*ec, ImportNameVersion::Swift2);
+              Impl.importDecl(constant, ImportNameVersion::Swift2);
           break;
         case EnumKind::Options:
           enumeratorDecl =
               SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                  .importOptionConstant(*ec, decl, enumeratorContext);
+                  .importOptionConstant(constant, decl, enumeratorContext);
           swift2EnumeratorDecl =
               SwiftDeclConverter(Impl, ImportNameVersion::Swift2)
-                  .importOptionConstant(*ec, decl, enumeratorContext);
+                  .importOptionConstant(constant, decl, enumeratorContext);
           break;
-        case EnumKind::Enum:
-          enumeratorDecl =
-              SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                  .importEnumCase(*ec, decl, cast<EnumDecl>(enumeratorContext));
+        case EnumKind::Enum: {
+          auto canonicalCaseIter =
+            canonicalEnumConstants.find(&constant->getInitVal());
+
+          if (canonicalCaseIter == canonicalEnumConstants.end()) {
+            // Unavailable declarations get no special treatment.
+            enumeratorDecl =
+                SwiftDeclConverter(Impl, getActiveSwiftVersion())
+                    .importEnumCase(constant, decl,
+                                    cast<EnumDecl>(enumeratorContext));
+          } else {
+            const clang::EnumConstantDecl *unimported =
+                canonicalCaseIter->
+                  second.dyn_cast<const clang::EnumConstantDecl *>();
+
+            // Import the canonical enumerator for this case first.
+            if (unimported) {
+              enumeratorDecl = SwiftDeclConverter(Impl, getActiveSwiftVersion())
+                  .importEnumCase(unimported, decl,
+                                  cast<EnumDecl>(enumeratorContext));
+              if (enumeratorDecl) {
+                canonicalCaseIter->getSecond() =
+                    cast<EnumElementDecl>(enumeratorDecl);
+              }
+            } else {
+              enumeratorDecl =
+                  canonicalCaseIter->second.get<EnumElementDecl *>();
+            }
+
+            if (unimported != constant && enumeratorDecl) {
+              ImportedName importedName =
+                  Impl.importFullName(constant, getActiveSwiftVersion());
+              Identifier name = importedName.getDeclName().getBaseName();
+              if (!name.empty()) {
+                auto original = cast<ValueDecl>(enumeratorDecl);
+                enumeratorDecl = importEnumCaseAlias(name, constant, original,
+                                                     decl, enumeratorContext);
+              }
+            }
+          }
+
           swift2EnumeratorDecl =
               SwiftDeclConverter(Impl, ImportNameVersion::Swift2)
-                  .importEnumCase(*ec, decl, cast<EnumDecl>(enumeratorContext),
+                  .importEnumCase(constant, decl,
+                                  cast<EnumDecl>(enumeratorContext),
                                   enumeratorDecl);
           break;
+        }
         }
         if (!enumeratorDecl)
           continue;
@@ -2532,7 +2603,7 @@ namespace {
           if (errorWrapper) {
             auto enumeratorValue = cast<ValueDecl>(enumeratorDecl);
             auto alias = importEnumCaseAlias(enumeratorValue->getName(),
-                                             *ec,
+                                             constant,
                                              enumeratorValue,
                                              decl,
                                              enumeratorContext,
@@ -4751,14 +4822,6 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
   bool negative = false;
   llvm::APSInt rawValue = decl->getInitVal();
 
-  // Did we already import an enum constant for this enum with the
-  // same value? If so, import it as a standalone constant.
-  auto insertResult =
-      Impl.EnumConstantValues.insert({{clangEnum, rawValue}, nullptr});
-  if (!insertResult.second)
-    return importEnumCaseAlias(name, decl, insertResult.first->second,
-                               clangEnum, theEnum);
-
   if (clangEnum->getIntegerType()->isSignedIntegerOrEnumerationType() &&
       rawValue.slt(0)) {
     rawValue = -rawValue;
@@ -4776,7 +4839,6 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
   auto element = Impl.createDeclWithClangNode<EnumElementDecl>(
       decl, Accessibility::Public, SourceLoc(), name, TypeLoc(), SourceLoc(),
       rawValueExpr, theEnum);
-  insertResult.first->second = element;
 
   // Give the enum element the appropriate type.
   element->computeType();
