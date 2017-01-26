@@ -4072,28 +4072,20 @@ static void writeObjCMethodTable(const index_block::ObjCMethodTableLayout &out,
   out.emit(scratch, tableOffset, hashTableBlob);
 }
 
-/// Add operator methods from the given declaration type.
-///
-/// Recursively walks the members and derived global decls of any nested
-/// nominal types.
+/// Recursively walks the members and derived global decls of any nominal types
+/// to build up global tables.
 template<typename Range>
-static void addOperatorsAndTopLevel(Serializer &S, Range members,
-                                    Serializer::DeclTable &operatorMethodDecls,
-                                    Serializer::DeclTable &topLevelDecls,
-                                    Serializer::ObjCMethodTable &objcMethods,
-                                    bool isDerivedTopLevel,
-                                    bool isLocal = false) {
+static void
+collectInterestingNestedDeclarations(Serializer &S, Range members,
+                                     Serializer::DeclTable &operatorMethodDecls,
+                                     Serializer::ObjCMethodTable &objcMethods,
+                                     bool isLocal = false) {
   for (const Decl *member : members) {
     if (auto memberValue = dyn_cast<ValueDecl>(member)) {
       if (!memberValue->hasName())
         continue;
 
-      if (isDerivedTopLevel) {
-        topLevelDecls[memberValue->getName()].push_back({
-          /*ignored*/0,
-          S.addDeclRef(memberValue, /*forceSerialization=*/true)
-        });
-      } else if (memberValue->isOperator()) {
+      if (memberValue->isOperator()) {
         // Add operator methods.
         // Note that we don't have to add operators that are already in the
         // top-level list.
@@ -4106,9 +4098,9 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
 
     // Recurse into nested declarations.
     if (auto iterable = dyn_cast<IterableDeclContext>(member)) {
-      addOperatorsAndTopLevel(S, iterable->getMembers(),
-                             operatorMethodDecls, topLevelDecls, objcMethods,
-                             false);
+      collectInterestingNestedDeclarations(S, iterable->getMembers(),
+                                           operatorMethodDecls,
+                                           objcMethods, isLocal);
     }
 
     // Record Objective-C methods.
@@ -4187,9 +4179,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       // derived conformance (for example, ==), force them to be
       // serialized.
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
-        addOperatorsAndTopLevel(*this, IDC->getMembers(),
-                                operatorMethodDecls, topLevelDecls,
-                                objcMethods, false);
+        collectInterestingNestedDeclarations(*this, IDC->getMembers(),
+                                             operatorMethodDecls, objcMethods);
       }
     }
 
@@ -4206,9 +4197,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       });
 
       if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
-        addOperatorsAndTopLevel(*this, IDC->getMembers(),
-                                operatorMethodDecls, topLevelDecls,
-                                objcMethods, false, /*isLocal=*/true);
+        collectInterestingNestedDeclarations(*this, IDC->getMembers(),
+                                             operatorMethodDecls, objcMethods,
+                                             /*isLocal=*/true);
       }
     }
   }
