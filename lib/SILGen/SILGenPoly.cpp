@@ -1918,7 +1918,6 @@ ResultPlanner::planTupleIntoDirectResult(AbstractionPattern innerOrigType,
                                          PlanData &planData,
                                          SILResultInfo outerResult) {
   assert(innerOrigType.isTuple());
-  assert(!outerOrigType.isTuple());
 
   CanTupleType outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
 
