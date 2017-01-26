@@ -2000,18 +2000,30 @@ public:
       return false;
     }
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      // If this is a TopLevelCodeDecl, scan for contained pattern binding
-      // declarations to mark them as used.
+      // If this is a TopLevelCodeDecl, scan for global variables
       auto *body = TLCD->getBody();
       for (auto node : body->getElements()) {
-        if (!node.is<Decl *>()) continue;
-        Decl *D = node.get<Decl *>();
-        PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D);
-        if (!PBD) continue;
-        for (PatternBindingEntry PBE : PBD->getPatternList()) {
-          PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
-            VarDecls[VD] = RK_Read|RK_Written;
-          });
+        if (node.is<Decl *>()) {
+          // Flag all variables in a PatternBindingDecl
+          Decl *D = node.get<Decl *>();
+          PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D);
+          if (!PBD) continue;
+          for (PatternBindingEntry PBE : PBD->getPatternList()) {
+            PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
+              VarDecls[VD] = RK_Read|RK_Written;
+            });
+          }
+        }
+        else if (node.is<Stmt *>()) {
+          // Flag all variables in guard statements
+          Stmt *S = node.get<Stmt *>();
+          GuardStmt *GS = dyn_cast<GuardStmt>(S);
+          if (!GS) continue;
+          for (StmtConditionElement SCE : GS->getCond()) {
+            SCE.getPattern()->forEachVariable([&](VarDecl *VD) {
+              VarDecls[VD] = RK_Read|RK_Written;
+            });
+          }
         }
       }
     }
