@@ -13,7 +13,11 @@
 @_exported import SafariServices // Clang module
 import _SwiftSafariServicesOverlayShims
 
+#if os(OSX)
+
 @available(OSX, introduced: 10.11)
-public func SFSafariServicesAvailable() -> Bool {
-  return _swift_SafariServices_isSafariServicesAvailable()
+public func SFSafariServicesAvailable(_ version: SFSafariServicesVersion = SFSafariServicesVersion.version10_0) -> Bool {
+  return _swift_SafariServices_isSafariServicesAvailable(version)
 }
+
+#endif
