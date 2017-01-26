@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -O -disable-llvm-optzns -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -O -module-name=test -disable-llvm-optzns -emit-ir | %FileCheck %s
 
 enum NoPayload {
   case E0

@@ -26,15 +26,15 @@ namespace swift {
 // FIXME(ABI)#76 : does this declaration need SWIFT_RUNTIME_STDLIB_INTERFACE?
 // _direct type metadata for Swift._EmptyArrayStorage
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" ClassMetadata CLASS_METADATA_SYM(s18_EmptyArrayStorage);
+ClassMetadata CLASS_METADATA_SYM(s18_EmptyArrayStorage);
 
 // _direct type metadata for Swift._RawNativeDictionaryStorage
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);
+ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);
 
 // _direct type metadata for Swift._RawNativeSetStorage
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" ClassMetadata CLASS_METADATA_SYM(s20_RawNativeSetStorage);
+ClassMetadata CLASS_METADATA_SYM(s20_RawNativeSetStorage);
 } // namespace swift
 
 swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {

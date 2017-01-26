@@ -338,6 +338,8 @@ ERROR(subscript_decl_wrong_scope,none,
       "'subscript' functions may only be declared within a type", ())
 ERROR(expected_lparen_subscript,PointsToFirstBadToken,
       "expected '(' for subscript parameters", ())
+ERROR(subscript_has_name,PointsToFirstBadToken,
+      "subscripts cannot have a name", ())
 ERROR(expected_arrow_subscript,PointsToFirstBadToken,
       "expected '->' for subscript element type", ())
 ERROR(expected_type_subscript,PointsToFirstBadToken,
@@ -360,12 +362,17 @@ ERROR(initializer_decl_wrong_scope,none,
       "initializers may only be declared within a type", ())
 ERROR(expected_lparen_initializer,PointsToFirstBadToken,
       "expected '(' for initializer parameters", ())
+ERROR(initializer_has_name,PointsToFirstBadToken,
+      "initializers cannot have a name", ())
 
 // Destructor
 ERROR(destructor_decl_outside_class,none,
       "deinitializers may only be declared within a class", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
+ERROR(destructor_has_name,PointsToFirstBadToken,
+      "deinitializers cannot have a name", ())
+
 ERROR(opened_destructor_expected_rparen,none,
       "expected ')' to close parameter list", ())
 ERROR(destructor_params,none,

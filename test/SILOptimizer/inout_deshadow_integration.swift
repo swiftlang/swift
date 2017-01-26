@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-sil | %FileCheck %s
 
 // This is an integration check for the inout-deshadow pass, verifying that it
 // deshadows the inout variables in certain cases.  These test should not be
@@ -92,12 +92,12 @@ struct StructWithMutatingMethod {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TFV26inout_deshadow_integration24StructWithMutatingMethod14mutatingMethod{{.*}} : $@convention(method) (@inout StructWithMutatingMethod) -> () {
+// CHECK-LABEL: sil hidden @_T026inout_deshadow_integration24StructWithMutatingMethodV08mutatingG0{{[_0-9a-zA-Z]*}}F : $@convention(method) (@inout StructWithMutatingMethod) -> () {
 // CHECK-NOT: alloc_box
 // CHECK-NOT: alloc_stack
 // CHECK: }
 
-// CHECK-LABEL: sil hidden @_TFV26inout_deshadow_integration24StructWithMutatingMethod28testStandardLibraryOperators{{.*}} : $@convention(method) (@inout StructWithMutatingMethod) -> () {
+// CHECK-LABEL: sil hidden @_T026inout_deshadow_integration24StructWithMutatingMethodV28testStandardLibraryOperators{{[_0-9a-zA-Z]*}}F : $@convention(method) (@inout StructWithMutatingMethod) -> () {
 // CHECK-NOT: alloc_box $<τ_0_0> { var τ_0_0 } <StructWithMutatingMethod>
 // CHECK-NOT: alloc_stack $StructWithMutatingMethod
 // CHECK: }

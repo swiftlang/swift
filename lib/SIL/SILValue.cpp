@@ -350,7 +350,9 @@ ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I) {
   // Find the first index where we have a trivial value.
   auto Iter =
     find_if(Ops,
-            [](const Operand &Op) -> bool {
+            [&I](const Operand &Op) -> bool {
+              if (I->isTypeDependentOperand(Op))
+                return false;
               return Op.get().getOwnershipKind() != ValueOwnershipKind::Trivial;
             });
   // All trivial.
@@ -360,7 +362,9 @@ ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I) {
 
   // See if we have any Any. If we do, just return that for now.
   if (any_of(Ops,
-             [](const Operand &Op) -> bool {
+             [&I](const Operand &Op) -> bool {
+               if (I->isTypeDependentOperand(Op))
+                 return false;
                return Op.get().getOwnershipKind() == ValueOwnershipKind::Any;
              }))
     return ValueOwnershipKind::Any;
@@ -369,6 +373,8 @@ ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I) {
   ValueOwnershipKind Base = Ops[Index].get().getOwnershipKind();
 
   for (const Operand &Op : Ops.slice(Index+1)) {
+    if (I->isTypeDependentOperand(Op))
+      continue;
     auto OpKind = Op.get().getOwnershipKind();
     if (OpKind.merge(ValueOwnershipKind::Trivial))
       continue;
@@ -675,6 +681,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, UnsafeGuaranteedEnd)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, GetObjCTypeEncoding)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, CanBeObjCClass)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, WillThrow)
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
 #define NO_OWNERSHIP_BUILTIN(ID)                                               \
@@ -688,7 +695,6 @@ NO_OWNERSHIP_BUILTIN(DestroyArray)
 NO_OWNERSHIP_BUILTIN(CopyArray)
 NO_OWNERSHIP_BUILTIN(TakeArrayFrontToBack)
 NO_OWNERSHIP_BUILTIN(TakeArrayBackToFront)
-NO_OWNERSHIP_BUILTIN(WillThrow)
 NO_OWNERSHIP_BUILTIN(UnexpectedError)
 NO_OWNERSHIP_BUILTIN(ErrorInMain)
 NO_OWNERSHIP_BUILTIN(DeallocRaw)

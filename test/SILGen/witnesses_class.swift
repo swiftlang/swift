@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 protocol Fooable: class {
   func foo()
@@ -9,22 +9,22 @@ protocol Fooable: class {
 class Foo: Fooable {
   
   func foo() { }
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC15witnesses_class3FooS_7FooableS_FS1_3foo
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T015witnesses_class3FooCAA7FooableAaaDP3foo{{[_0-9a-zA-Z]*}}FTW
   // CHECK-NOT:     function_ref
   // CHECK:         class_method
 
   class func bar() {}
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC15witnesses_class3FooS_7FooableS_ZFS1_3bar
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T015witnesses_class3FooCAA7FooableAaaDP3bar{{[_0-9a-zA-Z]*}}FZTW
   // CHECK-NOT:     function_ref
   // CHECK:         class_method
 
   required init() {}
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC15witnesses_class3FooS_7FooableS_FS1_C
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T015witnesses_class3FooCAA7FooableAaaDP{{[_0-9a-zA-Z]*}}fCTW
   // CHECK-NOT:     function_ref
   // CHECK:         class_method
 }
 
-// CHECK-LABEL: sil hidden @_TF15witnesses_class3gen
+// CHECK-LABEL: sil hidden @_T015witnesses_class3gen{{[_0-9a-zA-Z]*}}F
 // CHECK:         bb0([[SELF:%.*]] : $T)
 // CHECK:         [[METHOD:%.*]] = witness_method $T
 // CHECK-NOT:     copy_value [[SELF]]
@@ -36,7 +36,7 @@ func gen<T: Fooable>(_ foo: T) {
   foo.foo()
 }
 
-// CHECK-LABEL: sil hidden @_TF15witnesses_class2exFPS_7Fooable_T_
+// CHECK-LABEL: sil hidden @_T015witnesses_class2exyAA7Fooable_pF
 // CHECK: bb0([[SELF:%[0-0]+]] : $Fooable):
 // CHECK:         [[SELF_PROJ:%.*]] = open_existential_ref [[SELF]]
 // CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Fooable]],

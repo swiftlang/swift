@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -8,7 +8,7 @@ class Class <T> {
   init(_x : T) {x = _x}
 
   // Verify that the mangling of the decl context of the type U is correct.
-  // CHECK: !DICompositeType({{.*}}name: "{{[^"]*}}_TtQq_FC14dynamic_layout5Class3foo{{[^"]*}}"
+  // CHECK: !DICompositeType({{.*}}name: "{{[^"]*}}_T014dynamic_layout5ClassC3foox_qd__tqd__lFQq_{{[^"]*}}"
   func foo <U> (_ y : U) -> (T,U) {
     var tuple = (x,y)
     return tuple

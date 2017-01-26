@@ -16,6 +16,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -2997,6 +2998,30 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
 void ProtocolDecl::createGenericParamsIfMissing() {
   if (!getGenericParams())
     setGenericParams(createGenericParams(this));
+}
+
+GenericSignature *ProtocolDecl::getRequirementSignature() {
+  auto module = getParentModule();
+
+  auto genericSig = getGenericSignature();
+  // The signature should look like <Self where Self : ThisProtocol>, and we
+  // reuse the two parts of it because the parameter and the requirement are
+  // exactly what we need.
+  assert(genericSig->getGenericParams().size() == 1 &&
+         genericSig->getRequirements().size() == 1 &&
+         "getRequirementSignature with unexpected generic signature");
+
+  auto selfType = genericSig->getGenericParams()[0];
+  auto requirement = genericSig->getRequirements()[0];
+
+  RequirementSource source(RequirementSource::ProtocolRequirementSignatureSelf,
+                           getLoc());
+
+  ArchetypeBuilder builder(getASTContext(), LookUpConformanceInModule(module));
+  builder.addGenericParameter(selfType);
+  builder.addRequirement(requirement, source);
+
+  return builder.getGenericSignature();
 }
 
 /// Returns the default witness for a requirement, or nullptr if there is

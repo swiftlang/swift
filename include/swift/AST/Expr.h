@@ -500,6 +500,8 @@ public:
   SourceLoc getLoc() const { return (SUBEXPR)->getLoc(); } \
   SourceRange getSourceRange() const { return (SUBEXPR)->getSourceRange(); }
 
+  SourceLoc TrailingSemiLoc;
+
   /// getSemanticsProvidingExpr - Find the smallest subexpression
   /// which obeys the property that evaluating it is exactly
   /// equivalent to evaluating this expression.
@@ -4329,7 +4331,13 @@ public:
   
   SourceLoc getEqualLoc() const { return EqualLoc; }
   
-  SourceLoc getLoc() const { return EqualLoc; }
+  SourceLoc getLoc() const {
+    SourceLoc loc = EqualLoc;
+    if (loc.isValid()) {
+      return loc;
+    }
+    return getStartLoc();
+  }
   SourceLoc getStartLoc() const {
     if (!isFolded()) return EqualLoc;
     return ( Dest->getStartLoc().isValid()

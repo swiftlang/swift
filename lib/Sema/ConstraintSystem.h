@@ -1585,19 +1585,22 @@ public:
 
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
-                                 ConstraintLocator *locator) {
-    resolveOverload(locator, boundTy, choice);
+                                 ConstraintLocator *locator,
+                                 DeclContext *useDC) {
+    resolveOverload(locator, boundTy, choice, useDC);
   }
 
   /// \brief Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
+                                DeclContext *useDC,
                                 FunctionRefKind functionRefKind,
                                 ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
+    assert(useDC);
     switch (simplifyMemberConstraint(ConstraintKind::ValueMember, baseTy, name,
-                                     memberTy, functionRefKind,
+                                     memberTy, useDC, functionRefKind,
                                      TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
       llvm_unreachable("Unsolved result when generating constraints!");
@@ -1608,9 +1611,9 @@ public:
     case SolutionKind::Error:
       if (shouldAddNewFailingConstraint()) {
         addNewFailingConstraint(
-          Constraint::create(*this, ConstraintKind::ValueMember, baseTy,
-                             memberTy, name, functionRefKind,
-                             getConstraintLocator(locator)));
+          Constraint::createMember(*this, ConstraintKind::ValueMember, baseTy,
+                                   memberTy, name, useDC, functionRefKind,
+                                   getConstraintLocator(locator)));
       }
       break;
     }
@@ -1619,14 +1622,16 @@ public:
   /// \brief Add a value member constraint for an UnresolvedMemberRef
   /// to the constraint system.
   void addUnresolvedValueMemberConstraint(Type baseTy, DeclName name,
-                                          Type memberTy,
+                                          Type memberTy, DeclContext *useDC,
                                           FunctionRefKind functionRefKind,
                                           ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
+    assert(useDC);
     switch (simplifyMemberConstraint(ConstraintKind::UnresolvedValueMember,
-                                     baseTy, name, memberTy, functionRefKind,
+                                     baseTy, name, memberTy,
+                                     useDC, functionRefKind,
                                      TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
       llvm_unreachable("Unsolved result when generating constraints!");
@@ -1637,9 +1642,10 @@ public:
     case SolutionKind::Error:
       if (shouldAddNewFailingConstraint()) {
         addNewFailingConstraint(
-          Constraint::create(*this, ConstraintKind::UnresolvedValueMember,
-                             baseTy, memberTy, name, functionRefKind,
-                             getConstraintLocator(locator)));
+          Constraint::createMember(*this, ConstraintKind::UnresolvedValueMember,
+                                   baseTy, memberTy, name,
+                                   useDC, functionRefKind,
+                                   getConstraintLocator(locator)));
       }
       break;
     }
@@ -1991,7 +1997,7 @@ public:
   /// \returns a pair containing the full opened type (which includes the opened
   /// base) and opened type of a reference to this member.
   std::pair<Type, Type> getTypeOfMemberReference(
-                          Type baseTy, ValueDecl *decl,
+                          Type baseTy, ValueDecl *decl, DeclContext *useDC,
                           bool isTypeReference,
                           bool isDynamicResult,
                           FunctionRefKind functionRefKind,
@@ -2003,7 +2009,7 @@ public:
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
-                      ConstraintLocator *locator,
+                      DeclContext *useDC, ConstraintLocator *locator,
                       OverloadChoice *favored = nullptr);
 
   /// If the given type is ImplicitlyUnwrappedOptional<T>, and we're in a context
@@ -2138,7 +2144,7 @@ public: // FIXME: public due to statics in CSSimplify.cpp
 public:
   /// \brief Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,
-                       OverloadChoice choice);
+                       OverloadChoice choice, DeclContext *useDC);
 
   /// \brief Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
@@ -2193,6 +2199,7 @@ private:
   SolutionKind simplifyConstructionConstraint(Type valueType, 
                                               FunctionType *fnType,
                                               TypeMatchOptions flags,
+                                              DeclContext *DC,
                                               FunctionRefKind functionRefKind,
                                               ConstraintLocator *locator);
 
@@ -2231,7 +2238,7 @@ private:
   /// \brief Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(ConstraintKind kind,
                                         Type baseType, DeclName member,
-                                        Type memberType,
+                                        Type memberType, DeclContext *useDC,
                                         FunctionRefKind functionRefKind,
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator);

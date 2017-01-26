@@ -1,4 +1,3 @@
-// REQUIRES: rdar://problem/25498105
 // RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -sil-serialize-all -module-link-name swiftCore -O -parse-as-library -parse-stdlib -emit-module -emit-module-path - -o /dev/null | %target-sil-opt -enable-sil-verify-all -module-name="Swift" | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -O -parse-as-library -parse-stdlib -emit-sib -o - | %target-sil-opt -enable-sil-verify-all -module-name="Swift" | %FileCheck %s -check-prefix=SIB-CHECK
 

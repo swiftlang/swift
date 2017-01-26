@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
@@ -25,24 +25,24 @@ bb0:
   return %100 : $()
 }
 
-// CHECK-LABEL: define hidden %swift.type* @_TMaC12typemetadata1C()
-// CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type**  @_TMLC12typemetadata1C, align 8
+// CHECK-LABEL: define hidden %swift.type* @_T012typemetadata1CCMa()
+// CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type**  @_T012typemetadata1CCML, align 8
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]
-// CHECK:      [[T0:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass({{.*}} @_TMfC12typemetadata1C, {{.*}})
+// CHECK:      [[T0:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass({{.*}} @_T012typemetadata1CCMf, {{.*}})
 // CHECK-NEXT: [[T1:%.*]] = bitcast %objc_class* [[T0]] to %swift.type*
-// CHECK:      store atomic %swift.type* [[T1]], %swift.type** @_TMLC12typemetadata1C release, align 8
+// CHECK:      store atomic %swift.type* [[T1]], %swift.type** @_T012typemetadata1CCML release, align 8
 // CHECK-NEXT: br label
 // CHECK:      [[RES:%.*]] = phi
 // CHECK-NEXT: ret %swift.type* [[RES]]
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaTV12typemetadata1SCS_1C_()
-// CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type**  @_TMLTV12typemetadata1SCS_1C_, align 8
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T012typemetadata1SV_AA1CCtMa()
+// CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type**  @_T012typemetadata1SV_AA1CCtML, align 8
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]
-// CHECK:      [[T0:%.*]] = call %swift.type* @_TMaC12typemetadata1C()
-// CHECK-NEXT: [[T1:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* {{.*}} @_TMfV12typemetadata1S, {{.*}} %swift.type* [[T0]], i8* null, i8** null)
-// CHECK-NEXT: store atomic %swift.type* [[T1]], %swift.type** @_TMLTV12typemetadata1SCS_1C_ release, align 8
+// CHECK:      [[T0:%.*]] = call %swift.type* @_T012typemetadata1CCMa()
+// CHECK-NEXT: [[T1:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* {{.*}} @_T012typemetadata1SVMf, {{.*}} %swift.type* [[T0]], i8* null, i8** null)
+// CHECK-NEXT: store atomic %swift.type* [[T1]], %swift.type** @_T012typemetadata1SV_AA1CCtML release, align 8
 // CHECK-NEXT: br label
 // CHECK:      [[RES:%.*]] = phi
 // CHECK-NEXT: ret %swift.type* [[RES]]

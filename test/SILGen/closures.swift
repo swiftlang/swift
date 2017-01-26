@@ -721,3 +721,26 @@ func r25993258_helper(_ fn: (inout Int, Int) -> ()) {}
 func r25993258() {
   r25993258_helper { _ in () }
 }
+
+// rdar://29810997
+//
+// Using a let from a closure in an init was causing the type-checker
+// to produce invalid AST: 'self.fn' was an l-value, but 'self' was already
+// loaded to make an r-value.  This was ultimately because CSApply was
+// building the member reference correctly in the context of the closure,
+// where 'fn' is not settable, but CSGen / CSSimplify was processing it
+// in the general DC of the constraint system, i.e. the init, where
+// 'fn' *is* settable.
+func r29810997_helper(_ fn: (Int) -> Int) -> Int { return fn(0) }
+struct r29810997 {
+    private let fn: (Int) -> Int
+    private var x: Int
+
+    init(function: @escaping (Int) -> Int) {
+        fn = function
+        x = r29810997_helper { fn($0) }
+    }
+}
+
+//   DI will turn this into a direct capture of the specific stored property.
+// CHECK-LABEL: sil hidden @_TF8closures16r29810997_helperFFSiSiSi : $@convention(thin) (@owned @callee_owned (Int) -> Int) -> Int

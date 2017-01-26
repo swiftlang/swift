@@ -463,6 +463,9 @@ public:
 
   /// Parse an #endif.
   bool parseEndIfDirective(SourceLoc &Loc);
+  
+  /// True if Tok is the second consecutive identifier in a variable decl.
+  bool isSecondVarIdentifier();
 
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
@@ -490,6 +493,10 @@ public:
   }
   
   void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New);
+  
+  /// Add a fix-it to remove the space in consecutive identifiers.
+  /// Add a camel-cased option if it is different than the first option.
+  void diagnoseConsecutiveIDs(Token First, Token Second);
      
   /// \brief Check whether the current token starts with '<'.
   bool startsWithLess(Token Tok) {
@@ -675,8 +682,8 @@ public:
     return AlreadyHandledDecls.erase(D);
   }
 
-  ParserStatus parseDecl(ParseDeclOptions Flags,
-                         llvm::function_ref<void(Decl*)> Handler);
+  ParserResult<Decl> parseDecl(ParseDeclOptions Flags,
+                               llvm::function_ref<void(Decl*)> Handler);
 
   void parseDeclDelayed();
 
@@ -736,18 +743,20 @@ public:
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
-  ParserStatus parseDeclEnumCase(ParseDeclOptions Flags, DeclAttributes &Attributes,
-                                 SmallVectorImpl<Decl *> &decls);
+  ParserResult<EnumCaseDecl>
+  parseDeclEnumCase(ParseDeclOptions Flags, DeclAttributes &Attributes,
+                    SmallVectorImpl<Decl *> &decls);
   ParserResult<StructDecl>
   parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<ClassDecl>
   parseDeclClass(SourceLoc ClassLoc,
                  ParseDeclOptions Flags, DeclAttributes &Attributes);
-  ParserStatus parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
-                            SmallVectorImpl<Decl *> &Decls,
-                            SourceLoc StaticLoc,
-                            StaticSpellingKind StaticSpelling,
-                            SourceLoc TryLoc);
+  ParserResult<PatternBindingDecl>
+  parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
+               SmallVectorImpl<Decl *> &Decls,
+               SourceLoc StaticLoc,
+               StaticSpellingKind StaticSpelling,
+               SourceLoc TryLoc);
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
 
@@ -796,9 +805,9 @@ public:
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
-  ParserStatus parseDeclSubscript(ParseDeclOptions Flags,
-                                  DeclAttributes &Attributes,
-                                  SmallVectorImpl<Decl *> &Decls);
+  ParserResult<SubscriptDecl>
+  parseDeclSubscript(ParseDeclOptions Flags, DeclAttributes &Attributes,
+                     SmallVectorImpl<Decl *> &Decls);
 
   ParserResult<ConstructorDecl>
   parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes);

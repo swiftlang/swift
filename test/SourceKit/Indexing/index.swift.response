@@ -705,7 +705,17 @@
               key.name: "setter:subscript(_:)",
               key.usr: "s:FC5index3CC2s9subscriptFSiSi",
               key.line: 86,
-              key.column: 5
+              key.column: 5,
+              key.entities: [
+                {
+                  key.kind: source.lang.swift.ref.function.method.static,
+                  key.name: "+(_:_:)",
+                  key.usr: "s:ZFSioi1pFTSiSi_Si",
+                  key.line: 87,
+                  key.column: 8,
+                  key.receiver_usr: "s:Si"
+                }
+              ]
             }
           ]
         }
@@ -1035,125 +1045,38 @@
       ]
     },
     {
-      key.kind: source.lang.swift.decl.struct,
-      key.name: "S3",
-      key.usr: "s:V5index2S3",
-      key.line: 135,
-      key.column: 8,
-      key.entities: [
-        {
-          key.kind: source.lang.swift.decl.function.method.instance,
-          key.name: "test()",
-          key.usr: "s:FV5index2S34testFT_T_",
-          key.line: 136,
-          key.column: 8
-        }
-      ]
-    },
-    {
-      key.kind: source.lang.swift.decl.protocol,
-      key.name: "P2",
-      key.usr: "s:P5index2P2",
-      key.line: 138,
-      key.column: 10,
-      key.entities: [
-        {
-          key.kind: source.lang.swift.decl.function.method.instance,
-          key.name: "test()",
-          key.usr: "s:FP5index2P24testFT_T_",
-          key.line: 139,
-          key.column: 8
-        }
-      ]
-    },
-    {
-      key.kind: source.lang.swift.decl.class,
-      key.name: "CC3",
-      key.usr: "s:C5index3CC3",
-      key.line: 141,
-      key.column: 7,
-      key.entities: [
-        {
-          key.kind: source.lang.swift.decl.function.method.instance,
-          key.name: "meth()",
-          key.usr: "s:FC5index3CC34methFT_T_",
-          key.line: 142,
-          key.column: 8
-        },
-        {
-          key.kind: source.lang.swift.decl.function.method.class,
-          key.name: "test1()",
-          key.usr: "s:ZFC5index3CC35test1FT_T_",
-          key.line: 143,
-          key.column: 14
-        },
-        {
-          key.kind: source.lang.swift.decl.function.method.instance,
-          key.name: "test2()",
-          key.usr: "s:FC5index3CC35test2FT_T_",
-          key.line: 144,
-          key.column: 8,
-          key.is_test_candidate: 1
-        }
-      ]
-    },
-    {
-      key.kind: source.lang.swift.decl.extension.class,
-      key.name: "CC3",
-      key.usr: "s:C5index3CC3",
-      key.line: 146,
-      key.column: 11,
-      key.entities: [
-        {
-          key.kind: source.lang.swift.ref.class,
-          key.name: "CC3",
-          key.usr: "s:C5index3CC3",
-          key.line: 146,
-          key.column: 11
-        },
-        {
-          key.kind: source.lang.swift.decl.function.method.instance,
-          key.name: "test3()",
-          key.usr: "s:FC5index3CC35test3FT_T_",
-          key.line: 147,
-          key.column: 8,
-          key.is_test_candidate: 1
-        }
-      ]
-    },
-    {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "meth()",
       key.usr: "s:F5index4methERR",
-      key.line: 151,
+      key.line: 135,
       key.column: 8
     },
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "CC4",
       key.usr: "s:C5index3CC4",
-      key.line: 154,
+      key.line: 138,
       key.column: 7,
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.name: "init(x:)",
           key.usr: "s:FC5index3CC4cFT1xSi_S0_",
-          key.line: 155,
+          key.line: 139,
           key.column: 15,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.struct,
               key.name: "Int",
               key.usr: "s:Si",
-              key.line: 155,
+              key.line: 139,
               key.column: 23
             },
             {
               key.kind: source.lang.swift.ref.function.constructor,
               key.name: "init(x:)",
               key.usr: "s:FC5index3CC4cFT1xSi_S0_",
-              key.line: 156,
+              key.line: 140,
               key.column: 10,
               key.receiver_usr: "s:C5index3CC4",
               key.is_dynamic: 1
@@ -1171,14 +1094,14 @@
       key.kind: source.lang.swift.decl.class,
       key.name: "SubCC4",
       key.usr: "s:C5index6SubCC4",
-      key.line: 160,
+      key.line: 144,
       key.column: 7,
       key.related: [
         {
           key.kind: source.lang.swift.ref.class,
           key.name: "CC4",
           key.usr: "s:C5index3CC4",
-          key.line: 160,
+          key.line: 144,
           key.column: 16
         }
       ],
@@ -1187,14 +1110,14 @@
           key.kind: source.lang.swift.ref.class,
           key.name: "CC4",
           key.usr: "s:C5index3CC4",
-          key.line: 160,
+          key.line: 144,
           key.column: 16
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.name: "init(x:)",
           key.usr: "s:FC5index6SubCC4cFT1xSi_S0_",
-          key.line: 161,
+          key.line: 145,
           key.column: 3,
           key.related: [
             {
@@ -1208,14 +1131,14 @@
               key.kind: source.lang.swift.ref.struct,
               key.name: "Int",
               key.usr: "s:Si",
-              key.line: 161,
+              key.line: 145,
               key.column: 11
             },
             {
               key.kind: source.lang.swift.ref.function.constructor,
               key.name: "init(x:)",
               key.usr: "s:FC5index3CC4cFT1xSi_S0_",
-              key.line: 162,
+              key.line: 146,
               key.column: 11,
               key.receiver_usr: "s:C5index3CC4"
             }
@@ -1227,35 +1150,35 @@
       key.kind: source.lang.swift.decl.class,
       key.name: "Observing",
       key.usr: "s:C5index9Observing",
-      key.line: 166,
+      key.line: 150,
       key.column: 7,
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.name: "init()",
           key.usr: "s:FC5index9ObservingcFT_S0_",
-          key.line: 167,
+          key.line: 151,
           key.column: 3
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "globObserving",
           key.usr: "s:vC5index9Observing13globObservingSi",
-          key.line: 168,
+          key.line: 152,
           key.column: 7,
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.willset,
               key.name: "willSet:globObserving",
               key.usr: "s:FC5index9Observingw13globObservingSi",
-              key.line: 169,
+              key.line: 153,
               key.column: 5,
               key.entities: [
                 {
                   key.kind: source.lang.swift.ref.function.free,
                   key.name: "test2()",
                   key.usr: "s:F5index5test2FT_T_",
-                  key.line: 170,
+                  key.line: 154,
                   key.column: 7
                 }
               ],
@@ -1269,14 +1192,14 @@
               key.kind: source.lang.swift.decl.function.accessor.didset,
               key.name: "didSet:globObserving",
               key.usr: "s:FC5index9ObservingW13globObservingSi",
-              key.line: 172,
+              key.line: 156,
               key.column: 5,
               key.entities: [
                 {
                   key.kind: source.lang.swift.ref.function.free,
                   key.name: "test2()",
                   key.usr: "s:F5index5test2FT_T_",
-                  key.line: 173,
+                  key.line: 157,
                   key.column: 7
                 }
               ],
@@ -1292,7 +1215,7 @@
           key.kind: source.lang.swift.ref.struct,
           key.name: "Int",
           key.usr: "s:Si",
-          key.line: 168,
+          key.line: 152,
           key.column: 23
         }
       ]
@@ -1301,21 +1224,21 @@
       key.kind: source.lang.swift.decl.class,
       key.name: "rdar18640140",
       key.usr: "s:C5index12rdar18640140",
-      key.line: 179,
+      key.line: 163,
       key.column: 7,
       key.entities: [
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "S1",
           key.usr: "s:vC5index12rdar186401402S1Si",
-          key.line: 181,
+          key.line: 165,
           key.column: 7,
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.didset,
               key.name: "didSet:S1",
               key.usr: "s:FC5index12rdar18640140W2S1Si",
-              key.line: 187,
+              key.line: 171,
               key.column: 5,
               key.attributes: [
                 {
@@ -1329,7 +1252,7 @@
           key.kind: source.lang.swift.ref.struct,
           key.name: "Int",
           key.usr: "s:Si",
-          key.line: 181,
+          key.line: 165,
           key.column: 11
         }
       ]
@@ -1338,28 +1261,28 @@
       key.kind: source.lang.swift.decl.protocol,
       key.name: "rdar18640140Protocol",
       key.usr: "s:P5index20rdar18640140Protocol",
-      key.line: 192,
+      key.line: 176,
       key.column: 10,
       key.entities: [
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "S1",
           key.usr: "s:vP5index20rdar18640140Protocol2S1Si",
-          key.line: 193,
+          key.line: 177,
           key.column: 7,
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
               key.name: "getter:S1",
               key.usr: "s:FP5index20rdar18640140Protocolg2S1Si",
-              key.line: 196,
+              key.line: 180,
               key.column: 5
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
               key.name: "setter:S1",
               key.usr: "s:FP5index20rdar18640140Protocols2S1Si",
-              key.line: 195,
+              key.line: 179,
               key.column: 5
             }
           ]
@@ -1368,7 +1291,7 @@
           key.kind: source.lang.swift.ref.struct,
           key.name: "Int",
           key.usr: "s:Si",
-          key.line: 193,
+          key.line: 177,
           key.column: 11
         }
       ]
@@ -1377,7 +1300,7 @@
       key.kind: source.lang.swift.decl.class,
       key.name: "ConditionalUnavailableClass1",
       key.usr: "s:C5index28ConditionalUnavailableClass1",
-      key.line: 205,
+      key.line: 189,
       key.column: 7,
       key.attributes: [
         {
@@ -1389,7 +1312,7 @@
       key.kind: source.lang.swift.decl.class,
       key.name: "ConditionalUnavailableClass2",
       key.usr: "s:C5index28ConditionalUnavailableClass2",
-      key.line: 209,
+      key.line: 193,
       key.column: 7,
       key.attributes: [
         {

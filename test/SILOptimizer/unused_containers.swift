@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -primary-file %s -O -emit-sil | grep -v 'builtin "onFastPath"' | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -O -emit-sil | grep -v 'builtin "onFastPath"' | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts
 
-//CHECK-LABEL: @_TF17unused_containers16empty_array_testFT_T_
+//CHECK-LABEL: @_T017unused_containers16empty_array_testyyF
 //CHECK: bb0:
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
@@ -10,7 +10,7 @@ func empty_array_test() {
   let unused : [Int] = []
 }
 
-//CHECK-LABEL: @_TF17unused_containers14empty_dic_testFT_T_
+//CHECK-LABEL: @_T017unused_containers14empty_dic_testyyF
 //CHECK: bb0:
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
@@ -18,7 +18,7 @@ func empty_dic_test() {
   let unused : [Int: Int] = [:]
 }
 
-//CHECK-LABEL: sil hidden @_TF17unused_containers18unused_string_testFT_T_
+//CHECK-LABEL: sil hidden @_T017unused_containers0A12_string_testyyF
 //CHECK-NEXT: bb0:
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return

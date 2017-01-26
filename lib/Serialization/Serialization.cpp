@@ -21,6 +21,7 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Dwarf.h"
@@ -4197,10 +4198,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
     for (auto TD : localTypeDecls) {
       hasLocalTypes = true;
-
-      Mangle::Mangler DebugMangler(false);
-      DebugMangler.mangleType(TD->getDeclaredInterfaceType(), 0);
-      auto MangledName = DebugMangler.finalize();
+      std::string MangledName = NewMangling::mangleTypeAsUSR(
+                                              TD->getDeclaredInterfaceType());
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {
         addDeclRef(TD), TD->getLocalDiscriminator()

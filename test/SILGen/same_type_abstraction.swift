@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 protocol Associated {
   associatedtype Assoc
@@ -11,8 +11,8 @@ struct Abstracted<T: Associated, U: Associated> {
 struct S1 {}
 struct S2 {}
 
-// CHECK-LABEL: sil hidden @_TF21same_type_abstraction28callClosureWithConcreteTypes
-// CHECK:         function_ref @_TTR
+// CHECK-LABEL: sil hidden @_T021same_type_abstraction28callClosureWithConcreteTypes{{[_0-9a-zA-Z]*}}F
+// CHECK:         function_ref @_T0{{.*}}TR :
 func callClosureWithConcreteTypes<
   T: Associated, U: Associated
   where

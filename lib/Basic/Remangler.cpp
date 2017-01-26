@@ -47,11 +47,11 @@ namespace {
 class SubstitutionEntry {
   Node *TheNode = nullptr;
   size_t StoredHash = 0;
-  bool NewMangling = false;
+  bool treatAsIdentifier = false;
 
 public:
-  void setNode(Node *node, bool UseNewMangling) {
-    NewMangling = UseNewMangling;
+  void setNode(Node *node, bool treatAsIdentifier) {
+    this->treatAsIdentifier = treatAsIdentifier;
     TheNode = node;
     deepHash(node);
   }
@@ -65,26 +65,13 @@ public:
 private:
   friend bool operator==(const SubstitutionEntry &lhs,
                          const SubstitutionEntry &rhs) {
-    return (lhs.StoredHash == rhs.StoredHash &&
-            lhs.deepEquals(lhs.TheNode, rhs.TheNode));
-  }
-
-  bool treatAsIdentifier(Node *node) const {
-    if (!NewMangling)
+    if (lhs.StoredHash != rhs.StoredHash)
       return false;
-
-    switch (node->getKind()) {
-      case Node::Kind::Module:
-      case Node::Kind::TupleElementName:
-      case Node::Kind::InfixOperator:
-      case Node::Kind::PrefixOperator:
-      case Node::Kind::PostfixOperator:
-      case Node::Kind::DependentAssociatedTypeRef:
-      case Node::Kind::Identifier:
-        return true;
-      default:
-        return false;
-    }
+    if (lhs.treatAsIdentifier != rhs.treatAsIdentifier)
+      return false;
+    if (lhs.treatAsIdentifier)
+      return lhs.TheNode->getText() == rhs.TheNode->getText();
+    return lhs.deepEquals(lhs.TheNode, rhs.TheNode);
   }
 
   void combineHash(size_t newValue) {
@@ -98,7 +85,7 @@ private:
   }
 
   void deepHash(Node *node) {
-    if (treatAsIdentifier(node)) {
+    if (treatAsIdentifier) {
       combineHash((size_t) Node::Kind::Identifier);
       combineHash(node->getText());
       return;
@@ -118,9 +105,6 @@ private:
 };
 
 bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
-  if (treatAsIdentifier(lhs) && treatAsIdentifier(rhs))
-    return lhs->getText() == rhs->getText();
-
   if (lhs->getKind() != rhs->getKind())
     return false;
   if (lhs->hasIndex()) {
@@ -140,7 +124,7 @@ bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
   if (lhs->getNumChildren() != rhs->getNumChildren())
     return false;
 
-  for (auto li = lhs->begin(), ri = lhs->begin(), le = lhs->end();
+  for (auto li = lhs->begin(), ri = rhs->begin(), le = lhs->end();
        li != le; ++li, ++ri) {
     if (!deepEquals(li->get(), ri->get()))
       return false;
@@ -263,7 +247,8 @@ class Remangler {
     mangleChildNodes(Proto);
   }
 
-  bool trySubstitution(Node *node, SubstitutionEntry &entry);
+  bool trySubstitution(Node *node, SubstitutionEntry &entry,
+                       bool treatAsIdentifier = false);
   void addSubstitution(const SubstitutionEntry &entry);
 
   void mangleIdentifierImpl(Node *node, bool isOperator);
@@ -301,12 +286,13 @@ public:
   }
 };
 
-bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
+bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry,
+                                bool treatAsIdentifier) {
   if (mangleStandardSubstitution(node, Buffer))
     return true;
 
   // Go ahead and initialize the substitution entry.
-  entry.setNode(node, /*UseNewMangling*/ true);
+  entry.setNode(node, treatAsIdentifier);
 
   auto it = Substitutions.find(entry);
   if (it == Substitutions.end())
@@ -349,7 +335,7 @@ void Remangler::addSubstitution(const SubstitutionEntry &entry) {
 
 void Remangler::mangleIdentifierImpl(Node *node, bool isOperator) {
   SubstitutionEntry entry;
-  if (trySubstitution(node, entry)) return;
+  if (trySubstitution(node, entry, /*treatAsIdentifier*/ true)) return;
   if (isOperator) {
     NewMangling::mangleIdentifier(*this,
                               NewMangling::translateOperator(node->getText()));

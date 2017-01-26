@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
-// CHECK-LABEL: sil shared @_TFIvV26closure_inline_initializer3Foo3fooSiiU_FT_Si
+// CHECK-LABEL: sil shared @_T026closure_inline_initializer3FooV3fooSivfiSiycfU_
 
 struct Foo {
   var foo: Int = { 2 }()

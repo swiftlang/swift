@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 struct Foo {}
 class Bar {}
@@ -12,7 +12,7 @@ let x: Any = Foo.self
 // CHECK: [[CONCRETE:%.*]] = init_existential_addr [[EXISTENTIAL:%.*]] : $*Any, $() -> ()
 // CHECK: [[CLOSURE:%.*]] = function_ref
 // CHECK: [[CLOSURE_THICK:%.*]] = thin_to_thick_function [[CLOSURE]]
-// CHECK: [[REABSTRACTION_THUNK:%.*]] = function_ref @_TTRXFo___XFo_iT__iT__
+// CHECK: [[REABSTRACTION_THUNK:%.*]] = function_ref @_T0Ix_ytytIxir_TR
 // CHECK: [[CLOSURE_REABSTRACTED:%.*]] = partial_apply [[REABSTRACTION_THUNK]]([[CLOSURE_THICK]])
 // CHECK: store [[CLOSURE_REABSTRACTED]] to [init] [[CONCRETE]]
 let y: Any = {() -> () in ()}

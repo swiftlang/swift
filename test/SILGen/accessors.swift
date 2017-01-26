@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 // Hold a reference to do to magically become non-POD.
 class Reference {}
@@ -25,16 +25,16 @@ func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
 func test0(_ ref: A) {
   ref.array[index0()] = ref.array[index1()]
 }
-// CHECK: sil hidden @_TF9accessors5test0FCS_1AT_ : $@convention(thin) (@owned A) -> () {
+// CHECK: sil hidden @_T09accessors5test0yAA1ACF : $@convention(thin) (@owned A) -> () {
 // CHECK: bb0(%0 : $A):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
 // CHECK-NEXT: // function_ref accessors.index0 () -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TF9accessors6index0FT_Si
+// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index0SiyF
 // CHECK-NEXT: [[INDEX0:%.*]] = apply [[T0]]()
 //   Formal evaluation of RHS.
 // CHECK-NEXT: // function_ref accessors.index1 () -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TF9accessors6index1FT_Si
+// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $OrdinarySub
@@ -43,7 +43,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: store [[T1]] to [init] [[TEMP]]
 // CHECK-NEXT: [[T0:%.*]] = load [take] [[TEMP]]
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T1:%.*]] = function_ref @_TFV9accessors11OrdinarySubg9subscriptFSiSi
+// CHECK-NEXT: [[T1:%.*]] = function_ref @_T09accessors11OrdinarySubV9subscriptSiSicfg
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[T0]])
 // CHECK-NEXT: destroy_value [[T0]]
 //   Formal access to LHS.
@@ -57,7 +57,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*OrdinarySub on %0 : $A
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11OrdinarySubs9subscriptFSiSi
+// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11OrdinarySubV9subscriptSiSicfs
 // CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
@@ -91,16 +91,16 @@ class B { var array = MutatingSub() }
 func test1(_ ref: B) {
   ref.array[index0()] = ref.array[index1()]
 }
-// CHECK-LABEL: sil hidden @_TF9accessors5test1FCS_1BT_ : $@convention(thin) (@owned B) -> () {
+// CHECK-LABEL: sil hidden @_T09accessors5test1yAA1BCF : $@convention(thin) (@owned B) -> () {
 // CHECK:    bb0(%0 : $B):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
 // CHECK-NEXT: // function_ref accessors.index0 () -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TF9accessors6index0FT_Si
+// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index0SiyF
 // CHECK-NEXT: [[INDEX0:%.*]] = apply [[T0]]()
 //   Formal evaluation of RHS.
 // CHECK-NEXT: // function_ref accessors.index1 () -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TF9accessors6index1FT_Si
+// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
 // CHECK-NEXT: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
@@ -113,7 +113,7 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubg9subscriptFSiSi : $@convention(method) (Int, @inout MutatingSub) -> Int 
+// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11MutatingSubV9subscriptSiSicfg : $@convention(method) (Int, @inout MutatingSub) -> Int 
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
@@ -137,7 +137,7 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubs9subscriptFSiSi : $@convention(method) (Int, Int, @inout MutatingSub) -> () 
+// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11MutatingSubV9subscriptSiSicfs : $@convention(method) (Int, Int, @inout MutatingSub) -> () 
 // CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
@@ -174,8 +174,8 @@ func test_rec(_ outer: inout RecOuter) -> Int {
   return outer.inner[0]
 }
 // This uses the immutable addressor.
-// CHECK: sil hidden @_TF9accessors8test_recFRVS_8RecOuterSi : $@convention(thin) (@inout RecOuter) -> Int {
-// CHECK:   function_ref @_TFV9accessors8RecOuterlu5innerVS_8RecInner : $@convention(method) (RecOuter) -> UnsafePointer<RecInner>
+// CHECK: sil hidden @_T09accessors8test_recSiAA8RecOuterVzF : $@convention(thin) (@inout RecOuter) -> Int {
+// CHECK:   function_ref @_T09accessors8RecOuterV5innerAA0B5InnerVflu : $@convention(method) (RecOuter) -> UnsafePointer<RecInner>
 
 struct Rec2Inner {
   subscript(i: Int) -> Int {
@@ -192,5 +192,5 @@ func test_rec2(_ outer: inout Rec2Outer) -> Int {
   return outer.inner[0]
 }
 // This uses the mutable addressor.
-// CHECK: sil hidden @_TF9accessors9test_rec2FRVS_9Rec2OuterSi : $@convention(thin) (@inout Rec2Outer) -> Int {
-// CHECK:   function_ref @_TFV9accessors9Rec2Outerau5innerVS_9Rec2Inner : $@convention(method) (@inout Rec2Outer) -> UnsafeMutablePointer<Rec2Inner>
+// CHECK: sil hidden @_T09accessors9test_rec2SiAA9Rec2OuterVzF : $@convention(thin) (@inout Rec2Outer) -> Int {
+// CHECK:   function_ref @_T09accessors9Rec2OuterV5innerAA0B5InnerVfau : $@convention(method) (@inout Rec2Outer) -> UnsafeMutablePointer<Rec2Inner>

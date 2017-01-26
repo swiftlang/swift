@@ -63,6 +63,10 @@ void RequirementSource::dump(llvm::raw_ostream &out,
   case Inherited:
     out << "inherited";
     break;
+
+  case ProtocolRequirementSignatureSelf:
+    out << "protocol_requirement_signature_self";
+    break;
   }
 
   if (srcMgr && getLoc().isValid()) {
@@ -350,19 +354,6 @@ auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
   return Result;
 }
 
-bool ArchetypeBuilder::PotentialArchetype::hasConcreteTypeInPath() const {
-  for (auto pa = this; pa; pa = pa->getParent()) {
-    // FIXME: The archetype check here is a hack because we're reusing
-    // archetypes from the outer context.
-    if (Type concreteType = pa->getConcreteType()) {
-      if (!concreteType->is<ArchetypeType>())
-        return true;
-    }
-  }
-
-  return false;
-}
-
 /// Canonical ordering for dependent types in generic signatures.
 static int compareDependentTypes(
                              ArchetypeBuilder::PotentialArchetype * const* pa,
@@ -457,19 +448,31 @@ static int compareDependentTypes(
   llvm_unreachable("potential archetype total order failure");
 }
 
-bool ArchetypeBuilder::PotentialArchetype::isBetterArchetypeAnchor(
-       PotentialArchetype *other) const {
-  auto concrete = hasConcreteTypeInPath();
-  auto otherConcrete = other->hasConcreteTypeInPath();
-  if (concrete != otherConcrete)
-    return otherConcrete;
+/// Determine whether there is a concrete type anywhere in the path to the root.
+static bool hasConcreteTypeInPath(
+                               const ArchetypeBuilder::PotentialArchetype *pa) {
+  for (; pa; pa = pa->getParent()) {
+    if (pa->isConcreteType()) return true;
+  }
 
-  // FIXME: Not a total order.
-  auto rootKey = getRootGenericParamKey();
-  auto otherRootKey = other->getRootGenericParamKey();
-  return std::make_tuple(+rootKey.Depth, +rootKey.Index, getNestingDepth())
-    < std::make_tuple(+otherRootKey.Depth, +otherRootKey.Index,
-                      other->getNestingDepth());
+  return false;
+}
+
+/// Whether this potential archetype makes a better archetype anchor than
+/// the given archetype anchor.
+static bool isBetterArchetypeAnchor(
+                              const ArchetypeBuilder::PotentialArchetype *pa,
+                              const ArchetypeBuilder::PotentialArchetype *pb) {
+  // If one potential archetype has a concrete type in its path but the other
+  // does not, prefer the one that does not.
+  auto aConcrete = hasConcreteTypeInPath(pa);
+  auto bConcrete = hasConcreteTypeInPath(pb);
+  if (aConcrete != bConcrete)
+    return bConcrete;
+
+  auto mutablePA = const_cast<ArchetypeBuilder::PotentialArchetype *>(pa);
+  auto mutablePB = const_cast<ArchetypeBuilder::PotentialArchetype *>(pb);
+  return compareDependentTypes(&mutablePA, &mutablePB) < 0;
 }
 
 auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
@@ -479,14 +482,15 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
   PotentialArchetype *rep = getRepresentative();
   auto best = rep;
   for (auto pa : rep->getEquivalenceClass()) {
-    if (pa->isBetterArchetypeAnchor(best))
+    if (isBetterArchetypeAnchor(pa, best))
       best = pa;
   }
 
 #ifndef NDEBUG
   // Make sure that we did, in fact, get one that is better than all others.
   for (auto pa : rep->getEquivalenceClass()) {
-    assert(!pa->isBetterArchetypeAnchor(best) &&
+    assert((pa == best || isBetterArchetypeAnchor(best, pa)) &&
+           !isBetterArchetypeAnchor(pa, best) &&
            "archetype anchor isn't a total order");
   }
 #endif
@@ -557,6 +561,13 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         } else {
           nested.push_back(pa);
         }
+
+        // Produce a same-type constraint between the two same-named
+        // potential archetypes.
+        auto frontRep = nested.front()->getRepresentative();
+        pa->Representative = frontRep;
+        frontRep->EquivalenceClass.push_back(pa);
+        pa->SameTypeSource = redundantSource;
       } else
         nested.push_back(pa);
 
@@ -753,6 +764,7 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
     case RequirementSource::Protocol:
+    case RequirementSource::ProtocolRequirementSignatureSelf:
     case RequirementSource::Redundant:
       Protos.push_back(conforms.first);
       break;
@@ -1002,8 +1014,14 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   if (!T->addConformance(Proto, /*updateExistingSource=*/true, Source, *this))
     return false;
 
-  RequirementSource InnerSource(RequirementSource::Redundant, Source.getLoc());
-  
+  // Conformances to inherit protocols are explicit in a protocol requirement
+  // signature, but inferred from this conformance otherwise.
+  auto InnerKind =
+      Source.getKind() == RequirementSource::ProtocolRequirementSignatureSelf
+          ? RequirementSource::Explicit
+          : RequirementSource::Redundant;
+  RequirementSource InnerSource(InnerKind, Source.getLoc());
+
   bool inserted = Visited.insert(Proto).second;
   assert(inserted);
   (void) inserted;
@@ -1024,10 +1042,15 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
       auto AssocPA = T->getNestedType(AssocType, *this);
+      // Requirements introduced by the main protocol are explicit in a protocol
+      // requirement signature, but inferred from this conformance otherwise.
+      auto Kind = Source.getKind() ==
+                          RequirementSource::ProtocolRequirementSignatureSelf
+                      ? RequirementSource::Explicit
+                      : RequirementSource::Protocol;
+
       if (AssocPA != T) {
-        if (addAbstractTypeParamRequirements(AssocType, AssocPA,
-                                             RequirementSource::Protocol,
-                                             Visited))
+        if (addAbstractTypeParamRequirements(AssocType, AssocPA, Kind, Visited))
           return true;
       }
 
@@ -2060,7 +2083,7 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
 
 void ArchetypeBuilder::addGenericSignature(GenericSignature *sig) {
   if (!sig) return;
-  
+
   RequirementSource::Kind sourceKind = RequirementSource::Explicit;
   for (auto param : sig->getGenericParams())
     addGenericParameter(param);
@@ -2090,6 +2113,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
     case RequirementSource::Protocol:
     case RequirementSource::Redundant:
     case RequirementSource::Inherited:
+    case RequirementSource::ProtocolRequirementSignatureSelf:
       // The requirement was redundant, drop it.
       return;
     }

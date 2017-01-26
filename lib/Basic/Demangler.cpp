@@ -566,7 +566,7 @@ NodePointer Demangler::demangleNominalType(Node::Kind kind) {
 NodePointer Demangler::demangleTypeAlias() {
   NodePointer Name = popNode(isDeclName);
   NodePointer Ctx = popContext();
-  return createWithChildren(Node::Kind::TypeAlias, Ctx, Name);
+  return createType(createWithChildren(Node::Kind::TypeAlias, Ctx, Name));
 }
 
 NodePointer Demangler::demangleExtensionContext() {

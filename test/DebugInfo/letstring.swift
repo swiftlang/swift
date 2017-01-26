@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o %t.ll
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o %t.ll
 // RUN: %FileCheck %s < %t.ll
 
 class UIWindow {}
 class AppDelegate {
   var window: UIWindow?
-  // CHECK: define hidden i1 {{.*}}11AppDelegate1f
+  // CHECK: define hidden i1 {{.*}}11AppDelegateC1f
   func f() -> Bool {
     // Test for -O0 shadow copies.
     // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[B:.*]], metadata !{{[0-9]+}})

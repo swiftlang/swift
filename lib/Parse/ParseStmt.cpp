@@ -283,10 +283,19 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     // If the previous statement didn't have a semicolon and this new
     // statement doesn't start a line, complain.
     if (!PreviousHadSemi && !Tok.isAtStartOfLine()) {
-      SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
-      diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
-        .fixItInsert(EndOfPreviousLoc, ";");
-      // FIXME: Add semicolon to the AST?
+      // Add a fix-it to remove the space in consecutive identifiers
+      // in a variable decl.
+      if (isSecondVarIdentifier()) {
+        diagnose(Tok.getLoc(), diag::repeated_identifier, "variable");
+        auto Previous = L->getTokenAt(PreviousLoc);
+        diagnoseConsecutiveIDs(Previous, Tok);
+        skipUntilDeclRBrace(tok::semi, tok::pound_endif);
+      } else {
+        SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
+        diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
+          .fixItInsert(EndOfPreviousLoc, ";");
+        // FIXME: Add semicolon to the AST?
+      }
     }
 
     ParserPosition BeginParserPosition;
@@ -297,17 +306,18 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     PreviousHadSemi = false;
     if (isStartOfDecl()
         && Tok.isNot(tok::pound_if, tok::pound_sourceLocation)) {
-      ParseDeclOptions options = IsTopLevel ? PD_AllowTopLevel : PD_Default;
-      ParserStatus Status =
-        parseDecl(options, [&](Decl *D) { TmpDecls.push_back(D); });
-      if (Status.isError()) {
+      ParserResult<Decl> DeclResult = 
+          parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
+                    [&](Decl *D) {TmpDecls.push_back(D);});
+      if (DeclResult.isParseError()) {
         NeedParseErrorRecovery = true;
-        if (Status.hasCodeCompletion() && IsTopLevel &&
+        if (DeclResult.hasCodeCompletion() && IsTopLevel &&
             isCodeCompletionFirstPass()) {
           consumeDecl(BeginParserPosition, None, IsTopLevel);
-          return Status;
+          return DeclResult;
         }
       }
+      Result = DeclResult.getPtrOrNull();
 
       for (Decl *D : TmpDecls)
         Entries.push_back(D);
@@ -345,6 +355,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       IfConfigStmt *ICS = cast<IfConfigStmt>(Result.get<Stmt*>());
       for (auto &Entry : ICS->getActiveClauseElements()) {
         Entries.push_back(Entry);
+        if (Entry.is<Decl*>()) {
+          Entry.get<Decl*>()->setEscapedFromIfConfig(true);
+        }
       }
     } else if (Tok.is(tok::pound_line)) {
       ParserStatus Status = parseLineDirective(true);
@@ -412,9 +425,16 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         Entries.push_back(Result);
     }
 
-    if (!NeedParseErrorRecovery && !PreviousHadSemi && Tok.is(tok::semi)) {
-      consumeToken();
+    if (!NeedParseErrorRecovery && Tok.is(tok::semi)) {
       PreviousHadSemi = true;
+      if (Expr *E = Result.dyn_cast<Expr*>())
+        E->TrailingSemiLoc = consumeToken(tok::semi);
+      else if (Stmt *S = Result.dyn_cast<Stmt*>())
+        S->TrailingSemiLoc = consumeToken(tok::semi);
+      else if (Decl *D = Result.dyn_cast<Decl*>())
+        D->TrailingSemiLoc = consumeToken(tok::semi);
+      else
+        assert(!Result && "Unsupported AST node");
     }
 
     if (NeedParseErrorRecovery) {

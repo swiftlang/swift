@@ -237,8 +237,12 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// \brief Whether this declaration is currently being validated.
     unsigned BeingValidated : 1;
+
+    /// \brief Whether this declaration was added to the surrounding
+    /// DeclContext of an active #if config clause.
+    unsigned EscapedFromIfConfig : 1;
   };
-  enum { NumDeclBits = 11 };
+  enum { NumDeclBits = 12 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
 
   class PatternBindingDeclBitfields {
@@ -649,6 +653,7 @@ protected:
     DeclBits.FromClang = false;
     DeclBits.EarlyAttrValidation = false;
     DeclBits.BeingValidated = false;
+    DeclBits.EscapedFromIfConfig = false;
   }
 
   ClangNode getClangNodeImpl() const {
@@ -744,6 +749,8 @@ public:
   /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;
 
+  SourceLoc TrailingSemiLoc;
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -802,6 +809,14 @@ public:
   void setIsBeingValidated(bool ibv = true) {
     assert(DeclBits.BeingValidated != ibv);
     DeclBits.BeingValidated = ibv;
+  }
+
+  bool escapedFromIfConfig() const {
+    return DeclBits.EscapedFromIfConfig;
+  }
+
+  void setEscapedFromIfConfig(bool Escaped) {
+    DeclBits.EscapedFromIfConfig = Escaped;
   }
 
   /// \returns the unparsed comment attached to this declaration.
@@ -3559,6 +3574,15 @@ public:
   /// Create the generic parameters of this protocol if the haven't been
   /// created yet.
   void createGenericParamsIfMissing();
+
+  /// Retrieve the generic signature representing the requirements introduced by
+  /// this protocol.
+  ///
+  /// These are the requirements like any inherited protocols and conformances
+  /// for associated types that are mentioned literally in this
+  /// decl. Requirements implied via inheritance are not mentioned, nor is the
+  /// conformance of Self to this protocol.
+  GenericSignature *getRequirementSignature();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

@@ -328,11 +328,22 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
       /// \brief The second type.
       Type Second;
+    } Types;
+
+    struct {
+      /// \brief The type of the base.
+      Type First;
+
+      /// \brief The type of the member.
+      Type Second;
 
       /// \brief If non-null, the name of a member of the first type is that
       /// being related to the second type.
       DeclName Member;
-    } Types;
+
+      /// \brief The DC in which the use appears.
+      DeclContext *UseDC;
+    } Member;
 
     /// The set of constraints for a disjunction.
     ArrayRef<Constraint *> Nested;
@@ -343,6 +354,9 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
       /// \brief The overload choice
       OverloadChoice Choice;
+
+      /// \brief The DC in which the use appears.
+      DeclContext *UseDC;
     } Overload;
   };
 
@@ -358,14 +372,19 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new constraint.
+  Constraint(ConstraintKind kind, Type first, Type second,
+             ConstraintLocator *locator,
+             ArrayRef<TypeVariableType *> typeVars);
+
+  /// Construct a new member constraint.
   Constraint(ConstraintKind kind, Type first, Type second, DeclName member,
-             FunctionRefKind functionRefKind,
+             DeclContext *useDC, FunctionRefKind functionRefKind,
              ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new overload-binding constraint.
-  Constraint(Type type, OverloadChoice choice, ConstraintLocator *locator,
-             ArrayRef<TypeVariableType *> typeVars);
+  Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a restricted constraint.
   Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
@@ -385,13 +404,20 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 public:
   /// Create a new constraint.
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
-                            Type First, Type Second, DeclName Member,
-                            FunctionRefKind functionRefKind,
+                            Type First, Type Second,
                             ConstraintLocator *locator);
+
+  /// Create a new member constraint.
+  static Constraint *createMember(ConstraintSystem &cs, ConstraintKind kind,
+                                  Type first, Type second, DeclName member,
+                                  DeclContext *useDC,
+                                  FunctionRefKind functionRefKind,
+                                  ConstraintLocator *locator);
 
   /// Create an overload-binding constraint.
   static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
                                         OverloadChoice choice, 
+                                        DeclContext *useDC,
                                         ConstraintLocator *locator);
 
   /// Create a restricted relational constraint.
@@ -494,18 +520,36 @@ public:
 
   /// \brief Retrieve the first type in the constraint.
   Type getFirstType() const {
-    assert(getKind() != ConstraintKind::Disjunction);
+    switch (getKind()) {
+    case ConstraintKind::Disjunction:
+      llvm_unreachable("disjunction constraints have no type operands");
 
-    if (getKind() == ConstraintKind::BindOverload)
+    case ConstraintKind::BindOverload:
       return Overload.First;
 
-    return Types.First;
+    case ConstraintKind::ValueMember:
+    case ConstraintKind::UnresolvedValueMember:
+      return Member.First;
+
+    default:
+      return Types.First;
+    }
   }
 
   /// \brief Retrieve the second type in the constraint.
   Type getSecondType() const {
-    assert(getKind() != ConstraintKind::Disjunction);
-    return Types.Second;
+    switch (getKind()) {
+    case ConstraintKind::Disjunction:
+    case ConstraintKind::BindOverload:
+      llvm_unreachable("constraint has no second type");
+
+    case ConstraintKind::ValueMember:
+    case ConstraintKind::UnresolvedValueMember:
+      return Member.Second;
+
+    default:
+      return Types.Second;
+    }
   }
 
   /// \brief Retrieve the protocol in a conformance constraint.
@@ -515,7 +559,7 @@ public:
   DeclName getMember() const {
     assert(Kind == ConstraintKind::ValueMember ||
            Kind == ConstraintKind::UnresolvedValueMember);
-    return Types.Member;
+    return Member.Member;
   }
 
   /// \brief Determine whether this constraint kind has a second type.
@@ -544,6 +588,19 @@ public:
   OverloadChoice getOverloadChoice() const {
     assert(Kind == ConstraintKind::BindOverload);
     return Overload.Choice;
+  }
+
+  /// Retrieve the DC in which the overload was used.
+  DeclContext *getOverloadUseDC() const {
+    assert(Kind == ConstraintKind::BindOverload);
+    return Overload.UseDC;
+  }
+
+  /// Retrieve the DC in which the member was used.
+  DeclContext *getMemberUseDC() const {
+    assert(Kind == ConstraintKind::ValueMember ||
+           Kind == ConstraintKind::UnresolvedValueMember);
+    return Member.UseDC;
   }
 
   /// \brief Retrieve the locator for this constraint.

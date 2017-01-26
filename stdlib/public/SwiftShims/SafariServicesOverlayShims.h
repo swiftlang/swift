@@ -15,8 +15,17 @@
 
 #import <SafariServices/SFSwiftOverlaySupport.h>
 
-static inline bool _swift_SafariServices_isSafariServicesAvailable() {
-  return NULL != &_SFSafariServicesAvailable;
+static inline bool _swift_SafariServices_isSafariServicesAvailable(SFSafariServicesVersion version) {
+  if (version == SFSafariServicesVersion10_0) {
+    return NULL != &_SFSafariServicesAvailable;
+  }
+
+  SFSafariServicesVersion* latestVersion = &_SFSafariServicesVersion;
+  if (NULL == latestVersion) {
+    return false;
+  }
+
+  return *latestVersion >= version;
 }
 
 #endif // SWIFT_STDLIB_SHIMS_SAFARISERVICES_OVERLAY_H

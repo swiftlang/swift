@@ -4371,6 +4371,20 @@ public:
       visit(Member);
 
     TC.checkDeclAttributes(PD);
+
+    if (TC.Context.LangOpts.DebugGenericSignatures) {
+      auto requirementsSig = PD->getRequirementSignature();
+
+      llvm::errs() << "Protocol requirement signature:\n";
+      PD->dumpRef(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "Requirement signature: ";
+      requirementsSig->print(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "Canonical requirement signature: ";
+      requirementsSig->getCanonicalSignature()->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -6265,7 +6279,8 @@ public:
     // Require the carried type to be materializable.
     if (EED->getArgumentType() &&
         !EED->getArgumentType()->isMaterializable()) {
-      TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable);
+      TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable,
+                  EED->getArgumentType());
       EED->setInterfaceType(ErrorType::get(TC.Context));
       EED->setInvalid();
     }
