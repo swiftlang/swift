@@ -44,7 +44,7 @@ void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
                                         AbstractFunctionDecl *AFD);
 
 /// Perform diagnostics on the top level code declaration.
-void performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl &TLCD);
+void performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD);
   
 /// Emit a fix-it to set the accessibility of \p VD to \p desiredAccess.
 ///
