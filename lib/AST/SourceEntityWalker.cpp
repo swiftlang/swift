@@ -365,6 +365,7 @@ bool SemaAnnotator::handleImports(ImportDecl *Import) {
   auto Decls = Import->getDecls();
   if (Decls.size() == 1) {
     // FIXME: ImportDecl should store a DeclNameLoc.
+    // FIXME: Handle overloaded funcs too by passing a reference for each?
     if (!passReference(Decls.front(), Type(), DeclNameLoc(Import->getEndLoc()),
         SemaReferenceKind::DeclRef))
       return false;
