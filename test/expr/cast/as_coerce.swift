@@ -55,6 +55,7 @@ if cc is P {
 }
 if let p = cc as? P {
   doFoo()
+  _ = p
 }
 
 // Test that 'as?' coercion fails.
