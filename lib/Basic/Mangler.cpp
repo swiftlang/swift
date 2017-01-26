@@ -28,12 +28,9 @@ using namespace NewMangling;
 
 llvm::cl::opt<bool> NewManglingForTests(
                        "new-mangling-for-tests", llvm::cl::init(false),
-                       llvm::cl::desc("Use new mangling for compielr tests"));
+                       llvm::cl::desc("Use new mangling for compiler tests"));
 
-#ifndef NDEBUG
-llvm::cl::opt<bool> PrintSwiftManglingStats(
-    "print-swift-mangling-stats", llvm::cl::init(false),
-    llvm::cl::desc("Print statistics about Swift symbol mangling"));
+#ifndef USE_NEW_MANGLING
 
 static bool containsNonSwiftModule(Demangle::NodePointer Nd) {
   switch (Nd->getKind()) {
@@ -55,6 +52,8 @@ static bool containsNonSwiftModule(Demangle::NodePointer Nd) {
   return false;
 }
 
+#endif // USE_NEW_MANGLING
+
 bool swift::useNewMangling(Demangle::NodePointer Node) {
 #ifdef USE_NEW_MANGLING
   return true;
@@ -64,6 +63,12 @@ bool swift::useNewMangling(Demangle::NodePointer Node) {
   return false;
 #endif
 }
+
+#ifndef NDEBUG
+
+llvm::cl::opt<bool> PrintSwiftManglingStats(
+    "print-swift-mangling-stats", llvm::cl::init(false),
+    llvm::cl::desc("Print statistics about Swift symbol mangling"));
 
 namespace {
 
