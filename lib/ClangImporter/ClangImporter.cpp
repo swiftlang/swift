@@ -932,7 +932,14 @@ bool ClangImporter::Implementation::importHeader(
   // #1. So we treat that as an approximation of the condition we're after, and
   // accept that we might fail to warn in the odd case where "the import
   // occurred" but didn't introduce any new decls.
-  if (implicitImport && !allParsedDecls.empty()) {
+  //
+  // We also want to limit (for now) the warning in case #1 to invocations that
+  // requested an explicit bridging header, because otherwise the warning will
+  // complain in a very common scenario (unit test w/o bridging header imports
+  // application w/ bridging header) that we don't yet have Xcode automation
+  // to correct. The fix would be explicitly importing on the command line.
+  if (implicitImport && !allParsedDecls.empty() &&
+    BridgingHeaderExplicitlyRequested) {
     SwiftContext.Diags.diagnose(
       diagLoc, diag::implicit_bridging_header_imported_from_module,
       llvm::sys::path::filename(headerName), adapter->getName());
@@ -1355,6 +1362,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       ImportForwardDeclarations(opts.ImportForwardDeclarations),
       InferImportAsMember(opts.InferImportAsMember),
       DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
+      BridgingHeaderExplicitlyRequested(!opts.BridgingHeader.empty()),
       IsReadingBridgingPCH(false),
       CurrentVersion(nameVersionFromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
