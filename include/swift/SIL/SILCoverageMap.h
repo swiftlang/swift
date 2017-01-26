@@ -67,17 +67,11 @@ private:
   // The coverage hash of the function covered by this mapping.
   uint64_t Hash;
 
-  // The number of mapped regions.
-  unsigned NumMappedRegions;
-
-  // The number of counter expressions.
-  unsigned NumExpressions;
-
   // Tail-allocated region mappings.
-  MappedRegion *MappedRegions;
+  MutableArrayRef<MappedRegion> MappedRegions;
 
   // Tail-allocated expression list.
-  llvm::coverage::CounterExpression *Expressions;
+  MutableArrayRef<llvm::coverage::CounterExpression> Expressions;
 
   // Disallow copying into temporary objects.
   SILCoverageMap(const SILCoverageMap &other) = delete;
@@ -107,13 +101,11 @@ public:
   uint64_t getHash() const { return Hash; }
 
   /// Return all of the mapped regions.
-  ArrayRef<MappedRegion> getMappedRegions() const {
-    return {MappedRegions, NumMappedRegions};
-  }
+  ArrayRef<MappedRegion> getMappedRegions() const { return MappedRegions; }
 
   /// Return all of the counter expressions.
   ArrayRef<llvm::coverage::CounterExpression> getExpressions() const {
-    return {Expressions, NumExpressions};
+    return Expressions;
   }
 
   void printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C) const;

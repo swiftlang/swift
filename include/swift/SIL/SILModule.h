@@ -589,6 +589,22 @@ public:
   /// Allocate memory using the module's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const;
 
+  template <typename T> T *allocate(unsigned Count) const {
+    return static_cast<T *>(allocate(sizeof(T) * Count, alignof(T)));
+  }
+
+  template <typename T>
+  MutableArrayRef<T> allocateCopy(ArrayRef<T> Array) const {
+    MutableArrayRef<T> result(allocate<T>(Array.size()), Array.size());
+    std::uninitialized_copy(Array.begin(), Array.end(), result.begin());
+    return result;
+  }
+
+  StringRef allocateCopy(StringRef Str) const {
+    auto result = allocateCopy<char>({Str.data(), Str.size()});
+    return {result.data(), result.size()};
+  }
+
   /// Allocate memory for an instruction using the module's internal allocator.
   void *allocateInst(unsigned Size, unsigned Align) const;
 
