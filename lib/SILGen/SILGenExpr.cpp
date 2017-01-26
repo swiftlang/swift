@@ -47,7 +47,7 @@ using namespace Lowering;
 
 ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
                                                SILValue v) {
-  auto &lowering = getTypeLowering(v->getType().getSwiftRValueType());
+  auto &lowering = F.getTypeLowering(v->getType());
   return emitManagedRetain(loc, v, lowering);
 }
 
@@ -64,7 +64,7 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v) {
-  auto &lowering = getTypeLowering(v->getType().getSwiftRValueType());
+  auto &lowering = F.getTypeLowering(v->getType());
   return emitManagedLoadCopy(loc, v, lowering);
 }
 
@@ -80,7 +80,7 @@ ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v,
 
 ManagedValue SILGenFunction::emitManagedLoadBorrow(SILLocation loc,
                                                    SILValue v) {
-  auto &lowering = getTypeLowering(v->getType().getSwiftRValueType());
+  auto &lowering = F.getTypeLowering(v->getType());
   return emitManagedLoadBorrow(loc, v, lowering);
 }
 
@@ -100,7 +100,7 @@ SILGenFunction::emitManagedLoadBorrow(SILLocation loc, SILValue v,
 
 ManagedValue SILGenFunction::emitManagedStoreBorrow(SILLocation loc, SILValue v,
                                                     SILValue addr) {
-  auto &lowering = getTypeLowering(v->getType().getSwiftRValueType());
+  auto &lowering = F.getTypeLowering(v->getType());
   return emitManagedStoreBorrow(loc, v, addr, lowering);
 }
 
@@ -118,7 +118,7 @@ ManagedValue SILGenFunction::emitManagedStoreBorrow(
 
 ManagedValue SILGenFunction::emitManagedBeginBorrow(SILLocation loc,
                                                     SILValue v) {
-  auto &lowering = getTypeLowering(v->getType().getSwiftRValueType());
+  auto &lowering = F.getTypeLowering(v->getType());
   return emitManagedBeginBorrow(loc, v, lowering);
 }
 
@@ -138,7 +138,7 @@ SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue original,
                                                      SILValue borrowed) {
   assert(original->getType().getObjectType() ==
          borrowed->getType().getObjectType());
-  auto &lowering = getTypeLowering(original->getType());
+  auto &lowering = F.getTypeLowering(original->getType());
   return emitManagedBorrowedRValueWithCleanup(original, borrowed, lowering);
 }
 
@@ -155,7 +155,7 @@ ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
 }
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
-  auto &lowering = getTypeLowering(v->getType());
+  auto &lowering = F.getTypeLowering(v->getType());
   return emitManagedRValueWithCleanup(v, lowering);
 }
 
@@ -169,7 +169,7 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
 }
 
 ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v) {
-  auto &lowering = getTypeLowering(v->getType());
+  auto &lowering = F.getTypeLowering(v->getType());
   return emitManagedBufferWithCleanup(v, lowering);
 }
 
