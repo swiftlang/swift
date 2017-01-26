@@ -399,6 +399,7 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
     llvm::sys::fs::OpenFlags OSFlags = llvm::sys::fs::F_None;
     std::error_code EC;
     RawOS.emplace(OutputFilename, EC, OSFlags);
+
     if (RawOS->has_error() || EC) {
       if (Diags) {
         if (DiagMutex)
