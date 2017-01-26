@@ -13,8 +13,8 @@
 @_exported import Intents
 import Foundation
 
-#if os(iOS)
-@available(iOS 10.0, *)
+#if os(iOS) || os(watchOS)
+@available(iOS 10.0, watchOS 3.2, *)
 extension INRequestRideIntent {
   @nonobjc
   public convenience init(
@@ -22,13 +22,23 @@ extension INRequestRideIntent {
     dropOffLocation: CLPlacemark? = nil,
     rideOptionName: INSpeakableString? = nil,
     partySize: Int? = nil,
-    paymentMethod: INPaymentMethod? = nil
+    paymentMethod: INPaymentMethod? = nil,
+    scheduledPickupTime: INDateComponentsRange? = nil
   ) {
-    self.init(__pickupLocation: pickupLocation,
-      dropOffLocation: dropOffLocation,
-      rideOptionName: rideOptionName,
-      partySize: partySize.map { NSNumber(value: $0) },
-      paymentMethod: paymentMethod)
+    if #available(iOS 10.3, watchOS 3.2, *) {
+      self.init(__pickupLocation: pickupLocation,
+        dropOffLocation: dropOffLocation,
+        rideOptionName: rideOptionName,
+        partySize: partySize.map { NSNumber(value: $0) },
+        paymentMethod: paymentMethod,
+        scheduledPickupTime: scheduledPickupTime)
+    } else {
+      self.init(__pickupLocation: pickupLocation,
+        dropOffLocation: dropOffLocation,
+        rideOptionName: rideOptionName,
+        partySize: partySize.map { NSNumber(value: $0) },
+        paymentMethod: paymentMethod)
+    }
   }
 
   @nonobjc
