@@ -1570,7 +1570,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     auto instanceType = TE->getInstanceType();
     
     // TODO: figure out right value for isKnownPrivate
-    if (!instanceType->getAs<TupleType>()) {
+    if (instanceType->mayHaveMembers()) {
       auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType,
                                        NameLookupFlags::IgnoreAccessibility);
       for (auto ctor : ctors)
