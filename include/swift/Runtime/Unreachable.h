@@ -1,4 +1,4 @@
-//===--- Unreachable.h - Implements swift_unreachable -----------*- C++ -*-===//
+//===--- Unreachable.h - Implements swift_runtime_unreachable ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,23 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines swift_unreachable, an LLVM-independent implementation of
-//  llvm_unreachable.
+//  This file defines swift_runtime_unreachable, an LLVM-independent
+//  implementation of llvm_unreachable.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_UNREACHABLE_H
-#define SWIFT_BASIC_UNREACHABLE_H
+#ifndef SWIFT_RUNTIME_UNREACHABLE_H
+#define SWIFT_RUNTIME_UNREACHABLE_H
 
 #include "llvm/Support/Compiler.h"
 #include <assert.h>
 #include <stdlib.h>
 
 LLVM_ATTRIBUTE_NORETURN
-inline static void swift_unreachable(const char* msg) {
+inline static void swift_runtime_unreachable(const char *msg) {
   assert(false && msg);
   (void)msg;
   abort();
 }
 
-#endif // SWIFT_BASIC_UNREACHABLE_H
+#endif // SWIFT_RUNTIME_UNREACHABLE_H

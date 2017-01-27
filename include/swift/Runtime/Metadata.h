@@ -33,7 +33,7 @@
 #include "swift/Basic/FlaggedPointer.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Basic/ManglingMacros.h"
-#include "swift/Basic/Unreachable.h"
+#include "swift/Runtime/Unreachable.h"
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
 
 namespace swift {
@@ -1160,7 +1160,7 @@ public:
       return false;
     }
     
-    swift_unreachable("Unhandled MetadataKind in switch.");
+    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Is this metadata for an existential type?
@@ -1186,7 +1186,7 @@ public:
       return false;
     }
 
-    swift_unreachable("Unhandled MetadataKind in switch.");
+    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Is this either type metadata or a class object for any kind of class?
@@ -1267,7 +1267,7 @@ public:
       return RelativeDirectPointerNullPtrRef;
     }
 
-    swift_unreachable("Unhandled MetadataKind in switch.");
+    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Get the generic metadata pattern from which this generic type instance was

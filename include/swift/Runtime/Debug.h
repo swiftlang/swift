@@ -19,9 +19,9 @@
 
 #include <llvm/Support/Compiler.h>
 #include <stdint.h>
-#include "swift/Basic/Unreachable.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Unreachable.h"
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 
@@ -72,7 +72,7 @@ static inline void crash(const char *message) {
   CRSetCrashLogMessage(message);
 
   LLVM_BUILTIN_TRAP;
-  swift_unreachable("Expected compiler to crash.");
+  swift_runtime_unreachable("Expected compiler to crash.");
 }
 
 /// Report a corrupted type object.
