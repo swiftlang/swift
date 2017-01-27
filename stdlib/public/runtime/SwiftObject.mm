@@ -433,7 +433,6 @@ static bool usesNativeSwiftReferenceCounting_allocated(const void *object) {
   return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocated(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_unknownRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -445,7 +444,6 @@ void swift::swift_unknownRetain_n(void *object, int n)
     objc_retain(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_unknownRelease_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -455,7 +453,6 @@ void swift::swift_unknownRelease_n(void *object, int n)
     objc_release(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_unknownRetain(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -466,7 +463,6 @@ void swift::swift_unknownRetain(void *object)
   objc_retain(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_unknownRelease(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -475,7 +471,6 @@ void swift::swift_unknownRelease(void *object)
   return objc_release(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_unknownRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -487,7 +482,6 @@ void swift::swift_nonatomic_unknownRetain_n(void *object, int n)
     objc_retain(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_unknownRelease_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -497,7 +491,6 @@ void swift::swift_nonatomic_unknownRelease_n(void *object, int n)
     objc_release(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_unknownRetain(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -508,7 +501,6 @@ void swift::swift_nonatomic_unknownRetain(void *object)
   objc_retain(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_unknownRelease(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -538,7 +530,6 @@ static void* toPlainObject_unTagged_bridgeObject(void *object) {
   return (void*)(uintptr_t(object) & ~unTaggedNonNativeBridgeObjectBits);
 }
 
-SWIFT_RUNTIME_EXPORT
 void *swift::swift_bridgeObjectRetain(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -601,7 +592,6 @@ void swift::swift_bridgeObjectRelease(void *object)
 #endif
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_bridgeObjectRelease(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -620,7 +610,6 @@ void swift::swift_nonatomic_bridgeObjectRelease(void *object)
 #endif
 }
 
-SWIFT_RUNTIME_EXPORT
 void *swift::swift_bridgeObjectRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -645,7 +634,6 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n)
 #endif
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_bridgeObjectRelease_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -665,7 +653,6 @@ void swift::swift_bridgeObjectRelease_n(void *object, int n)
 #endif
 }
 
-SWIFT_RUNTIME_EXPORT
 void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -690,7 +677,6 @@ void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n)
 #endif
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_bridgeObjectRelease_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP

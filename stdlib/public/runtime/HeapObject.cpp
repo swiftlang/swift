@@ -153,9 +153,8 @@ public:
 
 static SimpleGlobalCache<BoxCacheEntry> Boxes;
 
-SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
-BoxPair::Return
-swift::swift_allocBox(const Metadata *type) {
+SWIFT_CC(swift)
+BoxPair::Return swift::swift_allocBox(const Metadata *type) {
   return SWIFT_RT_ENTRY_REF(swift_allocBox)(type);
 }
 
