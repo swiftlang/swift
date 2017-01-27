@@ -602,7 +602,7 @@ internal func _copyCollectionToContiguousArray<
 /// This presents a "builder" interface for initializing an array buffer
 /// element-by-element. The type is unsafe because it cannot be deinitialized
 /// until the buffer has been finalized by a call to `finish`.
-internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
+fileprivate struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   internal var result: _ContiguousArrayBuffer<Element>
   internal var p: UnsafeMutablePointer<Element>
   internal var remainingCapacity: Int

@@ -751,23 +751,23 @@ public struct ${Self}<Element>
   }
 
   @_semantics("array.get_count")
-  internal func _getCount() -> Int {
+  fileprivate func _getCount() -> Int {
     return _buffer.count
   }
   @_semantics("array.get_capacity")
-  internal func _getCapacity() -> Int {
+  fileprivate func _getCapacity() -> Int {
     return _buffer.capacity
   }
 
   /// - Precondition: The array has a native buffer.
   @_semantics("array.owner")
-  internal func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
+  private func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
     return Builtin.castToNativeObject(_buffer.nativeOwner)
   }
 
   /// - Precondition: The array has a native buffer.
   @inline(__always)
-  internal func _getOwner_native() -> Builtin.NativeObject {
+  private func _getOwner_native() -> Builtin.NativeObject {
 #if _runtime(_ObjC)
     if _isClassOrObjCExistential(Element.self) {
       // We are hiding the access to '_buffer.owner' behind
@@ -783,7 +783,7 @@ public struct ${Self}<Element>
   }
 
   // FIXME(ABI)#12 : move to an initializer on _Buffer.
-  static internal func _copyBuffer(_ buffer: inout _Buffer) {
+  static private func _copyBuffer(_ buffer: inout _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
     buffer._copyContents(
@@ -794,14 +794,14 @@ public struct ${Self}<Element>
   }
 
   @_semantics("array.make_mutable")
-  internal mutating func _makeMutableAndUnique() {
+  private mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
       ${Self}._copyBuffer(&_buffer)
     }
   }
 
   @_semantics("array.make_mutable")
-  internal mutating func _makeMutableAndUniqueOrPinned() {
+  private mutating func _makeMutableAndUniqueOrPinned() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
       ${Self}._copyBuffer(&_buffer)
     }
@@ -811,7 +811,7 @@ public struct ${Self}<Element>
   /// Check that the given `index` is valid for subscripting, i.e.
   /// `0 ≤ index < count`.
   @inline(__always)
-  internal func _checkSubscript_native(_ index: Int) {
+  private func _checkSubscript_native(_ index: Int) {
 % if Self != 'Array':
     _buffer._checkValidSubscript(index)
 % else:
@@ -841,7 +841,7 @@ public struct ${Self}<Element>
 
   /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
-  internal func _checkIndex(_ index: Int) {
+  fileprivate func _checkIndex(_ index: Int) {
     _precondition(index <= endIndex, "${Self} index is out of range")
 % if Self in ['Array', 'ContiguousArray']:
     _precondition(index >= startIndex, "Negative ${Self} index is out of range")
@@ -866,7 +866,7 @@ public struct ${Self}<Element>
   }
 
   @_semantics("array.get_element_address")
-  internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
+  private func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
     return _buffer.subscriptBaseAddress + index
   }
 
@@ -1286,7 +1286,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   }
 
   @_semantics("array.make_mutable")
-  internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
+  private mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
       _copyToNewBuffer(oldCount: _buffer.count)
     }
