@@ -14,7 +14,7 @@
 
 // XFAIL: linux
 
-import MixedWithHeader // expected-warning {{implicit import of bridging header 'header.h' via module 'MixedWithHeader' is deprecated and will be removed in a later version of Swift}}
+import MixedWithHeader
 
 func testReexportedClangModules(_ foo : FooProto) {
   _ = foo.bar as CInt
