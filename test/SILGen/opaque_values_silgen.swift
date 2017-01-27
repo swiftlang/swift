@@ -17,6 +17,18 @@ func materializeSelf<T: Foo>(t: T) where T: AnyObject {
   t.foo()
 }
 
+// Test OpaqueTypeLowering copyValue and destroyValue.
+// CHECK-LABEL: sil hidden @_TF20opaque_values_silgen6callerurFxx : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0(%0 : $T):
+// CHECK: %[[COPY:[0-9]+]] = copy_value %0 : $T
+// CHECK: %{{.*}} = apply %{{.*}}<T>(%[[COPY]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK: destroy_value %0 : $T
+// CHECK: return %{{.*}} : $T
+// CHECK-LABEL: } // end sil function '_TF20opaque_values_silgen6callerurFxx'
+func caller<T>(_ t: T) -> T {
+  return caller(t)
+}
+
 // Test a simple opaque parameter and return value.
 //
 // CHECK-LABEL: sil hidden @_TF20opaque_values_silgen8identityurFT1tx_x : $@convention(thin) <T> (@in T) -> @out T {
@@ -38,16 +50,4 @@ func identity<T>(t: T) -> T {
 // CHECK-LABEL: } // end sil function '_TTWV20opaque_values_silgen17HasGuaranteedSelfS_3FooS_FS1_3foofT_T_'
 struct HasGuaranteedSelf : Foo {
   func foo() {}
-}
-
-// Test OpaqueTypeLowering copyValue and destroyValue.
-// CHECK-LABEL: sil hidden @_TF8addronly6callerurFxx : $@convention(thin) <T> (@in T) -> @out T {
-// CHECK: bb0(%0 : $T):
-// CHECK: %{{.*}} = copy_value %0 : $T
-// CHECK: %{{.*}} = apply %{{.*}}<T>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
-// CHECK: destroy_value %0 : $T
-// CHECK: return %{{.*}} : $T
-// CHECK-LABEL: } // end sil function '_TF8addronly6callerurFxx'
-func caller<T>(_ t: T) -> T {
-  return caller(t)
 }
