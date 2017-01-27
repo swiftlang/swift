@@ -86,7 +86,7 @@ public:
       parameters(parameters) {}
 
   ManagedValue getManagedValue(SILValue arg, CanType t,
-                                 SILParameterInfo parameterInfo) const {
+                               SILParameterInfo parameterInfo) const {
     switch (parameterInfo.getConvention()) {
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -486,6 +486,11 @@ unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,
                                     Type resultType, DeclContext *DC,
                                     bool throws) {
   // Create the indirect result parameters.
+  if (auto *genericSig = DC->getGenericSignatureOfContext()) {
+    resultType = genericSig->getCanonicalTypeInContext(
+      resultType, *SGM.M.getSwiftModule());
+  }
+
   emitIndirectResultParameters(*this, resultType, DC);
 
   // Emit the argument variables in calling convention order.
