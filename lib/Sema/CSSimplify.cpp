@@ -3385,11 +3385,13 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       unwrappedFromType->getAnyNominal()
         != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
       !flags.contains(TMF_ApplyingOperatorParameter) &&
-      unwrappedToType->isBridgeableObjectType()) {
+      (unwrappedToType->isBridgeableObjectType() ||
+       (unwrappedToType->isExistentialType() &&
+        !unwrappedToType->isAny()))) {
     countOptionalInjections();
     if (Type classType = TC.Context.getBridgedToObjC(DC, unwrappedFromType)) {
-      return matchTypes(classType, unwrappedToType, ConstraintKind::Subtype, subflags,
-                        locator);
+      return matchTypes(classType, unwrappedToType, ConstraintKind::Conversion,
+                        subflags, locator);
     }
   }
 
