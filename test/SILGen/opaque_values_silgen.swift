@@ -40,3 +40,14 @@ struct HasGuaranteedSelf : Foo {
   func foo() {}
 }
 
+// Test OpaqueTypeLowering copyValue and destroyValue.
+// CHECK-LABEL: sil hidden @_TF8addronly6callerurFxx : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0(%0 : $T):
+// CHECK: %{{.*}} = copy_value %0 : $T
+// CHECK: %{{.*}} = apply %{{.*}}<T>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK: destroy_value %0 : $T
+// CHECK: return %{{.*}} : $T
+// CHECK-LABEL: } // end sil function '_TF8addronly6callerurFxx'
+func caller<T>(_ t: T) -> T {
+  return caller(t)
+}
