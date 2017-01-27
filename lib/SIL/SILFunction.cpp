@@ -571,3 +571,11 @@ ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
   ForwardingSubs = env->getForwardingSubstitutions();
   return *ForwardingSubs;
 }
+
+const TypeLowering &SILFunction::getTypeLowering(SILType InputType) const {
+  CanSILFunctionType FuncType = getLoweredFunctionType();
+  auto &TypeConverter = getModule().Types;
+  GenericContextScope GCS(TypeConverter, FuncType->getGenericSignature());
+  const TypeLowering &Result = TypeConverter.getTypeLowering(InputType);
+  return Result;
+}
