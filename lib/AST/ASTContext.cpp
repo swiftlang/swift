@@ -2926,6 +2926,8 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   RecursiveTypeProperties properties;
   if (Result->getRecursiveProperties().hasDynamicSelf())
     properties |= RecursiveTypeProperties::HasDynamicSelf;
+  if (Result->getRecursiveProperties().hasError())
+    properties |= RecursiveTypeProperties::HasError;
   return properties;
 }
 
@@ -3127,17 +3129,23 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
 
     for (auto param : getParameters()) {
       (void)param;
+      assert(!param.getType()->hasError()
+             && "interface type of parameter should not contain error types");
       assert(!param.getType()->hasArchetype()
-             && "interface type of generic type should not contain context archetypes");
+             && "interface type of parameter should not contain context archetypes");
     }
     for (auto result : getResults()) {
       (void)result;
+      assert(!result.getType()->hasError()
+             && "interface type of result should not contain error types");
       assert(!result.getType()->hasArchetype()
-             && "interface type of generic type should not contain context archetypes");
+             && "interface type of result should not contain context archetypes");
     }
     if (hasErrorResult()) {
+      assert(!getErrorResult().getType()->hasError()
+             && "interface type of result should not contain error types");
       assert(!getErrorResult().getType()->hasArchetype()
-             && "interface type of generic type should not contain context archetypes");
+             && "interface type of result should not contain context archetypes");
     }
   }
 #endif
