@@ -579,9 +579,10 @@ The downside of having two types is the inconvenience of sometimes having a
 `Substring` when you need a `String`, and vice-versa. It is likely this would
 be a significantly bigger problem than with `Array` and `ArraySlice`, as
 slicing of `String` is such a common operation. It is especially relevant to
-existing code that assumes `String` is the currency type. To ease the pain of
-type mismatches, `Substring` should be a subtype of `String` in the same way
-that `Int` is a subtype of `Optional<Int>`. This would give users an implicit
+existing code that assumes `String` is the currency type – that is, the default
+string type used for everyday exchange between APIs. To ease the pain of type
+mismatches, `Substring` should be a subtype of `String` in the same way that
+`Int` is a subtype of `Optional<Int>`. This would give users an implicit
 conversion from `Substring` to `String`, as well as the usual implicit
 conversions such as `[Substring]` to `[String]` that other subtype
 relationships receive.
