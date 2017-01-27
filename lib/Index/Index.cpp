@@ -361,7 +361,7 @@ private:
   bool initIndexSymbol(ValueDecl *D, SourceLoc Loc, bool IsRef,
                        IndexSymbol &Info);
   bool initFuncDeclIndexSymbol(ValueDecl *D, IndexSymbol &Info);
-  bool initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
+  bool initFuncRefIndexSymbol(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
                               SourceLoc Loc, IndexSymbol &Info);
   bool initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc,
                               IndexSymbol &Info);
@@ -662,15 +662,15 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
   if (IsRef) {
     IndexSymbol Info;
 
-    // initCallRefIndexSymbol uses the top of the entities stack as the caller,
+    // initFuncRefIndexSymbol uses the top of the entities stack as the caller,
     // but in this case the top of the stack is the referenced
     // AbstractStorageDecl.
     assert(getParentDecl() == D);
     auto PreviousTop = EntitiesStack.pop_back_val();
-    bool initCallFailed = initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info);
+    bool initFailed = initFuncRefIndexSymbol(getCurrentExpr(), getParentExpr(), D, Loc, Info);
     EntitiesStack.push_back(PreviousTop);
 
-    if (initCallFailed)
+    if (initFailed)
       return true; // continue walking.
     if (updateInfo(Info))
       return true;
@@ -793,7 +793,7 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
     return true; // keep walking
 
   if (isa<AbstractFunctionDecl>(D)) {
-    if (initCallRefIndexSymbol(getCurrentExpr(), getParentExpr(), D, Loc, Info))
+    if (initFuncRefIndexSymbol(getCurrentExpr(), getParentExpr(), D, Loc, Info))
       return true;
   } else if (isa<AbstractStorageDecl>(D)) {
     if (initVarRefIndexSymbols(getCurrentExpr(), D, Loc, Info))
@@ -809,11 +809,10 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
   }
 
   // Report the accessors that were utilized.
-  if (isa<AbstractStorageDecl>(D)) {
+  if (AbstractStorageDecl *ASD = dyn_cast<AbstractStorageDecl>(D)) {
     bool UsesGetter = Info.roles & (SymbolRoleSet)SymbolRole::Read;
     bool UsesSetter = Info.roles & (SymbolRoleSet)SymbolRole::Write;
 
-    AbstractStorageDecl *ASD = cast<AbstractStorageDecl>(D);
     if (UsesGetter)
       if (!reportPseudoAccessor(ASD, AccessorKind::IsGetter, /*IsRef=*/true,
                                 Loc))
@@ -947,13 +946,21 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
   return true;
 }
 
-bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
+bool IndexSwiftASTWalker::initFuncRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
                                                  ValueDecl *D, SourceLoc Loc,
                                                  IndexSymbol &Info) {
-  if (!ParentE)
-    return true;
 
   if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
+    return true;
+
+  if (!CurrentE)
+    return false;
+
+  // FIXME: the below check maintains existing indexing behaviour with
+  // pseudo/accessor output but seems incorrect. E.g otherGlobal in:
+  // let global = otherGlobal
+  // will not have a parent expression so no accessor call is reported
+  if (!ParentE)
     return true;
 
   Info.roles |= (unsigned)SymbolRole::Call;
@@ -995,10 +1002,13 @@ bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
 
 bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc, IndexSymbol &Info) {
 
-  if (!(CurrentE->getReferencedDecl() == D))
+  if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
 
-  if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
+  if (!CurrentE)
+    return false;
+
+  if (!(CurrentE->getReferencedDecl() == D))
     return true;
 
   AccessKind Kind = CurrentE->hasLValueAccessKind() ? CurrentE->getLValueAccessKind() : AccessKind::Read;
