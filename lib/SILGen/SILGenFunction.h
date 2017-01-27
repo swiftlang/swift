@@ -858,7 +858,8 @@ public:
   emitOpenExistential(SILLocation loc,
                       ManagedValue existentialValue,
                       CanArchetypeType openedArchetype,
-                      SILType loweredOpenedType);
+                      SILType loweredOpenedType,
+                      AccessKind accessKind);
 
   /// \brief Wrap the given value in an existential container.
   ///

@@ -732,7 +732,8 @@ SILGenFunction::emitOpenExistential(
        SILLocation loc,
        ManagedValue existentialValue,
        CanArchetypeType openedArchetype,
-       SILType loweredOpenedType) {
+       SILType loweredOpenedType,
+       AccessKind accessKind) {
   // Open the existential value into the opened archetype value.
   bool isUnique = true;
   bool canConsume;
