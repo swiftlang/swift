@@ -61,7 +61,7 @@ public protocol AnyUnicodeEncoding {
   /// - Parameter knownCount: a number of code units known to exist in `input`.
   ///   **Note:** passing a known compile-time constant is strongly advised,
   ///   even if it's zero.
-  static func parse1Forward<C: Collection>(
+  static func _parse1Forward<C: Collection>(
     _ input: C, knownCount: Int /* = 0 */
   ) -> ParseResult<UInt32, C.Index>
   where C.Iterator.Element == UInt32
@@ -71,7 +71,7 @@ public protocol AnyUnicodeEncoding {
   /// - Parameter knownCount: a number of code units known to exist in `input`.
   ///   **Note:** passing a known compile-time constant is strongly advised,
   ///   even if it's zero.
-  static func parse1Reverse<C: BidirectionalCollection>(
+  static func _parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCount: Int/* = 0 */
   ) -> ParseResult<UInt32, C.Index>
   where C.Iterator.Element == UInt32
@@ -187,7 +187,7 @@ extension UnicodeEncoding {
 extension UnicodeEncoding
 where EncodedScalar.Iterator.Element : UnsignedInteger {
   
-  public static func parse1Forward<C: Collection>(
+  public static func _parse1Forward<C: Collection>(
     _ input: C, knownCount: Int = 0
   ) -> ParseResult<UInt32, C.Index>
   where C.Iterator.Element == UInt32 {
@@ -202,7 +202,7 @@ where EncodedScalar.Iterator.Element : UnsignedInteger {
     }
   }
 
-  public static func parse1Reverse<C: BidirectionalCollection>(
+  public static func _parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCount: Int = 0
   ) -> ParseResult<UInt32, C.Index>
   where C.Iterator.Element == UInt32 {
@@ -1128,7 +1128,7 @@ extension UTF32 {
     public var startIndex: UInt8 { return 0 }
     public var endIndex: UInt8 { return 1 }
     internal let _bits: UInt32
-    
+
     internal init(_ _0: CodeUnit) {
       _bits = _0
     }
