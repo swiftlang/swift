@@ -2019,9 +2019,11 @@ public:
           GuardStmt *GS = dyn_cast<GuardStmt>(S);
           if (!GS) continue;
           for (StmtConditionElement SCE : GS->getCond()) {
-            SCE.getPattern()->forEachVariable([&](VarDecl *VD) {
-              VarDecls[VD] = RK_Read|RK_Written;
-            });
+            if (auto pattern = SCE.getPatternOrNull()) {
+              pattern->forEachVariable([&](VarDecl *VD) {
+                VarDecls[VD] = RK_Read|RK_Written;
+              });
+            }
           }
         }
       }
