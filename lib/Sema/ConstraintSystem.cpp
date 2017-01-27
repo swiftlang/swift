@@ -1021,7 +1021,7 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
 
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
-    Type baseTy, ValueDecl *value,
+    Type baseTy, ValueDecl *value, DeclContext *useDC,
     bool isTypeReference,
     bool isDynamicResult,
     FunctionRefKind functionRefKind,
@@ -1084,7 +1084,7 @@ ConstraintSystem::getTypeOfMemberReference(
                                   locator, replacements, innerDC, outerDC,
                                   /*skipProtocolSelfConstraint=*/true);
   } else {
-    openedType = TC.getUnopenedTypeOfReference(value, baseTy, DC, base,
+    openedType = TC.getUnopenedTypeOfReference(value, baseTy, useDC, base,
                                                /*wantInterfaceType=*/true);
 
     // The type of 'Self' that will be added if the declaration
@@ -1251,13 +1251,14 @@ ConstraintSystem::getTypeOfMemberReference(
 
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
+                                      DeclContext *useDC,
                                       ConstraintLocator *locator,
                                       OverloadChoice *favoredChoice) {
   assert(!choices.empty() && "Empty overload set");
 
   // If there is a single choice, add the bind overload directly.
   if (choices.size() == 1) {
-    addBindOverloadConstraint(boundType, choices.front(), locator);
+    addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
     return;
   }
 
@@ -1270,6 +1271,7 @@ void ConstraintSystem::addOverloadSet(Type boundType,
         Constraint::createBindOverload(*this,
                                        boundType,
                                        *favoredChoice,
+                                       useDC,
                                        locator);
     
     bindOverloadConstraint->setFavored();
@@ -1282,7 +1284,7 @@ void ConstraintSystem::addOverloadSet(Type boundType,
       continue;
     
     overloads.push_back(Constraint::createBindOverload(*this, boundType, choice,
-                                                       locator));
+                                                       useDC, locator));
   }
 
   addDisjunctionConstraint(overloads, locator, ForgetChoice, favoredChoice);
@@ -1363,7 +1365,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
-                                       OverloadChoice choice) {
+                                       OverloadChoice choice,
+                                       DeclContext *useDC) {
   // Determine the type to which we'll bind the overload set's type.
   Type refType;
   Type openedFullType;
@@ -1407,7 +1410,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       auto anchor = locator ? locator->getAnchor() : nullptr;
       auto base = getDotBase(anchor);
       std::tie(openedFullType, refType)
-        = getTypeOfMemberReference(baseTy, choice.getDecl(),
+        = getTypeOfMemberReference(baseTy, choice.getDecl(), useDC,
                                    isTypeReference, isDynamicResult,
                                    choice.getFunctionRefKind(),
                                    locator, base, nullptr);

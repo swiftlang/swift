@@ -1190,7 +1190,7 @@ matchWitness(TypeChecker &tc,
                      LocatorPathElt(ConstraintLocator::Requirement, req));
     llvm::DenseMap<CanType, TypeVariableType *> reqReplacements;
     std::tie(openedFullReqType, reqType)
-      = cs->getTypeOfMemberReference(selfTy, req,
+      = cs->getTypeOfMemberReference(selfTy, req, dc,
                                      /*isTypeReference=*/false,
                                      /*isDynamicResult=*/false,
                                      FunctionRefKind::DoubleApply,
@@ -1228,7 +1228,7 @@ matchWitness(TypeChecker &tc,
     llvm::DenseMap<CanType, TypeVariableType *> witnessReplacements;
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
-        = cs->getTypeOfMemberReference(selfTy, witness,
+        = cs->getTypeOfMemberReference(selfTy, witness, dc,
                                        /*isTypeReference=*/false,
                                        /*isDynamicResult=*/false,
                                        FunctionRefKind::DoubleApply,
