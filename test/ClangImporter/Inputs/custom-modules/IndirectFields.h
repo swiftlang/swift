@@ -14,3 +14,16 @@ union UnionWithIndirectField {
     };
     int c;
 };
+
+struct DeepIndirectField {
+    union {
+        struct {
+            int a;
+            int b;
+        };
+        struct {
+            int c;
+            int d;
+        };
+    };
+};
