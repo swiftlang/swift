@@ -34,7 +34,34 @@ public struct _DependenceToken {}
     ('ArraySlice', 'an `ArraySlice` instance'),
     ('Array', 'an array'),
   ]
+
+  bufferTypes = [
+    '_ArrayBuffer', 
+    '_ContiguousArrayBuffer', 
+    '_SliceBuffer',
+  ]
 }%
+
+// FIXME(eager-bridging): these if-defs for _ArrayBuffer are awful
+// and can be removed when eager bridging is implemented
+% for Buffer in bufferTypes:
+  % if Buffer == '_ArrayBuffer':
+    #if _runtime(_ObjC) 
+  % end
+extension ${Buffer} {
+  internal init(copying buffer: ${Buffer}) {
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
+    buffer._copyContents(
+      subRange: Range(buffer.indices),
+      initializing: newBuffer.firstElementAddress)
+    self.init(_buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
+  }
+}
+  % if Buffer == '_ArrayBuffer':
+    #endif
+  % end
+% end
 
 % for (Self, a_Self) in arrayTypes:
 
@@ -782,28 +809,17 @@ public struct ${Self}<Element>
     return Builtin.castToNativeObject(_buffer.owner)
   }
 
-  // FIXME(ABI)#12 : move to an initializer on _Buffer.
-  static internal func _copyBuffer(_ buffer: inout _Buffer) {
-    let newBuffer = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
-    buffer._copyContents(
-      subRange: Range(buffer.indices),
-      initializing: newBuffer.firstElementAddress)
-    buffer = _Buffer(
-      _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
-  }
-
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      ${Self}._copyBuffer(&_buffer)
+      _buffer = _Buffer(copying: _buffer)
     }
   }
 
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUniqueOrPinned() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
-      ${Self}._copyBuffer(&_buffer)
+      _buffer = _Buffer(copying: _buffer)
     }
   }
 
