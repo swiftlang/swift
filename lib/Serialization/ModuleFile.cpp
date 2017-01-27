@@ -555,6 +555,8 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       break;
     }
   }
+
+  return false;
 }
 
 class ModuleFile::DeclCommentTableInfo {
@@ -689,6 +691,8 @@ bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
       break;
     }
   }
+
+  return false;
 }
 
 static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
