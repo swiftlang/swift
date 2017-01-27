@@ -1,0 +1,51 @@
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %gyb %s > %t/collection-combinatorics.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/collection-combinatorics.swift
+
+// It should be possible to conform to any combination of
+// (1 + RangeReplaceable) * (1 + Bidirectional + RandomAccess) * (1 + Mutable)
+// Collection and get reasonable default implementations for slicing
+// operations from
+// the standard library.
+
+% for mutable in ['', 'Mutable']:
+%   for rangeReplaceable in ['', 'RangeReplaceable']:
+%     for capability in ['', 'Bidirectional', 'RandomAccess']:
+
+struct ${mutable}${rangeReplaceable}${capability}Butt
+    : ${mutable}Collection
+%       if rangeReplaceable:
+      , ${rangeReplaceable}Collection
+%       end
+%       if capability:
+      , ${capability}Collection
+%       end
+{
+  subscript(i: Int) -> Int {
+    get { return 0 }
+%       if mutable:
+    set { }
+%       end
+  }
+
+%       if capability:
+  func index(before i: Int) -> Int {
+    return i - 1
+  }
+%       end
+  func index(after i: Int) -> Int {
+    return i + 1
+  }
+
+  var startIndex: Int { return .min }
+  var endIndex: Int { return .max }
+
+%       if rangeReplaceable:
+  init() {}
+
+  mutating func replaceSubrange<C: Collection>(_: Range<Int>, with: C)
+    where C.Iterator.Element == Int
+  {}
+%       end
+}
