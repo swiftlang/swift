@@ -2343,7 +2343,8 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
 
   // Easy case: the types match.
   if (rvalue->getType() == destTL.getLoweredType()) {
-    assert(destTL.isAddressOnly() == rvalue->getType().isAddress());
+    assert(!silConv.useLoweredAddresses()
+           || (destTL.isAddressOnly() == rvalue->getType().isAddress()));
     if (rvalue->getType().isAddress()) {
       B.createCopyAddr(loc, rvalue, dest, IsTake, isInit);
     } else {
