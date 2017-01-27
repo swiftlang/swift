@@ -680,11 +680,11 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
 
 static bool rangeContainsPlaceholderEnd(const char *CurPtr,
                                         const char *End) {
-  while (CurPtr++ < End - 1) {
-    if (*CurPtr== '\n') {
+  for (auto SubStr = CurPtr; SubStr != End - 1; ++SubStr) {
+    if (SubStr[0] == '\n') {
       return false;
     }
-    if (CurPtr[0] == '#' && CurPtr[1] == '>') {
+    if (SubStr[0] == '#' && SubStr[1] == '>') {
       return true;
     }
   }
@@ -710,7 +710,7 @@ void Lexer::lexOperatorIdentifier() {
     // started with a '.'.
     if (*CurPtr == '.' && *TokStart != '.')
       break;
-    if (Identifier::isEditorPlaceholder(StringRef(CurPtr, 2)) &&
+    if (Identifier::isEditorPlaceholder(StringRef(CurPtr, BufferEnd-CurPtr)) &&
         rangeContainsPlaceholderEnd(CurPtr + 2, BufferEnd)) {
       break;
     }
