@@ -19,6 +19,7 @@
 #if defined(__ELF__) || defined(__ANDROID__)
 
 #include "ImageInspection.h"
+#include "swift/Runtime/Debug.h"
 #include <dlfcn.h>
 #include <elf.h>
 #include <link.h>
@@ -63,17 +64,19 @@ static InspectArgs TypeMetadataRecordArgs = {
 static SectionInfo getSectionInfo(const char *imageName,
                                   const char *sectionName) {
   SectionInfo sectionInfo = { 0, nullptr };
-  void *handle = dlopen(imageName, RTLD_LAZY);
-  if (handle) {
-    void *symbol = dlsym(handle, sectionName);
-    if (symbol) {
-      // Extract the size of the section data from the head of the section.
-      const char *section = reinterpret_cast<const char *>(symbol);
-      memcpy(&sectionInfo.size, section, sizeof(uint64_t));
-      sectionInfo.data = section + sizeof(uint64_t);
-    }
-    dlclose(handle);
+  void *handle = dlopen(imageName, RTLD_LAZY | RTLD_NOLOAD);
+  if (!handle) {
+    fatalError(/* flags = */ 0, "dlopen() failed on `%s': %s", imageName,
+               dlerror());
   }
+  void *symbol = dlsym(handle, sectionName);
+  if (symbol) {
+    // Extract the size of the section data from the head of the section.
+    const char *section = reinterpret_cast<const char *>(symbol);
+    memcpy(&sectionInfo.size, section, sizeof(uint64_t));
+    sectionInfo.data = section + sizeof(uint64_t);
+  }
+  dlclose(handle);
   return sectionInfo;
 }
 
