@@ -2013,8 +2013,7 @@ public:
               VarDecls[VD] = RK_Read|RK_Written;
             });
           }
-        }
-        else if (node.is<Stmt *>()) {
+        } else if (node.is<Stmt *>()) {
           // Flag all variables in guard statements
           Stmt *S = node.get<Stmt *>();
           GuardStmt *GS = dyn_cast<GuardStmt>(S);
