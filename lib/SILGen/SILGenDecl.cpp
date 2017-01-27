@@ -1242,9 +1242,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::Struct:
   case DeclKind::Class: {
     // Emit witness tables.
-    for (auto c : cast<NominalTypeDecl>(d)->getLocalConformances(
-                    ConformanceLookupKind::All,
-                    nullptr, /*sorted=*/true)) {
+    auto nom = cast<NominalTypeDecl>(d);
+    for (auto c : nom->getLocalConformances(ConformanceLookupKind::All,
+                                            nullptr, /*sorted=*/true)) {
       auto *proto = c->getProtocol();
       if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
           isa<NormalProtocolConformance>(c) &&
@@ -1606,7 +1606,7 @@ public:
 
       ProtocolConformanceRef conformance(protocol);
       // If the associated type requirement is satisfied by an associated type,
-      // these will all be null.
+      // these will all be abstract conformances.
       if (witness.getConformances()[0].isConcrete()) {
         auto foundConformance = std::find_if(witness.getConformances().begin(),
                                         witness.getConformances().end(),
@@ -1616,6 +1616,7 @@ public:
         assert(foundConformance != witness.getConformances().end());
         conformance = *foundConformance;
       }
+      SGM.useConformance(conformance);
 
       Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
         td, protocol, conformance
