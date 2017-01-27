@@ -59,6 +59,19 @@ entry(%b : $Error):
   return undef : $()
 }
 
+struct Str : Error { }
+
+// CHECK-LABEL: define{{( protected)?}} void @alloc_deallc_box_with_concrete_type
+sil @alloc_deallc_box_with_concrete_type : $@convention(thin) () -> () {
+bb0:
+  // CHECK: call {{.*}} @swift_allocError
+  %b = alloc_existential_box $Error, $Str
+  // CHECK: call void @swift_deallocError
+  dealloc_existential_box %b : $Error, $Str
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: define{{( protected)?}} {{i[0-9]+}} @project_boxed_existential(%swift.error*)
 sil @project_boxed_existential : $@convention(thin) (@owned Error) -> Int {
 entry(%b : $Error):

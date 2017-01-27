@@ -2514,6 +2514,24 @@ x:
   return undef : $()
 }
 
+public struct AnyError : Swift.Error { }
+
+public enum Result<T, Error: Swift.Error> {
+	case success(T)
+	case failure(Error)
+}
+
+// CHECK-LABEL: define{{( protected)?}} void @test_inject_enum_addr_with_bound_generic
+sil @test_inject_enum_addr_with_bound_generic : $@convention(thin) <T> () -> @out Result<T, AnyError> {
+bb0(%0 : $*Result<T, AnyError>):
+// CHECK: call {{.*}} @_T04enum6ResultOMa
+// CHECK: call void @swift_storeEnumTagMultiPayload
+  inject_enum_addr %0 : $*Result<T, AnyError>, #Result.success!enumelt.1
+  %r = tuple ()
+// CHECK:  ret void
+  return %r : $()
+}
+
 // CHECK-LABEL: define{{( protected)?}} void @force_global_variables_to_materialize
 sil @force_global_variables_to_materialize : $() -> () {
 entry:
