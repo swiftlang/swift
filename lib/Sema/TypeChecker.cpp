@@ -710,6 +710,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // Verify imported modules.
 #ifndef NDEBUG
     if (SF.Kind != SourceFileKind::REPL &&
+        SF.Kind != SourceFileKind::SIL &&
         !Ctx.LangOpts.DebuggerSupport) {
       Ctx.verifyAllLoadedModules();
     }

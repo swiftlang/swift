@@ -2089,6 +2089,38 @@ struct ASTNodeBase {};
 
     void verifyParsed(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
+
+      // All of the parameter names should match.
+      if (!isa<DestructorDecl>(AFD)) { // Destructor has no non-self params.
+        auto paramNames = AFD->getFullName().getArgumentNames();
+        bool checkParamNames = (bool)AFD->getFullName();
+        bool hasSelf =
+          isa<ConstructorDecl>(AFD) || AFD->getDeclContext()->isTypeContext();
+        auto *firstParams = AFD->getParameterList(hasSelf ? 1 : 0);
+
+        if (checkParamNames &&
+            paramNames.size() != firstParams->size()) {
+          Out << "Function name does not match its argument pattern ("
+              << paramNames.size() << " elements instead of "
+              << firstParams->size() << ")\n";
+          AFD->dump(Out);
+          abort();
+        }
+
+        // This doesn't use for_each because paramNames shouldn't be checked
+        // when the function is anonymous.
+        for (size_t i = 0, e = firstParams->size(); i < e; ++i) {
+          auto &param = firstParams->get(i);
+
+          if (checkParamNames &&
+              param->getArgumentName() != paramNames[i]) {
+            Out << "Function full name doesn't match parameter's arg name\n";
+            AFD->dump(Out);
+            abort();
+          }
+        }
+      }
+
       verifyParsedBase(AFD);
     }
 
@@ -2180,36 +2212,6 @@ struct ASTNodeBase {};
 
     void verifyChecked(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
-
-      // All of the parameter names should match.
-      if (!isa<DestructorDecl>(AFD)) { // Destructor has no non-self params.
-        auto paramNames = AFD->getFullName().getArgumentNames();
-        bool checkParamNames = (bool)AFD->getFullName();
-        bool hasSelf = AFD->getDeclContext()->isTypeContext();
-        auto *firstParams = AFD->getParameterList(hasSelf ? 1 : 0);
-
-        if (checkParamNames &&
-            paramNames.size() != firstParams->size()) {
-          Out << "Function name does not match its argument pattern ("
-              << paramNames.size() << " elements instead of "
-              << firstParams->size() << ")\n";
-          AFD->dump(Out);
-          abort();
-        }
-
-        // This doesn't use for_each because paramNames shouldn't be checked
-        // when the function is anonymous.
-        for (size_t i = 0, e = firstParams->size(); i < e; ++i) {
-          auto &param = firstParams->get(i);
-
-          if (checkParamNames &&
-              param->getArgumentName() != paramNames[i]) {
-            Out << "Function full name doesn't match variable name\n";
-            AFD->dump(Out);
-            abort();
-          }
-        }
-      }
 
       // If this function is generic or is within a generic context, it should
       // have an interface type.
