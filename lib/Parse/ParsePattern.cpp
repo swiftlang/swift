@@ -499,12 +499,17 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
       llvm_unreachable("should never be here");
     }
 
-    auto diag = diagnose(Tok, diagID);
-    if (Tok.isAny(tok::l_brace, tok::arrow, tok::kw_throws, tok::kw_rethrows))
-      diag.fixItInsertAfter(PreviousLoc, "()");
+    {
+      auto diag = diagnose(Tok, diagID);
+      if (Tok.isAny(tok::l_brace, tok::arrow, tok::kw_throws, tok::kw_rethrows))
+        diag.fixItInsertAfter(PreviousLoc, "()");
 
+      if (skipIdentifier)
+        diag.fixItRemove(Tok.getLoc());
+    }
+
+    // We might diagnose again down here, so make sure 'diag' is out of scope.
     if (skipIdentifier) {
-      diag.fixItRemove(Tok.getLoc());
       consumeToken();
       skipSingle();
     }
