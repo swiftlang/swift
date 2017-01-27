@@ -743,8 +743,11 @@ SILGenFunction::emitOpenExistential(
   switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
   case ExistentialRepresentation::Opaque: {
     if (existentialType.isAddress()) {
+      OpenedExistentialAccess allowedAccess =
+          getOpenedExistentialAccessFor(accessKind);
       SILValue archetypeValue = B.createOpenExistentialAddr(
-          loc, existentialValue.forward(*this), loweredOpenedType);
+          loc, existentialValue.forward(*this), loweredOpenedType,
+          allowedAccess);
       if (existentialValue.hasCleanup()) {
         canConsume = true;
         // Leave a cleanup to deinit the existential container.

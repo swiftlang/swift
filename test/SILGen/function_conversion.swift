@@ -228,7 +228,7 @@ func convExistentialTrivial(_ t2: @escaping (Q) -> Trivial, t3: @escaping (Q?) -
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T019function_conversion1Q_pAA7TrivialVIxid_AA1P_pAaE_pIxir_TR : $@convention(thin) (@in P, @owned @callee_owned (@in Q) -> Trivial) -> @out P
 // CHECK:         alloc_stack $Q
-// CHECK-NEXT:    open_existential_addr %1 : $*P
+// CHECK-NEXT:    open_existential_addr immutable_access %1 : $*P
 // CHECK-NEXT:    init_existential_addr %3 : $*Q
 // CHECK-NEXT:    copy_addr [take] {{.*}} to [initialization] {{.*}}
 // CHECK-NEXT:    apply

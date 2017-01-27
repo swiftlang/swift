@@ -32,7 +32,7 @@ func test_composition_erasure(_ x: HairType & Error) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden @_T018boxed_existentials24test_composition_erasures5Error_psAC_AA8HairTypepF
-// CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr [[OLD_EXISTENTIAL:%.*]] : $*Error & HairType to $*[[VALUE_TYPE:@opened\(.*\) Error & HairType]]
+// CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr immutable_access [[OLD_EXISTENTIAL:%.*]] : $*Error & HairType to $*[[VALUE_TYPE:@opened\(.*\) Error & HairType]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
 // CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[ADDR]]

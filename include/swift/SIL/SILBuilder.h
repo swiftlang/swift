@@ -1078,9 +1078,10 @@ public:
   }
 
   OpenExistentialAddrInst *
-  createOpenExistentialAddr(SILLocation Loc, SILValue Operand, SILType SelfTy) {
+  createOpenExistentialAddr(SILLocation Loc, SILValue Operand, SILType SelfTy,
+                            OpenedExistentialAccess ForAccess) {
     auto *I = insert(new (F.getModule()) OpenExistentialAddrInst(
-        getSILDebugLocation(Loc), Operand, SelfTy));
+        getSILDebugLocation(Loc), Operand, SelfTy, ForAccess));
     if (OpenedArchetypesTracker)
       OpenedArchetypesTracker->registerOpenedArchetypes(I);
     return I;

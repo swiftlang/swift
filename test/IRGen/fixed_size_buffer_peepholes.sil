@@ -34,7 +34,7 @@ entry(%p : $*P, %x: $*T):
 sil @dont_crash : $@convention(thin) (@in P) -> () {
 entry(%p : $*P):
   %0 = alloc_stack $P
-  %1 = open_existential_addr %p : $*P to $*@opened("4E4E7668-C798-11E6-9B9F-685B3589058E") P
+  %1 = open_existential_addr immutable_access %p : $*P to $*@opened("4E4E7668-C798-11E6-9B9F-685B3589058E") P
   %2 = init_existential_addr %0 : $*P, $@opened("4E4E7668-C798-11E6-9B9F-685B3589058E") P
   copy_addr %1 to [initialization] %2 : $*@opened("4E4E7668-C798-11E6-9B9F-685B3589058E") P
   destroy_addr %2 : $*@opened("4E4E7668-C798-11E6-9B9F-685B3589058E") P

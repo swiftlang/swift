@@ -414,8 +414,9 @@ namespace {
                         AccessKind accessKind) && override {
       assert(base.getType().isExistentialType() &&
              "base for open existential component must be an existential");
-      auto addr = gen.B.createOpenExistentialAddr(loc, base.getLValueAddress(),
-                                           getTypeOfRValue().getAddressType());
+      auto addr = gen.B.createOpenExistentialAddr(
+          loc, base.getLValueAddress(), getTypeOfRValue().getAddressType(),
+          getOpenedExistentialAccessFor(accessKind));
 
       if (base.hasCleanup()) {
         assert(false && "I believe that we should never end up here. One, we "
