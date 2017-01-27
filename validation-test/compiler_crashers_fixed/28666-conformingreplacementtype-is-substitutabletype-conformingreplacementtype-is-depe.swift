@@ -6,5 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-struct A:RangeReplaceableCollection{let c{{a f{}}var f=max
+// RUN: not %target-swift-frontend %s -emit-ir
+struct A:RangeReplaceableCollection{var f=max
