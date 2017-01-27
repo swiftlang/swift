@@ -5424,7 +5424,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::DeepEquality:
-      llvm_unreachable("Equality handled above");
+      assert(toType->hasUnresolvedType() && "Should have handled this above");
+      break;
 
     case ConversionRestrictionKind::Superclass: {
       // Coercion from archetype to its (concrete) superclass.
@@ -5669,23 +5670,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
-  // Tuple-to-scalar conversion.
-  if (auto fromTuple = fromType->getAs<TupleType>()) {
-    if (fromTuple->getNumElements() == 1 &&
-        !fromTuple->getElement(0).isVararg() &&
-        !toType->is<TupleType>()) {
-      expr = cs.cacheType(new (cs.getASTContext())
-          TupleElementExpr(
-              expr,
-              expr->getLoc(),
-              0,
-              expr->getLoc(),
-              fromTuple->getElementType(0)));
-      expr->setImplicit(true);
-      return expr;
-    }
-  }
-
   // Coercions from an lvalue: load or perform implicit address-of. We perform
   // these coercions first because they are often the first step in a multi-step
   // coercion.
@@ -5849,7 +5833,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coercion from one metatype to another.
-  if (fromType->is<MetatypeType>()) {
+  if (fromType->is<MetatypeType>() &&
+      toType->is<MetatypeType>()) {
     auto toMeta = toType->castTo<MetatypeType>();
     return cs.cacheType(new (tc.Context) MetatypeConversionExpr(expr, toMeta));
   }
@@ -5860,11 +5845,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return coerceToType(expr, toType, locator);
   }
 
-  auto fromObjType = fromType->getLValueOrInOutObjectType();
-  auto toObjType = toType->getLValueOrInOutObjectType();
-
-  // Conversion to/from UnresolvedType (looking through @lvalue or inout).
-  if (fromObjType->hasUnresolvedType() || toObjType->hasUnresolvedType())
+  // Unresolved types come up in diagnostics for lvalue and inout types.
+  if (fromType->hasUnresolvedType() || toType->hasUnresolvedType())
     return cs.cacheType(new (tc.Context)
                             UnresolvedTypeConversionExpr(expr, toType));
 
