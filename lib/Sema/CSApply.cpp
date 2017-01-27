@@ -4793,6 +4793,9 @@ Expr *ExprRewriter::coerceCallArguments(
 
   bool matchCanFail = false;
 
+  if (paramType->hasUnresolvedType())
+    matchCanFail = true;
+
   // If you value your sanity, ignore the body of this 'if' statement.
   if (cs.getASTContext().isSwiftVersion3()) {
     // Total hack: In Swift 3 mode, we can end up with an arity mismatch due to
