@@ -162,8 +162,9 @@ bool PartialApplyCombiner::allocateTemporaries() {
     // - the argument stems from an alloc_stack
     // - the argument is consumed by the callee and is indirect
     //   (e.g. it is an @in argument)
-    if (isa<AllocStackInst>(Arg) ||
-        (Param.isConsumed() && Param.isIndirect())) {
+    if (isa<AllocStackInst>(Arg)
+        || (Param.isConsumed()
+            && PAI->getSubstCalleeConv().isSILIndirect(Param))) {
       // If the temporary is non-trivial, we need to release it later.
       if (!Arg->getType().isTrivial(PAI->getModule()))
         needsReleases = true;
@@ -296,7 +297,7 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
 
   auto Callee = PAI->getCallee();
   auto FnType = PAI->getSubstCalleeSILType();
-  SILType ResultTy = PAI->getSubstCalleeType()->getSILResult();
+  SILType ResultTy = PAI->getSubstCalleeConv().getSILResultType();
   ArrayRef<Substitution> Subs = PAI->getSubstitutions();
 
   // The partial_apply might be substituting in an open existential type.
@@ -346,7 +347,7 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
 SILInstruction *PartialApplyCombiner::combine() {
   // We need to model @unowned_inner_pointer better before we can do the
   // peephole here.
-  for (auto R : PAI->getSubstCalleeType()->getAllResults())
+  for (auto R : PAI->getSubstCalleeType()->getResults())
     if (R.getConvention() == ResultConvention::UnownedInnerPointer)
       return nullptr;
 
@@ -414,19 +415,23 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // relevant types from the ConvertFunction function type and AI.
   Builder.setCurrentDebugScope(AI.getDebugScope());
   OperandValueArrayRef Ops = AI.getArgumentsWithoutIndirectResults();
-  auto OldOpTypes = SubstCalleeTy->getParameterSILTypes();
-  auto NewOpTypes = ConvertCalleeTy->getParameterSILTypes();
+  SILFunctionConventions substConventions(SubstCalleeTy, FRI->getModule());
+  SILFunctionConventions convertConventions(ConvertCalleeTy, FRI->getModule());
+  auto oldOpTypes = substConventions.getParameterSILTypes();
+  auto newOpTypes = convertConventions.getParameterSILTypes();
 
-  assert(Ops.size() == OldOpTypes.size() &&
-         "Ops and op types must have same size.");
-  assert(Ops.size() == NewOpTypes.size() &&
-         "Ops and op types must have same size.");
+  assert(Ops.size() == SubstCalleeTy->getNumParameters()
+         && "Ops and op types must have same size.");
+  assert(Ops.size() == ConvertCalleeTy->getNumParameters()
+         && "Ops and op types must have same size.");
 
   llvm::SmallVector<SILValue, 8> Args;
-  for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
+  auto newOpI = newOpTypes.begin();
+  auto oldOpI = oldOpTypes.begin();
+  for (unsigned i = 0, e = Ops.size(); i != e; ++i, ++newOpI, ++oldOpI) {
     SILValue Op = Ops[i];
-    SILType OldOpType = OldOpTypes[i];
-    SILType NewOpType = NewOpTypes[i];
+    SILType OldOpType = *oldOpI;
+    SILType NewOpType = *newOpI;
 
     // Convert function takes refs to refs, address to addresses, and leaves
     // other types alone.
@@ -452,10 +457,9 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                  ArrayRef<Substitution>(), Args,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   else
-    NAI = Builder.createApply(AI.getLoc(), FRI, CCSILTy,
-                              ConvertCalleeTy->getSILResult(),
-                              ArrayRef<Substitution>(), Args,
-                              cast<ApplyInst>(AI)->isNonThrowing());
+    NAI = Builder.createApply(
+        AI.getLoc(), FRI, CCSILTy, convertConventions.getSILResultType(),
+        ArrayRef<Substitution>(), Args, cast<ApplyInst>(AI)->isNonThrowing());
   return NAI;
 }
 
@@ -1005,9 +1009,9 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
   auto FnTy = F->getLoweredFunctionType();
 
   // Look at the result type.
-  if (FnTy->getNumAllResults() != 1)
+  if (FnTy->getNumResults() != 1)
     return false;
-  auto ResultInfo = FnTy->getAllResults()[0];
+  auto ResultInfo = FnTy->getResults()[0];
   if (ResultInfo.getConvention() != ResultConvention::Owned)
     return false;
 
@@ -1026,8 +1030,8 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
   FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
   SILFunction *F = FRI->getReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
-  assert(FnTy->getNumAllResults() == 1);
-  auto ResultInfo = FnTy->getAllResults()[0];
+  assert(FnTy->getNumResults() == 1);
+  auto ResultInfo = FnTy->getResults()[0];
   (void) ResultInfo;
 
   assert(ResultInfo.getConvention() == ResultConvention::Owned &&

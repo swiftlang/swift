@@ -1033,12 +1033,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty2 = MF->getType(TyID2);
     SILType FnTy = getSILType(Ty, SILValueCategory::Object);
     SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object);
-    SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
-    assert(FTI->getNumSILArguments() == ListOfValues.size() &&
-           "Argument number mismatch in ApplyInst.");
+    SILFunctionConventions substConventions(SubstFnTy.castTo<SILFunctionType>(),
+                                            Builder.getModule());
+    assert(substConventions.getNumSILArguments() == ListOfValues.size()
+           && "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
-      Args.push_back(getLocalValue(ListOfValues[I],FTI->getSILArgumentType(I)));
+      Args.push_back(getLocalValue(ListOfValues[I],
+                                   substConventions.getSILArgumentType(I)));
     unsigned NumSub = NumSubs;
 
     SmallVector<Substitution, 4> Substitutions;
@@ -1048,10 +1050,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Substitutions.push_back(*sub);
     }
 
-    ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
-                                    SubstFnTy,
-                                    FTI->getSILResult(),
-                                    Substitutions, Args, IsNonThrowingApply != 0);
+    ResultVal =
+        Builder.createApply(Loc, getLocalValue(ValID, FnTy), SubstFnTy,
+                            substConventions.getSILResultType(), Substitutions,
+                            Args, IsNonThrowingApply != 0);
     break;
   }
   case ValueKind::TryApplyInst: {
@@ -1069,12 +1071,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILBasicBlock *normalBB = getBBForReference(Fn, ListOfValues.back());
     ListOfValues = ListOfValues.drop_back();
 
-    SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
-    assert(FTI->getNumSILArguments() == ListOfValues.size() &&
-           "Argument number mismatch in ApplyInst.");
+    SILFunctionConventions substConventions(SubstFnTy.castTo<SILFunctionType>(),
+                                            Builder.getModule());
+    assert(substConventions.getNumSILArguments() == ListOfValues.size()
+           && "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
-      Args.push_back(getLocalValue(ListOfValues[I],FTI->getSILArgumentType(I)));
+      Args.push_back(getLocalValue(ListOfValues[I],
+                                   substConventions.getSILArgumentType(I)));
     unsigned NumSub = NumSubs;
 
     SmallVector<Substitution, 4> Substitutions;
@@ -1107,17 +1111,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto SubstFnTy = SILType::getPrimitiveObjectType(
       FnTy.castTo<SILFunctionType>()
         ->substGenericArgs(Builder.getModule(), Substitutions));
-    SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
-    auto ArgTys = FTI->getParameterSILTypes();
+    SILFunctionConventions fnConv(SubstFnTy.castTo<SILFunctionType>(),
+                                  Builder.getModule());
 
-    assert(ArgTys.size() >= ListOfValues.size() &&
-           "Argument number mismatch in PartialApplyInst.");
+    unsigned numArgs = fnConv.getNumSILArguments();
+    assert(numArgs >= ListOfValues.size()
+           && "Argument number mismatch in PartialApplyInst.");
 
     SILValue FnVal = getLocalValue(ValID, FnTy);
     SmallVector<SILValue, 4> Args;
-    unsigned unappliedArgs = ArgTys.size() - ListOfValues.size();
+    unsigned unappliedArgs = numArgs - ListOfValues.size();
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
-      Args.push_back(getLocalValue(ListOfValues[I], ArgTys[I + unappliedArgs]));
+      Args.push_back(getLocalValue(
+          ListOfValues[I], fnConv.getSILArgumentType(I + unappliedArgs)));
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = Builder.createPartialApply(Loc, FnVal, SubstFnTy,

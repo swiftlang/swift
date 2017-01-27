@@ -926,8 +926,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     // Found an apply that initializes the enum. We can optimize this by
     // localizing the initialization to an alloc_stack and loading from it.
     DataAddrInst = dyn_cast<InitEnumDataAddrInst>(Opd.get());
-    if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand() &&
-        ArgIdx < AI->getSubstCalleeType()->getNumIndirectResults()) {
+    if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand()
+        && ArgIdx < AI->getSubstCalleeConv().getNumIndirectSILResults()) {
       EnumInitOperand = &Opd;
       break;
     }

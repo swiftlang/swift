@@ -105,7 +105,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     for (auto param : ty->getParameters())
       if (doIt(param.getType()))
         return true;
-    for (auto result : ty->getAllResults())
+    for (auto result : ty->getResults())
       if (doIt(result.getType()))
         return true;
     if (ty->hasErrorResult())

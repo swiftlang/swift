@@ -3827,13 +3827,12 @@ public:
     }
     Printer << ") -> ";
 
-    unsigned totalResults =
-      T->getNumAllResults() + unsigned(T->hasErrorResult());
+    unsigned totalResults = T->getNumResults() + unsigned(T->hasErrorResult());
 
     if (totalResults != 1) Printer << "(";
 
     first = true;
-    for (auto result : T->getAllResults()) {
+    for (auto result : T->getResults()) {
       Printer.printSeparator(first, ", ");
       result.print(Printer, Options);
     }

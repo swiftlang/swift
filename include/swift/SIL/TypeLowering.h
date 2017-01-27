@@ -127,15 +127,16 @@ public:
 
   virtual ~TypeLowering() {}
 
-  /// \brief Are r-values of this type passed as arguments indirectly?
-  bool isPassedIndirectly() const {
-    return isAddressOnly();
-  }
+  /// \brief Are r-values of this type passed as arguments indirectly by formal
+  /// convention?
+  ///
+  /// This is independent of whether the SIL argument is address type.
+  bool isFormallyPassedIndirectly() const { return isAddressOnly(); }
 
-  /// \brief Are r-values of this type returned indirectly?
-  bool isReturnedIndirectly() const {
-    return isAddressOnly();
-  }
+  /// \brief Are r-values of this type returned indirectly by formal convention?
+  ///
+  /// This is independent of whether the SIL result is address type.
+  bool isFormallyReturnedIndirectly() const { return isAddressOnly(); }
 
   /// isAddressOnly - Returns true if the type is an address-only type. A type
   /// is address-only if it is a resilient value type, or if it is a fragile

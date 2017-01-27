@@ -1828,7 +1828,8 @@ private:
         if (FunctionArgs[ArgIdx] != Arg)
           continue;
 
-        if (!Params[ArgIdx].isIndirectInOut() && Params[ArgIdx].isIndirect()) {
+        if (!Params[ArgIdx].isIndirectInOut()
+            && Params[ArgIdx].isFormalIndirect()) {
           DEBUG(llvm::dbgs()
                 << "    Skipping Array: Not an inout or by val argument!\n");
           return false;

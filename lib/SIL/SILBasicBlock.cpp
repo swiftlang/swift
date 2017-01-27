@@ -127,8 +127,7 @@ SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,
   SILFunction *Parent = getParent();
   auto OwnershipKind = ValueOwnershipKind(
       Parent->getModule(), Ty,
-      Parent->getLoweredFunctionType()->getSILArgumentConvention(
-          getNumArguments()));
+      Parent->getConventions().getSILArgumentConvention(getNumArguments()));
   return new (getModule()) SILFunctionArgument(this, Ty, OwnershipKind, D);
 }
 

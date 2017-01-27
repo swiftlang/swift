@@ -189,6 +189,12 @@ public:
     return insertFunctionArgument(Pos, Ty, OwnershipKind, D);
   }
 
+  /// Replace the \p{i}th Function arg with a new Function arg with SILType \p
+  /// Ty and ValueDecl \p D.
+  SILFunctionArgument *replaceFunctionArgument(unsigned i, SILType Ty,
+                                               ValueOwnershipKind Kind,
+                                               const ValueDecl *D = nullptr);
+
   /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
   /// ValueDecl
   /// \p D.

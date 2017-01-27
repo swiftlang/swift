@@ -256,6 +256,9 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
+  SILFunctionConventions getConventions() const {
+    return SILFunctionConventions(LoweredType, getModule());
+  }
 
   bool isNoReturnFunction() const;
 
@@ -355,8 +358,8 @@ public:
   }
 
   // Returns true if the function has indirect out parameters.
-  bool hasIndirectResults() const {
-    return getLoweredFunctionType()->getNumIndirectResults() > 0;
+  bool hasIndirectFormalResults() const {
+    return getLoweredFunctionType()->hasIndirectFormalResults();
   }
 
   /// Returns true if this function either has a self metadata argument or
@@ -721,13 +724,13 @@ public:
   ArrayRef<SILArgument *> getIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
     return begin()->getArguments().slice(
-        0, getLoweredFunctionType()->getNumIndirectResults());
+        0, getConventions().getNumIndirectSILResults());
   }
 
   ArrayRef<SILArgument *> getArgumentsWithoutIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
     return begin()->getArguments().slice(
-        getLoweredFunctionType()->getNumIndirectResults());
+        getConventions().getNumIndirectSILResults());
   }
 
   const SILArgument *getSelfArgument() const {

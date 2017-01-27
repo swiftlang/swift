@@ -882,7 +882,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   }
 
   // Mangle the results.
-  for (auto result : fn->getAllResults()) {
+  for (auto result : fn->getResults()) {
     OpArgs.push_back(getResultConvention(result.getConvention()));
     appendType(result.getType());
   }

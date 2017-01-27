@@ -1794,7 +1794,7 @@ bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
         
         if (func->getParameters().size() != substFunc->getParameters().size())
           return false;
-        if (func->getAllResults().size() != substFunc->getAllResults().size())
+        if (func->getResults().size() != substFunc->getResults().size())
           return false;
         
         for (unsigned i : indices(func->getParameters())) {
@@ -1805,14 +1805,14 @@ bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
                      substFunc->getParameters()[i].getType()))
             return false;
         }
-        
-        for (unsigned i : indices(func->getAllResults())) {
-          if (func->getAllResults()[i].getConvention()
-                != substFunc->getAllResults()[i].getConvention())
+
+        for (unsigned i : indices(func->getResults())) {
+          if (func->getResults()[i].getConvention()
+              != substFunc->getResults()[i].getConvention())
             return false;
-          
-          if (!visit(func->getAllResults()[i].getType(),
-                     substFunc->getAllResults()[i].getType()))
+
+          if (!visit(func->getResults()[i].getType(),
+                     substFunc->getResults()[i].getType()))
             return false;
         }
         
@@ -3403,7 +3403,7 @@ case TypeKind::Id:
     }
 
     SmallVector<SILResultInfo, 8> transInterfaceResults;
-    for (SILResultInfo result : fnTy->getAllResults()) {
+    for (SILResultInfo result : fnTy->getResults()) {
       if (transformSILResult(result, changed, fn)) return Type();
       transInterfaceResults.push_back(result);
     }

@@ -328,9 +328,9 @@ public:
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn, ArrayRef<SILValue> Args,
                          bool isNonThrowing) {
-    auto FnTy = Fn->getType();
-    return createApply(Loc, Fn, FnTy,
-                       FnTy.castTo<SILFunctionType>()->getSILResult(),
+    SILFunctionConventions conventions(Fn->getType().castTo<SILFunctionType>(),
+                                       getModule());
+    return createApply(Loc, Fn, Fn->getType(), conventions.getSILResultType(),
                        ArrayRef<Substitution>(), Args, isNonThrowing);
   }
 

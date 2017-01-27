@@ -23,14 +23,15 @@ namespace swift {
 class SILBasicBlock;
 class SILModule;
 
+// Map an argument index onto a SILArgumentConvention.
 inline SILArgumentConvention
-SILFunctionType::getSILArgumentConvention(unsigned index) const {
+SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
   assert(index <= getNumSILArguments());
-  auto numIndirectResults = getNumIndirectResults();
-  if (index < numIndirectResults) {
+  if (index < getNumIndirectSILResults()) {
+    assert(silConv.loweredAddresses);
     return SILArgumentConvention::Indirect_Out;
   } else {
-    auto param = getParameters()[index - numIndirectResults];
+    auto param = funcTy->getParameters()[index - getNumIndirectSILResults()];
     return SILArgumentConvention(param.getConvention());
   }
 }
@@ -116,7 +117,7 @@ protected:
               const ValueDecl *D = nullptr);
 
   // A special constructor, only intended for use in
-  // SILBasicBlock::replacePHIArg.
+  // SILBasicBlock::replacePHIArg and replaceFunctionArg.
   explicit SILArgument(ValueKind SubClassKind, SILType Ty,
                        ValueOwnershipKind OwnershipKind,
                        const ValueDecl *D = nullptr)
@@ -189,25 +190,19 @@ class SILFunctionArgument : public SILArgument {
 public:
   bool isIndirectResult() const {
     auto numIndirectResults =
-        getFunction()->getLoweredFunctionType()->getNumIndirectResults();
+        getFunction()->getConventions().getNumIndirectSILResults();
     return (getIndex() < numIndirectResults);
   }
 
   SILArgumentConvention getArgumentConvention() const {
-    return getFunction()->getLoweredFunctionType()->getSILArgumentConvention(
-        getIndex());
+    return getFunction()->getConventions().getSILArgumentConvention(getIndex());
   }
 
   /// Given that this is an entry block argument, and given that it does
   /// not correspond to an indirect result, return the corresponding
   /// SILParameterInfo.
   SILParameterInfo getKnownParameterInfo() const {
-    auto index = getIndex();
-    auto fnType = getFunction()->getLoweredFunctionType();
-    auto numIndirectResults = fnType->getNumIndirectResults();
-    assert(index >= numIndirectResults && "Cannot be an indirect result");
-    auto param = fnType->getParameters()[index - numIndirectResults];
-    return param;
+    return getFunction()->getConventions().getParamInfoForSILArg(getIndex());
   }
 
   /// Returns true if this SILArgument is the self argument of its
@@ -234,6 +229,12 @@ private:
   SILFunctionArgument(SILBasicBlock *ParentBB, SILBasicBlock::arg_iterator Pos,
                       SILType Ty, ValueOwnershipKind OwnershipKind, const ValueDecl *D = nullptr)
       : SILArgument(ValueKind::SILFunctionArgument, ParentBB, Pos, Ty, OwnershipKind, D) {}
+
+  // A special constructor, only intended for use in
+  // SILBasicBlock::replaceFunctionArg.
+  explicit SILFunctionArgument(SILType Ty, ValueOwnershipKind OwnershipKind,
+                               const ValueDecl *D = nullptr)
+      : SILArgument(ValueKind::SILFunctionArgument, Ty, OwnershipKind, D) {}
 };
 
 //===----------------------------------------------------------------------===//

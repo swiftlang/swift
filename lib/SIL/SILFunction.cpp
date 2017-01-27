@@ -240,7 +240,7 @@ struct SubstDependentSILType
       }));
 
     SmallVector<SILResultInfo, 4> results;
-    for (auto &result : t->getAllResults())
+    for (auto &result : t->getResults())
       results.push_back(result.map([&](CanType pt) -> CanType {
         return visit(pt);
       }));
@@ -505,11 +505,11 @@ void SILFunction::viewCFG() const {
 /// Returns true if this function has either a self metadata argument or
 /// object from which Self metadata may be obtained.
 bool SILFunction::hasSelfMetadataParam() const {
-  auto paramTypes = getLoweredFunctionType()->getParameterSILTypes();
+  auto paramTypes = getConventions().getParameterSILTypes();
   if (paramTypes.empty())
     return false;
 
-  auto silTy = paramTypes.back();
+  auto silTy = *std::prev(paramTypes.end());
   if (!silTy.isClassOrClassMetatype())
     return false;
 

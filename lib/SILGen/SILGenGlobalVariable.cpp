@@ -101,10 +101,9 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
     (void)accessorTy;
     assert(!accessorTy->isPolymorphic()
            && "generic global variable accessors not yet implemented");
-    SILValue addr = B.createApply(loc, accessor, accessor->getType(),
-                              accessor->getType().castTo<SILFunctionType>()
-                                      ->getSingleResult().getSILType(),
-                              {}, {});
+    SILValue addr = B.createApply(
+        loc, accessor, accessor->getType(),
+        accessorFn->getConventions().getSingleSILResultType(), {}, {});
     // FIXME: It'd be nice if the result of the accessor was natively an
     // address.
     addr = B.createPointerToAddress(
