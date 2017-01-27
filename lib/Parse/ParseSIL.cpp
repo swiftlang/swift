@@ -293,7 +293,6 @@ namespace {
       SmallVector<ValueDecl *, 4> values;
       return parseSILDeclRef(Result, values);
     }
-    bool parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired);
     bool parseGlobalName(Identifier &Name);
     bool parseValueName(UnresolvedValueName &Name);
     bool parseValueRef(SILValue &Result, SILType Ty, SILLocation Loc,
@@ -1621,76 +1620,6 @@ static bool parseStoreOwnershipQualifier(StoreOwnershipQualifier &Result,
 
   // Otherwise, assign Result and return false.
   Result = Tmp;
-  return false;
-}
-
-bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
-  SourceLoc TyLoc;
-  SmallVector<ValueDecl *, 4> values;
-  if (parseSILDeclRef(Member, values))
-    return true;
-
-  // : ( or : < means that what follows is function type.
-  if (!P.Tok.is(tok::colon))
-    return false;
-
-  if (FnTypeRequired &&
-      !P.peekToken().is(tok::l_paren) &&
-      !P.peekToken().isContextualPunctuator("<"))
-    return false;
-
-  // Type of the SILDeclRef is optional, to be compatible with the old format.
-  if (!P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")) {
-    // Parse the type for SILDeclRef.
-    Optional<Scope> GenericsScope;
-    GenericsScope.emplace(&P, ScopeKind::Generics);
-    ParserResult<TypeRepr> TyR = P.parseType();
-    GenericsScope.reset();
-    if (TyR.isNull())
-      return true;
-    TypeLoc Ty = TyR.get();
-
-    // The type can be polymorphic.
-    GenericEnvironment *genericEnv = nullptr;
-    if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
-      if (auto generics = fnType->getGenericParams()) {
-        assert(!Ty.wasValidated() && Ty.getType().isNull());
-
-        genericEnv = handleSILGenericParams(P.Context, generics, &P.SF);
-        fnType->setGenericEnvironment(genericEnv);
-      }
-    }
-
-    if (performTypeLocChecking(Ty, /*isSILType=*/ false, genericEnv))
-      return true;
-
-    // Pick the ValueDecl that has the right type.
-    ValueDecl *TheDecl = nullptr;
-    auto declTy = Ty.getType()->getCanonicalType();
-    auto unlabeledDecl =
-        declTy->getUnlabeledType(P.Context)->getCanonicalType();
-    for (unsigned I = 0, E = values.size(); I < E; I++) {
-      auto *VD = values[I];
-      auto lookupTy = values[I]->getInterfaceType();
-      auto unlabeledLookup =
-          lookupTy->getUnlabeledType(P.Context)->getCanonicalType();
-      if (unlabeledDecl == unlabeledLookup) {
-        TheDecl = values[I];
-        // Update SILDeclRef to point to the right Decl.
-        Member.loc = TheDecl;
-        break;
-      }
-      if (values.size() == 1 && !TheDecl) {
-        P.diagnose(TyLoc, diag::sil_member_decl_type_mismatch, declTy,
-                   lookupTy);
-        return true;
-      }
-    }
-    if (!TheDecl) {
-      P.diagnose(TyLoc, diag::sil_member_decl_not_found);
-      return true;
-    }
-  }
   return false;
 }
 
@@ -3117,16 +3046,64 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     SourceLoc TyLoc;
     SmallVector<ValueDecl *, 4> values;
     if (parseTypedValueRef(Val, B) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILDeclRef(Member, values) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":"))
       return true;
 
-    if (parseSILDeclRef(Member, true))
+    // Parse the type for SILDeclRef.
+    Optional<Scope> GenericsScope;
+    GenericsScope.emplace(&P, ScopeKind::Generics);
+    ParserResult<TypeRepr> TyR = P.parseType();
+    GenericsScope.reset();
+    if (TyR.isNull())
+      return true;
+    TypeLoc Ty = TyR.get();
+
+    // The type can be polymorphic.
+    GenericEnvironment *genericEnv = nullptr;
+    if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
+      if (auto generics = fnType->getGenericParams()) {
+        assert(!Ty.wasValidated() && Ty.getType().isNull());
+
+        genericEnv = handleSILGenericParams(P.Context, generics, &P.SF);
+        fnType->setGenericEnvironment(genericEnv);
+      }
+    }
+
+    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, genericEnv))
       return true;
 
     if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILType(MethodTy, TyLoc) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
+    
+    // Pick the ValueDecl that has the right type.
+    ValueDecl *TheDecl = nullptr;
+    auto declTy = Ty.getType()->getCanonicalType();
+    auto unlabeledDecl =
+      declTy->getUnlabeledType(P.Context)->getCanonicalType();
+    for (unsigned I = 0, E = values.size(); I < E; I++) {
+      auto lookupTy = values[I]->getInterfaceType();
+      auto unlabeledLookup =
+        lookupTy->getUnlabeledType(P.Context)->getCanonicalType();
+      if (unlabeledDecl == unlabeledLookup) {
+        TheDecl = values[I];
+        // Update SILDeclRef to point to the right Decl.
+        Member.loc = TheDecl;
+        break;
+      }
+      if (values.size() == 1 && !TheDecl) {
+        P.diagnose(TyLoc, diag::sil_member_decl_type_mismatch, declTy,
+                   lookupTy);
+        return true;
+      }
+    }
+    if (!TheDecl) {
+      P.diagnose(TyLoc, diag::sil_member_decl_not_found);
+      return true;
+    }
 
     switch (Opcode) {
     default: llvm_unreachable("Out of sync with parent switch");
@@ -3155,9 +3132,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     SourceLoc TyLoc;
     if (P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
         parseASTType(LookupTy) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
-      return true;
-    if (parseSILDeclRef(Member, true))
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILDeclRef(Member))
       return true;
     // Optional operand.
     SILValue Operand;
@@ -4446,7 +4422,7 @@ bool Parser::parseSILVTable() {
       SILDeclRef Ref;
       Identifier FuncName;
       SourceLoc FuncLoc;
-      if (VTableState.parseSILDeclRef(Ref, true))
+      if (VTableState.parseSILDeclRef(Ref))
         return true;
       SILFunction *Func = nullptr;
       Optional<SILLinkage> Linkage = SILLinkage::Private;
@@ -4823,7 +4799,7 @@ bool Parser::parseSILWitnessTable() {
       SILDeclRef Ref;
       Identifier FuncName;
       SourceLoc FuncLoc;
-      if (WitnessState.parseSILDeclRef(Ref, true) ||
+      if (WitnessState.parseSILDeclRef(Ref) ||
           parseToken(tok::colon, diag::expected_sil_witness_colon))
         return true;
       
@@ -4918,7 +4894,7 @@ bool Parser::parseSILDefaultWitnessTable() {
       SILDeclRef Ref;
       Identifier FuncName;
       SourceLoc FuncLoc;
-      if (WitnessState.parseSILDeclRef(Ref, true) ||
+      if (WitnessState.parseSILDeclRef(Ref) ||
           parseToken(tok::colon, diag::expected_sil_witness_colon))
         return true;
       

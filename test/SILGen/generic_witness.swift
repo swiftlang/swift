@@ -8,7 +8,7 @@ protocol Runcible {
 // CHECK-LABEL: sil hidden @_T015generic_witness3foo{{[_0-9a-zA-Z]*}}F : $@convention(thin) <B where B : Runcible> (@in B) -> () {
 
 func foo<B : Runcible>(_ x: B) {
-  // CHECK: [[METHOD:%.*]] = witness_method $B, #Runcible.runce!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : Runcible><τ_1_0> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+  // CHECK: [[METHOD:%.*]] = witness_method $B, #Runcible.runce!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Runcible><τ_1_0> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
   // CHECK: apply [[METHOD]]<B, Int>
   x.runce(5)
 }

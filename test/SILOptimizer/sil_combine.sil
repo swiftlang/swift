@@ -3155,7 +3155,7 @@ final class XXX : BBB {
 // upcast.
 // CHECK-LABEL: sil @silcombine_dont_generate_wrong_upcasts_during_devirt
 // CHECK-NOT: upcast
-// CHECK: witness_method $XXX, #PPP.foo!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+// CHECK: witness_method $XXX, #PPP.foo!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
 // CHECK-NOT: upcast
 // CHECK: return
 sil @silcombine_dont_generate_wrong_upcasts_during_devirt: $@convention(thin) (@owned BBB) -> () {

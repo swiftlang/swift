@@ -193,62 +193,62 @@ class Noot : Aap {
 // CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_owned () -> @owned Noot to $@callee_owned () -> @owned Optional<Aap>
 // CHECK:         return [[OUTER]]
 // CHECK-LABEL: sil_vtable D {
-// CHECK:         #B.iuo!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.f!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.f2!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.f3!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.f4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.g!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.h!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.i!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.iuo!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.f!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f2!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f3!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f4!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.g!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g2!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g3!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g4!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.h!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h2!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h3!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h4!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.i!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i2!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i3!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i4!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 
 // CHECK-LABEL: sil_vtable E {
-// CHECK:         #B.iuo!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.f!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.f2!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.f3!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.f4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.g!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.h!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.i!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.iuo!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.f!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f2!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f3!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f4!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.g!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g2!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g3!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g4!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.h!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h2!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h3!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h4!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.i!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i2!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i3!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i4!1: _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 
 // CHECK-LABEL: sil_vtable F {
-// CHECK:         #B.iuo!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.f!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.f2!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.f3!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.f4!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.g!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g2!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g3!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g4!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.h!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h2!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h3!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h4!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.i!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i2!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i3!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i4!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.iuo!1: hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.f!1: _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f2!1: _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f3!1: _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f4!1: _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.g!1: hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g2!1: hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g3!1: hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g4!1: _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.h!1: hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h2!1: hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h3!1: hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h4!1: _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.i!1: hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i2!1: hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i3!1: hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i4!1: _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
 
 // CHECK-LABEL: sil_vtable NoThrowVariance {
-// CHECK:         #ThrowVariance.mightThrow!1: {{.*}} : _T013vtable_thunks{{[A-Z0-9a-z_]*}}F
+// CHECK:         #ThrowVariance.mightThrow!1: _T013vtable_thunks{{[A-Z0-9a-z_]*}}F
 
