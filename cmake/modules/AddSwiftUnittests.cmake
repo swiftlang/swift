@@ -42,6 +42,9 @@ function(add_swift_unittest test_dirname)
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -Xlinker -rpath -Xlinker ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
+      LINK_FLAGS " -latomic")
   endif()
 
   if(SWIFT_ENABLE_GOLD_LINKER AND
