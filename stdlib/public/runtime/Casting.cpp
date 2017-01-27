@@ -263,10 +263,8 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
 }
 
 /// Dynamically cast a class instance to a Swift class type.
-SWIFT_RT_ENTRY_VISIBILITY
-const void *
-swift::swift_dynamicCastClass(const void *object,
-                              const ClassMetadata *targetType)
+const void *swift::swift_dynamicCastClass(const void *object,
+                                          const ClassMetadata *targetType)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
   assert(!targetType->isPureObjC());
@@ -2421,9 +2419,8 @@ static bool _dynamicCastTupleToTuple(OpaqueValue *destination,
 /******************************************************************************/
 
 /// Perform a dynamic cast to an arbitrary type.
-SWIFT_RT_ENTRY_VISIBILITY
-bool swift::swift_dynamicCast(OpaqueValue *dest,
-                              OpaqueValue *src,
+
+bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
                               const Metadata *srcType,
                               const Metadata *targetType,
                               DynamicCastFlags flags)

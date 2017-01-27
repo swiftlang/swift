@@ -22,7 +22,6 @@
 
 using namespace swift;
 
-SWIFT_RT_ENTRY_VISIBILITY
 void *swift::swift_slowAlloc(size_t size, size_t alignMask)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   // FIXME: use posix_memalign if alignMask is larger than the system guarantee.
@@ -31,7 +30,6 @@ void *swift::swift_slowAlloc(size_t size, size_t alignMask)
   return p;
 }
 
-SWIFT_RT_ENTRY_VISIBILITY
 void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   free(ptr);
