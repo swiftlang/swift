@@ -6,7 +6,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: %target-swift-frontend %s -typecheck -verify
+// RUN: %target-swift-frontend %s -typecheck
 
 // Issue found by https://github.com/austinzheng (Austin Zheng)
 
@@ -16,7 +16,7 @@ enum A<T> {
 }
 
 func foo() -> A<(String, String?)> {
-    _ = A<(String, String?)>.Just("abc", "def") // expected-error{{extra argument in call}}
-    _ = A.Just("abc", "def") // no error?
-    return A.Just("abc", "def") // expected-error{{extra argument in call}}
+    _ = A<(String, String?)>.Just("abc", "def")
+    _ = A.Just("abc", "def")
+    return A.Just("abc", "def")
 }

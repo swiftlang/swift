@@ -653,6 +653,21 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
   auto params = decomposeParamType(paramType, callee, calleeLevel);
 
+  if (callee && cs.getASTContext().isSwiftVersion3()
+      && argType->is<TupleType>()) {
+    // Hack: In Swift 3 mode, accept `foo(x, y)` for `foo((x, y))` when the
+    // callee is a function-typed property or an enum constructor whose
+    // argument is a single unlabeled type parameter.
+    if (auto *prop = dyn_cast<VarDecl>(callee)) {
+      auto *fnType = prop->getInterfaceType()->getAs<AnyFunctionType>();
+      if (fnType && fnType->getInput()->isTypeParameter())
+        argType = ParenType::get(cs.getASTContext(), argType);
+    } else if (auto *enumCtor = dyn_cast<EnumElementDecl>(callee)) {
+      if (enumCtor->getArgumentInterfaceType()->isTypeParameter())
+        argType = ParenType::get(cs.getASTContext(), argType);
+    }
+  }
+
   // Extract the arguments.
   auto args = decomposeArgType(argType, argLabels);
 
