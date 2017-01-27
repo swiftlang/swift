@@ -115,7 +115,7 @@ TEST(SourceLoc, AssignExpr) {
                                               /*implicit*/false);
   EXPECT_EQ(start, invalidSource->getStartLoc());
   EXPECT_EQ(SourceLoc(), invalidSource->getEqualLoc());
-  EXPECT_EQ(SourceLoc(), invalidSource->getLoc());
+  EXPECT_EQ(start, invalidSource->getLoc()); // If the equal loc is invalid, but start is valid, point at the start
   EXPECT_EQ(start.getAdvancedLoc(3), invalidSource->getEndLoc());
   EXPECT_EQ(SourceRange(start, start.getAdvancedLoc(3)),
             invalidSource->getSourceRange());
@@ -124,7 +124,7 @@ TEST(SourceLoc, AssignExpr) {
                                             /*implicit*/false);
   EXPECT_EQ(start.getAdvancedLoc(8), invalidDest->getStartLoc());
   EXPECT_EQ(SourceLoc(), invalidDest->getEqualLoc());
-  EXPECT_EQ(SourceLoc(), invalidDest->getLoc());
+  EXPECT_EQ(start.getAdvancedLoc(8), invalidDest->getLoc()); // If the equal loc is invalid, but start is valid, point at the start
   EXPECT_EQ(start.getAdvancedLoc(11), invalidDest->getEndLoc());
   EXPECT_EQ(SourceRange(start.getAdvancedLoc(8), start.getAdvancedLoc(11)),
             invalidDest->getSourceRange());

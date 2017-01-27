@@ -4343,7 +4343,13 @@ public:
   
   SourceLoc getEqualLoc() const { return EqualLoc; }
   
-  SourceLoc getLoc() const { return EqualLoc; }
+  SourceLoc getLoc() const {
+    SourceLoc loc = EqualLoc;
+    if (loc.isValid()) {
+      return loc;
+    }
+    return getStartLoc();
+  }
   SourceLoc getStartLoc() const {
     if (!isFolded()) return EqualLoc;
     return ( Dest->getStartLoc().isValid()
