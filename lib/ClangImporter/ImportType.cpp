@@ -2141,6 +2141,7 @@ Type ClangImporter::Implementation::importAccessorMethodType(
     const clang::ObjCPropertyDecl *property,
     const clang::ObjCMethodDecl *clangDecl,
     bool isFromSystemModule,
+    ImportedName functionName,
     swift::ParameterList **params) {
   // Note: We're using a pointer instead of a reference here to make it clear
   // at the call site that this is an out-parameter.
@@ -2196,13 +2197,14 @@ Type ClangImporter::Implementation::importAccessorMethodType(
     ImportedName fullBodyName = importFullName(param,ImportNameVersion::Swift3);
     Identifier bodyName = fullBodyName.getDeclName().getBaseName();
     SourceLoc nameLoc = importSourceLoc(param->getLocation());
+    Identifier argLabel = functionName.getDeclName().getArgumentNames().front();
     auto paramInfo
       = createDeclWithClangNode<ParamDecl>(param, Accessibility::Private,
                                            /*IsLet*/true,
                                            /*let loc*/SourceLoc(),
                                            /*label loc*/SourceLoc(),
-                                           /*argument label*/Identifier(),
-                                           nameLoc, bodyName, propertyTy,
+                                           argLabel, nameLoc, bodyName,
+                                           propertyTy,
                                            /*dummy DC*/ImportedHeaderUnit);
     paramInfo->setInterfaceType(propertyInterfaceTy);
 
