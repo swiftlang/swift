@@ -722,12 +722,9 @@ public:
       }
     }
 
+    BaseTy = BaseTy->getCanonicalType();
     // Does it make sense to substitute types?
-    bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
-                       !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
-                       !BaseTy->isAnyExistentialType() &&
-                       !BaseTy->hasTypeVariable() &&
-                       VD->getDeclContext()->isTypeContext();
+    bool shouldSubst = BaseTy->mayHaveMembers();
     ModuleDecl *M = DC->getParentModule();
 
     auto FoundSignature = VD->getOverloadSignature();
