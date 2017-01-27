@@ -577,7 +577,7 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
   if (Iter == Results.end())
     llvm_unreachable("Should have already checked a trivial type?!");
 
-  ValueOwnershipKind Base = Iter->getOwnershipKind(M);
+  ValueOwnershipKind Base = Iter->getOwnershipKind(M, Sig);
 
   for (const SILResultInfo &ResultInfo :
        SILFunctionConventions::DirectSILResultRange(std::next(Iter),
