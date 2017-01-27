@@ -2661,12 +2661,12 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
 /// lower case counterparts are identical.
 ///   - DeclName is valid when such a correct case is found; invalid otherwise.
 static DeclName
-findCorrectEnumCaseName(MetatypeType *MetaTy, LookupResult &Result,
+findCorrectEnumCaseName(Type Ty, LookupResult &Result,
                         DeclName memberName) {
   if (!memberName.isSimpleName())
     return DeclName();
-  if (!MetaTy->getInstanceType()->is<EnumType>() &&
-      !MetaTy->getInstanceType()->is<BoundGenericEnumType>())
+  if (!Ty->is<EnumType>() &&
+      !Ty->is<BoundGenericEnumType>())
     return DeclName();
   llvm::SmallVector<DeclName, 4> candidates;
   for (auto &correction : Result) {
@@ -2707,17 +2707,19 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     if (memberName.isSimpleName("subscript")) {
       diagnose(loc, diag::type_not_subscriptable, baseObjTy)
         .highlight(baseRange);
-    } else if (auto MTT = baseObjTy->getAs<MetatypeType>()) {
+    } else if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
+      auto instanceTy = metatypeTy->getInstanceType();
       tryTypoCorrection();
-      if (DeclName rightName = findCorrectEnumCaseName(MTT, correctionResults,
+
+      if (DeclName rightName = findCorrectEnumCaseName(instanceTy,
+                                                       correctionResults,
                                                        memberName)) {
-        diagnose(loc, diag::could_not_find_enum_case, MTT->getInstanceType(),
+        diagnose(loc, diag::could_not_find_enum_case, instanceTy,
           memberName, rightName).fixItReplace(nameLoc.getBaseNameLoc(),
                                               rightName.getBaseName().str());
         return;
       }
-      diagnose(loc, diag::could_not_find_type_member,
-               MTT->getInstanceType(), memberName)
+      diagnose(loc, diag::could_not_find_type_member, instanceTy, memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
     } else {
       diagnose(loc, diag::could_not_find_value_member,
