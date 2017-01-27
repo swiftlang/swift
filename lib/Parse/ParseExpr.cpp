@@ -787,6 +787,14 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
                                              /*Implicit=*/false));
   }
 
+  // NOTE: l_square_lit is for migrating the old object literal syntax.
+  // Eventually this block can be removed.
+  if (Tok.is(tok::l_square_lit) && !Tok.isAtStartOfLine() &&
+      isCollectionLiteralStartingWithLSquareLit()) {
+    assert(Tok.getLength() == 1);
+    Tok.setKind(tok::l_square);
+  }
+
   if (Tok.isFollowingLSquare()) {
     // super[expr]
     SourceLoc lSquareLoc, rSquareLoc;
@@ -1538,12 +1546,20 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       continue;
     }
 
-      // If there is an expr-call-suffix, parse it and form a call.
+    // If there is an expr-call-suffix, parse it and form a call.
     if (Tok.isFollowingLParen()) {
       Result = parseExprCallSuffix(Result, isExprBasic);
       continue;
     }
     
+    // NOTE: l_square_lit is for migrating the old object literal syntax.
+    // Eventually this block can be removed.
+    if (Tok.is(tok::l_square_lit) && !Tok.isAtStartOfLine() &&
+        isCollectionLiteralStartingWithLSquareLit()) {
+      assert(Tok.getLength() == 1);
+      Tok.setKind(tok::l_square);
+    }
+
     // Check for a [expr] suffix.
     // Note that this cannot be the start of a new line.
     if (Tok.isFollowingLSquare()) {
