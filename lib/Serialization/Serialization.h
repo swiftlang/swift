@@ -130,6 +130,11 @@ public:
   // hash table of all defined Objective-C methods.
   using ObjCMethodTable = llvm::DenseMap<ObjCSelector, ObjCMethodTableData>;
 
+  using NestedTypeDeclsData = SmallVector<std::pair<DeclID, DeclID>, 4>;
+  // In-memory representation of what will eventually be an on-disk
+  // hash table of all defined Objective-C methods.
+  using NestedTypeDeclsTable = llvm::DenseMap<Identifier, NestedTypeDeclsData>;
+
 private:
   /// A map from identifiers to methods and properties with the given name.
   ///
@@ -366,7 +371,7 @@ private:
   void writeSIL(const SILModule *M, bool serializeAllSIL);
 
   /// Top-level entry point for serializing a module.
-  void writeAST(ModuleOrSourceFile DC);
+  void writeAST(ModuleOrSourceFile DC, bool enableNestedTypeLookupTable);
 
   void writeToStream(raw_ostream &os);
 
