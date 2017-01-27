@@ -1,4 +1,13 @@
-// RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s | %FileCheck %s
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+//
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/imported_swift_module.swift
+// RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s -I %t | %FileCheck %s
+
+import func imported_swift_module.importedFunc
+// CHECK: [[@LINE-1]]:35 | function/Swift | importedFunc() | s:F21imported_swift_module12importedFuncFT_T_ | Ref | rel: 0
+import var imported_swift_module.importedGlobal
+// CHECK: [[@LINE-1]]:34 | variable/Swift | importedGlobal | s:v21imported_swift_module14importedGlobalSi | Ref | rel: 0
 
 // Definition
 let x = 2
