@@ -435,7 +435,7 @@ public class Sub : Base {
   // CHECK: bb0([[VALUE:%.*]] : $Sub):
   // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK:     [[CASTED_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
-  // CHECK:     [[SUPER:%.*]] = super_method [volatile] [[VALUE_COPY]] : $Sub, #Base.x!getter.1.foreign : (Base) -> () -> Bool, $@convention(objc_method) (Base) -> ObjCBool
+  // CHECK:     [[SUPER:%.*]] = super_method [volatile] [[VALUE_COPY]] : $Sub, #Base.x!getter.1.foreign : (Base) -> () -> Bool , $@convention(objc_method) (Base) -> ObjCBool
   // CHECK:     = apply [[SUPER]]([[CASTED_VALUE_COPY]])
   // CHECK:     destroy_value [[VALUE_COPY]]
   // CHECK:     destroy_value [[VALUE]]
@@ -446,27 +446,27 @@ public class Sub : Base {
 
 // Vtable contains entries for native and @objc methods, but not dynamic ones
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK-LABEL:   #Foo.init!initializer.1: {{.*}} :   _T07dynamic3FooCACSi6native_tcfc
-// CHECK-LABEL:   #Foo.nativeMethod!1: {{.*}} :       _T07dynamic3FooC12nativeMethodyyF
-// CHECK-LABEL:   #Foo.subscript!getter.1: {{.*}} :   _T07dynamic3FooC9subscriptSiSi6native_tcfg    // dynamic.Foo.subscript.getter : (native : Swift.Int) -> Swift.Int
-// CHECK-LABEL:   #Foo.subscript!setter.1: {{.*}} :   _T07dynamic3FooC9subscriptSiSi6native_tcfs    // dynamic.Foo.subscript.setter : (native : Swift.Int) -> Swift.Int
-// CHECK-LABEL:   #Foo.init!initializer.1: {{.*}} :   _T07dynamic3FooCACSi4objc_tcfc
-// CHECK-LABEL:   #Foo.objcMethod!1: {{.*}} :         _T07dynamic3FooC10objcMethodyyF
-// CHECK-LABEL:   #Foo.subscript!getter.1: {{.*}} : _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfg // dynamic.Foo.subscript.getter : (objc : Swift.AnyObject) -> Swift.Int
-// CHECK-LABEL:   #Foo.subscript!setter.1: {{.*}} : _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfs // dynamic.Foo.subscript.setter : (objc : Swift.AnyObject) -> Swift.Int
+// CHECK-LABEL:   #Foo.init!initializer.1:   _T07dynamic3FooCACSi6native_tcfc
+// CHECK-LABEL:   #Foo.nativeMethod!1:       _T07dynamic3FooC12nativeMethodyyF
+// CHECK-LABEL:   #Foo.subscript!getter.1:   _T07dynamic3FooC9subscriptSiSi6native_tcfg    // dynamic.Foo.subscript.getter : (native : Swift.Int) -> Swift.Int
+// CHECK-LABEL:   #Foo.subscript!setter.1:   _T07dynamic3FooC9subscriptSiSi6native_tcfs    // dynamic.Foo.subscript.setter : (native : Swift.Int) -> Swift.Int
+// CHECK-LABEL:   #Foo.init!initializer.1:   _T07dynamic3FooCACSi4objc_tcfc
+// CHECK-LABEL:   #Foo.objcMethod!1:         _T07dynamic3FooC10objcMethodyyF
+// CHECK-LABEL:   #Foo.subscript!getter.1: _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfg // dynamic.Foo.subscript.getter : (objc : Swift.AnyObject) -> Swift.Int
+// CHECK-LABEL:   #Foo.subscript!setter.1: _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfs // dynamic.Foo.subscript.setter : (objc : Swift.AnyObject) -> Swift.Int
 // CHECK-NOT:     dynamic.Foo.init (dynamic.Foo.Type)(dynamic : Swift.Int) -> dynamic.Foo
 // CHECK-NOT:     dynamic.Foo.dynamicMethod
 // CHECK-NOT:     dynamic.Foo.subscript.getter (dynamic : Swift.Int) -> Swift.Int
 // CHECK-NOT:     dynamic.Foo.subscript.setter (dynamic : Swift.Int) -> Swift.Int
-// CHECK-LABEL:   #Foo.overriddenByDynamic!1: {{.*}} : _T07dynamic3FooC19overriddenByDynamic{{[_0-9a-zA-Z]*}}F
-// CHECK-LABEL:   #Foo.nativeProp!getter.1: {{.*}} :  _T07dynamic3FooC10nativePropSifg     // dynamic.Foo.nativeProp.getter : Swift.Int
-// CHECK-LABEL:   #Foo.nativeProp!setter.1: {{.*}} :  _T07dynamic3FooC10nativePropSifs     // dynamic.Foo.nativeProp.setter : Swift.Int
-// CHECK-LABEL:   #Foo.objcProp!getter.1: {{.*}} :    _T07dynamic3FooC8objcPropSifg  // dynamic.Foo.objcProp.getter : Swift.Int
-// CHECK-LABEL:   #Foo.objcProp!setter.1: {{.*}} :    _T07dynamic3FooC8objcPropSifs  // dynamic.Foo.objcProp.setter : Swift.Int
+// CHECK-LABEL:   #Foo.overriddenByDynamic!1: _T07dynamic3FooC19overriddenByDynamic{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL:   #Foo.nativeProp!getter.1:  _T07dynamic3FooC10nativePropSifg     // dynamic.Foo.nativeProp.getter : Swift.Int
+// CHECK-LABEL:   #Foo.nativeProp!setter.1:  _T07dynamic3FooC10nativePropSifs     // dynamic.Foo.nativeProp.setter : Swift.Int
+// CHECK-LABEL:   #Foo.objcProp!getter.1:    _T07dynamic3FooC8objcPropSifg  // dynamic.Foo.objcProp.getter : Swift.Int
+// CHECK-LABEL:   #Foo.objcProp!setter.1:    _T07dynamic3FooC8objcPropSifs  // dynamic.Foo.objcProp.setter : Swift.Int
 // CHECK-NOT:     dynamic.Foo.dynamicProp.getter
 // CHECK-NOT:     dynamic.Foo.dynamicProp.setter
 
 // Vtable uses a dynamic thunk for dynamic overrides
 // CHECK-LABEL: sil_vtable Subclass {
-// CHECK-LABEL:   #Foo.overriddenByDynamic!1: {{.*}} : public _T07dynamic8SubclassC19overriddenByDynamic{{[_0-9a-zA-Z]*}}FTD
+// CHECK-LABEL:   #Foo.overriddenByDynamic!1: public _T07dynamic8SubclassC19overriddenByDynamic{{[_0-9a-zA-Z]*}}FTD
 

@@ -261,20 +261,20 @@ extension InternalProtocol {
 // CHECK-LABEL: sil_default_witness_table ResilientMethods {
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #ResilientMethods.defaultWitness!1: {{.*}} : @_T019protocol_resilience16ResilientMethodsP14defaultWitnessyyF
-// CHECK-NEXT:    method #ResilientMethods.anotherDefaultWitness!1: {{.*}} : @_T019protocol_resilience16ResilientMethodsP21anotherDefaultWitnessxSiF
-// CHECK-NEXT:    method #ResilientMethods.defaultWitnessWithAssociatedType!1: {{.*}} : @_T019protocol_resilience16ResilientMethodsP32defaultWitnessWithAssociatedTypey05AssocI0QzF
-// CHECK-NEXT:    method #ResilientMethods.defaultWitnessMoreAbstractThanRequirement!1: {{.*}} : @_T019protocol_resilience16ResilientMethodsP41defaultWitnessMoreAbstractThanRequirementy9AssocTypeQz_Si1btF
-// CHECK-NEXT:    method #ResilientMethods.defaultWitnessMoreAbstractThanGenericRequirement!1: {{.*}} : @_T019protocol_resilience16ResilientMethodsP48defaultWitnessMoreAbstractThanGenericRequirementy9AssocTypeQz_qd__1ttlF
+// CHECK-NEXT:    method #ResilientMethods.defaultWitness!1: @_T019protocol_resilience16ResilientMethodsP14defaultWitnessyyF
+// CHECK-NEXT:    method #ResilientMethods.anotherDefaultWitness!1: @_T019protocol_resilience16ResilientMethodsP21anotherDefaultWitnessxSiF
+// CHECK-NEXT:    method #ResilientMethods.defaultWitnessWithAssociatedType!1: @_T019protocol_resilience16ResilientMethodsP32defaultWitnessWithAssociatedTypey05AssocI0QzF
+// CHECK-NEXT:    method #ResilientMethods.defaultWitnessMoreAbstractThanRequirement!1: @_T019protocol_resilience16ResilientMethodsP41defaultWitnessMoreAbstractThanRequirementy9AssocTypeQz_Si1btF
+// CHECK-NEXT:    method #ResilientMethods.defaultWitnessMoreAbstractThanGenericRequirement!1: @_T019protocol_resilience16ResilientMethodsP48defaultWitnessMoreAbstractThanGenericRequirementy9AssocTypeQz_qd__1ttlF
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #ResilientMethods.staticDefaultWitness!1: {{.*}} : @_T019protocol_resilience16ResilientMethodsP20staticDefaultWitnessxSiFZ
+// CHECK-NEXT:    method #ResilientMethods.staticDefaultWitness!1: @_T019protocol_resilience16ResilientMethodsP20staticDefaultWitnessxSiFZ
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientConstructors {
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #ResilientConstructors.init!allocator.1: {{.*}} : @_T019protocol_resilience21ResilientConstructorsPxyt7default_tcfC
-// CHECK-NEXT:    method #ResilientConstructors.init!allocator.1: {{.*}} : @_T019protocol_resilience21ResilientConstructorsPxSgyt17defaultIsOptional_tcfC
+// CHECK-NEXT:    method #ResilientConstructors.init!allocator.1: @_T019protocol_resilience21ResilientConstructorsPxyt7default_tcfC
+// CHECK-NEXT:    method #ResilientConstructors.init!allocator.1: @_T019protocol_resilience21ResilientConstructorsPxSgyt17defaultIsOptional_tcfC
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
 // CHECK-NEXT: }
@@ -282,42 +282,42 @@ extension InternalProtocol {
 // CHECK-LABEL: sil_default_witness_table ResilientStorage {
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
-// CHECK-NEXT:   method #ResilientStorage.propertyWithDefault!getter.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP19propertyWithDefaultSifg
+// CHECK-NEXT:   method #ResilientStorage.propertyWithDefault!getter.1: @_T019protocol_resilience16ResilientStorageP19propertyWithDefaultSifg
 // CHECK-NEXT:   no_default
-// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!getter.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSifg
-// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!setter.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSifs
-// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!materializeForSet.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSifm
+// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!getter.1: @_T019protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSifg
+// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!setter.1: @_T019protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSifs
+// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!materializeForSet.1: @_T019protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSifm
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
-// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!getter.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzfg
-// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!setter.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzfs
-// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!materializeForSet.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzfm
-// CHECK-NEXT:   method #ResilientStorage.subscript!getter.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP9subscript1TQzAFcfg
-// CHECK-NEXT:   method #ResilientStorage.subscript!setter.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP9subscript1TQzAFcfs
-// CHECK-NEXT:   method #ResilientStorage.subscript!materializeForSet.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP9subscript1TQzAFcfm
-// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!getter.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSifg
-// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!setter.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSifs
-// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!materializeForSet.1: {{.*}} : @_T019protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSifm
+// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!getter.1: @_T019protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzfg
+// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!setter.1: @_T019protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzfs
+// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!materializeForSet.1: @_T019protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzfm
+// CHECK-NEXT:   method #ResilientStorage.subscript!getter.1: @_T019protocol_resilience16ResilientStorageP9subscript1TQzAFcfg
+// CHECK-NEXT:   method #ResilientStorage.subscript!setter.1: @_T019protocol_resilience16ResilientStorageP9subscript1TQzAFcfs
+// CHECK-NEXT:   method #ResilientStorage.subscript!materializeForSet.1: @_T019protocol_resilience16ResilientStorageP9subscript1TQzAFcfm
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!getter.1: @_T019protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSifg
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!setter.1: @_T019protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSifs
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!materializeForSet.1: @_T019protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSifm
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientOperators {
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #ResilientOperators."~~~"!1: {{.*}} : @_T019protocol_resilience18ResilientOperatorsP3tttopyxFZ
-// CHECK-NEXT:    method #ResilientOperators."<*>"!1: {{.*}} : @_T019protocol_resilience18ResilientOperatorsP3lmgoiyx_qd__tlFZ
-// CHECK-NEXT:    method #ResilientOperators."<**>"!1: {{.*}} : @_T019protocol_resilience18ResilientOperatorsP4lmmgoi9AssocTypeQzqd___xtlFZ
-// CHECK-NEXT:    method #ResilientOperators."<===>"!1: {{.*}} : @_T019protocol_resilience18ResilientOperatorsP5leeegoi9AssocTypeQyd__qd___xtAaBRd__lFZ
+// CHECK-NEXT:    method #ResilientOperators."~~~"!1: @_T019protocol_resilience18ResilientOperatorsP3tttopyxFZ
+// CHECK-NEXT:    method #ResilientOperators."<*>"!1: @_T019protocol_resilience18ResilientOperatorsP3lmgoiyx_qd__tlFZ
+// CHECK-NEXT:    method #ResilientOperators."<**>"!1: @_T019protocol_resilience18ResilientOperatorsP4lmmgoi9AssocTypeQzqd___xtlFZ
+// CHECK-NEXT:    method #ResilientOperators."<===>"!1: @_T019protocol_resilience18ResilientOperatorsP5leeegoi9AssocTypeQyd__qd___xtAaBRd__lFZ
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ReabstractSelfRefined {
 // CHECK-NEXT:   no_default
-// CHECK-NEXT:   method #ReabstractSelfRefined.callback!getter.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcfg
-// CHECK-NEXT:   method #ReabstractSelfRefined.callback!setter.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcfs
-// CHECK-NEXT:   method #ReabstractSelfRefined.callback!materializeForSet.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcfm
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!getter.1: @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcfg
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!setter.1: @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcfs
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!materializeForSet.1: @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcfm
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table hidden InternalProtocol {
 // CHECK-NEXT:   no_default
-// CHECK-NEXT:   method #InternalProtocol.defaultG!1: {{.*}} : @_T019protocol_resilience16InternalProtocolP8defaultGyyF
+// CHECK-NEXT:   method #InternalProtocol.defaultG!1: @_T019protocol_resilience16InternalProtocolP8defaultGyyF
 // CHECK-NEXT: }

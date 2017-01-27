@@ -39,29 +39,29 @@ public class PublicSub: Base {
 }
 
 // CHECK-LABEL: sil_vtable PrivateSub {
-// CHECK-NEXT:   #Base.foo!1: {{.*}} : _T04main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLC3fooyyF
-// CHECK-NEXT:   #Base.init!initializer.1: {{.*}} : _T04main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLCADycfc
-// CHECK-NEXT:   #PrivateSub.deinit!deallocator: {{.*}} : _T04main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLCfD
+// CHECK-NEXT:   #Base.foo!1: _T04main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLC3fooyyF
+// CHECK-NEXT:   #Base.init!initializer.1: _T04main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLCADycfc
+// CHECK-NEXT:   #PrivateSub.deinit!deallocator: _T04main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable Sub {
-// CHECK-NEXT:   #Base.foo!1: {{.*}} : _T04main3SubC3fooyyF
-// CHECK-NEXT:   #Base.init!initializer.1: {{.*}} : _T04main3SubCACycfc
-// CHECK-NEXT:   #Sub.deinit!deallocator: {{.*}} : _T04main3SubCfD
+// CHECK-NEXT:   #Base.foo!1: _T04main3SubC3fooyyF
+// CHECK-NEXT:   #Base.init!initializer.1: _T04main3SubCACycfc
+// CHECK-NEXT:   #Sub.deinit!deallocator: _T04main3SubCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable PublicSub {
-// CHECK-NEXT:   #Base.foo!1: {{.*}} : _T04main9PublicSubC3fooyyF
-// CHECK-NEXT:   #Base.init!initializer.1: {{.*}} : _T04main9PublicSubCACycfc
-// CHECK-NEXT:   #PublicSub.deinit!deallocator: {{.*}} : _T04main9PublicSubCfD
+// CHECK-NEXT:   #Base.foo!1: _T04main9PublicSubC3fooyyF
+// CHECK-NEXT:   #Base.init!initializer.1: _T04main9PublicSubCACycfc
+// CHECK-NEXT:   #PublicSub.deinit!deallocator: _T04main9PublicSubCfD
 // CHECK-NEXT: }
 
 
 
 // CHECK-LABEL: sil_witness_table hidden FooImpl: Fooable module main {
-// CHECK-NEXT:  method #Fooable.foo!1: {{.*}} : @_T04main7FooImplVAA7FooableAaaDP3fooyyFTW
+// CHECK-NEXT:  method #Fooable.foo!1: @_T04main7FooImplVAA7FooableAaaDP3fooyyFTW
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table [fragile] PublicFooImpl: Fooable module main {
-// CHECK-NEXT:  method #Fooable.foo!1: {{.*}} : @_T04main13PublicFooImplVAA7FooableAaaDP3fooyyFTW
+// CHECK-NEXT:  method #Fooable.foo!1: @_T04main13PublicFooImplVAA7FooableAaaDP3fooyyFTW
 // CHECK-NEXT: }

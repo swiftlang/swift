@@ -1447,20 +1447,19 @@ public:
   void visitClassMethodInst(ClassMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
-    *this << ", ";
+    *this << " , ";
     *this << AMI->getType();
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
-    *this << ", ";
+    *this << " , ";
     *this << AMI->getType();
   }
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {
     if (WMI->isVolatile())
       *this << "[volatile] ";
-    *this << "$" << WMI->getLookupType() << ", " << WMI->getMember() 
-          << " : " << WMI->getMember().getDecl()->getInterfaceType();
+    *this << "$" << WMI->getLookupType() << ", " << WMI->getMember();
     if (!WMI->getTypeDependentOperands().empty()) {
       *this << ", ";
       *this << getIDAndType(WMI->getTypeDependentOperands()[0].get());
@@ -2186,8 +2185,7 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   for (auto &entry : getEntries()) {
     OS << "  ";
     entry.Method.print(OS);
-    OS << ": " << entry.Method.getDecl()->getInterfaceType();
-    OS << " : ";
+    OS << ": ";
     if (entry.Linkage !=
         stripExternalFromLinkage(entry.Implementation->getLinkage())) {
       OS << getLinkageString(entry.Linkage);
@@ -2228,8 +2226,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       auto &methodWitness = witness.getMethodWitness();
       OS << "method ";
       methodWitness.Requirement.print(OS);
-      OS << ": " << methodWitness.Requirement.getDecl()->getInterfaceType();
-      OS << " : ";
+      OS << ": ";
       if (methodWitness.Witness) {
         methodWitness.Witness->printName(OS);
         OS << "\t// "
@@ -2300,8 +2297,7 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     // method #declref: @function
     OS << "  method ";
     witness.getRequirement().print(OS);
-    OS << ": " << witness.getRequirement().getDecl()->getInterfaceType();
-    OS << " : ";
+    OS << ": ";
     witness.getWitness()->printName(OS);
     OS << "\t// "
        << demangleSymbolAsString(witness.getWitness()->getName());

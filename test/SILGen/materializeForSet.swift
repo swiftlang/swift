@@ -515,7 +515,7 @@ func testMaterializedSetter() {
 }
 
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module materializeForSet {
-// CHECK:   method #Totalled.total!getter.1: {{.*}} : @_T017materializeForSet4BillVAA8TotalledAaaDP5totalSifgTW
-// CHECK:   method #Totalled.total!setter.1: {{.*}} : @_T017materializeForSet4BillVAA8TotalledAaaDP5totalSifsTW
-// CHECK:   method #Totalled.total!materializeForSet.1: {{.*}} : @_T017materializeForSet4BillVAA8TotalledAaaDP5totalSifmTW
+// CHECK:   method #Totalled.total!getter.1: @_T017materializeForSet4BillVAA8TotalledAaaDP5totalSifgTW
+// CHECK:   method #Totalled.total!setter.1: @_T017materializeForSet4BillVAA8TotalledAaaDP5totalSifsTW
+// CHECK:   method #Totalled.total!materializeForSet.1: @_T017materializeForSet4BillVAA8TotalledAaaDP5totalSifmTW
 // CHECK: }

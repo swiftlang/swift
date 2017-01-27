@@ -1266,12 +1266,12 @@ bb0(%0 : $Int32, %1 : $Int, %2 : $Int, %3 : $Foo):
 
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfg
-// CHECK: #Foo.subscript!setter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfs
+// CHECK: #Foo.subscript!getter.1: _T03tmp3FooC9subscriptSiSi1x_Si1ytcfg
+// CHECK: #Foo.subscript!setter.1: _T03tmp3FooC9subscriptSiSi1x_Si1ytcfs
 // CHECK: }
 // CHECK_DECL-LABEL: sil_vtable Foo {
-// CHECK_DECL: #Foo.subscript!getter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfg
-// CHECK_DECL: #Foo.subscript!setter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfs
+// CHECK_DECL: #Foo.subscript!getter.1: _T03tmp3FooC9subscriptSiSi1x_Si1ytcfg
+// CHECK_DECL: #Foo.subscript!setter.1: _T03tmp3FooC9subscriptSiSi1x_Si1ytcfs
 // CHECK_DECL: }
 sil_vtable Foo {
   #Foo.subscript!getter.1: _T03tmp3FooC9subscriptSiSi1x_Si1ytcfg
@@ -1303,7 +1303,7 @@ bb0(%0 : $*ConformingAssoc):
 
 
 // CHECK-LABEL: sil_witness_table public_external ConformingAssoc: AssocReqt module
-// CHECK: #AssocReqt.requiredMethod!1: {{.*}} : @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
+// CHECK: #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
 // CHECK: }
 sil_witness_table ConformingAssoc: AssocReqt module def_basic {
   method #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
