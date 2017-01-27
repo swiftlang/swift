@@ -1390,6 +1390,9 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(Target));
   }
 
+  Arguments.push_back("-Wl,-z,nocopyreloc");
+  Arguments.push_back("-Wl,-z,noextern-protected-data");
+
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
   llvm::SmallString<128> RuntimeLibPath;
