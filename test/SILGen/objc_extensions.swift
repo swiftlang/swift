@@ -58,7 +58,7 @@ extension Sub {
     // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<String>, [[SELF:%.*]] : $Sub):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
-    // CHECK:   [[GET_SUPER_METHOD:%.*]] = super_method [volatile] [[SELF_COPY]] : $Sub, #Base.prop!getter.1.foreign : (Base) -> () -> String! , $@convention(objc_method) (Base) -> @autoreleased Optional<NSString>
+    // CHECK:   [[GET_SUPER_METHOD:%.*]] = super_method [volatile] [[SELF_COPY]] : $Sub, #Base.prop!getter.1.foreign : (Base) -> () -> String!, $@convention(objc_method) (Base) -> @autoreleased Optional<NSString>
     // CHECK:   [[OLD_NSSTRING:%.*]] = apply [[GET_SUPER_METHOD]]([[UPCAST_SELF_COPY]])
 
     // CHECK: bb3([[OLD_NSSTRING_BRIDGED:%.*]] : $Optional<String>):
@@ -66,7 +66,7 @@ extension Sub {
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
-    // CHECK:   [[SET_SUPER_METHOD:%.*]] = super_method [volatile] [[SELF_COPY]] : $Sub, #Base.prop!setter.1.foreign : (Base) -> (String!) -> () , $@convention(objc_method) (Optional<NSString>, Base) -> ()
+    // CHECK:   [[SET_SUPER_METHOD:%.*]] = super_method [volatile] [[SELF_COPY]] : $Sub, #Base.prop!setter.1.foreign : (Base) -> (String!) -> (), $@convention(objc_method) (Optional<NSString>, Base) -> ()
     // CHECK: bb4:
     // CHECK: bb6([[BRIDGED_NEW_STRING:%.*]] : $Optional<NSString>):
     // CHECK:    apply [[SET_SUPER_METHOD]]([[BRIDGED_NEW_STRING]], [[UPCAST_SELF_COPY]])
@@ -119,7 +119,7 @@ class SubSub : Sub {
   // CHECK-LABEL: sil hidden @_T015objc_extensions03SubC0C14objCBaseMethodyyF
   // CHECK: bb0([[SELF:%.*]] : $SubSub):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:   super_method [volatile] [[SELF_COPY]] : $SubSub, #Sub.objCBaseMethod!1.foreign : (Sub) -> () -> () , $@convention(objc_method) (Sub) -> ()
+  // CHECK:   super_method [volatile] [[SELF_COPY]] : $SubSub, #Sub.objCBaseMethod!1.foreign : (Sub) -> () -> (), $@convention(objc_method) (Sub) -> ()
   // CHECK: } // end sil function '_T015objc_extensions03SubC0C14objCBaseMethodyyF'
   override func objCBaseMethod() {
     super.objCBaseMethod()

@@ -24,7 +24,7 @@ bb0:
   %1 = alloc_ref $Bar                             // user: %2
   store %1 to %0 : $*Bar                          // id: %2
   %3 = load %0 : $*Bar                            // users: %6, %5, %4
-  %5 = class_method %1 : $Bar, #Bar.foo!1 : (Bar) -> () -> () , $@convention(method) (@guaranteed Bar) -> () // user: %6
+  %5 = class_method %1 : $Bar, #Bar.foo!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
   %6 = apply %5(%1) : $@convention(method) (@guaranteed Bar) -> ()
   release_value %1 : $Bar
   %7 = tuple ()                                   // user: %8
@@ -50,7 +50,7 @@ bb0(%0 : $Node):
   strong_retain %0 : $Node
   // CHECK-NOT: class_method %0
   // CHECK: [[FUNC:%.*]] = function_ref @transparent_target
-  %3 = class_method %0 : $Node, #Node.index!getter.1 : (Node) -> () -> Int , $@convention(method) (@guaranteed Node) -> Int
+  %3 = class_method %0 : $Node, #Node.index!getter.1 : (Node) -> () -> Int, $@convention(method) (@guaranteed Node) -> Int
   // CHECK: [[RESULT:%.*]] = apply [[FUNC]](%0)
   %4 = apply %3(%0) : $@convention(method) (@guaranteed Node) -> Int
   // CHECK: strong_release %0
@@ -86,7 +86,7 @@ bb0(%0 : $@thick C.Type):
   %2 = upcast %0 : $@thick C.Type to $@thick B.Type
   // CHECK-NOT: class_method
   // CHECK: function_ref @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
-  %3 = class_method %2 : $@thick B.Type, #B.foo!1 : (B.Type) -> () -> Int , $@convention(method) (@thick B.Type) -> Int
+  %3 = class_method %2 : $@thick B.Type, #B.foo!1 : (B.Type) -> () -> Int, $@convention(method) (@thick B.Type) -> Int
   %4 = apply %3(%2) : $@convention(method) (@thick B.Type) -> Int
   %5 = tuple ()
   // CHECK: return
