@@ -334,6 +334,14 @@ void ConformanceCollector::collect(swift::SILInstruction *I) {
     case ValueKind::WitnessMethodInst:
       scanConformance(cast<WitnessMethodInst>(I)->getConformance());
       break;
+    case ValueKind::SuperMethodInst: {
+      SILType InstanceTy = cast<SuperMethodInst>(I)->getOperand()->getType();
+      if (auto MTy = dyn_cast<MetatypeType>(InstanceTy.getSwiftRValueType()))
+        InstanceTy = SILType::getPrimitiveObjectType(MTy.getInstanceType());
+      if (SILType SuperTy = InstanceTy.getSuperclass(/*resolver=*/nullptr))
+        scanType(SuperTy.getSwiftRValueType());
+      break;
+    }
     case ValueKind::AllocBoxInst: {
       CanSILBoxType BTy = cast<AllocBoxInst>(I)->getBoxType();
       size_t NumFields = BTy->getLayout()->getFields().size();
