@@ -614,6 +614,8 @@ public:
   // SILModuleConventions API for convenience.
   //===--------------------------------------------------------------------===//
 
+  bool useLoweredAddresses() const { return silConv.useLoweredAddresses(); }
+
   bool isSILIndirect(SILParameterInfo param) const {
     return silConv.isSILIndirect(param);
   }
