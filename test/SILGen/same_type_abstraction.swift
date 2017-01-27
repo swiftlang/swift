@@ -38,3 +38,20 @@ extension MyProtocol where Data == (ReadData, ReadData) {
     return (readData(), readData())
   }
 }
+
+// Problem with protocol typealiases, which are modeled as same-type
+// constraints
+
+protocol Refined : Associated {
+  associatedtype Key
+  typealias Assoc = Key
+
+  init()
+}
+
+extension Refined {
+  // CHECK-LABEL: sil hidden @_TFE21same_type_abstractionPS_7RefinedCfT12withElementswx3Key_x : $@convention(method) <Self where Self : Refined> (@in Self.Key, @thick Self.Type) -> @out Self
+  init(withElements newElements: Key) {
+    self.init()
+  }
+}
