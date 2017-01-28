@@ -68,29 +68,35 @@ extension String : _ExpressibleByStringInterpolation {
     self = String(describing: expr)
   }
 
-% for Type in StreamableTypes:
   /// Creates a string containing the given value's textual representation.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
-  public init(stringInterpolationSegment expr: ${Type}) {
+  public init<T: TextOutputStreamable> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyStreamable(expr)
   }
-% end
 
-% for Type in PrintableTypes:
   /// Creates a string containing the given value's textual representation.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
-  public init(stringInterpolationSegment expr: ${Type}) {
+  public init<T: CustomStringConvertible> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyPrintable(expr)
   }
-% end
+
+  /// Creates a string containing the given value's textual representation.
+  ///
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// interpreting string interpolations.
+  ///
+  /// - SeeAlso: `ExpressibleByStringInterpolation`
+  public init<T: TextOutputStreamable & CustomStringConvertible> (stringInterpolationSegment expr: T) {
+    self = _toStringReadOnlyStreamable(expr)
+  }
 }
 
 // ${'Local Variables'}:
