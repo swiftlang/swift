@@ -862,25 +862,23 @@ static ManagedValue emitBuiltinAllocWithTailElems(SILGenFunction &gen,
   SILType RefType = gen.getLoweredType(subs[0].getReplacement()->
                                   getCanonicalType()).getObjectType();
 
-  SmallVector<SILValue, 4> Counts;
+  SmallVector<ManagedValue, 4> Counts;
   SmallVector<SILType, 4> ElemTypes;
   for (unsigned Idx = 0; Idx < NumTailTypes; ++Idx) {
-    Counts.push_back(args[Idx * 2 + 1].getValue());
+    Counts.push_back(args[Idx * 2 + 1]);
     ElemTypes.push_back(gen.getLoweredType(subs[Idx+1].getReplacement()->
                                            getCanonicalType()).getObjectType());
   }
-  SILValue Metatype = args[0].getValue();
-  SILValue result;
-  if (auto *MI = dyn_cast<MetatypeInst>(Metatype)) {
-    assert(MI->getType().getMetatypeInstanceType(gen.SGM.M) == RefType &&
+  ManagedValue Metatype = args[0];
+  if (isa<MetatypeInst>(Metatype)) {
+    assert(Metatype.getType().getMetatypeInstanceType(gen.SGM.M) == RefType &&
            "substituted type does not match operand metatype");
-    result = gen.B.createAllocRef(loc, RefType, false, false,
-                                  ElemTypes, Counts);
+    return gen.B.createAllocRef(loc, RefType, false, false,
+                                ElemTypes, Counts);
   } else {
-    result = gen.B.createAllocRefDynamic(loc, Metatype, RefType, false,
-                                         ElemTypes, Counts);
+    return gen.B.createAllocRefDynamic(loc, Metatype, RefType, false,
+                                       ElemTypes, Counts);
   }
-  return ManagedValue::forUnmanaged(result);
 }
 
 static ManagedValue emitBuiltinProjectTailElems(SILGenFunction &gen,

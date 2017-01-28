@@ -121,6 +121,15 @@ public:
   ManagedValue createUnsafeCopyUnownedValue(SILLocation Loc,
                                             ManagedValue OriginalValue);
   ManagedValue createOwnedPHIArgument(SILType Type);
+
+  using SILBuilder::createAllocRef;
+  ManagedValue createAllocRef(SILLocation Loc, SILType RefType, bool objc, bool canAllocOnStack,
+                              ArrayRef<SILType> ElementTypes,
+                              ArrayRef<ManagedValue> ElementCountOperands);
+  using SILBuilder::createAllocRefDynamic;
+  ManagedValue createAllocRefDynamic(SILLocation Loc, ManagedValue Operand, SILType RefType, bool objc,
+                                     ArrayRef<SILType> ElementTypes,
+                                     ArrayRef<ManagedValue> ElementCountOperands);
 };
 
 } // namespace Lowering
