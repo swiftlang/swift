@@ -132,3 +132,9 @@ extension P3 {
 }
 
 struct S3 : P3, Equatable { }
+
+// rdar://problem/30220565
+func shrinkTooFar(_ : Double, closure : ()->()) {}
+func testShrinkTooFar() {
+  shrinkTooFar(0*0*0) {}
+}
