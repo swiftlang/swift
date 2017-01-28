@@ -189,8 +189,9 @@ protected:
     // Destroy the node's payload.
     node->~Node();
 
-    // Deallocate the node.
-    this->Deallocate(node, allocSize);
+    // Deallocate the node.  The static_cast here is required
+    // because LLVM's allocator API is insane.
+    this->Deallocate(static_cast<void*>(node), allocSize);
   }
 };
 
