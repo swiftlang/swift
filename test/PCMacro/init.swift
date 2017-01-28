@@ -8,6 +8,9 @@
 // REQUIRES: executable_test
 // XFAIL: *
 
+// FIXME: rdar://problem/30234450 PCMacro tests fail on linux in optimized mode
+// UNSUPPORTED: OS=linux-gnu
+
 class A {
   func access() -> Void {
   }

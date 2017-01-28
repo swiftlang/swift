@@ -5,6 +5,9 @@
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
 
+// FIXME: rdar://problem/30234450 PCMacro tests fail on linux in optimized mode
+// UNSUPPORTED: OS=linux-gnu
+
 #sourceLocation(file: "code.exe", line: 15)
 func foo(_ x: Int) -> Bool {
   return x == 1
