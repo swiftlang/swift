@@ -1871,7 +1871,7 @@ extension BinaryInteger {
 ///     // y == 254
 ///     // overflow == ArithmeticOverflow.overflow
 public enum ArithmeticOverflow {
-  // @_transparent
+  @_transparent
   public init(_ overflow: Bool) { self = overflow ? .overflow : .none }
   /// An indication that no overflow occured in the operation.
   case none
