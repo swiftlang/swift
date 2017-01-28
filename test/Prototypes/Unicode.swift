@@ -236,7 +236,6 @@ Base.SubSequence.Iterator.Element == Base.Iterator.Element
 {
   typealias Encoding = Latin1
   typealias CodeUnits = Base
-  /* where CodeUnits.Iterator.Element == Encoding.CodeUnit */
   let codeUnits: CodeUnits
   
   typealias ValidUTF8View = TranscodedView<CodeUnits, Encoding, UTF8>
@@ -250,13 +249,13 @@ Base.SubSequence.Iterator.Element == Base.Iterator.Element
   
   typealias ExtendedASCII = LazyMapRandomAccessCollection<CodeUnits, UInt32>
   var extendedASCII: ExtendedASCII {
-    return ExtendedASCII(codeUnits) { ()UInt32($0) }
+    return codeUnits.lazy.map { UInt32($0) }
   }
 
   typealias Characters = LazyMapRandomAccessCollection<CodeUnits, Character>
   var characters: Characters {
-    return Characters(codeUnits) {
-      Character(scalar: UnicodeScalar(UInt32($0))!)
+    return codeUnits.lazy.map {
+      Character(UnicodeScalar(UInt32($0))!)
     }
   }
   
