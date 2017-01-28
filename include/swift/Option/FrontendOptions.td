@@ -248,6 +248,9 @@ def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
 def assume_parsing_unqualified_ownership_sil : Flag<["-"], "assume-parsing-unqualified-ownership-sil">,
   HelpText<"Assume unqualified SIL ownership when parsing SIL">;
 
+def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
+  HelpText<"Enable SIL Opaque Values">;
+
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
