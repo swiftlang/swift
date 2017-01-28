@@ -29,32 +29,9 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
     list(APPEND CMAKE_MODULE_PATH ${path})
   endforeach()
 
-  # If we already have a cached value for LLVM_ENABLE_ASSERTIONS, save the value.
-  if (DEFINED LLVM_ENABLE_ASSERTIONS)
-    set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
-  endif()
-
-  # Then we import LLVMConfig. This is going to override whatever cached value
-  # we have for LLVM_ENABLE_ASSERTIONS.
+  # Then include LLVM.
   find_package(LLVM REQUIRED CONFIG
     HINTS "${PATH_TO_LLVM_BUILD}" NO_DEFAULT_PATH)
-
-  # If we did not have a cached value for LLVM_ENABLE_ASSERTIONS, set
-  # LLVM_ENABLE_ASSERTIONS_saved to be the ENABLE_ASSERTIONS value from LLVM so
-  # we follow LLVMConfig.cmake's value by default if nothing is provided.
-  if (NOT DEFINED LLVM_ENABLE_ASSERTIONS_saved)
-    set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
-  endif()
-
-  # Then set LLVM_ENABLE_ASSERTIONS with a default value of
-  # LLVM_ENABLE_ASSERTIONS_saved.
-  #
-  # The effect of this is that if LLVM_ENABLE_ASSERTION did not have a cached
-  # value, then LLVM_ENABLE_ASSERTIONS_saved is set to LLVM's value, so we get a
-  # default value from LLVM.
-  set(LLVM_ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS_saved}"
-    CACHE BOOL "Enable assertions")
-  mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
 
   precondition(LLVM_TOOLS_BINARY_DIR)
   escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_TOOLS_BINARY_DIR}" LLVM_TOOLS_BINARY_DIR)
@@ -208,9 +185,34 @@ endmacro()
 #   is_cross_compiling
 #     Whether this is cross-compiling host tools.
 macro(swift_common_standalone_build_config product is_cross_compiling)
+  # If we already have a cached value for LLVM_ENABLE_ASSERTIONS, save the value.
+  # Loading the LLVM & Clang modules overwrites this value.
+  if (DEFINED LLVM_ENABLE_ASSERTIONS)
+    set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
+  endif()
+
   swift_common_standalone_build_config_llvm(${product} ${is_cross_compiling})
+
+  # If we did not have a cached value for LLVM_ENABLE_ASSERTIONS, set
+  # LLVM_ENABLE_ASSERTIONS_saved to be the ENABLE_ASSERTIONS value from LLVM so
+  # we follow LLVMConfig.cmake's value by default if nothing is provided.
+  if (NOT DEFINED LLVM_ENABLE_ASSERTIONS_saved)
+    set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
+  endif()
+
   swift_common_standalone_build_config_clang(${product} ${is_cross_compiling})
   swift_common_standalone_build_config_cmark(${product})
+
+  # Then set LLVM_ENABLE_ASSERTIONS with a default value of
+  # LLVM_ENABLE_ASSERTIONS_saved.
+  #
+  # The effect of this is that if LLVM_ENABLE_ASSERTION did not have a cached
+  # value, then LLVM_ENABLE_ASSERTIONS_saved is set to LLVM's value, so we get a
+  # default value from LLVM.
+  # It's safe to force the SET here because we honor the user-specified value.
+  set(LLVM_ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS_saved}"
+    CACHE BOOL "Enable assertions" FORCE)
+  mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
 endmacro()
 
 # Common cmake project config for unified builds.
