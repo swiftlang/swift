@@ -133,11 +133,12 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
   // Prepare generic target information.
   SwiftTargetInfo target(triple.getObjectFormat(), pointerSize);
   
-  // On Apple platforms, we implement "once" using dispatch_once, which exposes
-  // -1 as ABI for the "done" value.
+  // On Apple platforms, we implement "once" using dispatch_once,
+  // which exposes a barrier-free inline path with -1 as the "done" value.
   if (triple.isOSDarwin())
     target.OnceDonePredicateValue = -1L;
-  // TODO: Do we know this for Linux?
+  // Other platforms use std::call_once() and we don't
+  // assume that they have a barrier-free inline fast path.
   
   switch (triple.getArch()) {
   case llvm::Triple::x86_64:
