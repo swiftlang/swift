@@ -356,6 +356,11 @@ public:
 };
   
 } // end namespace Lowering
+
+template <typename To> inline bool isa(const Lowering::ManagedValue &M) {
+  return isa<To>(M.getValue());
+}
+
 } // end namespace swift
 
 #endif
