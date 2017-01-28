@@ -1641,6 +1641,24 @@ void ConstraintSystem::shrink(Expr *expr) {
       return { true, expr };
     }
 
+    /// Determine whether this is an arithmetic expression comprised entirely
+    /// of literals.
+    static bool isArithmeticExprOfLiterals(Expr *expr) {
+      expr = expr->getSemanticsProvidingExpr();
+
+      if (auto prefix = dyn_cast<PrefixUnaryExpr>(expr))
+        return isArithmeticExprOfLiterals(prefix->getArg());
+
+      if (auto postfix = dyn_cast<PostfixUnaryExpr>(expr))
+        return isArithmeticExprOfLiterals(postfix->getArg());
+
+      if (auto binary = dyn_cast<BinaryExpr>(expr))
+        return isArithmeticExprOfLiterals(binary->getArg()->getElement(0)) &&
+               isArithmeticExprOfLiterals(binary->getArg()->getElement(1));
+
+      return isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr);
+    }
+
     Expr *walkToExprPost(Expr *expr) override {
       if (expr == PrimaryExpr) {
         // If this is primary expression and there are no candidates
@@ -1688,7 +1706,7 @@ void ConstraintSystem::shrink(Expr *expr) {
       // If there are fewer than two overloads in the chain
       // there is no point of solving this expression,
       // because we won't be able to reduce its domain.
-      if (numOverloadSets > 1)
+      if (numOverloadSets > 1 && !isArithmeticExprOfLiterals(expr))
         Candidates.push_back(Candidate(CS, expr));
 
       return expr;
