@@ -544,7 +544,8 @@ void EmitPolymorphicParameters::bindParameterSources(const GetParameterFn &getPa
 void EmitPolymorphicParameters::bindParameterSource(SILParameterInfo param, unsigned paramIndex,
                          const GetParameterFn &getParameter) {
   // Ignore indirect parameters for now.  This is potentially dumb.
-  if (param.isIndirect()) return;
+  if (IGF.IGM.silConv.isSILIndirect(param))
+    return;
 
   CanType paramType = getArgTypeInContext(paramIndex);
 
@@ -2351,7 +2352,7 @@ static CanType getSubstSelfType(CanSILFunctionType origFnType,
   // - even if they could, they would conform as a value type 'self' and thus
   //   be passed indirectly as an @in or @inout parameter.
   if (auto meta = dyn_cast<MetatypeType>(inputType)) {
-    if (!selfParam.isIndirect())
+    if (!selfParam.isFormalIndirect())
       inputType = meta.getInstanceType();
   }
   

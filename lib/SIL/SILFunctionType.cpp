@@ -35,19 +35,41 @@
 using namespace swift;
 using namespace swift::Lowering;
 
-SILType SILFunctionType::getSILResult() {
+SILType SILFunctionType::getDirectFormalResultsType() {
   CanType type;
-  if (NumDirectResults == 0) {
+  if (getNumDirectFormalResults() == 0) {
     type = getASTContext().TheEmptyTupleType;
-  } else if (NumDirectResults == 1) {
-    type = getDirectResults()[0].getType();
+  } else if (getNumDirectFormalResults() == 1) {
+    type = getSingleDirectFormalResult().getType();
   } else {
-    auto &cache = getMutableSILResultCache();
+    auto &cache = getMutableFormalResultsCache();
     if (cache) {
       type = cache;
     } else {
       SmallVector<TupleTypeElt, 4> elts;
-      for (auto result : getDirectResults())
+      for (auto result : getResults())
+        if (!result.isFormalIndirect())
+          elts.push_back(result.getType());
+      type = CanType(TupleType::get(elts, getASTContext()));
+      cache = type;
+    }
+  }
+  return SILType::getPrimitiveObjectType(type);
+}
+
+SILType SILFunctionType::getAllResultsType() {
+  CanType type;
+  if (getNumResults() == 0) {
+    type = getASTContext().TheEmptyTupleType;
+  } else if (getNumResults() == 1) {
+    type = getResults()[0].getType();
+  } else {
+    auto &cache = getMutableAllResultsCache();
+    if (cache) {
+      type = cache;
+    } else {
+      SmallVector<TupleTypeElt, 4> elts;
+      for (auto result : getResults())
         elts.push_back(result.getType());
       type = CanType(TupleType::get(elts, getASTContext()));
       cache = type;
@@ -56,16 +78,10 @@ SILType SILFunctionType::getSILResult() {
   return SILType::getPrimitiveObjectType(type);
 }
 
-SILType SILFunctionType::getCSemanticResult() {
+SILType SILFunctionType::getFormalCSemanticResult() {
   assert(getLanguage() == SILFunctionLanguage::C);
-  assert(getNumAllResults() <= 1);
-  if (NumDirectResults == 0) {
-    return SILType::getPrimitiveObjectType(getASTContext().TheEmptyTupleType);
-  } else if (NumDirectResults == 1) {
-    return SILType::getPrimitiveObjectType(getDirectResults()[0].getType());
-  } else {
-    return SILType::getPrimitiveAddressType(getIndirectResults()[0].getType());
-  }
+  assert(getNumResults() <= 1);
+  return getDirectFormalResultsType();
 }
 
 CanType SILFunctionType::getSelfInstanceType() const {
@@ -159,11 +175,8 @@ CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
       type->getCalleeConvention() == callee)
     return type;
 
-  return SILFunctionType::get(type->getGenericSignature(),
-                              extInfo,
-                              callee,
-                              type->getParameters(),
-                              type->getAllResults(),
+  return SILFunctionType::get(type->getGenericSignature(), extInfo, callee,
+                              type->getParameters(), type->getResults(),
                               type->getOptionalErrorResult(),
                               type->getASTContext());
 }
@@ -235,7 +248,7 @@ enum class ConventionsKind : uint8_t {
 
       // Determine the result convention.
       ResultConvention convention;
-      if (isReturnedIndirectly(origType, substType, substResultTL)) {
+      if (isFormallyReturnedIndirectly(origType, substType, substResultTL)) {
         convention = ResultConvention::Indirect;
       } else {
         convention = Convs.getResult(substResultTL);
@@ -263,16 +276,18 @@ enum class ConventionsKind : uint8_t {
       Results.push_back(result);
     }
 
-    /// Query whether the original type is returned indirectly given complete
-    /// lowering information about its substitution.
-    bool isReturnedIndirectly(AbstractionPattern origType,
-                              CanType substType, const TypeLowering &substTL) {
+    /// Query whether the original type is returned indirectly for the purpose
+    /// of reabstraction given complete lowering information about its
+    /// substitution.
+    bool isFormallyReturnedIndirectly(AbstractionPattern origType,
+                                      CanType substType,
+                                      const TypeLowering &substTL) {
       // If the substituted type is returned indirectly, so must the
       // unsubstituted type.
-      if ((origType.isTypeParameter() &&
-           !origType.isConcreteType(*M.getSwiftModule()) &&
-           !origType.requiresClass(*M.getSwiftModule())) ||
-          substTL.isReturnedIndirectly()) {
+      if ((origType.isTypeParameter()
+           && !origType.isConcreteType(*M.getSwiftModule())
+           && !origType.requiresClass(*M.getSwiftModule()))
+          || substTL.isAddressOnly()) {
         return true;
 
       // If the substitution didn't change the type, then a negative
@@ -284,9 +299,9 @@ enum class ConventionsKind : uint8_t {
       // Otherwise, query specifically for the original type.
       } else {
         // FIXME: Get expansion from SILDeclRef
-        return SILType::isReturnedIndirectly(origType.getType(), M,
-                                             origType.getGenericSignature(),
-                                             ResilienceExpansion::Minimal);
+        return SILType::isFormallyReturnedIndirectly(
+            origType.getType(), M, origType.getGenericSignature(),
+            ResilienceExpansion::Minimal);
       }
     }
   };
@@ -433,8 +448,9 @@ enum class ConventionsKind : uint8_t {
   
     /// Query whether the original type is address-only given complete
     /// lowering information about its substitution.
-    bool isPassedIndirectly(AbstractionPattern origType, CanType substType,
-                            const TypeLowering &substTL) {
+    bool isFormallyPassedIndirectly(AbstractionPattern origType,
+                                    CanType substType,
+                                    const TypeLowering &substTL) {
       auto &mod = *M.getSwiftModule();
 
       // If the C type of the argument is a const pointer, but the Swift type
@@ -447,10 +463,9 @@ enum class ConventionsKind : uint8_t {
 
       // If the substituted type is passed indirectly, so must the
       // unsubstituted type.
-      if ((origType.isTypeParameter() &&
-           !origType.isConcreteType(mod) &&
-           !origType.requiresClass(mod)) ||
-          substTL.isPassedIndirectly()) {
+      if ((origType.isTypeParameter() && !origType.isConcreteType(mod)
+           && !origType.requiresClass(mod))
+          || substTL.isAddressOnly()) {
         return true;
 
       // If the substitution didn't change the type, then a negative
@@ -462,9 +477,9 @@ enum class ConventionsKind : uint8_t {
       // Otherwise, query specifically for the original type.
       } else {
         // FIXME: Get expansion from SILDeclRef
-        return SILType::isPassedIndirectly(origType.getType(), M,
-                                           origType.getGenericSignature(),
-                                           ResilienceExpansion::Minimal);
+        return SILType::isFormallyPassedIndirectly(
+            origType.getType(), M, origType.getGenericSignature(),
+            ResilienceExpansion::Minimal);
       }
     }
 
@@ -475,18 +490,18 @@ enum class ConventionsKind : uint8_t {
       ParameterConvention convention;
       if (origType.getAs<InOutType>()) {
         convention = ParameterConvention::Indirect_Inout;
-      } else if (isPassedIndirectly(origType, substType, substTL)) {
+      } else if (isFormallyPassedIndirectly(origType, substType, substTL)) {
         if (rep == SILFunctionTypeRepresentation::WitnessMethod)
           convention = ParameterConvention::Indirect_In_Guaranteed;
         else
           convention = Convs.getIndirectSelfParameter(origType);
-        assert(isIndirectParameter(convention));
+        assert(isIndirectFormalParameter(convention));
 
       } else if (substTL.isTrivial()) {
         convention = ParameterConvention::Direct_Unowned;
       } else {
         convention = Convs.getDirectSelfParameter(origType);
-        assert(!isIndirectParameter(convention));
+        assert(!isIndirectFormalParameter(convention));
       }
 
       maybeAddForeignErrorParameter();
@@ -553,14 +568,14 @@ enum class ConventionsKind : uint8_t {
       if (isa<InOutType>(substType)) {
         assert(origType.isTypeParameter() || origType.getAs<InOutType>());
         convention = ParameterConvention::Indirect_Inout;
-      } else if (isPassedIndirectly(origType, substType, substTL)) {
+      } else if (isFormallyPassedIndirectly(origType, substType, substTL)) {
         convention = Convs.getIndirectParameter(origParamIndex, origType);
-        assert(isIndirectParameter(convention));
+        assert(isIndirectFormalParameter(convention));
       } else if (substTL.isTrivial()) {
         convention = ParameterConvention::Direct_Unowned;
       } else {
         convention = Convs.getDirectParameter(origParamIndex, origType);
-        assert(!isIndirectParameter(convention));
+        assert(!isIndirectFormalParameter(convention));
       }
       auto loweredType = substTL.getLoweredType().getSwiftRValueType();
       
@@ -1749,14 +1764,12 @@ namespace {
     const Optional<ForeignErrorConvention> &ForeignError;
 
   public:
-    SILFunctionTypeSubstituter(TypeConverter &TC,
-                               CanSILFunctionType origFnType,
-                         const Optional<ForeignErrorConvention> &foreignError)
-      : TC(TC), OrigFnType(origFnType),
-        OrigParams(origFnType->getParameters()),
-        OrigResults(origFnType->getAllResults()),
-        ForeignError(foreignError)
-    {}
+    SILFunctionTypeSubstituter(
+        TypeConverter &TC, CanSILFunctionType origFnType,
+        const Optional<ForeignErrorConvention> &foreignError)
+        : TC(TC), OrigFnType(origFnType),
+          OrigParams(origFnType->getParameters()),
+          OrigResults(origFnType->getResults()), ForeignError(foreignError) {}
 
     ArrayRef<SILResultInfo> getSubstResults() const {
       assert(NextOrigResultIndex == OrigResults.size() &&
@@ -1805,8 +1818,8 @@ namespace {
       auto &substTL = TC.getTypeLowering(origType, substType);
       auto substConvention = getSubstConvention(origParam.getConvention(),
                                                 substTL.isTrivial());
-      assert(isIndirectParameter(substConvention) ||
-             !substTL.isPassedIndirectly());
+      assert(isIndirectFormalParameter(substConvention)
+             || !substTL.isAddressOnly());
       addSubstParam(substTL.getLoweredType().getSwiftRValueType(),
                     substConvention);
     }
@@ -1876,7 +1889,7 @@ void SILFunctionTypeSubstituter::substResults(AbstractionPattern origResultType,
                                               CanType substResultType) {
   // Fast path: if the results of the original type are not type-dependent,
   // we can just copy them over.
-  auto allResults = OrigFnType->getAllResults();
+  auto allResults = OrigFnType->getResults();
   if (std::find_if(allResults.begin(), allResults.end(),
                    [&](SILResultInfo result) { 
                      return result.getType()->hasTypeParameter();
@@ -2140,8 +2153,8 @@ namespace {
                                 origType->getGenericSignature());
 
       SmallVector<SILResultInfo, 8> substResults;
-      substResults.reserve(origType->getNumAllResults());
-      for (auto origResult : origType->getAllResults()) {
+      substResults.reserve(origType->getNumResults());
+      for (auto origResult : origType->getResults()) {
         substResults.push_back(subst(origResult));
       }
 

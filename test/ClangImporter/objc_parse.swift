@@ -134,6 +134,9 @@ func properties(_ b: B) {
 
   // Properties that are Swift keywords
   var prot = b.`protocol`
+
+  // Properties whose accessors run afoul of selector splitting.
+  _ = SelectorSplittingAccessors()
 }
 
 // Construction.

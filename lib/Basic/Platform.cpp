@@ -90,6 +90,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     llvm_unreachable("unknown OS");
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
+  case llvm::Triple::Fuchsia:
   case llvm::Triple::KFreeBSD:
   case llvm::Triple::Lv2:
   case llvm::Triple::NetBSD:
@@ -107,6 +108,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::AMDHSA:
   case llvm::Triple::ELFIAMCU:
   case llvm::Triple::Mesa3D:
+  case llvm::Triple::Contiki:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:

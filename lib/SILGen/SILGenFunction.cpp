@@ -35,9 +35,9 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
-    : SGM(SGM), F(F), StartOfPostmatter(F.end()), B(*this, createBasicBlock()),
-      OpenedArchetypesTracker(F), CurrentSILLoc(F.getLocation()),
-      Cleanups(*this) {
+    : SGM(SGM), F(F), silConv(SGM.M), StartOfPostmatter(F.end()),
+      B(*this, createBasicBlock()), OpenedArchetypesTracker(F),
+      CurrentSILLoc(F.getLocation()), Cleanups(*this) {
   B.setCurrentDebugScope(F.getDebugScope());
   B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 }
@@ -540,6 +540,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto UIApplicationMainFn = SGM.M.getOrCreateFunction(mainClass, mainRef,
                                                          NotForDefinition);
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
+    SILFunctionConventions fnConv(fnTy, SGM.M);
 
     // Get the class name as a string using NSStringFromClass.
     CanType mainClassTy = mainClass->getDeclaredInterfaceType()
@@ -587,8 +588,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                                {}, metaTy);
 
     // Fix up the string parameters to have the right type.
-    SILType nameArgTy = fnTy->getSILArgumentType(3);
-    assert(nameArgTy == fnTy->getSILArgumentType(2));
+    SILType nameArgTy = fnConv.getSILArgumentType(3);
+    assert(nameArgTy == fnConv.getSILArgumentType(2));
     auto managedName = ManagedValue::forUnmanaged(optName);
     SILValue nilValue;
     if (optName->getType() == nameArgTy) {
@@ -607,7 +608,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     }
 
     // Fix up argv to have the right type.
-    auto argvTy = fnTy->getSILArgumentType(1);
+    auto argvTy = fnConv.getSILArgumentType(1);
 
     SILType unwrappedTy = argvTy;
     if (Type innerTy = argvTy.getSwiftRValueType()->getAnyOptionalObjectType()){
@@ -640,7 +641,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   argc->getType(), {}, args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, ctx), 0);
-    auto rType = F.getLoweredFunctionType()->getSingleResult().getSILType();
+    auto rType = F.getConventions().getSingleSILResultType();
     if (r->getType() != rType)
       r = B.createStruct(mainClass, rType, r);
 
@@ -685,7 +686,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   argc->getType(), {}, args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
-    auto rType = F.getLoweredFunctionType()->getSingleResult().getSILType();
+    auto rType = F.getConventions().getSingleSILResultType();
     if (r->getType() != rType)
       r = B.createStruct(mainClass, rType, r);
     B.createReturn(mainClass, r);
@@ -834,9 +835,9 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
 
   SILValue toFn = getNextUncurryLevelRef(*this, vd, to, from.isDirectReference,
                                          curriedArgs, subs);
-  SILType resultTy
-    = SGM.getConstantType(from).castTo<SILFunctionType>()
-         ->getSingleResult().getSILType();
+  SILFunctionConventions fromConv(
+      SGM.getConstantType(from).castTo<SILFunctionType>(), SGM.M);
+  SILType resultTy = fromConv.getSingleSILResultType();
   resultTy = F.mapTypeIntoContext(resultTy);
   auto toTy = toFn->getType();
 

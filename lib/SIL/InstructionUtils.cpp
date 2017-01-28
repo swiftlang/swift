@@ -357,6 +357,9 @@ void ConformanceCollector::collect(swift::SILInstruction *I) {
       scanConformances(AEBI->getConformances());
       break;
     }
+    case ValueKind::DeallocExistentialBoxInst:
+      scanType(cast<DeallocExistentialBoxInst>(I)->getConcreteType());
+      break;
     case ValueKind::AllocRefInst:
     case ValueKind::AllocRefDynamicInst:
     case ValueKind::MetatypeInst:
@@ -390,9 +393,18 @@ void ConformanceCollector::collect(swift::SILInstruction *I) {
       scanType(VMTI->getOperand()->getType().getSwiftRValueType());
       break;
     }
-    case ValueKind::DestroyAddrInst: {
-      auto *DAI = cast<DestroyAddrInst>(I);
-      scanType(DAI->getOperand()->getType().getSwiftRValueType());
+    case ValueKind::DestroyAddrInst:
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::InjectEnumAddrInst:
+    case ValueKind::SwitchEnumAddrInst:
+    case ValueKind::SelectEnumAddrInst:
+    case ValueKind::IndexAddrInst:
+    case ValueKind::RefElementAddrInst:
+    case ValueKind::CopyAddrInst: {
+      Type Ty = I->getOperand(0)->getType().getSwiftRValueType();
+      if (Ty->hasArchetype())
+        scanType(Ty);
       break;
     }
     default:
@@ -404,7 +416,7 @@ void ConformanceCollector::collect(swift::SILInstruction *I) {
         CanSILFunctionType SubstFnTy = AS.getSubstCalleeType();
 
         scanFuncParams(OrigFnTy->getParameters(), SubstFnTy->getParameters());
-        scanFuncParams(OrigFnTy->getAllResults(), SubstFnTy->getAllResults());
+        scanFuncParams(OrigFnTy->getResults(), SubstFnTy->getResults());
 
         if (OrigFnTy->getRepresentation() ==
             SILFunctionType::Representation::WitnessMethod) {

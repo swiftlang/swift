@@ -89,6 +89,7 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::TupleExtractInst:
   case ValueKind::StructExtractInst:
   case ValueKind::UncheckedEnumDataInst:
+  case ValueKind::MarkUninitializedInst:
     return true;
   default:
     return false;
@@ -288,7 +289,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, LoadBorrow)
 CONSTANT_OWNERSHIP_INST(Trivial, false, LoadUnowned)
 CONSTANT_OWNERSHIP_INST(Trivial, false, LoadWeak)
 CONSTANT_OWNERSHIP_INST(Trivial, false, MarkFunctionEscape)
-CONSTANT_OWNERSHIP_INST(Trivial, false, MarkUninitialized)
 CONSTANT_OWNERSHIP_INST(Trivial, false, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, false, ObjCExistentialMetatypeToObject)
 CONSTANT_OWNERSHIP_INST(Trivial, false, ObjCMetatypeToObject)
@@ -378,7 +378,8 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, DynamicMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ExistentialMetatype)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBox)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefElementAddr)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(
+    false, RefElementAddr) // TODO: Make this accept a borrowed value.
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefTailAddr)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefToRawPointer)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefToUnmanaged)
@@ -447,6 +448,7 @@ FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
 FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
+FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
@@ -570,13 +572,13 @@ OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
   SILModule &M = RI->getModule();
   bool IsTrivial = RI->getOperand()->getType().isTrivial(M);
-  auto FnType = RI->getFunction()->getLoweredFunctionType();
-  auto Results = FnType->getDirectResults();
+  SILFunctionConventions fnConv = RI->getFunction()->getConventions();
+  auto Results = fnConv.getDirectSILResults();
   if (Results.empty() || IsTrivial) {
     return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
   }
 
-  CanGenericSignature Sig = FnType->getGenericSignature();
+  CanGenericSignature Sig = fnConv.funcTy->getGenericSignature();
 
   // Find the first index where we have a trivial value.
   auto Iter = find_if(Results, [&M, &Sig](const SILResultInfo &Info) -> bool {
@@ -589,10 +591,11 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
   if (Iter == Results.end())
     llvm_unreachable("Should have already checked a trivial type?!");
 
-  unsigned Index = std::distance(Results.begin(), Iter);
-  ValueOwnershipKind Base = Results[Index].getOwnershipKind(M, Sig);
+  ValueOwnershipKind Base = Iter->getOwnershipKind(M);
 
-  for (const SILResultInfo &ResultInfo : Results.slice(Index + 1)) {
+  for (const SILResultInfo &ResultInfo :
+       SILFunctionConventions::DirectSILResultRange(std::next(Iter),
+                                                    Results.end())) {
     auto RKind = ResultInfo.getOwnershipKind(M, Sig);
     // Ignore trivial types.
     if (RKind.merge(ValueOwnershipKind::Trivial))
@@ -647,12 +650,19 @@ OwnershipCompatibilityUseChecker::visitStoreBorrowInst(StoreBorrowInst *I) {
   return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
 }
 
+// FIXME: Why not use SILArgumentConvention here?
 OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitCallee(
     CanSILFunctionType SubstCalleeType) {
   ParameterConvention Conv = SubstCalleeType->getCalleeConvention();
   switch (Conv) {
   case ParameterConvention::Indirect_In:
+    assert(!SILModuleConventions(Mod).isSILIndirect(
+        SILParameterInfo(SubstCalleeType, Conv)));
+    return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
   case ParameterConvention::Indirect_In_Guaranteed:
+    assert(!SILModuleConventions(Mod).isSILIndirect(
+        SILParameterInfo(SubstCalleeType, Conv)));
+    return {compatibleWithOwnership(ValueOwnershipKind::Owned), false};
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Illegal convention for callee");

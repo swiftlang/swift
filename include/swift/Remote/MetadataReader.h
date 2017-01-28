@@ -21,7 +21,7 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Unreachable.h"
+#include "swift/Runtime/Unreachable.h"
 
 #include <vector>
 #include <unordered_map>
@@ -763,7 +763,7 @@ public:
     }
     }
 
-    swift_unreachable("Unhandled MetadataKind in switch");
+    swift_runtime_unreachable("Unhandled MetadataKind in switch");
   }
 
   BuiltType readTypeFromMangledName(const char *MangledTypeName,

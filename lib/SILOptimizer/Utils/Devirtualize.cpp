@@ -592,7 +592,8 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   }
 
   // Check if the optimizer knows how to cast the return type.
-  SILType ReturnType = SubstCalleeType->getSILResult();
+  SILType ReturnType =
+      SILFunctionConventions(SubstCalleeType, Mod).getSILResultType();
 
   if (!canCastValueToABICompatibleType(Mod, ReturnType, AI.getType()))
       return false;
@@ -624,6 +625,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   CanSILFunctionType SubstCalleeType = GenCalleeType;
   if (GenCalleeType->isPolymorphic())
     SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Subs);
+  SILFunctionConventions substConv(SubstCalleeType, Mod);
 
   SILBuilderWithScope B(AI.getInstruction());
   FunctionRefInst *FRI = B.createFunctionRef(AI.getLoc(), F);
@@ -633,30 +635,35 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   // contravariant argument types.
   llvm::SmallVector<SILValue, 8> NewArgs;
 
-  auto IndirectResultArgs = AI.getIndirectResults();
-  auto IndirectResultInfos = SubstCalleeType->getIndirectResults();
-  for (unsigned i : indices(IndirectResultArgs))
-    NewArgs.push_back(castValueToABICompatibleType(&B, AI.getLoc(),
-                              IndirectResultArgs[i],
-                              IndirectResultArgs[i]->getType(),
-                              IndirectResultInfos[i].getSILType()).getValue());
+  auto IndirectResultArgIter = AI.getIndirectSILResults().begin();
+  for (auto ResultTy : substConv.getIndirectSILResultTypes()) {
+    NewArgs.push_back(
+        castValueToABICompatibleType(&B, AI.getLoc(), *IndirectResultArgIter,
+                                     IndirectResultArgIter->getType(), ResultTy)
+            .getValue());
+    ++IndirectResultArgIter;
+  }
 
-  auto Args = AI.getArgumentsWithoutIndirectResults();
-  auto ParamTypes = SubstCalleeType->getParameterSILTypes();
-  for (unsigned i = 0, e = Args.size() - 1; i != e; ++i)
-    NewArgs.push_back(castValueToABICompatibleType(&B, AI.getLoc(), Args[i],
-                                                   Args[i]->getType(),
-                                                   ParamTypes[i]).getValue());
+  auto ParamArgIter = AI.getArgumentsWithoutIndirectResults().begin();
+  // Skip the last paramater, which is `self`. Add it below.
+  for (auto param : substConv.getParameters().drop_back()) {
+    auto paramType = substConv.getSILType(param);
+    NewArgs.push_back(
+        castValueToABICompatibleType(&B, AI.getLoc(), *ParamArgIter,
+                                     ParamArgIter->getType(), paramType)
+            .getValue());
+    ++ParamArgIter;
+  }
 
   // Add the self argument, upcasting if required because we're
   // calling a base class's method.
-  auto SelfParamTy = SubstCalleeType->getSelfParameter().getSILType();
+  auto SelfParamTy = substConv.getSILType(SubstCalleeType->getSelfParameter());
   NewArgs.push_back(castValueToABICompatibleType(&B, AI.getLoc(),
                                                  ClassOrMetatype,
                                                  ClassOrMetatypeType,
                                                  SelfParamTy).getValue());
 
-  SILType ResultTy = SubstCalleeType->getSILResult();
+  SILType ResultTy = substConv.getSILResultType();
 
   SILType SubstCalleeSILType =
     SILType::getPrimitiveObjectType(SubstCalleeType);
@@ -1001,14 +1008,13 @@ bool swift::isLegalUpcast(SILType FromTy, SILType ToTy) {
 static bool
 canPassOrConvertAllArguments(ApplySite AI,
                              CanSILFunctionType SubstCalleeCanType) {
-  for (unsigned ArgN = 0, ArgE = AI.getNumArguments(); ArgN != ArgE; ++ArgN) {
-    SILValue A = AI.getArgument(ArgN);
-    auto ParamType = SubstCalleeCanType->getSILArgumentType(
-      SubstCalleeCanType->getNumSILArguments() - AI.getNumArguments() + ArgN);
+  SILFunctionConventions substConv(SubstCalleeCanType, AI.getModule());
+  unsigned substArgIdx = AI.getCalleeArgIndexOfFirstAppliedArg();
+  for (auto arg : AI.getArguments()) {
     // Check if we can cast the provided argument into the required
     // parameter type.
-    auto FromTy = A->getType();
-    auto ToTy = ParamType;
+    auto FromTy = arg->getType();
+    auto ToTy = substConv.getSILArgumentType(substArgIdx++);
     // If types are the same, no conversion will be required.
     if (FromTy == ToTy)
       continue;
@@ -1016,6 +1022,7 @@ canPassOrConvertAllArguments(ApplySite AI,
     if (!isLegalUpcast(FromTy, ToTy))
       return false;
   }
+  assert(substArgIdx == substConv.getNumSILArguments());
   return true;
 }
 
@@ -1053,15 +1060,15 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // Iterate over the non self arguments and add them to the
   // new argument list, upcasting when required.
   SILBuilderWithScope B(AI.getInstruction());
-  for (unsigned ArgN = 0, ArgE = AI.getNumArguments(); ArgN != ArgE; ++ArgN) {
-    SILValue A = AI.getArgument(ArgN);
-    auto ParamType = SubstCalleeCanType->getSILArgumentType(
-      SubstCalleeCanType->getNumSILArguments() - AI.getNumArguments() + ArgN);
-    if (A->getType() != ParamType)
-      A = B.createUpcast(AI.getLoc(), A, ParamType);
-
-    Arguments.push_back(A);
+  SILFunctionConventions substConv(SubstCalleeCanType, Module);
+  unsigned substArgIdx = AI.getCalleeArgIndexOfFirstAppliedArg();
+  for (auto arg : AI.getArguments()) {
+    auto paramType = substConv.getSILArgumentType(substArgIdx++);
+    if (arg->getType() != paramType)
+      arg = B.createUpcast(AI.getLoc(), arg, paramType);
+    Arguments.push_back(arg);
   }
+  assert(substArgIdx == substConv.getNumSILArguments());
 
   // Replace old apply instruction by a new apply instruction that invokes
   // the witness thunk.
@@ -1070,7 +1077,7 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
 
   auto SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeCanType);
-  auto ResultSILType = SubstCalleeCanType->getSILResult();
+  auto ResultSILType = substConv.getSILResultType();
   ApplySite SAI;
 
   if (auto *A = dyn_cast<ApplyInst>(AI))

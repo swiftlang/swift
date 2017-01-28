@@ -373,6 +373,12 @@ static int compareDependentTypes(
   if (a->isGenericParam() != b->isGenericParam())
     return a->isGenericParam() ? -1 : +1;
 
+  // Typealiases must be ordered *after* everything else, to ensure they
+  // don't become representatives in the case where a typealias is equated
+  // with an associated type.
+  if (!!a->getTypeAliasDecl() != !!b->getTypeAliasDecl())
+    return a->getTypeAliasDecl() ? +1 : -1;
+
   // - Dependent members
   auto ppa = a->getParent();
   auto ppb = b->getParent();
@@ -411,27 +417,22 @@ static int compareDependentTypes(
   // Make sure typealiases are properly ordered, to avoid crashers.
   // FIXME: Ideally we would eliminate typealiases earlier.
   if (auto *aa = a->getTypeAliasDecl()) {
-    if (auto *ab = b->getTypeAliasDecl()) {
-      // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
-      auto protoa =
-        aa->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-      auto protob =
-        ab->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+    auto *ab = b->getTypeAliasDecl();
+    assert(ab != nullptr && "Should have handled this case above");
 
-      if (int compareProtocols
-            = ProtocolType::compareProtocols(&protoa, &protob))
-        return compareProtocols;
+    // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
+    auto protoa =
+      aa->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+    auto protob =
+      ab->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
 
-      // FIXME: Arbitrarily break the result here.
-      if (aa != ab)
-        return aa < ab ? -1 : +1;
-    } else {
-      // A resolved archetype is always ordered before an unresolved one.
-      return -1;
-    }
-  } else if (b->getTypeAliasDecl()) {
-    // A resolved archetype is always ordered before an unresolved one.
-    return +1;
+    if (int compareProtocols
+          = ProtocolType::compareProtocols(&protoa, &protob))
+      return compareProtocols;
+
+    // FIXME: Arbitrarily break the result here.
+    if (aa != ab)
+      return aa < ab ? -1 : +1;
   }
 
   // Along the error path where one or both of the potential archetypes was
@@ -533,8 +534,6 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
           continue;
 
         auto type = alias->getDeclaredInterfaceType();
-        SmallVector<Identifier, 4> identifiers;
-
         if (auto existingPA = builder.resolveArchetype(type)) {
           builder.addSameTypeRequirementBetweenArchetypes(pa, existingPA,
                                                           redundantSource);

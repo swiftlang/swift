@@ -51,7 +51,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   // If the original method has an @autoreleased return, the partial application
   // thunk will retain it for us, converting the return value to @owned.
   SmallVector<SILResultInfo, 4> results;
-  results.append(FTI->getAllResults().begin(), FTI->getAllResults().end());
+  results.append(FTI->getResults().begin(), FTI->getResults().end());
   for (auto &result : results) {
     if (result.getConvention() == ResultConvention::UnownedInnerPointer)
       result = SILResultInfo(result.getType(), ResultConvention::Unowned);

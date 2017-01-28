@@ -2403,11 +2403,12 @@ void ClangImporter::printStatistics() const {
 
 void ClangImporter::verifyAllModules() {
 #ifndef NDEBUG
-  if (Impl.ImportCounter == Impl.VerifiedImportCounter)
+  if (Impl.VerifiedDeclsCounter == Impl.ImportedDecls.size())
     return;
 
   // Collect the Decls before verifying them; the act of verifying may cause
   // more decls to be imported and modify the map while we are iterating it.
+  size_t verifiedCounter = Impl.ImportedDecls.size();
   SmallVector<Decl *, 8> Decls;
   for (auto &I : Impl.ImportedDecls)
     if (I.first.second == Impl.CurrentVersion)
@@ -2417,7 +2418,7 @@ void ClangImporter::verifyAllModules() {
   for (auto D : Decls)
     verify(D);
 
-  Impl.VerifiedImportCounter = Impl.ImportCounter;
+  Impl.VerifiedDeclsCounter = verifiedCounter;
 #endif
 }
 

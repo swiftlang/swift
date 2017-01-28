@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 307; // Last change: layout requirements
+const uint16_t VERSION_MINOR = 308; // Last change: nested type table
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -1463,7 +1463,8 @@ namespace index_block {
     SIL_LAYOUT_OFFSETS,
 
     PRECEDENCE_GROUPS,
-    
+    NESTED_TYPE_DECLS,
+
     LastRecordKind = PRECEDENCE_GROUPS,
   };
   
@@ -1492,6 +1493,12 @@ namespace index_block {
     OBJC_METHODS,  // record ID
     BCVBR<16>,     // table offset within the blob (see below)
     BCBlob         // map from Objective-C selectors to methods with that selector
+  >;
+
+  using NestedTypeDeclsLayout = BCRecordLayout<
+    NESTED_TYPE_DECLS, // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from identifier strings to decl kinds / decl IDs
   >;
 
   using EntryPointLayout = BCRecordLayout<

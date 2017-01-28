@@ -298,9 +298,8 @@ private:
   /// FIXME: Horrible, horrible hack for \c loadModule().
   unsigned ImportCounter = 0;
 
-  /// \brief The value of \c ImportCounter last time when imported modules were
-  /// verified.
-  unsigned VerifiedImportCounter = 0;
+  /// \brief Used to avoid running the AST verifier over the same declarations.
+  size_t VerifiedDeclsCounter = 0;
 
   /// \brief Clang compiler invocation.
   std::shared_ptr<clang::CompilerInvocation> Invocation;
@@ -995,6 +994,9 @@ public:
   /// \param clangDecl The underlying declaration.
   /// \param isFromSystemModule Whether to apply special rules that only apply
   ///   to system APIs.
+  /// \param importedName How to import the name of the method. This is still
+  ///   important to satisfy the AST verifier, even though the method is an
+  ///   accessor.
   /// \param[out] params The patterns visible inside the function body.
   ///
   /// \returns the imported function type, or null if the type cannot be
@@ -1003,6 +1005,7 @@ public:
                                 const clang::ObjCPropertyDecl *property,
                                 const clang::ObjCMethodDecl *clangDecl,
                                 bool isFromSystemModule,
+                                importer::ImportedName importedName,
                                 ParameterList **params);
 
   /// \brief Determine whether the given typedef-name is "special", meaning

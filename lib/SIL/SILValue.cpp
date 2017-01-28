@@ -221,7 +221,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, IsNonnull)
 CONSTANT_OWNERSHIP_INST(Trivial, IsUnique)
 CONSTANT_OWNERSHIP_INST(Trivial, IsUniqueOrPinned)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkFunctionEscape)
-CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitialized)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, Metatype)
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCProtocol)           // Is this right?
@@ -406,6 +405,7 @@ FORWARDING_OWNERSHIP_INST(Tuple)
 FORWARDING_OWNERSHIP_INST(UncheckedRefCast)
 FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
+FORWARDING_OWNERSHIP_INST(MarkUninitialized)
 #undef FORWARDING_OWNERSHIP_INST
 
 ValueOwnershipKind
@@ -471,7 +471,8 @@ ValueOwnershipKind
 ValueOwnershipKindVisitor::visitApplyInst(ApplyInst *AI) {
   SILModule &M = AI->getModule();
   bool IsTrivial = AI->getType().isTrivial(M);
-  auto Results = AI->getSubstCalleeType()->getDirectResults();
+  SILFunctionConventions fnConv(AI->getSubstCalleeType(), M);
+  auto Results = fnConv.getDirectSILResults();
   // No results => empty tuple result => Trivial.
   if (Results.empty() || IsTrivial)
     return ValueOwnershipKind::Trivial;
@@ -485,10 +486,11 @@ ValueOwnershipKindVisitor::visitApplyInst(ApplyInst *AI) {
   if (Iter == Results.end())
     return ValueOwnershipKind::Trivial;
 
-  unsigned Index = std::distance(Results.begin(), Iter);
-  ValueOwnershipKind Base = Results[Index].getOwnershipKind(M, Sig);
+  ValueOwnershipKind Base = Iter->getOwnershipKind(M);
 
-  for (const SILResultInfo &ResultInfo : Results.slice(Index+1)) {
+  for (const SILResultInfo &ResultInfo :
+       SILFunctionConventions::DirectSILResultRange(next(Iter),
+                                                    Results.end())) {
     auto RKind = ResultInfo.getOwnershipKind(M, Sig);
     if (RKind.merge(ValueOwnershipKind::Trivial))
       continue;

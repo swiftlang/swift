@@ -99,8 +99,9 @@ bool swift::ArraySemanticsCall::isValidSignature() {
     return true;
   }
   case ArrayCallKind::kWithUnsafeMutableBufferPointer: {
-    if (SemanticsCall->getOrigCalleeType()->getNumIndirectResults() != 1 ||
-        SemanticsCall->getNumArguments() != 3)
+    SILFunctionConventions origConv(SemanticsCall->getOrigCalleeType(), Mod);
+    if (origConv.getNumIndirectSILResults() != 1
+        || SemanticsCall->getNumArguments() != 3)
       return false;
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Indirect_Inout;
@@ -198,7 +199,7 @@ bool swift::ArraySemanticsCall::hasGetElementDirectResult() const {
   assert(getKind() == ArrayCallKind::kGetElement &&
          "must be an array.get_element call");
   bool DirectResult =
-    (SemanticsCall->getOrigCalleeType()->getNumIndirectResults() == 0);
+      (SemanticsCall->getOrigCalleeConv().getNumIndirectSILResults() == 0);
   assert((DirectResult && SemanticsCall->getNumArguments() == 4 ||
           !DirectResult && SemanticsCall->getNumArguments() == 5) &&
          "wrong number of array.get_element call arguments");

@@ -34,7 +34,7 @@ bool isNotAliasingArgument(SILValue V, InoutAliasingAssumption isInoutAliasing =
 /// object.
 /// The \p assumeInoutIsNotAliasing specifies in no-aliasing is assumed for
 /// the @inout convention. See swift::isNotAliasedIndirectParameter().
-  bool pointsToLocalObject(SILValue V, InoutAliasingAssumption isInoutAliasing =
+bool pointsToLocalObject(SILValue V, InoutAliasingAssumption isInoutAliasing =
                                          InoutAliasingAssumption::Aliasing);
 
 enum class IsZeroKind {

@@ -66,11 +66,20 @@ enum ReferencedFromFunctionEnum {
   case g((ReferencedFromFunctionStruct) -> ())
 }
 
-// CHECK-LABEL: sil hidden @_T05types34referencedFromFunctionStructFieldsyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF
-// CHECK:         [[F:%.*]] = struct_extract [[X:%.*]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.f
-// CHECK:         [[F]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()
-// CHECK:         [[G:%.*]] = struct_extract [[X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.g
-// CHECK:         [[G]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()
+// CHECK-LABEL: sil hidden @_T05types34referencedFromFunctionStructFieldsyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF{{.*}} : $@convention(thin) (@owned ReferencedFromFunctionStruct) -> (@owned @callee_owned (@owned ReferencedFromFunctionStruct) -> (), @owned @callee_owned (@owned ReferencedFromFunctionEnum) -> ()) {
+// CHECK: bb0([[X:%.*]] : $ReferencedFromFunctionStruct):
+// CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
+// CHECK:   [[F:%.*]] = struct_extract [[BORROWED_X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.f
+// CHECK:   [[COPIED_F:%.*]] = copy_value [[F]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()
+// CHECK:   [[BORROWED_X_2:%.*]] = begin_borrow [[X]]
+// CHECK:   [[G:%.*]] = struct_extract [[BORROWED_X_2]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.g
+// CHECK:   [[COPIED_G:%.*]] = copy_value [[G]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()
+// CHECK:   end_borrow [[BORROWED_X_2]] from [[X]]
+// CHECK:   end_borrow [[BORROWED_X]] from [[X]]
+// CHECK:   destroy_value [[X]]
+// CHECK:   [[RESULT:%.*]] = tuple ([[COPIED_F]] : {{.*}}, [[COPIED_G]] : {{.*}})
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function '_T05types34referencedFromFunctionStructFieldsyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF'
 func referencedFromFunctionStructFields(_ x: ReferencedFromFunctionStruct)
     -> ((ReferencedFromFunctionStruct) -> (), (ReferencedFromFunctionEnum) -> ()) {
   return (x.f, x.g)

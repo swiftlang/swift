@@ -457,11 +457,11 @@ bool CopyForwarding::collectUsers() {
       /// object. However, we can rely on a subsequent mark_dependent
       /// instruction to take that object as an operand, causing it to escape
       /// for the purpose of this analysis.
-      assert(Apply->getSubstCalleeType()
-                 ->getSILArgumentConvention(UI->getOperandNumber() -
-                                            Apply->getArgumentOperandNumber())
-                 .isIndirectConvention() &&
-             "copy_addr location should be passed indirect");
+      assert(Apply->getSubstCalleeConv()
+                 .getSILArgumentConvention(UI->getOperandNumber()
+                                           - Apply->getArgumentOperandNumber())
+                 .isIndirectConvention()
+             && "copy_addr location should be passed indirect");
       SrcUserInsts.insert(Apply);
       continue;
     }
