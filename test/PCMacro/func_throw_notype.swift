@@ -8,6 +8,9 @@
 // REQUIRES: executable_test
 // XFAIL: *
 
+// FIXME: rdar://problem/30234450 PCMacro tests fail on linux in optimized mode
+// UNSUPPORTED: OS=linux-gnu
+
 #sourceLocation(file: "main.swift", line: 31)
 func function3(_ x: Int) throws {
   

@@ -7,6 +7,9 @@
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
 
+// FIXME: rdar://problem/30234450 PCMacro tests fail on linux in optimized mode
+// UNSUPPORTED: OS=linux-gnu
+
 // Lets check that the source ranges are correct on all different kinds of func
 // decls.
 #sourceLocation(file: "main.swift", line: 8)

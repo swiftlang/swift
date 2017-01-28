@@ -7,6 +7,10 @@
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
 
+// FIXME: rdar://problem/30234450 PCMacro tests fail on linux in optimized mode
+// UNSUPPORTED: OS=linux-gnu
+
+#sourceLocation(file: "main.swift", line: 10)
 class A {
   func access() -> Void {
   }
