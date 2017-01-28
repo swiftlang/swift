@@ -252,3 +252,18 @@ func test2() {
   var c: Int = 4 // expected-warning {{variable 'c' was never used; consider replacing with '_' or removing it}} {{7-8=_}}
   let (d): Int = 9 // expected-warning {{immutable value 'd' was never used; consider replacing with '_' or removing it}} {{8-9=_}}
 }
+
+for i in 0..<10 { // expected-warning {{immutable value 'i' was never used; consider replacing with '_' or removing it}} {{5-6=_}}
+   print("")
+}
+
+
+let optionalString: String? = "check"
+if let string = optionalString {}  // expected-warning {{value 'string' was defined but never used; consider replacing with boolean test}} {{4-17=}} {{31-31= != nil}}
+
+var unNeededVar = false // expected-warning {{variable 'unNeededVar' was never mutated; consider changing to 'let' constant}} {{1-4=let}}
+if unNeededVar {}
+
+let optionalAny: Any? = "check"
+if let string = optionalAny as? String {} // expected-warning {{value 'string' was defined but never used; consider replacing with boolean test}} {{4-17=(}} {{39-39=) != nil}}
+

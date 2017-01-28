@@ -22,8 +22,10 @@
 
 namespace swift {
   class AbstractFunctionDecl;
+  class TopLevelCodeDecl;
   class ApplyExpr;
   class CallExpr;
+  class Decl;
   class DeclContext;
   class Expr;
   class InFlightDiagnostic;
@@ -41,6 +43,8 @@ void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
 void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
                                         AbstractFunctionDecl *AFD);
+
+void performTopLevelDeclDiagnostics(TypeChecker &TC, ArrayRef<Decl*> topLevel);
   
 /// Emit a fix-it to set the accessibility of \p VD to \p desiredAccess.
 ///
