@@ -69,34 +69,44 @@ extension ParsedUnicode : BidirectionalCollection {
   }
 
   public func index(after i: Index) -> Index {
-    let remainder = codeUnits[i.next..<codeUnits.endIndex]
-    switch Encoding.parse1Forward(remainder, knownCount: 0) {
-    case .valid(let scalar, let nextIndex):
-      return Index(base:i.next, next: nextIndex, scalar: scalar)
-    case .error(let nextIndex):
-      // FIXME: don't go through UnicodeScalar once this is in the stdlib
-      let replacement = UTF32.EncodedScalar(UnicodeScalar(0xFFFD)!)
-      return Index(
-        base:i.next, next: nextIndex,
-        scalar: Encoding.transcodeScalar(replacement))
-    case .emptyInput:
-      return endIndex
+    var remainder = codeUnits[i.next..<codeUnits.endIndex]
+    while true {
+      switch Encoding.parse1Forward(remainder, knownCount: 0) {
+      case .valid(let scalar, let nextIndex):
+        return Index(base:i.next, next: nextIndex, scalar: scalar)
+      case .error(let nextIndex):
+        // FIXME: don't go through UnicodeScalar once this is in the stdlib
+        if let replacement = Encoding.encode(
+          UTF32.EncodedScalar(UnicodeScalar(0xFFFD)!)) {
+          return Index(
+            base:i.next, next: nextIndex,
+            scalar: replacement)
+        }
+        remainder = remainder.dropFirst()
+      case .emptyInput:
+        return endIndex
+      }
     }
   }
 
   public func index(before i: Index) -> Index {
-    let remainder = codeUnits[codeUnits.startIndex..<i.base]
-    switch Encoding.parse1Reverse(remainder, knownCount: 0) {
-    case .valid(let scalar, let priorIndex):
-      return Index(base: priorIndex, next: i.base, scalar: scalar)
-    case .error(let priorIndex):
-      // FIXME: don't go through UnicodeScalar once this is in the stdlib
-      let replacement = UTF32.EncodedScalar(UnicodeScalar(0xFFFD)!)
-      return Index(
-        base: priorIndex, next: i.base, 
-        scalar: Encoding.transcodeScalar(replacement))
-    case .emptyInput:
-      fatalError("Indexing past start of code units")
+    var remainder = codeUnits[codeUnits.startIndex..<i.base]
+    while true {
+      switch Encoding.parse1Reverse(remainder, knownCount: 0) {
+      case .valid(let scalar, let priorIndex):
+        return Index(base: priorIndex, next: i.base, scalar: scalar)
+      case .error(let priorIndex):
+        // FIXME: don't go through UnicodeScalar once this is in the stdlib
+        if let replacement = Encoding.encode(
+          UTF32.EncodedScalar(UnicodeScalar(0xFFFD)!)) {
+          return Index(
+            base: priorIndex, next: i.base, 
+            scalar: replacement)        
+        }
+        remainder = remainder.dropLast()
+      case .emptyInput:
+        fatalError("Indexing past start of code units")
+      }
     }
   }
 }
@@ -142,7 +152,7 @@ extension TranscodedView : BidirectionalCollection {
     to dst: ToEncoding.Type = ToEncoding.self
   ) {
     base = Base(ParsedUnicode(codeUnits, src).lazy.map {
-        dst.transcodeScalar($0)
+        dst.encode($0)!
       })
   }
   public func index(after i: Base.Index) -> Base.Index {
@@ -205,7 +215,7 @@ protocol UnicodeStorage {
   var extendedASCII: ExtendedASCII {get}
 
   associatedtype Characters : BidirectionalCollection
-  /* where ExtendedASCII.Iterator.Element == UInt32 */
+  /* where Characters.Iterator.Element == Character */
   var characters: Characters { get }
   
   func contentWidth(knownWithoutScanning: Bool/* = false*/) -> UInt32
@@ -216,9 +226,54 @@ protocol UnicodeStorage {
 
 extension UnicodeStorage
 where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element {
-  
 }
+
+struct Latin1Storage<Base : RandomAccessCollection> : UnicodeStorage
+where Base.Iterator.Element == UInt8, Base.Index == Base.SubSequence.Index,
+Base.SubSequence.SubSequence == Base.SubSequence,
+Base.Iterator.Element == UInt8,
+Base.SubSequence.Iterator.Element == Base.Iterator.Element
+{
+  typealias Encoding = Latin1
+  typealias CodeUnits = Base
+  /* where CodeUnits.Iterator.Element == Encoding.CodeUnit */
+  let codeUnits: CodeUnits
   
+  typealias ValidUTF8View = TranscodedView<CodeUnits, Encoding, UTF8>
+  var utf8: ValidUTF8View { return ValidUTF8View(codeUnits) }
+  
+  typealias ValidUTF16View = TranscodedView<CodeUnits, Encoding, UTF16>
+  var utf16: ValidUTF16View { return ValidUTF16View(codeUnits) }
+  
+  typealias ValidUTF32View = TranscodedView<CodeUnits, Encoding, UTF32>
+  var utf32: ValidUTF32View { return ValidUTF32View(codeUnits) }
+  
+  typealias ExtendedASCII = LazyMapRandomAccessCollection<CodeUnits, UInt32>
+  var extendedASCII: ExtendedASCII {
+    return ExtendedASCII(codeUnits) { ()UInt32($0) }
+  }
+
+  typealias Characters = LazyMapRandomAccessCollection<CodeUnits, Character>
+  var characters: Characters {
+    return Characters(codeUnits) {
+      Character(scalar: UnicodeScalar(UInt32($0))!)
+    }
+  }
+  
+  func contentWidth(knownWithoutScanning: Bool = false) -> UInt32 {
+    return 1 << 8
+  }
+  func isNormalizedNFC(knownWithoutScanning: Bool = false) -> Bool {
+    return true
+  }
+  func isNormalizedNFD(knownWithoutScanning: Bool = false) -> Bool {
+    return true
+  }
+  func isInFastCOrDForm(knownWithoutScanning: Bool = false) -> Bool {
+    return true
+  }
+}
+
 /*
 print(s32.count, s16to32.count)
 for (n, (x, y)) in zip(s32, s16to32).enumerated() {

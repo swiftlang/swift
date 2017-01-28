@@ -127,10 +127,9 @@ public protocol UnicodeEncoding : AnyUnicodeEncoding {
   associatedtype EncodedScalar : EncodedScalarProtocol
   // where Iterator.Element : UnsignedInteger
 
-  /// Provide a means to produce a scalar of this encoding from any other
-  /// encoding
-  static func transcodeScalar<T: EncodedScalarProtocol>(
-    _:T) -> Self.EncodedScalar
+  /// Produces a scalar of this encoding if possible; returns `nil` otherwise.
+  static func encode<Scalar: EncodedScalarProtocol>(
+    _:Scalar) -> Self.EncodedScalar?
   
   /// Parse a single unicode scalar forward from `input`.
   ///
@@ -309,7 +308,9 @@ extension UnicodeEncoding {
       s in 
       let u32 = s.utf32.first!
       isASCII = isASCII && (u32 <= 0x7f)
-      count += numericCast(EncodedScalar(UnicodeScalar(u32)!).count)
+      if let encoded = EncodedScalar(UnicodeScalar(u32)!) {
+        count += numericCast(encoded.count)
+      }
     }
 
     if errorCount != 0 && !makeRepairs { return nil }
@@ -501,8 +502,8 @@ public enum UTF8 : UnicodeEncoding {
     return x & (0b11111 >> (x >> 5 & 1))
   }
   
-  public static func transcodeScalar<T: EncodedScalarProtocol>(
-    _ other:T) -> UTF8.EncodedScalar {
+  public static func encode<T: EncodedScalarProtocol>(
+    _ other:T) -> UTF8.EncodedScalar? {
     return other.utf8
   }
 
@@ -748,9 +749,9 @@ public enum ValidUTF8 : UnicodeEncoding {
     return UTF8.maxLengthOfEncodedScalar
   }
 
-  public static func transcodeScalar<T: EncodedScalarProtocol>(
-    _ other:T) -> ValidUTF8.EncodedScalar {
-    // FIXME: validity? May need to substitute for invalid forms?
+  public static func encode<Scalar: EncodedScalarProtocol>(
+    _ other: Scalar
+  ) -> ValidUTF8.EncodedScalar? {
     return other.utf8
   }
 
@@ -837,7 +838,7 @@ public enum ValidUTF8 : UnicodeEncoding {
 
 
 public protocol EncodedScalarProtocol : RandomAccessCollection {
-  init(_ scalarValue: UnicodeScalar)
+  init?(_ scalarValue: UnicodeScalar)
   var utf8: UTF8.EncodedScalar { get }
   var utf16: UTF16.EncodedScalar { get }
   var utf32: UTF32.EncodedScalar { get }
@@ -875,8 +876,9 @@ public enum UTF16 : UnicodeEncoding {
     return 0x10000 + ((UInt32(unit0 & 0x03ff) << 10) | UInt32(unit1 & 0x03ff))
   }
   
-  public static func transcodeScalar<T: EncodedScalarProtocol>(
-    _ other:T) -> UTF16.EncodedScalar {
+  public static func encode<T: EncodedScalarProtocol>(
+    _ other:T
+  ) -> UTF16.EncodedScalar? {
     return other.utf16
   }
 
@@ -1013,9 +1015,9 @@ public enum ValidUTF16 : UnicodeEncoding {
     return UTF16.maxLengthOfEncodedScalar
   }
   
-  public static func transcodeScalar<T: EncodedScalarProtocol>(
-    _ other:T) -> ValidUTF16.EncodedScalar {
-    // FIXME: validity? May need to substitute for invalid forms?
+  public static func encode<Scalar : EncodedScalarProtocol>(
+    _ other: Scalar
+  ) -> ValidUTF16.EncodedScalar? {
     return other.utf16
   }
 
@@ -1082,8 +1084,9 @@ public enum UTF32 : UnicodeEncoding {
     return u <= 0xD7FF || 0xE000...0x10FFFF ~= u
   }
   
-  public static func transcodeScalar<T: EncodedScalarProtocol>(
-    _ other:T) -> UTF32.EncodedScalar {
+  public static func encode<Scalar : EncodedScalarProtocol>(
+    _ other: Scalar
+  ) -> UTF32.EncodedScalar? {
     return other.utf32
   }
 
@@ -1180,5 +1183,64 @@ extension UTF32.EncodedScalar : EncodedScalarProtocol {
   }
   public var utf32: UTF32.EncodedScalar {
     return self
+  }
+}
+
+public enum Latin1 : UnicodeEncoding {
+  public static var maxLengthOfEncodedScalar: UInt { return 1 }
+  
+  /// A type that can represent a single UnicodeScalar as it is encoded in this
+  /// encoding.
+  public struct EncodedScalar : EncodedScalarProtocol {
+    public init?(_ value: UnicodeScalar) {
+      guard value.value <= 0xff else { return nil }
+      self.value = UInt8(value.value)
+    }
+    init(_ value: UInt8) {
+      self.value = value
+    }
+    public var startIndex : UInt8 {
+      return 0
+    }
+    public var endIndex : UInt8 {
+      return 1
+    }
+    public subscript(i: UInt8) -> UInt8 {
+      return value
+    }
+    let value: UInt8
+    
+    public var utf8 : UTF8.EncodedScalar { return UTF8.EncodedScalar(value) }
+    public var utf16 : UTF16.EncodedScalar { return UTF16.EncodedScalar(UInt16(value)) }
+    public var utf32 : UTF32.EncodedScalar { return UTF32.EncodedScalar(UInt32(value)) }
+  }
+  
+  public static func encode<Scalar: EncodedScalarProtocol>(
+    _ s: Scalar
+  ) -> EncodedScalar? {
+    let u32 = s.utf32.first!
+    return u32 <= 0xff ? EncodedScalar(UInt8(u32)) : nil
+  }
+  
+  /// Parse a single unicode scalar forward from `input`.
+  public static func parse1Forward<C: Collection>(
+    _ input: C, knownCount: Int /* = 0 */
+  ) -> ParseResult<EncodedScalar, C.Index>
+  where C.Iterator.Element == EncodedScalar.Iterator.Element {
+    return input.isEmpty ? .emptyInput : .valid(
+      EncodedScalar(input.first!),
+      resumptionPoint: input.index(after: input.startIndex))
+  }
+
+  public static func parse1Reverse<C: BidirectionalCollection>(
+    _ input: C, knownCount: Int/* = 0 */
+  ) -> ParseResult<EncodedScalar, C.Index>
+  where C.Iterator.Element == EncodedScalar.Iterator.Element,
+  // FIXME: drop these constraints once we have the compiler features.
+  C.SubSequence.Index == C.Index,
+  C.SubSequence.Iterator.Element == C.Iterator.Element {
+    return input.isEmpty ? .emptyInput : .valid(
+      EncodedScalar(input.last!),
+      resumptionPoint: input.index(before: input.endIndex))
   }
 }

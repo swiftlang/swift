@@ -40,7 +40,7 @@ public struct TranscodedView<FromEncoding: UnicodeEncoding,
   // TODO: should the return type be a parse result? code units? scalar? buffer?
   public subscript(_ i: Index) -> ToEncoding.EncodedScalar {
     let (value, _) = parseForward(i)
-    return ToEncoding.transcodeScalar(value)
+    return ToEncoding.encode(value)!
   }
   public func index(after i: Index) -> Index {
     // TODO: better if there was a faster `scan1Forward` etc.
