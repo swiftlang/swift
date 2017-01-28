@@ -22,7 +22,7 @@ func assigninout<T>(_ a: inout T, _ b: T) {
 // ---
 // CHECK-LABEL: sil hidden @_TF20opaque_values_silgen15materializeSelfuRxs9AnyObjectxS_3FoorFT1tx_T_ : $@convention(thin) <T where T : AnyObject, T : Foo> (@owned T) -> () {
 // CHECK: bb0(%0 : $T):
-// CHECK: witness_method $T, #Foo.foo!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
+// CHECK: witness_method $T, #Foo.foo!1 : <Self where Self : Foo> (Self) -> () -> () : $@convention(witness_method) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
 // CHECK: apply %{{[0-9]+}}<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
 // CHECK: destroy_value %0 : $T
 // CHECK: return %{{[0-9]+}} : $()
