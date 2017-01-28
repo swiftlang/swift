@@ -30,6 +30,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
@@ -43,19 +44,35 @@ class SubstitutionMap {
   using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
 
   llvm::DenseMap<SubstitutableType *, Type> subMap;
-  llvm::DenseMap<TypeBase *, ArrayRef<ProtocolConformanceRef>> conformanceMap;
+  llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>>
+    conformanceMap;
   llvm::DenseMap<TypeBase *, SmallVector<ParentType, 1>> parentMap;
 
-  Optional<ProtocolConformanceRef>
-  lookupConformance(ProtocolDecl *proto,
-                    ArrayRef<ProtocolConformanceRef> conformances) const;
+  // Call the given function for each parent of the given type. The
+  // function \c fn should return an \c Optional<T>. \c forEachParent() will
+  // return the first non-empty \C Optional<T> returned by \c fn.
+  template<typename T>
+  Optional<T> forEachParent(
+                CanType type,
+                llvm::SmallPtrSetImpl<CanType> &visitedParents,
+                llvm::function_ref<Optional<T>(CanType,
+                                               AssociatedTypeDecl *)> fn) const;
 
-  template<typename Fn>
-  Optional<ProtocolConformanceRef> forEachParent(CanType type, Fn fn) const;
+  // Call the given function for each conformance of the given type. The
+  // function \c fn should return an \c Optional<T>. \c forEachConformance()
+  // will return the first non-empty \C Optional<T> returned by \c fn.
+  template<typename T>
+  Optional<T> forEachConformance(
+                  CanType type,
+                  llvm::SmallPtrSetImpl<CanType> &visitedParents,
+                  llvm::function_ref<Optional<T>(ProtocolConformanceRef)> fn)
+                const;
 
 public:
   Optional<ProtocolConformanceRef>
-  lookupConformance(CanType type, ProtocolDecl *proto) const;
+  lookupConformance(
+                CanType type, ProtocolDecl *proto,
+                llvm::SmallPtrSetImpl<CanType> *visitedParents = nullptr) const;
 
   const llvm::DenseMap<SubstitutableType *, Type> &getMap() const {
     return subMap;
@@ -66,7 +83,7 @@ public:
 
   void addSubstitution(CanSubstitutableType type, Type replacement);
 
-  void addConformances(CanType type, ArrayRef<ProtocolConformanceRef> conformances);
+  void addConformance(CanType type, ProtocolConformanceRef conformance);
 
   void addParent(CanType type, CanType parent,
                  AssociatedTypeDecl *assocType);
@@ -94,6 +111,11 @@ public:
                            GenericSignature *derivedSig,
                            Optional<SubstitutionMap> derivedSubs,
                            LazyResolver *resolver);
+
+  /// Dump the contents of this substitution map for debugging purposes.
+  void dump(llvm::raw_ostream &out) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in the debugger");
 };
 
 } // end namespace swift

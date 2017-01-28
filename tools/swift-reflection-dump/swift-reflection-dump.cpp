@@ -58,8 +58,7 @@ Action(llvm::cl::desc("Mode:"),
                     "Dump the field reflection section"),
          clEnumValN(ActionType::DumpTypeLowering,
                     "dump-type-lowering",
-                    "Dump the field layout for typeref strings read from stdin"),
-         clEnumValEnd),
+                    "Dump the field layout for typeref strings read from stdin")),
        llvm::cl::init(ActionType::DumpReflectionSections));
 
 static llvm::cl::list<std::string>

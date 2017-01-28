@@ -288,6 +288,58 @@ endif()
 # End of user-configurable options.
 #
 
+# Look for either a program in execute_process()'s path or for a hardcoded path.
+# Find a program's version and set it in the parent scope.
+# Replace newlines with spaces so it prints on one line.
+function(find_version cmd flag find_in_path)
+  if(find_in_path)
+    message(STATUS "Finding installed version for: ${cmd}")
+  else()
+    message(STATUS "Finding version for: ${cmd}")
+  endif()
+  execute_process(
+    COMMAND ${cmd} ${flag}
+    OUTPUT_VARIABLE out
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT out)
+    if(find_in_path)
+      message(STATUS "tried to find version for ${cmd}, but ${cmd} not found in path, continuing")
+    else()
+      message(FATAL_ERROR "tried to find version for ${cmd}, but ${cmd} not found")
+    endif()
+  else()
+    string(REPLACE "\n" " " out2 ${out})
+    message(STATUS "Found version: ${out2}")
+  endif()
+  message(STATUS "")
+endfunction()
+
+# Print out path and version of any installed commands.
+# We migth be using the wrong version of a command, so record them all.
+function(print_versions)
+  find_version("cmake" "--version" TRUE)
+  find_version(${CMAKE_COMMAND} "--version" FALSE)
+
+  if(CMAKE_MAKE_PROGRAM MATCHES "ninja")
+    find_version("ninja" "--version" TRUE)
+    find_version(${CMAKE_MAKE_PROGRAM} "--version" FALSE)
+  elseif(CMAKE_MAKE_PROGRAM MATCHES "make")
+    find_version("make" "--version" TRUE)
+    find_version(${CMAKE_MAKE_PROGRAM} "--version" FALSE)
+  endif()
+
+  if(${SWIFT_PATH_TO_CMARK_BUILD})
+    find_version("cmark" "--version" TRUE)
+    find_version("${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark" "--version" FALSE)
+  endif()
+
+  find_version(${CMAKE_C_COMPILER} "--version" FALSE)
+  find_version(${CMAKE_CXX_COMPILER} "--version" FALSE)
+endfunction()
+
+print_versions()
+
+
 set(SWIFT_BUILT_STANDALONE FALSE)
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
   set(SWIFT_BUILT_STANDALONE TRUE)
@@ -450,6 +502,8 @@ else()
     set(SWIFT_HOST_VARIANT_SDK_default "FREEBSD")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
     set(SWIFT_HOST_VARIANT_SDK_default "CYGWIN")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    set(SWIFT_HOST_VARIANT_SDK_default "WINDOWS")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set(SWIFT_HOST_VARIANT_SDK_default "OSX")
   else()
@@ -476,6 +530,12 @@ else()
     set(SWIFT_HOST_VARIANT_ARCH_default "armv6")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv7l")
     set(SWIFT_HOST_VARIANT_ARCH_default "armv7")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
+    set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "IA64")
+    set(SWIFT_HOST_VARIANT_ARCH_default "itanium")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86")
+    set(SWIFT_HOST_VARIANT_ARCH_default "i686")
   else()
     message(FATAL_ERROR "Unrecognized architecture on host system: ${CMAKE_SYSTEM_PROCESSOR}")
   endif()
@@ -581,12 +641,17 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
 
   # set(CMAKE_EXECUTABLE_FORMAT "ELF")
-  set(SWIFT_HOST_VARIANT "windows" CACHE STRING
-      "Deployment OS for Swift host tools (the compiler) [windows].")
+  set(SWIFT_HOST_VARIANT "cygwin" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [cygwin].")
 
-  configure_sdk_unix(CYGWIN "Cygwin" "windows" "cygwin" "windows" "x86_64-unknown-windows-cygnus" "/")
-  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+  configure_sdk_unix(CYGWIN "Cygwin" "cygwin" "cygwin" "x86_64" "x86_64-unknown-windows-cygnus" "/")
+  set(SWIFT_PRIMARY_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+  configure_sdk_windows(WINDOWS "Windows" "msvc" "${SWIFT_HOST_VARIANT_ARCH}")
+  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 
 elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
 
@@ -731,7 +796,7 @@ endif()
 
 # Should we cross-compile the standard library for Windows?
 is_sdk_requested(WINDOWS swift_build_windows)
-if(swift_build_windows)
+if(swift_build_windows AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   configure_sdk_windows(WINDOWS "Windows" "msvc" i686)
 endif()
 
@@ -795,6 +860,13 @@ message(STATUS "")
 message(STATUS "Building Swift runtime with:")
 message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
 message(STATUS "")
+
+#
+# Find required dependencies.
+#
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND "${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
+  find_package(ICU REQUIRED COMPONENTS uc i18n)
+endif()
 
 #
 # Find optional dependencies.

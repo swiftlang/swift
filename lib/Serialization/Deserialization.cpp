@@ -19,10 +19,20 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/BCReadingExtras.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
+
+#define DEBUG_TYPE "Serialization"
+
+STATISTIC(NumMemberListsLoaded,
+          "# of nominals/extensions whose members were loaded");
+STATISTIC(NumNestedTypeShortcuts,
+          "# of same-module nested types resolved without lookup");
 
 using namespace swift;
 using namespace swift::serialization;
@@ -223,6 +233,10 @@ namespace {
 
     void addUnknown(uintptr_t kind) {
       path.push_back({ PathPiece::Kind::Unknown, kind });
+    }
+
+    void removeLast() {
+      path.pop_back();
     }
 
     void print(raw_ostream &os) const override {
@@ -912,6 +926,61 @@ void ModuleFile::readGenericRequirements(
       }
       break;
       }
+    case LAYOUT_REQUIREMENT: {
+      uint8_t rawKind;
+      uint64_t rawTypeID;
+      uint32_t size;
+      uint32_t alignment;
+      LayoutRequirementLayout::readRecord(scratch, rawKind, rawTypeID,
+                                          size, alignment);
+
+      auto first = getType(rawTypeID);
+      LayoutConstraintInfo layoutInfo;
+      LayoutConstraintKind kind = LayoutConstraintKind::UnknownLayout;
+      switch (rawKind) {
+      default: {
+        // Unknown layout requirement kind.
+        error();
+        break;
+      }
+      case LayoutRequirementKind::NativeRefCountedObject: {
+        kind = LayoutConstraintKind::NativeRefCountedObject;
+        break;
+      }
+      case LayoutRequirementKind::RefCountedObject: {
+        kind = LayoutConstraintKind::RefCountedObject;
+        break;
+      }
+      case LayoutRequirementKind::Trivial: {
+        kind = LayoutConstraintKind::Trivial;
+        break;
+      }
+      case LayoutRequirementKind::TrivialOfExactSize: {
+        kind = LayoutConstraintKind::TrivialOfExactSize;
+        break;
+      }
+      case LayoutRequirementKind::TrivialOfAtMostSize: {
+        kind = LayoutConstraintKind::TrivialOfAtMostSize;
+        break;
+      }
+      case LayoutRequirementKind::UnknownLayout: {
+        kind = LayoutConstraintKind::UnknownLayout;
+        break;
+      }
+      }
+
+      if (kind != LayoutConstraintKind::TrivialOfAtMostSize &&
+          kind != LayoutConstraintKind::TrivialOfExactSize)
+        layoutInfo = LayoutConstraintInfo(kind);
+      else
+        layoutInfo = LayoutConstraintInfo(kind, size, alignment);
+
+      auto layout = getContext().AllocateObjectCopy(layoutInfo);
+
+      requirements.push_back(
+          Requirement(RequirementKind::Layout, first, layout));
+      break;
+      }
     default:
       // This record is not part of the GenericParamList.
       shouldContinue = false;
@@ -1399,7 +1468,61 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
                                                   &blobData);
     switch (recordID) {
-    case XREF_TYPE_PATH_PIECE:
+    case XREF_TYPE_PATH_PIECE: {
+      if (values.size() == 1) {
+        ModuleDecl *module = values.front()->getModuleContext();
+        if (module == this->getAssociatedModule()) {
+          // Fast path for nested types in the same module.
+          IdentifierID IID;
+          bool onlyInNominal = false;
+          XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
+          Identifier memberName = getIdentifier(IID);
+          pathTrace.addValue(memberName);
+
+          llvm::PrettyStackTraceString message{
+              "If you're seeing a crash here, try passing "
+              "-Xfrontend -disable-serialization-nested-type-lookup-table"};
+
+          TypeDecl *nestedType = nullptr;
+          if (onlyInNominal) {
+            // Only look in the file containing the type itself.
+            const DeclContext *dc = values.front()->getDeclContext();
+            auto *serializedFile =
+                dyn_cast<SerializedASTFile>(dc->getModuleScopeContext());
+            if (serializedFile) {
+              nestedType =
+                  serializedFile->File.lookupNestedType(memberName,
+                                                        values.front());
+            }
+          } else {
+            // Fault in extensions, then ask every serialized AST in the module.
+            (void)cast<NominalTypeDecl>(values.front())->getExtensions();
+            for (FileUnit *file : module->getFiles()) {
+              if (file == getFile())
+                continue;
+              auto *serializedFile = dyn_cast<SerializedASTFile>(file);
+              if (!serializedFile)
+                continue;
+              nestedType =
+                  serializedFile->File.lookupNestedType(memberName,
+                                                        values.front());
+              if (nestedType)
+                break;
+            }
+          }
+
+          if (nestedType) {
+            values.clear();
+            values.push_back(nestedType);
+            ++NumNestedTypeShortcuts;
+            break;
+          }
+
+          pathTrace.removeLast();
+        }
+      }
+      SWIFT_FALLTHROUGH;
+    }
     case XREF_VALUE_PATH_PIECE:
     case XREF_INITIALIZER_PATH_PIECE: {
       TypeID TID = 0;
@@ -2253,7 +2376,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         Attr = new (ctx) AvailableAttr(
           SourceLoc(), SourceRange(),
           (PlatformKind)platform, message, rename,
-          Introduced, Deprecated, Obsoleted,
+          Introduced, SourceRange(),
+          Deprecated, SourceRange(),
+          Obsoleted, SourceRange(),
           platformAgnostic, isImplicit);
         break;
 
@@ -2294,16 +2419,23 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       }
 
       case decls_block::Specialize_DECL_ATTR: {
-        ArrayRef<uint64_t> rawTypeIDs;
-        serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
-          scratch, rawTypeIDs);
+        unsigned exported;
+        SpecializeAttr::SpecializationKind specializationKind;
+        unsigned specializationKindVal;
+        SmallVector<Requirement, 8> requirements;
 
-        SmallVector<TypeLoc, 8> typeLocs;
-        for (auto tid : rawTypeIDs)
-          typeLocs.push_back(TypeLoc::withoutLoc(getType(tid)));
+        serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
+          scratch, exported, specializationKindVal);
+
+        specializationKind = specializationKindVal
+                                 ? SpecializeAttr::SpecializationKind::Partial
+                                 : SpecializeAttr::SpecializationKind::Full;
+
+        readGenericRequirements(requirements, DeclTypeCursor);
 
         Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
-                                      typeLocs);
+                                      requirements, exported != 0,
+                                      specializationKind);
         break;
       }
 
@@ -3478,7 +3610,6 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   CASE(Direct_Owned)
   CASE(Direct_Unowned)
   CASE(Direct_Guaranteed)
-  CASE(Direct_Deallocating)
 #undef CASE
   }
   return None;
@@ -3749,6 +3880,9 @@ Type ModuleFile::getType(TypeID TID) {
     Type superclass;
     superclass = getType(superclassID);
 
+    // TODO: Read layout.
+    LayoutConstraint layout;
+
     SmallVector<ProtocolDecl *, 4> conformances;
     for (DeclID protoID : rawConformanceIDs)
       conformances.push_back(cast<ProtocolDecl>(getDecl(protoID)));
@@ -3761,11 +3895,11 @@ Type ModuleFile::getType(TypeID TID) {
     if (parent) {
       auto assocTypeDecl = cast<AssociatedTypeDecl>(getDecl(assocTypeOrNameID));
       archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
-                                        conformances, superclass);
+                                        conformances, superclass, layout);
     } else {
       archetype = ArchetypeType::getNew(ctx, genericEnv,
                                         getIdentifier(assocTypeOrNameID),
-                                        conformances, superclass);
+                                        conformances, superclass, layout);
     }
 
     typeOrOffset = archetype;
@@ -4187,6 +4321,7 @@ Type ModuleFile::getType(TypeID TID) {
 
 void ModuleFile::loadAllMembers(Decl *D, uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", D);
+  ++NumMemberListsLoaded;
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(contextData);
@@ -4306,7 +4441,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
       // Create an archetype builder, which will help us create the
       // synthetic environment.
-      ArchetypeBuilder builder(*getAssociatedModule());
+      ArchetypeBuilder builder(
+                         getContext(),
+                         LookUpConformanceInModule(getAssociatedModule()));
       builder.addGenericSignature(syntheticSig);
       builder.finalize(SourceLoc());
       syntheticEnv = builder.getGenericEnvironment(syntheticSig);
@@ -4322,12 +4459,10 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
         reqToSyntheticMap.addSubstitution(canonicalGP, concreteTy);
 
         if (unsigned numConformances = *rawIDIter++) {
-          SmallVector<ProtocolConformanceRef, 2> conformances;
           while (numConformances--) {
-            conformances.push_back(readConformance(DeclTypeCursor));
+            reqToSyntheticMap.addConformance(
+                canonicalGP, readConformance(DeclTypeCursor));
           }
-          reqToSyntheticMap.addConformances(canonicalGP,
-                                            ctx.AllocateCopy(conformances));
         }
       }
     }

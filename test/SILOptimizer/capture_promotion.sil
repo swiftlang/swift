@@ -114,7 +114,7 @@ bb0:
   store %15 to %11a : $*Int
 
 // CHECK-NOT: function_ref @closure_indirect_result :
-// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_TTSf2i_i_i_n__closure_indirect_result
+// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_TTSf2n_i_i_i__closure_indirect_result
 // CHECK-NOT: function_ref @closure_indirect_result :
 
 // The three strong retains are removed
@@ -154,7 +154,7 @@ bb0:
 
 // The load of %1 is removed, and its uses replaced with the Foo argument
 // CHECK-NEXT: strong_retain {{.*}} : $Foo
-// CHECK-NEXT: [[METHOD_FOO:%.*]] = class_method {{.*}} : $Foo, #Foo.foo!1 : (Foo) -> () -> Int , $@convention(method) (@guaranteed Foo) -> Int
+// CHECK-NEXT: [[METHOD_FOO:%.*]] = class_method {{.*}} : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
 // CHECK-NEXT: [[APPLY_FOO:%.*]] = apply [[METHOD_FOO]]({{.*}}) : $@convention(method) (@guaranteed Foo) -> Int
 
 // The struct_element_addr of %3 followed by a load is replaced by a struct_extract of the Baz argument

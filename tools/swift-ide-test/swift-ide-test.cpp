@@ -18,7 +18,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SourceEntityWalker.h"
@@ -218,8 +218,7 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "Print information about a given range"),
            clEnumValN(ActionType::PrintIndexedSymbols,
                       "print-indexed-symbols",
-                      "Print indexed symbol information"),
-           clEnumValEnd));
+                      "Print indexed symbol information")));
 
 static llvm::cl::opt<std::string>
 SourceFilename("source-filename", llvm::cl::desc("Name of the source file"));
@@ -483,8 +482,7 @@ AccessibilityFilter(
         clEnumValN(Accessibility::Internal, "accessibility-filter-internal",
             "Print internal and public declarations"),
         clEnumValN(Accessibility::Public, "accessibility-filter-public",
-            "Print public declarations"),
-        clEnumValEnd));
+            "Print public declarations")));
 
 static llvm::cl::opt<bool>
 SynthesizeExtension("synthesize-extension",
@@ -1553,13 +1551,9 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
     // Simulate already having mangled names
     for (auto LTD : LocalTypeDecls) {
-      std::string MangledName;
-      {
-        Mangle::Mangler Mangler(/*DWARFMangling*/ true);
-        Mangler.mangleTypeForDebugger(LTD->getDeclaredInterfaceType(),
-                                      LTD->getDeclContext());
-        MangledName = Mangler.finalize();
-      }
+      std::string MangledName =
+          NewMangling::mangleTypeForDebugger(LTD->getDeclaredInterfaceType(),
+                                             LTD->getDeclContext());
       MangledNames.push_back(MangledName);
     }
 
@@ -1594,8 +1588,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       while (node->getKind() != NodeKind::LocalDeclName)
         node = node->getChild(1); // local decl name
 
-      auto remangled = Demangle::mangleNode(typeNode,
-                                            NewMangling::useNewMangling());
+      auto remangled = Demangle::mangleNode(typeNode, useNewMangling(typeNode));
 
       auto LTD = M->lookupLocalType(remangled);
 
@@ -2567,9 +2560,7 @@ public:
 
 private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
-    Mangle::Mangler Man(/* DWARFMangling */true);
-    Man.mangleTypeForDebugger(T, DC);
-    std::string mangledName(Man.finalize());
+    std::string mangledName(NewMangling::mangleTypeForDebugger(T, DC));
     std::string Error;
     Type ReconstructedType =
         getTypeFromMangledSymbolname(Ctx, mangledName, Error);
@@ -2680,43 +2671,42 @@ namespace {
     raw_ostream &OS;
     bool firstSourceEntity = true;
 
-    void anchor() {}
-
-    void printSymbolKind(SymbolKind kind, SymbolSubKindSet subKinds) {
-      OS << getSymbolKindString(kind);
-      if (subKinds) {
+    void printSymbolInfo(SymbolInfo SymInfo) {
+      OS << getSymbolKindString(SymInfo.Kind);
+      if (SymInfo.SubKind != SymbolSubKind::None)
+        OS << '/' << getSymbolSubKindString(SymInfo.SubKind);
+      if (SymInfo.Properties) {
         OS << '(';
-        printSymbolSubKinds(subKinds, OS);
+        printSymbolProperties(SymInfo.Properties, OS);
         OS << ')';
       }
-      // FIXME: add and use language enum
-      OS << '/' << "Swift";
+      OS << '/' << getSymbolLanguageString(SymInfo.Lang);
     }
 
   public:
     PrintIndexDataConsumer(raw_ostream &OS) : OS(OS) {}
 
-    void failed(StringRef error) {}
+    void failed(StringRef error) override {}
 
-    bool recordHash(StringRef hash, bool isKnown) { return true; }
-    bool startDependency(SymbolKind kind, StringRef name, StringRef path,
-                         bool isSystem, StringRef hash) {
-      OS << getSymbolKindString(kind) << " | ";
+    bool recordHash(StringRef hash, bool isKnown) override { return true; }
+    bool startDependency(StringRef name, StringRef path, bool isClangModule,
+                         bool isSystem, StringRef hash) override {
+      OS << (isClangModule ? "clang-module" : "module") << " | ";
       OS << (isSystem ? "system" : "user") << " | ";
       OS << name << " | " << path << "-" << hash << "\n";
       return true;
     }
-    bool finishDependency(SymbolKind kind) {
+    bool finishDependency(bool isClangModule) override {
       return true;
     }
 
-    Action startSourceEntity(const IndexSymbol &symbol) {
+    Action startSourceEntity(const IndexSymbol &symbol) override {
       if (firstSourceEntity) {
         firstSourceEntity = false;
         OS << "------------\n";
       }
       OS << symbol.line << ':' << symbol.column << " | ";
-      printSymbolKind(symbol.kind, symbol.subKinds);
+      printSymbolInfo(symbol.symInfo);
       OS << " | " << symbol.name << " | " << symbol.USR << " | ";
       clang::index::printSymbolRoles(symbol.roles, OS);
       OS << " | rel: " << symbol.Relations.size() << "\n";
@@ -2728,12 +2718,11 @@ namespace {
       }
       return Continue;
     }
-    bool finishSourceEntity(SymbolKind kind, SymbolSubKindSet subKinds,
-                                    SymbolRoleSet roles) {
+    bool finishSourceEntity(SymbolInfo symInfo, SymbolRoleSet roles) override {
       return true;
     }
 
-    void finish() {}
+    void finish() override {}
   };
 
 } // anonymous namespace
@@ -2772,6 +2761,37 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
   return 0;
 }
 
+static int doPrintIndexedSymbolsFromModule(const CompilerInvocation &InitInvok,
+                                           StringRef ModuleName) {
+  CompilerInvocation Invocation(InitInvok);
+
+  CompilerInstance CI;
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+
+  auto &Context = CI.getASTContext();
+
+  // Load standard library so that Clang importer can use it.
+  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
+  if (!Stdlib) {
+    llvm::errs() << "Failed loading stdlib\n";
+    return 1;
+  }
+
+  auto *M = getModuleByFullName(Context, ModuleName);
+  if (!M) {
+    llvm::errs() << "Failed loading " << ModuleName << "\n";
+    return 1;
+  }
+
+  PrintIndexDataConsumer consumer(llvm::outs());
+  indexModule(M, StringRef(), consumer);
+
+  return 0;
+}
 
 static int doPrintUSRs(const CompilerInvocation &InitInvok,
                        StringRef SourceFilename) {
@@ -3190,7 +3210,16 @@ int main(int argc, char *argv[]) {
                                 options::EndLineColumnPair);
     break;
   case ActionType::PrintIndexedSymbols:
-      ExitCode = doPrintIndexedSymbols(InitInvok, options::SourceFilename);
+      if (options::ModuleToPrint.empty()) {
+        ExitCode = doPrintIndexedSymbols(InitInvok, options::SourceFilename);
+      } else {
+        if (options::ModuleToPrint.size() > 1) {
+          llvm::errs() << "printing symbols for the first module name, the rest "
+            "are ignored";
+        }
+        ExitCode = doPrintIndexedSymbolsFromModule(InitInvok,
+                                               options::ModuleToPrint.front());
+      }
   }
 
   if (options::PrintStats)

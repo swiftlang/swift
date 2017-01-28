@@ -749,40 +749,9 @@ static void VisitNodeArchetype(
   if (ast) {
     result._types.push_back(ArchetypeType::getNew(
         *ast, nullptr, ast->getIdentifier(archetype_name), conforms_to,
-        Type()));
+        Type(), LayoutConstraint()));
   } else {
     result._error = "invalid ASTContext";
-  }
-}
-
-static void VisitNodeArchetypeRef(
-    ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
-    Demangle::NodePointer &cur_node, VisitNodeResult &result,
-    const VisitNodeResult &generic_context) { // set by GenericType case
-  const StringRef &archetype_name(cur_node->getText());
-  Type result_type;
-  for (const Type &archetype : generic_context._types) {
-    const ArchetypeType *cast_archetype =
-        dyn_cast<ArchetypeType>(archetype.getPointer());
-
-    if (cast_archetype &&
-        !cast_archetype->getName().str().compare(archetype_name)) {
-      result_type = archetype;
-      break;
-    }
-  }
-
-  if (result_type)
-    result._types.push_back(result_type);
-  else {
-    if (ast) {
-      SmallVector<ProtocolDecl *, 1> protocols;
-      result._types.push_back(ArchetypeType::getNew(
-        *ast, nullptr, ast->getIdentifier(archetype_name), protocols,
-        Type()));
-    } else {
-      result._error = "invalid ASTContext";
-    }
   }
 }
 
@@ -1358,6 +1327,45 @@ static void VisitNodeFunction(
   }
 }
 
+static void CreateFunctionType(ASTContext *ast,
+                               const VisitNodeResult &arg_type_result,
+                               const VisitNodeResult &return_type_result,
+                               bool throws,
+                               VisitNodeResult &result) {
+  Type arg_clang_type;
+  Type return_clang_type;
+
+  switch (arg_type_result._types.size()) {
+  case 0:
+    arg_clang_type = TupleType::getEmpty(*ast);
+    break;
+  case 1:
+    arg_clang_type = arg_type_result._types.front().getPointer();
+    break;
+  default:
+    result._error = "too many argument types for a function type";
+    break;
+  }
+
+  switch (return_type_result._types.size()) {
+  case 0:
+    return_clang_type = TupleType::getEmpty(*ast);
+    break;
+  case 1:
+    return_clang_type = return_type_result._types.front().getPointer();
+    break;
+  default:
+    result._error = "too many return types for a function type";
+    break;
+  }
+
+  if (arg_clang_type && return_clang_type) {
+    result._types.push_back(
+        FunctionType::get(arg_clang_type, return_clang_type,
+                          FunctionType::ExtInfo().withThrows(throws)));
+  }
+}
+
 static void VisitNodeFunctionType(
     ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
@@ -1395,39 +1403,51 @@ static void VisitNodeFunctionType(
       break;
     }
   }
-  Type arg_clang_type;
-  Type return_clang_type;
-
-  switch (arg_type_result._types.size()) {
-  case 0:
-    arg_clang_type = TupleType::getEmpty(*ast);
-    break;
-  case 1:
-    arg_clang_type = arg_type_result._types.front().getPointer();
-    break;
-  default:
-    result._error = "too many argument types for a function type";
-    break;
-  }
-
-  switch (return_type_result._types.size()) {
-  case 0:
-    return_clang_type = TupleType::getEmpty(*ast);
-    break;
-  case 1:
-    return_clang_type = return_type_result._types.front().getPointer();
-    break;
-  default:
-    result._error = "too many return types for a function type";
-    break;
-  }
-
-  if (arg_clang_type && return_clang_type) {
-    result._types.push_back(
-        FunctionType::get(arg_clang_type, return_clang_type,
-                          FunctionType::ExtInfo().withThrows(throws)));
-  }
+  CreateFunctionType(ast, arg_type_result, return_type_result, throws, result);
 }
+
+static void VisitNodeImplFunctionType(
+    ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
+    Demangle::NodePointer &cur_node, VisitNodeResult &result,
+    const VisitNodeResult &generic_context) { // set by GenericType case
+  VisitNodeResult arg_type_result;
+  VisitNodeResult return_type_result;
+  Demangle::Node::iterator end = cur_node->end();
+  bool throws = false;
+  for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    switch (child_node_kind) {
+    case Demangle::Node::Kind::Class: {
+      VisitNodeResult class_type_result;
+      nodes.push_back(*pos);
+      VisitNode(ast, nodes, class_type_result, generic_context);
+    } break;
+    case Demangle::Node::Kind::Structure: {
+      VisitNodeResult class_type_result;
+      nodes.push_back(*pos);
+      VisitNode(ast, nodes, class_type_result, generic_context);
+    } break;
+    case Demangle::Node::Kind::ImplConvention:
+      // Ignore the ImplConvention it is only a hint for the SIL ARC optimizer.
+      break;
+    case Demangle::Node::Kind::ImplParameter:
+      nodes.push_back(*pos);
+      VisitNode(ast, nodes, arg_type_result, generic_context);
+      break;
+    case Demangle::Node::Kind::ThrowsAnnotation:
+      throws = true;
+      break;
+    case Demangle::Node::Kind::ImplResult:
+      nodes.push_back(*pos);
+      VisitNode(ast, nodes, return_type_result, generic_context);
+      break;
+    default:
+      break;
+    }
+  }
+  CreateFunctionType(ast, arg_type_result, return_type_result, throws, result);
+}
+
 
 static void VisitNodeSetterGetter(
     ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
@@ -1622,7 +1642,7 @@ static void VisitNodeLocalDeclName(
     const VisitNodeResult &generic_context) { // set by GenericType case
   Demangle::NodePointer parent_node = nodes[nodes.size() - 2];
   std::string remangledNode = Demangle::mangleNode(parent_node,
-                                                 NewMangling::useNewMangling());
+                                                   useNewMangling(parent_node));
   TypeDecl *decl = result._module.lookupLocalType(remangledNode);
   if (!decl)
     result._error = stringWithFormat("unable to lookup local type %s",
@@ -1997,10 +2017,6 @@ static void visitNodeImpl(
     VisitNodeAddressor(ast, nodes, node, result, genericContext);
     break;
 
-  case Demangle::Node::Kind::ArchetypeRef:
-    VisitNodeArchetypeRef(ast, nodes, node, result, genericContext);
-    break;
-
   case Demangle::Node::Kind::Archetype:
     VisitNodeArchetype(ast, nodes, node, result, genericContext);
     break;
@@ -2072,6 +2088,10 @@ static void visitNodeImpl(
     VisitNodeFunctionType(ast, nodes, node, result, genericContext);
     break;
 
+  case Demangle::Node::Kind::ImplFunctionType:
+    VisitNodeImplFunctionType(ast, nodes, node, result, genericContext);
+    break;
+  
   case Demangle::Node::Kind::DidSet:
   case Demangle::Node::Kind::Getter:
   case Demangle::Node::Kind::Setter:
@@ -2164,8 +2184,11 @@ Decl *ide::getDeclFromUSR(ASTContext &context, StringRef USR,
   // This relies on USR generation being very close to symbol mangling; if we
   // need to support entities with customized USRs (e.g. extensions), we will
   // need to do something smarter here.
-  mangledName.replace(0, 2, NewMangling::useNewMangling() ?
-                             MANGLING_PREFIX_STR : "_T");
+#ifdef USE_NEW_MANGLING
+  mangledName.replace(0, 2, MANGLING_PREFIX_STR);
+#else
+  mangledName.replace(0, 2, "_T");
+#endif
 
   return getDeclFromMangledSymbolName(context, mangledName, error);
 }

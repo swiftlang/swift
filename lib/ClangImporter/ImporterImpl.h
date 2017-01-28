@@ -271,6 +271,10 @@ public:
   const bool ImportForwardDeclarations;
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
+  const bool BridgingHeaderExplicitlyRequested;
+
+  bool IsReadingBridgingPCH;
+  llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
 
   const Version CurrentVersion;
 
@@ -281,7 +285,7 @@ public:
 
 private:
   /// The Swift lookup table for the bridging header.
-  SwiftLookupTable BridgingHeaderLookupTable;
+  std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
 
   /// The Swift lookup tables, per module.
   ///
@@ -294,12 +298,11 @@ private:
   /// FIXME: Horrible, horrible hack for \c loadModule().
   unsigned ImportCounter = 0;
 
-  /// \brief The value of \c ImportCounter last time when imported modules were
-  /// verified.
-  unsigned VerifiedImportCounter = 0;
+  /// \brief Used to avoid running the AST verifier over the same declarations.
+  size_t VerifiedDeclsCounter = 0;
 
   /// \brief Clang compiler invocation.
-  llvm::IntrusiveRefCntPtr<clang::CompilerInvocation> Invocation;
+  std::shared_ptr<clang::CompilerInvocation> Invocation;
 
   /// \brief Clang compiler instance, which is used to actually load Clang
   /// modules.
@@ -407,37 +410,12 @@ public:
   LookupTableMap &getLookupTables() { return LookupTables; }
 
 private:
-  class EnumConstantDenseMapInfo {
-  public:
-    using PairTy = std::pair<const clang::EnumDecl *, llvm::APSInt>;
-    using PointerInfo = llvm::DenseMapInfo<const clang::EnumDecl *>;
-    static inline PairTy getEmptyKey() {
-      return {PointerInfo::getEmptyKey(), llvm::APSInt(/*bitwidth=*/1)};
-    }
-    static inline PairTy getTombstoneKey() {
-      return {PointerInfo::getTombstoneKey(), llvm::APSInt(/*bitwidth=*/1)};
-    }
-    static unsigned getHashValue(const PairTy &pair) {
-      return llvm::combineHashValue(PointerInfo::getHashValue(pair.first),
-                                    llvm::hash_value(pair.second));
-    }
-    static bool isEqual(const PairTy &lhs, const PairTy &rhs) {
-      return lhs == rhs;
-    }
-  };
-
   /// A mapping from imported declarations to their "alternate" declarations,
   /// for cases where a single Clang declaration is imported to two
   /// different Swift declarations.
   llvm::DenseMap<Decl *, TinyPtrVector<ValueDecl *>> AlternateDecls;
 
 public:
-  /// \brief Keep track of enum constant values that have been imported.
-  llvm::DenseMap<std::pair<const clang::EnumDecl *, llvm::APSInt>,
-                 EnumElementDecl *,
-                 EnumConstantDenseMapInfo>
-    EnumConstantValues;
-
   /// \brief Keep track of initializer declarations that correspond to
   /// imported methods.
   llvm::DenseMap<
@@ -596,7 +574,8 @@ public:
   /// Imports the given header contents into the Clang context.
   bool importHeader(ModuleDecl *adapter, StringRef headerName,
                     SourceLoc diagLoc, bool trackParsedSymbols,
-                    std::unique_ptr<llvm::MemoryBuffer> contents);
+                    std::unique_ptr<llvm::MemoryBuffer> contents,
+                    bool implicitImport);
 
   /// \brief Retrieve the imported module that should contain the given
   /// Clang decl.
@@ -1015,6 +994,9 @@ public:
   /// \param clangDecl The underlying declaration.
   /// \param isFromSystemModule Whether to apply special rules that only apply
   ///   to system APIs.
+  /// \param importedName How to import the name of the method. This is still
+  ///   important to satisfy the AST verifier, even though the method is an
+  ///   accessor.
   /// \param[out] params The patterns visible inside the function body.
   ///
   /// \returns the imported function type, or null if the type cannot be
@@ -1023,6 +1005,7 @@ public:
                                 const clang::ObjCPropertyDecl *property,
                                 const clang::ObjCMethodDecl *clangDecl,
                                 bool isFromSystemModule,
+                                importer::ImportedName importedName,
                                 ParameterList **params);
 
   /// \brief Determine whether the given typedef-name is "special", meaning
@@ -1165,16 +1148,18 @@ namespace importer {
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
 class SwiftNameLookupExtension : public clang::ModuleFileExtension {
+  std::unique_ptr<SwiftLookupTable> &pchLookupTable;
   LookupTableMap &lookupTables;
   ASTContext &swiftCtx;
   const PlatformAvailability &availability;
   const bool inferImportAsMember;
 
 public:
-  SwiftNameLookupExtension(LookupTableMap &tables, ASTContext &ctx,
+  SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
+                           LookupTableMap &tables, ASTContext &ctx,
                            const PlatformAvailability &avail, bool inferIAM)
-      : lookupTables(tables), swiftCtx(ctx), availability(avail),
-        inferImportAsMember(inferIAM) {}
+      : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
+        availability(avail), inferImportAsMember(inferIAM) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;

@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -456,8 +457,8 @@ void MaterializeForSetEmitter::emit(SILGenFunction &gen) {
   SILType rawPointerTy = SILType::getRawPointerType(gen.getASTContext());
   address = gen.B.createAddressToPointer(loc, address, rawPointerTy);
 
-  SILType resultTupleTy = gen.F.mapTypeIntoContext(
-                 gen.F.getLoweredFunctionType()->getSILResult());
+  SILType resultTupleTy =
+      gen.F.mapTypeIntoContext(gen.F.getConventions().getSILResultType());
   SILType optCallbackTy = resultTupleTy.getTupleElementType(1);
 
   // Form the callback.
@@ -562,9 +563,9 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
   {
     SILGenFunction gen(SGM, *callback);
 
-    auto makeParam = [&](unsigned index) -> SILArgument* {
+    auto makeParam = [&](unsigned index) -> SILArgument * {
       SILType type = gen.F.mapTypeIntoContext(
-          callbackType->getParameters()[index].getSILType());
+          gen.getSILType(callbackType->getParameters()[index]));
       return gen.F.begin()->createFunctionArgument(type);
     };
 

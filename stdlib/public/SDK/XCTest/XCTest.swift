@@ -53,25 +53,24 @@ enum _XCTThrowableBlockResult {
 /// and if it does consume the exception and return information about it.
 func _XCTRunThrowableBlock(_ block: () throws -> Void) -> _XCTThrowableBlockResult {
   var blockErrorOptional: Error?
-  
-  let d = _XCTRunThrowableBlockBridge({
+
+  let exceptionResult = _XCTRunThrowableBlockBridge({
     do {
       try block()
     } catch {
       blockErrorOptional = error
     }
   })
-  
+
   if let blockError = blockErrorOptional {
     return .failedWithError(error: blockError)
-  } else if d.count > 0 {
-    let t: String = d["type"]!
-    
-    if t == "objc" {
+  } else if let exceptionResult = exceptionResult {
+
+    if exceptionResult["type"] == "objc" {
       return .failedWithException(
-        className: d["className"]!,
-        name: d["name"]!,
-        reason: d["reason"]!)
+        className: exceptionResult["className"]!,
+        name: exceptionResult["name"]!,
+        reason: exceptionResult["reason"]!)
     } else {
       return .failedWithUnknownException
     }
@@ -297,8 +296,8 @@ public func XCTAssertEqual<T : Equatable>(_ expression1: @autoclosure () throws 
             let expressionValueStr1 = String(describing: expressionValue1Optional)
             let expressionValueStr2 = String(describing: expressionValue2Optional)
 
-            // FIXME: this file seems to use `as NSString` unnecesarily a lot,
-            // unlesss I'm missing something.
+            // FIXME: this file seems to use `as NSString` unnecessarily a lot,
+            // unless I'm missing something.
             _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
         }
 
@@ -1020,13 +1019,33 @@ public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _
     }
     
   case .failedWithError(let error):
-    _XCTRegisterFailure(false, "XCTAssertLessThanOrEqual failed: threw error \"\(error)\"", message, file, line)
+    _XCTRegisterFailure(false, "XCTAssertThrowsError failed: threw error \"\(error)\"", message, file, line)
     
   case .failedWithException(_, _, let reason):
     _XCTRegisterFailure(true, "XCTAssertThrowsError failed: throwing \(reason)", message, file, line)
     
   case .failedWithUnknownException:
     _XCTRegisterFailure(true, "XCTAssertThrowsError failed: throwing an unknown exception", message, file, line)
+  }
+}
+
+public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
+  let assertionType = _XCTAssertionType.noThrow
+
+  let result = _XCTRunThrowableBlock { _ = try expression() }
+
+  switch result {
+  case .success:
+    return
+
+  case .failedWithError(let error):
+    _XCTRegisterFailure(true, "XCTAssertNoThrow failed: threw error \"\(error)\"", message, file, line)
+
+  case .failedWithException(_, _, let reason):
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
+
+  case .failedWithUnknownException:
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 2), message, file, line)
   }
 }
 
@@ -1047,12 +1066,6 @@ public func XCTAssertThrowsSpecific(_ expression: @autoclosure () -> Any?, _ exc
 
 public func XCTAssertThrowsSpecificNamed(_ expression: @autoclosure () -> Any?, _ exception: Any, _ name: String, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
   let assertionType = _XCTAssertionType.assertion_ThrowsSpecificNamed
-  
-  // FIXME: Unsupported
-}
-
-public func XCTAssertNoThrow(_ expression: @autoclosure () -> Any?, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
-  let assertionType = _XCTAssertionType.assertion_NoThrow
   
   // FIXME: Unsupported
 }

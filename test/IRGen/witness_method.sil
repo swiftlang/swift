@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 
 // REQUIRES: CPU=i386_or_x86_64
 
@@ -34,7 +34,7 @@ struct ImplementsDerived : Derived {
 // CHECK-LABEL: define{{( protected)?}} void @testInheritedConformance
 sil @testInheritedConformance : $@convention(thin) (@in ImplementsDerived) -> () {
 entry(%0: $*ImplementsDerived):
-  // CHECK: [[WITNESS:%.*]] = load i8*, i8** @_TWPV14witness_method17ImplementsDerivedS_4BaseS_
+  // CHECK: [[WITNESS:%.*]] = load i8*, i8** @_T014witness_method17ImplementsDerivedVAA4BaseAAWP
   // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, i8**)*
   // CHECK: call void [[METHOD]]
   %m = witness_method $ImplementsDerived, #Base.foo!1 : $@convention(witness_method) <U: Base> (@in_guaranteed U) -> ()
@@ -62,8 +62,8 @@ struct SyncUp<Deliverable> : Synergy {
 
 // CHECK-LABEL: define{{( protected)?}} void @testGenericWitnessMethod(%swift.opaque* noalias nocapture sret, %V14witness_method6SyncUp* noalias nocapture, %swift.type* %T)
 // CHECK: entry:
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @_TMaV14witness_method6SyncUp(%swift.type* %T)
-// CHECK:   [[WTABLE:%.*]] = call i8** @_TWaurGV14witness_method6SyncUpx_S_7SynergyS_(%swift.type* [[METADATA]])
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @_T014witness_method6SyncUpVMa(%swift.type* %T)
+// CHECK:   [[WTABLE:%.*]] = call i8** @_T014witness_method6SyncUpVyxGAA7SynergyAAlWa(%swift.type* [[METADATA]])
 // CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[WTABLE]], i32 1
 // CHECK:   [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK:   [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, i8**)*

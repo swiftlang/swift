@@ -958,7 +958,8 @@ namespace {
         auto rawPointerTy = SILType::getRawPointerType(ctx);
 
         // The callback is a BB argument from the switch_enum.
-        SILValue callback = writebackBB->createPHIArgument(rawPointerTy);
+        SILValue callback = writebackBB->createPHIArgument(
+            rawPointerTy, ValueOwnershipKind::Trivial);
 
         // Cast the callback to the correct polymorphic function type.
         auto origCallbackFnType = gen.SGM.Types.getMaterializeForSetCallbackType(
@@ -969,7 +970,8 @@ namespace {
         auto substCallbackFnType = origCallbackFnType->substGenericArgs(
             M, substitutions);
         auto substCallbackType = SILType::getPrimitiveObjectType(substCallbackFnType);
-        auto metatypeType = substCallbackFnType->getParameters().back().getSILType();
+        auto metatypeType =
+            gen.getSILType(substCallbackFnType->getParameters().back());
 
         // We need to borrow the base here.  We can't just consume it
         // because we're in conditionally-executed code (and because
@@ -1669,9 +1671,8 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
   SILValue address = gen.emitTemporaryAllocation(e, typeData.TypeOfRValue);
   address = gen.B.createMarkUninitialized(e, address,
                                           MarkUninitializedInst::Var);
-  gen.enterDestroyCleanup(address);
   LValue lv;
-  lv.add<ValueComponent>(ManagedValue::forUnmanaged(address), typeData);
+  lv.add<ValueComponent>(gen.emitManagedBufferWithCleanup(address), typeData);
   return lv;
 }
 
@@ -2159,6 +2160,27 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
               SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
     // SEMANTIC ARC TODO: Does this need a cleanup?
     return B.createCopyValue(loc, result);
+  }
+
+  llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
+}
+
+ManagedValue SILGenFunction::emitConversionToSemanticRValue(
+    SILLocation loc, ManagedValue src, const TypeLowering &valueTL) {
+  // Weak storage types are handled with their underlying type.
+  assert(!src.getType().is<WeakStorageType>() &&
+         "weak pointers are always the right optional types");
+
+  // For @unowned(safe) types, we need to generate a strong retain and
+  // strip the unowned box.
+  if (src.getType().is<UnownedStorageType>()) {
+    return B.createCopyUnownedValue(loc, src);
+  }
+
+  // For @unowned(unsafe) types, we need to strip the unmanaged box
+  // and then do an (unsafe) retain.
+  if (src.getType().is<UnmanagedStorageType>()) {
+    return B.createUnsafeCopyUnownedValue(loc, src);
   }
 
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");

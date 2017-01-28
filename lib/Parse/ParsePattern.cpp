@@ -159,8 +159,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
   // Parse the parameter list.
   bool isClosure = paramContext == ParameterContextKind::Closure;
-  return parseList(tok::r_paren, leftParenLoc, rightParenLoc, tok::comma,
-                      /*OptionalSep=*/false, /*AllowSepAfterLast=*/false,
+  return parseList(tok::r_paren, leftParenLoc, rightParenLoc,
+                      /*AllowSepAfterLast=*/false,
                       diag::expected_rparen_parameter,
                       [&]() -> ParserStatus {
     ParsedParameter param;
@@ -476,16 +476,23 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
   if (!Tok.is(tok::l_paren)) {
     // If we don't have the leading '(', complain.
     Diag<> diagID;
+    bool skipIdentifier = false;
     switch (paramContext) {
     case ParameterContextKind::Function:
     case ParameterContextKind::Operator:
       diagID = diag::func_decl_without_paren;
       break;
     case ParameterContextKind::Subscript:
-      diagID = diag::expected_lparen_subscript;
+      skipIdentifier = Tok.is(tok::identifier) &&
+                       peekToken().is(tok::l_paren);
+      diagID = skipIdentifier ? diag::subscript_has_name
+                              : diag::expected_lparen_subscript;
       break;
     case ParameterContextKind::Initializer:
-      diagID = diag::expected_lparen_initializer;
+      skipIdentifier = Tok.is(tok::identifier) &&
+                       peekToken().is(tok::l_paren);
+      diagID = skipIdentifier ? diag::initializer_has_name
+                              : diag::expected_lparen_initializer;
       break;
     case ParameterContextKind::Closure:
     case ParameterContextKind::Curried:
@@ -496,6 +503,12 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
     if (Tok.isAny(tok::l_brace, tok::arrow, tok::kw_throws, tok::kw_rethrows))
       diag.fixItInsertAfter(PreviousLoc, "()");
 
+    if (skipIdentifier) {
+      diag.fixItRemove(Tok.getLoc());
+      consumeToken();
+      skipSingle();
+    }
+    
     // Create an empty parameter list to recover.
     return makeParserErrorResult(
         ParameterList::createEmpty(Context, PreviousLoc, PreviousLoc));
@@ -867,7 +880,7 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
   ParserStatus ListStatus =
-    parseList(tok::r_paren, LPLoc, RPLoc, tok::comma, /*OptionalSep=*/false,
+    parseList(tok::r_paren, LPLoc, RPLoc,
               /*AllowSepAfterLast=*/false,
               diag::expected_rparen_tuple_pattern_list,
               [&] () -> ParserStatus {

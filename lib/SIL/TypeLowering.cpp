@@ -338,6 +338,8 @@ namespace {
       case ExistentialRepresentation::Metatype:
         return asImpl().handleTrivial(type);
       }
+
+      llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
     }
     RetTy visitProtocolType(CanProtocolType type) {
       return visitExistentialType(type);
@@ -1210,8 +1212,8 @@ TypeConverter::~TypeConverter() {
 void *TypeLowering::operator new(size_t size, TypeConverter &tc,
                                  IsDependent_t dependent) {
   return dependent
-    ? tc.DependentBPA.Allocate(size, alignof(TypeLowering))
-    : tc.IndependentBPA.Allocate(size, alignof(TypeLowering));
+    ? tc.DependentBPA.Allocate(size, alignof(TypeLowering&))
+    : tc.IndependentBPA.Allocate(size, alignof(TypeLowering&));
 }
 
 const TypeLowering *TypeConverter::find(TypeKey k) {
@@ -1807,6 +1809,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, Context, true);
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 /// Get the generic environment for an entity.
@@ -1853,6 +1857,8 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
     // Use the generic environment of the containing type.
     return c.getDecl()->getDeclContext()->getGenericEnvironmentOfContext();
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 SILType TypeConverter::getSubstitutedStorageType(AbstractStorageDecl *value,
@@ -2259,7 +2265,7 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
     return ABIDifference::NeedsThunk;
 
-  if (fnTy1->getNumAllResults() != fnTy2->getNumAllResults())
+  if (fnTy1->getNumResults() != fnTy2->getNumResults())
     return ABIDifference::NeedsThunk;
 
   // If we don't have a context but the other type does, we'll return
@@ -2268,15 +2274,16 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
       fnTy1->getCalleeConvention() != fnTy2->getCalleeConvention())
     return ABIDifference::NeedsThunk;
 
-  for (unsigned i : indices(fnTy1->getAllResults())) {
-    auto result1 = fnTy1->getAllResults()[i];
-    auto result2 = fnTy2->getAllResults()[i];
+  for (unsigned i : indices(fnTy1->getResults())) {
+    auto result1 = fnTy1->getResults()[i];
+    auto result2 = fnTy2->getResults()[i];
 
     if (result1.getConvention() != result2.getConvention())
       return ABIDifference::NeedsThunk;
 
-    if (checkForABIDifferences(result1.getSILType(), result2.getSILType())
-          != ABIDifference::Trivial)
+    if (checkForABIDifferences(result1.getSILStorageType(),
+                               result2.getSILStorageType())
+        != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
   }
 
@@ -2289,8 +2296,9 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
     if (error1.getConvention() != error2.getConvention())
       return ABIDifference::NeedsThunk;
 
-    if (checkForABIDifferences(error1.getSILType(), error2.getSILType())
-          != ABIDifference::Trivial)
+    if (checkForABIDifferences(error1.getSILStorageType(),
+                               error2.getSILStorageType())
+        != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
   }
 
@@ -2304,8 +2312,9 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
     // make sure to flip the relation around.
     std::swap(param1, param2);
 
-    if (checkForABIDifferences(param1.getSILType(), param2.getSILType())
-          != ABIDifference::Trivial)
+    if (checkForABIDifferences(param1.getSILStorageType(),
+                               param2.getSILStorageType())
+        != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
   }
 

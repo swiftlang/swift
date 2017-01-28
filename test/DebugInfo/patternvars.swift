@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
 
 @_fixed_layout
 public struct UnicodeScalar {
@@ -33,7 +33,7 @@ public func mangle(s: [UnicodeScalar]) -> [UnicodeScalar] {
 // which shares the storage with the expression in the switch statement. Make
 // sure we only emit live range extensions for the storage once per basic block.
 
-// CHECK: define {{.*}}@_TFF11patternvars6mangleFT1sGSaVS_13UnicodeScalar__GSaS0__U_FS0_S0_
+// CHECK: define {{.*}}@_T011patternvars6mangleSayAA13UnicodeScalarVGSayADG1s_tFAdDcfU_
 // CHECK: call void asm sideeffect "", "r"
 // CHECK-NOT: call void asm sideeffect "", "r"
 // CHECK: br {{.*}}label

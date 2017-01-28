@@ -126,8 +126,7 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                      "Compare SDK content in JSON file"),
           clEnumValN(ActionType::DiagnoseSDKs,
                      "diagnose-sdk",
-                     "Diagnose SDK content in JSON file"),
-          clEnumValEnd));
+                     "Diagnose SDK content in JSON file")));
 
 static llvm::cl::list<std::string>
 SDKJsonPaths("input-paths",

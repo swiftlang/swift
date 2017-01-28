@@ -28,6 +28,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/SmallString.h"
 #include <iterator>
@@ -203,15 +204,15 @@ void TemporaryInitialization::finishInitialization(SILGenFunction &gen) {
 
 namespace {
 class EndBorrowCleanup : public Cleanup {
-  SILValue borrowee;
+  SILValue original;
   SILValue borrowed;
 
 public:
-  EndBorrowCleanup(SILValue borrowee, SILValue borrowed)
-      : borrowee(borrowee), borrowed(borrowed) {}
+  EndBorrowCleanup(SILValue original, SILValue borrowed)
+      : original(original), borrowed(borrowed) {}
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.createEndBorrow(l, borrowee, borrowed);
+    gen.B.createEndBorrow(l, borrowed, original);
   }
 };
 } // end anonymous namespace
@@ -716,7 +717,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   // is not address-only.
   SILValue eltValue;
   if (!value.getType().isAddress())
-    eltValue = contBB->createPHIArgument(eltTy);
+    eltValue = contBB->createPHIArgument(eltTy, ValueOwnershipKind::Owned);
 
   if (subInit == nullptr) {
     // If there is no subinitialization, then we are done matching.  Don't
@@ -1159,9 +1160,9 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
   return Cleanups.getTopCleanup();
 }
 
-CleanupHandle SILGenFunction::enterEndBorrowCleanup(SILValue borrowee,
+CleanupHandle SILGenFunction::enterEndBorrowCleanup(SILValue original,
                                                     SILValue borrowed) {
-  Cleanups.pushCleanup<EndBorrowCleanup>(borrowee, borrowed);
+  Cleanups.pushCleanup<EndBorrowCleanup>(original, borrowed);
   return Cleanups.getTopCleanup();
 }
 
@@ -1242,9 +1243,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::Struct:
   case DeclKind::Class: {
     // Emit witness tables.
-    for (auto c : cast<NominalTypeDecl>(d)->getLocalConformances(
-                    ConformanceLookupKind::All,
-                    nullptr, /*sorted=*/true)) {
+    auto nom = cast<NominalTypeDecl>(d);
+    for (auto c : nom->getLocalConformances(ConformanceLookupKind::All,
+                                            nullptr, /*sorted=*/true)) {
       auto *proto = c->getProtocol();
       if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
           isa<NormalProtocolConformance>(c) &&
@@ -1606,7 +1607,7 @@ public:
 
       ProtocolConformanceRef conformance(protocol);
       // If the associated type requirement is satisfied by an associated type,
-      // these will all be null.
+      // these will all be abstract conformances.
       if (witness.getConformances()[0].isConcrete()) {
         auto foundConformance = std::find_if(witness.getConformances().begin(),
                                         witness.getConformances().end(),
@@ -1616,6 +1617,7 @@ public:
         assert(foundConformance != witness.getConformances().end());
         conformance = *foundConformance;
       }
+      SGM.useConformance(conformance);
 
       Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
         td, protocol, conformance
@@ -1776,9 +1778,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       specialized = ctx.getSpecializedConformance(concreteTy, conformance,
                                                   concreteSubs);
 
-    SmallVector<ProtocolConformanceRef, 1> conformances;
-    conformances.push_back(ProtocolConformanceRef(specialized));
-    reqtSubs.addConformances(selfTy, ctx.AllocateCopy(conformances));
+    reqtSubs.addConformance(selfTy, ProtocolConformanceRef(specialized));
 
     auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
     auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();

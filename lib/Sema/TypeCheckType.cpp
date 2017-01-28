@@ -26,6 +26,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -156,10 +157,37 @@ Type TypeChecker::getNSObjectType(DeclContext *dc) {
 }
 
 Type TypeChecker::getNSErrorType(DeclContext *dc) {
-  return getObjectiveCNominalType(*this, NSObjectType, Context.Id_Foundation,
+  return getObjectiveCNominalType(*this, NSErrorType, Context.Id_Foundation,
                                   Context.getSwiftId(
                                     KnownFoundationEntity::NSError),
                                   dc);
+}
+
+Type TypeChecker::getNSNumberType(DeclContext *dc) {
+  return getObjectiveCNominalType(*this, NSNumberType, Context.Id_Foundation,
+                                  Context.getSwiftId(
+                                               KnownFoundationEntity::NSNumber),
+                                  dc);
+}
+
+Type TypeChecker::getNSValueType(DeclContext *dc) {
+  return getObjectiveCNominalType(*this, NSValueType, Context.Id_Foundation,
+                                  Context.getSwiftId(
+                                               KnownFoundationEntity::NSValue),
+                                  dc);
+}
+
+bool TypeChecker::isObjCClassWithMultipleSwiftBridgedTypes(Type t,
+                                                           DeclContext *dc) {
+  if (auto nsNumber = getNSNumberType(dc)) {
+    if (t->isEqual(nsNumber))
+      return true;
+  }
+  if (auto nsValue = getNSValueType(dc)) {
+    if (t->isEqual(nsValue))
+      return true;
+  }
+  return false;
 }
 
 Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
@@ -467,8 +495,13 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
 
     // Don't add fixit on module type; that isn't the right type regardless
     // of whether it had generic arguments.
-    if (!type->is<ModuleType>())
-      diag.fixItRemove(generic->getAngleBrackets());
+    if (!type->is<ModuleType>()) {
+      // When turning a SourceRange into CharSourceRange the closing angle
+      // brackets on nested generics are lexed as one token.
+      SourceRange angles = generic->getAngleBrackets();
+      diag.fixItRemoveChars(angles.Start,
+                            angles.End.getAdvancedLocOrInvalid(1));
+    }
 
     generic->setInvalid();
     return type;
@@ -2379,8 +2412,6 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_owned, ParameterConvention::Direct_Owned);
     checkFor(TypeAttrKind::TAK_guaranteed,
              ParameterConvention::Direct_Guaranteed);
-    checkFor(TypeAttrKind::TAK_deallocating,
-             ParameterConvention::Direct_Deallocating);
 
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
   } else {
@@ -3205,7 +3236,8 @@ bool TypeChecker::isRepresentableInObjC(
       // Global computed properties may however @_cdecl their accessors.
       auto storage = FD->getAccessorStorageDecl();
       validateDecl(storage);
-      if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl) {
+      if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl &&
+          Reason != ObjCReason::WitnessToObjC) {
         if (Diagnose) {
           auto error = FD->isGetter()
                     ? (isa<VarDecl>(storage) 
@@ -3220,25 +3252,27 @@ bool TypeChecker::isRepresentableInObjC(
         }
         return false;
       }
-    } else {
-      unsigned ExpectedParamPatterns = 1;
-      if (FD->getImplicitSelfDecl())
-        ExpectedParamPatterns++;
-      if (FD->getParameterLists().size() != ExpectedParamPatterns) {
+
+      // willSet/didSet implementations are never exposed to objc, they are
+      // always directly dispatched from the synthesized setter.
+      if (FD->isObservingAccessor()) {
         if (Diagnose) {
-          diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried,
-                   getObjCDiagnosticAttrKind(Reason));
+          diagnose(AFD->getLoc(), diag::objc_observing_accessor);
           describeObjCReason(*this, AFD, Reason);
         }
         return false;
       }
+      assert(FD->isGetterOrSetter() && "missing diags for other accessors");
+      return true;
     }
 
-    // willSet/didSet implementations are never exposed to objc, they are always
-    // directly dispatched from the synthesized setter.
-    if (FD->isObservingAccessor()) {
+    unsigned ExpectedParamPatterns = 1;
+    if (FD->getImplicitSelfDecl())
+      ExpectedParamPatterns++;
+    if (FD->getParameterLists().size() != ExpectedParamPatterns) {
       if (Diagnose) {
-        diagnose(AFD->getLoc(), diag::objc_observing_accessor);
+        diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried,
+                 getObjCDiagnosticAttrKind(Reason));
         describeObjCReason(*this, AFD, Reason);
       }
       return false;

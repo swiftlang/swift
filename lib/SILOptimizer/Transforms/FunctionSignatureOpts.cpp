@@ -451,16 +451,16 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
   // back into the all-results list.
   llvm::SmallVector<SILResultInfo, 8> InterfaceResults;
   auto &ResultDescs = ResultDescList;
-  for (SILResultInfo InterfaceResult : FTy->getAllResults()) {
-    if (InterfaceResult.isDirect()) {
+  for (SILResultInfo InterfaceResult : FTy->getResults()) {
+    if (InterfaceResult.isFormalDirect()) {
       auto &RV = ResultDescs[0];
       if (!RV.CalleeRetain.empty()) {
         ++NumOwnedConvertedToNotOwnedResult;
         InterfaceResults.push_back(SILResultInfo(InterfaceResult.getType(),
                                                  ResultConvention::Unowned));
         continue;
-      }   
-    }   
+      }
+    }
 
     InterfaceResults.push_back(InterfaceResult);
   }
@@ -539,17 +539,19 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // now.
   SILValue ReturnValue;
   SILType LoweredType = NewF->getLoweredType();
-  SILType ResultType = LoweredType.getFunctionInterfaceResultType();
+  SILType ResultType = NewF->getConventions().getSILResultType();
   auto FunctionTy = LoweredType.castTo<SILFunctionType>();
   if (FunctionTy->hasErrorResult()) {
     // We need a try_apply to call a function with an error result.
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
-    ReturnValue = NormalBlock->createPHIArgument(ResultType);
+    ReturnValue =
+        NormalBlock->createPHIArgument(ResultType, ValueOwnershipKind::Owned);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createPHIArgument(Error);
+    auto *ErrorArg =
+        ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
@@ -669,9 +671,9 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
 }
 
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeResults() {
-  auto FTy = F->getLoweredFunctionType();
+  auto fnConv = F->getConventions();
   // For now, only do anything if there's a single direct result.
-  if (FTy->getDirectResults().size() != 1)
+  if (fnConv.getNumDirectSILResults() != 1)
     return false; 
 
   bool SignatureOptimize = false;
@@ -706,6 +708,10 @@ void FunctionSignatureTransform::OwnedToGuaranteedTransformFunctionParameters() 
     for (auto &X : AD.CalleeReleaseInThrowBlock) { 
       X->eraseFromParent();
     }
+
+    // Now we need to replace the FunctionArgument so that we have the correct
+    // ValueOwnershipKind.
+    AD.Arg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
   }
 }
 
@@ -846,10 +852,12 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     // order of leaf values matches the order of leaf types.
     llvm::SmallVector<const ProjectionTreeNode*, 8> LeafNodes;
     AD.ProjTree.getLeafNodes(LeafNodes);
-    for (auto Node : LeafNodes) {
-      LeafValues.push_back(
-          BB->insertFunctionArgument(ArgOffset++, Node->getType(),
-                                     BB->getArgument(OldArgIndex)->getDecl()));
+
+    for (auto *Node : LeafNodes) {
+      auto OwnershipKind = *AD.getTransformedOwnershipKind(Node->getType());
+      LeafValues.push_back(BB->insertFunctionArgument(
+          ArgOffset++, Node->getType(), OwnershipKind,
+          BB->getArgument(OldArgIndex)->getDecl()));
       AIM[TotalArgIndex - 1] = AD.Index;
       TotalArgIndex ++;
     }
@@ -943,7 +951,7 @@ public:
     for (unsigned i = 0, e = Args.size(); i != e; ++i) {
       ArgumentDescList.emplace_back(Args[i]);
     }
-    for (SILResultInfo IR : F->getLoweredFunctionType()->getAllResults()) {
+    for (SILResultInfo IR : F->getLoweredFunctionType()->getResults()) {
       ResultDescList.emplace_back(IR);
     }
 

@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
 class Class {
-// CHECK: _TtQq_FC5atype5Class8function
+// CHECK: tag: DW_TAG_structure_type, name: "_T05atype5ClassC8functionyxlFQq_D"
   func function<T>(_ x: T) {
     markUsed("hello world")
   }

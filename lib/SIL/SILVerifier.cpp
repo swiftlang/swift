@@ -24,6 +24,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/TypeLowering.h"
@@ -340,17 +341,17 @@ public:
     };
     
     // Check the results.
-    _require(type1->getNumAllResults() == type2->getNumAllResults(),
-             what, complain("different number of results"));
-    for (unsigned i : indices(type1->getAllResults())) {
-      auto result1 = type1->getAllResults()[i];
-      auto result2 = type2->getAllResults()[i];
+    _require(type1->getNumResults() == type2->getNumResults(), what,
+             complain("different number of results"));
+    for (unsigned i : indices(type1->getResults())) {
+      auto result1 = type1->getResults()[i];
+      auto result2 = type2->getResults()[i];
 
       _require(result1.getConvention() == result2.getConvention(), what,
                complain("Different return value conventions"));
-      _require(areABICompatibleParamsOrReturns(result1.getSILType(),
-                                               result2.getSILType()), what,
-               complain("ABI-incompatible return values"));
+      _require(areABICompatibleParamsOrReturns(result1.getSILStorageType(),
+                                               result2.getSILStorageType()),
+               what, complain("ABI-incompatible return values"));
     }
 
     // Our error result conventions are designed to be ABI compatible
@@ -361,9 +362,9 @@ public:
       auto error2 = type2->getErrorResult();
       _require(error1.getConvention() == error2.getConvention(), what,
                complain("Different error result conventions"));
-      _require(areABICompatibleParamsOrReturns(error1.getSILType(),
-                                               error2.getSILType()), what,
-               complain("ABI-incompatible error results"));
+      _require(areABICompatibleParamsOrReturns(error1.getSILStorageType(),
+                                               error2.getSILStorageType()),
+               what, complain("ABI-incompatible error results"));
     }
 
     // Check the parameters.
@@ -380,9 +381,9 @@ public:
                complainBy([=] {
                  llvm::dbgs() << "Different conventions for parameter " << i;
                }));
-      _require(areABICompatibleParamsOrReturns(param1.getSILType(),
-                                               param2.getSILType()), what,
-               complainBy([=] {
+      _require(areABICompatibleParamsOrReturns(param1.getSILStorageType(),
+                                               param2.getSILStorageType()),
+               what, complainBy([=] {
                  llvm::dbgs() << "ABI-incompatible types for parameter " << i;
                }));
     }
@@ -391,10 +392,10 @@ public:
   void requireSameFunctionComponents(CanSILFunctionType type1,
                                      CanSILFunctionType type2,
                                      const Twine &what) {
-    require(type1->getNumAllResults() == type2->getNumAllResults(),
+    require(type1->getNumResults() == type2->getNumResults(),
             "results of " + what + " do not match in count");
-    for (auto i : indices(type1->getAllResults())) {
-      require(type1->getAllResults()[i] == type2->getAllResults()[i],
+    for (auto i : indices(type1->getResults())) {
+      require(type1->getResults()[i] == type2->getResults()[i],
               "result " + Twine(i) + " of " + what + " do not match");
     }
     require(type1->getParameters().size() ==
@@ -846,34 +847,28 @@ public:
             "substituted callee type does not match substitutions");
 
     // Check that the arguments and result match.
+    SILFunctionConventions fnConv(substTy, F.getModule());
     //require(site.getArguments().size() == substTy->getNumSILArguments(),
-    require(site.getNumCallArguments() == substTy->getNumSILArguments(),
+    require(site.getNumCallArguments() == fnConv.getNumSILArguments(),
             "apply doesn't have right number of arguments for function");
-    auto numIndirects = substTy->getNumIndirectResults();
     for (size_t i = 0, size = site.getNumCallArguments(); i < size; ++i) {
-      if (i < numIndirects) {
-        requireSameType(site.getArguments()[i]->getType(),
-                        substTy->getIndirectResults()[i].getSILType(),
-                        "operand of 'apply' doesn't match function input type");
-      } else {
-        requireSameType(site.getArguments()[i]->getType(),
-                        substTy->getParameters()[i - numIndirects].getSILType(),
-                        "operand of 'apply' doesn't match function input type");
-      }
+      requireSameType(site.getArguments()[i]->getType(),
+                      fnConv.getSILArgumentType(i),
+                      "operand of 'apply' doesn't match function input type");
     }
   }
 
   void checkApplyInst(ApplyInst *AI) {
     checkFullApplySite(AI);
 
-    auto substTy = AI->getSubstCalleeType();
-    require(AI->getType() == substTy->getSILResult(),
+    SILFunctionConventions fnConv(AI->getSubstCalleeType(), F.getModule());
+    require(AI->getType() == fnConv.getSILResultType(),
             "type of apply instruction doesn't match function result type");
     if (AI->isNonThrowing()) {
-      require(substTy->hasErrorResult(),
+      require(fnConv.funcTy->hasErrorResult(),
               "nothrow flag used for callee without error result");
     } else {
-      require(!substTy->hasErrorResult(),
+      require(!fnConv.funcTy->hasErrorResult(),
               "apply instruction cannot call function with error result");
     }
 
@@ -889,23 +884,23 @@ public:
   void checkTryApplyInst(TryApplyInst *AI) {
     checkFullApplySite(AI);
 
-    auto substTy = AI->getSubstCalleeType();
+    SILFunctionConventions fnConv(AI->getSubstCalleeType(), F.getModule());
 
     auto normalBB = AI->getNormalBB();
     require(normalBB->args_size() == 1,
             "normal destination of try_apply must take one argument");
     requireSameType((*normalBB->args_begin())->getType(),
-                    substTy->getSILResult(),
+                    fnConv.getSILResultType(),
                     "normal destination of try_apply must take argument "
                     "of normal result type");
 
     auto errorBB = AI->getErrorBB();
-    require(substTy->hasErrorResult(),
+    require(fnConv.funcTy->hasErrorResult(),
             "try_apply must call function with error result");
     require(errorBB->args_size() == 1,
             "error destination of try_apply must take one argument");
     requireSameType((*errorBB->args_begin())->getType(),
-                    substTy->getErrorResult().getSILType(),
+                    fnConv.getSILErrorType(),
                     "error destination of try_apply must take argument "
                     "of error result type");
   }
@@ -969,12 +964,12 @@ public:
             "result of partial_apply should take as many inputs as were not "
             "applied by the instruction");
 
-    unsigned offset =
-      substTy->getParameters().size() - PAI->getArguments().size();
-
+    SILFunctionConventions substConv(substTy, F.getModule());
+    unsigned appliedArgStartIdx =
+        substConv.getNumSILArguments() - PAI->getNumArguments();
     for (unsigned i = 0, size = PAI->getArguments().size(); i < size; ++i) {
       require(PAI->getArguments()[i]->getType()
-                == substTy->getParameters()[i + offset].getSILType(),
+                  == substConv.getSILArgumentType(appliedArgStartIdx + i),
               "applied argument types do not match suffix of function type's "
               "inputs");
     }
@@ -989,11 +984,11 @@ public:
               "of original function");
     }
 
-    require(resultInfo->getNumAllResults() == substTy->getNumAllResults(),
+    require(resultInfo->getNumResults() == substTy->getNumResults(),
             "applied results do not agree in count with function type");
-    for (unsigned i = 0, size = resultInfo->getNumAllResults(); i < size; ++i) {
-      auto originalResult = resultInfo->getAllResults()[i];
-      auto expectedResult = substTy->getAllResults()[i];
+    for (unsigned i = 0, size = resultInfo->getNumResults(); i < size; ++i) {
+      auto originalResult = resultInfo->getResults()[i];
+      auto expectedResult = substTy->getResults()[i];
 
       // The "returns inner pointer" convention doesn't survive through a
       // partial application, since the thunk takes responsibility for
@@ -1184,8 +1179,8 @@ public:
     // We allow for end_borrow to express relationships in between addresses and
     // values, but we require that the types are the same ignoring value
     // category.
-    require(EBI->getDest()->getType().getObjectType() ==
-                EBI->getSrc()->getType().getObjectType(),
+    require(EBI->getBorrowedValue()->getType().getObjectType() ==
+                EBI->getOriginalValue()->getType().getObjectType(),
             "end_borrow can only relate the same types ignoring value "
             "category");
   }
@@ -1312,7 +1307,7 @@ public:
     auto SubstInitStorageTy = InitStorageTy->substGenericArgs(F.getModule(),
                                              MU->getInitStorageSubstitutions());
     // FIXME: Destructured value or results?
-    require(SubstInitStorageTy->getAllResults().size() == 1,
+    require(SubstInitStorageTy->getResults().size() == 1,
             "mark_uninitialized initializer must have one result");
     auto StorageTy = SILType::getPrimitiveAddressType(
                               SubstInitStorageTy->getSingleResult().getType());
@@ -1327,10 +1322,11 @@ public:
                                                MU->getSetterSubstitutions());
     require(SubstSetterTy->getParameters().size() == 2,
             "mark_uninitialized setter must have a value and self param");
-    auto SelfTy = SubstSetterTy->getSelfParameter().getSILType();
-    requireSameType(SelfTy, MU->getSelf()->getType(),
+    auto silConv = SILModuleConventions(F.getModule());
+    requireSameType(silConv.getSILType(SubstSetterTy->getSelfParameter()),
+                    MU->getSelf()->getType(),
                     "self type must match setter's self parameter type");
-    
+
     auto ValueTy = SubstInitStorageTy->getParameters()[0].getType();
     requireSameType(SILType::getPrimitiveAddressType(ValueTy),
                     SILType::getPrimitiveAddressType(
@@ -1916,7 +1912,8 @@ public:
   }
   
   SILType getMethodSelfType(CanSILFunctionType ft) {
-    return ft->getParameters().back().getSILType();
+    auto silConv = SILModuleConventions(F.getModule());
+    return silConv.getSILType(ft->getParameters().back());
   }
 
   void checkWitnessMethodInst(WitnessMethodInst *AMI) {
@@ -1997,7 +1994,7 @@ public:
     dynParams.push_back(SILParameterInfo(selfType.getSwiftRValueType(),
                                          params.back().getConvention()));
 
-    auto results = methodTy->getAllResults();
+    auto results = methodTy->getResults();
     SmallVector<SILResultInfo, 4> dynResults(results.begin(), results.end());    
 
     // If the method returns Self, substitute AnyObject for the result type.
@@ -2800,8 +2797,8 @@ public:
   void checkReturnInst(ReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
 
-    CanSILFunctionType ti = F.getLoweredFunctionType();
-    SILType functionResultType = F.mapTypeIntoContext(ti->getSILResult());
+    SILType functionResultType =
+        F.mapTypeIntoContext(F.getConventions().getSILResultType());
     SILType instResultType = RI->getOperand()->getType();
     DEBUG(llvm::dbgs() << "function return type: ";
           functionResultType.dump();
@@ -2818,8 +2815,8 @@ public:
     require(fnType->hasErrorResult(),
             "throw in function that doesn't have an error result");
 
-    SILType functionResultType
-      = F.mapTypeIntoContext(fnType->getErrorResult().getSILType());
+    SILType functionResultType =
+        F.mapTypeIntoContext(F.getConventions().getSILErrorType());
     SILType instResultType = TI->getOperand()->getType();
     DEBUG(llvm::dbgs() << "function error result type: ";
           functionResultType.dump();
@@ -3195,9 +3192,9 @@ public:
     require(blockTy, "result must be a function");
     require(blockTy->getRepresentation() == SILFunctionType::Representation::Block,
             "result must be a cdecl block function");
-    require(blockTy->getAllResults() == invokeTy->getAllResults(),
+    require(blockTy->getResults() == invokeTy->getResults(),
             "result must have same results as invoke function");
-    
+
     require(blockTy->getParameters().size() + 1
               == invokeTy->getParameters().size(),
           "result must match all parameters of invoke function but the first");
@@ -3251,50 +3248,62 @@ public:
   }
 
   void verifyEntryPointArguments(SILBasicBlock *entry) {
-    SILFunctionType *ti = F.getLoweredFunctionType();
-
+    auto fnConv = F.getConventions();
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
           for (auto *arg
                : make_range(entry->args_begin(), entry->args_end()))
               arg->getType()
                   .dump();
           llvm::dbgs() << "Input types for SIL function type ";
-          ti->print(llvm::dbgs()); llvm::dbgs() << ":\n";
-          for (auto input
-               : ti->getParameters()) input.getSILType()
-              .dump(););
+          F.getLoweredFunctionType()->print(llvm::dbgs());
+          llvm::dbgs() << ":\n";
+          for (auto paramTy
+               : fnConv.getParameterSILTypes()) { paramTy.dump(); });
 
-    require(entry->args_size() ==
-                ti->getNumIndirectResults() + ti->getParameters().size(),
+    require(entry->args_size() == (fnConv.getNumIndirectSILResults()
+                                   + fnConv.getNumParameters()),
             "entry point has wrong number of arguments");
 
     bool matched = true;
     auto argI = entry->args_begin();
+    SILModule &M = F.getModule();
+    auto funcConv = F.getConventions();
 
     auto check = [&](const char *what, SILType ty) {
       auto mappedTy = F.mapTypeIntoContext(ty);
-      SILArgument *bbarg = *argI++;
+      SILArgument *bbarg = *argI;
+      ++argI;
+      auto ownershipkind = ValueOwnershipKind(
+          M, mappedTy, funcConv.getSILArgumentConvention(bbarg->getIndex()));
       if (bbarg->getType() != mappedTy) {
         llvm::errs() << what << " type mismatch!\n";
         llvm::errs() << "  argument: "; bbarg->dump();
         llvm::errs() << "  expected: "; mappedTy.dump();
         matched = false;
       }
+
+      if (bbarg->getOwnershipKind() != ownershipkind) {
+        llvm::errs() << what << " ownership kind mismatch!\n";
+        llvm::errs() << "  argument: " << bbarg->getOwnershipKind() << '\n';
+        llvm::errs() << "  expected: " << ownershipkind << '\n';
+        matched = false;
+      }
     };
 
-    for (auto result : ti->getIndirectResults()) {
-      assert(result.isIndirect());
-      check("result", result.getSILType());
+    for (auto result : fnConv.getIndirectSILResults()) {
+      assert(fnConv.isSILIndirect(result));
+      check("result", fnConv.getSILType(result));
     }
-    for (auto param : ti->getParameters()) {
-      check("parameter", param.getSILType());
+    for (auto param : F.getLoweredFunctionType()->getParameters()) {
+      check("parameter", fnConv.getSILType(param));
     }
 
     require(matched, "entry point argument types do not match function type");
 
     // TBAA requirement for all address arguments.
-    require(std::equal(entry->args_begin() + ti->getNumIndirectResults(),
-                       entry->args_end(), ti->getParameters().begin(),
+    require(std::equal(entry->args_begin() + fnConv.getNumIndirectSILResults(),
+                       entry->args_end(),
+                       fnConv.funcTy->getParameters().begin(),
                        [&](SILArgument *bbarg, SILParameterInfo paramInfo) {
                          if (!bbarg->getType().isAddress())
                            return true;

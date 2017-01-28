@@ -13,7 +13,6 @@
 #ifndef SWIFT_SERIALIZATION_MODULEFILE_H
 #define SWIFT_SERIALIZATION_MODULEFILE_H
 
-#include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
@@ -37,6 +36,9 @@ namespace llvm {
 }
 
 namespace swift {
+class Decl;
+class FileUnit;
+class ModuleDecl;
 class Pattern;
 class ProtocolConformance;
 
@@ -55,12 +57,6 @@ class ModuleFile : public LazyMemberLoader {
   /// The module file data.
   std::unique_ptr<llvm::MemoryBuffer> ModuleInputBuffer;
   std::unique_ptr<llvm::MemoryBuffer> ModuleDocInputBuffer;
-
-  /// The reader attached to \c ModuleInputBuffer.
-  llvm::BitstreamReader ModuleInputReader;
-
-  /// The reader attached to \c ModuleDocInputBuffer.
-  llvm::BitstreamReader ModuleDocInputReader;
 
   /// The cursor used to lazily load things from the file.
   llvm::BitstreamCursor DeclTypeCursor;
@@ -320,6 +316,10 @@ private:
   using SerializedLocalDeclTable =
       llvm::OnDiskIterableChainedHashTable<LocalDeclTableInfo>;
 
+  class NestedTypeDeclsTableInfo;
+  using SerializedNestedTypeDeclsTable =
+      llvm::OnDiskIterableChainedHashTable<NestedTypeDeclsTableInfo>;
+
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> PrecedenceGroupDecls;
@@ -327,6 +327,7 @@ private:
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
   std::unique_ptr<SerializedLocalDeclTable> LocalTypeDecls;
+  std::unique_ptr<SerializedNestedTypeDeclsTable> NestedTypeDecls;
 
   class ObjCMethodTableInfo;
   using SerializedObjCMethodTable =
@@ -444,6 +445,11 @@ private:
   /// index_block::ObjCMethodTableLayout format.
   std::unique_ptr<ModuleFile::SerializedObjCMethodTable>
   readObjCMethodTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Read an on-disk local decl hash table stored in
+  /// index_block::NestedTypeDeclsLayout format.
+  std::unique_ptr<SerializedNestedTypeDeclsTable>
+  readNestedTypeDeclsTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
   /// Reads the index block, which contains global tables.
   ///
@@ -583,6 +589,10 @@ public:
 
   /// Searches the module's local type decls for the given mangled name.
   TypeDecl *lookupLocalType(StringRef MangledName);
+
+  /// Searches the module's nested type decls table for the given member of
+  /// the given type.
+  TypeDecl *lookupNestedType(Identifier name, const ValueDecl *parent);
 
   /// Searches the module's operators for one with the given name and fixity.
   ///

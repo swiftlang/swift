@@ -2,7 +2,7 @@
 // RUN: %build-clang-importer-objc-overlays
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -typecheck %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir %s -D IRGEN | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -Xllvm -new-mangling-for-tests -I %S/Inputs/custom-modules -emit-ir %s -D IRGEN | %FileCheck %s
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -print-module -source-filename="%s" -module-to-print SwiftPrivateAttr > %t.txt
 // RUN: %FileCheck -check-prefix=GENERATED-NEGATIVE %s < %t.txt
@@ -91,17 +91,17 @@ public func testTopLevel() {
 #endif
 }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaCSo12__PrivFooSub{{.*}} {
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T0So12__PrivFooSubCMa{{.*}} {
 // CHECK: %objc_class** @"OBJC_CLASS_REF_$_PrivFooSub"
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfT2__Vs5Int32_GSQS__
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarCSQyABGs5Int32V2___tcfcTO
 // CHECK: @"\01L_selector(init:)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfT9__twoArgsVs5Int325otherS0__GSQS__
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarCSQyABGs5Int32V9__twoArgs_AD5othertcfcTO
 // CHECK: @"\01L_selector(initWithTwoArgs:other:)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfT8__oneArgVs5Int32_GSQS__
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarCSQyABGs5Int32V8__oneArg_tcfcTO
 // CHECK: @"\01L_selector(initWithOneArg:)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfT8__noArgsT__GSQS__
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarCSQyABGyt8__noArgs_tcfcTO
 // CHECK: @"\01L_selector(initWithNoArgs)"
 
 _ = __PrivAnonymousA

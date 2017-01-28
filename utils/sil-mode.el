@@ -73,7 +73,7 @@
                   'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Borrowing
-   `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow") 'words) . font-lock-keyword-face)
+   `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow" "end_borrow_argument") 'words) . font-lock-keyword-face)
    '("\\(end_borrow\\) %[[:alnum:]] \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
 
    ;; SIL Instructions - Reference Counting.
@@ -108,6 +108,7 @@
                     "tuple_element_addr" "struct" "struct_extract"
                     "struct_element_addr" "ref_element_addr"
                     "autorelease_value" "copy_value" "destroy_value"
+                    "unmanaged_retain_value" "unmanaged_release_value"
                     "copy_unowned_value")
                   'words) . font-lock-keyword-face)
    ;; Enums. *NOTE* We do not include enum itself here since enum is a
@@ -118,9 +119,10 @@
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential_addr" "deinit_existential_addr"
-                    "open_existential_addr" "alloc_existential_box"
-                    "init_existential_ref" "project_existential_box"
-                    "open_existential_ref" "open_existential_box"
+                    "open_existential_addr"
+                    "alloc_existential_box" "project_existential_box"
+                    "open_existential_box" "dealloc_existential_box"
+                    "init_existential_ref" "open_existential_ref"
                     "open_existential_metatype"
                     "objc_protocol")
                   'words) . font-lock-keyword-face)

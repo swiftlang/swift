@@ -541,7 +541,6 @@ public struct ${Self}<
     return base.removeFirst()
   }
 
-  @discardableResult
   public mutating func removeFirst(_ n: Int) {
     Log.removeFirstN[selfType] += 1
     base.removeFirst(n)

@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -1041,7 +1042,7 @@ int ConformanceLookupTable::compareProtocolConformances(
         }
 
         // Otherwise, order by buffer identifier.
-        return StringRef(ctx.SourceMgr.getIdentifierForBuffer(lhsBuffer))
+        return ctx.SourceMgr.getIdentifierForBuffer(lhsBuffer)
                  .compare(ctx.SourceMgr.getIdentifierForBuffer(rhsBuffer));
       }
     }

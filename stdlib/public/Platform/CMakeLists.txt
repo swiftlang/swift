@@ -7,7 +7,7 @@ set(swift_platform_sources
     tgmath.swift.gyb)
 
 add_swift_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-    Darwin.swift
+    Darwin.swift.gyb
     ${swift_platform_sources}
     POSIXError.swift
     MachError.swift
@@ -18,7 +18,7 @@ add_swift_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     API_NOTES_NON_OVERLAY)
 
 add_swift_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-    Glibc.swift
+    Glibc.swift.gyb
     ${swift_platform_sources}
 
     SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"

@@ -780,7 +780,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   // Do we need to lifetime-extend self?
   bool lifetimeExtendsSelf;
-  auto results = origMethodType->getAllResults();
+  auto results = origMethodType->getResults();
   if (results.size() == 1) {
     switch (results[0].getConvention()) {
     case ResultConvention::UnownedInnerPointer:
@@ -802,7 +802,6 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   bool retainsSelf;
   switch (origMethodType->getParameters().back().getConvention()) {
   case ParameterConvention::Direct_Unowned:
-  case ParameterConvention::Direct_Deallocating:
     retainsSelf = false;
     break;
   case ParameterConvention::Direct_Guaranteed:
@@ -833,13 +832,13 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   llvm::Value *formalIndirectResult = nullptr;
   llvm::Value *indirectedDirectResult = nullptr;
   const LoadableTypeInfo *indirectedResultTI = nullptr;
-  if (origMethodType->hasIndirectResults()) {
+  if (origMethodType->hasIndirectFormalResults()) {
     // We should never import an ObjC method as returning a tuple which
     // would get broken up into multiple results like this.
-    assert(origMethodType->getNumIndirectResults() == 1);
+    assert(origMethodType->getNumIndirectFormalResults() == 1);
     formalIndirectResult = params.claimNext();
   } else {
-    SILType appliedResultTy = origMethodType->getSILResult();
+    SILType appliedResultTy = origMethodType->getDirectFormalResultsType();
     indirectedResultTI =
       &cast<LoadableTypeInfo>(IGM.getTypeInfo(appliedResultTy));
     if (indirectedResultTI->getSchema().requiresIndirectResult(IGM)) {
@@ -857,14 +856,14 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
 
   for (auto info : origParamInfos) {
     // Addresses consist of a single pointer argument.
-    if (isIndirectParameter(info.getConvention())) {
+    if (isIndirectFormalParameter(info.getConvention())) {
       translatedParams.add(params.claimNext());
       continue;
     }
     // Otherwise, we have a loadable type that can either be passed directly or
     // indirectly.
-    assert(info.getSILType().isObject());
-    auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(info.getSILType()));
+    assert(info.getSILStorageType().isObject());
+    auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(info.getSILStorageType()));
     auto schema = ti.getSchema();
 
     // Load the indirectly passed parameter.
@@ -919,7 +918,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     emission.emitToExplosion(result);
     cleanup();
     auto &callee = emission.getCallee();
-    auto resultType = callee.getOrigFunctionType()->getSILResult();
+    auto resultType =
+        callee.getOrigFunctionType()->getDirectFormalResultsType();
     subIGF.emitScalarReturn(resultType, result);
   }
   
@@ -1100,7 +1100,8 @@ static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,
   auto getter = property->getGetter();
   assert(getter);
   CanSILFunctionType methodTy = getObjCMethodType(IGM, getter);
-  return IGM.getClangType(methodTy->getCSemanticResult().getSwiftRValueType());
+  return IGM.getClangType(
+      methodTy->getFormalCSemanticResult().getSwiftRValueType());
 }
 
 void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
@@ -1165,7 +1166,7 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
 static llvm::Constant *getObjCEncodingForMethodType(IRGenModule &IGM,
                                                     CanSILFunctionType fnType,
                                                     bool useExtendedEncoding) {
-  SILType resultType = fnType->getCSemanticResult();
+  SILType resultType = fnType->getFormalCSemanticResult();
 
   // Get the inputs without 'self'.
   auto inputs = fnType->getParameters().drop_back();
@@ -1403,7 +1404,7 @@ irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
 llvm::Constant *
 irgen::getBlockTypeExtendedEncoding(IRGenModule &IGM,
                                     CanSILFunctionType invokeTy) {
-  SILType resultType = invokeTy->getCSemanticResult();
+  SILType resultType = invokeTy->getFormalCSemanticResult();
 
   // Skip the storage pointer, which is encoded as '@?' to avoid the infinite
   // recursion of the usual '@?<...>' rule for blocks.

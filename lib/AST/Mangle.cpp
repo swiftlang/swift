@@ -531,6 +531,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
       for (auto &reqt : sig->getRequirements()) {
         switch (reqt.getKind()) {
         case RequirementKind::Conformance:
+        case RequirementKind::Layout:
         case RequirementKind::Superclass:
           // We don't need the requirement if the constrained type is above the
           // method depth.
@@ -590,6 +591,45 @@ void Mangler::mangleConstrainedType(CanType type) {
     return;
   }
   mangleType(type, 0);
+}
+
+void Mangler::mangleLayoutConstraint(LayoutConstraint layout) {
+  switch (layout->getKind()) {
+  case LayoutConstraintKind::UnknownLayout:
+    Buffer << "U";
+    break;
+  case LayoutConstraintKind::RefCountedObject:
+    Buffer << "R";
+    break;
+  case LayoutConstraintKind::NativeRefCountedObject:
+    Buffer << "N";
+    break;
+  case LayoutConstraintKind::Trivial:
+    Buffer << "T";
+    break;
+  case LayoutConstraintKind::TrivialOfExactSize:
+    if (layout->getAlignment())
+      Buffer << "E";
+    else
+      Buffer << "e";
+    Buffer << layout->getTrivialSizeInBits();
+    if (layout->getAlignment()) {
+      Buffer << "_";
+      Buffer << layout->getAlignment();
+    }
+    break;
+  case LayoutConstraintKind::TrivialOfAtMostSize:
+    if (layout->getAlignment())
+      Buffer << "M";
+    else
+      Buffer << "m";
+    Buffer << layout->getTrivialSizeInBits();
+    if (layout->getAlignment()) {
+      Buffer << "_";
+      Buffer << layout->getAlignment();
+    }
+    break;
+  }
 }
 
 bool Mangler::
@@ -666,6 +706,18 @@ mangle_requirements:
       mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
       mangleProtocolName(
                       reqt.getSecondType()->castTo<ProtocolType>()->getDecl());
+      break;
+
+    case RequirementKind::Layout:
+      if (!didMangleRequirement) {
+        Buffer << 'R';
+        didMangleRequirement = true;
+      }
+      // TODO: We could golf this a little more by assuming the first type
+      // is a dependent type.
+      mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
+      Buffer << 'l';
+      mangleLayoutConstraint(reqt.getLayoutConstraint());
       break;
 
     case RequirementKind::Superclass:
@@ -1000,7 +1052,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
       case ParameterConvention::Direct_Owned: return 'o';
       case ParameterConvention::Direct_Unowned: return 'd';
       case ParameterConvention::Direct_Guaranteed: return 'g';
-      case ParameterConvention::Direct_Deallocating: return 'e';
       }
       llvm_unreachable("bad parameter convention");
     };
@@ -1061,7 +1112,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     Buffer << '_';
 
     // Mangle the results.
-    for (auto result : fn->getAllResults()) {
+    for (auto result : fn->getResults()) {
       Buffer << mangleResultConvention(result.getConvention());
       mangleType(result.getType(), 0);
     }
@@ -1080,7 +1131,9 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
   // type ::= archetype
   case TypeKind::Archetype: {
     auto *archetype = cast<ArchetypeType>(tybase);
-    
+
+    assert(DWARFMangling && "Cannot mangle free-standing archetypes");
+
     // archetype ::= associated-type
     
     // associated-type ::= substitution
@@ -1110,36 +1163,29 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     auto GTPT = DC->mapTypeOutOfContext(archetype)
         ->castTo<GenericTypeParamType>();
 
-    if (DWARFMangling) {
-      Buffer << 'q' << Index(GTPT->getIndex());
+    Buffer << 'q' << Index(GTPT->getIndex());
 
-      {
-        // The DWARF output created by Swift is intentionally flat,
-        // therefore archetypes are emitted with their DeclContext if
-        // they appear at the top level of a type (_Tt).
-        // Clone a new, non-DWARF Mangler for the DeclContext.
-        Mangler ContextMangler(/*DWARFMangling=*/false);
-        SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
-        for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
-        for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
-        while (DC && DC->isGenericContext()) {
-          if (DC->isInnermostContextGeneric() &&
-              DC->getGenericParamsOfContext()->getDepth() == GTPT->getDepth())
-            break;
-          DC = DC->getParent();
-        }
-        assert(DC && "no decl context for archetype found");
-        if (!DC) return;
-        ContextMangler.mangleContext(DC);
-        ContextMangler.finalize(Buffer);
+    {
+      // The DWARF output created by Swift is intentionally flat,
+      // therefore archetypes are emitted with their DeclContext if
+      // they appear at the top level of a type (_Tt).
+      // Clone a new, non-DWARF Mangler for the DeclContext.
+      Mangler ContextMangler(/*DWARFMangling=*/false);
+      SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
+      for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
+      for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
+      while (DC && DC->isGenericContext()) {
+        if (DC->isInnermostContextGeneric() &&
+            DC->getGenericParamsOfContext()->getDepth() == GTPT->getDepth())
+          break;
+        DC = DC->getParent();
       }
-
-    } else {
-      if (GTPT->getDepth() != 0) {
-        Buffer << 'd' << Index(GTPT->getDepth() - 1);
-      }
-      Buffer << Index(GTPT->getIndex());
+      assert(DC && "no decl context for archetype found");
+      if (!DC) return;
+      ContextMangler.mangleContext(DC);
+      ContextMangler.finalize(Buffer);
     }
+
     return;
   }
 

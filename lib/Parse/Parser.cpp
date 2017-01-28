@@ -658,9 +658,8 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
 
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                  tok SeparatorK, bool OptionalSep, bool AllowSepAfterLast,
-                  Diag<> ErrorDiag, std::function<ParserStatus()> callback) {
-  assert(SeparatorK == tok::comma || SeparatorK == tok::semi);
+                  bool AllowSepAfterLast, Diag<> ErrorDiag,
+                  std::function<ParserStatus()> callback) {
 
   if (Tok.is(RightK)) {
     RightLoc = consumeToken(RightK);
@@ -669,9 +668,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   ParserStatus Status;
   while (true) {
-    while (Tok.is(SeparatorK)) {
-      diagnose(Tok, diag::unexpected_separator,
-               SeparatorK == tok::comma ? "," : ";")
+    while (Tok.is(tok::comma)) {
+      diagnose(Tok, diag::unexpected_separator, ",")
         .fixItRemove(SourceRange(Tok.getLoc()));
       consumeToken();
     }
@@ -689,23 +687,22 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     // If we haven't made progress, or seeing any error, skip ahead.
     if (Tok.getLoc() == StartLoc || Status.isError()) {
       assert(Status.isError() && "no progress without error");
-      skipUntilDeclRBrace(RightK, SeparatorK);
-      if (Tok.is(RightK) || (!OptionalSep && Tok.isNot(SeparatorK)))
+      skipUntilDeclRBrace(RightK, tok::comma);
+      if (Tok.is(RightK) || Tok.isNot(tok::comma))
         break;
     }
-    if (consumeIf(SeparatorK)) {
+    if (consumeIf(tok::comma)) {
       if (Tok.isNot(RightK))
         continue;
       if (!AllowSepAfterLast) {
-        diagnose(Tok, diag::unexpected_separator,
-                 SeparatorK == tok::comma ? "," : ";")
+        diagnose(Tok, diag::unexpected_separator, ",")
           .fixItRemove(SourceRange(PreviousLoc));
       }
       break;
     }
     // If we're in a comma-separated list, the next token is at the
     // beginning of a new line and can never start an element, break.
-    if (SeparatorK == tok::comma && Tok.isAtStartOfLine() &&
+    if (Tok.isAtStartOfLine() &&
         (Tok.is(tok::r_brace) || isStartOfDecl() || isStartOfStmt())) {
       break;
     }
@@ -714,12 +711,10 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       IsInputIncomplete = true;
       break;
     }
-    if (!OptionalSep) {
-      StringRef Separator = (SeparatorK == tok::comma ? "," : ";");
-      diagnose(Tok, diag::expected_separator, Separator)
-        .fixItInsertAfter(PreviousLoc, Separator);
-      Status.setIsParseError();
-    }
+
+    diagnose(Tok, diag::expected_separator, ",")
+      .fixItInsertAfter(PreviousLoc, ",");
+    Status.setIsParseError();
   }
 
   if (Status.isError()) {
@@ -740,6 +735,27 @@ void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
   diagnose(New->getLoc(), diag::decl_redefinition, New->isDefinition());
   diagnose(Prev->getLoc(), diag::previous_decldef, Prev->isDefinition(),
              Prev->getName());
+}
+
+/// True if Tok is the second consecutive identifier in a variable decl.
+bool Parser::isSecondVarIdentifier() {
+  auto PreviousTok = L->getTokenAt(PreviousLoc);
+  if (Tok.isNot(tok::identifier) || PreviousTok.isNot(tok::identifier)) {
+    return false;
+  }
+  auto LineStart = L->getLocForStartOfLine(SourceMgr, Tok.getLoc());
+  auto FirstTok = L->getTokenAt(LineStart);
+  Lexer::State FirstTokState = L->getStateForBeginningOfToken(FirstTok);
+  auto StartPos = ParserPosition(FirstTokState, LineStart);
+  auto RestorePos = getParserPosition();
+  backtrackToPosition(StartPos);
+  while (Tok.isNot(tok::kw_let) && Tok.isNot(tok::kw_var)
+         && Tok.getLoc() != PreviousTok.getLoc()) {
+    consumeToken();
+  }
+  bool IsConsecutiveLoc = peekToken().getLoc() == PreviousTok.getLoc();
+  restoreParserPosition(RestorePos);
+  return IsConsecutiveLoc;
 }
 
 struct ParserUnit::Implementation {

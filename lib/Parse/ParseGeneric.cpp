@@ -241,7 +241,8 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
 ParserStatus Parser::parseGenericWhereClause(
                SourceLoc &WhereLoc,
                SmallVectorImpl<RequirementRepr> &Requirements,
-               bool &FirstTypeInComplete) {
+               bool &FirstTypeInComplete,
+               bool AllowLayoutConstraints) {
   ParserStatus Status;
   // Parse the 'where'.
   WhereLoc = consumeToken(tok::kw_where);
@@ -262,21 +263,44 @@ ParserStatus Parser::parseGenericWhereClause(
       // A conformance-requirement.
       SourceLoc ColonLoc = consumeToken();
 
-      // Parse the protocol or composition.
-      ParserResult<TypeRepr> Protocol = parseTypeForInheritance(
-          diag::expected_identifier_for_type,
-          diag::expected_ident_type_in_inheritance);
-      
-      if (Protocol.isNull()) {
-        Status.setIsParseError();
-        if (Protocol.hasCodeCompletion())
-          Status.setHasCodeCompletion();
-        break;
-      }
+      if (Tok.is(tok::identifier) &&
+          getLayoutConstraintInfo(Context.getIdentifier(Tok.getText()),
+                                  Context)) {
+        // Parse a layout constraint.
+        auto LayoutName = Context.getIdentifier(Tok.getText());
+        auto LayoutLoc = consumeToken();
+        auto LayoutInfo = parseLayoutConstraint(LayoutName);
+        if (!LayoutInfo.isKnownLayout()) {
+          // There was a bug in the layout constraint.
+          Status.setIsParseError();
+        }
+        auto Layout = LayoutConstraint(Context.AllocateObjectCopy(LayoutInfo));
+        if (!AllowLayoutConstraints) {
+          diagnose(LayoutLoc,
+                   diag::layout_constraints_only_inside_specialize_attr);
+        } else {
+          // Add the layout requirement.
+          Requirements.push_back(RequirementRepr::getLayoutConstraint(
+              FirstType.get(), ColonLoc,
+              LayoutConstraintLoc(Layout, LayoutLoc)));
+        }
+      } else {
+        // Parse the protocol or composition.
+        ParserResult<TypeRepr> Protocol =
+            parseTypeForInheritance(diag::expected_identifier_for_type,
+                                    diag::expected_ident_type_in_inheritance);
 
-      // Add the requirement.
-      Requirements.push_back(RequirementRepr::getTypeConstraint(FirstType.get(),
-                                                     ColonLoc, Protocol.get()));
+        if (Protocol.isNull()) {
+          Status.setIsParseError();
+          if (Protocol.hasCodeCompletion())
+            Status.setHasCodeCompletion();
+          break;
+        }
+
+        // Add the requirement.
+        Requirements.push_back(RequirementRepr::getTypeConstraint(
+            FirstType.get(), ColonLoc, Protocol.get()));
+      }
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
       // A same-type-requirement

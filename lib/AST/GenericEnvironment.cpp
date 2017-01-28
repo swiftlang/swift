@@ -284,14 +284,21 @@ Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
   return Type();
 }
 
-Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
+Type GenericEnvironment::mapTypeIntoContext(
+                                Type type,
+                                LookupConformanceFn lookupConformance) const {
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
-                           LookUpConformanceInModule(M),
+                           lookupConformance,
                            (SubstFlags::AllowLoweredTypes|
                             SubstFlags::UseErrorType));
   assert((!result->hasTypeParameter() || result->hasError()) &&
          "not fully substituted");
   return result;
+
+}
+
+Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
+  return mapTypeIntoContext(type, LookUpConformanceInModule(M));
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
@@ -309,6 +316,18 @@ GenericTypeParamType *GenericEnvironment::getSugaredType(
       return sugaredType;
 
   llvm_unreachable("missing generic parameter");
+}
+
+Type GenericEnvironment::getSugaredType(Type type) const {
+  if (!type->hasTypeParameter())
+    return type;
+
+  return type.transform([this](Type Ty) -> Type {
+    if (auto GP = dyn_cast<GenericTypeParamType>(Ty.getPointer())) {
+      return Type(getSugaredType(GP));
+    }
+    return Ty;
+  });
 }
 
 ArrayRef<Substitution>
@@ -350,7 +369,8 @@ getSubstitutionMap(ModuleDecl *mod,
     // Record the replacement type and its conformances.
     if (auto *archetype = contextTy->getAs<ArchetypeType>()) {
       result.addSubstitution(CanArchetypeType(archetype), sub.getReplacement());
-      result.addConformances(CanType(archetype), sub.getConformances());
+      for (auto conformance : sub.getConformances())
+        result.addConformance(CanType(archetype), conformance);
       continue;
     }
 

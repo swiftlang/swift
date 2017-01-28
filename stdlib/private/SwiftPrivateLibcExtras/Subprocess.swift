@@ -13,7 +13,7 @@
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
 import Glibc
 #endif
 
@@ -264,9 +264,19 @@ public enum ProcessTerminationStatus : CustomStringConvertible {
 
 public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
   var status: CInt = 0
+#if CYGWIN
+  withUnsafeMutablePointer(to: &status) {
+    statusPtr in
+    let statusPtrWrapper = __wait_status_ptr_t(__int_ptr: statusPtr)
+    if waitpid(pid, statusPtrWrapper, 0) < 0 {
+      preconditionFailure("waitpid() failed")
+    }
+  }
+#else
   if waitpid(pid, &status, 0) < 0 {
     preconditionFailure("waitpid() failed")
   }
+#endif
   if WIFEXITED(status) {
     return .exit(Int(WEXITSTATUS(status)))
   }
@@ -289,6 +299,8 @@ internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?
 #elseif os(PS4)
   return environ
 #elseif os(Android)
+  return environ
+#elseif CYGWIN
   return environ
 #else
   return __environ

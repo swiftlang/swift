@@ -97,7 +97,7 @@ def update_repository_to_scheme(
     cross_repo = False
     repo_branch = scheme_name
     # This loop is only correct, since we know that each alias set has
-    # unique contents. This is checked by verify config. Thus the first
+    # unique contents. This is checked by validate_config. Thus the first
     # branch scheme data that has scheme_name as one of its aliases is
     # the only possible correct answer.
     for v in config['branch-schemes'].values():
@@ -187,7 +187,7 @@ def obtain_all_additional_swift_sources(
                 continue
 
             if os.path.isdir(os.path.join(repo_name, ".git")):
-                print("Skipping clone of '" + repo_name + "', directory already eixsts")
+                print("Skipping clone of '" + repo_name + "', directory already exists")
                 continue
 
             # If we have a url override, use that url instead of
@@ -234,12 +234,38 @@ def dump_repo_hashes(config):
                               echo=False).strip()
             print(fmt.format(repo_name, h))
 
+def dump_hashes_config(args, config):
+    branch_scheme_name = args.dump_hashes_config
+    new_config = {}
+    config_copy_keys = ['ssh-clone-pattern', 'https-clone-pattern', 'repos']
+    for config_copy_key in config_copy_keys:
+        new_config[config_copy_key] = config[config_copy_key]
+    repos = {}
+    branch_scheme = {'aliases': [branch_scheme_name], 'repos': repos}
+    new_config['branch-schemes'] = {args.dump_hashes_config: branch_scheme}
+    for repo_name, repo_info in sorted(config['repos'].items(),
+                                       key=lambda x: x[0]):
+        with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
+                         dry_run=False,
+                         echo=False):
+            h = shell.capture(["git", "rev-parse", "HEAD"],
+                              echo=False).strip()
+            repos[repo_name] = str(h)
+    print(json.dumps(new_config, indent=4))
 
 def validate_config(config):
     # Make sure that our branch-names are unique.
     scheme_names = config['branch-schemes'].keys()
     if len(scheme_names) != len(set(scheme_names)):
         raise RuntimeError('Configuration file has duplicate schemes?!')
+
+    # Ensure the branch-scheme name is also an alias
+    # This guarantees sensible behavior of update_repository_to_scheme when
+    # the branch-scheme is passed as the scheme name
+    for scheme_name in config['branch-schemes'].keys():
+        if not scheme_name in config['branch-schemes'][scheme_name]['aliases']:
+            raise RuntimeError('branch-scheme name: "{0}" must be an alias too.'
+                .format(scheme_name))
 
     # Then make sure the alias names used by our branches are unique.
     #
@@ -283,8 +309,9 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         dest='skip_repository_list',
         action="append")
     parser.add_argument(
-        "--scheme", "--branch",
-        help='Use branches from the specified branch-scheme',
+        "--scheme",
+        help='Use branches from the specified branch-scheme. A "branch-scheme"'
+        ' is a list of (repo, branch) pairs.',
         metavar='BRANCH-SCHEME',
         dest='scheme')
     parser.add_argument(
@@ -310,6 +337,10 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         action='store_true',
         help='Dump the git hashes of all repositories being tracked')
     parser.add_argument(
+        '--dump-hashes-config',
+        help='Dump the git hashes of all repositories packaged into update-checkout-config.json',
+        metavar='BRANCH-SCHEME-NAME')
+    parser.add_argument(
         "--tag",
         help="""Check out each repository to the specified tag.""",
         metavar='TAG-NAME')
@@ -322,7 +353,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     args = parser.parse_args()
 
     if args.reset_to_remote and not args.scheme:
-        print("update-checkout usage error: --reset-to-remote must specify --branch=foo")
+        print("update-checkout usage error: --reset-to-remote must specify --scheme=foo")
         exit(1)
 
     clone = args.clone
@@ -337,7 +368,11 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
     if args.dump_hashes:
         dump_repo_hashes(config)
-        return 0
+        return (None, None)
+
+    if args.dump_hashes_config:
+        dump_hashes_config(args, config)
+        return (None, None)
 
     cross_repos_pr = {}
     if github_comment:

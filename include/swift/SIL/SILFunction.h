@@ -32,28 +32,63 @@ namespace swift {
 class ASTContext;
 class SILInstruction;
 class SILModule;
+namespace Lowering {
+class TypeLowering;
+} // namespace Lowering
 
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
 enum IsThunk_t { IsNotThunk, IsThunk, IsReabstractionThunk };
 
-class SILSpecializeAttr final :
-    private llvm::TrailingObjects<SILSpecializeAttr, Substitution> {
-  friend TrailingObjects;
-
-  unsigned numSubs;
-  
-  SILSpecializeAttr(ArrayRef<Substitution> subs);
-
+class SILSpecializeAttr final {
+  friend SILFunction;
 public:
-  static SILSpecializeAttr *create(SILModule &M, ArrayRef<Substitution> subs);
+  enum class SpecializationKind {
+    Full,
+    Partial
+  };
 
-  ArrayRef<Substitution> getSubstitutions() const {
-    return { getTrailingObjects<Substitution>(), numSubs };
+  static SILSpecializeAttr *create(SILModule &M,
+                                   ArrayRef<Requirement> requirements,
+                                   bool exported, SpecializationKind kind);
+
+  ArrayRef<Requirement> getRequirements() const;
+
+  bool isExported() const {
+    return exported;
   }
-  
+
+  bool isFullSpecialization() const {
+    return kind == SpecializationKind::Full;
+  }
+
+  bool isPartialSpecialization() const {
+    return kind == SpecializationKind::Partial;
+  }
+
+  SpecializationKind getSpecializationKind() const {
+    return kind;
+  }
+
+  SILFunction *getFunction() const {
+    return F;
+  }
+
   void print(llvm::raw_ostream &OS) const;
+
+private:
+  unsigned numRequirements;
+  SpecializationKind kind;
+  bool exported;
+  SILFunction *F;
+
+  SILSpecializeAttr(ArrayRef<Requirement> requirements, bool exported,
+                    SpecializationKind kind);
+
+  Requirement *getRequirementsData() {
+    return reinterpret_cast<Requirement *>(this+1);
+  }
 };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
@@ -224,6 +259,9 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
+  SILFunctionConventions getConventions() const {
+    return SILFunctionConventions(LoweredType, getModule());
+  }
 
   bool isNoReturnFunction() const;
 
@@ -323,8 +361,8 @@ public:
   }
 
   // Returns true if the function has indirect out parameters.
-  bool hasIndirectResults() const {
-    return getLoweredFunctionType()->getNumIndirectResults() > 0;
+  bool hasIndirectFormalResults() const {
+    return getLoweredFunctionType()->hasIndirectFormalResults();
   }
 
   /// Returns true if this function either has a self metadata argument or
@@ -452,9 +490,7 @@ public:
   /// Removes all specialize attributes from this function.
   void clearSpecializeAttrs() { SpecializeAttrSet.clear(); }
 
-  void addSpecializeAttr(SILSpecializeAttr *attr) {
-    SpecializeAttrSet.push_back(attr);
-  }
+  void addSpecializeAttr(SILSpecializeAttr *Attr);
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
   ///          or is raw SIL (so that the mandatory passes still run).
@@ -577,6 +613,10 @@ public:
     GenericEnv = env;
   }
 
+  /// Returns the type lowering for the \p Type given the generic signature of
+  /// the current function.
+  const Lowering::TypeLowering &getTypeLowering(SILType Type) const;
+
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
@@ -691,13 +731,13 @@ public:
   ArrayRef<SILArgument *> getIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
     return begin()->getArguments().slice(
-        0, getLoweredFunctionType()->getNumIndirectResults());
+        0, getConventions().getNumIndirectSILResults());
   }
 
   ArrayRef<SILArgument *> getArgumentsWithoutIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
     return begin()->getArguments().slice(
-        getLoweredFunctionType()->getNumIndirectResults());
+        getConventions().getNumIndirectSILResults());
   }
 
   const SILArgument *getSelfArgument() const {

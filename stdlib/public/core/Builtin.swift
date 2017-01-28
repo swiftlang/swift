@@ -389,15 +389,19 @@ internal var _objCTaggedPointerBits: UInt {
     @inline(__always) get { return 0 }
 }
 #elseif arch(s390x)
+@_versioned
 internal var _objectPointerSpareBits: UInt {
   @inline(__always) get { return 0x0000_0000_0000_0007 }
 }
+@_versioned
 internal var _objectPointerIsObjCBit: UInt {
   @inline(__always) get { return 0x0000_0000_0000_0002 }
 }
+@_versioned
 internal var _objectPointerLowSpareBitShift: UInt {
   @inline(__always) get { return 0 }
 }
+@_versioned
 internal var _objCTaggedPointerBits: UInt {
   @inline(__always) get { return 0 }
 }

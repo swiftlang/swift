@@ -75,56 +75,58 @@ class ConvertForWcharSize;
 template<>
 class ConvertForWcharSize<2> {
 public:
-  static ConversionResult ConvertFromUTF8(const char** sourceStart,
-                                          const char* sourceEnd,
-                                          wchar_t** targetStart,
-                                          wchar_t* targetEnd,
-                                          ConversionFlags flags) {
-    return ConvertUTF8toUTF16(reinterpret_cast<const UTF8**>(sourceStart),
-                              reinterpret_cast<const UTF8*>(sourceEnd),
-                              reinterpret_cast<UTF16**>(targetStart),
-                              reinterpret_cast<UTF16*>(targetEnd),
+  static llvm::ConversionResult ConvertFromUTF8(const char** sourceStart,
+                                                const char* sourceEnd,
+                                                wchar_t** targetStart,
+                                                wchar_t* targetEnd,
+                                                llvm::ConversionFlags flags) {
+    return ConvertUTF8toUTF16(reinterpret_cast<const llvm::UTF8**>(sourceStart),
+                              reinterpret_cast<const llvm::UTF8*>(sourceEnd),
+                              reinterpret_cast<llvm::UTF16**>(targetStart),
+                              reinterpret_cast<llvm::UTF16*>(targetEnd),
                               flags);
   }
   
-  static ConversionResult ConvertToUTF8(const wchar_t** sourceStart,
-                                        const wchar_t* sourceEnd,
-                                        char** targetStart,
-                                        char* targetEnd,
-                                        ConversionFlags flags) {
-    return ConvertUTF16toUTF8(reinterpret_cast<const UTF16**>(sourceStart),
-                              reinterpret_cast<const UTF16*>(sourceEnd),
-                              reinterpret_cast<UTF8**>(targetStart),
-                              reinterpret_cast<UTF8*>(targetEnd),
-                              flags);
+  static llvm::ConversionResult ConvertToUTF8(const wchar_t** sourceStart,
+                                              const wchar_t* sourceEnd,
+                                              char** targetStart,
+                                              char* targetEnd,
+                                              llvm::ConversionFlags flags) {
+    return ConvertUTF16toUTF8(
+                             reinterpret_cast<const llvm::UTF16**>(sourceStart),
+                             reinterpret_cast<const llvm::UTF16*>(sourceEnd),
+                             reinterpret_cast<llvm::UTF8**>(targetStart),
+                             reinterpret_cast<llvm::UTF8*>(targetEnd),
+                             flags);
   }
 };
 
 template<>
 class ConvertForWcharSize<4> {
 public:
-  static ConversionResult ConvertFromUTF8(const char** sourceStart,
-                                          const char* sourceEnd,
-                                          wchar_t** targetStart,
-                                          wchar_t* targetEnd,
-                                          ConversionFlags flags) {
-    return ConvertUTF8toUTF32(reinterpret_cast<const UTF8**>(sourceStart),
-                              reinterpret_cast<const UTF8*>(sourceEnd),
-                              reinterpret_cast<UTF32**>(targetStart),
-                              reinterpret_cast<UTF32*>(targetEnd),
+  static llvm::ConversionResult ConvertFromUTF8(const char** sourceStart,
+                                                const char* sourceEnd,
+                                                wchar_t** targetStart,
+                                                wchar_t* targetEnd,
+                                                llvm::ConversionFlags flags) {
+    return ConvertUTF8toUTF32(reinterpret_cast<const llvm::UTF8**>(sourceStart),
+                              reinterpret_cast<const llvm::UTF8*>(sourceEnd),
+                              reinterpret_cast<llvm::UTF32**>(targetStart),
+                              reinterpret_cast<llvm::UTF32*>(targetEnd),
                               flags);
   }
   
-  static ConversionResult ConvertToUTF8(const wchar_t** sourceStart,
-                                        const wchar_t* sourceEnd,
-                                        char** targetStart,
-                                        char* targetEnd,
-                                        ConversionFlags flags) {
-    return ConvertUTF32toUTF8(reinterpret_cast<const UTF32**>(sourceStart),
-                              reinterpret_cast<const UTF32*>(sourceEnd),
-                              reinterpret_cast<UTF8**>(targetStart),
-                              reinterpret_cast<UTF8*>(targetEnd),
-                              flags);
+  static llvm::ConversionResult ConvertToUTF8(const wchar_t** sourceStart,
+                                              const wchar_t* sourceEnd,
+                                              char** targetStart,
+                                              char* targetEnd,
+                                              llvm::ConversionFlags flags) {
+    return ConvertUTF32toUTF8(
+                             reinterpret_cast<const llvm::UTF32**>(sourceStart),
+                             reinterpret_cast<const llvm::UTF32*>(sourceEnd),
+                             reinterpret_cast<llvm::UTF8**>(targetStart),
+                             reinterpret_cast<llvm::UTF8*>(targetEnd),
+                             flags);
   }
 };
 
@@ -139,8 +141,8 @@ static void convertFromUTF8(llvm::StringRef utf8,
   wchar_t *wide_begin = out.end();
   auto res = Convert::ConvertFromUTF8(&utf8_begin, utf8.end(),
                                       &wide_begin, out.data() + reserve,
-                                      lenientConversion);
-  assert(res == conversionOK && "utf8-to-wide conversion failed!");
+                                      llvm::lenientConversion);
+  assert(res == llvm::conversionOK && "utf8-to-wide conversion failed!");
   (void)res;
   out.set_size(wide_begin - out.begin());
 }
@@ -153,8 +155,8 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
   char *utf8_begin = out.end();
   auto res = Convert::ConvertToUTF8(&wide_begin, wide.end(),
                                     &utf8_begin, out.data() + reserve,
-                                    lenientConversion);
-  assert(res == conversionOK && "wide-to-utf8 conversion failed!");
+                                    llvm::lenientConversion);
+  assert(res == llvm::conversionOK && "wide-to-utf8 conversion failed!");
   (void)res;
   out.set_size(utf8_begin - out.begin());
 }

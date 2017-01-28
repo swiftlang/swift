@@ -16,6 +16,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/AssertImplements.h"
@@ -672,6 +673,10 @@ EndBorrowInst::EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
     : SILInstruction(ValueKind::EndBorrowInst, DebugLoc),
       Operands(this, Src, Dest) {}
 
+EndBorrowArgumentInst::EndBorrowArgumentInst(SILDebugLocation DebugLoc,
+                                             SILArgument *Arg)
+    : UnaryInstructionBase(DebugLoc, SILValue(Arg)) {}
+
 AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
     : SILInstruction(ValueKind::AssignInst, Loc), Operands(this, Src, Dest) {}
 
@@ -976,6 +981,8 @@ bool TermInst::isFunctionExiting() const {
     case TermKind::ThrowInst:
       return true;
   }
+
+  llvm_unreachable("Unhandled TermKind in switch.");
 }
 
 BranchInst::BranchInst(SILDebugLocation Loc, SILBasicBlock *DestBB,

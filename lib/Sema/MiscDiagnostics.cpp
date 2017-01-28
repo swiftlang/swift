@@ -249,7 +249,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         checkOptionalPromotions(Call);
         
         // Check for tuple splat.
-        checkTupleSplat(Call);
+        //
+        // Note that in Swift 4 mode, this is rejected much earlier in
+        // the constraint solver; this check only exists to preserve the
+        // behavior of the earlier, incomplete implementation of SE-0110.
+        if (TC.Context.isSwiftVersion3())
+          checkTupleSplat(Call);
 
         // Check the callee, looking through implicit conversions.
         auto Base = Call->getFn();
@@ -1830,11 +1835,14 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
   if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
     auto *baseSubscript = cast<SubscriptDecl>(base);
     bool fixedAny = false;
-    for_each(*subscript->getIndices(),
-             *baseSubscript->getIndices(),
-             [&](ParamDecl *param, const ParamDecl *baseParam) {
-      fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
-    });
+    if (subscript->getIndices()->size() ==
+        baseSubscript->getIndices()->size()) {
+      for_each(*subscript->getIndices(),
+               *baseSubscript->getIndices(),
+               [&](ParamDecl *param, const ParamDecl *baseParam) {
+        fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
+      });
+    }
 
     auto resultType = subscript->getDeclContext()->mapTypeIntoContext(
         subscript->getElementInterfaceType());

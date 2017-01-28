@@ -25,17 +25,13 @@ using llvm::ArrayRef;
 namespace swift {
 namespace NewMangling {
 
-/// Returns true if the new mangling scheme should be used.
-///
-/// TODO: remove this function when the old mangling is removed.
-bool useNewMangling();
-  
 /// Select an old or new mangled string, based on useNewMangling().
 ///
 /// Also performs test to check if the demangling of both string yield the same
 /// demangling tree.
 /// TODO: remove this function when the old mangling is removed.
-std::string selectMangling(const std::string &Old, const std::string &New);
+std::string selectMangling(const std::string &Old, const std::string &New,
+                           bool compareTrees = true);
 
 void printManglingStats();
 
@@ -161,6 +157,21 @@ protected:
       appendListSeparator();
       isFirstListItem = false;
     }
+  }
+  void appendOperatorParam(StringRef op) {
+    Buffer << op;
+  }
+  void appendOperatorParam(StringRef op, int natural) {
+    Buffer << op << natural << '_';
+  }
+  void appendOperatorParam(StringRef op, Index index) {
+    Buffer << op << index;
+  }
+  void appendOperatorParam(StringRef op, Index index1, Index index2) {
+    Buffer << op << index1 << index2;
+  }
+  void appendOperatorParam(StringRef op, StringRef arg) {
+    Buffer << op << arg;
   }
 };
 

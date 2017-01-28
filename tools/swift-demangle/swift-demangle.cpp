@@ -14,10 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__FreeBSD__)
-#define _WITH_GETLINE
-#endif
-
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/ManglingMacros.h"
 #include "llvm/ADT/SmallString.h"
@@ -28,13 +24,13 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"
 
+// For std::rand, to work around a bug if main()'s first function call passes
+// argv[0].
+#if defined(__CYGWIN__)
 #include <cstdlib>
-#include <string>
-#if !defined(_MSC_VER) && !defined(__MINGW32__)
-#include <unistd.h>
-#else
-#include <io.h>
 #endif
+
+#include <iostream>
 
 static llvm::cl::opt<bool>
 ExpandMode("expand",
@@ -51,6 +47,10 @@ TreeOnly("tree-only",
 static llvm::cl::opt<bool>
 RemangleMode("test-remangle",
            llvm::cl::desc("Remangle test mode (show the remangled string)"));
+
+static llvm::cl::opt<bool>
+RemangleNew("remangle-new",
+           llvm::cl::desc("Remangle the symbol with new mangling scheme"));
 
 static llvm::cl::opt<bool>
 DisableSugar("no-sugar",
@@ -108,6 +108,15 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     return;
   }
   if (!TreeOnly) {
+    if (RemangleNew) {
+      if (!pointer) {
+        llvm::errs() << "Can't de-mangle " << name << '\n';
+        exit(1);
+      }
+      std::string remangled = swift::Demangle::mangleNodeNew(pointer);
+      llvm::outs() << remangled;
+      return;
+    }
     std::string string = swift::Demangle::nodeToString(pointer, options);
     if (!CompactMode)
       llvm::outs() << name << " ---> ";
@@ -119,18 +128,9 @@ static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
   llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
 
-  while (true) {
-    char *inputLine = nullptr;
-    size_t size;
-    if (getline(&inputLine, &size, stdin) == -1 || size <= 0) {
-      if (errno == 0) {
-        break;
-      }
+  for (std::string mangled; std::getline(std::cin, mangled);) {
+    llvm::StringRef inputContents(mangled);
 
-      return EXIT_FAILURE;
-    }
-
-    llvm::StringRef inputContents(inputLine);
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       llvm::outs() << substrBefore(inputContents, matches.front());
@@ -138,8 +138,7 @@ static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
       inputContents = substrAfter(inputContents, matches.front());
     }
 
-    llvm::outs() << inputContents;
-    free(inputLine);
+    llvm::outs() << inputContents << '\n';
   }
 
   return EXIT_SUCCESS;

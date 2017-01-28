@@ -9,6 +9,7 @@ function(handle_swift_sources
     dependency_target_out_var_name
     dependency_module_target_out_var_name
     dependency_sib_target_out_var_name
+    dependency_sibopt_target_out_var_name
     dependency_sibgen_target_out_var_name
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
@@ -46,6 +47,7 @@ function(handle_swift_sources
   set("${dependency_target_out_var_name}" "" PARENT_SCOPE)
   set("${dependency_module_target_out_var_name}" "" PARENT_SCOPE)
   set("${dependency_sib_target_out_var_name}" "" PARENT_SCOPE)
+  set("${dependency_sibopt_target_out_var_name}" "" PARENT_SCOPE)
   set("${dependency_sibgen_target_out_var_name}" "" PARENT_SCOPE)
 
   set(result)
@@ -89,6 +91,7 @@ function(handle_swift_sources
         dependency_target
         module_dependency_target
         sib_dependency_target
+        sibopt_dependency_target
         sibgen_dependency_target
         OUTPUT ${swift_obj}
         SOURCES ${swift_sources}
@@ -108,6 +111,7 @@ function(handle_swift_sources
     set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
     set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
     set("${dependency_sib_target_out_var_name}" "${sib_dependency_target}" PARENT_SCOPE)
+    set("${dependency_sibopt_target_out_var_name}" "${sibopt_dependency_target}" PARENT_SCOPE)
     set("${dependency_sibgen_target_out_var_name}" "${sibgen_dependency_target}" PARENT_SCOPE)
 
     list(APPEND result ${swift_obj})
@@ -137,8 +141,9 @@ endfunction()
 #   _compile_swift_files(
 #     dependency_target_out_var_name
 #     dependency_module_target_out_var_name
-#     dependency_sib_target_out_var_name
-#     dependency_sibgen_target_out_var_name
+#     dependency_sib_target_out_var_name    # -Onone sib target
+#     dependency_sibopt_target_out_var_name # -O sib target
+#     dependency_sibgen_target_out_var_name # -sibgen target
 #     OUTPUT objfile                    # Name of the resulting object file
 #     SOURCES swift_src [swift_src...]  # Swift source files to compile
 #     FLAGS -module-name foo            # Flags to add to the compilation
@@ -158,7 +163,8 @@ endfunction()
 #     )
 function(_compile_swift_files
     dependency_target_out_var_name dependency_module_target_out_var_name
-    dependency_sib_target_out_var_name dependency_sibgen_target_out_var_name)
+    dependency_sib_target_out_var_name dependency_sibopt_target_out_var_name
+    dependency_sibgen_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
     "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE"
     "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT"
@@ -312,7 +318,8 @@ function(_compile_swift_files
 
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
     set(module_file "${module_base}.swiftmodule")
-    set(sib_file "${module_base}.sib")
+    set(sib_file "${module_base}.Onone.sib")
+    set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
     set(module_doc_file "${module_base}.swiftdoc")
 
@@ -387,6 +394,7 @@ function(_compile_swift_files
   set(apinotes_outputs ${apinote_files})
   set(module_outputs "${module_file}" "${module_doc_file}")
   set(sib_outputs "${sib_file}")
+  set(sibopt_outputs "${sibopt_file}")
   set(sibgen_outputs "${sibgen_file}")
 
   if(XCODE)
@@ -410,6 +418,8 @@ function(_compile_swift_files
       COMMAND "${CMAKE_COMMAND}" -E touch ${module_outputs})
     set(command_touch_sib_outputs
       COMMAND "${CMAKE_COMMAND}" -E touch ${sib_outputs})
+    set(command_touch_sibopt_outputs
+      COMMAND "${CMAKE_COMMAND}" -E touch ${sibopt_outputs})
     set(command_touch_sibgen_outputs
       COMMAND "${CMAKE_COMMAND}" -E touch ${sibgen_outputs})
   endif()
@@ -441,12 +451,21 @@ function(_compile_swift_files
 
   # Then we can compile both the object files and the swiftmodule files
   # in parallel in this target for the object file, and ...
+
+  # Windows doesn't support long command line paths, of 8191 chars or over.
+  # We need to work around this by avoiding long command line arguments. This can be
+  # achieved by writing the list of file paths to a file, then reading that list
+  # in the Python script.
+  string(RANDOM file_name)
+  set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
+  file(WRITE "${file_path}" "${source_files}")
+  
   add_custom_command_target(
       dependency_target
       COMMAND
-        "${line_directive_tool}" "${source_files}" --
+        "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
         "${swift_compiler_tool}" "${main_command}" ${swift_flags}
-        ${output_option} ${embed_bitcode_option} "${source_files}"
+        ${output_option} ${embed_bitcode_option} "@${file_path}"
       ${command_touch_standard_outputs}
       OUTPUT ${standard_outputs}
       DEPENDS
@@ -461,10 +480,11 @@ function(_compile_swift_files
   #
   # 1. *.swiftmodule
   # 2. *.swiftdoc
-  # 3. *.sib
-  # 4. *.sibgen
+  # 3. *.Onone.sib
+  # 4. *.O.sib
+  # 5. *.sibgen
   #
-  # Only 1,2 are built by default. 3,4 are utility targets for use by engineers
+  # Only 1,2 are built by default. 3,4,5 are utility targets for use by engineers
   # and thus even though the targets are generated, the targets are not built by
   # default.
   #
@@ -474,9 +494,9 @@ function(_compile_swift_files
     add_custom_command_target(
         module_dependency_target
         COMMAND
-          "${line_directive_tool}" "${source_files}" --
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}" ${swift_flags}
-          "${source_files}"
+          "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS
@@ -491,9 +511,9 @@ function(_compile_swift_files
     add_custom_command_target(
         sib_dependency_target
         COMMAND
-          "${line_directive_tool}" "${source_files}" --
-          "${swift_compiler_tool}" "-emit-sib" "-o" "${sib_file}" ${swift_flags}
-          "${source_files}"
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "${swift_compiler_tool}" "-emit-sib" "-o" "${sib_file}" ${swift_flags} -Onone
+          "@${file_path}"
         ${command_touch_sib_outputs}
         OUTPUT ${sib_outputs}
         DEPENDS
@@ -504,13 +524,29 @@ function(_compile_swift_files
         EXCLUDE_FROM_ALL)
     set("${dependency_sib_target_out_var_name}" "${sib_dependency_target}" PARENT_SCOPE)
 
+    add_custom_command_target(
+        sibopt_dependency_target
+        COMMAND
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "${swift_compiler_tool}" "-emit-sib" "-o" "${sibopt_file}" ${swift_flags} -O
+          "@${file_path}"
+        ${command_touch_sibopt_outputs}
+        OUTPUT ${sibopt_outputs}
+        DEPENDS
+          ${swift_compiler_tool_dep}
+          ${source_files} ${SWIFTFILE_DEPENDS}
+          ${obj_dirs_dependency_target}
+        COMMENT "Generating ${sibopt_file}"
+        EXCLUDE_FROM_ALL)
+    set("${dependency_sibopt_target_out_var_name}" "${sibopt_dependency_target}" PARENT_SCOPE)
+
     # This is the target to generate the .sibgen files. It is not built by default.
     add_custom_command_target(
         sibgen_dependency_target
         COMMAND
-          "${line_directive_tool}" "${source_files}" --
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-sibgen" "-o" "${sibgen_file}" ${swift_flags}
-          "${source_files}"
+          "@${file_path}"
         ${command_touch_sibgen_outputs}
         OUTPUT ${sibgen_outputs}
         DEPENDS

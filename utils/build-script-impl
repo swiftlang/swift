@@ -170,7 +170,7 @@ KNOWN_SETTINGS=(
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
     compiler-vendor             "none"           "compiler vendor name [none,apple]"
-    clang-user-visible-version  "3.8.0"          "user-visible version of the embedded Clang and LLVM compilers"
+    clang-user-visible-version  "4.0.0"          "user-visible version of the embedded Clang and LLVM compilers"
     swift-user-visible-version  "3.1"            "user-visible version of the Swift language"
     swift-compiler-version      ""               "string that indicates a compiler version for Swift"
     clang-compiler-version      ""               "string that indicates a compiler version for Clang"
@@ -214,7 +214,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
-    darwin-sdk-deployment-targets      ""        "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
+    darwin-sdk-deployment-targets      "xctest-ios-8.0"        "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
     darwin-overlay-target              ""        "single overlay target to build, dependencies are computed later"
     build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
@@ -419,7 +419,7 @@ function set_build_options_for_host() {
             USE_GOLD_LINKER=1
             ;;
         cygwin-x86_64)
-            SWIFT_HOST_VARIANT="windows"
+            SWIFT_HOST_VARIANT="cygwin"
             SWIFT_HOST_VARIANT_SDK="CYGWIN"
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
@@ -722,6 +722,7 @@ function set_build_options_for_host() {
     llvm_cmake_options+=(
         -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
         -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+        -DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING:BOOL=TRUE
     )
 
     # If we are asked to not generate test targets for LLVM and or Swift,

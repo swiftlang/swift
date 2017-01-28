@@ -104,6 +104,7 @@ public:
 class SerializedASTFile final : public LoadedFile {
   friend class SerializedModuleLoader;
   friend class SerializedSILLoader;
+  friend class ModuleFile;
 
   ModuleFile &File;
   bool IsSIB;

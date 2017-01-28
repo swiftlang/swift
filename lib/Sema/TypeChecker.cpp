@@ -26,6 +26,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -616,6 +617,9 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
       TC.enableDebugTimeFunctionBodies();
 
+    if (Options.contains(TypeCheckingFlags::DebugTimeExpressions))
+      TC.enableDebugTimeExpressions();
+
     if (Options.contains(TypeCheckingFlags::ForImmediateMode))
       TC.setInImmediateMode(true);
     
@@ -706,6 +710,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // Verify imported modules.
 #ifndef NDEBUG
     if (SF.Kind != SourceFileKind::REPL &&
+        SF.Kind != SourceFileKind::SIL &&
         !Ctx.LangOpts.DebuggerSupport) {
       Ctx.verifyAllLoadedModules();
     }

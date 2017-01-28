@@ -2,7 +2,7 @@
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -I %t -module-name resilient_struct -o %t %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -I %t -module-name resilient_class -o %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -enable-resilience -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -31,19 +31,19 @@ public extension ResilientOutsideChild {
 }
 
 // resilient_class.ResilientOutsideParent.method () -> ()
-sil @_TFC15resilient_class22ResilientOutsideParent6methodfT_T_ : $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
+sil @_T015resilient_class22ResilientOutsideParentC6methodyyF : $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
 
 // static resilient_class.ResilientOutsideParent.classMethod () -> ()
-sil @_TZFC15resilient_class22ResilientOutsideParent11classMethodfT_T_ : $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
+sil @_T015resilient_class22ResilientOutsideParentC0B6MethodyyFZ : $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
 
 // super.ChildToResilientParent.method () -> ()
-sil @_TFC5super22ChildToResilientParent6methodfT_T_ : $@convention(method) (@guaranteed ChildToResilientParent) -> () {
+sil @_T05super22ChildToResilientParentC6methodyyF : $@convention(method) (@guaranteed ChildToResilientParent) -> () {
 // %0
 bb0(%0 : $ChildToResilientParent):
   debug_value %0 : $ChildToResilientParent, let, name "self", argno 1
   strong_retain %0 : $ChildToResilientParent
   %3 = upcast %0 : $ChildToResilientParent to $ResilientOutsideParent
-  %4 = super_method %0 : $ChildToResilientParent, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> () , $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
+  %4 = super_method %0 : $ChildToResilientParent, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   %5 = apply %4(%3) : $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   strong_release %3 : $ResilientOutsideParent
   %7 = tuple ()
@@ -51,87 +51,87 @@ bb0(%0 : $ChildToResilientParent):
 }
 
 // ChildToResilientParent is in our resilience domain - can load the superclass's metadata directly.
-// CHECK-LABEL: define{{( protected)?}} void @_TFC5super22ChildToResilientParent6methodfT_T_(%C5super22ChildToResilientParent*)
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class22ResilientOutsideParent()
+// CHECK-LABEL: define{{( protected)?}} void @_T05super22ChildToResilientParentC6methodyyF(%C5super22ChildToResilientParent*)
+// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class22ResilientOutsideParentCMa()
 // CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%C15resilient_class22ResilientOutsideParent*)**
 // CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%C15resilient_class22ResilientOutsideParent*)*, void (%C15resilient_class22ResilientOutsideParent*)** [[OPAQUE_SUPER_METADATA]]
 // CHECK: [[FN_PTR:%[0-9]+]] = load void (%C15resilient_class22ResilientOutsideParent*)*, void (%C15resilient_class22ResilientOutsideParent*)** [[VTABLE_SLOT]]
 // CHECK: call void
 
 // static super.ChildToResilientParent.classMethod () -> ()
-sil @_TZFC5super22ChildToResilientParent11classMethodfT_T_ : $@convention(method) (@thick ChildToResilientParent.Type) -> () {
+sil @_T05super22ChildToResilientParentC11classMethodyyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> () {
 bb0(%0 : $@thick ChildToResilientParent.Type):
   debug_value %0 : $@thick ChildToResilientParent.Type, let, name "self", argno 1
   %2 = upcast %0 : $@thick ChildToResilientParent.Type to $@thick ResilientOutsideParent.Type
-  %3 = super_method %0 : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> () , $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
+  %3 = super_method %0 : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   %4 = apply %3(%2) : $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   %5 = tuple ()
   return %5 : $()
 }
 
 // ChildToResilientParent is in our resilience domain - can load the superclass's metadata directly.
-// CHECK-LABEL: define{{( protected)?}} void @_TZFC5super22ChildToResilientParent11classMethodfT_T_(%swift.type*)
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class22ResilientOutsideParent()
+// CHECK-LABEL: define{{( protected)?}} void @_T05super22ChildToResilientParentC11classMethodyyFZ(%swift.type*)
+// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class22ResilientOutsideParentCMa()
 // CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
 // CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
 // CHECK: [[FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
 // CHECK: call void
 
 // resilient_class.OutsideParent.method () -> ()
-sil @_TFC15resilient_class13OutsideParent6methodfT_T_ : $@convention(method) (@guaranteed OutsideParent) -> ()
+sil @_T015resilient_class13OutsideParentC6methodyyF : $@convention(method) (@guaranteed OutsideParent) -> ()
 
 // static resilient_class.OutsideParent.classMethod () -> ()
-sil @_TZFC15resilient_class13OutsideParent11classMethodfT_T_ : $@convention(thin) (@thick OutsideParent.Type) -> ()
+sil @_T015resilient_class13OutsideParentC0B6MethodyyFZ : $@convention(thin) (@thick OutsideParent.Type) -> ()
 
 // super.ChildToFixedParent.method () -> ()
-sil @_TFC5super18ChildToFixedParent6methodfT_T_ : $@convention(method) (@guaranteed ChildToFixedParent) -> () {
+sil @_T05super18ChildToFixedParentC6methodyyF : $@convention(method) (@guaranteed ChildToFixedParent) -> () {
 // %0
 bb0(%0 : $ChildToFixedParent):
   debug_value %0 : $ChildToFixedParent, let, name "self", argno 1
   strong_retain %0 : $ChildToFixedParent
   %3 = upcast %0 : $ChildToFixedParent to $OutsideParent
-  %4 = super_method %0 : $ChildToFixedParent, #OutsideParent.method!1 : (OutsideParent) -> () -> () , $@convention(method) (@guaranteed OutsideParent) -> ()
+  %4 = super_method %0 : $ChildToFixedParent, #OutsideParent.method!1 : (OutsideParent) -> () -> (), $@convention(method) (@guaranteed OutsideParent) -> ()
   %5 = apply %4(%3) : $@convention(method) (@guaranteed OutsideParent) -> ()
   strong_release %3 : $OutsideParent
   %7 = tuple ()
   return %7 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @_TFC5super18ChildToFixedParent6methodfT_T_(%C5super18ChildToFixedParent*)
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class13OutsideParent()
+// CHECK-LABEL: define{{( protected)?}} void @_T05super18ChildToFixedParentC6methodyyF(%C5super18ChildToFixedParent*)
+// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class13OutsideParentCMa()
 // CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%C15resilient_class13OutsideParent*)**
 // CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%C15resilient_class13OutsideParent*)*, void (%C15resilient_class13OutsideParent*)** [[OPAQUE_SUPER_METADATA]]
 // CHECK: [[FN_PTR:%[0-9]+]] = load void (%C15resilient_class13OutsideParent*)*, void (%C15resilient_class13OutsideParent*)** [[VTABLE_SLOT]]
 // CHECK: call void
 
 // static super.ChildToFixedParent.classMethod () -> ()
-sil @_TZFC5super18ChildToFixedParent11classMethodfT_T_ : $@convention(method) (@thick ChildToFixedParent.Type) -> () {
+sil @_T05super18ChildToFixedParentC11classMethodyyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> () {
 // %0
 bb0(%0 : $@thick ChildToFixedParent.Type):
   debug_value %0 : $@thick ChildToFixedParent.Type, let, name "self", argno 1
   %2 = upcast %0 : $@thick ChildToFixedParent.Type to $@thick OutsideParent.Type
-  %3 = super_method %0 : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> () , $@convention(method) (@thick OutsideParent.Type) -> ()
+  %3 = super_method %0 : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> (), $@convention(method) (@thick OutsideParent.Type) -> ()
   %4 = apply %3(%2) : $@convention(method) (@thick OutsideParent.Type) -> ()
   %5 = tuple ()
   return %5 : $()
 }
 
 // ChildToFixedParent is in our resilience domain - load super metadata directly.
-// CHECK-LABEL: define{{( protected)?}} void @_TZFC5super18ChildToFixedParent11classMethodfT_T_(%swift.type*)
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class13OutsideParent()
+// CHECK-LABEL: define{{( protected)?}} void @_T05super18ChildToFixedParentC11classMethodyyFZ(%swift.type*)
+// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class13OutsideParentCMa()
 // CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
 // CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
 // CHECK: [[FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
 // CHECK: call void
 
 // ext.super.resilient_class.ResilientOutsideChild.callSuperMethod () -> ()
-sil @_TFE5superC15resilient_class21ResilientOutsideChild15callSuperMethodfT_T_ : $@convention(method) (@guaranteed ResilientOutsideChild) -> () {
+sil @_T015resilient_class21ResilientOutsideChildC5superE15callSuperMethodyyF : $@convention(method) (@guaranteed ResilientOutsideChild) -> () {
 // %0
 bb0(%0 : $ResilientOutsideChild):
   debug_value %0 : $ResilientOutsideChild, let, name "self", argno 1
   strong_retain %0 : $ResilientOutsideChild
   %3 = upcast %0 : $ResilientOutsideChild to $ResilientOutsideParent
-  %4 = super_method %0 : $ResilientOutsideChild, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> () , $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
+  %4 = super_method %0 : $ResilientOutsideChild, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   %5 = apply %4(%3) : $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   strong_release %3 : $ResilientOutsideParent
   %7 = tuple ()
@@ -139,8 +139,8 @@ bb0(%0 : $ResilientOutsideChild):
 }
 
 // Extending a resilient class - load super metadata indirectly.
-// CHECK-LABEL: define{{( protected)?}} void @_TFE5superC15resilient_class21ResilientOutsideChild15callSuperMethodfT_T_(%C15resilient_class21ResilientOutsideChild*)
-// CHECK: [[METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class21ResilientOutsideChild()
+// CHECK-LABEL: define{{( protected)?}} void @_T015resilient_class21ResilientOutsideChildC5superE15callSuperMethodyyF(%C15resilient_class21ResilientOutsideChild*)
+// CHECK: [[METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class21ResilientOutsideChildCMa()
 // CHECK: [[OPAQUE_METADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to %swift.type**
 // CHECK: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
 // CHECK: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
@@ -150,20 +150,20 @@ bb0(%0 : $ResilientOutsideChild):
 // CHECK: call void
 
 // static ext.super.resilient_class.ResilientOutsideChild.callSuperClassMethod () -> ()
-sil @_TZFE5superC15resilient_class21ResilientOutsideChild20callSuperClassMethodfT_T_ : $@convention(method) (@thick ResilientOutsideChild.Type) -> () {
+sil @_T015resilient_class21ResilientOutsideChildC5superE20callSuperClassMethodyyFZ : $@convention(method) (@thick ResilientOutsideChild.Type) -> () {
 // %0
 bb0(%0 : $@thick ResilientOutsideChild.Type):
   debug_value %0 : $@thick ResilientOutsideChild.Type, let, name "self", argno 1
   %2 = upcast %0 : $@thick ResilientOutsideChild.Type to $@thick ResilientOutsideParent.Type
-  %3 = super_method %0 : $@thick ResilientOutsideChild.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> () , $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
+  %3 = super_method %0 : $@thick ResilientOutsideChild.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   %4 = apply %3(%2) : $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   %5 = tuple ()
   return %5 : $()
 }
 
 // Extending a resilient class - load super metadata indirectly.
-// CHECK-LABEL: define{{( protected)?}} void @_TZFE5superC15resilient_class21ResilientOutsideChild20callSuperClassMethodfT_T_(%swift.type*)
-// CHECK: [[METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class21ResilientOutsideChild()
+// CHECK-LABEL: define{{( protected)?}} void @_T015resilient_class21ResilientOutsideChildC5superE20callSuperClassMethodyyFZ(%swift.type*)
+// CHECK: [[METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class21ResilientOutsideChildCMa()
 // CHECK: [[OPAQUE_METADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to %swift.type**
 // CHECK: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
 // CHECK: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
@@ -173,12 +173,46 @@ bb0(%0 : $@thick ResilientOutsideChild.Type):
 // CHECK: call void
 
 sil_vtable ChildToResilientParent {
-  #ResilientOutsideParent.method!1: _TFC5super22ChildToResilientParent6methodfT_T_	// super.ChildToResilientParent.method () -> ()
-  #ResilientOutsideParent.classMethod!1: _TZFC5super22ChildToResilientParent11classMethodfT_T_	// static super.ChildToResilientParent.classMethod () -> ()
+  #ResilientOutsideParent.method!1: _T05super22ChildToResilientParentC6methodyyF	// super.ChildToResilientParent.method () -> ()
+  #ResilientOutsideParent.classMethod!1: _T05super22ChildToResilientParentC11classMethodyyFZ	// static super.ChildToResilientParent.classMethod () -> ()
 }
 
 sil_vtable ChildToFixedParent {
-  #OutsideParent.method!1: _TFC5super18ChildToFixedParent6methodfT_T_	// super.ChildToFixedParent.method () -> ()
-  #OutsideParent.classMethod!1: _TZFC5super18ChildToFixedParent11classMethodfT_T_	// static super.ChildToFixedParent.classMethod () -> ()
+  #OutsideParent.method!1: _T05super18ChildToFixedParentC6methodyyF	// super.ChildToFixedParent.method () -> ()
+  #OutsideParent.classMethod!1: _T05super18ChildToFixedParentC11classMethodyyFZ	// static super.ChildToFixedParent.classMethod () -> ()
+}
+
+protocol Proto {
+}
+
+public class Base<T: Proto> {
+  func Method() { }
+}
+
+struct Str : Proto {
+}
+
+public class Derived : Base<Str> {
+  override func Method()
+}
+
+sil_vtable Base {
+}
+
+sil_vtable Derived {
+}
+
+// CHECK-LABEL: define{{.*}} @test_super_method_of_generic_base
+// CHECK: [[METADATA:%[0-9]+]] = call %swift.type* @_T05super4BaseCyAA3StrVGMa()
+// CHECK: [[BASEMETADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to void (%C5super4Base*)**
+// CHECK: [[GEP:%[0-9]+]] = getelementptr inbounds void (%C5super4Base*)*, void (%C5super4Base*)** [[BASEMETADATA]]
+// CHECK: [[SUPERMT:%[0-9]+]] = load void (%C5super4Base*)*, void (%C5super4Base*)** [[GEP]]
+// CHECK: bitcast void (%C5super4Base*)* [[SUPERMT]] to i8*
+// CHECK: ret void
+sil @test_super_method_of_generic_base : $@convention(method) (@guaranteed Derived) -> () {
+bb0(%0 : $Derived):
+  %4 = super_method %0 : $Derived, #Base.Method!1 : <T where T : Proto> (Base<T>) -> () -> () , $@convention(method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed Base<τ_0_0>) -> ()
+  %7 = tuple ()
+  return %7 : $()
 }
 

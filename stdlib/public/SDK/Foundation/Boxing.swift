@@ -110,10 +110,8 @@ extension _SwiftNativeFoundationType {
         switch __wrapped {
         case .Immutable(let i):
             i.release()
-            break
         case .Mutable(let m):
             m.release()
-            break
         }
     }
     

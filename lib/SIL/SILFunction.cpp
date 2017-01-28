@@ -24,17 +24,32 @@
 using namespace swift;
 using namespace Lowering;
 
-SILSpecializeAttr::SILSpecializeAttr(ArrayRef<Substitution> subs)
-  : numSubs(subs.size()) {
-  std::copy(subs.begin(), subs.end(), getTrailingObjects<Substitution>());
+ArrayRef<Requirement> SILSpecializeAttr::getRequirements() const {
+  return {const_cast<SILSpecializeAttr *>(this)->getRequirementsData(),
+          numRequirements};
+}
+
+SILSpecializeAttr::SILSpecializeAttr(ArrayRef<Requirement> requirements,
+                                     bool exported, SpecializationKind kind)
+    : numRequirements(requirements.size()), kind(kind), exported(exported) {
+  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
 }
 
 SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
-                                             ArrayRef<Substitution> subs) {
+                                             ArrayRef<Requirement> requirements,
+                                             bool exported,
+                                             SpecializationKind kind) {
   unsigned size =
-    sizeof(SILSpecializeAttr) + (subs.size() * sizeof(Substitution));
+      sizeof(SILSpecializeAttr) + sizeof(Requirement) * requirements.size();
   void *buf = M.allocate(size, alignof(SILSpecializeAttr));
-  return ::new (buf) SILSpecializeAttr(subs);
+  return ::new (buf) SILSpecializeAttr(requirements, exported, kind);
+}
+
+void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
+  if (getLoweredFunctionType()->getGenericSignature()) {
+    Attr->F = this;
+    SpecializeAttrSet.push_back(Attr);
+  }
 }
 
 SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
@@ -225,7 +240,7 @@ struct SubstDependentSILType
       }));
 
     SmallVector<SILResultInfo, 4> results;
-    for (auto &result : t->getAllResults())
+    for (auto &result : t->getResults())
       results.push_back(result.map([&](CanType pt) -> CanType {
         return visit(pt);
       }));
@@ -318,8 +333,7 @@ LLBehavior("view-cfg-long-line-behavior",
                clEnumValN(LongLineBehavior::None, "none", "Print everything"),
                clEnumValN(LongLineBehavior::Truncate, "truncate",
                           "Truncate long lines"),
-               clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines"),
-               clEnumValEnd));
+               clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines")));
 
 static llvm::cl::opt<bool>
 RemoveUseListComments("view-cfg-remove-use-list-comments",
@@ -491,11 +505,11 @@ void SILFunction::viewCFG() const {
 /// Returns true if this function has either a self metadata argument or
 /// object from which Self metadata may be obtained.
 bool SILFunction::hasSelfMetadataParam() const {
-  auto paramTypes = getLoweredFunctionType()->getParameterSILTypes();
+  auto paramTypes = getConventions().getParameterSILTypes();
   if (paramTypes.empty())
     return false;
 
-  auto silTy = paramTypes.back();
+  auto silTy = *std::prev(paramTypes.end());
   if (!silTy.isClassOrClassMetatype())
     return false;
 
@@ -556,4 +570,12 @@ ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
 
   ForwardingSubs = env->getForwardingSubstitutions();
   return *ForwardingSubs;
+}
+
+const TypeLowering &SILFunction::getTypeLowering(SILType InputType) const {
+  CanSILFunctionType FuncType = getLoweredFunctionType();
+  auto &TypeConverter = getModule().Types;
+  GenericContextScope GCS(TypeConverter, FuncType->getGenericSignature());
+  const TypeLowering &Result = TypeConverter.getTypeLowering(InputType);
+  return Result;
 }

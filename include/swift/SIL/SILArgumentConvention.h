@@ -31,8 +31,9 @@ enum class InoutAliasingAssumption {
 
 /// Conventions for apply operands and function-entry arguments in SIL.
 ///
-/// By design, this is exactly the same as ParameterConvention, plus
-/// Indirect_Out.
+/// This is simply a union of ParameterConvention and ResultConvention
+/// (ParameterConvention + Indirect_Out) for convenience when visiting all
+/// arguments.
 struct SILArgumentConvention {
   enum ConventionType : uint8_t {
     Indirect_In,
@@ -71,9 +72,6 @@ struct SILArgumentConvention {
       return;
     case ParameterConvention::Direct_Owned:
       Value = SILArgumentConvention::Direct_Owned;
-      return;
-    case ParameterConvention::Direct_Deallocating:
-      Value = SILArgumentConvention::Direct_Deallocating;
       return;
     }
     llvm_unreachable("covered switch isn't covered?!");

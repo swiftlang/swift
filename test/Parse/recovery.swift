@@ -88,10 +88,10 @@ func missingControllingExprInIf() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-warning {{boolean literal is unused}}
   }
 
-  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>
@@ -110,10 +110,10 @@ func missingControllingExprInWhile() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-warning {{boolean literal is unused}}
   }
 
-  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
+  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>
@@ -241,6 +241,58 @@ enum NoBracesUnion2 // expected-error {{expected '{' in enum}}
 class NoBracesClass2 // expected-error {{expected '{' in class}}
 protocol NoBracesProtocol2 // expected-error {{expected '{' in protocol type}}
 extension NoBracesStruct2 // expected-error {{expected '{' in extension}}
+
+//===--- Recovery for multiple identifiers in decls
+
+enum EE EE {}
+// expected-error @-1 {{found an unexpected second identifier in enum declaration; is there an accidental break?}} 
+// expected-note @-2 {{join the identifiers together}} {{6-11=EEEE}}
+
+struct SS SS {}
+// expected-error @-1 {{found an unexpected second identifier in struct declaration; is there an accidental break?}}
+// expected-note @-2 {{join the identifiers together}} {{8-13=SSSS}}
+
+class CC CC {}
+// expected-error @-1 {{found an unexpected second identifier in class declaration; is there an accidental break?}}
+// expected-note @-2 {{join the identifiers together}} {{7-12=CCCC}}
+// expected-note @-3 {{did you mean 'CC'}}
+
+enum EEE {
+  
+  case a a
+  // expected-error @-1 {{found an unexpected second identifier in enum case declaration; is there an accidental break?}} 
+  // expected-note @-2 {{join the identifiers together}} {{8-11=aa}}
+  // expected-note @-3 {{join the identifiers together with camel-case}} {{8-11=aA}}
+  
+  case b
+}
+
+struct AA {
+  
+  private var a b = 0
+  // expected-error @-1 {{found an unexpected second identifier in property declaration; is there an accidental break?}}
+  // expected-note @-2 {{join the identifiers together}} {{15-18=ab}}
+  // expected-note @-3 {{join the identifiers together with camel-case}} {{15-18=aB}}
+  // expected-error @-4 {{type annotation missing in pattern}}
+  
+  func f() {
+    var c d = 5
+    // expected-error @-1 {{found an unexpected second identifier in variable declaration; is there an accidental break?}}
+    // expected-note @-2 {{join the identifiers together}} {{9-12=cd}}
+    // expected-note @-3 {{join the identifiers together with camel-case}} {{9-12=cD}}
+    // expected-error @-4 {{type annotation missing in pattern}}
+    
+    let _ = 0
+  }
+}
+
+let e f = 5
+// expected-error @-1 {{found an unexpected second identifier in variable declaration; is there an accidental break?}}
+// expected-note @-2 {{join the identifiers together}} {{5-8=ef}}
+// expected-note @-3 {{join the identifiers together with camel-case}} {{5-8=eF}}
+// expected-error @-4 {{type annotation missing in pattern}}
+// expected-note @-5 * {{did you mean 'e'?}}
+
 
 //===--- Recovery for parse errors in types.
 
@@ -536,6 +588,22 @@ func a(s: S[{{g) -> Int {}
 // expected-error@+2{{initializers may only be declared within a type}}
 // expected-error@+1{{expected an identifier to name generic parameter}}
 func F() { init<( } )} // expected-note {{did you mean 'F'?}}
+
+struct InitializerWithName {
+  init x() {} // expected-error {{initializers cannot have a name}} {{8-9=}}
+}
+
+struct InitializerWithNameAndParam {
+  init a(b: Int) {} // expected-error {{initializers cannot have a name}} {{8-9=}}
+}
+
+struct InitializerWithLabels {
+  init c d: Int {}
+  // expected-error @-1 {{expected '(' for initializer parameters}}
+  // expected-error @-2 {{expected declaration}}
+  // expected-error @-3 {{consecutive declarations on a line must be separated by ';'}}
+  // expected-note @-5 {{in declaration of 'InitializerWithLabels'}}
+}
 
 // rdar://20337695
 func f1() {

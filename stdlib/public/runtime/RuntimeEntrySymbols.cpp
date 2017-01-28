@@ -48,7 +48,7 @@ typedef void (*RuntimeEntry)();
 #define DEFINE_SYMBOL(SymbolName, Name, CC)                                    \
   SWIFT_RT_ENTRY_IMPL_VISIBILITY extern "C" void Name()                        \
       SWIFT_CC(CC);                                                            \
-  SWIFT_RUNTIME_EXPORT extern "C" RuntimeEntry SymbolName =                    \
+  SWIFT_RUNTIME_EXPORT RuntimeEntry SymbolName =                    \
       reinterpret_cast<RuntimeEntry>(Name);
 
 #define FUNCTION1(Id, Name, CC, ReturnTys, ArgTys, Attrs)                      \

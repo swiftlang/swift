@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -21,7 +21,7 @@ class X {
   func g()
 }
 
-// CHECK-LABEL: sil hidden @_TF14dynamic_lookup15direct_to_class
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup15direct_to_class{{[_0-9a-zA-Z]*}}F
 func direct_to_class(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : $AnyObject):
   // CHECK: [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
@@ -32,9 +32,9 @@ func direct_to_class(_ obj: AnyObject) {
   // CHECK: destroy_value [[ARG]]
   obj.f!()
 }
-// CHECK: } // end sil function '_TF14dynamic_lookup15direct_to_class{{.*}}'
+// CHECK: } // end sil function '_T014dynamic_lookup15direct_to_class{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil hidden @_TF14dynamic_lookup18direct_to_protocol
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup18direct_to_protocol{{[_0-9a-zA-Z]*}}F
 func direct_to_protocol(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : $AnyObject):
   // CHECK:   [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
@@ -45,9 +45,9 @@ func direct_to_protocol(_ obj: AnyObject) {
   // CHECK:   destroy_value [[ARG]]
   obj.g!()
 }
-// CHECK: } // end sil function '_TF14dynamic_lookup18direct_to_protocol{{.*}}'
+// CHECK: } // end sil function '_T014dynamic_lookup18direct_to_protocol{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil hidden @_TF14dynamic_lookup23direct_to_static_method
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup23direct_to_static_method{{[_0-9a-zA-Z]*}}F
 func direct_to_static_method(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : $AnyObject):
   var obj = obj
@@ -66,7 +66,7 @@ func direct_to_static_method(_ obj: AnyObject) {
 }
 // } // end sil function '_TF14dynamic_lookup23direct_to_static_method{{.*}}'
 
-// CHECK-LABEL: sil hidden @_TF14dynamic_lookup12opt_to_class
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup12opt_to_class{{[_0-9a-zA-Z]*}}F
 func opt_to_class(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : $AnyObject):
   var obj = obj
@@ -111,13 +111,13 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK:   return [[RESULT]] : $()
 }
 
-// CHECK-LABEL: sil hidden @_TF14dynamic_lookup20forced_without_outer
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup20forced_without_outer{{[_0-9a-zA-Z]*}}F
 func forced_without_outer(_ obj: AnyObject) {
   // CHECK: dynamic_method_br
   var f = obj.f!
 }
 
-// CHECK-LABEL: sil hidden @_TF14dynamic_lookup20opt_to_static_method
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup20opt_to_static_method{{[_0-9a-zA-Z]*}}F
 func opt_to_static_method(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
@@ -136,7 +136,7 @@ func opt_to_static_method(_ obj: AnyObject) {
   var optF: (() -> ())! = type(of: obj).staticF
 }
 
-// CHECK-LABEL: sil hidden @_TF14dynamic_lookup15opt_to_property
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F
 func opt_to_property(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
@@ -161,9 +161,9 @@ func opt_to_property(_ obj: AnyObject) {
   // CHECK:   br bb3
   var i: Int = obj.value!
 }
-// CHECK: } // end sil function '_TF14dynamic_lookup15opt_to_property{{.*}}'
+// CHECK: } // end sil function '_T014dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil hidden @_TF14dynamic_lookup19direct_to_subscript
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F
 func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
@@ -193,9 +193,9 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   br bb3
   var x: Int = obj[i]!
 }
-// CHECK: } // end sil function '_TF14dynamic_lookup19direct_to_subscript{{.*}}'
+// CHECK: } // end sil function '_T014dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil hidden @_TF14dynamic_lookup16opt_to_subscript
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup16opt_to_subscript{{[_0-9a-zA-Z]*}}F
 func opt_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
@@ -224,7 +224,7 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   obj[i]
 }
 
-// CHECK-LABEL: sil hidden @_TF14dynamic_lookup8downcast
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup8downcast{{[_0-9a-zA-Z]*}}F
 func downcast(_ obj: AnyObject) -> X {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
@@ -246,7 +246,7 @@ func downcast(_ obj: AnyObject) -> X {
   @objc optional var juice: Juice { get }
 }
 
-// CHECK-LABEL: sil hidden @_TF14dynamic_lookup7consumeFPS_5Fruit_T_
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup7consumeyAA5Fruit_pF
 // CHECK: bb0(%0 : $Fruit):
 // CHECK:        [[BOX:%.*]] = alloc_stack $Optional<Juice>
 // CHECK:        dynamic_method_br [[SELF:%.*]] : $@opened("{{.*}}") Fruit, #Fruit.juice!getter.1.foreign, bb1, bb2

@@ -574,7 +574,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     auto *CurBB = B->getInsertionPoint()->getParent();
 
     auto *ContBB = CurBB->split(B->getInsertionPoint());
-    ContBB->createPHIArgument(DestTy);
+    ContBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned);
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
     CaseBBs.push_back(std::make_pair(SomeDecl, SomeBB));
@@ -999,7 +999,8 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
   Arguments.push_back(FuncResultType);
 
   auto FnTy = FRIConvertFromBuiltin->getType();
-  auto STResultType = FnTy.castTo<SILFunctionType>()->getSILResult();
+  auto fnConv = FRIConvertFromBuiltin->getConventions();
+  auto STResultType = fnConv.getSILResultType();
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin, FnTy,
                              STResultType, ArrayRef<Substitution>(), Arguments,
                              false);
@@ -1437,7 +1438,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
       // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
       if (isConditional) {
         SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-        CastSuccessBB->createPHIArgument(SILBridgedTy);
+        CastSuccessBB->createPHIArgument(SILBridgedTy,
+                                         ValueOwnershipKind::Owned);
         Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
         Builder.setInsertionPoint(CastSuccessBB);
         SrcOp = CastSuccessBB->getArgument(0);
@@ -1446,7 +1448,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
       }
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-      CastSuccessBB->createPHIArgument(SILBridgedTy);
+      CastSuccessBB->createPHIArgument(SILBridgedTy, ValueOwnershipKind::Owned);
       NewI = Builder.createCheckedCastBranch(Loc, false, Load, SILBridgedTy,
                                              CastSuccessBB, ConvFailBB);
       Builder.setInsertionPoint(CastSuccessBB);
@@ -1492,7 +1494,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   };
   auto SILFnTy = FuncRef->getType();
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
-  SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
+  SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
+  SILType ResultTy = substConv.getSILResultType();
 
   // Temporary to hold the intermediate result.
   AllocStackInst *Tmp = nullptr;
@@ -1650,7 +1653,9 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       M.Types.getConstantFunctionType(BridgeFuncDeclRef));
 
   // TODO: Handle return from witness function.
-  if (BridgedFunc->getLoweredFunctionType()->getSingleResult().isIndirect())
+  if (BridgedFunc->getLoweredFunctionType()
+          ->getSingleResult()
+          .isFormalIndirect())
     return nullptr;
 
   // Get substitutions, if source is a bound generic type.
@@ -1659,10 +1664,11 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
           M.getSwiftModule(), nullptr);
 
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
-  SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
+  SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
+  SILType ResultTy = substConv.getSILResultType();
 
   auto FnRef = Builder.createFunctionRef(Loc, BridgedFunc);
-  if (Src->getType().isAddress() && !ParamTypes[0].isIndirect()) {
+  if (Src->getType().isAddress() && !substConv.isSILIndirect(ParamTypes[0])) {
     // Create load
     Src = Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
   }
@@ -1727,6 +1733,8 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       // Source as-is, we don't need to copy it due to guarantee
       break;
     case ParameterConvention::Indirect_In: {
+      assert(substConv.isSILIndirect(ParamTypes[0])
+             && "unsupported convention for bridging conversion");
       // Need to make a copy of the source, can be changed in ObjC
       auto BridgeStack = Builder.createAllocStack(Loc, Src->getType());
       Src = Builder.createCopyAddr(Loc, Src, BridgeStack, IsNotTake,
@@ -1737,8 +1745,6 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     case ParameterConvention::Indirect_InoutAliasable:
       // TODO handle remaining indirect argument types
       return nullptr;
-    case ParameterConvention::Direct_Deallocating:
-      llvm_unreachable("unsupported convention for bridging conversion");
   }
 
   if (needRetainBeforeCall)
@@ -2151,7 +2157,8 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, MI,
               Dest->getType().getObjectType(), SuccessBB, FailureBB);
-          SuccessBB->createPHIArgument(Dest->getType().getObjectType());
+          SuccessBB->createPHIArgument(Dest->getType().getObjectType(),
+                                       ValueOwnershipKind::Owned);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result
           B.createStore(Loc, SuccessBB->getArgument(0), Dest,

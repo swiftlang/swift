@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
@@ -248,6 +249,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
       switch (Kind) {
         case RequirementKind::Conformance:
+        case RequirementKind::Layout:
         case RequirementKind::Superclass:
           if (!canPossiblyConvertTo(First, Second, *DC))
             return {Result, MergeInfo};
@@ -475,17 +477,17 @@ bool TypeTransformContext::isPrintingSynthesizedExtension() const {
 std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
   llvm::SmallString<256> Builder;
   Builder.reserve(Text.size());
-  const UTF8* Data = reinterpret_cast<const UTF8*>(Text.begin());
-  const UTF8* End = reinterpret_cast<const UTF8*>(Text.end());
+  const llvm::UTF8* Data = reinterpret_cast<const llvm::UTF8*>(Text.begin());
+  const llvm::UTF8* End = reinterpret_cast<const llvm::UTF8*>(Text.end());
   StringRef Replacement = u8"\ufffd";
   while (Data < End) {
-    auto Step = getNumBytesForUTF8(*Data);
+    auto Step = llvm::getNumBytesForUTF8(*Data);
     if (Data + Step > End) {
       Builder.append(Replacement);
       break;
     }
 
-    if (isLegalUTF8Sequence(Data, Data + Step)) {
+    if (llvm::isLegalUTF8Sequence(Data, Data + Step)) {
       Builder.append(Data, Data + Step);
     } else {
 
@@ -1067,7 +1069,7 @@ void PrintAST::printAttributes(const Decl *D) {
     Options.ExcludeAttrList.push_back(DAK_Final);
   }
 
-  D->getAttrs().print(Printer, Options);
+  D->getAttrs().print(Printer, Options, D);
 
   Options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
@@ -1179,6 +1181,7 @@ static unsigned getDepthOfType(Type ty) {
 static unsigned getDepthOfRequirement(const Requirement &req) {
   switch (req.getKind()) {
   case RequirementKind::Conformance:
+  case RequirementKind::Layout:
   case RequirementKind::Superclass:
     return getDepthOfType(req.getFirstType());
 
@@ -1306,7 +1309,10 @@ void PrintAST::printSingleDepthOfGenericSignature(
     bool isFirstReq = true;
     for (const auto &req : requirements) {
       auto first = req.getFirstType();
-      auto second = req.getSecondType();
+      Type second;
+
+      if (req.getKind() != RequirementKind::Layout)
+        second = req.getSecondType();
 
       if ((flags & SkipSelfRequirement) &&
           req.getKind() == RequirementKind::Conformance) {
@@ -1318,11 +1324,13 @@ void PrintAST::printSingleDepthOfGenericSignature(
       if (!subMap.empty()) {
         if (Type subFirst = first.subst(M, subMap))
           first = subFirst;
-        if (Type subSecond = second.subst(M, subMap))
-          second = subSecond;
-        if (!(first->is<ArchetypeType>() || first->isTypeParameter()) &&
-            !(second->is<ArchetypeType>() || second->isTypeParameter()))
-          continue;
+        if (second) {
+          if (Type subSecond = second.subst(M, subMap))
+            second = subSecond;
+          if (!(first->is<ArchetypeType>() || first->isTypeParameter()) &&
+              !(second->is<ArchetypeType>() || second->isTypeParameter()))
+            continue;
+        }
       }
 
       if (isFirstReq) {
@@ -1332,8 +1340,13 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Printer << ", ";
       }
 
-      Requirement substReq(req.getKind(), first, second);
-      printRequirement(substReq);
+      if (second) {
+        Requirement substReq(req.getKind(), first, second);
+        printRequirement(substReq);
+      } else {
+        Requirement substReq(req.getKind(), first, req.getLayoutConstraint());
+        printRequirement(substReq);
+      }
     }
   }
 
@@ -1344,11 +1357,14 @@ void PrintAST::printSingleDepthOfGenericSignature(
 void PrintAST::printRequirement(const Requirement &req) {
   printType(req.getFirstType());
   switch (req.getKind()) {
+  case RequirementKind::Layout:
+    Printer << " : ";
+    req.getLayoutConstraint()->print(Printer, Options);
+    return;
   case RequirementKind::Conformance:
   case RequirementKind::Superclass:
     Printer << " : ";
     break;
-
   case RequirementKind::SameType:
     Printer << " == ";
     break;
@@ -3784,9 +3800,6 @@ public:
     case ParameterConvention::Direct_Guaranteed:
       Printer << "@callee_guaranteed ";
       return;
-    case ParameterConvention::Direct_Deallocating:
-      // Closures do not have destructors.
-      llvm_unreachable("callee convention cannot be deallocating");
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
@@ -3814,13 +3827,12 @@ public:
     }
     Printer << ") -> ";
 
-    unsigned totalResults =
-      T->getNumAllResults() + unsigned(T->hasErrorResult());
+    unsigned totalResults = T->getNumResults() + unsigned(T->hasErrorResult());
 
     if (totalResults != 1) Printer << "(";
 
     first = true;
-    for (auto result : T->getAllResults()) {
+    for (auto result : T->getResults()) {
       Printer.printSeparator(first, ", ");
       result.print(Printer, Options);
     }
@@ -4048,6 +4060,38 @@ void Type::print(ASTPrinter &Printer, const PrintOptions &PO) const {
     TypePrinter(Printer, PO).visit(*this);
 }
 
+void LayoutConstraintInfo::print(raw_ostream &OS,
+                                 const PrintOptions &PO) const {
+  StreamPrinter Printer(OS);
+  print(Printer, PO);
+}
+
+void LayoutConstraint::print(raw_ostream &OS,
+                             const PrintOptions &PO) const {
+  assert(*this);
+  getPointer()->print(OS, PO);
+}
+
+void LayoutConstraintInfo::print(ASTPrinter &Printer,
+                                 const PrintOptions &PO) const {
+  Printer << getName();
+  switch (getKind()) {
+  case LayoutConstraintKind::UnknownLayout:
+  case LayoutConstraintKind::RefCountedObject:
+  case LayoutConstraintKind::NativeRefCountedObject:
+  case LayoutConstraintKind::Trivial:
+    return;
+  case LayoutConstraintKind::TrivialOfAtMostSize:
+  case LayoutConstraintKind::TrivialOfExactSize:
+    Printer << "(";
+    Printer << SizeInBits;
+    if (Alignment)
+      Printer << ", " << Alignment <<")";
+    Printer << ")";
+    break;
+  }
+}
+
 void GenericSignature::print(raw_ostream &OS) const {
   StreamPrinter Printer(OS);
   PrintAST(Printer, PrintOptions())
@@ -4064,6 +4108,9 @@ void Requirement::dump() const {
   switch (getKind()) {
   case RequirementKind::Conformance:
     llvm::errs() << "conforms_to: ";
+    break;
+  case RequirementKind::Layout:
+    llvm::errs() << "layout: ";
     break;
   case RequirementKind::Superclass:
     llvm::errs() << "superclass: ";
@@ -4083,6 +4130,10 @@ void Requirement::print(raw_ostream &os, const PrintOptions &opts) const {
   PrintAST(printer, opts).printRequirement(*this);
 }
 
+void Requirement::print(ASTPrinter &printer, const PrintOptions &opts) const {
+  PrintAST(printer, opts).printRequirement(*this);
+}
+
 std::string GenericSignature::getAsString() const {
   std::string result;
   llvm::raw_string_ostream out(result);
@@ -4099,7 +4150,6 @@ static StringRef getStringForParameterConvention(ParameterConvention conv) {
   case ParameterConvention::Direct_Owned: return "@owned ";
   case ParameterConvention::Direct_Unowned: return "";
   case ParameterConvention::Direct_Guaranteed: return "@guaranteed ";
-  case ParameterConvention::Direct_Deallocating: return "@deallocating ";
   }
   llvm_unreachable("bad parameter convention");
 }
@@ -4118,8 +4168,10 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "dictionary_downcast";
   case CheckedCastKind::SetDowncast:
     return "set_downcast";
-  case CheckedCastKind::BridgingCast:
-    return "bridging_cast";
+  case CheckedCastKind::BridgingCoercion:
+    return "bridging_coercion";
+  case CheckedCastKind::Swift3BridgingDowncast:
+    return "bridging_downcast";
   }
   llvm_unreachable("bad checked cast name");
 }
@@ -4187,6 +4239,19 @@ void TypeBase::print(ASTPrinter &Printer, const PrintOptions &PO) const {
   Type(const_cast<TypeBase *>(this)).print(Printer, PO);
 }
 
+std::string LayoutConstraint::getString(const PrintOptions &PO) const {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+  print(OS, PO);
+  return OS.str();
+}
+
+std::string LayoutConstraintInfo::getString(const PrintOptions &PO) const {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+  print(OS, PO);
+  return OS.str();
+}
 
 void ProtocolConformance::printName(llvm::raw_ostream &os,
                                     const PrintOptions &PO) const {

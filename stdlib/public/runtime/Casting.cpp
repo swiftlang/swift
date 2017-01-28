@@ -18,12 +18,12 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Lazy.h"
-#include "swift/Basic/Unreachable.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
+#include "swift/Runtime/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "swift/Runtime/Debug.h"
@@ -612,7 +612,7 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
 
 #if SWIFT_OBJC_INTEROP
 SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
-extern "C" id
+id
 swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
   case MetadataKind::Class:
@@ -644,7 +644,7 @@ swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
 }
 
 SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
-extern "C" id
+id
 swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
   case MetadataKind::Class:
@@ -1013,7 +1013,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   }
   }
 
-  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
+  swift_runtime_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 /******************************************************************************/
@@ -1276,7 +1276,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     return origSourceType;
   }
 
-  swift_unreachable("Unhandled MetadataKind in switch.");
+  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 const Metadata *
@@ -1388,7 +1388,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     return origSourceType;
   }
 
-  swift_unreachable("Unhandled MetadataKind in switch.");
+  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 /******************************************************************************/
@@ -1523,7 +1523,8 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
   }
   }
 
-  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
+  swift_runtime_unreachable(
+      "Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 static void unwrapExistential(OpaqueValue *src,
@@ -1994,7 +1995,7 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
     return _fail(src, srcType, targetType, flags);
   }
 
-  swift_unreachable("Unhandled MetadataKind in switch.");
+  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 /******************************************************************************/
@@ -2983,7 +2984,6 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
 id _swift_bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
                                                 const Metadata *srcType) {
   return bridgeAnythingNonVerbatimToObjectiveC(src, srcType, /*consume*/ true);
@@ -3044,7 +3044,7 @@ findBridgeWitness(const Metadata *T) {
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" const Metadata *_swift_getBridgedNonVerbatimObjectiveCType(
+const Metadata *_swift_getBridgedNonVerbatimObjectiveCType(
   const Metadata *value, const Metadata *T
 ) {
   // Classes and Objective-C existentials bridge verbatim.
@@ -3065,7 +3065,7 @@ extern "C" const Metadata *_swift_getBridgedNonVerbatimObjectiveCType(
 //     inout result: Any?
 // )
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void
+void
 _swift_bridgeNonVerbatimFromObjectiveCToAny(HeapObject *sourceValue,
                                             OpaqueValue *destValue);
 
@@ -3075,7 +3075,7 @@ _swift_bridgeNonVerbatimFromObjectiveCToAny(HeapObject *sourceValue,
 //     inout result: NativeType?
 // )
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void
+void
 _swift_bridgeNonVerbatimBoxedValue(const OpaqueValue *sourceValue,
                                    OpaqueValue *destValue,
                                    const Metadata *nativeType);
@@ -3120,7 +3120,7 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
 //     inout result: T?
 // )
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void
+void
 _swift_bridgeNonVerbatimFromObjectiveC(
   HeapObject *sourceValue,
   const Metadata *nativeType,
@@ -3163,7 +3163,7 @@ _swift_bridgeNonVerbatimFromObjectiveC(
 //   inout result: T?
 // ) -> Bool
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool
+bool
 _swift_bridgeNonVerbatimFromObjectiveCConditional(
   HeapObject *sourceValue,
   const Metadata *nativeType,
@@ -3207,7 +3207,7 @@ _swift_bridgeNonVerbatimFromObjectiveCConditional(
 
 // func _isBridgedNonVerbatimToObjectiveC<T>(x: T.Type) -> Bool
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool _swift_isBridgedNonVerbatimToObjectiveC(
+bool _swift_isBridgedNonVerbatimToObjectiveC(
   const Metadata *value, const Metadata *T
 ) {
   assert(!swift_isClassOrObjCExistentialTypeImpl(T));
@@ -3219,7 +3219,7 @@ extern "C" bool _swift_isBridgedNonVerbatimToObjectiveC(
 
 // func _isClassOrObjCExistential<T>(x: T.Type) -> Bool
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool _swift_isClassOrObjCExistentialType(const Metadata *value,
+bool _swift_isClassOrObjCExistentialType(const Metadata *value,
                                                     const Metadata *T) {
   return swift_isClassOrObjCExistentialTypeImpl(T);
 }
@@ -3232,11 +3232,11 @@ const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
 }
 
 SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
-extern "C" bool swift_isClassType(const Metadata *type) {
+bool swift_isClassType(const Metadata *type) {
   return Metadata::isAnyKindOfClass(type->getKind());
 }
 
 SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
-extern "C" bool swift_isOptionalType(const Metadata *type) {
+bool swift_isOptionalType(const Metadata *type) {
   return type->getKind() == MetadataKind::Optional;
 }

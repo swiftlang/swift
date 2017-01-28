@@ -121,6 +121,11 @@ public:
 
   std::string mangleDeclAsUSR(ValueDecl *Decl, StringRef USRPrefix);
 
+  std::string mangleAccessorEntityAsUSR(AccessorKind kind,
+                                        AddressorKind addressorKind,
+                                        const ValueDecl *decl,
+                                        StringRef USRPrefix);
+
 protected:
 
   void appendSymbolKind(SymbolKind SKind);
@@ -217,6 +222,8 @@ protected:
   void appendEntity(const ValueDecl *decl);
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
+
+  void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
 
   static bool checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params);
 };

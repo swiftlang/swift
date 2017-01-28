@@ -1,4 +1,4 @@
-// RUN: %target-build-swift %s -emit-ir -o -
+// RUN: %target-build-swift %s -Xfrontend -assume-parsing-unqualified-ownership-sil -emit-ir -o -
 // REQUIRES: executable_test
 
 // Make sure we are not crashing here.
@@ -26,7 +26,7 @@ sil @_TFC4main4HashCfMS0_FT_S0_ : $@convention(thin) (@thick Hash.Type) -> @owne
 
 sil @_TFC4main4Hash6updatefS0_FT_T_ : $@convention(method) (@guaranteed Hash) -> () {
 bb0(%0 : $Hash):
-  %1 = class_method %0 : $Hash, #Hash.hash!1 : (Hash) -> () -> () , $@convention(method) (@guaranteed Hash) -> () // user: %9
+  %1 = class_method %0 : $Hash, #Hash.hash!1 : (Hash) -> () -> (), $@convention(method) (@guaranteed Hash) -> () // user: %9
   checked_cast_br [exact] %0 : $Hash to $MD5, bb2, bb3 // id: %2
 
 bb1:                                              // Preds: bb2 bb3

@@ -505,6 +505,15 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
         break;
       }
     }
+
+    // Remove dead address instructions that may be uses of the allocation.
+    while (Inst->use_empty() && (isa<StructElementAddrInst>(Inst) ||
+                                 isa<TupleElementAddrInst>(Inst))) {
+      SILValue Next = Inst->getOperand(0);
+      Inst->eraseFromParent();
+      NumInstRemoved++;
+      Inst = cast<SILInstruction>(Next);
+    }
   }
 }
 
@@ -512,7 +521,7 @@ void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
   DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
   for (auto *Block : PhiBlocks)
-    Block->createPHIArgument(ASI->getElementType());
+    Block->createPHIArgument(ASI->getElementType(), ValueOwnershipKind::Owned);
 }
 
 SILValue

@@ -60,6 +60,7 @@ TYPE("remap",           Remapping,          "remap",           "")
 
 // Misc types
 TYPE("pcm",             ClangModuleFile,    "pcm",             "")
+TYPE("pch",             PCH,                "pch",             "")
 TYPE("none",            Nothing,            "",                "")
 
 #undef TYPE

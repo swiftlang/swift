@@ -30,6 +30,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
@@ -245,19 +246,19 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     switch(CTypeKind) {
     case MappedCTypeKind::FloatIEEEsingle:
       assert(Bitwidth == 32 && "FloatIEEEsingle should be 32 bits wide");
-      if (&Sem != &APFloat::IEEEsingle)
+      if (&Sem != &APFloat::IEEEsingle())
         return std::make_pair(Type(), "");
       break;
 
     case MappedCTypeKind::FloatIEEEdouble:
       assert(Bitwidth == 64 && "FloatIEEEdouble should be 64 bits wide");
-      if (&Sem != &APFloat::IEEEdouble)
+      if (&Sem != &APFloat::IEEEdouble())
         return std::make_pair(Type(), "");
       break;
 
     case MappedCTypeKind::FloatX87DoubleExtended:
       assert(Bitwidth == 80 && "FloatX87DoubleExtended should be 80 bits wide");
-      if (&Sem != &APFloat::x87DoubleExtended)
+      if (&Sem != &APFloat::x87DoubleExtended())
         return std::make_pair(Type(), "");
       break;
 
@@ -642,7 +643,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
 
   // Reverse scan of the members because indirect field are generated just
   // after the corresponding anonymous type, so a reverse scan allows
-  // swiftching from O(n) to O(1) here.
+  // switching from O(n) to O(1) here.
   for (auto decl : reverse(members)) {
     if (decl->getClangDecl() == containingField) {
       anonymousFieldDecl = cast<VarDecl>(decl);
@@ -1087,12 +1088,20 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
   for (auto var : members) {
-    // TODO create value constructor with indirect fields instead of the
-    // generated __Anonymous_field.
-    if (var->hasClangNode() && isa<clang::IndirectFieldDecl>(var->getClangDecl()))
-      continue;
+    bool generateParamName = wantCtorParamNames;
 
-    Identifier argName = wantCtorParamNames ? var->getName() : Identifier();
+    if (var->hasClangNode()) {
+      // TODO create value constructor with indirect fields instead of the
+      // generated __Anonymous_field.
+      if (isa<clang::IndirectFieldDecl>(var->getClangDecl()))
+        continue;
+
+      if (auto clangField = dyn_cast<clang::FieldDecl>(var->getClangDecl()))
+        if (clangField->isAnonymousStructOrUnion())
+          generateParamName = false;
+    }
+
+    Identifier argName = generateParamName ? var->getName() : Identifier();
     auto param = new (context)
         ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), var->getType(), structDecl);
@@ -1133,14 +1142,18 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 
     // To keep DI happy, initialize stored properties before computed.
     for (unsigned pass = 0; pass < 2; pass++) {
+      unsigned paramPos = 0;
+
       for (unsigned i = 0, e = members.size(); i < e; i++) {
         auto var = members[i];
 
         if (var->hasClangNode() && isa<clang::IndirectFieldDecl>(var->getClangDecl()))
           continue;
 
-        if (var->hasStorage() == (pass != 0))
+        if (var->hasStorage() == (pass != 0)) {
+          paramPos++;
           continue;
+        }
 
         // Construct left-hand side.
         Expr *lhs = new (context) DeclRefExpr(selfDecl, DeclNameLoc(),
@@ -1149,12 +1162,14 @@ createValueConstructor(ClangImporter::Implementation &Impl,
                                           /*Implicit=*/true);
 
         // Construct right-hand side.
-        auto rhs = new (context) DeclRefExpr(valueParameters[i], DeclNameLoc(),
+        auto rhs = new (context) DeclRefExpr(valueParameters[paramPos],
+                                             DeclNameLoc(),
                                              /*Implicit=*/true);
 
         // Add assignment.
         stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs,
                                                  /*Implicit=*/true));
+        paramPos++;
       }
     }
 
@@ -1550,8 +1565,11 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
                                       /*Message=*/StringRef(),
                                       /*Rename=*/StringRef(),
                                       info.getOSVersion().getLowerEndpoint(),
+                                      /*IntroducedRange*/SourceRange(),
                                       /*Deprecated=*/noVersion,
+                                      /*DeprecatedRange*/SourceRange(),
                                       /*Obsoleted=*/noVersion,
+                                      /*ObsoletedRange*/SourceRange(),
                                       PlatformAgnosticAvailabilityKind::None,
                                       /*Implicit=*/false);
 
@@ -1782,6 +1800,26 @@ applyPropertyOwnership(VarDecl *prop,
 }
 
 namespace {
+  /// Customized llvm::DenseMapInfo for storing borrowed APSInts.
+  struct APSIntRefDenseMapInfo {
+    static inline const llvm::APSInt *getEmptyKey() {
+      return llvm::DenseMapInfo<const llvm::APSInt *>::getEmptyKey();
+    }
+    static inline const llvm::APSInt *getTombstoneKey() {
+      return llvm::DenseMapInfo<const llvm::APSInt *>::getTombstoneKey();
+    }
+    static unsigned getHashValue(const llvm::APSInt *ptrVal) {
+      assert(ptrVal != getEmptyKey() && ptrVal != getTombstoneKey());
+      return llvm::hash_value(*ptrVal);
+    }
+    static bool isEqual(const llvm::APSInt *lhs, const llvm::APSInt *rhs) {
+      if (lhs == rhs) return true;
+      if (lhs == getEmptyKey() || rhs == getEmptyKey()) return false;
+      if (lhs == getTombstoneKey() || rhs == getTombstoneKey()) return false;
+      return *lhs == *rhs;
+    }
+  };
+
   /// \brief Convert Clang declarations into the corresponding Swift
   /// declarations.
   class SwiftDeclConverter
@@ -2463,35 +2501,86 @@ namespace {
         addEnumeratorsAsMembers = true;
         break;
       }
-      
-      for (auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
-           ec != ecEnd; ++ec) {
+
+      llvm::SmallDenseMap<const llvm::APSInt *,
+                          PointerUnion<const clang::EnumConstantDecl *,
+                                       EnumElementDecl *>, 8,
+                          APSIntRefDenseMapInfo> canonicalEnumConstants;
+
+      if (enumKind == EnumKind::Enum) {
+        for (auto constant : decl->enumerators()) {
+          if (Impl.isUnavailableInSwift(constant))
+            continue;
+          canonicalEnumConstants.insert({&constant->getInitVal(), constant});
+        }
+      }
+
+      for (auto constant : decl->enumerators()) {
         Decl *enumeratorDecl;
         Decl *swift2EnumeratorDecl = nullptr;
         switch (enumKind) {
         case EnumKind::Constants:
         case EnumKind::Unknown:
-          enumeratorDecl = Impl.importDecl(*ec, getActiveSwiftVersion());
+          enumeratorDecl = Impl.importDecl(constant, getActiveSwiftVersion());
           swift2EnumeratorDecl =
-              Impl.importDecl(*ec, ImportNameVersion::Swift2);
+              Impl.importDecl(constant, ImportNameVersion::Swift2);
           break;
         case EnumKind::Options:
           enumeratorDecl =
               SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                  .importOptionConstant(*ec, decl, enumeratorContext);
+                  .importOptionConstant(constant, decl, enumeratorContext);
           swift2EnumeratorDecl =
               SwiftDeclConverter(Impl, ImportNameVersion::Swift2)
-                  .importOptionConstant(*ec, decl, enumeratorContext);
+                  .importOptionConstant(constant, decl, enumeratorContext);
           break;
-        case EnumKind::Enum:
-          enumeratorDecl =
-              SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                  .importEnumCase(*ec, decl, cast<EnumDecl>(enumeratorContext));
+        case EnumKind::Enum: {
+          auto canonicalCaseIter =
+            canonicalEnumConstants.find(&constant->getInitVal());
+
+          if (canonicalCaseIter == canonicalEnumConstants.end()) {
+            // Unavailable declarations get no special treatment.
+            enumeratorDecl =
+                SwiftDeclConverter(Impl, getActiveSwiftVersion())
+                    .importEnumCase(constant, decl,
+                                    cast<EnumDecl>(enumeratorContext));
+          } else {
+            const clang::EnumConstantDecl *unimported =
+                canonicalCaseIter->
+                  second.dyn_cast<const clang::EnumConstantDecl *>();
+
+            // Import the canonical enumerator for this case first.
+            if (unimported) {
+              enumeratorDecl = SwiftDeclConverter(Impl, getActiveSwiftVersion())
+                  .importEnumCase(unimported, decl,
+                                  cast<EnumDecl>(enumeratorContext));
+              if (enumeratorDecl) {
+                canonicalCaseIter->getSecond() =
+                    cast<EnumElementDecl>(enumeratorDecl);
+              }
+            } else {
+              enumeratorDecl =
+                  canonicalCaseIter->second.get<EnumElementDecl *>();
+            }
+
+            if (unimported != constant && enumeratorDecl) {
+              ImportedName importedName =
+                  Impl.importFullName(constant, getActiveSwiftVersion());
+              Identifier name = importedName.getDeclName().getBaseName();
+              if (!name.empty()) {
+                auto original = cast<ValueDecl>(enumeratorDecl);
+                enumeratorDecl = importEnumCaseAlias(name, constant, original,
+                                                     decl, enumeratorContext);
+              }
+            }
+          }
+
           swift2EnumeratorDecl =
               SwiftDeclConverter(Impl, ImportNameVersion::Swift2)
-                  .importEnumCase(*ec, decl, cast<EnumDecl>(enumeratorContext),
+                  .importEnumCase(constant, decl,
+                                  cast<EnumDecl>(enumeratorContext),
                                   enumeratorDecl);
           break;
+        }
         }
         if (!enumeratorDecl)
           continue;
@@ -2514,7 +2603,7 @@ namespace {
           if (errorWrapper) {
             auto enumeratorValue = cast<ValueDecl>(enumeratorDecl);
             auto alias = importEnumCaseAlias(enumeratorValue->getName(),
-                                             *ec,
+                                             constant,
                                              enumeratorValue,
                                              decl,
                                              enumeratorContext,
@@ -3451,17 +3540,28 @@ namespace {
       Optional<ForeignErrorConvention> errorConvention;
       bodyParams.push_back(nullptr);
       Type type;
+
+      // If we have a property accessor, find the corresponding property
+      // declaration.
+      const clang::ObjCPropertyDecl *prop = nullptr;
       if (decl->isPropertyAccessor()) {
-        const clang::ObjCPropertyDecl *prop = decl->findPropertyDecl();
-        if (!prop)
-          return nullptr;
+        prop = decl->findPropertyDecl();
+        if (!prop) return nullptr;
+
+        // If we're importing just the accessors (not the property), ignore
+        // the property.
+        if (shouldImportPropertyAsAccessors(prop))
+          prop = nullptr;
+      }
+
+      if (prop) {
         // If the matching property is in a superclass, or if the getter and
         // setter are redeclared in a potentially incompatible way, bail out.
         if (prop->getGetterMethodDecl() != decl &&
             prop->getSetterMethodDecl() != decl)
           return nullptr;
         type = Impl.importAccessorMethodType(dc, prop, decl,
-                                             isInSystemModule(dc),
+                                             isInSystemModule(dc), importedName,
                                              &bodyParams.back());
       } else {
         type = Impl.importMethodType(dc, decl, decl->parameters(),
@@ -4072,8 +4172,8 @@ namespace {
       //
       // FIXME: Remove this once SILGen gets proper support for factory
       // initializers.
-      if (result->getName() ==
-          result->getASTContext().getIdentifier("OS_object")) {
+      if (decl->getName() == "OS_object" ||
+          decl->getName() == "OS_os_log") {
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
       }
 
@@ -4265,7 +4365,7 @@ namespace {
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
-      addObjCAttribute(result, None);
+      addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
       applyPropertyOwnership(result, decl->getPropertyAttributesAsWritten());
 
       // Handle attributes.
@@ -4722,14 +4822,6 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
   bool negative = false;
   llvm::APSInt rawValue = decl->getInitVal();
 
-  // Did we already import an enum constant for this enum with the
-  // same value? If so, import it as a standalone constant.
-  auto insertResult =
-      Impl.EnumConstantValues.insert({{clangEnum, rawValue}, nullptr});
-  if (!insertResult.second)
-    return importEnumCaseAlias(name, decl, insertResult.first->second,
-                               clangEnum, theEnum);
-
   if (clangEnum->getIntegerType()->isSignedIntegerOrEnumerationType() &&
       rawValue.slt(0)) {
     rawValue = -rawValue;
@@ -4747,7 +4839,6 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
   auto element = Impl.createDeclWithClangNode<EnumElementDecl>(
       decl, Accessibility::Public, SourceLoc(), name, TypeLoc(), SourceLoc(),
       rawValueExpr, theEnum);
-  insertResult.first->second = element;
 
   // Give the enum element the appropriate type.
   element->computeType();
@@ -6554,7 +6645,12 @@ void ClangImporter::Implementation::importAttributes(
       auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
                                           platformK.getValue(),
                                           message, swiftReplacement,
-                                          introduced, deprecated, obsoleted,
+                                          introduced,
+                                          /*IntroducedRange=*/SourceRange(),
+                                          deprecated,
+                                          /*DeprecatedRange=*/SourceRange(),
+                                          obsoleted,
+                                          /*ObsoletedRange=*/SourceRange(),
                                           PlatformAgnostic, /*Implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
@@ -6982,7 +7078,8 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 // Calculate the generic environment from an imported generic param list.
 GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
     GenericParamList *genericParams, DeclContext *dc) {
-  ArchetypeBuilder builder(*dc->getParentModule());
+  ArchetypeBuilder builder(SwiftContext,
+                           LookUpConformanceInModule(dc->getParentModule()));
   for (auto param : *genericParams)
     builder.addGenericParameter(param);
   for (auto param : *genericParams) {
@@ -7142,8 +7239,14 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     // Create the expression node.
     StringRef printedValueCopy(context.AllocateCopy(printedValue));
     if (value.getKind() == clang::APValue::Int) {
-      expr = new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
-                                              /*Implicit=*/true);
+      if (type->getCanonicalType()->isBool()) {
+        expr = new (context) BooleanLiteralExpr(value.getInt().getBoolValue(),
+                                                SourceLoc(),
+                                                /**Implicit=*/true);
+      } else {
+        expr = new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
+                                                /*Implicit=*/true);
+      }
     } else {
       expr = new (context) FloatLiteralExpr(printedValueCopy, SourceLoc(),
                                             /*Implicit=*/true);

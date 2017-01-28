@@ -289,7 +289,7 @@ visitStrongEntranceApply(ApplyInst *AI) {
   // prevent mistakes, assert that here.
 #ifndef NDEBUG
   bool hasOwnedResult = false;
-  for (auto result : AI->getSubstCalleeType()->getDirectResults()) {
+  for (auto result : AI->getSubstCalleeConv().getDirectSILResults()) {
     if (result.getConvention() == ResultConvention::Owned)
       hasOwnedResult = true;
   }

@@ -20,8 +20,8 @@ import pipes
 import shutil
 import subprocess
 import sys
-from multiprocessing import Pool, Lock, cpu_count
 from contextlib import contextmanager
+from multiprocessing import Lock, Pool, cpu_count
 
 from . import diagnostics
 

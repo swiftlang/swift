@@ -289,7 +289,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       // Resolve this component to the variable we found.
       expr->resolveComponent(idx, var);
-      updateState(/*isProperty=*/true, var->getType()->getRValueObjectType());
+      updateState(/*isProperty=*/true,
+                  var->getInterfaceType()->getRValueObjectType());
 
       // Check that the property is @objc.
       if (!var->isObjC()) {

@@ -240,7 +240,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     failureExitBB = createBasicBlock();
     Cleanups.emitCleanupsForReturn(ctor);
     // Return nil.
-    if (lowering.isAddressOnly()) {
+    if (F.getConventions().hasIndirectSILResults()) {
       // Inject 'nil' into the indirect return.
       assert(F.getIndirectResults().size() == 1);
       B.createInjectEnumAddr(ctor, F.getIndirectResults()[0],
@@ -251,8 +251,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       B.createReturn(ctor, emitEmptyTuple(ctor));
     } else {
       // Pass 'nil' as the return value to the exit BB.
-      failureExitArg =
-          failureExitBB->createPHIArgument(resultLowering.getLoweredType());
+      failureExitArg = failureExitBB->createPHIArgument(
+          resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
       SILValue nilResult =
         B.createEnum(ctor, {}, getASTContext().getOptionalNoneDecl(),
                      resultLowering.getLoweredType());
@@ -286,8 +286,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     assert(B.getInsertionBB()->empty() && "Epilog already set up?");
     
     auto cleanupLoc = CleanupLocation::get(ctor);
-    
-    if (!lowering.isAddressOnly()) {
+
+    if (!F.getConventions().hasIndirectSILResults()) {
       // Otherwise, load and return the final 'self' value.
       selfValue = lowering.emitLoad(B, cleanupLoc, selfLV,
                                     LoadOwnershipQualifier::Copy);
@@ -300,8 +300,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       }
     } else {
       // If 'self' is address-only, copy 'self' into the indirect return slot.
-      assert(F.getIndirectResults().size() == 1 &&
-             "no indirect return for address-only ctor?!");
+      assert(F.getConventions().getNumIndirectSILResults() == 1
+             && "no indirect return for address-only ctor?!");
 
       // Get the address to which to store the result.
       SILValue completeReturnAddress = F.getIndirectResults()[0];
@@ -629,8 +629,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     SavedInsertionPoint savedIP(*this, failureBB, FunctionSection::Postmatter);
 
     failureExitBB = createBasicBlock();
-    failureExitArg =
-        failureExitBB->createPHIArgument(resultLowering.getLoweredType());
+    failureExitArg = failureExitBB->createPHIArgument(
+        resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
 
     Cleanups.emitCleanupsForReturn(ctor);
     SILValue nilResult = B.createEnum(loc, {},

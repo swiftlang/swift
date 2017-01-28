@@ -57,6 +57,11 @@ __swift_size_t swift::_swift_stdlib_strlen(const char *s) {
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_size_t swift::_swift_stdlib_strlen_unsigned(const unsigned char *s) {
+  return strlen((char *)s);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
 int swift::_swift_stdlib_memcmp(const void *s1, const void *s2,
                                 __swift_size_t n) {
   return memcmp(s1, s2, n);
@@ -138,32 +143,3 @@ swift::_swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);
   return RandomUniform(getGlobalMT19937());
 }
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-float swift::_swift_stdlib_remainderf(float dividend, float divisor) {
-  return std::remainder(dividend, divisor);
-}
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-float swift::_swift_stdlib_squareRootf(float x) { return std::sqrt(x); }
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-double swift::_swift_stdlib_remainder(double dividend, double divisor) {
-  return std::remainder(dividend, divisor);
-}
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-double swift::_swift_stdlib_squareRoot(double x) { return std::sqrt(x); }
-
-#if (defined(__i386__) || defined(__x86_64__)) && !defined(_WIN32)
-SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift::_swift_stdlib_remainderl(void *_self, const void *_other) {
-  *(long double *)_self = std::remainder(*(long double *)_self,
-                                         *(const long double *)_other);
-}
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift::_swift_stdlib_squareRootl(void *_self) {
-  *(long double *)_self = std::sqrt(*(long double *)_self);
-}
-#endif // Have Float80

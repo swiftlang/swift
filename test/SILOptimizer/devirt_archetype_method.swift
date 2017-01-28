@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil -primary-file %s | %FileCheck %s
 
 // We can't deserialize apply_inst with subst lists. When radar://14443304
 // is fixed then we should convert this test to a SIL test.
@@ -16,7 +16,7 @@ func generic_call<T : Pingable>(_ x: T) {
 }
 
 // Make sure we can devirtualize and inline the virtual call to ping.
-//CHECK: @_TF23devirt_archetype_method21interesting_code_hereFT_T_
+//CHECK: @_T023devirt_archetype_method21interesting_code_hereyyF
 //CHECK-NOT: apply
 //CHECK: return
 func interesting_code_here() {
@@ -43,7 +43,7 @@ func aMethod<T : TPingable>(_ x : T) {
 
 // Make sure that we devirtualizer, specialize and inline the call to aMethod
 // and that everything is optimized away.
-//CHECK: _TF23devirt_archetype_method4mainFT_T_
+//CHECK: _T023devirt_archetype_method4mainyyF
 //CHECK-NOT: apply
 //CHECK: return
 func main() {

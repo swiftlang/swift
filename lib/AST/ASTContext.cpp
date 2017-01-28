@@ -31,6 +31,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
@@ -277,12 +278,12 @@ struct ASTContext::Implementation {
         conformance.~SpecializedProtocolConformance();
       // Work around MSVC warning: local variable is initialized but
       // not referenced.
-#if defined(_MSC_VER)
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning (disable: 4189)
 #endif
       for (auto &conformance : InheritedConformances)
         conformance.~InheritedProtocolConformance();
-#if defined(_MSC_VER)
+#if SWIFT_COMPILER_IS_MSVC
 #pragma warning (default: 4189)
 #endif
 
@@ -1251,7 +1252,7 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
     return known->second.get();
 
   // Create a new archetype builder with the given signature.
-  auto builder = new ArchetypeBuilder(*mod);
+  auto builder = new ArchetypeBuilder(*this, LookUpConformanceInModule(mod));
   builder->addGenericSignature(sig);
 
   // Store this archetype builder (no generic environment yet).
@@ -1264,7 +1265,7 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
                                                     ArchetypeBuilder *builder) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
-  if (known != Impl.CanonicalGenericEnvironments.find(builder))
+  if (known != Impl.CanonicalGenericEnvironments.end())
     return known->second;
 
   auto sig = builder->getGenericSignature();
@@ -2925,6 +2926,8 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   RecursiveTypeProperties properties;
   if (Result->getRecursiveProperties().hasDynamicSelf())
     properties |= RecursiveTypeProperties::HasDynamicSelf;
+  if (Result->getRecursiveProperties().hasError())
+    properties |= RecursiveTypeProperties::HasError;
   return properties;
 }
 
@@ -3082,46 +3085,40 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
   if (errorResult) errorResult->profile(id);
 }
 
-SILFunctionType::SILFunctionType(GenericSignature *genericSig,
-                                 ExtInfo ext,
+SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
                                  ParameterConvention calleeConvention,
                                  ArrayRef<SILParameterInfo> params,
-                                 ArrayRef<SILResultInfo> allResults,
-                                 ArrayRef<SILResultInfo> directResults,
-                                 ArrayRef<SILResultInfo> indirectResults,
+                                 ArrayRef<SILResultInfo> normalResults,
                                  Optional<SILResultInfo> errorResult,
                                  const ASTContext &ctx,
                                  RecursiveTypeProperties properties)
-  : TypeBase(TypeKind::SILFunction, &ctx, properties),
-    GenericSig(genericSig) {
-  bool hasCombinedResults =
-    (!directResults.empty() && !indirectResults.empty());
+    : TypeBase(TypeKind::SILFunction, &ctx, properties),
+      GenericSig(genericSig) {
 
   SILFunctionTypeBits.HasErrorResult = errorResult.hasValue();
-  SILFunctionTypeBits.HasCombinedResults = hasCombinedResults;
   SILFunctionTypeBits.ExtInfo = ext.Bits;
   NumParameters = params.size();
-  NumDirectResults = directResults.size();
-  NumIndirectResults = indirectResults.size();
-  assert(!isIndirectParameter(calleeConvention));
+  NumResults = normalResults.size();
+  NumIndirectFormalResults =
+      std::count_if(normalResults.begin(), normalResults.end(),
+                    [](const SILResultInfo &resultInfo) {
+                      return resultInfo.isFormalIndirect();
+                    });
+
+  assert(!isIndirectFormalParameter(calleeConvention));
   SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
 
   memcpy(getMutableParameters().data(), params.data(),
          params.size() * sizeof(SILParameterInfo));
-  memcpy(getMutableAllResults().data(), allResults.data(),
-         allResults.size() * sizeof(SILResultInfo));
-  if (hasCombinedResults) {
-    memcpy(getMutableDirectResults().data(), directResults.data(),
-           directResults.size() * sizeof(SILResultInfo));
-    memcpy(getMutableIndirectResults().data(), indirectResults.data(),
-           indirectResults.size() * sizeof(SILResultInfo));
-  }
+  memcpy(getMutableResults().data(), normalResults.data(),
+         normalResults.size() * sizeof(SILResultInfo));
   if (errorResult)
     getMutableErrorResult() = *errorResult;
 
-  if (hasSILResultCache())
-    getMutableSILResultCache() = CanType();
-
+  if (hasResultCache()) {
+    getMutableFormalResultsCache() = CanType();
+    getMutableAllResultsCache() = CanType();
+  }
 #ifndef NDEBUG
   // Make sure the interface types are sane.
   if (genericSig) {
@@ -3132,28 +3129,23 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig,
 
     for (auto param : getParameters()) {
       (void)param;
+      assert(!param.getType()->hasError()
+             && "interface type of parameter should not contain error types");
       assert(!param.getType()->hasArchetype()
-             && "interface type of generic type should not contain context archetypes");
+             && "interface type of parameter should not contain context archetypes");
     }
-    for (auto result : getAllResults()) {
+    for (auto result : getResults()) {
       (void)result;
+      assert(!result.getType()->hasError()
+             && "interface type of result should not contain error types");
       assert(!result.getType()->hasArchetype()
-             && "interface type of generic type should not contain context archetypes");
+             && "interface type of result should not contain context archetypes");
     }
     if (hasErrorResult()) {
+      assert(!getErrorResult().getType()->hasError()
+             && "interface type of result should not contain error types");
       assert(!getErrorResult().getType()->hasArchetype()
-             && "interface type of generic type should not contain context archetypes");
-    }
-  }
-
-  // Make sure the direct and indirect results are sane.
-  assert(allResults.size() == directResults.size() + indirectResults.size());
-  unsigned directIndex = 0, indirectIndex = 0;
-  for (auto result : allResults) {
-    if (result.isDirect()) {
-      assert(directResults[directIndex++] == result);
-    } else {
-      assert(indirectResults[indirectIndex++] == result);
+             && "interface type of result should not contain context archetypes");
     }
   }
 #endif
@@ -3174,14 +3166,14 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
 }
 
 CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
-                                    ExtInfo ext, ParameterConvention callee,
-                                    ArrayRef<SILParameterInfo> params,
-                                    ArrayRef<SILResultInfo> allResults,
-                                    Optional<SILResultInfo> errorResult,
-                                    const ASTContext &ctx) {
+                                        ExtInfo ext, ParameterConvention callee,
+                                        ArrayRef<SILParameterInfo> params,
+                                        ArrayRef<SILResultInfo> normalResults,
+                                        Optional<SILResultInfo> errorResult,
+                                        const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  SILFunctionType::Profile(id, genericSig, ext, callee,
-                           params, allResults, errorResult);
+  SILFunctionType::Profile(id, genericSig, ext, callee, params, normalResults,
+                           errorResult);
 
   // Do we already have this generic function type?
   void *insertPos;
@@ -3191,27 +3183,12 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
 
   // All SILFunctionTypes are canonical.
 
-  SmallVector<SILResultInfo, 4> directResults;
-  SmallVector<SILResultInfo, 4> indirectResults;
-  for (auto result : allResults) {
-    if (result.isDirect()) {
-      directResults.push_back(result);
-    } else {
-      indirectResults.push_back(result);
-    }
-  }
-  bool hasCombinedResults =
-    (!directResults.empty() && !indirectResults.empty());
-
   // Allocate storage for the object.
   size_t bytes = sizeof(SILFunctionType)
-               + sizeof(SILParameterInfo) * params.size()
-               + sizeof(SILResultInfo) * allResults.size()
-               + (hasCombinedResults
-                  ? sizeof(SILResultInfo) * allResults.size()
-                  : 0)
-               + (errorResult ? sizeof(SILResultInfo) : 0)
-               + (directResults.size() > 1 ? sizeof(CanType) : 0);
+                 + sizeof(SILParameterInfo) * params.size()
+                 + sizeof(SILResultInfo) * normalResults.size()
+                 + (errorResult ? sizeof(SILResultInfo) : 0)
+                 + (normalResults.size() > 1 ? sizeof(CanType) * 2 : 0);
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
@@ -3219,7 +3196,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getType()->getRecursiveProperties();
-  for (auto &result : allResults)
+  for (auto &result : normalResults)
     properties |= result.getType()->getRecursiveProperties();
   if (errorResult)
     properties |= errorResult->getType()->getRecursiveProperties();
@@ -3230,9 +3207,8 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
     properties.removeHasTypeParameter();
 
   auto fnType =
-    new (mem) SILFunctionType(genericSig, ext, callee, params, allResults,
-                              directResults, indirectResults, errorResult,
-                              ctx, properties);
+      new (mem) SILFunctionType(genericSig, ext, callee, params, normalResults,
+                                errorResult, ctx, properties);
   ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);
   return CanSILFunctionType(fnType);
 }
@@ -3441,13 +3417,13 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
 
   auto arena = AllocationArena::Permanent;
   void *mem = ctx.Allocate(
-                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(conformsTo.size(),
-                                                             superclass ? 1 : 0,
-                                                             1),
-                alignof(ArchetypeType), arena);
+      totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
+        conformsTo.size(), superclass ? 1 : 0, 0, 1),
+      alignof(ArchetypeType), arena);
 
-  auto result = ::new (mem) ArchetypeType(ctx, existential, conformsTo,
-                                          superclass, *knownID);
+  auto result =
+      ::new (mem) ArchetypeType(ctx, existential, conformsTo, superclass,
+                                existential->getLayoutConstraint(), *knownID);
   openedExistentialArchetypes[*knownID] = result;
 
   return CanArchetypeType(result);
@@ -3517,7 +3493,10 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
 
   for (auto &reqt : requirements) {
     ID.AddPointer(reqt.getFirstType().getPointer());
-    ID.AddPointer(reqt.getSecondType().getPointer());
+    if (reqt.getKind() != RequirementKind::Layout)
+      ID.AddPointer(reqt.getSecondType().getPointer());
+    else
+      ID.AddPointer(reqt.getLayoutConstraint().getPointer());
     ID.AddInteger(unsigned(reqt.getKind()));
   }
 }

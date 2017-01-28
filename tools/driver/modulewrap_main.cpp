@@ -143,9 +143,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   }
 
   // Superficially verify that the input is a swift module file.
-  llvm::BitstreamReader Reader((unsigned char *)(*ErrOrBuf)->getBufferStart(),
-                               (unsigned char *)(*ErrOrBuf)->getBufferEnd());
-  llvm::BitstreamCursor Cursor(Reader);
+  llvm::BitstreamCursor Cursor(ErrOrBuf.get()->getMemBufferRef());
   for (unsigned char Byte : serialization::MODULE_SIGNATURE)
     if (Cursor.AtEndOfStream() || Cursor.Read(8) != Byte) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,

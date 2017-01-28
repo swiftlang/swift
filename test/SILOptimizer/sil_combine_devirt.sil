@@ -32,7 +32,7 @@ bb0:
   %3 = alloc_ref $Foo                             // users: %6, %7, %4
   %4 = ref_element_addr %3 : $Foo, #Foo.m_val     // user: %5
   store %2 to %4 : $*Int32                        // id: %5
-  %6 = class_method %3 : $Foo, #Foo.get!1 : (Foo) -> () -> Int32 , $@convention(method) (@guaranteed Foo) -> Int32 // user: %7
+  %6 = class_method %3 : $Foo, #Foo.get!1 : (Foo) -> () -> Int32, $@convention(method) (@guaranteed Foo) -> Int32 // user: %7
   %7 = apply %6(%3) : $@convention(method) (@guaranteed Foo) -> Int32 // user: %8
   %8 = apply %0(%7) : $@convention(thin) (Int32) -> ()
   %9 = tuple ()                                   // user: %10

@@ -166,7 +166,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   SILBasicBlock *ContBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
-    ContBB->createPHIArgument(argTy);
+    ContBB->createPHIArgument(argTy, ValueOwnershipKind::Owned);
   }
   
   SILBasicBlock *FalseBB, *FalseDestBB;
@@ -289,7 +289,7 @@ prepareIndirectResultInit(SILGenFunction &gen, CanType resultType,
   allResults = allResults.slice(1);
 
   // If it's indirect, we should be emitting into an argument.
-  if (result.isIndirect()) {
+  if (gen.silConv.isSILIndirect(result)) {
     // Pull off the next indirect result argument.
     SILValue addr = indirectResultAddrs.front();
     indirectResultAddrs = indirectResultAddrs.slice(1);
@@ -324,12 +324,12 @@ static std::unique_ptr<Initialization>
 prepareIndirectResultInit(SILGenFunction &gen, CanType formalResultType,
                           SmallVectorImpl<SILValue> &directResultsBuffer,
                           SmallVectorImpl<CleanupHandle> &cleanups) {
-  auto fnType = gen.F.getLoweredFunctionType();
+  auto fnConv = gen.F.getConventions();
 
   // Make space in the direct-results array for all the entries we need.
-  directResultsBuffer.append(fnType->getNumDirectResults(), SILValue());
+  directResultsBuffer.append(fnConv.getNumDirectSILResults(), SILValue());
 
-  ArrayRef<SILResultInfo> allResults = fnType->getAllResults();
+  ArrayRef<SILResultInfo> allResults = fnConv.funcTy->getResults();
   MutableArrayRef<SILValue> directResults = directResultsBuffer;
   ArrayRef<SILArgument*> indirectResultAddrs = gen.F.getIndirectResults();
 
@@ -348,7 +348,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                     Expr *ret) {
   SmallVector<SILValue, 4> directResults;
 
-  if (F.getLoweredFunctionType()->hasIndirectResults()) {
+  if (F.getConventions().hasIndirectSILResults()) {
     // Indirect return of an address-only value.
     FullExpr scope(Cleanups, CleanupLocation(ret));
 
@@ -619,8 +619,8 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // Create the throw destination at the end of the function.
   JumpDest throwDest = createJumpDest(S->getBody(),
                                       FunctionSection::Postmatter);
-  SILArgument *exnArg =
-      throwDest.getBlock()->createPHIArgument(exnTL.getLoweredType());
+  SILArgument *exnArg = throwDest.getBlock()->createPHIArgument(
+      exnTL.getLoweredType(), ValueOwnershipKind::Owned);
 
   // We always need a continuation block because we might fall out of
   // a catch block.  But we don't need a loop block unless the 'do'
@@ -906,7 +906,8 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // For now, don't try to re-use destination blocks for multiple
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
-  SILValue exn = destBB->createPHIArgument(exnResult.getSILType());
+  SILValue exn = destBB->createPHIArgument(getSILType(exnResult),
+                                           ValueOwnershipKind::Owned);
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);

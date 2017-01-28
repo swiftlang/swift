@@ -14,6 +14,7 @@
 #define SWIFT_BASIC_TYPETRAITS_H
 
 #include <type_traits>
+#include "swift/Basic/Compiler.h"
 
 #ifndef __has_feature
 #define SWIFT_DEFINED_HAS_FEATURE
@@ -29,8 +30,8 @@ namespace swift {
 /// is not intended to be specialized.
 template<typename T>
 struct IsTriviallyCopyable {
-#if _LIBCPP_VERSION || (defined(_MSC_VER) && !defined(__clang__))
-  // libc++ implements it.
+#if _LIBCPP_VERSION || SWIFT_COMPILER_IS_MSVC
+  // libc++ and MSVC implement is_trivially_copyable.
   static const bool value = std::is_trivially_copyable<T>::value;
 #elif __has_feature(is_trivially_copyable)
   static const bool value = __is_trivially_copyable(T);
@@ -41,8 +42,8 @@ struct IsTriviallyCopyable {
 
 template<typename T>
 struct IsTriviallyConstructible {
-#if _LIBCPP_VERSION || (defined(_MSC_VER) && !defined(__clang__))
-  // libc++ implements it.
+#if _LIBCPP_VERSION || SWIFT_COMPILER_IS_MSVC
+  // libc++ and MSVC implement is_trivially_constructible.
   static const bool value = std::is_trivially_constructible<T>::value;
 #elif __has_feature(has_trivial_constructor)
   static const bool value = __has_trivial_constructor(T);
@@ -53,8 +54,8 @@ struct IsTriviallyConstructible {
 
 template<typename T>
 struct IsTriviallyDestructible {
-#if _LIBCPP_VERSION || (defined(_MSC_VER) && !defined(__clang__))
-  // libc++ implements it.
+#if _LIBCPP_VERSION || SWIFT_COMPILER_IS_MSVC
+  // libc++ and MSVC implement is_trivially_destructible.
   static const bool value = std::is_trivially_destructible<T>::value;
 #elif __has_feature(has_trivial_destructor)
   static const bool value = __has_trivial_destructor(T);

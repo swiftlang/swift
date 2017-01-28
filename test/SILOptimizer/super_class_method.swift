@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil  %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil  %s | %FileCheck %s
 
 class Parent {
   @inline(never)
@@ -13,18 +13,18 @@ class Child : Parent {}
 
 class Grandchild : Child {
   class func onlyInGrandchild() {
-    // CHECK-LABEL: sil hidden @_TZFC18super_class_method10Grandchild16onlyInGrandchildfT_T_
-    // CHECK-NOT: super_method %0 : $@thick Grandchild.Type, #Parent.onlyInParent!1 : Parent.Type -> () -> () , $@convention(method) (@thick Parent.Type) -> (){{.*}} // user: %5
-    // CHECK: function_ref @_TZFC18super_class_method6Parent12onlyInParentfT_T_
+    // CHECK-LABEL: sil hidden @_T018super_class_method10GrandchildC06onlyInD0yyFZ
+    // CHECK-NOT: super_method %0 : $@thick Grandchild.Type, #Parent.onlyInParent!1 : Parent.Type -> () -> (), $@convention(method) (@thick Parent.Type) -> (){{.*}} // user: %5
+    // CHECK: function_ref @_T018super_class_method6ParentC06onlyInD0yyFZ
     super.onlyInParent()
-    // CHECK: function_ref @_TZFC18super_class_method6Parent17finalOnlyInParentfT_T_
+    // CHECK: function_ref @_T018super_class_method6ParentC011finalOnlyInD0yyFZ
     super.finalOnlyInParent()
   }
 
   override class func foo() {
-    // CHECK: sil hidden @_TZFC18super_class_method10Grandchild3foofT_T_ : $@convention(method) (@thick Grandchild.Type) -> () {
-    // CHECK-NOT: super_method %0 : $@thick Grandchild.Type, #Parent.foo!1 : Parent.Type -> () -> () , $@convention(method) (@thick Parent.Type) -> ()
-    // CHECK: function_ref @_TZFC18super_class_method6Parent3foofT_T_ 
+    // CHECK: sil hidden @_T018super_class_method10GrandchildC3fooyyFZ : $@convention(method) (@thick Grandchild.Type) -> () {
+    // CHECK-NOT: super_method %0 : $@thick Grandchild.Type, #Parent.foo!1 : Parent.Type -> () -> (), $@convention(method) (@thick Parent.Type) -> ()
+    // CHECK: function_ref @_T018super_class_method6ParentC3fooyyFZ 
     super.foo()
   }
 }

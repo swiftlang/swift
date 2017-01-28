@@ -161,7 +161,11 @@ namespace swift {
 
     /// Indicates that the type checker is checking code that will be
     /// immediately executed.
-    ForImmediateMode = 1 << 2
+    ForImmediateMode = 1 << 2,
+
+    /// If set, dumps wall time taken to type check each expression to
+    /// llvm::errs().
+    DebugTimeExpressions = 1 << 3,
   };
 
   /// Once parsing and name-binding are complete, this walks the AST to resolve

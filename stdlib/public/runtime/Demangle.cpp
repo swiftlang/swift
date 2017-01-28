@@ -42,6 +42,11 @@ _buildDemanglingForNominalType(const Metadata *type) {
   switch (type->getKind()) {
   case MetadataKind::Class: {
     auto classType = static_cast<const ClassMetadata *>(type);
+#if SWIFT_OBJC_INTEROP
+    // Peek through artificial subclasses.
+    while (classType->isTypeMetadata() && classType->isArtificialSubclass())
+      classType = classType->SuperClass;
+#endif
     parent = classType->getParentType(classType->getDescription());
     boundGenericKind = Node::Kind::BoundGenericClass;
     description = classType->getDescription();

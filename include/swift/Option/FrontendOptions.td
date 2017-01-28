@@ -119,6 +119,10 @@ def autolink_library : Separate<["-"], "autolink-library">,
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
+def disable_serialization_nested_type_lookup_table :
+  Flag<["-"], "disable-serialization-nested-type-lookup-table">,
+  HelpText<"Force module merging to use regular lookups to find nested types">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
@@ -147,6 +151,8 @@ def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
   HelpText<"Prints the time taken by each compilation phase">;
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
+def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-type-checking">,
+  HelpText<"Dumps the time it takes to type-check each expression">;
 
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
@@ -232,6 +238,9 @@ def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-valid
 
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
+
+def emit_pch : Flag<["-"], "emit-pch">,
+  HelpText<"Emit PCH for imported Objective-C header file">, ModeOpt;
 
 def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
   HelpText<"Enable the SIL Ownership Model">;

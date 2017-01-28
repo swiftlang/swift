@@ -47,7 +47,7 @@ struct MirrorReturn {
 /// Produce a mirror for any value.  The runtime produces a mirror that
 /// structurally reflects values of any type.
 SWIFT_RUNTIME_EXPORT
-extern "C" MirrorReturn
+MirrorReturn
 swift_reflectAny(OpaqueValue *value, const Metadata *T);
 
 #pragma clang diagnostic pop

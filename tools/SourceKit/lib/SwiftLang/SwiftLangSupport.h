@@ -250,8 +250,7 @@ public:
   static SourceKit::UIdent getUIDForSyntaxStructureElementKind(
       swift::ide::SyntaxStructureElementKind Kind);
 
-  static SourceKit::UIdent getUIDForSymbol(swift::index::SymbolKind kind,
-                                           swift::index::SymbolSubKindSet subKinds,
+  static SourceKit::UIdent getUIDForSymbol(swift::index::SymbolInfo sym,
                                            bool isRef);
 
   static SourceKit::UIdent getUIDForRangeKind(swift::ide::RangeKind Kind);

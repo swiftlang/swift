@@ -602,11 +602,19 @@ enum DefaultCustomizedError3 : UInt, CustomNSError {
   }
 }
 
+enum DefaultCustomizedParent {
+    enum ChildError: CustomNSError {
+        case foo
+    }
+}
+
 ErrorBridgingTests.test("Default-customized via CustomNSError") {
   expectEqual(1, (DefaultCustomizedError1.worse as NSError).code)
   expectEqual(13, (DefaultCustomizedError2.worse as NSError).code)
   expectEqual(115, (DefaultCustomizedError3.worse as NSError).code)
+  expectEqual("main.DefaultCustomizedError1", (DefaultCustomizedError1.worse as NSError).domain)
   expectEqual("customized3", (DefaultCustomizedError3.worse as NSError).domain)
+  expectEqual("main.DefaultCustomizedParent.ChildError", (DefaultCustomizedParent.ChildError.foo as NSError).domain)
 }
 
 class MyNSError : NSError {  }

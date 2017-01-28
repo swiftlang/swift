@@ -369,7 +369,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     /// Retrieve the value the pointer points to.
     @_transparent get {
       // We can do a strong load normally.
-      return unsafeBitCast(self, to: UnsafeMutablePointer<Pointee>.self).pointee
+      return UnsafePointer(self).pointee
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -527,7 +527,6 @@ public func == <Pointee>(
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
-@_fixed_layout
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
   internal var _item0: UnsafeRawPointer?

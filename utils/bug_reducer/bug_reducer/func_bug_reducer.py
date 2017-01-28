@@ -3,12 +3,12 @@ import md5
 import os
 import sys
 
-import bug_reducer_utils
-
 import list_reducer
 from list_reducer import TESTRESULT_KEEPPREFIX
 from list_reducer import TESTRESULT_KEEPSUFFIX
 from list_reducer import TESTRESULT_NOFAILURE
+
+import swift_tools
 
 
 class ReduceMiscompilingFunctions(list_reducer.ListReducer):
@@ -87,12 +87,12 @@ class OptimizerTester(object):
         sys.stdout.write("Trying to optimize functions...")
         self.silopt.input_file = filepath_to_opt
         result = self.silopt.invoke_with_passlist(self.passes, out_optpath)
-        if result == 0:
+        if result['exit_code'] == 0:
             print(' NOCRASH!\n')
         else:
             self.result = self.silopt.input_file
             print(' CRASH!\n')
-        return result
+        return result['exit_code']
 
 
 def function_bug_reducer(input_file, nm, sil_opt_invoker, sil_extract_invoker,
@@ -119,27 +119,27 @@ def invoke_function_bug_reducer(args):
     """Given a path to a sib file with canonical sil, attempt to find a perturbed
 list of function given a specific pass that causes the perf pipeline to crash
     """
-    tools = bug_reducer_utils.SwiftTools(args.swift_build_dir)
-    config = bug_reducer_utils.SILToolInvokerConfig(args)
-    nm = bug_reducer_utils.SILNMInvoker(config, tools)
+    tools = swift_tools.SwiftTools(args.swift_build_dir)
+    config = swift_tools.SILToolInvokerConfig(args)
+    nm = swift_tools.SILNMInvoker(config, tools)
 
     input_file = args.input_file
     extra_args = args.extra_args
-    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(config, tools,
-                                                      input_file,
-                                                      extra_args)
+    sil_opt_invoker = swift_tools.SILOptInvoker(config, tools,
+                                                input_file,
+                                                extra_args)
 
     # Make sure that the base case /does/ crash.
     filename = sil_opt_invoker.get_suffixed_filename('base_case')
     result = sil_opt_invoker.invoke_with_passlist(args.pass_list, filename)
     # If we succeed, there is no further work to do.
-    if result == 0:
+    if result['exit_code'] == 0:
         print("Success with PassList: %s" % (' '.join(args.pass_list)))
         return
 
-    sil_extract_invoker = bug_reducer_utils.SILFuncExtractorInvoker(config,
-                                                                    tools,
-                                                                    input_file)
+    sil_extract_invoker = swift_tools.SILFuncExtractorInvoker(config,
+                                                              tools,
+                                                              input_file)
 
     function_bug_reducer(input_file, nm, sil_opt_invoker, sil_extract_invoker,
                          args.pass_list)

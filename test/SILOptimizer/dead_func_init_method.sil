@@ -27,7 +27,7 @@ bb0(%4 : $Derived):
 
 sil @testit : $@convention(method) (@owned Derived) -> @owned Derived {
 bb0(%1 : $Derived):
-  %157 = class_method %1 : $Derived, #Derived.init!initializer.1 : (Derived.Type) -> () -> Derived , $@convention(method) (@owned Derived) -> @owned Derived
+  %157 = class_method %1 : $Derived, #Derived.init!initializer.1 : (Derived.Type) -> () -> Derived, $@convention(method) (@owned Derived) -> @owned Derived
   return %1 : $Derived
 }
 

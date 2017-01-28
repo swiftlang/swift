@@ -81,8 +81,8 @@ FunctionSignatureSpecializationMangler::
 FunctionSignatureSpecializationMangler(SpecializationPass P, Mangler &M,
                                        IsFragile_t Fragile, SILFunction *F)
   : SpecializationMangler(SpecializationKind::FunctionSignature, P, M, Fragile, F) {
-  for (unsigned i = 0, e = F->getLoweredFunctionType()->getNumSILArguments();
-       i != e; ++i) {
+  for (unsigned i = 0, e = F->getConventions().getNumSILArguments(); i != e;
+       ++i) {
     (void)i;
     Args.push_back({ArgumentModifierIntBase(ArgumentModifier::Unmodified), nullptr});
   }

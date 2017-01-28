@@ -91,7 +91,10 @@ createAvailableAttr(PlatformKind Platform,
   return new (Context) AvailableAttr(
       SourceLoc(), SourceRange(), Platform,
       /*Message=*/StringRef(),
-      /*Rename=*/StringRef(), Introduced, Deprecated, Obsoleted,
+      /*Rename=*/StringRef(),
+        Introduced, /*IntroducedRange=*/SourceRange(),
+        Deprecated, /*DeprecatedRange=*/SourceRange(),
+        Obsoleted, /*ObsoletedRange=*/SourceRange(),
       Inferred.PlatformAgnostic, /*Implicit=*/true);
 }
 

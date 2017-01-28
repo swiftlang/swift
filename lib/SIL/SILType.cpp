@@ -73,7 +73,9 @@ bool SILType::isReferenceCounted(SILModule &M) const {
 
 bool SILType::isNoReturnFunction() const {
   if (auto funcTy = dyn_cast<SILFunctionType>(getSwiftRValueType()))
-    return funcTy->getSILResult().getSwiftRValueType()->isUninhabited();
+    return funcTy->getDirectFormalResultsType()
+        .getSwiftRValueType()
+        ->isUninhabited();
 
   return false;
 }
@@ -191,7 +193,8 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   }
   // If toType has more elements, it may be larger.
   auto fromElements = fromEnum->getAllElements();
-  if (numToElements > std::distance(fromElements.begin(), fromElements.end()))
+  if (static_cast<ptrdiff_t>(numToElements) >
+      std::distance(fromElements.begin(), fromElements.end()))
     return false;
 
   if (toElementTy.isNull())
@@ -549,6 +552,8 @@ SILType::canUseExistentialRepresentation(SILModule &M,
   case ExistentialRepresentation::Metatype:
     return is<ExistentialMetatypeType>();
   }
+
+  llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
 }
 
 SILType SILType::getReferentType(SILModule &M) const {
@@ -583,12 +588,16 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
   return fieldTy;
 }
 
-ValueOwnershipKind SILResultInfo::getOwnershipKind(SILModule &M) const {
-  SILType Ty = M.Types.getLoweredType(getType());
-  bool IsTrivial = Ty.isTrivial(M);
+ValueOwnershipKind
+SILResultInfo::getOwnershipKind(SILModule &M,
+                                CanGenericSignature signature) const {
+  GenericContextScope GCS(M.Types, signature);
+  bool IsTrivial = getSILStorageType().isTrivial(M);
   switch (getConvention()) {
   case ResultConvention::Indirect:
-    return ValueOwnershipKind::Trivial; // Should this be an Any?
+    return SILModuleConventions(M).isSILIndirect(*this)
+               ? ValueOwnershipKind::Trivial
+               : ValueOwnershipKind::Owned;
   case ResultConvention::Autoreleased:
   case ResultConvention::Owned:
     return ValueOwnershipKind::Owned;
@@ -598,4 +607,24 @@ ValueOwnershipKind SILResultInfo::getOwnershipKind(SILModule &M) const {
       return ValueOwnershipKind::Trivial;
     return ValueOwnershipKind::Unowned;
   }
+
+  llvm_unreachable("Unhandled ResultConvention in switch.");
+}
+
+SILModuleConventions::SILModuleConventions(const SILModule &M)
+    : loweredAddresses(true) {}
+
+bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
+                                                     SILModule &M) {
+  if (SILModuleConventions(M).loweredAddresses)
+    return type.isAddressOnly(M);
+
+  return false;
+}
+
+bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
+  if (SILModuleConventions(M).loweredAddresses)
+    return type.isAddressOnly(M);
+
+  return false;
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 public struct stuffStruct {
     var a: Int64 = 6
@@ -13,7 +13,7 @@ public func f() {
 // is constructed in an alloca. The debug info for the alloca should not
 // describe a reference type as we would normally do with inout arguments.
 //
-// CHECK: define {{.*}} @_TFV4self11stuffStructCfT_S0_(
+// CHECK: define {{.*}} @_T04self11stuffStructVACycfC(
 // CHECK-NEXT: entry:
 // CHECK-NEXT: %[[ALLOCA:.*]] = alloca %V4self11stuffStruct, align {{(4|8)}}
 // CHECK: call void @llvm.dbg.declare(metadata %V4self11stuffStruct* %[[ALLOCA]],

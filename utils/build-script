@@ -17,6 +17,7 @@ import os
 import pipes
 import platform
 import sys
+import time
 
 # FIXME: Instead of modifying the system path in order to enable imports from
 #        other directories, all Python modules related to the build script
@@ -988,6 +989,14 @@ class BuildScriptInvocation(object):
         # Lipo...
         execute_one_impl_action(name="merged-hosts-lipo")
 
+# Provide a short delay so accidentally invoked clean builds can be canceled.
+def clean_delay():
+    sys.stdout.write('Starting clean build in  ')
+    for i in range(3, 0, -1):
+        sys.stdout.write('\b%d' % i)
+        sys.stdout.flush()
+        time.sleep(1)
+    print('\b\b\b\bnow.')
 
 # Main entry point for the preset mode.
 def main_preset():
@@ -1956,7 +1965,7 @@ iterations with -O",
         "--clang-user-visible-version",
         help="User-visible version of the embedded Clang and LLVM compilers",
         type=arguments.type.clang_compiler_version,
-        default="3.8.0",
+        default="4.0.0",
         metavar="MAJOR.MINOR.PATCH")
     parser.add_argument(
         "--swift-compiler-version",
@@ -1967,7 +1976,7 @@ iterations with -O",
         "--swift-user-visible-version",
         help="User-visible version of the embedded Swift compiler",
         type=arguments.type.swift_compiler_version,
-        default="3.0",
+        default="3.1",
         metavar="MAJOR.MINOR")
 
     parser.add_argument(
@@ -2115,6 +2124,7 @@ iterations with -O",
 
     # Clean build directory if requested.
     if args.clean:
+        clean_delay()
         shell.rmtree(invocation.workspace.build_root)
 
     # Create build directory.

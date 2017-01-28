@@ -134,6 +134,9 @@ func properties(_ b: B) {
 
   // Properties that are Swift keywords
   var prot = b.`protocol`
+
+  // Properties whose accessors run afoul of selector splitting.
+  _ = SelectorSplittingAccessors()
 }
 
 // Construction.
@@ -356,14 +359,14 @@ class ProtocolAdopter2 : FooProto {
     set { /* do nothing! */ }
   }
 }
-class ProtocolAdopterBad1 : FooProto { // expected-error 2{{type 'ProtocolAdopterBad1' does not conform to protocol 'FooProto'}}
-  @objc var bar: Int = 0 // expected-note 2{{candidate has non-matching type 'Int'}}
+class ProtocolAdopterBad1 : FooProto { // expected-error {{type 'ProtocolAdopterBad1' does not conform to protocol 'FooProto'}}
+  @objc var bar: Int = 0 // expected-note {{candidate has non-matching type 'Int'}}
 }
-class ProtocolAdopterBad2 : FooProto { // expected-error 2{{type 'ProtocolAdopterBad2' does not conform to protocol 'FooProto'}}
-  let bar: CInt = 0 // expected-note 2{{candidate is not settable, but protocol requires it}}
+class ProtocolAdopterBad2 : FooProto { // expected-error {{type 'ProtocolAdopterBad2' does not conform to protocol 'FooProto'}}
+  let bar: CInt = 0 // expected-note {{candidate is not settable, but protocol requires it}}
 }
-class ProtocolAdopterBad3 : FooProto { // expected-error 2{{type 'ProtocolAdopterBad3' does not conform to protocol 'FooProto'}}
-  var bar: CInt { // expected-note 2{{candidate is not settable, but protocol requires it}}
+class ProtocolAdopterBad3 : FooProto { // expected-error {{type 'ProtocolAdopterBad3' does not conform to protocol 'FooProto'}}
+  var bar: CInt { // expected-note {{candidate is not settable, but protocol requires it}}
     return 42
   }
 }

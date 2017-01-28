@@ -71,7 +71,7 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
     // TODO: When we support pairing retains with @owned parameters, we will
     // need to be able to handle the potential of multiple state transition
     // kinds.
-    for (auto result : AI->getSubstCalleeType()->getDirectResults()) {
+    for (auto result : AI->getSubstCalleeConv().getDirectSILResults()) {
       if (result.getConvention() == ResultConvention::Owned)
         return RCStateTransitionKind::StrongEntrance;
     }

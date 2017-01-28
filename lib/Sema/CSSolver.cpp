@@ -708,6 +708,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -836,19 +837,11 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // Relational constraints: break out to look for types above/below.
       break;
 
-    case ConstraintKind::CheckedCast:
-      // FIXME: Relational constraints for which we could perhaps do better
-      // than the default.
-      break;
-
     case ConstraintKind::BridgingConversion:
-      // Nothing to infer from bridging conversions.
-      continue;
-
+    case ConstraintKind::CheckedCast:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
       // Constraints from which we can't do anything.
-      // FIXME: Record this somehow?
       continue;
 
     case ConstraintKind::Defaultable:
@@ -875,6 +868,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
       SWIFT_FALLTHROUGH;
         
+    case ConstraintKind::Layout:
     case ConstraintKind::LiteralConformsTo: {
       // If there is a 'nil' literal constraint, we might need optional
       // supertype bindings.
@@ -1251,14 +1245,9 @@ static bool tryTypeVariableBindings(
   auto &tc = cs.getTypeChecker();
   ++cs.solverState->NumTypeVariablesBound;
   
-  // If the solver has allocated an excessive amount of memory when solving for
-  // this expression, short-circuit the binding operation and mark the parent
-  // expression as "too complex".
-  if (cs.TC.Context.getSolverMemory() >
-        cs.TC.Context.LangOpts.SolverMemoryThreshold) {
-    cs.setExpressionTooComplex(true);
+  // If we've already explored a lot of potential solutions, bail.
+  if (cs.getExpressionTooComplex())
     return true;
-  }
 
   for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
     // Try each of the bindings in turn.
@@ -1460,20 +1449,45 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
 }
 
 bool ConstraintSystem::Candidate::solve() {
+  // Don't attempt to solve candidate if there is closure
+  // expression involved, because it's handled specially
+  // by parent constraint system (e.g. parameter lists).
+  bool containsClosure = false;
+  E->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+    if (isa<ClosureExpr>(childExpr)) {
+      containsClosure = true;
+      return nullptr;
+    }
+    return childExpr;
+  });
+
+  if (containsClosure)
+    return false;
+
+  auto cleanupImplicitExprs = [&](Expr *expr) {
+    expr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+      Type type = childExpr->getType();
+      if (childExpr->isImplicit() && type && type->hasTypeVariable())
+        childExpr->setType(Type());
+      return childExpr;
+    });
+  };
+
+  // Allocate new constraint system for sub-expression.
+  ConstraintSystem cs(TC, DC, None);
+
   // Cleanup after constraint system generation/solving,
   // because it would assign types to expressions, which
   // might interfere with solving higher-level expressions.
   ExprCleaner cleaner(E);
 
-  // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(TC, DC, None);
-
   // Generate constraints for the new system.
   if (auto generatedExpr = cs.generateConstraints(E)) {
     E = generatedExpr;
   } else {
-    // Failure to generate constraint system for sub-expression means we can't
-    // continue solving sub-expressions.
+    // Failure to generate constraint system for sub-expression
+    // means we can't continue solving sub-expressions.
+    cleanupImplicitExprs(E);
     return true;
   }
 
@@ -1499,14 +1513,16 @@ bool ConstraintSystem::Candidate::solve() {
     cs.solveRec(solutions, FreeTypeVariableBinding::Allow);
   }
 
-  // No solutions for the sub-expression means that either main expression
-  // needs salvaging or it's inconsistent (read: doesn't have solutions).
-  if (solutions.empty())
-    return true;
-
   // Record found solutions as suggestions.
   this->applySolutions(solutions);
-  return false;
+
+  // Let's double-check if we have any implicit expressions
+  // with type variables and nullify their types.
+  cleanupImplicitExprs(E);
+
+  // No solutions for the sub-expression means that either main expression
+  // needs salvaging or it's inconsistent (read: doesn't have solutions).
+  return solutions.empty();
 }
 
 void ConstraintSystem::Candidate::applySolutions(
@@ -1599,8 +1615,9 @@ void ConstraintSystem::shrink(Expr *expr) {
         return {false, expr};
       }
 
-      // Let's not attempt to type-check closures, which has already been
-      // type checked anyway.
+      // Let's not attempt to type-check closures or expressions
+      // which constrain closures, because they require special handling
+      // when dealing with context and parameters declarations.
       if (isa<ClosureExpr>(expr)) {
         return {false, expr};
       }
@@ -1622,6 +1639,24 @@ void ConstraintSystem::shrink(Expr *expr) {
       }
 
       return { true, expr };
+    }
+
+    /// Determine whether this is an arithmetic expression comprised entirely
+    /// of literals.
+    static bool isArithmeticExprOfLiterals(Expr *expr) {
+      expr = expr->getSemanticsProvidingExpr();
+
+      if (auto prefix = dyn_cast<PrefixUnaryExpr>(expr))
+        return isArithmeticExprOfLiterals(prefix->getArg());
+
+      if (auto postfix = dyn_cast<PostfixUnaryExpr>(expr))
+        return isArithmeticExprOfLiterals(postfix->getArg());
+
+      if (auto binary = dyn_cast<BinaryExpr>(expr))
+        return isArithmeticExprOfLiterals(binary->getArg()->getElement(0)) &&
+               isArithmeticExprOfLiterals(binary->getArg()->getElement(1));
+
+      return isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr);
     }
 
     Expr *walkToExprPost(Expr *expr) override {
@@ -1671,7 +1706,7 @@ void ConstraintSystem::shrink(Expr *expr) {
       // If there are fewer than two overloads in the chain
       // there is no point of solving this expression,
       // because we won't be able to reduce its domain.
-      if (numOverloadSets > 1)
+      if (numOverloadSets > 1 && !isArithmeticExprOfLiterals(expr))
         Candidates.push_back(Candidate(CS, expr));
 
       return expr;
@@ -1911,7 +1946,16 @@ ConstraintSystem::solve(Expr *&expr,
 
   // If there are no solutions let's mark system as unsolved,
   // and solved otherwise even if there are multiple solutions still present.
-  return solutions.empty() ? SolutionKind::Unsolved : SolutionKind::Solved;
+
+  // There was a Swift 3 bug that allowed us to return Solved if we
+  // had found at least one solution before deciding an expression was
+  // "too complex". Maintain that behavior, but for Swift > 3 return
+  // Unsolved in these cases.
+  auto tooComplex = getExpressionTooComplex() &&
+    !getASTContext().isSwiftVersion3();
+  auto unsolved = tooComplex || solutions.empty();
+
+  return unsolved ? SolutionKind::Unsolved : SolutionKind::Solved;
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
@@ -2201,11 +2245,7 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   if (auto restriction = constraint->getRestriction()) {
     // Non-optional conversions are better than optional-to-optional
     // conversions.
-    if (*restriction == ConversionRestrictionKind::OptionalToOptional ||
-        *restriction
-          == ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional ||
-        *restriction
-          == ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional)
+    if (*restriction == ConversionRestrictionKind::OptionalToOptional)
       return true;
     
     // Array-to-pointer conversions are better than inout-to-pointer conversions.
@@ -2448,5 +2488,12 @@ bool ConstraintSystem::solveSimplified(
   InactiveConstraints.insert(afterDisjunction, disjunction);
   CG.addConstraint(disjunction);
 
-  return !firstSolvedConstraint;
+  // If we are exiting due to an expression that is too complex, do
+  // not allow our caller to continue as if we have been successful.
+  // Maintain the broken behavior under Swift 3 mode though, to avoid
+  // breaking code.
+  auto tooComplex = getExpressionTooComplex() &&
+    !getASTContext().isSwiftVersion3();
+
+  return tooComplex || !firstSolvedConstraint;
 }

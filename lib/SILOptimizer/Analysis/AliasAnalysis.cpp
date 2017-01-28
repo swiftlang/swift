@@ -68,8 +68,7 @@ DebugAAKinds("aa-kind", llvm::cl::desc("Alias Analysis Kinds:"),
                                          "typed-access-tb-aa"),
                               clEnumValN(AAKind::All,
                                          "all",
-                                         "all"),
-                              clEnumValEnd));
+                                         "all")));
 
 static inline bool shouldRunAA() {
   return unsigned(AAKind(DebugAAKinds));

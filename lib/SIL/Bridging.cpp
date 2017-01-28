@@ -20,6 +20,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
@@ -132,6 +133,8 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
     return getLoweredCBridgedType(pattern, t, canBridgeBool,
                                   purpose == ForResult);
   }
+
+  llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 };
 
 Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,

@@ -149,6 +149,8 @@ public:
     /// Parse, type-check, and dump type refinement context hierarchy
     DumpTypeRefinementContexts,
 
+    EmitPCH, ///< Emit PCH of imported bridging header
+
     EmitSILGen, ///< Emit raw SIL
     EmitSIL, ///< Emit canonical SIL
 
@@ -179,6 +181,9 @@ public:
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
 
+  /// If set, dumps wall time taken to check each expression.
+  bool DebugTimeExpressionTypeChecking = false;
+
   /// If set, prints the time taken in each major compilation phase to 
   /// llvm::errs().
   ///
@@ -188,6 +193,11 @@ public:
   /// Indicates whether function body parsing should be delayed
   /// until the end of all files.
   bool DelayedFunctionBodyParsing = false;
+
+  /// If true, serialization encodes an extra lookup table for use in module-
+  /// merging when emitting partial modules (the per-file modules in a non-WMO
+  /// build).
+  bool EnableSerializationNestedTypeLookupTable = true;
 
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).

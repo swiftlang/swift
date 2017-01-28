@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
@@ -282,10 +283,19 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     // If the previous statement didn't have a semicolon and this new
     // statement doesn't start a line, complain.
     if (!PreviousHadSemi && !Tok.isAtStartOfLine()) {
-      SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
-      diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
-        .fixItInsert(EndOfPreviousLoc, ";");
-      // FIXME: Add semicolon to the AST?
+      // Add a fix-it to remove the space in consecutive identifiers
+      // in a variable decl.
+      if (isSecondVarIdentifier()) {
+        diagnose(Tok.getLoc(), diag::repeated_identifier, "variable");
+        auto Previous = L->getTokenAt(PreviousLoc);
+        diagnoseConsecutiveIDs(Previous, Tok);
+        skipUntilDeclRBrace(tok::semi, tok::pound_endif);
+      } else {
+        SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
+        diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
+          .fixItInsert(EndOfPreviousLoc, ";");
+        // FIXME: Add semicolon to the AST?
+      }
     }
 
     ParserPosition BeginParserPosition;
@@ -296,22 +306,21 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     PreviousHadSemi = false;
     if (isStartOfDecl()
         && Tok.isNot(tok::pound_if, tok::pound_sourceLocation)) {
-      ParseDeclOptions options = IsTopLevel ? PD_AllowTopLevel : PD_Default;
-      ParserStatus Status =
-        parseDecl(options, [&](Decl *D) { TmpDecls.push_back(D); });
-      if (Status.isError()) {
+      ParserResult<Decl> DeclResult = 
+          parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
+                    [&](Decl *D) {TmpDecls.push_back(D);});
+      if (DeclResult.isParseError()) {
         NeedParseErrorRecovery = true;
-        if (Status.hasCodeCompletion() && IsTopLevel &&
+        if (DeclResult.hasCodeCompletion() && IsTopLevel &&
             isCodeCompletionFirstPass()) {
           consumeDecl(BeginParserPosition, None, IsTopLevel);
-          return Status;
+          return DeclResult;
         }
       }
+      Result = DeclResult.getPtrOrNull();
 
       for (Decl *D : TmpDecls)
         Entries.push_back(D);
-      if (!TmpDecls.empty())
-        PreviousHadSemi = TmpDecls.back()->TrailingSemiLoc.isValid();
       TmpDecls.clear();
     } else if (Tok.is(tok::pound_if)) {
       SourceLoc StartLoc = Tok.getLoc();
@@ -346,6 +355,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       IfConfigStmt *ICS = cast<IfConfigStmt>(Result.get<Stmt*>());
       for (auto &Entry : ICS->getActiveClauseElements()) {
         Entries.push_back(Entry);
+        if (Entry.is<Decl*>()) {
+          Entry.get<Decl*>()->setEscapedFromIfConfig(true);
+        }
       }
     } else if (Tok.is(tok::pound_line)) {
       ParserStatus Status = parseLineDirective(true);
@@ -413,15 +425,16 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         Entries.push_back(Result);
     }
 
-    if (!NeedParseErrorRecovery && !PreviousHadSemi && Tok.is(tok::semi)) {
-      if (Result) {
-        if (Result.is<Expr*>()) {
-          Result.get<Expr*>()->TrailingSemiLoc = consumeToken(tok::semi);
-        } else {
-          Result.get<Stmt*>()->TrailingSemiLoc = consumeToken(tok::semi);
-        }
-      }
+    if (!NeedParseErrorRecovery && Tok.is(tok::semi)) {
       PreviousHadSemi = true;
+      if (Expr *E = Result.dyn_cast<Expr*>())
+        E->TrailingSemiLoc = consumeToken(tok::semi);
+      else if (Stmt *S = Result.dyn_cast<Stmt*>())
+        S->TrailingSemiLoc = consumeToken(tok::semi);
+      else if (Decl *D = Result.dyn_cast<Decl*>())
+        D->TrailingSemiLoc = consumeToken(tok::semi);
+      else
+        assert(!Result && "Unsupported AST node");
     }
 
     if (NeedParseErrorRecovery) {
@@ -1569,9 +1582,26 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
               break;
           }
         } else {
-          D.diagnose(SE->getLoc(),
-                     diag::unsupported_conditional_compilation_binary_expression);
+          D.diagnose(
+              SE->getLoc(),
+              diag::unsupported_conditional_compilation_binary_expression);
           return ConditionalCompilationExprState::error();
+        }
+      } else {
+        // Swift3 didn't have this branch. the operator and the RHS are
+        // silently ignored.
+        if (!Context.isSwiftVersion3()) {
+          D.diagnose(
+              elements[iOperator]->getLoc(),
+              diag::unsupported_conditional_compilation_expression_type);
+          return ConditionalCompilationExprState::error();
+        } else {
+          SourceRange ignoredRange(elements[iOperator]->getLoc(),
+                                   elements[iOperand]->getEndLoc());
+          D.diagnose(
+              elements[iOperator]->getLoc(),
+              diag::swift3_unsupported_conditional_compilation_expression_type)
+            .highlight(ignoredRange);
         }
       }
 
@@ -1709,20 +1739,32 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
                      diag::unsupported_platform_runtime_condition_argument);
           return ConditionalCompilationExprState::error();
         }
+
+        std::vector<StringRef> suggestions;
+        SWIFT_DEFER {
+          for (const StringRef& suggestion : suggestions) {
+            D.diagnose(UDRE->getLoc(), diag::note_typo_candidate,
+                       suggestion)
+            .fixItReplace(UDRE->getSourceRange(), suggestion);
+          }
+        };
         if (fnName == "os") {
-          if (!LangOptions::checkPlatformConditionOS(argument)) {
+          if (!LangOptions::checkPlatformConditionOS(argument,
+                                                     suggestions)) {
             D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
                        "operating system", fnName);
             return ConditionalCompilationExprState::error();
           }
         } else if (fnName == "arch") {
-          if (!LangOptions::isPlatformConditionArchSupported(argument)) {
+          if (!LangOptions::isPlatformConditionArchSupported(argument,
+                                                             suggestions)) {
             D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
                        "architecture", fnName);
             return ConditionalCompilationExprState::error();
           }
         } else if (fnName == "_endian") {
-          if (!LangOptions::isPlatformConditionEndiannessSupported(argument)) {
+          if (!LangOptions::isPlatformConditionEndiannessSupported(argument,
+                                                                   suggestions)) {
             D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
                        "endianness", fnName);
           }

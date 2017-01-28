@@ -17,7 +17,7 @@
 
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool _swift_stdlib_NSObject_isKindOfClass(
+bool _swift_stdlib_NSObject_isKindOfClass(
     id NS_RELEASES_ARGUMENT _Nonnull object,
     NSString *NS_RELEASES_ARGUMENT _Nonnull className) {
   bool result = [object isKindOfClass:NSClassFromString(className)];
