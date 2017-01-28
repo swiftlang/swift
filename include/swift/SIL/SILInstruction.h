@@ -1083,6 +1083,9 @@ public:
   CanSILFunctionType getOrigCalleeType() const {
     return getCallee()->getType().template castTo<SILFunctionType>();
   }
+  SILFunctionConventions getOrigCalleeConv() const {
+    return SILFunctionConventions(getOrigCalleeType(), this->getModule());
+  }
 
   /// Get the type of the callee with the applied substitutions.
   CanSILFunctionType getSubstCalleeType() const {
@@ -1090,6 +1093,9 @@ public:
   }
   SILType getSubstCalleeSILType() const {
     return SubstCalleeType;
+  }
+  SILFunctionConventions getSubstCalleeConv() const {
+    return SILFunctionConventions(getSubstCalleeType(), this->getModule());
   }
 
   bool isCalleeNoReturn() const {
@@ -1189,6 +1195,7 @@ protected:
 public:
   using super::getCallee;
   using super::getSubstCalleeType;
+  using super::getSubstCalleeConv;
   using super::hasSubstitutions;
   using super::getSubstitutions;
   using super::getNumArguments;
@@ -1242,7 +1249,7 @@ public:
   }
 
   SILArgumentConvention getArgumentConvention(unsigned index) const {
-    return getSubstCalleeType()->getSILArgumentConvention(index);
+    return getSubstCalleeConv().getSILArgumentConvention(index);
   }
 
   Optional<SILResultInfo> getSingleResult() const {
@@ -1269,10 +1276,10 @@ public:
   }
 
   bool hasIndirectResults() const {
-    return getSubstCalleeType()->hasIndirectResults();
+    return getSubstCalleeConv().hasIndirectSILResults();
   }
   unsigned getNumIndirectResults() const {
-    return getSubstCalleeType()->getNumIndirectResults();
+    return getSubstCalleeConv().getNumIndirectSILResults();
   }
 
   bool hasSelfArgument() const {
@@ -1284,7 +1291,7 @@ public:
     return C == ParameterConvention::Direct_Guaranteed;
   }
 
-  OperandValueArrayRef getIndirectResults() const {
+  OperandValueArrayRef getIndirectSILResults() const {
     return getArguments().slice(0, getNumIndirectResults());
   }
 
@@ -1397,6 +1404,9 @@ public:
 
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
+  }
+  SILFunctionConventions getConventions() const {
+    return SILFunctionConventions(getFunctionType(), getModule());
   }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
@@ -5411,13 +5421,15 @@ public:
   }
 
   /// Return the type.
-  SILType getType() const {
-    FOREACH_IMPL_RETURN(getSubstCalleeType()->getSILResult());
-  }
+  SILType getType() const { return getSubstCalleeConv().getSILResultType(); }
 
   /// Get the type of the callee without the applied substitutions.
   CanSILFunctionType getOrigCalleeType() const {
     return getCallee()->getType().castTo<SILFunctionType>();
+  }
+  /// Get the conventions of the callee without the applied substitutions.
+  SILFunctionConventions getOrigCalleeConv() const {
+    return SILFunctionConventions(getOrigCalleeType(), getModule());
   }
 
   /// Get the type of the callee with the applied substitutions.
@@ -5426,6 +5438,10 @@ public:
   }
   SILType getSubstCalleeSILType() const {
     FOREACH_IMPL_RETURN(getSubstCalleeSILType());
+  }
+  /// Get the conventions of the callee with the applied substitutions.
+  SILFunctionConventions getSubstCalleeConv() const {
+    return SILFunctionConventions(getSubstCalleeType(), getModule());
   }
 
   /// Check if this is a call of a never-returning function.
@@ -5500,6 +5516,20 @@ public:
 
   /// Returns the number of arguments for this partial apply.
   unsigned getNumArguments() const { return getArguments().size(); }
+
+  // Get the callee argument index corresponding to the caller's first applied
+  // argument. Returns 0 for full applies. May return > 0 for partial applies.
+  unsigned getCalleeArgIndexOfFirstAppliedArg() const {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+    case ValueKind::TryApplyInst:
+      return 0;
+    case ValueKind::PartialApplyInst:
+      return getSubstCalleeConv().getNumSILArguments() - getNumArguments();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
 
   Operand &getArgumentRef(unsigned i) const { return getArgumentOperands()[i]; }
 
@@ -5583,24 +5613,24 @@ public:
     return (classof(inst) ? FullApplySite(inst) : FullApplySite());
   }
 
-  bool hasIndirectResults() const {
-    return getSubstCalleeType()->hasIndirectResults();
+  bool hasIndirectSILResults() const {
+    return getSubstCalleeConv().hasIndirectSILResults();
   }
 
-  unsigned getNumIndirectResults() const {
-    return getSubstCalleeType()->getNumIndirectResults();
+  unsigned getNumIndirectSILResults() const {
+    return getSubstCalleeConv().getNumIndirectSILResults();
   }
 
-  OperandValueArrayRef getIndirectResults() const {
-    return getArguments().slice(0, getNumIndirectResults());
+  OperandValueArrayRef getIndirectSILResults() const {
+    return getArguments().slice(0, getNumIndirectSILResults());
   }
 
   OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
-    return getArguments().slice(getNumIndirectResults());
+    return getArguments().slice(getNumIndirectSILResults());
   }
 
   SILArgumentConvention getArgumentConvention(unsigned index) const {
-    return getSubstCalleeType()->getSILArgumentConvention(index);
+    return getSubstCalleeConv().getSILArgumentConvention(index);
   }
 
   static FullApplySite getFromOpaqueValue(void *p) {

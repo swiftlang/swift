@@ -86,7 +86,7 @@ public:
       parameters(parameters) {}
 
   ManagedValue getManagedValue(SILValue arg, CanType t,
-                                 SILParameterInfo parameterInfo) const {
+                               SILParameterInfo parameterInfo) const {
     switch (parameterInfo.getConvention()) {
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -120,9 +120,11 @@ public:
     // Pop the next parameter info.
     auto parameterInfo = parameters.front();
     parameters = parameters.slice(1);
-    assert(argType == parent->getParent()
-                            ->mapTypeIntoContext(parameterInfo.getSILType()) &&
-           "argument does not have same type as specified by parameter info");
+    assert(
+        argType
+            == parent->getParent()->mapTypeIntoContext(
+                   gen.getSILType(parameterInfo))
+        && "argument does not have same type as specified by parameter info");
 
     SILValue arg =
         parent->createFunctionArgument(argType, loc.getAsASTNode<ValueDecl>());
@@ -461,10 +463,13 @@ static void emitIndirectResultParameters(SILGenFunction &gen, Type resultType,
   }
 
   // If the return type is address-only, emit the indirect return argument.
-  const TypeLowering &resultTI = gen.getTypeLowering(
-      DC->mapTypeIntoContext(resultType));
-  if (!resultTI.isReturnedIndirectly()) return;
 
+  const TypeLowering &resultTI =
+      gen.getTypeLowering(DC->mapTypeIntoContext(resultType));
+  if (!SILModuleConventions::isReturnedIndirectlyInSIL(
+          resultTI.getLoweredType(), gen.SGM.M)) {
+    return;
+  }
   auto &ctx = gen.getASTContext();
   auto var = new (ctx) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
@@ -481,6 +486,11 @@ unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,
                                     Type resultType, DeclContext *DC,
                                     bool throws) {
   // Create the indirect result parameters.
+  if (auto *genericSig = DC->getGenericSignatureOfContext()) {
+    resultType = genericSig->getCanonicalTypeInContext(
+      resultType, *SGM.M.getSwiftModule());
+  }
+
   emitIndirectResultParameters(*this, resultType, DC);
 
   // Emit the argument variables in calling convention order.

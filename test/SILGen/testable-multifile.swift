@@ -41,19 +41,19 @@ public class PublicSub: Base {
 // CHECK-LABEL: sil_vtable PrivateSub {
 // CHECK-NEXT:   #Base.foo!1: {{.*}} : _T04main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLC3fooyyF
 // CHECK-NEXT:   #Base.init!initializer.1: {{.*}} : _T04main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLCADycfc
-// CHECK-NEXT:   #PrivateSub.deinit!deallocator: {{.*}} : _T04main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLCfD
+// CHECK-NEXT:   #PrivateSub.deinit!deallocator: _T04main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable Sub {
 // CHECK-NEXT:   #Base.foo!1: {{.*}} : _T04main3SubC3fooyyF
 // CHECK-NEXT:   #Base.init!initializer.1: {{.*}} : _T04main3SubCACycfc
-// CHECK-NEXT:   #Sub.deinit!deallocator: {{.*}} : _T04main3SubCfD
+// CHECK-NEXT:   #Sub.deinit!deallocator: _T04main3SubCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable PublicSub {
 // CHECK-NEXT:   #Base.foo!1: {{.*}} : _T04main9PublicSubC3fooyyF
 // CHECK-NEXT:   #Base.init!initializer.1: {{.*}} : _T04main9PublicSubCACycfc
-// CHECK-NEXT:   #PublicSub.deinit!deallocator: {{.*}} : _T04main9PublicSubCfD
+// CHECK-NEXT:   #PublicSub.deinit!deallocator: _T04main9PublicSubCfD
 // CHECK-NEXT: }
 
 

@@ -73,7 +73,9 @@ bool SILType::isReferenceCounted(SILModule &M) const {
 
 bool SILType::isNoReturnFunction() const {
   if (auto funcTy = dyn_cast<SILFunctionType>(getSwiftRValueType()))
-    return funcTy->getSILResult().getSwiftRValueType()->isUninhabited();
+    return funcTy->getDirectFormalResultsType()
+        .getSwiftRValueType()
+        ->isUninhabited();
 
   return false;
 }
@@ -589,14 +591,13 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
 ValueOwnershipKind
 SILResultInfo::getOwnershipKind(SILModule &M,
                                 CanGenericSignature signature) const {
-  if (signature)
-    M.Types.pushGenericContext(signature);
-  bool IsTrivial = getSILType().isTrivial(M);
-  if (signature)
-    M.Types.popGenericContext(signature);
+  GenericContextScope GCS(M.Types, signature);
+  bool IsTrivial = getSILStorageType().isTrivial(M);
   switch (getConvention()) {
   case ResultConvention::Indirect:
-    return ValueOwnershipKind::Trivial; // Should this be an Any?
+    return SILModuleConventions(M).isSILIndirect(*this)
+               ? ValueOwnershipKind::Trivial
+               : ValueOwnershipKind::Owned;
   case ResultConvention::Autoreleased:
   case ResultConvention::Owned:
     return ValueOwnershipKind::Owned;
@@ -608,4 +609,22 @@ SILResultInfo::getOwnershipKind(SILModule &M,
   }
 
   llvm_unreachable("Unhandled ResultConvention in switch.");
+}
+
+SILModuleConventions::SILModuleConventions(const SILModule &M)
+    : loweredAddresses(true) {}
+
+bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
+                                                     SILModule &M) {
+  if (SILModuleConventions(M).loweredAddresses)
+    return type.isAddressOnly(M);
+
+  return false;
+}
+
+bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
+  if (SILModuleConventions(M).loweredAddresses)
+    return type.isAddressOnly(M);
+
+  return false;
 }

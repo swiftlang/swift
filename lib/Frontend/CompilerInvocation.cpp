@@ -767,6 +767,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
   Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
+  Opts.EnableSerializationNestedTypeLookupTable &=
+      !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
 
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();

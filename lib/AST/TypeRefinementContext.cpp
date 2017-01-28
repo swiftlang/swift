@@ -285,6 +285,8 @@ TypeRefinementContext::getAvailabilityConditionVersionSourceRange(
   case Reason::Root:
     return SourceRange();
   }
+
+  llvm_unreachable("Unhandled Reason in switch.");
 }
 
 void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,

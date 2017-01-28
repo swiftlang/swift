@@ -77,10 +77,11 @@ static std::string getClonedName(PartialApplyInst *PAI, IsFragile_t Fragile,
   NewMangling::FunctionSignatureSpecializationMangler NewMangler(P, Fragile, F);
 
   // We know that all arguments are literal insts.
-  auto Args = PAI->getArguments();
-  for (unsigned i : indices(Args)) {
-    OldMangler.setArgumentConstantProp(i, getConstant(Args[i]));
-    NewMangler.setArgumentConstantProp(i, getConstant(Args[i]));
+  unsigned argIdx = ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();
+  for (auto arg : PAI->getArguments()) {
+    OldMangler.setArgumentConstantProp(argIdx, getConstant(arg));
+    NewMangler.setArgumentConstantProp(argIdx, getConstant(arg));
+    ++argIdx;
   }
   OldMangler.mangle();
   std::string Old = M.finalize();
@@ -170,13 +171,13 @@ void CapturePropagationCloner::cloneBlocks(
   // Create the entry basic block with the function arguments.
   SILBasicBlock *OrigEntryBB = &*OrigF->begin();
   SILBasicBlock *ClonedEntryBB = CloneF.createBasicBlock();
-  CanSILFunctionType CloneFTy = CloneF.getLoweredFunctionType();
+  auto cloneConv = CloneF.getConventions();
 
   // Only clone the arguments that remain in the new function type. The trailing
   // arguments are now propagated through the partial apply.
   assert(!IsCloningConstant && "incorrect mode");
   unsigned ParamIdx = 0;
-  for (unsigned NewParamEnd = CloneFTy->getNumSILArguments();
+  for (unsigned NewParamEnd = cloneConv.getNumSILArguments();
        ParamIdx != NewParamEnd; ++ParamIdx) {
 
     SILArgument *Arg = OrigEntryBB->getArgument(ParamIdx);

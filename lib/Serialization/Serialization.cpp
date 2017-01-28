@@ -152,6 +152,46 @@ namespace {
   using LocalTypeHashTableGenerator =
     llvm::OnDiskChainedHashTableGenerator<LocalDeclTableInfo>;
 
+  class NestedTypeDeclsTableInfo {
+  public:
+    using key_type = Identifier;
+    using key_type_ref = const key_type &;
+    using data_type = Serializer::NestedTypeDeclsData; // (parent, child) pairs
+    using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      assert(!key.empty());
+      return llvm::HashString(key.str());
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      uint32_t keyLength = key.str().size();
+      uint32_t dataLength = (sizeof(uint32_t) * 2) * data.size();
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      // FIXME: Avoid writing string data for identifiers here.
+      out << key.str();
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      endian::Writer<little> writer(out);
+      for (auto entry : data) {
+        writer.write<uint32_t>(entry.first);
+        writer.write<uint32_t>(entry.second);
+      }
+    }
+  };
 } // end anonymous namespace
 
 namespace llvm {
@@ -508,6 +548,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, NORMAL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
+  BLOCK_RECORD(index_block, NESTED_TYPE_DECLS);
 
   BLOCK(SIL_BLOCK);
   BLOCK_RECORD(sil_block, SIL_FUNCTION);
@@ -3237,7 +3278,7 @@ void Serializer::writeType(Type ty) {
       unsigned conv = getRawStableParameterConvention(param.getConvention());
       variableData.push_back(TypeID(conv));
     }
-    for (auto result : fnTy->getAllResults()) {
+    for (auto result : fnTy->getResults()) {
       variableData.push_back(addTypeRef(result.getType()));
       unsigned conv = getRawStableResultConvention(result.getConvention());
       variableData.push_back(TypeID(conv));
@@ -3259,14 +3300,10 @@ void Serializer::writeType(Type ty) {
       getRawStableParameterConvention(fnTy->getCalleeConvention());
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
-    SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-          stableCalleeConvention,
-          stableRepresentation,
-          fnTy->isPseudogeneric(),
-          fnTy->hasErrorResult(),
-          fnTy->getParameters().size(),
-          fnTy->getNumAllResults(),
-          variableData);
+    SILFunctionTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, stableCalleeConvention,
+        stableRepresentation, fnTy->isPseudogeneric(), fnTy->hasErrorResult(),
+        fnTy->getParameters().size(), fnTy->getNumResults(), variableData);
     if (sig)
       writeGenericRequirements(sig->getRequirements(),
                                DeclTypeAbbrCodes);
@@ -3607,6 +3644,26 @@ static void writeLocalDeclTable(const index_block::DeclListLayout &DeclList,
   }
 
   DeclList.emit(scratch, kind, tableOffset, hashTableBlob);
+}
+
+static void
+writeNestedTypeDeclsTable(const index_block::NestedTypeDeclsLayout &declList,
+                          const Serializer::NestedTypeDeclsTable &table) {
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<NestedTypeDeclsTableInfo> generator;
+    for (auto &entry : table)
+      generator.insert(entry.first, entry.second);
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  declList.emit(scratch, tableOffset, hashTableBlob);
 }
 
 namespace {
@@ -4072,28 +4129,24 @@ static void writeObjCMethodTable(const index_block::ObjCMethodTableLayout &out,
   out.emit(scratch, tableOffset, hashTableBlob);
 }
 
-/// Add operator methods from the given declaration type.
-///
-/// Recursively walks the members and derived global decls of any nested
-/// nominal types.
+/// Recursively walks the members and derived global decls of any nominal types
+/// to build up global tables.
 template<typename Range>
-static void addOperatorsAndTopLevel(Serializer &S, Range members,
-                                    Serializer::DeclTable &operatorMethodDecls,
-                                    Serializer::DeclTable &topLevelDecls,
-                                    Serializer::ObjCMethodTable &objcMethods,
-                                    bool isDerivedTopLevel,
-                                    bool isLocal = false) {
+static void collectInterestingNestedDeclarations(
+    Serializer &S,
+    Range members,
+    Serializer::DeclTable &operatorMethodDecls,
+    Serializer::ObjCMethodTable &objcMethods,
+    Serializer::NestedTypeDeclsTable &nestedTypeDecls,
+    bool isLocal = false) {
+  const NominalTypeDecl *nominalParent = nullptr;
+
   for (const Decl *member : members) {
     if (auto memberValue = dyn_cast<ValueDecl>(member)) {
       if (!memberValue->hasName())
         continue;
 
-      if (isDerivedTopLevel) {
-        topLevelDecls[memberValue->getName()].push_back({
-          /*ignored*/0,
-          S.addDeclRef(memberValue, /*forceSerialization=*/true)
-        });
-      } else if (memberValue->isOperator()) {
+      if (memberValue->isOperator()) {
         // Add operator methods.
         // Note that we don't have to add operators that are already in the
         // top-level list.
@@ -4104,11 +4157,26 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
       }
     }
 
+    if (auto nestedType = dyn_cast<TypeDecl>(member)) {
+      if (nestedType->getEffectiveAccess() > Accessibility::FilePrivate) {
+        if (!nominalParent) {
+          const DeclContext *DC = member->getDeclContext();
+          nominalParent = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+          assert(nominalParent && "parent context is not a type or extension");
+        }
+        nestedTypeDecls[nestedType->getName()].push_back({
+          S.addDeclRef(nominalParent),
+          S.addDeclRef(nestedType)
+        });
+      }
+    }
+
     // Recurse into nested declarations.
     if (auto iterable = dyn_cast<IterableDeclContext>(member)) {
-      addOperatorsAndTopLevel(S, iterable->getMembers(),
-                             operatorMethodDecls, topLevelDecls, objcMethods,
-                             false);
+      collectInterestingNestedDeclarations(S, iterable->getMembers(),
+                                           operatorMethodDecls,
+                                           objcMethods, nestedTypeDecls,
+                                           isLocal);
     }
 
     // Record Objective-C methods.
@@ -4127,10 +4195,12 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
   }
 }
 
-void Serializer::writeAST(ModuleOrSourceFile DC) {
+void Serializer::writeAST(ModuleOrSourceFile DC,
+                          bool enableNestedTypeLookupTable) {
   DeclTable topLevelDecls, extensionDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
   ObjCMethodTable objcMethods;
+  NestedTypeDeclsTable nestedTypeDecls;
   LocalTypeHashTableGenerator localTypeGenerator;
   bool hasLocalTypes = false;
 
@@ -4187,9 +4257,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       // derived conformance (for example, ==), force them to be
       // serialized.
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
-        addOperatorsAndTopLevel(*this, IDC->getMembers(),
-                                operatorMethodDecls, topLevelDecls,
-                                objcMethods, false);
+        collectInterestingNestedDeclarations(*this, IDC->getMembers(),
+                                             operatorMethodDecls, objcMethods,
+                                             nestedTypeDecls);
       }
     }
 
@@ -4206,9 +4276,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       });
 
       if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
-        addOperatorsAndTopLevel(*this, IDC->getMembers(),
-                                operatorMethodDecls, topLevelDecls,
-                                objcMethods, false, /*isLocal=*/true);
+        collectInterestingNestedDeclarations(*this, IDC->getMembers(),
+                                             operatorMethodDecls, objcMethods,
+                                             nestedTypeDecls, /*isLocal=*/true);
       }
     }
   }
@@ -4242,6 +4312,12 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
     index_block::ObjCMethodTableLayout ObjCMethodTable(Out);
     writeObjCMethodTable(ObjCMethodTable, objcMethods);
+
+    if (DC.is<SourceFile *>() && enableNestedTypeLookupTable &&
+        !nestedTypeDecls.empty()) {
+      index_block::NestedTypeDeclsLayout NestedTypeDeclsTable(Out);
+      writeNestedTypeDeclsTable(NestedTypeDeclsTable, nestedTypeDecls);
+    }
 
     if (entryPointClassID.hasValue()) {
       index_block::EntryPointLayout EntryPoint(Out);
@@ -4279,7 +4355,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeHeader(options);
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
-    S.writeAST(DC);
+    S.writeAST(DC, options.EnableNestedTypeLookupTable);
   }
 
   S.writeToStream(os);

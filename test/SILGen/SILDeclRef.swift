@@ -58,7 +58,7 @@ public func testBase(b: Base) -> Int32 {
 // CHECK:  #Base.foo!1: (Base) -> () -> Int32 : _TFC10SILDeclRef4Base3foofT_Vs5Int32	// Base.foo() -> Int32
 // CHECK:  #Base.foo!1: (Base) -> (Int32) -> () : _TFC10SILDeclRef4Base3foofT1nVs5Int32_T_	// Base.foo(n : Int32) -> ()
 // CHECK:  #Base.foo!1: (Base) -> (Float) -> Int32 : _TFC10SILDeclRef4Base3foofT1fSf_Vs5Int32	// Base.foo(f : Float) -> Int32
-// CHECK:  #Base.deinit!deallocator: (Base) -> () -> () : _TFC10SILDeclRef4BaseD	// Base.__deallocating_deinit
+// CHECK:  #Base.deinit!deallocator: _TFC10SILDeclRef4BaseD	// Base.__deallocating_deinit
 // CHECK:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _TFC10SILDeclRef4BasecfT_S0_	// Base.init() -> Base
 // CHECK: }
 

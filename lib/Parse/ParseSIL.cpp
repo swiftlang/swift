@@ -1639,7 +1639,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
       !P.peekToken().isContextualPunctuator("<"))
     return false;
 
-  // Type of the SILDeclRef is optional, to be compatible with the old format.
+  // Type of the SILDeclRef is optional to be compatible with the old format.
   if (!P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")) {
     // Parse the type for SILDeclRef.
     Optional<Scope> GenericsScope;
@@ -1670,7 +1670,6 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
     auto unlabeledDecl =
         declTy->getUnlabeledType(P.Context)->getCanonicalType();
     for (unsigned I = 0, E = values.size(); I < E; I++) {
-      auto *VD = values[I];
       auto lookupTy = values[I]->getInterfaceType();
       auto unlabeledLookup =
           lookupTy->getUnlabeledType(P.Context)->getCanonicalType();
@@ -2547,13 +2546,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     auto StorageTy = SILType::getPrimitiveAddressType(
                                SubstInitStorageTy->getSingleResult().getType());
     auto Storage = getLocalValue(StorageName, StorageTy, InstLoc, B);
-    
-    auto SelfTy = SubstSetterTy->getSelfParameter().getSILType();
+
+    SILFunctionConventions substConv(SubstSetterTy, B.getModule());
+    auto SelfTy = substConv.getSILType(SubstSetterTy->getSelfParameter());
     auto Self = getLocalValue(SelfName, SelfTy, InstLoc, B);
-    
-    auto PropTy = SubstInitStorageTy->getParameters()[0].getSILType()
-      .getAddressType();
-    
+
+    auto PropTy = SubstInitStorageTy->getParameters()[0]
+                      .getSILStorageType()
+                      .getAddressType();
+
     ResultVal = B.createMarkUninitializedBehavior(InstLoc,
                                                   InitStorageFunc,
                                                   InitStorageSubs,
@@ -3946,13 +3947,14 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       = silFnTy->substGenericArgs(SILMod, subs);
     FnTy = SILType::getPrimitiveObjectType(substFTI);
   }
-  
+  SILFunctionConventions substConv(substFTI, B.getModule());
+
   switch (Opcode) {
   default: llvm_unreachable("Unexpected case");
   case ValueKind::ApplyInst : {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    if (substFTI->getNumSILArguments() != ArgNames.size()) {
+    if (substConv.getNumSILArguments() != ArgNames.size()) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,
                  "to have the same number of arg names as arg types");
       return true;
@@ -3961,13 +3963,13 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     unsigned ArgNo = 0;
     SmallVector<SILValue, 4> Args;
     for (auto &ArgName : ArgNames) {
-      SILType expectedTy = substFTI->getSILArgumentType(ArgNo++);
+      SILType expectedTy = substConv.getSILArgumentType(ArgNo++);
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
-    
-    ResultVal = B.createApply(InstLoc, FnVal, FnTy,
-                              substFTI->getSILResult(),
-                              subs, Args, IsNonThrowingApply);
+
+    ResultVal =
+        B.createApply(InstLoc, FnVal, FnTy, substConv.getSILResultType(), subs,
+                      Args, IsNonThrowingApply);
     break;
   }
   case ValueKind::PartialApplyInst: {
@@ -3982,9 +3984,9 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     // Compute the result type of the partial_apply, based on which arguments
     // are getting applied.
     SmallVector<SILValue, 4> Args;
-    unsigned ArgNo = substFTI->getNumSILArguments() - ArgNames.size();
+    unsigned ArgNo = substConv.getNumSILArguments() - ArgNames.size();
     for (auto &ArgName : ArgNames) {
-      SILType expectedTy = substFTI->getSILArgumentType(ArgNo++);
+      SILType expectedTy = substConv.getSILArgumentType(ArgNo++);
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
 
@@ -4010,7 +4012,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    if (substFTI->getNumSILArguments() != ArgNames.size()) {
+    if (substConv.getNumSILArguments() != ArgNames.size()) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,
                  "to have the same number of arg names as arg types");
       return true;
@@ -4019,7 +4021,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     unsigned argNo = 0;
     SmallVector<SILValue, 4> args;
     for (auto &argName : ArgNames) {
-      SILType expectedTy = substFTI->getSILArgumentType(argNo++);
+      SILType expectedTy = substConv.getSILArgumentType(argNo++);
       args.push_back(getLocalValue(argName, expectedTy, InstLoc, B));
     }
 

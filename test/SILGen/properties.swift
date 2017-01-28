@@ -130,7 +130,10 @@ func physical_struct_rvalue() -> Int {
   return struct_rvalue().y
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T010properties13struct_rvalueAA3ValVyF
   // CHECK: [[STRUCT:%[0-9]+]] = apply [[FUNC]]()
-  // CHECK: [[RET:%[0-9]+]] = struct_extract [[STRUCT]] : $Val, #Val.y
+  // CHECK: [[BORROWED_STRUCT:%.*]] = begin_borrow [[STRUCT]]
+  // CHECK: [[RET:%[0-9]+]] = struct_extract [[BORROWED_STRUCT]] : $Val, #Val.y
+  // CHECK: end_borrow [[BORROWED_STRUCT]] from [[STRUCT]]
+  // CHECK: destroy_value [[STRUCT]]
   // CHECK: return [[RET]]
 }
 
@@ -717,13 +720,12 @@ struct ReferenceStorageTypeRValues {
   func testRValueUnowned() -> Ref {
     return p1
   }
-// CHECK: sil hidden @{{.*}}testRValueUnowned
-// CHECK: bb0(%0 : $ReferenceStorageTypeRValues):
-// CHECK-NEXT:   debug_value %0 : $ReferenceStorageTypeRValues
-// CHECK-NEXT:   %2 = struct_extract %0 : $ReferenceStorageTypeRValues, #ReferenceStorageTypeRValues.p1
-// CHECK-NEXT:   strong_retain_unowned %2 : $@sil_unowned Ref
-// CHECK-NEXT:   %4 = unowned_to_ref %2 : $@sil_unowned Ref to $Ref
-// CHECK-NEXT:   return %4 : $Ref
+// CHECK: sil hidden @{{.*}}testRValueUnowned{{.*}} : $@convention(method) (@guaranteed ReferenceStorageTypeRValues) -> @owned Ref {
+// CHECK: bb0([[ARG:%.*]] : $ReferenceStorageTypeRValues):
+// CHECK-NEXT:   debug_value [[ARG]] : $ReferenceStorageTypeRValues
+// CHECK-NEXT:   [[UNOWNED_ARG_FIELD:%.*]] = struct_extract [[ARG]] : $ReferenceStorageTypeRValues, #ReferenceStorageTypeRValues.p1
+// CHECK-NEXT:   [[COPIED_VALUE:%.*]] = copy_unowned_value [[UNOWNED_ARG_FIELD]]
+// CHECK-NEXT:   return [[COPIED_VALUE]] : $Ref
 
   init() {
   }

@@ -21,7 +21,7 @@ D: AST, Basic, Parse, Sema
 
 N: Joe Groff
 E: jgroff@apple.com
-D: SIL, SILGen
+D: SIL, SILGen, everything in Swift not covered by someone else
 
 N: Argyrios Kyrzidis
 E: kyrtzidis@apple.com
@@ -30,10 +30,6 @@ D: IDE, SourceKit, swift-ide-test
 N: Luke Larson
 E: llarson@apple.com
 D: Swift Benchmark Suite
-
-N: Chris Lattner
-E: clattner@apple.com
-D: Everything in Swift not covered by someone else
 
 N: John McCall
 E: rjmccall@apple.com

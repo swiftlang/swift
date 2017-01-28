@@ -172,3 +172,8 @@ typedef SomeCell <NSCopying> *CopyableSomeCell;
 - (nullable instancetype)initWithValue:(NSInteger)val error:(NSError **)error;
 + (BOOL)processValueAndReturnError:(NSError **)error;
 @end
+
+@interface SelectorSplittingAccessors : NSObject
+// Note the custom setter name here; this is important.
+@property (setter=takeFooForBar:) BOOL fooForBar;
+@end

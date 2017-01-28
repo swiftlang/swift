@@ -451,16 +451,16 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
   // back into the all-results list.
   llvm::SmallVector<SILResultInfo, 8> InterfaceResults;
   auto &ResultDescs = ResultDescList;
-  for (SILResultInfo InterfaceResult : FTy->getAllResults()) {
-    if (InterfaceResult.isDirect()) {
+  for (SILResultInfo InterfaceResult : FTy->getResults()) {
+    if (InterfaceResult.isFormalDirect()) {
       auto &RV = ResultDescs[0];
       if (!RV.CalleeRetain.empty()) {
         ++NumOwnedConvertedToNotOwnedResult;
         InterfaceResults.push_back(SILResultInfo(InterfaceResult.getType(),
                                                  ResultConvention::Unowned));
         continue;
-      }   
-    }   
+      }
+    }
 
     InterfaceResults.push_back(InterfaceResult);
   }
@@ -539,7 +539,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // now.
   SILValue ReturnValue;
   SILType LoweredType = NewF->getLoweredType();
-  SILType ResultType = LoweredType.getFunctionInterfaceResultType();
+  SILType ResultType = NewF->getConventions().getSILResultType();
   auto FunctionTy = LoweredType.castTo<SILFunctionType>();
   if (FunctionTy->hasErrorResult()) {
     // We need a try_apply to call a function with an error result.
@@ -671,9 +671,9 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
 }
 
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeResults() {
-  auto FTy = F->getLoweredFunctionType();
+  auto fnConv = F->getConventions();
   // For now, only do anything if there's a single direct result.
-  if (FTy->getDirectResults().size() != 1)
+  if (fnConv.getNumDirectSILResults() != 1)
     return false; 
 
   bool SignatureOptimize = false;
@@ -951,7 +951,7 @@ public:
     for (unsigned i = 0, e = Args.size(); i != e; ++i) {
       ArgumentDescList.emplace_back(Args[i]);
     }
-    for (SILResultInfo IR : F->getLoweredFunctionType()->getAllResults()) {
+    for (SILResultInfo IR : F->getLoweredFunctionType()->getResults()) {
       ResultDescList.emplace_back(IR);
     }
 

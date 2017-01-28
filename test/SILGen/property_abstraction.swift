@@ -10,12 +10,14 @@ struct Foo<T, U> {
   var g: T
 }
 
-// CHECK-LABEL: sil hidden @_T020property_abstraction4getF{{[_0-9a-zA-Z]*}}Foo{{.*}}F : 
+// CHECK-LABEL: sil hidden @_T020property_abstraction4getF{{[_0-9a-zA-Z]*}}Foo{{.*}}F : $@convention(thin) (@owned Foo<Int, Int>) -> @owned @callee_owned (Int) -> Int {
 // CHECK:       bb0([[X_ORIG:%.*]] : $Foo<Int, Int>):
-// CHECK:         [[F_ORIG:%.*]] = struct_extract [[X_ORIG]] : $Foo<Int, Int>, #Foo.f
+// CHECK:         [[BORROWED_X_ORIG:%.*]] = begin_borrow [[X_ORIG]] : $Foo<Int, Int>
+// CHECK:         [[F_ORIG:%.*]] = struct_extract [[BORROWED_X_ORIG]] : $Foo<Int, Int>, #Foo.f
 // CHECK:         [[F_ORIG_COPY:%.*]] = copy_value [[F_ORIG]]
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_T0{{.*}}TR :
 // CHECK:         [[F_SUBST:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG_COPY]])
+// CHECK:         end_borrow [[BORROWED_X_ORIG]] from [[X_ORIG]]
 // CHECK:         destroy_value [[X_ORIG]]
 // CHECK:         return [[F_SUBST]]
 // CHECK:       } // end sil function '_T020property_abstraction4getF{{[_0-9a-zA-Z]*}}F'

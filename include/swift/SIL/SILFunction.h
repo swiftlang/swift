@@ -32,6 +32,9 @@ namespace swift {
 class ASTContext;
 class SILInstruction;
 class SILModule;
+namespace Lowering {
+class TypeLowering;
+} // namespace Lowering
 
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
@@ -256,6 +259,9 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
+  SILFunctionConventions getConventions() const {
+    return SILFunctionConventions(LoweredType, getModule());
+  }
 
   bool isNoReturnFunction() const;
 
@@ -355,8 +361,8 @@ public:
   }
 
   // Returns true if the function has indirect out parameters.
-  bool hasIndirectResults() const {
-    return getLoweredFunctionType()->getNumIndirectResults() > 0;
+  bool hasIndirectFormalResults() const {
+    return getLoweredFunctionType()->hasIndirectFormalResults();
   }
 
   /// Returns true if this function either has a self metadata argument or
@@ -607,6 +613,10 @@ public:
     GenericEnv = env;
   }
 
+  /// Returns the type lowering for the \p Type given the generic signature of
+  /// the current function.
+  const Lowering::TypeLowering &getTypeLowering(SILType Type) const;
+
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
@@ -721,13 +731,13 @@ public:
   ArrayRef<SILArgument *> getIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
     return begin()->getArguments().slice(
-        0, getLoweredFunctionType()->getNumIndirectResults());
+        0, getConventions().getNumIndirectSILResults());
   }
 
   ArrayRef<SILArgument *> getArgumentsWithoutIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
     return begin()->getArguments().slice(
-        getLoweredFunctionType()->getNumIndirectResults());
+        getConventions().getNumIndirectSILResults());
   }
 
   const SILArgument *getSelfArgument() const {

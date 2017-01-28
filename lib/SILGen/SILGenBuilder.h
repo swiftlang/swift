@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILGEN_SILGENBUILDER_H
 #define SWIFT_SILGEN_SILGENBUILDER_H
 
+#include "ManagedValue.h"
 #include "swift/SIL/SILBuilder.h"
 
 namespace swift {
@@ -101,6 +102,24 @@ public:
   createAllocExistentialBox(SILLocation Loc, SILType ExistentialType,
                             CanType ConcreteType,
                             ArrayRef<ProtocolConformanceRef> Conformances);
+
+  //===---
+  // Ownership Endowed APIs
+  //
+
+  using SILBuilder::createStructExtract;
+  using SILBuilder::createCopyValue;
+  using SILBuilder::createCopyUnownedValue;
+  ManagedValue createStructExtract(SILLocation Loc, ManagedValue Base,
+                                   VarDecl *Decl);
+
+  ManagedValue createCopyValue(SILLocation Loc, ManagedValue OriginalValue);
+
+  ManagedValue createCopyUnownedValue(SILLocation Loc,
+                                      ManagedValue OriginalValue);
+
+  ManagedValue createUnsafeCopyUnownedValue(SILLocation Loc,
+                                            ManagedValue OriginalValue);
 };
 
 } // namespace Lowering

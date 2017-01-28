@@ -396,18 +396,19 @@ struct StructMemberTest {
     return i
   }
   // CHECK-LABEL: sil hidden @_T09let_decls16StructMemberTestV07testIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
-  // CHECK: bb0(%0 : $StructMemberTest):
-  // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
-  // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.i
-  // CHECK-NOT:  destroy_value %0 : $StructMemberTest
-  // CHECK:  return %2 : $Int
+  // CHECK: bb0([[ARG:%.*]] : $StructMemberTest):
+  // CHECK:  debug_value [[ARG]] : $StructMemberTest, let, name "self"
+  // CHECK:  [[TRIVIAL_VALUE:%.*]] = struct_extract [[ARG]] : $StructMemberTest, #StructMemberTest.i
+  // CHECK-NOT:  destroy_value [[ARG]] : $StructMemberTest
+  // CHECK-NOT:  destroy_value [[BORROWED_ARG]] : $StructMemberTest
+  // CHECK:  return [[TRIVIAL_VALUE]] : $Int
 
   // Accessing the int member in s should not copy_value the whole struct.
   func testRecursiveIntMemberLoad() -> Int {
     return s.i
   }
   // CHECK-LABEL: sil hidden @_T09let_decls16StructMemberTestV016testRecursiveIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
-  // CHECK: bb0(%0 : $StructMemberTest):
+  // CHECK: bb0([[ARG:%.*]] : $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
   // CHECK:  %3 = struct_extract %2 : $AnotherStruct, #AnotherStruct.i

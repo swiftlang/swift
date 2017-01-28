@@ -1693,7 +1693,7 @@ static bool isReadOnlyFunction(SILFunction *f) {
   // Check if the function has any 'owned' parameters. Owned parameters may
   // call the destructor of the object which could violate the readonly-ness
   // of the function.
-  if (f->hasOwnedParameters() || f->hasIndirectResults())
+  if (f->hasOwnedParameters() || f->hasIndirectFormalResults())
     return false;
 
   auto Eff = f->getEffectsKind();

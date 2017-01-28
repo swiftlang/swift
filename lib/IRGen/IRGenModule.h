@@ -367,6 +367,8 @@ public:
   ModuleDecl *getSwiftModule() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
+  SILModuleConventions silConv;
+
   llvm::SmallString<128> OutputFilename;
 
 #ifndef NDEBUG

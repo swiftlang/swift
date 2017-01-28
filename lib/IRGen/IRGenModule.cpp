@@ -131,7 +131,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                             ModuleName)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
       DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
-      TargetMachine(std::move(target)), OutputFilename(OutputFilename),
+      TargetMachine(std::move(target)), silConv(irgen.SIL),
+      OutputFilename(OutputFilename),
 #ifndef NDEBUG
       EligibleConfs(getSILModule()),
 #endif

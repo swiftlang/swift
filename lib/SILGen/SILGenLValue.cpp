@@ -970,7 +970,8 @@ namespace {
         auto substCallbackFnType = origCallbackFnType->substGenericArgs(
             M, substitutions);
         auto substCallbackType = SILType::getPrimitiveObjectType(substCallbackFnType);
-        auto metatypeType = substCallbackFnType->getParameters().back().getSILType();
+        auto metatypeType =
+            gen.getSILType(substCallbackFnType->getParameters().back());
 
         // We need to borrow the base here.  We can't just consume it
         // because we're in conditionally-executed code (and because
@@ -2159,6 +2160,27 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
               SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
     // SEMANTIC ARC TODO: Does this need a cleanup?
     return B.createCopyValue(loc, result);
+  }
+
+  llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
+}
+
+ManagedValue SILGenFunction::emitConversionToSemanticRValue(
+    SILLocation loc, ManagedValue src, const TypeLowering &valueTL) {
+  // Weak storage types are handled with their underlying type.
+  assert(!src.getType().is<WeakStorageType>() &&
+         "weak pointers are always the right optional types");
+
+  // For @unowned(safe) types, we need to generate a strong retain and
+  // strip the unowned box.
+  if (src.getType().is<UnownedStorageType>()) {
+    return B.createCopyUnownedValue(loc, src);
+  }
+
+  // For @unowned(unsafe) types, we need to strip the unmanaged box
+  // and then do an (unsafe) retain.
+  if (src.getType().is<UnmanagedStorageType>()) {
+    return B.createUnsafeCopyUnownedValue(loc, src);
   }
 
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");

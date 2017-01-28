@@ -114,7 +114,7 @@ bb0:
   store %15 to %11a : $*Int
 
 // CHECK-NOT: function_ref @closure_indirect_result :
-// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_TTSf2i_i_i_n__closure_indirect_result
+// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_TTSf2n_i_i_i__closure_indirect_result
 // CHECK-NOT: function_ref @closure_indirect_result :
 
 // The three strong retains are removed

@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Fallthrough.h"
-#include "swift/Basic/Unreachable.h"
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Enum.h"
+#include "swift/Runtime/Unreachable.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
@@ -1100,7 +1100,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
     swift::crash("Swift mirror lookup failure");
   }
 
-  swift_unreachable("Unhandled MetadataKind in switch.");
+  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 /// MagicMirror ownership-taking whole-value constructor.

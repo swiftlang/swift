@@ -224,7 +224,10 @@ public:
     
   /// The SILFunction being constructed.
   SILFunction &F;
-  
+
+  /// The SILModuleConventions for this SIL module.
+  SILModuleConventions silConv;
+
   /// The name of the function currently being emitted, as presented to user
   /// code by #function.
   DeclName MagicFunctionName;
@@ -420,6 +423,13 @@ public:
 
   const TypeLowering &getTypeLowering(SILType type) {
     return SGM.Types.getTypeLowering(type);
+  }
+
+  SILType getSILType(SILParameterInfo param) const {
+    return silConv.getSILType(param);
+  }
+  SILType getSILType(SILResultInfo result) const {
+    return silConv.getSILType(result);
   }
 
   SILConstantInfo getConstantInfo(SILDeclRef constant) {
@@ -954,6 +964,9 @@ public:
   SILValue emitConversionToSemanticRValue(SILLocation loc, SILValue value,
                                           const TypeLowering &valueTL);
 
+  ManagedValue emitConversionToSemanticRValue(SILLocation loc,
+                                              ManagedValue value,
+                                              const TypeLowering &valueTL);
 
   /// Emit the empty tuple value by emitting
   SILValue emitEmptyTuple(SILLocation loc);

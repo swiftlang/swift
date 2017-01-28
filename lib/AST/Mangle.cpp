@@ -1112,7 +1112,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     Buffer << '_';
 
     // Mangle the results.
-    for (auto result : fn->getAllResults()) {
+    for (auto result : fn->getResults()) {
       Buffer << mangleResultConvention(result.getConvention());
       mangleType(result.getType(), 0);
     }

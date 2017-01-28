@@ -894,7 +894,7 @@ func testOptionalTryNeverFailsAddressOnlyVar<T>(_ obj: T) {
 class SomeErrorClass : Error { }
 
 // CHECK-LABEL: sil_vtable SomeErrorClass
-// CHECK-NEXT:   #SomeErrorClass.deinit!deallocator: {{.*}} : _TFC6errors14SomeErrorClassD
+// CHECK-NEXT:   #SomeErrorClass.deinit!deallocator: _TFC6errors14SomeErrorClassD
 // CHECK-NEXT:   #SomeErrorClass.init!initializer.1: {{.*}} : _TFC6errors14SomeErrorClasscfT_S0_
 // CHECK-NEXT: }
 
@@ -902,5 +902,5 @@ class OtherErrorSub : OtherError { }
 
 // CHECK-LABEL: sil_vtable OtherErrorSub {
 // CHECK-NEXT:  #OtherError.init!initializer.1: {{.*}} : _TFC6errors13OtherErrorSubcfT_S0_     // OtherErrorSub.init() -> OtherErrorSub
-// CHECK-NEXT:  #OtherErrorSub.deinit!deallocator: {{.*}} : _TFC6errors13OtherErrorSubD        // OtherErrorSub.__deallocating_deinit
+// CHECK-NEXT:  #OtherErrorSub.deinit!deallocator: _TFC6errors13OtherErrorSubD        // OtherErrorSub.__deallocating_deinit
 // CHECK-NEXT:}
