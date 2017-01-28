@@ -170,6 +170,11 @@ public:
     return LoweredType;
   }
 
+  /// Returns true if the SIL type is an address.
+  bool isAddress() const {
+    return LoweredType.isAddress();
+  }
+
   /// Return the semantic type.
   ///
   /// The semantic type is what a type pretends to be during

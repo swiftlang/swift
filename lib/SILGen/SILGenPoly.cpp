@@ -730,6 +730,19 @@ static ManagedValue manageParam(SILGenFunction &gen,
                                 SILParameterInfo info,
                                 bool allowPlusZero) {
   switch (info.getConvention()) {
+  case ParameterConvention::Indirect_In_Guaranteed:
+    if (gen.silConv.useLoweredAddresses()) {
+      // FIXME: Avoid a behavior change while guaranteed self is disabled by
+      // default.
+      if (allowPlusZero) {
+        return ManagedValue::forUnmanaged(paramValue);
+      } else {
+        auto copy = gen.emitTemporaryAllocation(loc, paramValue->getType());
+        gen.B.createCopyAddr(loc, paramValue, copy, IsNotTake, IsInitialization);
+        return gen.emitManagedBufferWithCleanup(copy);
+      }
+    }
+    SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Guaranteed:
     if (allowPlusZero)
       return ManagedValue::forUnmanaged(paramValue);
@@ -743,21 +756,14 @@ static ManagedValue manageParam(SILGenFunction &gen,
   case ParameterConvention::Direct_Owned:
     return gen.emitManagedRValueWithCleanup(paramValue);
 
-  case ParameterConvention::Indirect_In_Guaranteed:
-    // FIXME: Avoid a behavior change while guaranteed self is disabled by
-    // default.
-    if (allowPlusZero) {
-      return ManagedValue::forUnmanaged(paramValue);
-    } else {
-      auto copy = gen.emitTemporaryAllocation(loc, paramValue->getType());
-      gen.B.createCopyAddr(loc, paramValue, copy, IsNotTake, IsInitialization);
-      return gen.emitManagedBufferWithCleanup(copy);
-    }
+  case ParameterConvention::Indirect_In:
+    if (gen.silConv.useLoweredAddresses())
+      return gen.emitManagedBufferWithCleanup(paramValue);
+    return gen.emitManagedRValueWithCleanup(paramValue);
+
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     return ManagedValue::forLValue(paramValue);
-  case ParameterConvention::Indirect_In:
-    return gen.emitManagedBufferWithCleanup(paramValue);
   }
   llvm_unreachable("bad parameter convention");
 }

@@ -2710,6 +2710,9 @@ enum class ParameterConvention {
   /// guarantees its validity for the entirety of the call.
   Direct_Guaranteed,
 };
+// Check that the enum values fit inside SILFunctionTypeBits.
+static_assert(unsigned(ParameterConvention::Direct_Guaranteed) < (1<<3),
+              "fits in SILFunctionTypeBits");
 
 // Does this parameter convention require indirect storage? This reflects a
 // SILFunctionType's formal (immutable) conventions, as opposed to the transient

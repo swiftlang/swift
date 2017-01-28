@@ -469,7 +469,8 @@ public:
     assert((Qualifier == LoadOwnershipQualifier::Unqualified) ||
            F.hasQualifiedOwnership() &&
                "Qualified inst in unqualified function");
-    assert(LV->getType().isLoadable(F.getModule()));
+    assert(!SILModuleConventions(F.getModule()).useLoweredAddresses()
+           || LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }

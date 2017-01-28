@@ -64,7 +64,7 @@ ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &gen, SILLocation loc) {
     return *this;
   
   SILValue result;
-  if (!lowering.isAddressOnly()) {
+  if (!lowering.isAddress()) {
     result = lowering.emitCopyValue(gen.B, loc, getValue());
   } else {
     result = gen.emitTemporaryAllocation(loc, getType());
