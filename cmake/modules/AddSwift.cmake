@@ -329,7 +329,7 @@ function(_add_variant_link_flags)
     RESULT_VAR_NAME result)
 
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
-    list(APPEND result "-lpthread" "-latomic" "-ldl")
+    list(APPEND result "-lpthread" "-ldl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND result "-lpthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
