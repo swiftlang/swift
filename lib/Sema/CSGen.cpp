@@ -1022,6 +1022,16 @@ namespace {
     DeclContext *CurDC;
     SmallVector<DeclContext*, 4> DCStack;
 
+    static const unsigned numEditorPlaceholderVariables = 2;
+
+    /// A buffer of type variables used for editor placeholders. We only
+    /// use a small number of these (rotating through), to prevent expressions
+    /// with a large number of editor placeholders from flooding the constraint
+    /// system with type variables.
+    TypeVariableType *editorPlaceholderVariables[numEditorPlaceholderVariables]
+      = { nullptr, nullptr };
+    unsigned currentEditorPlaceholderVariable = 0;
+
     /// \brief Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, DeclName name,
@@ -2760,14 +2770,28 @@ namespace {
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       if (E->getTypeLoc().isNull()) {
         auto locator = CS.getConstraintLocator(E);
-        auto placeholderTy = CS.createTypeVariable(locator, /*options*/0);
+
         // A placeholder may have any type, but default to Void type if
         // otherwise unconstrained.
-        CS.addConstraint(ConstraintKind::Defaultable,
-                         placeholderTy, TupleType::getEmpty(CS.getASTContext()),
-                         locator);
+        auto &placeholderTy
+          = editorPlaceholderVariables[currentEditorPlaceholderVariable];
+        if (!placeholderTy) {
+          placeholderTy = CS.createTypeVariable(locator, /*options*/0);
+
+          CS.addConstraint(ConstraintKind::Defaultable,
+                           placeholderTy,
+                           TupleType::getEmpty(CS.getASTContext()),
+                           locator);
+        }
+
+        // Move to the next placeholder variable.
+        currentEditorPlaceholderVariable
+          = (currentEditorPlaceholderVariable + 1) %
+              numEditorPlaceholderVariables;
+
         return placeholderTy;
       }
+
       // NOTE: The type loc may be there but have failed to validate, in which
       // case we return the null type.
       return E->getType();
