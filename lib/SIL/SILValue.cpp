@@ -159,7 +159,11 @@ public:
   ValueOwnershipKindVisitor(const ValueOwnershipKindVisitor &) = delete;
   ValueOwnershipKindVisitor(ValueOwnershipKindVisitor &&) = delete;
 
-  ValueOwnershipKind visitForwardingInst(SILInstruction *I);
+  ValueOwnershipKind visitForwardingInst(SILInstruction *I,
+                                         ArrayRef<Operand> Ops);
+  ValueOwnershipKind visitForwardingInst(SILInstruction *I) {
+    return visitForwardingInst(I, I->getAllOperands());
+  }
 
   ValueOwnershipKind visitValueBase(ValueBase *V) {
     llvm_unreachable("unimplemented method on ValueBaseOwnershipVisitor");
@@ -348,8 +352,8 @@ NO_RESULT_OWNERSHIP_INST(CheckedCastAddrBranch)
 // For a forwarding instruction, we loop over all operands and make sure that
 // all non-trivial values have the same ownership.
 ValueOwnershipKind
-ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I) {
-  ArrayRef<Operand> Ops = I->getAllOperands();
+ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I,
+                                               ArrayRef<Operand> Ops) {
   // A forwarding inst without operands must be trivial.
   if (Ops.empty())
     return ValueOwnershipKind::Trivial;
@@ -406,7 +410,6 @@ FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
-FORWARDING_OWNERSHIP_INST(SelectEnum)
 FORWARDING_OWNERSHIP_INST(SelectValue)
 FORWARDING_OWNERSHIP_INST(Struct)
 FORWARDING_OWNERSHIP_INST(Tuple)
@@ -417,8 +420,14 @@ FORWARDING_OWNERSHIP_INST(MarkUninitialized)
 #undef FORWARDING_OWNERSHIP_INST
 
 ValueOwnershipKind
-ValueOwnershipKindVisitor::
-visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
+ValueOwnershipKindVisitor::visitSelectEnumInst(SelectEnumInst *SEI) {
+  // We handle this specially, since a select enum forwards only its case
+  // values. We drop the first element since that is the condition element.
+  return visitForwardingInst(SEI, SEI->getAllOperands().drop_front());
+}
+
+ValueOwnershipKind ValueOwnershipKindVisitor::visitUncheckedBitwiseCastInst(
+    UncheckedBitwiseCastInst *UBCI) {
   ValueOwnershipKind OpOwnership = UBCI->getOperand().getOwnershipKind();
   bool ResultTypeIsTrivial = UBCI->getType().isTrivial(UBCI->getModule());
 

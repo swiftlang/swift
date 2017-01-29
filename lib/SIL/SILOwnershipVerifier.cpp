@@ -90,6 +90,7 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::StructExtractInst:
   case ValueKind::UncheckedEnumDataInst:
   case ValueKind::MarkUninitializedInst:
+  case ValueKind::SelectEnumInst:
     return true;
   default:
     return false;
@@ -165,7 +166,11 @@ public:
     return getType().isTrivial(Mod);
   }
 
-  OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I);
+  OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I,
+                                                ArrayRef<Operand> Ops);
+  OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I) {
+    return visitForwardingInst(I, I->getAllOperands());
+  }
 
   /// Check if \p User as compatible ownership with the SILValue that we are
   /// checking.
@@ -350,7 +355,6 @@ ACCEPTS_ANY_OWNERSHIP_INST(BeginBorrow)
 ACCEPTS_ANY_OWNERSHIP_INST(CopyValue)
 ACCEPTS_ANY_OWNERSHIP_INST(DebugValue)
 ACCEPTS_ANY_OWNERSHIP_INST(FixLifetime)
-ACCEPTS_ANY_OWNERSHIP_INST(SelectEnum)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedBitwiseCast) // Is this right?
 ACCEPTS_ANY_OWNERSHIP_INST(WitnessMethod)        // Is this right?
 ACCEPTS_ANY_OWNERSHIP_INST(ProjectBox)           // The result is a T*.
@@ -392,12 +396,10 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ProjectExistentialBox)
 #undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP
 
 OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitForwardingInst(SILInstruction *I) {
+OwnershipCompatibilityUseChecker::visitForwardingInst(SILInstruction *I, ArrayRef<Operand> Ops) {
   assert(I->getNumOperands() && "Expected to have non-zero operands");
   assert(isOwnershipForwardingInst(I) &&
          "Expected to have an ownership forwarding inst");
-
-  ArrayRef<Operand> Ops = I->getAllOperands();
 
   // Find the first index where we have a trivial value.
   auto Iter = find_if(Ops, [&I](const Operand &Op) -> bool {
@@ -477,6 +479,15 @@ FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, TupleExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, StructExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, UncheckedEnumData)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitSelectEnumInst(SelectEnumInst *I) {
+  if (getValue() == I->getEnumOperand()) {
+    return {true, false};
+  }
+
+  return visitForwardingInst(I, I->getAllOperands().drop_front());
+}
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitAllocRefInst(AllocRefInst *I) {
