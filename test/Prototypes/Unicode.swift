@@ -312,6 +312,15 @@ protocol _UTextable {
     _ destination: UnsafeMutableBufferPointer<UChar>,
     _ error: UnsafeMutablePointer<UErrorCode>?
   ) -> Int32
+  
+  func _mapOffsetToNative(_ u: UText) -> Int64
+  func _mapNativeIndexToUTF16(_ u: UText, _ nativeIndex: Int64) -> Int32
+}
+
+extension _UTextable {
+  static func recovered(from u: UnsafeMutablePointer<UText>) -> _UTextable {
+    return u.pointee.context.assumingMemoryBound(to: _UTextable.self).pointee
+  }
 }
 
 protocol UnicodeStorage : _UTextable {
@@ -383,29 +392,31 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
     return numericCast(codeUnits.count)
   }
 
+  private func _parsedSlice(
+    _ offset: Int64,
+    _ slice: (CodeUnits.Index) -> CodeUnits.SubSequence
+  ) -> ParsedUnicode<CodeUnits.SubSequence,Encoding>.SubSequence {
+    return ParsedUnicode(
+      slice(codeUnits.index(atOffset: offset)), Encoding.self
+    ).dropFirst(0)
+  }
+
+  private func _parsedSuffix(
+    fromOffset offset: Int64
+  ) -> ParsedUnicode<CodeUnits.SubSequence,Encoding>.SubSequence {
+    return _parsedSlice(offset, codeUnits.suffix(from:))
+  }
+  
   func _access(
     _ u: inout UText, _ nativeTargetIndex: Int64, _ forward: Bool
   ) -> Bool {
-
-    func parsedSlice(
-      _ offset: Int64,
-      _ slice: (CodeUnits.Index) -> CodeUnits.SubSequence
-    ) -> ParsedUnicode<CodeUnits.SubSequence,Encoding>.SubSequence {
-      
-      return ParsedUnicode(
-        slice(codeUnits.index(atOffset: offset)),
-        Encoding.self
-      ).dropFirst(0)      
-    }
-    
     
     u.chunkOffset = 0
 
     let inBoundsTarget = nativeTargetIndex - (forward ? 0 : 1)
     if (u.chunkNativeStart..<u.chunkNativeLimit).contains(inBoundsTarget) {
 
-      var parsedChunk = parsedSlice(
-        u.chunkNativeStart, codeUnits.suffix(from:))
+      var parsedChunk = _parsedSuffix(fromOffset: u.chunkNativeStart)
       
       var nativeOffset = u.chunkNativeStart
       while nativeOffset < nativeTargetIndex,
@@ -424,8 +435,7 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
     u.chunkLength = 0
     u.withBuffer { buffer in
       if forward {
-        var chunkSource = parsedSlice(
-          nativeTargetIndex, codeUnits.suffix(from:))
+        var chunkSource = _parsedSuffix(fromOffset: nativeTargetIndex)
         
         while let scalar = chunkSource.popFirst() {
           let newChunkLength = u.chunkLength + numericCast(scalar.utf16.count)
@@ -438,8 +448,8 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
         }
       }
       else {
-        var chunkSource = parsedSlice(
-          nativeTargetIndex, codeUnits.prefix(upTo:))
+        var chunkSource
+          = _parsedSlice(nativeTargetIndex, codeUnits.prefix(upTo:))
         
         while let scalar = chunkSource.popLast() {
           let newChunkLength = u.chunkLength + numericCast(scalar.utf16.count)
@@ -490,13 +500,47 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
     }
     return 0
   }
+  
+  func _mapOffsetToNative(_ u: UText) -> Int64 {
+    
+    if u.chunkOffset == 0 { return 0 }
+    
+    let chunkSource = _parsedSuffix(fromOffset: u.chunkNativeStart)
+    var chunkOffset = 0
+    
+    for i in chunkSource.indices {
+      chunkOffset += chunkSource[i].utf16.count
+      if chunkOffset == numericCast(u.chunkOffset) {
+        return numericCast(codeUnits.offset(of: i.base)) - u.chunkNativeStart
+      }
+    }
+    fatalError("supposed to be unreachable")
+  }
+  
+  func _mapNativeIndexToUTF16(_ u: UText, _ nativeIndex: Int64) -> Int32 {
+    if u.chunkOffset == 0 { return 0 }
+
+    let nativeChunk = codeUnits[
+      codeUnits.index(atOffset: u.chunkNativeStart)
+      ..<
+      codeUnits.index(atOffset: nativeIndex)]
+    
+    return numericCast(
+      TranscodedView(nativeChunk, from: Encoding.self, to: UTF16.self).count)
+  }
+}
+
+extension Optional where Wrapped == UnsafePointer<UText> {
+  var _self: _UTextable {
+    return self!.pointee.context.assumingMemoryBound(to: _UTextable.self).pointee    
+  }
 }
 
 extension UnicodeStorage {
   func withUText<R>(_ body: (UnsafePointer<UText>)->R) -> R {
 
     var copy: _UTextable = self
-    
+
     return withUnsafePointer(to: &copy) { pSelf in
       
       var vtable = UTextFuncs(
@@ -505,28 +549,43 @@ extension UnicodeStorage {
         clone: nil,
         
         nativeLength: { u in
-          let pSelf = u!.pointee.context.assumingMemoryBound(to: _UTextable.self)
-          return pSelf.pointee._nativeLength(&u!.pointee)
+          let _self = u!.pointee.context.assumingMemoryBound(
+            to: _UTextable.self).pointee
+          return _self._nativeLength(&u!.pointee)
         },
         
         access: { u, nativeIndex, forward in
-          let pSelf = u!.pointee.context.assumingMemoryBound(to: _UTextable.self)
-          return pSelf.pointee._access(&u!.pointee, nativeIndex, forward != 0)
+          let _self = u!.pointee.context.assumingMemoryBound(
+            to: _UTextable.self).pointee
+          return _self._access(&u!.pointee, nativeIndex, forward != 0) 
             ? 1 : 0
-          },
+        },
+        
         extract: { u, nativeStart, nativeLimit, dest, destCapacity, status in
-          let pSelf = u!.pointee.context.assumingMemoryBound(to: _UTextable.self)
+          let _self = u!.pointee.context.assumingMemoryBound(
+            to: _UTextable.self).pointee
           
           let destination = UnsafeMutableBufferPointer(
             start: dest, count: numericCast(destCapacity))
-            
-          return pSelf.pointee._extract(
+
+          return _self._extract(
             &u!.pointee, nativeStart, nativeLimit, destination, status)
         },
+        
         replace: nil,
         copy: nil,
-        mapOffsetToNative: nil,
-        mapNativeIndexToUTF16: nil,
+        
+        mapOffsetToNative: { u in 
+          let _self = u!.pointee.context.assumingMemoryBound(
+            to: _UTextable.self).pointee
+          return _self._mapOffsetToNative(u!.pointee)
+        },
+        
+        mapNativeIndexToUTF16: { u, nativeIndex in 
+          let _self = u!.pointee.context.assumingMemoryBound(
+            to: _UTextable.self).pointee
+          return _self._mapNativeIndexToUTF16(u!.pointee, nativeIndex)
+        },
         close: nil,
         spare1: nil, spare2: nil, spare3: nil)
 
@@ -565,8 +624,7 @@ struct Latin1Storage<Base : RandomAccessCollection> : UnicodeStorage
 where Base.Iterator.Element == UInt8, Base.Index == Base.SubSequence.Index,
 Base.SubSequence.SubSequence == Base.SubSequence,
 Base.Iterator.Element == UInt8,
-Base.SubSequence.Iterator.Element == Base.Iterator.Element
-{
+Base.SubSequence.Iterator.Element == Base.Iterator.Element {
   typealias Encoding = Latin1
   typealias CodeUnits = Base
   let codeUnits: CodeUnits
@@ -638,6 +696,7 @@ case Unlimited = 1 << 21
 var t = TestSuite("t")
 t.test("basic") {
   let s = "abcdefghijklmnopqrstuvwxyz\n"
+  + "🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\n"
   + "Σὲ 👥🥓γνωρίζω ἀπὸ τὴν κόψη χαῖρε, ὦ χαῖρε, ᾿Ελευθεριά!\n"
   + "Οὐχὶ ταὐτὰ παρίσταταί μοι γιγνώσκειν, ὦ ἄνδρες ᾿Αθηναῖοι,\n"
   + "გთხოვთ ახლავე გაიაროთ რეგისტრაცია Unicode-ის მეათე საერთაშორისო\n"
