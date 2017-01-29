@@ -163,32 +163,6 @@ extension TranscodedView : BidirectionalCollection {
   }
 }
 
-//===--- Quickie Tests ----------------------------------------------------===//
-let s = "abcdefghijklmnopqrstuvwxyz\n"
-  + "Σὲ 👥🥓γνωρίζω ἀπὸ τὴν κόψη χαῖρε, ὦ χαῖρε, ᾿Ελευθεριά!\n"
-  + "Οὐχὶ ταὐτὰ παρίσταταί μοι γιγνώσκειν, ὦ ἄνδρες ᾿Αθηναῖοι,\n"
-  + "გთხოვთ ახლავე გაიაროთ რეგისტრაცია Unicode-ის მეათე საერთაშორისო\n"
-  + "Зарегистрируйтесь сейчас на Десятую Международную Конференцию по\n"
-  + "  ๏ แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช  พระปกเกศกองบู๊กู้ขึ้นใหม่\n"
-  + "ᚻᛖ ᚳᚹᚫᚦ ᚦᚫᛏ ᚻᛖ ᛒᚢᛞᛖ ᚩᚾ ᚦᚫᛗ ᛚᚪᚾᛞᛖ ᚾᚩᚱᚦᚹᛖᚪᚱᛞᚢᛗ ᚹᛁᚦ ᚦᚪ ᚹᛖᛥᚫ"
-let s32 = s.unicodeScalars.lazy.map { $0.value }
-let s16 = s.utf16
-let s8 = Array(s.utf8)
-let s16to32 = TranscodedView(s16, from: UTF16.self, to: UTF32.self)
-let s16to8 = TranscodedView(s16, from: UTF16.self, to: UTF8.self)
-let s8to16 = TranscodedView(s8, from: UTF8.self, to: UTF16.self)
-let s8Vto16 = TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
-assert(s32.elementsEqual(s16to32))
-assert(s8.elementsEqual(s16to8))
-assert(s16.elementsEqual(s8to16))
-assert(s16.elementsEqual(s8Vto16))
-
-assert(s32.reversed().elementsEqual(s16to32.reversed()))
-assert(s8.reversed().elementsEqual(s16to8.reversed()))
-assert(s16.reversed().elementsEqual(s8to16.reversed()))
-assert(s16.reversed().elementsEqual(s8Vto16.reversed()))
-//===----------------------------------------------------------------------===//
-
 protocol UnicodeStorage {
   associatedtype Encoding: UnicodeEncoding
   associatedtype CodeUnits: RandomAccessCollection
@@ -218,10 +192,11 @@ protocol UnicodeStorage {
   /* where Characters.Iterator.Element == Character */
   var characters: Characters { get }
   
-  func contentWidth(knownWithoutScanning: Bool/* = false*/) -> UInt32
-  func isNormalizedNFC(knownWithoutScanning: Bool/* = false*/) -> Bool
-  func isNormalizedNFD(knownWithoutScanning: Bool/* = false*/) -> Bool
-  func isInFastCOrDForm(knownWithoutScanning: Bool/* = false*/) -> Bool
+  func isASCII(scan: Bool/* = true */) -> Bool 
+  func isLatin1(scan: Bool/* = true */) -> Bool 
+  func isNormalizedNFC(scan: Bool/* = true*/) -> Bool
+  func isNormalizedNFD(scan: Bool/* = true*/) -> Bool
+  func isInFastCOrDForm(scan: Bool/* = true*/) -> Bool
 }
 
 extension UnicodeStorage
@@ -237,6 +212,12 @@ Base.SubSequence.Iterator.Element == Base.Iterator.Element
   typealias Encoding = Latin1
   typealias CodeUnits = Base
   let codeUnits: CodeUnits
+  let _isASCII: Bool?
+
+  init(_ codeUnits: CodeUnits, isASCII: Bool? = nil) {
+    self.codeUnits = codeUnits
+    self._isASCII = isASCII
+  }
   
   typealias ValidUTF8View = TranscodedView<CodeUnits, Encoding, UTF8>
   var utf8: ValidUTF8View { return ValidUTF8View(codeUnits) }
@@ -259,19 +240,72 @@ Base.SubSequence.Iterator.Element == Base.Iterator.Element
     }
   }
   
-  func contentWidth(knownWithoutScanning: Bool = false) -> UInt32 {
-    return 1 << 8
+  func isASCII(scan: Bool = true) -> Bool {
+    if let result = _isASCII { return result }
+    return scan && !codeUnits.contains { $0 > 0x7f }
   }
-  func isNormalizedNFC(knownWithoutScanning: Bool = false) -> Bool {
+  func isLatin1(scan: Bool = true) -> Bool {
     return true
   }
-  func isNormalizedNFD(knownWithoutScanning: Bool = false) -> Bool {
+  func isNormalizedNFC(scan: Bool = true) -> Bool {
     return true
   }
-  func isInFastCOrDForm(knownWithoutScanning: Bool = false) -> Bool {
+  func isNormalizedNFD(scan: Bool = true) -> Bool {
+    return true
+  }
+  func isInFastCOrDForm(scan: Bool = true) -> Bool {
     return true
   }
 }
+
+//===--- Quickie Tests ----------------------------------------------------===//
+let s = "abcdefghijklmnopqrstuvwxyz\n"
+  + "Σὲ 👥🥓γνωρίζω ἀπὸ τὴν κόψη χαῖρε, ὦ χαῖρε, ᾿Ελευθεριά!\n"
+  + "Οὐχὶ ταὐτὰ παρίσταταί μοι γιγνώσκειν, ὦ ἄνδρες ᾿Αθηναῖοι,\n"
+  + "გთხოვთ ახლავე გაიაროთ რეგისტრაცია Unicode-ის მეათე საერთაშორისო\n"
+  + "Зарегистрируйтесь сейчас на Десятую Международную Конференцию по\n"
+  + "  ๏ แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช  พระปกเกศกองบู๊กู้ขึ้นใหม่\n"
+  + "ᚻᛖ ᚳᚹᚫᚦ ᚦᚫᛏ ᚻᛖ ᛒᚢᛞᛖ ᚩᚾ ᚦᚫᛗ ᛚᚪᚾᛞᛖ ᚾᚩᚱᚦᚹᛖᚪᚱᛞᚢᛗ ᚹᛁᚦ ᚦᚪ ᚹᛖᛥᚫ"
+let s32 = s.unicodeScalars.lazy.map { $0.value }
+let s16 = s.utf16
+let s8 = Array(s.utf8)
+let s16to32 = TranscodedView(s16, from: UTF16.self, to: UTF32.self)
+let s16to8 = TranscodedView(s16, from: UTF16.self, to: UTF8.self)
+let s8to16 = TranscodedView(s8, from: UTF8.self, to: UTF16.self)
+let s8Vto16 = TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
+assert(s32.elementsEqual(s16to32))
+assert(s8.elementsEqual(s16to8))
+assert(s16.elementsEqual(s8to16))
+assert(s16.elementsEqual(s8Vto16))
+
+assert(s32.reversed().elementsEqual(s16to32.reversed()))
+assert(s8.reversed().elementsEqual(s16to8.reversed()))
+assert(s16.reversed().elementsEqual(s8to16.reversed()))
+assert(s16.reversed().elementsEqual(s8Vto16.reversed()))
+
+do {
+  // We happen to know that alphabet is non-ASCII, but we're not going to say
+  // anything about that.
+  let alphabet = Latin1Storage(s8.prefix(27))
+  assert(alphabet.isASCII())
+  assert(!alphabet.isASCII(scan: false))
+  
+  // We know that if you interpret s8 as Latin1, it has a lot of non-ASCII
+  let nonASCII = Latin1Storage(s8) 
+  assert(!nonASCII.isASCII(scan: true))
+  assert(!nonASCII.isASCII(scan: false))
+}
+
+do {
+  let alphabet = Latin1Storage(s8.prefix(27), isASCII: true)
+  let nonASCII = Latin1Storage(s8, isASCII: false)
+  assert(alphabet.isASCII())
+  assert(alphabet.isASCII(scan: false))
+  assert(!nonASCII.isASCII(scan: true))
+  assert(!nonASCII.isASCII(scan: false))
+}
+//===----------------------------------------------------------------------===//
+
 
 /*
 print(s32.count, s16to32.count)
