@@ -64,6 +64,12 @@ public:
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.B.emitDestroyValueOperation(l, box);
   }
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "DeallocateValueBuffer\n"
+                 << "State: " << getState() << "box: " << box << "\n";
+#endif
+  }
 };
 } // end anonymous namespace
 

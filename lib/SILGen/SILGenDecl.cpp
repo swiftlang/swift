@@ -120,6 +120,13 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation l) override {
       gen.B.emitDestroyValueOperation(l, closure);
     }
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "CleanupClosureConstant\n"
+                   << "State:" << getState() << "\n"
+                   << "closure:" << closure << "\n";
+#endif
+    }
   };
 } // end anonymous namespace
 
@@ -214,6 +221,15 @@ public:
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.B.createEndBorrow(l, borrowed, original);
   }
+
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "EndBorrowCleanup "
+                 << "State:" << getState() << "\n"
+                 << "original:" << original << "\n"
+                 << "borrowed:" << borrowed << "\n";
+#endif
+  }
 };
 } // end anonymous namespace
 
@@ -229,6 +245,14 @@ public:
     else
       gen.B.emitDestroyValueOperation(l, v);
   }
+
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "ReleaseValueCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << v << "\n";
+#endif
+  }
 };
 } // end anonymous namespace
 
@@ -241,6 +265,14 @@ public:
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.B.createDeallocStack(l, Addr);
+  }
+
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "DeallocStackCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Addr:" << Addr << "\n";
+#endif
   }
 };
 } // end anonymous namespace
@@ -255,6 +287,15 @@ public:
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.destroyLocalVariable(l, Var);
   }
+
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "DestroyLocalVariable\n"
+                 << "State:" << getState() << "\n";
+    // TODO: Make sure we dump var.
+    llvm::errs() << "\n";
+#endif
+  }
 };
 } // end anonymous namespace
 
@@ -267,6 +308,15 @@ public:
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.deallocateUninitializedLocalVariable(l, Var);
+  }
+
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "DeallocateUninitializedLocalVariable\n"
+                 << "State:" << getState() << "\n";
+    // TODO: Make sure we dump var.
+    llvm::errs() << "\n";
+#endif
   }
 };
 } // end anonymous namespace
@@ -1195,6 +1245,14 @@ namespace {
                                           existentialAddr);
         break;
       }
+    }
+
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "DeinitExistentialCleanup\n"
+                   << "State:" << getState() << "\n"
+                   << "Value:" << existentialAddr << "\n";
+#endif
     }
   };
 } // end anonymous namespace

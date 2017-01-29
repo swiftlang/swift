@@ -116,6 +116,8 @@ public:
       return Depth != (std::size_t) -1;
     }
 
+    std::size_t getDepth() const { return Depth; }
+
     /// A helper class that wraps a stable_iterator as something that
     /// pretends to be a non-null pointer.
     ///

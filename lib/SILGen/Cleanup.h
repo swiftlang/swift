@@ -52,6 +52,8 @@ enum class CleanupState {
   PersistentlyActive
 };
 
+llvm::raw_ostream &operator<<(raw_ostream &os, CleanupState state);
+
 class LLVM_LIBRARY_VISIBILITY Cleanup {
   unsigned allocatedSize;
   CleanupState state;
@@ -72,6 +74,7 @@ public:
   bool isDead() const { return state == CleanupState::Dead; }
 
   virtual void emit(SILGenFunction &Gen, CleanupLocation L) = 0;
+  virtual void dump() const = 0;
 };
 
 /// A cleanup depth is generally used to denote the set of cleanups
@@ -198,6 +201,9 @@ public:
   /// True if there are any active cleanups in the scope between the specified
   /// cleanup handle and the current top of stack.
   bool hasAnyActiveCleanups(CleanupsDepth from);
+
+  /// Dump the output of each cleanup on this stack.
+  void dump() const;
 };
 
 /// An RAII object that allows the state of a cleanup to be

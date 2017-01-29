@@ -93,6 +93,13 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation loc) override {
       gen.getWritebackStack()[Depth].performWriteback(gen, /*isFinal*/ false);
     }
+
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "LValueWritebackCleanup\n"
+                   << "State: " << getState() << "Depth: " << Depth << "\n";
+#endif
+    }
   };
 } // end anonymous namespace
 
