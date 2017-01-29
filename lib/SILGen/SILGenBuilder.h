@@ -175,6 +175,14 @@ public:
                              const TypeLowering &lowering,
                              SGFContext context,
                              std::function<void(SILValue)> rvalueEmitter);
+
+  using SILBuilder::createUncheckedEnumData;
+  ManagedValue createUncheckedEnumData(SILLocation loc, ManagedValue operand,
+                                       EnumElementDecl *element);
+
+  using SILBuilder::createUncheckedTakeEnumDataAddr;
+  ManagedValue createUncheckedTakeEnumDataAddr(SILLocation loc, ManagedValue operand,
+                                               EnumElementDecl *element, SILType ty);
 };
 
 } // namespace Lowering
