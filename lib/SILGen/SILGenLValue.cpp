@@ -418,6 +418,13 @@ namespace {
                                            getTypeOfRValue().getAddressType());
 
       if (base.hasCleanup()) {
+        assert(false && "I believe that we should never end up here. One, we "
+                        "assert above that base is an l-value address and we "
+                        "state l-values don't have associated cleanup. Two, we "
+                        "enter deinit of the buffer but don't have "
+                        "book-keeping for the value. Three, I believe that "
+                        "would mean to have a l-value passed at +1 which I "
+                        "don't believe we do.");
         // Leave a cleanup to deinit the existential container.
         gen.enterDeinitExistentialCleanup(base.getValue(), CanType(),
                                           ExistentialRepresentation::Opaque);
