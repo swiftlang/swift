@@ -1,5 +1,4 @@
-// RUN: %target-build-swift -I %S/icu %s -o %t
-// RUN: %target-run %t
+// RUN: rm %t && %target-build-swift -I %S/icu %s -o %t && %target-run %t
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -165,7 +164,12 @@ extension TranscodedView : BidirectionalCollection {
   }
 }
 
-protocol UnicodeStorage {
+protocol _UTextable {
+  func _nativeLength(_ uText: inout UText) -> Int64
+  func _access(_ uText: inout UText, _ nativeIndex: Int64, _ forward: UBool) -> UBool
+}
+
+protocol UnicodeStorage : _UTextable {
   associatedtype Encoding: UnicodeEncoding
   associatedtype CodeUnits: RandomAccessCollection
   /* where CodeUnits.Iterator.Element == Encoding.CodeUnit */
@@ -201,133 +205,158 @@ protocol UnicodeStorage {
   func isInFastCOrDForm(scan: Bool/* = true*/) -> Bool
 }
 
+extension UText {
+  mutating func withBuffer<R>(
+    _ body: (UnsafeMutableBufferPointer<UChar>)->R
+  ) -> R {
+    
+    return withUnsafeMutablePointer(to: &a) { a in
+      let rawA = UnsafeRawPointer(a)
+      let capacity = withUnsafeMutablePointer(to: &privA) {
+        bufferLimit in
+        (
+          rawA.assumingMemoryBound(to: Int8.self)
+          - UnsafeRawPointer(bufferLimit).assumingMemoryBound(to: Int8.self)
+        ) / MemoryLayout<UChar>.stride
+      }
+      
+      return body(
+        UnsafeMutableBufferPointer(
+          start: UnsafeMutablePointer(mutating: rawA.assumingMemoryBound(to: UChar.self)), count: capacity))
+    }
+  }
+}
+
+extension UnicodeStorage
+where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence : BidirectionalCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
+{
+  func _nativeLength(_ uText: inout UText) -> Int64 {
+    return numericCast(codeUnits.count)
+  }
+
+  func _access(
+    _ u: inout UText, _ nativeTargetIndex: Int64, _ forward: UBool
+  ) -> UBool {
+
+    func parsedFragment(
+      _ offset: Int64,
+      _ slice: (CodeUnits.Index) -> CodeUnits.SubSequence
+    ) -> ParsedUnicode<CodeUnits.SubSequence,Encoding>.SubSequence {
+      
+      return ParsedUnicode(
+        slice(
+          codeUnits.index(codeUnits.startIndex,
+            offsetBy: numericCast(offset) )),
+        Encoding.self
+      ).dropFirst(0)      
+    }
+    
+    
+    u.chunkOffset = 0
+    
+    if forward != 0
+    ? nativeTargetIndex >= u.chunkNativeStart && nativeTargetIndex < u.chunkNativeLimit
+    : nativeTargetIndex > u.chunkNativeStart && nativeTargetIndex <= u.chunkNativeLimit {
+
+      var parsedChunk = parsedFragment(u.chunkNativeStart, codeUnits.suffix(from:))
+      
+      var nativeOffset = u.chunkNativeStart
+      while nativeOffset < nativeTargetIndex,
+      let scalar = parsedChunk.popFirst() {
+        nativeOffset += numericCast(scalar.count)
+        u.chunkOffset += numericCast(scalar.utf16.count)
+      }
+      return 1
+    }
+
+    u.chunkLength = 0
+    u.withBuffer { buffer in
+      if forward != 0 {
+        var chunkSource = parsedFragment(nativeTargetIndex, codeUnits.suffix(from:))
+        while let scalar = chunkSource.popFirst() {
+          let newChunkLength = u.chunkLength + numericCast(scalar.utf16.count)
+          // don't overfill the buffer
+          if newChunkLength > numericCast(buffer.count) {
+            break
+          }
+          for unit in scalar.utf16 {
+            buffer[numericCast(u.chunkLength)] = unit
+            u.chunkLength += 1
+          }
+        }
+      }
+      else {
+        var chunkSource = parsedFragment(nativeTargetIndex, codeUnits.prefix(upTo:))
+        print(chunkSource)
+        fatalError("write me")
+      }
+    }
+    return 1
+  }
+    
+}
+
 extension UnicodeStorage {
   func withUText<R>(_ body: (UnsafePointer<UText>)->R) -> R {
-    var vtable = UTextFuncs(
-      tableSize: Int32(MemoryLayout<UTextFuncs>.stride),
-      reserved1: 0,
-      reserved2: 0,
-      reserved3: 0,
 
-      // UText* UTextClone(
-      //   UText *dest, const UText *src, UBool deep, UErrorCode *status)
-      //
-      // clone a UText. Much like opening a UText where the source text is
-      // itself another UText.
-      //
-      // A deep clone will copy both the UText data structures and the
-      // underlying text. The original and cloned UText will operate completely
-      // independently; modifications made to the text in one will not effect
-      // the other. Text providers are not required to support deep clones. The
-      // user of clone() must check the status return and be prepared to handle
-      // failures.
-      //
-      // A shallow clone replicates only the UText data structures; it does not
-      // make a copy of the underlying text. Shallow clones can be used as an
-      // efficient way to have multiple iterators active in a single text string
-      // that is not being modified.
-      //
-      // A shallow clone operation must not fail except for truly exceptional
-      // conditions such as memory allocation failures.
-      //
-      // A UText and its clone may be safely concurrently accessed by separate
-      // threads. This is true for both shallow and deep clones. It is the
-      // responsibility of the Text Provider to ensure that this thread safety
-      // constraint is met.
+    var copy: _UTextable = self
+    
+    return withUnsafePointer(to: &copy) { pSelf in
       
-      clone: nil, //
+      var vtable = UTextFuncs(
+        tableSize: Int32(MemoryLayout<UTextFuncs>.stride),
+        reserved1: 0, reserved2: 0, reserved3: 0,
+        clone: nil,
+        
+        nativeLength: { u in
+          let pSelf = u!.pointee.context.assumingMemoryBound(to: _UTextable.self)
+          return pSelf.pointee._nativeLength(&u!.pointee)
+        },
+        
+        access: { u, nativeIndex, forward in
+          let pSelf = u!.pointee.context.assumingMemoryBound(to: _UTextable.self)
+          return pSelf.pointee._access(&u!.pointee, nativeIndex, forward)
+          },
+        extract: nil,
+        replace: nil,
+        copy: nil,
+        mapOffsetToNative: nil,
+        mapNativeIndexToUTF16: nil,
+        close: nil,
+        spare1: nil, spare2: nil, spare3: nil)
 
-      // int64_t UTextNativeLength(UText *ut)
-      //
-      // the length, in the native units of the original text string.
-      nativeLength: { return numericCast(codeUnits.count) }, //
-
-      // UBool UTextAccess(UText *ut, int64_t nativeIndex, UBool forward)
-      //
-      // Get the description of the text chunk containing the text at a
-      // requested native index. The UText's iteration position will be left at
-      // the requested index. If the index is out of bounds, the iteration
-      // position will be left at the start or end of the string, as
-      // appropriate.
-      //
-      // Chunks must begin and end on code point boundaries. A single code point
-      // comprised of multiple storage units must never span a chunk boundary.
-      access: nil, //
-
-      // typedef int32_t UTextExtract(UText *ut, int64_t nativeStart, int64_t
-      // nativeLimit, UChar *dest, int32_t destCapacity, UErrorCode *status)
-      // 
-      // Extract text from a UText into a UChar buffer. The range of text to be
-      // extracted is specified in the native indices of the UText
-      // provider. These may not necessarily be UTF-16 indices.
-      // 
-      // The size (number of 16 bit UChars) in the data to be extracted is
-      // returned. The full amount is returned, even when the specified buffer
-      // size is smaller.
-      // 
-      // The extracted string will (if you are a user) / must (if you are a text
-      // provider) be NUL-terminated if there is sufficient space in the
-      // destination buffer.
-
-      extract: nil, //
-
-      
-      replace: nil,
-      copy: nil,
-      
-      // int64_t UTextMapOffsetToNative(const UText *ut)
-      // 
-      // Map from the current UChar offset within the current text chunk to the
-      // corresponding native index in the original source text.
-      // 
-      // This is required only for text providers that do not use native UTF-16
-      // indexes.
-      mapOffsetToNative: nil,
-
-
-      // int32_t UTextMapNativeIndexToUTF16(const UText *ut, int64_t nativeIndex)
-      // Function type declaration for UText.mapIndexToUTF16().
-      // 
-      // Map from a native index to a UChar offset within a text chunk. Behavior
-      // is undefined if the native index does not fall within the current
-      // chunk.
-      // 
-      // This function is required only for text providers that do not use
-      // native UTF-16 indexes.
-      mapNativeIndexToUTF16: nil,
-      
-      close: nil,
-      spare1: nil,
-      spare2: nil,
-      spare3: nil)
-
-    func impl(
-      _ vtable: UnsafePointer<UTextFuncs>,
-      _ body: (UnsafePointer<UText>)->R // why must I pass body explicitly here?
-    ) -> R {                            // if I don't, the compiler complains it
-                                        // might escape.
-      var u = UText(
-        magic: UInt32(UTEXT_MAGIC),
-        flags: 0,
-        providerProperties: 0,
-        sizeOfStruct: Int32(MemoryLayout<UText>.stride),
-        chunkNativeLimit: 0,
-        extraSize: 0,
-        nativeIndexingLimit: 0,
-        chunkNativeStart: 0,
-        chunkOffset: 0,
-        chunkLength: 0,
-        chunkContents: nil,
-        pFuncs: vtable,
-        pExtra: nil,
-        context: nil,
-        p: nil, q: nil, r: nil,
-        privP: nil,
-        a: 0, b: 0, c: 0,
-        privA: 0, privB: 0, privC: 0)
-      return body(&u)
+      func impl(
+        _ vtable: UnsafePointer<UTextFuncs>,
+        _ body: (UnsafePointer<UText>)->R // why must I pass body explicitly here?
+      ) -> R {                            // if I don't, the compiler complains it
+                                          // might escape.
+        var u = UText(
+          magic: UInt32(UTEXT_MAGIC),
+          flags: 0,
+          providerProperties: 0,
+          sizeOfStruct: Int32(MemoryLayout<UText>.stride),
+          chunkNativeLimit: 0,
+          extraSize: 0,
+          nativeIndexingLimit: 0,
+          chunkNativeStart: 0,
+          chunkOffset: 0,
+          chunkLength: 0,
+          chunkContents: nil,
+          pFuncs: vtable,
+          pExtra: nil,
+          context: UnsafeRawPointer(pSelf),
+          p: nil, q: nil, r: nil,
+          privP: nil,
+          a: 0, b: 0, c: 0,
+          privA: 0, privB: 0, privC: 0)
+        return body(&u)
+      }
+      return impl(&vtable, body)
     }
-    return impl(&vtable, body)
   }
 }
 
