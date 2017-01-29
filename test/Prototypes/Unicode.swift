@@ -48,6 +48,86 @@ extension ParsedUnicode {
   }
 }
 
+prefix operator ..<
+struct IncompleteRangeUpTo<T: Comparable> {
+  init(_ upperBound: T) { self.upperBound = upperBound }
+  let upperBound: T
+}
+extension Comparable {
+  static prefix func ..<(x: Self) -> IncompleteRangeUpTo<Self> {
+    return IncompleteRangeUpTo(x)
+  }
+}
+extension Collection {
+  subscript(r: IncompleteRangeUpTo<Index>) -> SubSequence {
+    return self[self.startIndex..<r.upperBound]
+  }
+}
+extension MutableCollection {
+  subscript(r: IncompleteRangeUpTo<Index>) -> SubSequence {
+    get {
+      return self[self.startIndex..<r.upperBound]
+    }
+    set {
+      self[self.startIndex..<r.upperBound] = newValue
+    }
+  }
+}
+
+
+prefix operator ...
+struct IncompleteRangeThrough<T: Comparable> {
+  init(_ upperBound: T) { self.upperBound = upperBound }
+  let upperBound: T
+}
+extension Comparable {
+  static prefix func ...(x: Self) -> IncompleteRangeThrough<Self> {
+    return IncompleteRangeThrough(x)
+  }
+}
+extension Collection {
+  subscript(r: IncompleteRangeThrough<Index>) -> SubSequence {
+    return self[self.startIndex...r.upperBound]
+  }
+}
+extension MutableCollection {
+  subscript(r: IncompleteRangeThrough<Index>) -> SubSequence {
+    get {
+      return self[self.startIndex...r.upperBound]
+    }
+    set {
+      self[self.startIndex...r.upperBound] = newValue
+    }
+  }
+}
+
+postfix operator ...
+struct IncompleteRangeFrom<T: Comparable> {
+  init(_ lowerBound: T) { self.lowerBound = lowerBound }
+  let lowerBound: T
+}
+extension Comparable {
+  static postfix func ...(x: Self) -> IncompleteRangeFrom<Self> {
+    return IncompleteRangeFrom(x)
+  }
+}
+extension Collection {
+  subscript(r: IncompleteRangeFrom<Index>) -> SubSequence {
+    return self[r.lowerBound..<self.endIndex]
+  }
+}
+extension MutableCollection {
+  subscript(r: IncompleteRangeFrom<Index>) -> SubSequence {
+    get {
+      return self[r.lowerBound..<self.endIndex]
+    }
+    set {
+      self[r.lowerBound..<self.endIndex] = newValue
+    }
+  }
+}
+
+
 /// Collection Conformance
 extension ParsedUnicode : BidirectionalCollection {
   public var startIndex: Index {
@@ -166,7 +246,7 @@ extension TranscodedView : BidirectionalCollection {
 
 protocol _UTextable {
   func _nativeLength(_ uText: inout UText) -> Int64
-  func _access(_ uText: inout UText, _ nativeIndex: Int64, _ forward: UBool) -> UBool
+  func _access(_ uText: inout UText, _ nativeIndex: Int64, _ forward: Bool) -> Bool
 }
 
 protocol UnicodeStorage : _UTextable {
@@ -239,10 +319,10 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   }
 
   func _access(
-    _ u: inout UText, _ nativeTargetIndex: Int64, _ forward: UBool
-  ) -> UBool {
+    _ u: inout UText, _ nativeTargetIndex: Int64, _ forward: Bool
+  ) -> Bool {
 
-    func parsedFragment(
+    func parsedSlice(
       _ offset: Int64,
       _ slice: (CodeUnits.Index) -> CodeUnits.SubSequence
     ) -> ParsedUnicode<CodeUnits.SubSequence,Encoding>.SubSequence {
@@ -257,12 +337,12 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
     
     
     u.chunkOffset = 0
-    
-    if forward != 0
-    ? nativeTargetIndex >= u.chunkNativeStart && nativeTargetIndex < u.chunkNativeLimit
-    : nativeTargetIndex > u.chunkNativeStart && nativeTargetIndex <= u.chunkNativeLimit {
 
-      var parsedChunk = parsedFragment(u.chunkNativeStart, codeUnits.suffix(from:))
+    let inBoundsTarget = nativeTargetIndex - (forward ? 0 : 1)
+    if (u.chunkNativeStart..<u.chunkNativeLimit).contains(inBoundsTarget) {
+
+      var parsedChunk = parsedSlice(
+        u.chunkNativeStart, codeUnits.suffix(from:))
       
       var nativeOffset = u.chunkNativeStart
       while nativeOffset < nativeTargetIndex,
@@ -270,19 +350,24 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
         nativeOffset += numericCast(scalar.count)
         u.chunkOffset += numericCast(scalar.utf16.count)
       }
-      return 1
+      return true
+    }
+    
+    if nativeTargetIndex < 0
+    || nativeTargetIndex > numericCast(codeUnits.count) {
+      return false
     }
 
     u.chunkLength = 0
     u.withBuffer { buffer in
-      if forward != 0 {
-        var chunkSource = parsedFragment(nativeTargetIndex, codeUnits.suffix(from:))
+      if forward {
+        var chunkSource = parsedSlice(
+          nativeTargetIndex, codeUnits.suffix(from:))
+        
         while let scalar = chunkSource.popFirst() {
           let newChunkLength = u.chunkLength + numericCast(scalar.utf16.count)
           // don't overfill the buffer
-          if newChunkLength > numericCast(buffer.count) {
-            break
-          }
+          if newChunkLength > numericCast(buffer.count) { break }
           for unit in scalar.utf16 {
             buffer[numericCast(u.chunkLength)] = unit
             u.chunkLength += 1
@@ -290,12 +375,25 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
         }
       }
       else {
-        var chunkSource = parsedFragment(nativeTargetIndex, codeUnits.prefix(upTo:))
-        print(chunkSource)
-        fatalError("write me")
+        var chunkSource = parsedSlice(
+          nativeTargetIndex, codeUnits.prefix(upTo:))
+        
+        while let scalar = chunkSource.popLast() {
+          let newChunkLength = u.chunkLength + numericCast(scalar.utf16.count)
+          // don't overfill the buffer
+          if newChunkLength > numericCast(buffer.count) { break }
+          for unit in scalar.utf16.reversed() {
+            buffer[numericCast(u.chunkLength)] = unit
+            u.chunkLength += 1
+          }
+          var b = buffer
+          b[
+            buffer.startIndex..<buffer.index(buffer.startIndex, offsetBy: numericCast(u.chunkLength))
+          ].reverse()
+        }
       }
     }
-    return 1
+    return true
   }
     
 }
@@ -319,7 +417,8 @@ extension UnicodeStorage {
         
         access: { u, nativeIndex, forward in
           let pSelf = u!.pointee.context.assumingMemoryBound(to: _UTextable.self)
-          return pSelf.pointee._access(&u!.pointee, nativeIndex, forward)
+          return pSelf.pointee._access(&u!.pointee, nativeIndex, forward != 0)
+            ? 1 : 0
           },
         extract: nil,
         replace: nil,
