@@ -479,6 +479,12 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     ValueDecl *D = Result.Decl;
     if (!D->hasInterfaceType()) validateDecl(D);
 
+    // FIXME: Circularity hack.
+    if (!D->hasInterfaceType()) {
+      AllDeclRefs = false;
+      continue;
+    }
+
     // FIXME: The source-location checks won't make sense once
     // EnableASTScopeLookup is the default.
     if (Loc.isValid() && D->getLoc().isValid() &&
