@@ -122,6 +122,10 @@ public:
     return F.getModule().getOptions().EnableSILOwnership;
   }
 
+  bool areCOWExistentialsEnabled() const {
+    return F.getModule().getOptions().UseCOWExistentials;
+  }
+
   void _require(bool condition, const Twine &complaint,
                 const std::function<void()> &extraContext = nullptr) {
     if (condition) return;
@@ -2178,6 +2182,90 @@ public:
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
             "Archetype opened by open_existential_addr should be registered in "
             "SILFunction");
+
+    if (!areCOWExistentialsEnabled())
+      return;
+
+    // Check all the uses. Consuming or mutating uses must have mutable access
+    // to the opened value.
+    auto allowedAccessKind = OEI->getAccessKind();
+    if (allowedAccessKind == OpenedExistentialAccess::Mutable)
+      return;
+
+    auto isConsumingOrMutatingApplyUse = [](Operand *use) -> bool {
+      ApplySite apply(use->getUser());
+      assert(apply && "Not an apply instruction kind");
+      auto conv = apply.getArgumentConvention(use->getOperandNumber() - 1);
+      switch (conv) {
+      case SILArgumentConvention::Indirect_In_Guaranteed:
+        return false;
+
+      case SILArgumentConvention::Indirect_Out:
+      case SILArgumentConvention::Indirect_In:
+      case SILArgumentConvention::Indirect_Inout:
+      case SILArgumentConvention::Indirect_InoutAliasable:
+        return true;
+
+      case SILArgumentConvention::Direct_Unowned:
+      case SILArgumentConvention::Direct_Guaranteed:
+      case SILArgumentConvention::Direct_Owned:
+      case SILArgumentConvention::Direct_Deallocating:
+        assert(conv.isIndirectConvention() && "Expect an indirect convention");
+        return true; // return something "conservative".
+      }
+      llvm_unreachable("covered switch isn't covered?!");
+    };
+
+    // A "copy_addr %src [take] to *" is consuming on "%src".
+    // A "copy_addr * to * %dst" is mutating on "%dst".
+    auto isConsumingOrMutatingCopyAddrUse = [](Operand *use) -> bool {
+      auto *copyAddr = cast<CopyAddrInst>(use->getUser());
+      if (copyAddr->getDest() == use->get())
+        return true;
+      if (copyAddr->getSrc() == use->get() && copyAddr->isTakeOfSrc() == IsTake)
+        return true;
+      return false;
+    };
+
+    auto isMutatingOrConsuming = [=](OpenExistentialAddrInst *OEI) -> bool {
+      for (auto *use : OEI->getUses()) {
+        auto *inst = use->getUser();
+        if (inst->isTypeDependentOperand(*use))
+          continue;
+        switch (inst->getKind()) {
+        case ValueKind::ApplyInst:
+        case ValueKind::TryApplyInst:
+        case ValueKind::PartialApplyInst:
+          if (isConsumingOrMutatingApplyUse(use))
+            return true;
+          else
+            break;
+        case ValueKind::CopyAddrInst:
+          if (isConsumingOrMutatingCopyAddrUse(use))
+            return true;
+          else
+            break;
+        case ValueKind::DestroyAddrInst:
+          return true;
+        case ValueKind::UncheckedAddrCastInst:
+          // Escaping use lets be conservative here.
+          return true;
+        case ValueKind::CheckedCastAddrBranchInst:
+          if (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind() !=
+              CastConsumptionKind::CopyOnSuccess)
+            return true;
+          break;
+        default:
+          assert(false && "Unhandled unexpected instruction");
+          break;
+        }
+      }
+      return false;
+    };
+    require(!isMutatingOrConsuming(OEI) ||
+                allowedAccessKind == OpenedExistentialAccess::Mutable,
+            "open_existential_addr uses that consumes or mutates but is not "
+            "opened for mutation");
   }
 
   void checkOpenExistentialRefInst(OpenExistentialRefInst *OEI) {
