@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: OS=linux-gnu
+// RUN: not %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-struct A:RangeReplaceableCollection{var f=max
+{($0=[{$0
+f}(n:_

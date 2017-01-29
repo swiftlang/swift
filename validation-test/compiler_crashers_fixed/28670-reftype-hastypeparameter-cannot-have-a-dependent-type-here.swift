@@ -5,5 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-{for nil,4
+// REQUIRES: asserts
+// RUN: not %target-swift-frontend %s -emit-ir
+struct A:RangeReplaceableCollection{let c{{a f{}}var f=max

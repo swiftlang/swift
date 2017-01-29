@@ -2975,10 +2975,12 @@ ERROR(objc_setter_for_nonobjc_subscript,none,
 ERROR(objc_enum_generic,none,
       "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,none,
-      "'@objc' %select{class|protocol|enum|enum case|property}0 must have a simple name", (int))
+      "'@objc' %0 must have a simple name", (DescriptiveDeclKind))
 ERROR(objc_name_subscript,none,
       "'@objc' subscript cannot have a name; did you mean to put "
       "the name on the getter or setter?", ())
+ERROR(objc_name_deinit,none,
+      "'@objc' deinitializer cannot have a name", ())
 ERROR(objc_name_func_mismatch,none,
       "'@objc' %select{initializer|method}0 name provides "
       "%select{one argument name|names for %1 arguments}2, but "

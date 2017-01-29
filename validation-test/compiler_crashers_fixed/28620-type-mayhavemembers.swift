@@ -5,6 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+// RUN: not %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-class X{let a=t@objc(b)deinit{
+AnyClass{

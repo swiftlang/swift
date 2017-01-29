@@ -576,7 +576,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       const TypeDecl *declParent =
           VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
       if (!declParent) {
-        assert(VD->getDeclContext()->isModuleScopeContext());
+        // If the declaration has been validated but not fully type-checked,
+        // the attribute might be applied to something invalid.
+        if (!VD->getDeclContext()->isModuleScopeContext())
+          return;
         declParent = VD->getDeclContext()->getParentModule();
       }
 
