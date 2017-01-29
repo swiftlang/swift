@@ -67,6 +67,7 @@ struct OwnershipModelEliminatorVisitor
   bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *URVI);
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *URVI);
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *UAVI);
+  bool visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
 };
 
 } // end anonymous namespace
@@ -195,6 +196,24 @@ bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(DestroyValueInst *DV
   return true;
 }
 
+bool OwnershipModelEliminatorVisitor::visitCheckedCastBranchInst(
+    CheckedCastBranchInst *CBI) {
+  // In ownership qualified SIL, checked_cast_br must pass its argument to the
+  // fail case so we can clean it up. In non-ownership qualified SIL, we expect
+  // no argument from the checked_cast_br in the default case. The way that we
+  // handle this transformation is that:
+  //
+  // 1. We replace all uses of the argument to the false block with a use of the
+  // checked cast branch's operand.
+  // 2. We delete the argument from the false block.
+  SILBasicBlock *FailureBlock = CBI->getFailureBB();
+  if (FailureBlock->getNumArguments() == 0)
+    return false;
+  FailureBlock->getArgument(0)->replaceAllUsesWith(CBI->getOperand());
+  FailureBlock->eraseArgument(0);
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
@@ -224,9 +243,8 @@ struct OwnershipModelEliminator : SILFunctionTransform {
     }
 
     if (MadeChange) {
-      // If we made any changes, we just changed instructions, so invalidate
-      // that analysis.
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(
+          SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
   }
 
