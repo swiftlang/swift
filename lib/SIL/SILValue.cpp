@@ -283,7 +283,6 @@ CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, UncheckedEnumData)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 // These are instructions that do not have any result, so we should never reach
@@ -418,6 +417,7 @@ FORWARDING_OWNERSHIP_INST(UncheckedRefCast)
 FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
 FORWARDING_OWNERSHIP_INST(MarkUninitialized)
+FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
 #undef FORWARDING_OWNERSHIP_INST
 
 ValueOwnershipKind

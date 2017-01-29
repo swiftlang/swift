@@ -298,6 +298,17 @@ bb0(%0 : @owned $Ref):
   return %9999 : $()
 }
 
+sil @unchecked_enum_data_propagates_ownership : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Optional<Builtin.NativeObject>):
+  %1 = begin_borrow %0 : $Optional<Builtin.NativeObject>
+  unchecked_enum_data %1 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
+  unchecked_enum_data %1 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
+  unchecked_enum_data %1 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
+  end_borrow %1 from %0 : $Optional<Builtin.NativeObject>, $Optional<Builtin.NativeObject>
+  %2 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
+  return %2 : $Builtin.NativeObject
+}
+
 //////////////////////
 // Terminator Tests //
 //////////////////////
