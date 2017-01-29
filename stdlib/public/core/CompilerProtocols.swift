@@ -338,7 +338,7 @@ public protocol ExpressibleByUnicodeScalarLiteral {
   /// A type that represents a Unicode scalar literal.
   ///
   /// Valid types for `UnicodeScalarLiteralType` are `UnicodeScalar`,
-  /// `String`, and `StaticString`.
+  /// `Character`, `String`, and `StaticString`.
   associatedtype UnicodeScalarLiteralType : _ExpressibleByBuiltinUnicodeScalarLiteral
 
   /// Creates an instance initialized to the given value.
@@ -395,6 +395,13 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
   init(extendedGraphemeClusterLiteral value: ExtendedGraphemeClusterLiteralType)
 }
 
+extension ExpressibleByExtendedGraphemeClusterLiteral
+  where Self.ExtendedGraphemeClusterLiteralType == Character {
+  public init(unicodeScalarLiteral value: UnicodeScalar) {
+    self.init(extendedGraphemeClusterLiteral: Character(value))
+  }
+}
+
 public protocol _ExpressibleByBuiltinStringLiteral
   : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
 
@@ -439,8 +446,6 @@ public protocol _ExpressibleByBuiltinConstUTF16StringLiteral
 /// implement the required initializer.
 public protocol ExpressibleByStringLiteral
   : ExpressibleByExtendedGraphemeClusterLiteral {
-  // FIXME: when we have default function implementations in protocols, provide
-  // an implementation of init(extendedGraphemeClusterLiteral:).
   
   /// A type that represents a string literal.
   ///
@@ -451,6 +456,12 @@ public protocol ExpressibleByStringLiteral
   ///
   /// - Parameter value: The value of the new instance.
   init(stringLiteral value: StringLiteralType)
+}
+
+extension ExpressibleByStringLiteral where Self.StringLiteralType == String {
+  public init(extendedGraphemeClusterLiteral value: Character) {
+    self.init(stringLiteral: String(describing: value))
+  }
 }
 
 /// A type that can be initialized using an array literal.
