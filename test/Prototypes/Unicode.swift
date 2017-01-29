@@ -48,6 +48,63 @@ extension ParsedUnicode {
   }
 }
 
+//===--- Missing stdlib niceties ------------------------------------------===//
+extension Comparable {
+  func clamped(to r: ClosedRange<Self>) -> Self {
+    return self < r.lowerBound ? r.lowerBound
+         : self > r.upperBound ? r.upperBound
+         : self
+  }
+}
+extension Collection {
+  func index<I: SignedInteger>(atOffset offset: I) -> Index {
+    return index(startIndex, offsetBy: numericCast(offset))
+  }
+  func offset(of i: Index) -> IndexDistance {
+    return distance(from: startIndex, to: i)
+  }
+  subscript() -> SubSequence {
+    return self[startIndex...]
+  }
+}
+extension MutableCollection {
+  subscript() -> SubSequence {
+    get {
+      return self[startIndex...]
+    }
+    set {
+      self[startIndex...] = newValue
+    }
+  }
+  
+  /// Copies elements from `source` into `self`, starting at the beginning of
+  /// each.
+  ///
+  /// - Returns:
+  ///
+  ///   - `limit`: the first index in `self` that was not copied into, or
+  ///     `endIndex` if all elements were assigned.
+  ///
+  ///   - `remainder`: the subsequence of source that didn't fit into `self`, 
+  ///     or `self[endIndex...]` if all elements fit.
+  @discardableResult
+  mutating func copy<Source: Collection>(from source: Source)
+  -> (limit: Index, remainder: Source.SubSequence)
+  where Source.SubSequence : Collection,
+  Source.SubSequence.Iterator.Element == Iterator.Element,
+  Source.SubSequence == Source.SubSequence.SubSequence {
+    // This method should be optimizable for segmented collections
+    var r = source[]
+    var i: Index = startIndex
+    while i != endIndex {
+      guard let e = r.popFirst()
+      else { return (limit: i, remainder: r) }
+      self[i] = e
+      i = index(after: i)
+    }
+    return (limit: endIndex, remainder: r)
+  }
+}
 prefix operator ..<
 struct IncompleteRangeUpTo<T: Comparable> {
   init(_ upperBound: T) { self.upperBound = upperBound }
@@ -126,7 +183,7 @@ extension MutableCollection {
     }
   }
 }
-
+//===----------------------------------------------------------------------===//
 
 /// Collection Conformance
 extension ParsedUnicode : BidirectionalCollection {
@@ -150,7 +207,7 @@ extension ParsedUnicode : BidirectionalCollection {
   }
 
   public func index(after i: Index) -> Index {
-    var remainder = codeUnits[i.next..<codeUnits.endIndex]
+    var remainder = codeUnits[i.next...]
     while true {
       switch Encoding.parse1Forward(remainder, knownCount: 0) {
       case .valid(let scalar, let nextIndex):
@@ -171,7 +228,7 @@ extension ParsedUnicode : BidirectionalCollection {
   }
 
   public func index(before i: Index) -> Index {
-    var remainder = codeUnits[codeUnits.startIndex..<i.base]
+    var remainder = codeUnits[..<i.base]
     while true {
       switch Encoding.parse1Reverse(remainder, knownCount: 0) {
       case .valid(let scalar, let priorIndex):
@@ -219,6 +276,8 @@ where FromEncoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
 }
 
 extension TranscodedView : BidirectionalCollection {
+  typealias SubSequence = BidirectionalSlice<TranscodedView>
+  
   public var startIndex : Base.Index {
     return base.startIndex
   }
@@ -246,7 +305,13 @@ extension TranscodedView : BidirectionalCollection {
 
 protocol _UTextable {
   func _nativeLength(_ uText: inout UText) -> Int64
-  func _access(_ uText: inout UText, _ nativeIndex: Int64, _ forward: Bool) -> Bool
+  func _access(_ u: inout UText, _ nativeIndex: Int64, _ forward: Bool) -> Bool
+  func _extract(
+    _ u: inout UText,
+    _ nativeStart: Int64, _ nativeLimit: Int64,
+    _ destination: UnsafeMutableBufferPointer<UChar>,
+    _ error: UnsafeMutablePointer<UErrorCode>?
+  ) -> Int32
 }
 
 protocol UnicodeStorage : _UTextable {
@@ -328,9 +393,7 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
     ) -> ParsedUnicode<CodeUnits.SubSequence,Encoding>.SubSequence {
       
       return ParsedUnicode(
-        slice(
-          codeUnits.index(codeUnits.startIndex,
-            offsetBy: numericCast(offset) )),
+        slice(codeUnits.index(atOffset: offset)),
         Encoding.self
       ).dropFirst(0)      
     }
@@ -386,16 +449,47 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
             buffer[numericCast(u.chunkLength)] = unit
             u.chunkLength += 1
           }
-          var b = buffer
-          b[
-            buffer.startIndex..<buffer.index(buffer.startIndex, offsetBy: numericCast(u.chunkLength))
-          ].reverse()
+          var b = buffer // copy due to https://bugs.swift.org/browse/SR-3782
+          b[..<buffer.index(atOffset: u.chunkLength)].reverse()
         }
       }
     }
     return true
   }
+  
+  func _extract(
+    _ u: inout UText,
+    _ nativeStart: Int64, _ nativeLimit: Int64,
+    _ destination: UnsafeMutableBufferPointer<UChar>,
+    _ error: UnsafeMutablePointer<UErrorCode>?
+  ) -> Int32 {
+
+    let s = nativeStart.clamped(to: 0...numericCast(codeUnits.count))
+    let l = nativeLimit.clamped(to: 0...numericCast(codeUnits.count))
+    u.chunkNativeStart = l
+    u.chunkNativeLimit = l
+    u.chunkLength = 0
     
+    if s < l { // anything to extract?
+      let base = codeUnits[
+        codeUnits.index(atOffset: s)..<codeUnits.index(atOffset: l)
+      ]
+      let source = TranscodedView(base, from: Encoding.self, to: UTF16.self)
+      var d = destination // copy due to https://bugs.swift.org/browse/SR-3782
+      let (limit, remainder) = d.copy(from: source)
+      
+      // Add null termination if it fits
+      if limit < d.endIndex { d[limit] = 0 }
+
+      // If no overflow, we're done
+      if remainder.isEmpty { return Int32(destination.offset(of: limit)) }
+
+      // Report the error and account for the overflow length in the return value
+      error!.pointee = U_BUFFER_OVERFLOW_ERROR
+      return Int32(destination.offset(of: limit) + remainder.count)
+    }
+    return 0
+  }
 }
 
 extension UnicodeStorage {
@@ -420,7 +514,15 @@ extension UnicodeStorage {
           return pSelf.pointee._access(&u!.pointee, nativeIndex, forward != 0)
             ? 1 : 0
           },
-        extract: nil,
+        extract: { u, nativeStart, nativeLimit, dest, destCapacity, status in
+          let pSelf = u!.pointee.context.assumingMemoryBound(to: _UTextable.self)
+          
+          let destination = UnsafeMutableBufferPointer(
+            start: dest, count: numericCast(destCapacity))
+            
+          return pSelf.pointee._extract(
+            &u!.pointee, nativeStart, nativeLimit, destination, status)
+        },
         replace: nil,
         copy: nil,
         mapOffsetToNative: nil,
