@@ -305,3 +305,22 @@ SILBasicBlock::getFunctionArguments() const {
   };
   return makeTransformArrayRef(getArguments(), F);
 }
+
+/// Returns true if this block ends in an unreachable or an apply of a
+/// no-return apply or builtin.
+bool SILBasicBlock::isNoReturn() const {
+  if (isa<UnreachableInst>(getTerminator()))
+    return true;
+
+  auto Iter = prev_or_begin(getTerminator()->getIterator(), begin());
+  FullApplySite FAS = FullApplySite::isa(const_cast<SILInstruction *>(&*Iter));
+  if (FAS && FAS.isCalleeNoReturn()) {
+    return true;
+  }
+
+  if (auto *BI = dyn_cast<BuiltinInst>(&*Iter)) {
+    return BI->getModule().isNoReturnBuiltinOrIntrinsic(BI->getName());
+  }
+
+  return false;
+}

@@ -76,9 +76,6 @@ public:
   /// This method unlinks 'self' from the containing SILFunction and deletes it.
   void eraseFromParent();
 
-  /// Returns true if this BB is the entry BB of its parent.
-  bool isEntry() const;
-
   //===--------------------------------------------------------------------===//
   // SILInstruction List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
@@ -313,6 +310,17 @@ public:
   const SILBasicBlock *getSinglePredecessorBlock() const {
     return const_cast<SILBasicBlock *>(this)->getSinglePredecessorBlock();
   }
+
+  //===--------------------------------------------------------------------===//
+  // Utility
+  //===--------------------------------------------------------------------===//
+
+  /// Returns true if this BB is the entry BB of its parent.
+  bool isEntry() const;
+
+  /// Returns true if this block ends in an unreachable or an apply of a
+  /// no-return apply or builtin.
+  bool isNoReturn() const;
 
   //===--------------------------------------------------------------------===//
   // Debugging
