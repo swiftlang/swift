@@ -49,6 +49,25 @@ extension ParsedUnicode {
 }
 
 //===--- Missing stdlib niceties ------------------------------------------===//
+postfix operator ^
+
+extension _SignedInteger {
+  static postfix func ^ <U : _SignedInteger>(_ x: Self) -> U {
+    return numericCast(x)
+  }
+  static postfix func ^ <U : UnsignedInteger>(_ x: Self) -> U {
+    return numericCast(x)
+  }
+}
+extension UnsignedInteger {
+  static postfix func ^ <U : UnsignedInteger>(_ x: Self) -> U {
+    return numericCast(x)
+  }
+  static postfix func ^ <U : SignedInteger>(_ x: Self) -> U {
+    return numericCast(x)
+  }
+}
+
 extension Comparable {
   func clamped(to r: ClosedRange<Self>) -> Self {
     return self < r.lowerBound ? r.lowerBound
@@ -58,7 +77,7 @@ extension Comparable {
 }
 extension Collection {
   func index<I: SignedInteger>(atOffset offset: I) -> Index {
-    return index(startIndex, offsetBy: numericCast(offset))
+    return index(startIndex, offsetBy: offset^)
   }
   func offset(of i: Index) -> IndexDistance {
     return distance(from: startIndex, to: i)
@@ -303,21 +322,7 @@ extension TranscodedView : BidirectionalCollection {
   }
 }
 
-protocol _UTextable {
-  func _nativeLength(_ uText: inout UText) -> Int64
-  func _access(_ u: inout UText, _ nativeIndex: Int64, _ forward: Bool) -> Bool
-  func _extract(
-    _ u: inout UText,
-    _ nativeStart: Int64, _ nativeLimit: Int64,
-    _ destination: UnsafeMutableBufferPointer<UChar>,
-    _ error: UnsafeMutablePointer<UErrorCode>?
-  ) -> Int32
-  
-  func _mapOffsetToNative(_ u: UText) -> Int64
-  func _mapNativeIndexToUTF16(_ u: UText, _ nativeIndex: Int64) -> Int32
-}
-
-protocol Unicode : _UTextable {
+protocol Unicode {
   associatedtype Encoding: UnicodeEncoding
   associatedtype CodeUnits: RandomAccessCollection
   /* where CodeUnits.Iterator.Element == Encoding.CodeUnit */
@@ -353,11 +358,28 @@ protocol Unicode : _UTextable {
   func isInFastCOrDForm(scan: Bool/* = true*/) -> Bool
 }
 
+
+struct UnicodeStorage<
+  CodeUnits : RandomAccessCollection,
+  Encoding : UnicodeEncoding
+>
+where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+
+  init(_ codeUnits: CodeUnits) { self.codeUnits = codeUnits }
+  let codeUnits: CodeUnits
+}
+
 extension UText {
+  /// Invokes body, passing this UText's buffer area as a parameter
   mutating func withBuffer<R>(
     _ body: (UnsafeMutableBufferPointer<UChar>)->R
   ) -> R {
-    
+    // Currently we are using the a, b, and c fields to get 128 bits of
+    // contiguous storage.  It's not much.
     return withUnsafeMutablePointer(to: &a) { a in
       let rawA = UnsafeRawPointer(a)
       let capacity = withUnsafeMutablePointer(to: &privA) {
@@ -367,26 +389,34 @@ extension UText {
           - UnsafeRawPointer(bufferLimit).assumingMemoryBound(to: Int8.self)
         ) / MemoryLayout<UChar>.stride
       }
-      
-      return body(
-        UnsafeMutableBufferPointer(
-          start: UnsafeMutablePointer(mutating: rawA.assumingMemoryBound(to: UChar.self)), count: capacity))
+      let start = rawA.bindMemory(to: UChar.self, capacity: capacity)
+      let mutableStart = UnsafeMutablePointer(mutating: start)
+      let buffer = UnsafeMutableBufferPointer(start: mutableStart, count: capacity)
+      return body(buffer)
     }
   }
 }
 
-extension Unicode
-where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : BidirectionalCollection,
-  CodeUnits.SubSequence.Index == CodeUnits.Index,
-  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
-{
-  func _nativeLength(_ uText: inout UText) -> Int64 {
-    return numericCast(codeUnits.count)
+fileprivate protocol _UTextable {
+  func _nativeLength(_ uText: inout UText) -> Int64
+  func _access(_ u: inout UText, _ nativeIndex: Int64, _ forward: Bool) -> Bool
+  func _extract(
+    _ u: inout UText,
+    _ nativeStart: Int64, _ nativeLimit: Int64,
+    _ destination: UnsafeMutableBufferPointer<UChar>,
+    _ error: UnsafeMutablePointer<UErrorCode>?
+  ) -> Int32
+  
+  func _mapOffsetToNative(_ u: UText) -> Int64
+  func _mapNativeIndexToUTF16(_ u: UText, _ nativeIndex: Int64) -> Int32
+}
+
+extension UnicodeStorage : _UTextable {
+  fileprivate func _nativeLength(_ uText: inout UText) -> Int64 {
+    return codeUnits.count^
   }
 
-  private func _parsedSlice(
+  fileprivate func _parsedSlice(
     _ offset: Int64,
     _ slice: (CodeUnits.Index) -> CodeUnits.SubSequence
   ) -> ParsedUnicode<CodeUnits.SubSequence,Encoding>.SubSequence {
@@ -395,13 +425,13 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
     ).dropFirst(0)
   }
 
-  private func _parsedSuffix(
+  fileprivate func _parsedSuffix(
     fromOffset offset: Int64
   ) -> ParsedUnicode<CodeUnits.SubSequence,Encoding>.SubSequence {
     return _parsedSlice(offset, codeUnits.suffix(from:))
   }
   
-  func _access(
+  fileprivate func _access(
     _ u: inout UText, _ nativeTargetIndex: Int64, _ forward: Bool
   ) -> Bool {
     
@@ -415,16 +445,14 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
       var nativeOffset = u.chunkNativeStart
       while nativeOffset < nativeTargetIndex,
       let scalar = parsedChunk.popFirst() {
-        nativeOffset += numericCast(scalar.count)
-        u.chunkOffset += numericCast(scalar.utf16.count)
+        nativeOffset += scalar.count^
+        u.chunkOffset += scalar.utf16.count^
       }
       return true
     }
     
-    if nativeTargetIndex < 0
-    || nativeTargetIndex > numericCast(codeUnits.count) {
-      return false
-    }
+    guard (0...codeUnits.count^).contains(nativeTargetIndex)
+    else { return false }
 
     u.chunkLength = 0
     u.withBuffer { buffer in
@@ -432,11 +460,11 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
         var chunkSource = _parsedSuffix(fromOffset: nativeTargetIndex)
         
         while let scalar = chunkSource.popFirst() {
-          let newChunkLength = u.chunkLength + numericCast(scalar.utf16.count)
+          let newChunkLength = u.chunkLength + scalar.utf16.count^
           // don't overfill the buffer
-          if newChunkLength > numericCast(buffer.count) { break }
+          if newChunkLength > buffer.count^ { break }
           for unit in scalar.utf16 {
-            buffer[numericCast(u.chunkLength)] = unit
+            buffer[u.chunkLength^] = unit
             u.chunkLength += 1
           }
         }
@@ -446,11 +474,11 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
           = _parsedSlice(nativeTargetIndex, codeUnits.prefix(upTo:))
         
         while let scalar = chunkSource.popLast() {
-          let newChunkLength = u.chunkLength + numericCast(scalar.utf16.count)
+          let newChunkLength = u.chunkLength + scalar.utf16.count^
           // don't overfill the buffer
-          if newChunkLength > numericCast(buffer.count) { break }
+          if newChunkLength > buffer.count^ { break }
           for unit in scalar.utf16.reversed() {
-            buffer[numericCast(u.chunkLength)] = unit
+            buffer[u.chunkLength^] = unit
             u.chunkLength += 1
           }
           var b = buffer // copy due to https://bugs.swift.org/browse/SR-3782
@@ -461,15 +489,15 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
     return true
   }
   
-  func _extract(
+  fileprivate func _extract(
     _ u: inout UText,
     _ nativeStart: Int64, _ nativeLimit: Int64,
     _ destination: UnsafeMutableBufferPointer<UChar>,
     _ error: UnsafeMutablePointer<UErrorCode>?
   ) -> Int32 {
 
-    let s = nativeStart.clamped(to: 0...numericCast(codeUnits.count))
-    let l = nativeLimit.clamped(to: 0...numericCast(codeUnits.count))
+    let s = nativeStart.clamped(to: 0...codeUnits.count^)
+    let l = nativeLimit.clamped(to: 0...codeUnits.count^)
     u.chunkNativeStart = l
     u.chunkNativeLimit = l
     u.chunkLength = 0
@@ -495,7 +523,7 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
     return 0
   }
   
-  func _mapOffsetToNative(_ u: UText) -> Int64 {
+  fileprivate func _mapOffsetToNative(_ u: UText) -> Int64 {
     
     if u.chunkOffset == 0 { return 0 }
     
@@ -504,14 +532,14 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
     
     for i in chunkSource.indices {
       chunkOffset += chunkSource[i].utf16.count
-      if chunkOffset == numericCast(u.chunkOffset) {
-        return numericCast(codeUnits.offset(of: i.base)) - u.chunkNativeStart
+      if chunkOffset == u.chunkOffset^ {
+        return codeUnits.offset(of: i.base)^ - u.chunkNativeStart
       }
     }
     fatalError("supposed to be unreachable")
   }
   
-  func _mapNativeIndexToUTF16(_ u: UText, _ nativeIndex: Int64) -> Int32 {
+  fileprivate func _mapNativeIndexToUTF16(_ u: UText, _ nativeIndex: Int64) -> Int32 {
     if u.chunkOffset == 0 { return 0 }
 
     let nativeChunk = codeUnits[
@@ -519,19 +547,12 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
       ..<
       codeUnits.index(atOffset: nativeIndex)]
     
-    return numericCast(
-      TranscodedView(nativeChunk, from: Encoding.self, to: UTF16.self).count)
+    return TranscodedView(
+      nativeChunk, from: Encoding.self, to: UTF16.self
+    ).count^
   }
-}
-
-extension Optional where Wrapped == UnsafePointer<UText> {
-  var _self: _UTextable {
-    return self!.pointee.context.assumingMemoryBound(to: _UTextable.self).pointee    
-  }
-}
-
-extension Unicode {
-  func withUText<R>(_ body: (UnsafePointer<UText>)->R) -> R {
+  
+  public func withUText<R>(_ body: (UnsafePointer<UText>)->R) -> R {
 
     var copy: _UTextable = self
 
@@ -560,7 +581,7 @@ extension Unicode {
             to: _UTextable.self).pointee
           
           let destination = UnsafeMutableBufferPointer(
-            start: dest, count: numericCast(destCapacity))
+            start: dest, count: destCapacity^)
 
           return _self._extract(
             &u!.pointee, nativeStart, nativeLimit, destination, status)
