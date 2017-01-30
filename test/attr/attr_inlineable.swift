@@ -217,32 +217,29 @@ extension VersionedProtocol {
   }
 }
 
-protocol InternalProtocol {
-  associatedtype T
-
-  func requirement() -> T
+enum InternalEnum {
+// expected-note@-1 2{{enum 'InternalEnum' is not '@_versioned' or public}}
+  case apple
+  case orange
 }
 
-extension InternalProtocol {
-  func internalMethod() {}
+@_inlineable public func usesInternalEnum() {
+  _ = InternalEnum.apple
+  // expected-error@-1 {{enum 'InternalEnum' is internal and cannot be referenced from an '@_inlineable' function}}
+  let _: InternalEnum = .orange
+  // expected-error@-1 {{enum 'InternalEnum' is internal and cannot be referenced from an '@_inlineable' function}}
+}
 
-  // FIXME: https://bugs.swift.org/browse/SR-3684
-  //
-  // This should either complain that the method cannot be '@_versioned' since
-  // we're inside an extension of an internal protocol, or if such methods are
-  // allowed, we should diagnose the reference to 'internalMethod()' from the
-  // body.
-  @_inlineable
-  @_versioned
-  func versionedMethod() -> T {
-    internalMethod()
-    return requirement()
-  }
+@_versioned enum VersionedEnum {
+  case apple
+  case orange
+  // FIXME: Should this be banned?
+  case pear(InternalEnum)
+  case persimmon(String)
+}
 
-  // Ditto, except s/@_versioned/public/.
-  @_inlineable
-  public func publicMethod() -> T {
-    internalMethod()
-    return requirement()
-  }
+@_inlineable public func usesVersionedEnum() {
+  _ = VersionedEnum.apple
+  let _: VersionedEnum = .orange
+  _ = VersionedEnum.persimmon
 }
