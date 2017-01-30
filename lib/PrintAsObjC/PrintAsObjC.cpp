@@ -649,10 +649,8 @@ private:
       = FD->getForeignErrorConvention();
     assert(!FD->getGenericSignature() &&
            "top-level generic functions not supported here");
-    auto resultTy = getForeignResultType(
-        FD,
-        FD->getInterfaceType()->castTo<FunctionType>(),
-        errorConvention);
+    auto funcTy = FD->getInterfaceType()->castTo<FunctionType>();
+    auto resultTy = getForeignResultType(FD, funcTy, errorConvention);
     
     // The result type may be a partial function type we need to close
     // up later.
@@ -666,17 +664,28 @@ private:
     
     assert(FD->getParameterLists().size() == 1 && "not a C-compatible func");
     auto params = FD->getParameterLists().back();
-    interleave(*params,
-               [&](const ParamDecl *param) {
-                 print(param->getInterfaceType(), OTK_None, param->getName(),
-                       IsFunctionParam);
-               },
-               [&]{ os << ", "; });
+    if (params->size()) {
+      interleave(*params,
+                 [&](const ParamDecl *param) {
+                   print(param->getInterfaceType(), OTK_None, param->getName(),
+                         IsFunctionParam);
+                 },
+                 [&]{ os << ", "; });
+    } else {
+      os << "void";
+    }
     
     os << ')';
     
     // Finish the result type.
     multiPart.finish();
+
+    if (funcTy->getResult()->isUninhabited()) {
+      os << " SWIFT_NORETURN";
+    } else if (!funcTy->getResult()->isVoid() &&
+               !FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+      os << " SWIFT_WARN_UNUSED_RESULT";
+    }
 
     appendAvailabilityAttribute(FD);
     
