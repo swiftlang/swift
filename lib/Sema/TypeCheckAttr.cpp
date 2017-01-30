@@ -292,9 +292,12 @@ void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    NominalTypeDecl *extendedType = ED->getExtendedType()->getAnyNominal();
-    if (extendedType && !isa<ClassDecl>(extendedType))
-      return diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
+    if (auto extendedType = ED->getExtendedType()) {
+      if (auto *nominalDecl = extendedType->getAnyNominal()) {
+        if (!isa<ClassDecl>(nominalDecl))
+          return diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
+      }
+    }
   }
 }
 
