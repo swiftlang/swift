@@ -1247,6 +1247,44 @@ bool ModuleDecl::isSystemModule() const {
   return false;
 }
 
+namespace {
+enum class SerializedModuleKind {
+  Other,
+  Clang,
+  Swift,
+};
+}
+static SerializedModuleKind getSerializedModuleKind(const ModuleDecl *M) {
+  Optional<SerializedModuleKind> K;
+
+  for (auto File : M->getFiles()) {
+    switch (File->getKind()) {
+      case FileUnitKind::Source:
+      case FileUnitKind::Builtin:
+      case FileUnitKind::Derived:
+        return SerializedModuleKind::Other;
+      case FileUnitKind::SerializedAST:
+        assert(!K.hasValue() && "cannot handle multi-file modules");
+        K = SerializedModuleKind::Swift;
+        break;
+      case FileUnitKind::ClangModule:
+        assert(!K.hasValue() && "cannot handle multi-file modules");
+        K = SerializedModuleKind::Clang;
+        break;
+    }
+  }
+
+  return K.getValue();
+}
+
+bool ModuleDecl::isClangModule() const {
+  return getSerializedModuleKind(this) == SerializedModuleKind::Clang;
+}
+
+bool ModuleDecl::isSwiftASTModule() const {
+  return getSerializedModuleKind(this) == SerializedModuleKind::Swift;
+}
+
 template<bool respectVisibility, typename Callback>
 static bool forAllImportedModules(ModuleDecl *topLevel,
                                   ModuleDecl::AccessPathTy thisPath,

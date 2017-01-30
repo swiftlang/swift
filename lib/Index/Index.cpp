@@ -490,28 +490,11 @@ bool IndexSwiftASTWalker::visitImports(
     if (Path.empty() || Path == TopMod.getFilename())
       continue; // this is a submodule.
 
-    Optional<bool> IsClangModuleOpt;
-    for (auto File : Mod->getFiles()) {
-      switch (File->getKind()) {
-      case FileUnitKind::Source:
-      case FileUnitKind::Builtin:
-      case FileUnitKind::Derived:
-        break;
-      case FileUnitKind::SerializedAST:
-        assert(!IsClangModuleOpt.hasValue() &&
-               "cannot handle multi-file modules");
-        IsClangModuleOpt = false;
-        break;
-      case FileUnitKind::ClangModule:
-        assert(!IsClangModuleOpt.hasValue() &&
-               "cannot handle multi-file modules");
-        IsClangModuleOpt = true;
-        break;
-      }
-    }
-    if (!IsClangModuleOpt.hasValue())
+    bool IsClangModule = false;
+    if (Mod->isClangModule())
+      IsClangModule = true;
+    else if (!Mod->isSwiftASTModule())
       continue;
-    bool IsClangModule = *IsClangModuleOpt;
 
     StringRef Hash;
     SmallString<32> HashBuf;
