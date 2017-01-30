@@ -317,6 +317,14 @@ SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
   return gen.emitFormalAccessManagedRValueWithCleanup(loc, result);
 }
 
+ManagedValue SILGenBuilder::createCopyAddr(
+    SILLocation loc, ManagedValue originalAddr, SILValue newAddr,
+    IsTake_t isTake, IsInitialization_t isInit) {
+  SILBuilder::createCopyAddr(loc, originalAddr.getValue(), newAddr, isTake,
+                             isInit);
+  return gen.emitManagedBufferWithCleanup(newAddr);
+}
+
 ManagedValue SILGenBuilder::createFormalAccessCopyAddr(
     SILLocation loc, ManagedValue originalAddr, SILValue newAddr,
     IsTake_t isTake, IsInitialization_t isInit) {
@@ -489,3 +497,19 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
   return gen.emitManagedRValueWithCleanup(result);
 }
 
+ManagedValue
+SILGenBuilder::loadCopySemanticTupleElementRValue
+(SILLocation loc, ManagedValue addr, unsigned i, SILType fieldTy) {
+  const auto &fieldTL = getFunction().getTypeLowering(fieldTy);
+  auto *tupleAddr = SILBuilder::createTupleElementAddr(loc, addr.getValue(), i, fieldTy);
+  if (!fieldTL.isAddressOnly()) {
+    return createLoadCopy(loc, ManagedValue::forUnmanaged(tupleAddr), fieldTL);
+  }
+
+  // Create the temporary for the field type.
+  SILValue tupleTemporary = gen.emitTemporaryAllocation(loc, fieldTy);
+
+  // Copy the tuple address into the temporary.
+  return createCopyAddr(loc, ManagedValue::forUnmanaged(tupleAddr),
+                        tupleTemporary, IsNotTake, IsInitialization);
+}

@@ -180,53 +180,71 @@ struct X : P { func p() {} }
 struct Y : P { func p() {} }
 struct Z : P { func p() {} }
 
-// CHECK-LABEL: sil hidden  @_T010switch_var05test_B2_4yAA1P_p1p_tF
+// CHECK-LABEL: sil hidden  @_T010switch_var05test_B2_4y{{.*}}F : $@convention(thin) (@in P) -> () {
 func test_var_4(p p: P) {
+  // CHECK: bb0([[P:%.*]] : $*P):
+  // CHECK:   [[P_COPY:%.*]] = alloc_stack $P
+  // -- ref(p) == +1
+  // CHECK:   copy_addr [[P]] to [initialization] [[P_COPY]] : $*P
+  // -- ref(p) == +2
   // CHECK:   function_ref @_T010switch_var3fooSiyF
   switch (p, foo()) {
   // CHECK:   [[PAIR:%.*]] = alloc_stack $(P, Int)
-  // CHECK:   store
-  // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
-  // CHECK:   [[T0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 1
-  // CHECK:   [[PAIR_1:%.*]] = load [trivial] [[T0]] : $*Int
-  // CHECK:   [[TMP:%.*]] = alloc_stack $X
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[PAIR_0]] : $*P to X in [[TMP]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
-
+  // CHECK:   [[LEFT:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
+  // CHECK:   copy_addr [take] [[P_COPY]] to [initialization] [[LEFT]] : $*P
+  // CHECK:   [[RIGHT:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 1
+  // CHECK:   store {{.*}} to [trivial] [[RIGHT]]
+  // CHECK:   [[LEFT_2:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
+  // CHECK:   [[P_COPY_2:%.*]] = alloc_stack $P
+  // CHECK:   copy_addr [[LEFT_2]] to [initialization] [[P_COPY_2]] : $*P
+  // -- ref(p) == +3
+  // CHECK:   [[RIGHT:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 1
+  // CHECK:   [[RIGHT_VALUE:%.*]] = load [trivial] [[RIGHT]] : $*Int
+  // CHECK:   [[X_BOX:%.*]] = alloc_stack $X
+  // CHECK:   checked_cast_addr_br copy_on_success P in [[P_COPY_2]] : $*P to X in [[X_BOX]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  //
   // CHECK: [[IS_X]]:
-  // CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*X
+  // CHECK:   [[T0:%.*]] = load [trivial] [[X_BOX]] : $*X
   // CHECK:   [[XADDR:%.*]] = alloc_box ${ var Int }
   // CHECK:   [[X:%.*]] = project_box [[XADDR]]
-  // CHECK:   store [[PAIR_1]] to [trivial] [[X]]
+  // CHECK:   store [[RIGHT_VALUE]] to [trivial] [[X]]
   // CHECK:   function_ref @_T010switch_var6runcedSbSi1x_tF
   // CHECK:   load [trivial] [[X]]
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   case (is X, var x) where runced(x: x):
+  //
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_T010switch_var1aySi1x_tF
   // CHECK:   destroy_value [[XADDR]]
-  // CHECK:   dealloc_stack [[TMP]]
-  // CHECK:   destroy_addr [[PAIR_0]] : $*P
+  // CHECK:   dealloc_stack [[X_BOX]]
+  // CHECK:   destroy_addr [[P_COPY_2]] : $*P
+  // -- ref(p) == +2
+  // CHECK:   dealloc_stack [[P_COPY_2]]
+  // CHECK:   destroy_addr [[PAIR]]
+  // -- ref(p) == +1
   // CHECK:   dealloc_stack [[PAIR]]
+  // CHECK:   dealloc_stack [[P_COPY]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
 
   // CHECK: [[NO_CASE1]]:
   // CHECK:   destroy_value [[XADDR]]
-  // CHECK:   dealloc_stack [[TMP]]
+  // CHECK:   dealloc_stack [[X_BOX]]
   // CHECK:   br [[NEXT:bb[0-9]+]]
+
   // CHECK: [[IS_NOT_X]]:
-  // CHECK:   dealloc_stack [[TMP]]
+  // CHECK:   dealloc_stack [[X_BOX]]
   // CHECK:   br [[NEXT]]
 
   // CHECK: [[NEXT]]:
   // CHECK:   [[TMP:%.*]] = alloc_stack $Y
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[PAIR_0]] : $*P to Y in [[TMP]] : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success P in [[P_COPY_2]] : $*P to Y in [[TMP]] : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
   // CHECK: [[IS_Y]]:
   // CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*Y
-  // CHECK:   [[YADDR:%.*]] = alloc_box ${ var Int }
+  // CHECK:   [[YADDR:%.*]] = alloc_box ${ var Int }, var, name "y"
   // CHECK:   [[Y:%.*]] = project_box [[YADDR]]
-  // CHECK:   store [[PAIR_1]] to [trivial] [[Y]]
+  // CHECK:   store [[RIGHT_VALUE]] to [trivial] [[Y]]
   // CHECK:   function_ref @_T010switch_var6fungedSbSi1x_tF
   // CHECK:   load [trivial] [[Y]]
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
@@ -237,47 +255,75 @@ func test_var_4(p p: P) {
   // CHECK:   load [trivial] [[Y]]
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   dealloc_stack [[TMP]]
-  // CHECK:   destroy_addr [[PAIR_0]] : $*P
+  // CHECK:   destroy_addr [[P_COPY_2]] : $*P
+  // -- ref(p) == +2
+  // CHECK:   dealloc_stack [[P_COPY_2]]
+  // CHECK:   destroy_addr [[PAIR]]
+  // -- ref(p) == +1
   // CHECK:   dealloc_stack [[PAIR]]
+  // CHECK:   dealloc_stack [[P_COPY]]
   // CHECK:   br [[CONT]]
     b(x: y)
 
   // CHECK: [[NO_CASE2]]:
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   dealloc_stack [[TMP]]
+  // CHECK:   destroy_addr [[P_COPY_2]]
+  // -- ref(p) == +2
+  // CHECK:   dealloc_stack [[P_COPY_2]]
   // CHECK:   br [[NEXT:bb[0-9]+]]
+
   // CHECK: [[IS_NOT_Y]]:
   // CHECK:   dealloc_stack [[TMP]]
+  // CHECK:   destroy_addr [[P_COPY_2]]
+  // -- ref(p) == +2
+  // CHECK:   dealloc_stack [[P_COPY_2]]
   // CHECK:   br [[NEXT]]
 
   // CHECK: [[NEXT]]:
-  // CHECK:   [[ZADDR:%.*]] = alloc_box ${ var (P, Int) }
+  // CHECK:   [[ZADDR:%.*]] = alloc_box ${ var (P, Int) }, var, name "z"
   // CHECK:   [[Z:%.*]] = project_box [[ZADDR]]
+  // CHECK:   [[P_LEFT:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
+  // CHECK:   [[Z_LEFT:%.*]] = tuple_element_addr [[Z]] : $*(P, Int), 0
+  // CHECK:   [[Z_RIGHT:%.*]] = tuple_element_addr [[Z]] : $*(P, Int), 1
+  // CHECK:   copy_addr [[P_LEFT]] to [initialization] [[Z_LEFT]]
+  // -- ref(p) == +3
+  // CHECK:   store {{.*}} to [trivial] [[Z_RIGHT]]
   // CHECK:   function_ref @_T010switch_var5ansedSbSi1x_tF
-  // CHECK:   tuple_element_addr [[Z]] : {{.*}}, 1
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[DFLT_NO_CASE3:bb[0-9]+]]
   case var z where ansed(x: z.1):
+
   // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_T010switch_var1cySi1x_tF
   // CHECK:   tuple_element_addr [[Z]] : {{.*}}, 1
-  // CHECK:   destroy_value [[ZADDR]]
+  // CHECK:   destroy_addr [[P_LEFT]]
+  // -- ref(p) == +2
+  // CHECK-NEXT: destroy_value [[ZADDR]]
+  // -- ref(p) == +1
   // CHECK-NEXT: dealloc_stack [[PAIR]]
+  // CHECK-NEXT: dealloc_stack [[P_COPY]]
   // CHECK:   br [[CONT]]
     c(x: z.1)
 
   // CHECK: [[DFLT_NO_CASE3]]:
+  // CHECK:   destroy_addr [[P_LEFT]]
+  // -- ref(p) == +2
   // CHECK:   destroy_value [[ZADDR]]
+  // -- ref(p) == +1
   // CHECK:   br [[CASE4:bb[0-9]+]]
+
   case (_, var w):
   // CHECK: [[CASE4]]:
   // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
-  // CHECK:   [[WADDR:%.*]] = alloc_box ${ var Int }
+  // CHECK:   [[WADDR:%.*]] = alloc_box ${ var Int }, var, name "w"
   // CHECK:   [[W:%.*]] = project_box [[WADDR]]
   // CHECK:   function_ref @_T010switch_var1dySi1x_tF
   // CHECK:   load [trivial] [[W]]
   // CHECK:   destroy_value [[WADDR]]
-  // CHECK:   destroy_addr [[PAIR_0]] : $*P
+  // CHECK:   destroy_addr [[PAIR]]
+  // -- ref(p) == +1
   // CHECK:   dealloc_stack [[PAIR]]
+  // CHECK:   dealloc_stack [[P_COPY]]
   // CHECK:   br [[CONT]]
     d(x: w)
   }

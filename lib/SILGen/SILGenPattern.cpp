@@ -1375,27 +1375,33 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
   SILLocation loc = firstPat;
 
-  SILValue v = src.getFinalManagedValue().forward(SGF);
+  ManagedValue v = src.getFinalManagedValue();
   SmallVector<ConsumableManagedValue, 4> destructured;
 
-  // Break down the values.
-  auto tupleSILTy = v->getType();
+  // Break down the values. We copy the tuple element addr always instead of
+  // taking so that we eliminate the need for unforwarding.
+  auto tupleSILTy = v.getType();
   for (unsigned i = 0, e = sourceType->getNumElements(); i < e; ++i) {
     SILType fieldTy = tupleSILTy.getTupleElementType(i);
     auto &fieldTL = SGF.getTypeLowering(fieldTy);
 
-    SILValue member;
     if (tupleSILTy.isAddress()) {
-      member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
-      if (!fieldTL.isAddressOnly())
-        member =
-            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
+      destructured.emplace_back(
+          SGF.B.loadCopySemanticTupleElementRValue(loc, v, i, fieldTy),
+          CastConsumptionKind::TakeAlways);
     } else {
-      member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
+      // Since we do not have a take, we need to do a borrow-copy-dance here.
+      SILValue member;
+      {
+        FullExpr borrowCopyForwardScope(SGF.Cleanups, CleanupLocation::get(loc));
+        ManagedValue copiedTupleElt = SGF.B.createCopyValue(
+            loc, SGF.B.createTupleExtract(loc, v, i, fieldTy));
+        member = copiedTupleElt.forward(SGF);
+      }
+      destructured.push_back(
+          {SGF.emitManagedRValueWithCleanup(member),
+           CastConsumptionKind::TakeAlways});
     }
-    auto memberCMV = getManagedSubobject(SGF, member, fieldTL,
-                                         src.getFinalConsumption());
-    destructured.push_back(memberCMV);
   }
 
   // Construct the specialized rows.
@@ -1410,18 +1416,8 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     }
   }
 
-  // Maybe revert to the original cleanups during failure branches.
-  const FailureHandler *innerFailure = &outerFailure;
-  FailureHandler specializedFailure = [&](SILLocation loc) {
-    ArgUnforwarder unforwarder(SGF);
-    unforwarder.unforwardBorrowedValues(src, destructured);
-    outerFailure(loc);
-  };
-  if (ArgUnforwarder::requiresUnforwarding(src))
-    innerFailure = &specializedFailure;
-
   // Recurse.
-  handleCase(destructured, specializedRows, *innerFailure);
+  handleCase(destructured, specializedRows, outerFailure);
 }
 
 static CanType getTargetType(const RowToSpecialize &row) {

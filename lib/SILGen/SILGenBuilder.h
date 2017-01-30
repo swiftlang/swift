@@ -112,11 +112,10 @@ public:
   //
 
   using SILBuilder::createStructExtract;
-  using SILBuilder::createCopyValue;
-  using SILBuilder::createCopyUnownedValue;
   ManagedValue createStructExtract(SILLocation loc, ManagedValue base,
                                    VarDecl *decl);
 
+  using SILBuilder::createCopyValue;
   /// Emit a +1 copy on \p originalValue that lives until the end of the current
   /// lexical scope.
   ManagedValue createCopyValue(SILLocation loc, ManagedValue originalValue);
@@ -127,6 +126,14 @@ public:
   /// This reuses a passed in lowering.
   ManagedValue createCopyValue(SILLocation loc, ManagedValue originalValue,
                                const TypeLowering &lowering);
+
+  using SILBuilder::createCopyAddr;
+  /// Emit a +1 copy of \p originalValue into newAddr that lives until the end
+  /// of the current Lexical Evaluation Scope.
+  ManagedValue createCopyAddr(SILLocation loc,
+                              ManagedValue originalAddr,
+                              SILValue newAddr, IsTake_t isTake,
+                              IsInitialization_t isInit);
 
   /// Emit a +1 copy of \p originalValue into newAddr that lives until the end
   /// of the current Formal Evaluation Scope.
@@ -140,6 +147,7 @@ public:
   ManagedValue createFormalAccessCopyValue(SILLocation loc,
                                            ManagedValue originalValue);
 
+  using SILBuilder::createCopyUnownedValue;
   ManagedValue createCopyUnownedValue(SILLocation loc,
                                       ManagedValue originalValue);
 
@@ -211,6 +219,15 @@ public:
   ManagedValue formalAccessBufferForExpr(
       SILLocation loc, SILType ty, const TypeLowering &lowering,
       SGFContext context, std::function<void(SILValue)> rvalueEmitter);
+
+  using SILBuilder::createTupleElementAddr;
+
+  /// Perform a "semantic load copy" of a tuple rvalue.
+  ///
+  /// This means for an address only type, copying into a temporary value.
+  ManagedValue loadCopySemanticTupleElementRValue(SILLocation loc,
+                                                  ManagedValue addr,
+                                                  unsigned i, SILType fieldTy);
 };
 
 } // namespace Lowering
