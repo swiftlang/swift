@@ -119,6 +119,10 @@ def autolink_library : Separate<["-"], "autolink-library">,
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
+def disable_serialization_nested_type_lookup_table :
+  Flag<["-"], "disable-serialization-nested-type-lookup-table">,
+  HelpText<"Force module merging to use regular lookups to find nested types">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;

@@ -377,6 +377,50 @@ public:
   }
 };
 
+class ModuleFile::NestedTypeDeclsTableInfo {
+public:
+  using internal_key_type = StringRef;
+  using external_key_type = Identifier;
+  using data_type = SmallVector<std::pair<DeclID, DeclID>, 4>;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type ID) {
+    return ID.str();
+  }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    return llvm::HashString(key);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    return { keyLength, dataLength };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return StringRef(reinterpret_cast<const char *>(data), length);
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    data_type result;
+    while (length > 0) {
+      DeclID parentID = endian::readNext<uint32_t, little, unaligned>(data);
+      DeclID childID = endian::readNext<uint32_t, little, unaligned>(data);
+      result.push_back({ parentID, childID });
+      length -= sizeof(uint32_t) * 2;
+    }
+
+    return result;
+  }
+};
+
 std::unique_ptr<ModuleFile::SerializedDeclTable>
 ModuleFile::readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   uint32_t tableOffset;
@@ -397,6 +441,18 @@ ModuleFile::readLocalDeclTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   using OwnedTable = std::unique_ptr<SerializedLocalDeclTable>;
   return OwnedTable(SerializedLocalDeclTable::Create(base + tableOffset,
     base + sizeof(uint32_t), base));
+}
+
+std::unique_ptr<ModuleFile::SerializedNestedTypeDeclsTable>
+ModuleFile::readNestedTypeDeclsTable(ArrayRef<uint64_t> fields,
+                                     StringRef blobData) {
+  uint32_t tableOffset;
+  index_block::NestedTypeDeclsLayout::readRecord(fields, tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  using OwnedTable = std::unique_ptr<SerializedNestedTypeDeclsTable>;
+  return OwnedTable(SerializedNestedTypeDeclsTable::Create(base + tableOffset,
+      base + sizeof(uint32_t), base));
 }
 
 /// Used to deserialize entries in the on-disk Objective-C method table.
@@ -530,6 +586,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::LOCAL_TYPE_DECLS:
         LocalTypeDecls = readLocalDeclTable(scratch, blobData);
+        break;
+      case index_block::NESTED_TYPE_DECLS:
+        NestedTypeDecls = readNestedTypeDeclsTable(scratch, blobData);
         break;
       case index_block::LOCAL_DECL_CONTEXT_OFFSETS:
         assert(blobData.empty());
@@ -1192,6 +1251,31 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
     return nullptr;
 
   return cast<TypeDecl>(getDecl((*iter).first));
+}
+
+TypeDecl *ModuleFile::lookupNestedType(Identifier name,
+                                       const ValueDecl *parent) {
+  PrettyModuleFileDeserialization stackEntry(*this);
+
+  if (!NestedTypeDecls)
+    return nullptr;
+
+  auto iter = NestedTypeDecls->find(name);
+  if (iter == NestedTypeDecls->end())
+    return nullptr;
+
+  auto data = *iter;
+  for (std::pair<DeclID, DeclID> entry : data) {
+    assert(entry.first);
+    auto declOrOffset = Decls[entry.first - 1];
+    if (!declOrOffset.isComplete())
+      continue;
+    if (declOrOffset != parent)
+      continue;
+    return cast<TypeDecl>(getDecl(entry.second));
+  }
+
+  return nullptr;
 }
 
 OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {

@@ -22,7 +22,16 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/BCReadingExtras.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
+
+#define DEBUG_TYPE "Serialization"
+
+STATISTIC(NumMemberListsLoaded,
+          "# of nominals/extensions whose members were loaded");
+STATISTIC(NumNestedTypeShortcuts,
+          "# of same-module nested types resolved without lookup");
 
 using namespace swift;
 using namespace swift::serialization;
@@ -223,6 +232,10 @@ namespace {
 
     void addUnknown(uintptr_t kind) {
       path.push_back({ PathPiece::Kind::Unknown, kind });
+    }
+
+    void removeLast() {
+      path.pop_back();
     }
 
     void print(raw_ostream &os) const override {
@@ -1408,7 +1421,61 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
                                                   &blobData);
     switch (recordID) {
-    case XREF_TYPE_PATH_PIECE:
+    case XREF_TYPE_PATH_PIECE: {
+      if (values.size() == 1) {
+        ModuleDecl *module = values.front()->getModuleContext();
+        if (module == this->getAssociatedModule()) {
+          // Fast path for nested types in the same module.
+          IdentifierID IID;
+          bool onlyInNominal = false;
+          XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
+          Identifier memberName = getIdentifier(IID);
+          pathTrace.addValue(memberName);
+
+          llvm::PrettyStackTraceString message{
+              "If you're seeing a crash here, try passing "
+              "-Xfrontend -disable-serialization-nested-type-lookup-table"};
+
+          TypeDecl *nestedType = nullptr;
+          if (onlyInNominal) {
+            // Only look in the file containing the type itself.
+            const DeclContext *dc = values.front()->getDeclContext();
+            auto *serializedFile =
+                dyn_cast<SerializedASTFile>(dc->getModuleScopeContext());
+            if (serializedFile) {
+              nestedType =
+                  serializedFile->File.lookupNestedType(memberName,
+                                                        values.front());
+            }
+          } else {
+            // Fault in extensions, then ask every serialized AST in the module.
+            (void)cast<NominalTypeDecl>(values.front())->getExtensions();
+            for (FileUnit *file : module->getFiles()) {
+              if (file == getFile())
+                continue;
+              auto *serializedFile = dyn_cast<SerializedASTFile>(file);
+              if (!serializedFile)
+                continue;
+              nestedType =
+                  serializedFile->File.lookupNestedType(memberName,
+                                                        values.front());
+              if (nestedType)
+                break;
+            }
+          }
+
+          if (nestedType) {
+            values.clear();
+            values.push_back(nestedType);
+            ++NumNestedTypeShortcuts;
+            break;
+          }
+
+          pathTrace.removeLast();
+        }
+      }
+      SWIFT_FALLTHROUGH;
+    }
     case XREF_VALUE_PATH_PIECE:
     case XREF_INITIALIZER_PATH_PIECE: {
       TypeID TID = 0;
@@ -4198,6 +4265,7 @@ Type ModuleFile::getType(TypeID TID) {
 
 void ModuleFile::loadAllMembers(Decl *D, uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", D);
+  ++NumMemberListsLoaded;
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(contextData);

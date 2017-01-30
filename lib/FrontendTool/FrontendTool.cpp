@@ -666,6 +666,8 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
       serializationOpts.ModuleLinkName = opts.ModuleLinkName;
       serializationOpts.ExtraClangOptions =
           Invocation.getClangImporterOptions().ExtraArgs;
+      serializationOpts.EnableNestedTypeLookupTable =
+          opts.EnableSerializationNestedTypeLookupTable;
       if (!IRGenOpts.ForceLoadSymbolName.empty())
         serializationOpts.AutolinkForceLoad = true;
 
