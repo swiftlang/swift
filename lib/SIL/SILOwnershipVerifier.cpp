@@ -318,7 +318,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, TupleElementAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UncheckedAddrCast)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UncheckedRefCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UncheckedTakeEnumDataAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, false, UncheckedTrivialBitCast)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UnconditionalCheckedCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UnmanagedToRef)
 CONSTANT_OWNERSHIP_INST(Trivial, false, AllocValueBuffer)
@@ -361,6 +360,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(ProjectBox)           // The result is a T*.
 ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedRetainValue)
 ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedReleaseValue)
 ACCEPTS_ANY_OWNERSHIP_INST(DynamicMethodBranch)
+ACCEPTS_ANY_OWNERSHIP_INST(UncheckedTrivialBitCast)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
