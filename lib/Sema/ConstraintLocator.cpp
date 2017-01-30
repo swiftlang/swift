@@ -70,7 +70,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ScalarToTuple:
     case Load:
     case GenericArgument:
-    case InterpolationArgument:
     case NamedTupleElement:
     case TupleElement:
     case ApplyArgToParam:
@@ -162,10 +161,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case InstanceType:
       out << "instance type";
-      break;
-
-    case InterpolationArgument:
-      out << "interpolation argument #" << llvm::utostr(elt.getValue());
       break;
 
     case Load:
