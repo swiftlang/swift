@@ -163,7 +163,7 @@ public:
   bool isAddressOrTrivialType() const {
     if (getType().isAddress())
       return true;
-    return getType().isTrivial(Mod);
+    return getOwnershipKind() == ValueOwnershipKind::Trivial;
   }
 
   OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I,
