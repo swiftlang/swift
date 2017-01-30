@@ -223,22 +223,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
-    case ConstraintLocator::InterpolationArgument:
-      if (auto interp = dyn_cast<InterpolatedStringLiteralExpr>(anchor)) {
-        unsigned index = path[0].getValue();
-        if (index < interp->getSegments().size()) {
-          // No additional target locator information.
-          // FIXME: Dig out the constructor we're trying to call?
-          targetAnchor = nullptr;
-          targetPath.clear();
-
-          anchor = interp->getSegments()[index];
-          path = path.slice(1);
-          continue;
-        }
-      }
-      break;
-
     case ConstraintLocator::SubscriptIndex:
       if (auto subscript = dyn_cast<SubscriptExpr>(anchor)) {
         targetAnchor = subscript->getBase();
