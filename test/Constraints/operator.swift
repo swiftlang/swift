@@ -6,7 +6,7 @@ do {
   let a: String? = "a"
   let b: String? = "b"
   let c: String? = "c"
-  let d: String? = a! + b! + c!
+  let _: String? = a! + b! + c!
 
   let x: Double = 1
   _ = x + x + x

@@ -98,6 +98,9 @@ func testKeyPath(a: A, b: B) {
   // Nested type of a bridged type (rdar://problem/28061409).
   typealias IntArray = [Int]
   let _: String = #keyPath(IntArray.Foo.propString)
+
+  let dict: [String: Int] = [:]
+  let _: Int? = dict[#keyPath(A.propB)]
 }
 
 func testAsStaticString() {
