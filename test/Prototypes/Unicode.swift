@@ -317,7 +317,7 @@ protocol _UTextable {
   func _mapNativeIndexToUTF16(_ u: UText, _ nativeIndex: Int64) -> Int32
 }
 
-protocol UnicodeStorage : _UTextable {
+protocol Unicode : _UTextable {
   associatedtype Encoding: UnicodeEncoding
   associatedtype CodeUnits: RandomAccessCollection
   /* where CodeUnits.Iterator.Element == Encoding.CodeUnit */
@@ -375,7 +375,7 @@ extension UText {
   }
 }
 
-extension UnicodeStorage
+extension Unicode
 where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   CodeUnits.SubSequence : BidirectionalCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
@@ -530,7 +530,7 @@ extension Optional where Wrapped == UnsafePointer<UText> {
   }
 }
 
-extension UnicodeStorage {
+extension Unicode {
   func withUText<R>(_ body: (UnsafePointer<UText>)->R) -> R {
 
     var copy: _UTextable = self
@@ -614,7 +614,7 @@ extension UnicodeStorage {
   }
 }
 
-struct Latin1Storage<Base : RandomAccessCollection> : UnicodeStorage
+struct Latin1String<Base : RandomAccessCollection> : Unicode
 where Base.Iterator.Element == UInt8, Base.Index == Base.SubSequence.Index,
 Base.SubSequence.SubSequence == Base.SubSequence,
 Base.Iterator.Element == UInt8,
@@ -717,19 +717,19 @@ t.test("basic") {
   do {
     // We happen to know that alphabet is non-ASCII, but we're not going to say
     // anything about that.
-    let alphabet = Latin1Storage(s8.prefix(27))
+    let alphabet = Latin1String(s8.prefix(27))
     expectTrue(alphabet.isASCII())
     expectFalse(alphabet.isASCII(scan: false))
     
     // We know that if you interpret s8 as Latin1, it has a lot of non-ASCII
-    let nonASCII = Latin1Storage(s8) 
+    let nonASCII = Latin1String(s8) 
     expectFalse(nonASCII.isASCII(scan: true))
     expectFalse(nonASCII.isASCII(scan: false))
   }
 
   do {
-    let alphabet = Latin1Storage(s8.prefix(27), isASCII: true)
-    let nonASCII = Latin1Storage(s8, isASCII: false)
+    let alphabet = Latin1String(s8.prefix(27), isASCII: true)
+    let nonASCII = Latin1String(s8, isASCII: false)
     expectTrue(alphabet.isASCII())
     expectTrue(alphabet.isASCII(scan: false))
     expectFalse(nonASCII.isASCII(scan: true))
