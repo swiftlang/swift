@@ -358,8 +358,6 @@ ACCEPTS_ANY_OWNERSHIP_INST(FixLifetime)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedBitwiseCast) // Is this right?
 ACCEPTS_ANY_OWNERSHIP_INST(WitnessMethod)        // Is this right?
 ACCEPTS_ANY_OWNERSHIP_INST(ProjectBox)           // The result is a T*.
-ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedRetainValue)
-ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedReleaseValue)
 ACCEPTS_ANY_OWNERSHIP_INST(DynamicMethodBranch)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedTrivialBitCast)
 ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
@@ -392,6 +390,9 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, StrongPin)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, UnownedToRef)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyUnownedValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ProjectExistentialBox)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, UnmanagedRetainValue)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, UnmanagedReleaseValue)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, UnmanagedAutoreleaseValue)
 #undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP
 
 OwnershipUseCheckerResult

@@ -897,6 +897,9 @@ public:
   void visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *i) {
     llvm_unreachable("unimplemented");
   }
+  void visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitMarkDependenceInst(MarkDependenceInst *i);
   void visitCopyBlockInst(CopyBlockInst *i);
   void visitStrongPinInst(StrongPinInst *i);
