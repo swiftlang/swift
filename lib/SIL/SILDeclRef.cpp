@@ -499,8 +499,15 @@ bool SILDeclRef::isFragile() const {
   DeclContext *dc;
   if (auto closure = getAbstractClosureExpr())
     dc = closure->getLocalContext();
-  else
+  else {
     dc = getDecl()->getInnermostDeclContext();
+
+    // Enum case constructors are serialized if the enum is @_versioned
+    // or public.
+    if (isEnumElement())
+      if (cast<EnumDecl>(dc)->getEffectiveAccess() >= Accessibility::Public)
+        return true;
+  }
 
   // This is stupid
   return (dc->getResilienceExpansion() == ResilienceExpansion::Minimal);
