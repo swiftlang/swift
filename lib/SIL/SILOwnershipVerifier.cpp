@@ -361,6 +361,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedRetainValue)
 ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedReleaseValue)
 ACCEPTS_ANY_OWNERSHIP_INST(DynamicMethodBranch)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedTrivialBitCast)
+ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
@@ -380,7 +381,6 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, BridgeObjectToWord)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ClassMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, DynamicMethod)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ExistentialMetatype)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBox)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(
     false, RefElementAddr) // TODO: Make this accept a borrowed value.
