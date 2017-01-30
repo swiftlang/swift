@@ -438,11 +438,6 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isEnumElement())
     return SILLinkage::Shared;
 
-  // Stored property initializers have hidden linkage, since they are
-  // not meant to be used from outside of their module.
-  if (isStoredPropertyInitializer())
-    return (forDefinition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
-
   // Declarations imported from Clang modules have shared linkage.
   const SILLinkage ClangLinkage = SILLinkage::Shared;
 
@@ -499,8 +494,15 @@ bool SILDeclRef::isFragile() const {
   DeclContext *dc;
   if (auto closure = getAbstractClosureExpr())
     dc = closure->getLocalContext();
-  else
+  else {
     dc = getDecl()->getInnermostDeclContext();
+
+    // Enum case constructors are serialized if the enum is @_versioned
+    // or public.
+    if (isEnumElement())
+      if (cast<EnumDecl>(dc)->getEffectiveAccess() >= Accessibility::Public)
+        return true;
+  }
 
   // This is stupid
   return (dc->getResilienceExpansion() == ResilienceExpansion::Minimal);
