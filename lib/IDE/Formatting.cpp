@@ -420,7 +420,7 @@ public:
       } else if (auto *Seq = dyn_cast_or_null<SequenceExpr>(Cursor->getAsExpr())) {
         ArrayRef<Expr*> Elements = Seq->getElements();
         if (Elements.size() == 3 &&
-            Elements[1]->getKind() == ExprKind::Assign &&
+            isa<AssignExpr>(Elements[1]) &&
             SM.getLineAndColumn(Elements[2]->getEndLoc()).first == Line) {
               return false;
         }

@@ -54,9 +54,9 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
   cacheResult(Ty, true);
 
   // Trivial value types.
-  if (Ty->getKind() == TypeKind::BuiltinInteger)
+  if (Ty->is<BuiltinIntegerType>())
     return cacheResult(Ty, true);
-  if (Ty->getKind() == TypeKind::BuiltinFloat)
+  if (Ty->is<BuiltinFloatType>())
     return cacheResult(Ty, true);
 
   // A struct is safe if

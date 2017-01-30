@@ -913,8 +913,8 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
                                                                 Type ExpectedTy,
                                                                 DeclContext *DC) {
   if (Ty.isNull() || ExpectedTy.isNull() ||
-      Ty->getKind() == TypeKind::Error ||
-      ExpectedTy->getKind() == TypeKind::Error)
+      Ty->is<ErrorType>() ||
+      ExpectedTy->is<ErrorType>())
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   if (Ty->isEqual(ExpectedTy))
     return CodeCompletionResult::ExpectedTypeRelation::Identical;
@@ -2833,7 +2833,7 @@ public:
           Optional<Type> Result = None;
           if (auto AT = MT->getInstanceType()) {
             if (!CD->getInterfaceType()->is<ErrorType>() &&
-                AT->getKind() == TypeKind::NameAlias &&
+                isa<NameAliasType>(AT.getPointer()) &&
                 AT->getDesugaredType() ==
                     CD->getResultInterfaceType().getPointer())
               Result = AT;
@@ -3658,9 +3658,9 @@ public:
     }
 
     void unboxType(Type T) {
-      if (T->getKind() == TypeKind::Paren) {
+      if (isa<ParenType>(T.getPointer())) {
         unboxType(T->getDesugaredType());
-      } else if (T->getKind() == TypeKind::Tuple) {
+      } else if (T->is<TupleType>()) {
         for (auto Ele : T->getAs<TupleType>()->getElements()) {
           unboxType(Ele.getType());
         }
@@ -3838,7 +3838,7 @@ public:
                                       DeclContext *DC) {
     for (auto It = PossibleArgTypes.begin(); It != PossibleArgTypes.end(); ) {
       llvm::SmallVector<Type, 3> ExpectedTypes;
-      if ((*It)->getKind() == TypeKind::Tuple) {
+      if (isa<TupleType>((*It).getPointer())) {
         auto Elements = (*It)->getAs<TupleType>()->getElements();
         for (auto Ele : Elements)
           ExpectedTypes.push_back(Ele.getType());
@@ -3874,7 +3874,7 @@ public:
         removeUnlikelyOverloads(PossibleTypes, TupleEleTypesBeforeTarget, &DC);
         return !PossibleTypes.empty();
       }
-    } else if (CallE->getArg()->getKind() == ExprKind::Paren) {
+    } else if (isa<ParenExpr>(CallE->getArg())) {
       Position = 0;
       HasName = false;
       if (PossibleTypes.empty() &&
@@ -4230,7 +4230,7 @@ public:
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
-      if (D->getKind() == DeclKind::TypeAlias) {
+      if (isa<TypeAliasDecl>(D)) {
         ValueDecl *VD = dyn_cast<ValueDecl>(D);
         SatisfiedAssociatedTypes.insert(VD->getName().str());
       }

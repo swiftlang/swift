@@ -3278,9 +3278,13 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto RealType = SILTy.getSwiftType();
   // Unwrap implicitly indirect types and types that are passed by
   // reference only at the SIL level and below.
+  //
+  // FIXME: Should this check if the lowered SILType is address only
+  // instead? Otherwise optionals of archetypes etc will still have
+  // 'Unwrap' set to false.
   bool Unwrap =
       i->getVarInfo().Constant ||
-      RealType->getLValueOrInOutObjectType()->getKind() == TypeKind::Archetype;
+      RealType->getLValueOrInOutObjectType()->is<ArchetypeType>();
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       CurSILFn->getDeclContext(), Decl, RealType,
       getTypeInfo(SILVal->getType()), Unwrap);

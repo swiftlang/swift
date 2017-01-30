@@ -514,7 +514,7 @@ static bool FindFirstNamedDeclWithKind(
       // If we didn't find any exact matches, accept any type aliases
       if (check_type_aliases) {
         for (auto decl : decls) {
-          if (decl->getKind() == DeclKind::TypeAlias) {
+          if (isa<TypeAliasDecl>(decl)) {
             result._decls.assign(1, decl);
             if (decl->hasInterfaceType()) {
               result._types.assign(1, decl->getInterfaceType());
