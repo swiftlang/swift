@@ -1,4 +1,4 @@
-//===--- StringInterpolation.swift.gyb - String Interpolation -*- swift -*-===//
+//===--- StringInterpolation.swift - String Interpolation -----*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,30 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-%{
-
-from SwiftIntTypes import all_integer_types
-
-# Number of bits in the Builtin.Word type
-word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
-
-StreamableTypes = [
-    'String',
-    'Character',
-    'UnicodeScalar',
-  ]
-
-PrintableTypes = [
-    'Bool',
-    'Float32',
-    'Float64'
-  ]
-
-for int_ty in all_integer_types(word_bits):
-    PrintableTypes.append(int_ty.stdlib_name)
-
-}%
 
 extension String : _ExpressibleByStringInterpolation {
   /// Creates a new string by concatenating the given interpolations.
@@ -98,7 +74,3 @@ extension String : _ExpressibleByStringInterpolation {
     self = _toStringReadOnlyStreamable(expr)
   }
 }
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:
