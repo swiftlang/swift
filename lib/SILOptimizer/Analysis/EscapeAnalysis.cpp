@@ -1023,7 +1023,7 @@ static bool isOrContainsReference(SILType Ty, SILModule *Mod) {
   }
   if (auto En = Ty.getEnumOrBoundGenericEnum()) {
     for (auto *ElemDecl : En->getAllElements()) {
-      if (ElemDecl->hasArgumentType() &&
+      if (ElemDecl->getArgumentInterfaceType() &&
           isOrContainsReference(Ty.getEnumElementType(ElemDecl, *Mod), Mod))
         return true;
     }

@@ -258,7 +258,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
   } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
     assert(kind == Kind::EnumElement
            && "can only create EnumElement SILDeclRef for enum element");
-    naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
+    naturalUncurryLevel = ed->getArgumentInterfaceType() ? 1 : 0;
   } else if (isa<DestructorDecl>(vd)) {
     assert((kind == Kind::Destroyer || kind == Kind::Deallocator)
            && "can only create destroyer/deallocator SILDeclRef for dtor");
@@ -315,7 +315,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
     else if (EnumElementDecl *ed = dyn_cast<EnumElementDecl>(vd)) {
       loc = ed;
       kind = Kind::EnumElement;
-      naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
+      naturalUncurryLevel = ed->getArgumentInterfaceType() ? 1 : 0;
     }
     // VarDecl constants require an explicit kind.
     else if (isa<VarDecl>(vd)) {

@@ -1434,10 +1434,9 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     // If there is a subpattern, push the enum element type down onto it.
     if (EEP->hasSubPattern()) {
       Type elementType;
-      if (elt->hasArgumentType())
+      if (auto argType = elt->getArgumentInterfaceType())
         elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
-                                              elt, this,
-                                              elt->getArgumentInterfaceType());
+                                              elt, this, argType);
       else
         elementType = TupleType::getEmpty(Context);
       Pattern *sub = EEP->getSubPattern();

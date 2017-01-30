@@ -4318,7 +4318,7 @@ namespace {
 
         // Get the payload argument.
         ArgumentSource payload;
-        if (element->hasArgumentType()) {
+        if (element->getArgumentInterfaceType()) {
           assert(uncurriedSites.size() == 2);
           formalResultType = formalType.getResult();
           claimNextParamClause(origFormalType);

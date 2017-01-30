@@ -1244,7 +1244,7 @@ namespace {
       bool trivial = true;
       for (auto elt : D->getAllElements()) {
         // No-payload elements do not affect address-only-ness.
-        if (!elt->hasArgumentType())
+        if (!elt->getArgumentInterfaceType())
           continue;
 
         // Indirect elements make the type nontrivial, but don't affect

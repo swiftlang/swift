@@ -1618,7 +1618,7 @@ public:
 
   void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
     StringRef HasDefault = "";
-    if (D->getKind() == DeclKind::Protocol) {
+    if (isa<ProtocolDecl>(D)) {
       InProtocol = true;
       DefaultImplementationMap.clear();
       ProtocolDecl *PD = const_cast<ProtocolDecl*>(dyn_cast<ProtocolDecl>(D));
@@ -1642,7 +1642,7 @@ public:
     OS << "</loc>";
   }
   void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
-    if (D->getKind() == DeclKind::Protocol) {
+    if (isa<ProtocolDecl>(D)) {
       InProtocol = false;
     }
     OS << "</decl>";
@@ -2235,7 +2235,7 @@ public:
       OS << " ";
       printDocComment(D);
       OS << "\n";
-    } else if (D->getKind() == DeclKind::Extension) {
+    } else if (isa<ExtensionDecl>(D)) {
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);

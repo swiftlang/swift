@@ -321,11 +321,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitEnumElementDecl(EnumElementDecl *ED) {
-    if (ED->hasArgumentType()) {
-      if (auto TR = ED->getArgumentTypeLoc().getTypeRepr()) {
-        if (doIt(TR)) {
-          return true;
-        }
+    if (auto TR = ED->getArgumentTypeLoc().getTypeRepr()) {
+      if (doIt(TR)) {
+        return true;
       }
     }
 
