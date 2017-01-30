@@ -36,3 +36,11 @@ public class MyCls {
 @_inlineable public func referencesMyEnum() {
   _ = MyEnum.c
 }
+
+// CHECK-LABEL: sil [transparent] @_T020inlineable_attribute15HasInitializersV1xSivfi : $@convention(thin) () -> Int
+
+public struct HasInitializers {
+  public let x = 1234
+
+  @_inlineable public init() {}
+}
