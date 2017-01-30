@@ -4702,7 +4702,7 @@ bool EnumElementDecl::computeType() {
   Type selfTy = MetatypeType::get(resultTy);
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
-  if (auto inputTy = getArgumentType()) {
+  if (auto inputTy = getArgumentTypeLoc().getType()) {
     resultTy = FunctionType::get(ED->mapTypeOutOfContext(inputTy), resultTy);
   }
 
@@ -4719,7 +4719,7 @@ bool EnumElementDecl::computeType() {
 }
 
 Type EnumElementDecl::getArgumentInterfaceType() const {
-  if (!hasArgumentType())
+  if (!EnumElementDeclBits.HasArgumentType)
     return nullptr;
 
   auto interfaceType = getInterfaceType();

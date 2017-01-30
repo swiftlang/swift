@@ -2458,16 +2458,18 @@ namespace {
     // using the lowered cases, i.e. the cases for Optional<>.
     if (type->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional) {
       assert(enumElements.size() == 1);
-      auto caseType =
-        IGM.Context.getImplicitlyUnwrappedOptionalSomeDecl()
-           ->getArgumentType()->getCanonicalType();
+      auto decl = IGM.Context.getImplicitlyUnwrappedOptionalSomeDecl();
+      auto caseType = decl->getParentEnum()->mapTypeIntoContext(
+        decl->getArgumentInterfaceType())
+          ->getCanonicalType();
       types.push_back(FieldTypeInfo(caseType, false, false));
       return getFieldTypeAccessorFn(IGM, type, types);
     }
 
     for (auto &elt : enumElements) {
-      assert(elt.decl->hasArgumentType() && "enum case doesn't have arg?!");
-      auto caseType = elt.decl->getArgumentType()->getCanonicalType();
+      auto caseType = elt.decl->getParentEnum()->mapTypeIntoContext(
+        elt.decl->getArgumentInterfaceType())
+          ->getCanonicalType();
       bool isIndirect = elt.decl->isIndirect()
         || elt.decl->getParentEnum()->isIndirect();
       types.push_back(FieldTypeInfo(caseType, isIndirect, /*weak*/ false));

@@ -521,7 +521,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       if (isa<AbstractFunctionDecl>(decl1) || isa<EnumElementDecl>(decl1)) {
         // Nothing to do: these have the curried 'self' already.
         if (auto elt = dyn_cast<EnumElementDecl>(decl1)) {
-          checkKind = elt->hasArgumentType() ? CheckInput : CheckAll;
+          checkKind = elt->getArgumentInterfaceType() ? CheckInput : CheckAll;
         } else {
           checkKind = CheckInput;
         }

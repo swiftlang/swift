@@ -78,25 +78,29 @@ public:
 
   void unwrapLValueOrInOutType() {
     Type = Type->getLValueOrInOutObjectType().getPointer();
-    }
+  }
 
-    // Determine whether this type is an Archetype itself.
-    bool isArchetype() const {
-      return Type->getLValueOrInOutObjectType()->is<ArchetypeType>();
-    }
+  // Determine whether this type is an Archetype itself.
+  bool isArchetype() const {
+    return Type->getLValueOrInOutObjectType()->is<ArchetypeType>();
+  }
 
-    /// LValues, inout args, and Archetypes are implicitly indirect by
-    /// virtue of their DWARF type.
-    bool isImplicitlyIndirect() const {
-      return Type->isLValueType() || isArchetype() ||
-             (Type->getKind() == TypeKind::InOut);
-    }
+  /// LValues, inout args, and Archetypes are implicitly indirect by
+  /// virtue of their DWARF type.
+  //
+  // FIXME: Should this check if the lowered SILType is address only
+  // instead? Otherwise optionals of archetypes etc will still have
+  // 'isImplicitlyIndirect()' return false.
+  bool isImplicitlyIndirect() const {
+    return Type->isLValueType() || isArchetype() ||
+      Type->is<InOutType>();
+  }
 
-    bool isNull() const { return Type == nullptr; }
-    bool operator==(DebugTypeInfo T) const;
-    bool operator!=(DebugTypeInfo T) const;
+  bool isNull() const { return Type == nullptr; }
+  bool operator==(DebugTypeInfo T) const;
+  bool operator!=(DebugTypeInfo T) const;
 
-    void dump() const;
+  void dump() const;
 };
 }
 }

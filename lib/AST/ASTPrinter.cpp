@@ -325,7 +325,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
   std::unique_ptr<ExtensionInfoMap>
   collectSynthesizedExtensionInfo(MergeGroupVector &AllGroups) {
-    if (Target->getKind() == DeclKind::Protocol) {
+    if (isa<ProtocolDecl>(Target)) {
       return collectSynthesizedExtensionInfoForProtocol(AllGroups);
     }
     std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
@@ -553,7 +553,7 @@ void ASTPrinter::callPrintDeclPre(const Decl *D,
                                   Optional<BracketOptions> Bracket) {
   forceNewlines();
 
-  if (SynthesizeTarget && D->getKind() == DeclKind::Extension)
+  if (SynthesizeTarget && isa<ExtensionDecl>(D))
     printSynthesizedExtensionPre(cast<ExtensionDecl>(D), SynthesizeTarget, Bracket);
   else
     printDeclPre(D, Bracket);
@@ -1006,7 +1006,7 @@ public:
     bool Synthesize =
         Options.TransformContext &&
         Options.TransformContext->isPrintingSynthesizedExtension() &&
-        D->getKind() == DeclKind::Extension;
+        isa<ExtensionDecl>(D);
     if (Synthesize)
       Printer.setSynthesizedTarget(Options.TransformContext->getNominal());
 
@@ -2016,7 +2016,7 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
   }
 
   // Respect alias type.
-  if (ExtendedType->getKind() == TypeKind::NameAlias) {
+  if (isa<NameAliasType>(ExtendedType.getPointer())) {
     ExtendedType.print(Printer, Options);
     return;
   }
@@ -2720,10 +2720,9 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
       Printer.printName(elt->getName());
     });
 
-  if (elt->hasArgumentType()) {
-    Type Ty = elt->getArgumentType();
-    if (!Options.SkipPrivateStdlibDecls || !Ty.isPrivateStdlibType())
-      Ty.print(Printer, Options);
+  if (auto argTy = elt->getArgumentInterfaceType()) {
+    if (!Options.SkipPrivateStdlibDecls || !argTy.isPrivateStdlibType())
+      argTy.print(Printer, Options);
   }
 
   auto *raw = elt->getRawValueExpr();

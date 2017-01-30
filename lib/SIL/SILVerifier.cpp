@@ -1511,10 +1511,10 @@ public:
             "EnumInst case must be a case of the result enum type");
     require(UI->getType().isObject(),
             "EnumInst must produce an object");
-    require(UI->hasOperand() == UI->getElement()->hasArgumentType(),
+    require(UI->hasOperand() == !!UI->getElement()->getArgumentInterfaceType(),
             "EnumInst must take an argument iff the element does");
 
-    if (UI->getElement()->hasArgumentType()) {
+    if (UI->getElement()->getArgumentInterfaceType()) {
       require(UI->getOperand()->getType().isObject(),
               "EnumInst operand must be an object");
       SILType caseTy = UI->getType().getEnumElementType(UI->getElement(),
@@ -1529,7 +1529,7 @@ public:
     require(ud, "InitEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "InitEnumDataAddrInst case must be a case of the enum operand type");
-    require(UI->getElement()->hasArgumentType(),
+    require(UI->getElement()->getArgumentInterfaceType(),
             "InitEnumDataAddrInst case must have a data type");
     require(UI->getOperand()->getType().isAddress(),
             "InitEnumDataAddrInst must take an address operand");
@@ -1548,7 +1548,7 @@ public:
     require(ud, "UncheckedEnumData must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedEnumData case must be a case of the enum operand type");
-    require(UI->getElement()->hasArgumentType(),
+    require(UI->getElement()->getArgumentInterfaceType(),
             "UncheckedEnumData case must have a data type");
     require(UI->getOperand()->getType().isObject(),
             "UncheckedEnumData must take an address operand");
@@ -1567,7 +1567,7 @@ public:
     require(ud, "UncheckedTakeEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedTakeEnumDataAddrInst case must be a case of the enum operand type");
-    require(UI->getElement()->hasArgumentType(),
+    require(UI->getElement()->getArgumentInterfaceType(),
             "UncheckedTakeEnumDataAddrInst case must have a data type");
     require(UI->getOperand()->getType().isAddress(),
             "UncheckedTakeEnumDataAddrInst must take an address operand");
@@ -2992,7 +2992,7 @@ public:
 
       // The destination BB can take the argument payload, if any, as a BB
       // arguments, or it can ignore it and take no arguments.
-      if (elt->hasArgumentType()) {
+      if (elt->getArgumentInterfaceType()) {
         require(dest->getArguments().size() == 0 ||
                     dest->getArguments().size() == 1,
                 "switch_enum destination for case w/ args must take 0 or 1 "
