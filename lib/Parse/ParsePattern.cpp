@@ -431,6 +431,13 @@ mapParsedParameters(Parser &parser,
                            param.FirstName, param.FirstNameLoc);
     }
 
+    // Warn when an unlabeled parameter follows a variadic parameter
+    if (ellipsisLoc.isValid() && elements.back()->isVariadic() &&
+        param.FirstName.empty()) {
+      parser.diagnose(param.FirstNameLoc,
+                      diag::unlabeled_parameter_following_variadic_parameter);
+    }
+    
     // If this parameter had an ellipsis, check whether it's the last parameter.
     if (param.EllipsisLoc.isValid()) {
       if (ellipsisLoc.isValid()) {
