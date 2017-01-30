@@ -183,6 +183,10 @@ public:
   using SILBuilder::createUncheckedTakeEnumDataAddr;
   ManagedValue createUncheckedTakeEnumDataAddr(SILLocation loc, ManagedValue operand,
                                                EnumElementDecl *element, SILType ty);
+
+  ManagedValue createLoadTake(SILLocation loc, ManagedValue addr);
+  ManagedValue createLoadTake(SILLocation loc, ManagedValue addr,
+                              const TypeLowering &lowering);
 };
 
 } // namespace Lowering

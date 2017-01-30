@@ -38,8 +38,7 @@ func getDescription(_ o: NSObject) -> String {
 // CHECK: [[NONE_BB]]:
 // CHECK:   unreachable
 //
-// CHECK: [[SOME_BB]]:
-// CHECK:    [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]] : $Optional<String>
+// CHECK: [[SOME_BB]]([[NATIVE:%.*]] : $String):
 // CHECK:    end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:    destroy_value [[ARG]]
 // CHECK:    return [[NATIVE]] 
@@ -77,8 +76,7 @@ func getUppercaseString(_ s: NSString) -> String {
 // CHECK: [[NONE_BB]]:
 // CHECK:   unreachable
 //
-// CHECK: [[SOME_BB]]:
-// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]] : $Optional<String>
+// CHECK: [[SOME_BB]]([[NATIVE:%.*]] : $String):
 // CHECK:   return [[NATIVE]]
 // CHECK: }
 
@@ -264,7 +262,7 @@ func callBar() -> String {
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]]
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NATIVE]]
-// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data {{.*}} : $Optional<String>
+// CHECK:   bb5([[NATIVE:%.*]] : $String):
 // CHECK:   return [[NATIVE]]
 // CHECK: }
 

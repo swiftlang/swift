@@ -102,8 +102,7 @@ class F: D {
 // CHECK:   apply [[DIAGNOSE_UNREACHABLE_FUNC]]
 // CHECK:   unreachable
 
-// CHECK: [[SOME_BB]]:
-// CHECK:   [[UNWRAP_Y:%.*]] = unchecked_enum_data [[Y]]
+// CHECK: [[SOME_BB]]([[UNWRAP_Y:%.*]] : $B):
 // CHECK:   [[THUNK_FUNC:%.*]] = function_ref @_T013vtable_thunks1DC3iuo{{.*}}
 // CHECK:   [[RES:%.*]] = apply [[THUNK_FUNC]]([[WRAP_X]], [[UNWRAP_Y]], [[Z]], [[W]])
 // CHECK:   [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]

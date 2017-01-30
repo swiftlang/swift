@@ -376,3 +376,19 @@ ManagedValue SILGenBuilder::createUncheckedTakeEnumDataAddr(
     return ManagedValue::forLValue(result);
   return ManagedValue::forUnmanaged(result);
 }
+
+ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v) {
+  auto &lowering = getFunction().getTypeLowering(v.getType());
+  return createLoadTake(loc, v, lowering);
+}
+
+ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
+                                           const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getAddressType() == v.getType());
+  SILValue result =
+      lowering.emitLoadOfCopy(*this, loc, v.forward(gen), IsTake);
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(result);
+  assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
+  return gen.emitManagedRValueWithCleanup(result, lowering);
+}
