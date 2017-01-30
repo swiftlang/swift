@@ -33,7 +33,7 @@ func getDescription(_ o: NSObject) -> String {
 // CHECK:   br [[CONT_BB]]([[OPT_NATIVE]] : $Optional<String>)
 //
 // CHECK: [[CONT_BB]]([[OPT_NATIVE:%.*]] : $Optional<String>):
-// CHECK:   switch_enum [[OPT_NATIVE]] : $Optional<String>, case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]], default [[SOME_BB:bb[0-9]+]]
+// CHECK:   switch_enum [[OPT_NATIVE]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[NONE_BB]]:
 // CHECK:   unreachable
@@ -72,7 +72,7 @@ func getUppercaseString(_ s: NSString) -> String {
 // CHECK:   br [[CONT_BB]]([[OPT_NATIVE]] : $Optional<String>)
 //
 // CHECK: [[CONT_BB]]([[OPT_NATIVE:%.*]] : $Optional<String>):
-// CHECK:   switch_enum [[OPT_NATIVE]] : $Optional<String>, case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]], default [[SOME_BB:bb[0-9]+]]
+// CHECK:   switch_enum [[OPT_NATIVE]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[NONE_BB]]:
 // CHECK:   unreachable

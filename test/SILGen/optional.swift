@@ -77,7 +77,7 @@ func wrap<T>(_ x: T) -> T? { return x }
 
 // CHECK-LABEL: sil hidden @_T08optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
 func wrap_then_unwrap<T>(_ x: T) -> T {
-  // CHECK:   switch_enum_addr {{.*}}, case #Optional.none!enumelt: [[FAIL:bb[0-9]+]], default [[OK:bb[0-9]+]]
+  // CHECK:   switch_enum_addr {{.*}}, case #Optional.some!enumelt.1: [[OK:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL:bb[0-9]+]]
   // CHECK: [[FAIL]]:
   // CHECK:   unreachable
   // CHECK: [[OK]]:
