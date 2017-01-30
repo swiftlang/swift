@@ -211,7 +211,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   printContext(OS, RangeContext);
   OS << "</Context>\n";
 
-  if (!HasSingeEntry) {
+  if (!HasSingleEntry) {
     OS << "<Entry>Multi</Entry>\n";
   }
 

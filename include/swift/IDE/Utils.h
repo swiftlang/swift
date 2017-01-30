@@ -227,7 +227,7 @@ struct ResolvedRangeInfo {
   RangeKind Kind;
   Type Ty;
   StringRef Content;
-  bool HasSingeEntry;
+  bool HasSingleEntry;
 
   // The topmost ast nodes contained in the given range.
   ArrayRef<ASTNode> ContainedNodes;
@@ -236,11 +236,11 @@ struct ResolvedRangeInfo {
   DeclContext* RangeContext;
   ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content,
                     DeclContext* RangeContext,
-                    bool HasSingeEntry,
+                    bool HasSingleEntry,
                     ArrayRef<ASTNode> ContainedNodes,
                     ArrayRef<DeclaredDecl> DeclaredDecls,
                     ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
-                      Ty(Ty), Content(Content), HasSingeEntry(HasSingeEntry),
+                      Ty(Ty), Content(Content), HasSingleEntry(HasSingleEntry),
                       ContainedNodes(ContainedNodes),
                       DeclaredDecls(DeclaredDecls),
                       ReferencedDecls(ReferencedDecls),
