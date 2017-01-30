@@ -3301,13 +3301,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::ENUM_ELEMENT_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    TypeID argTypeID, interfaceTypeID;
+    TypeID interfaceTypeID;
+    bool hasArgumentType;
     bool isImplicit; bool isNegative;
     unsigned rawValueKindID;
 
     decls_block::EnumElementLayout::readRecord(scratch, nameID,
-                                               contextID, argTypeID,
+                                               contextID,
                                                interfaceTypeID,
+                                               hasArgumentType,
                                                isImplicit, rawValueKindID,
                                                isNegative);
 
@@ -3315,13 +3317,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto argTy = getType(argTypeID);
-    if (declOrOffset.isComplete())
-      return declOrOffset;
-
     auto elem = createDecl<EnumElementDecl>(SourceLoc(),
                                             getIdentifier(nameID),
-                                            TypeLoc::withoutLoc(argTy),
+                                            TypeLoc(),
+                                            hasArgumentType,
                                             SourceLoc(),
                                             nullptr,
                                             DC);

@@ -947,8 +947,9 @@ namespace {
 
           // The associated data of the case.
           if (level == 1) {
-            if (!enumElt->hasArgumentType()) return { };
-            gatherArgumentLabels(enumElt->getArgumentType(), scratch);
+            auto argTy = enumElt->getArgumentInterfaceType();
+            if (!argTy) return { };
+            gatherArgumentLabels(argTy, scratch);
             return scratch;
           }
         }

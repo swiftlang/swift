@@ -657,7 +657,7 @@ static bool shouldDisableCleanupOnFailurePath(ManagedValue value,
     if (elt == elementDecl) continue;
     
     // Elements without payloads are trivial.
-    if (!elt->hasArgumentType()) continue;
+    if (!elt->getArgumentInterfaceType()) continue;
 
     auto eltTy = value.getType().getEnumElementType(elt, SGF.SGM.M);
     if (!eltTy.isTrivial(SGF.SGM.M))
@@ -703,7 +703,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   SGF.B.setInsertionPoint(contBB);
   
   // If the enum case has no bound value, we're done.
-  if (!ElementDecl->hasArgumentType()) {
+  if (!ElementDecl->getArgumentInterfaceType()) {
     assert(subInit == nullptr &&
            "Cannot have a subinit when there is no value to match against");
     return;

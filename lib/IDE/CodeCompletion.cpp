@@ -2694,8 +2694,8 @@ public:
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(EED->getName().str());
-    if (EED->hasArgumentType())
-      addPatternFromType(Builder, EED->getArgumentType());
+    if (auto argTy = EED->getArgumentInterfaceType())
+      addPatternFromType(Builder, argTy);
 
     // Enum element is of function type such as EnumName.type -> Int ->
     // EnumName; however we should show Int -> EnumName as the type
