@@ -121,11 +121,16 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 
 	private func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: CountableRange<Index>) {
 		var copiedCount = 0
-		__dispatch_data_apply(__wrapped) { (_, _, ptr: UnsafeRawPointer, size: Int) in
-			let limit = Swift.min((range.endIndex - range.startIndex) - copiedCount, size)
-			memcpy(pointer + copiedCount, ptr, limit)
-			copiedCount += limit
-			return copiedCount < (range.endIndex - range.startIndex)
+		if range.isEmpty { return }
+		let rangeSize = range.count
+		__dispatch_data_apply(__wrapped) { (_, offset: Int, ptr: UnsafeRawPointer, size: Int) in
+			if offset >= range.endIndex { return false } // This region is after endIndex
+			let copyOffset = range.startIndex > offset ? range.startIndex - offset : 0 // offset of first byte, in this region
+			if copyOffset >= size { return true } // This region is before startIndex
+			let count = Swift.min(rangeSize - copiedCount, size - copyOffset)
+			memcpy(pointer + copiedCount, ptr + copyOffset, count)
+			copiedCount += count
+			return copiedCount < rangeSize
 		}
 	}
 
