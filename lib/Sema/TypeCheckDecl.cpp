@@ -6857,6 +6857,11 @@ static bool checkEnumDeclCircularity(EnumDecl *E, NominalDeclSet &known,
     known.insert(E);
 
   for (auto elt: E->getAllElements()) {
+    // FIXME: Strange that this can happen, it means we're potentially
+    // not diagnosing circularity when we should be.
+    if (!elt->hasInterfaceType())
+      continue;
+
     // skip uninteresting fields.
     if (!elt->getArgumentInterfaceType() || elt->isIndirect())
       continue;
