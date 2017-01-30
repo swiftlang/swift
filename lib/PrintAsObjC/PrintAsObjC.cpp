@@ -628,9 +628,10 @@ private:
       if (looksLikeInitMethod(AFD->getObjCSelector())) {
         os << " SWIFT_METHOD_FAMILY(none)";
       }
-      if (!methodTy->getResult()->isVoid() &&
-          !methodTy->getResult()->isUninhabited() &&
-          !AFD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+      if (methodTy->getResult()->isUninhabited()) {
+        os << " SWIFT_NORETURN";
+      } else if (!methodTy->getResult()->isVoid() &&
+                 !AFD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
         os << " SWIFT_WARN_UNUSED_RESULT";
       }
     }
@@ -2336,6 +2337,11 @@ public:
            "# define SWIFT_WARN_UNUSED_RESULT __attribute__((warn_unused_result))\n"
            "#else\n"
            "# define SWIFT_WARN_UNUSED_RESULT\n"
+           "#endif\n"
+           "#if defined(__has_attribute) && __has_attribute(noreturn)\n"
+           "# define SWIFT_NORETURN __attribute__((noreturn))\n"
+           "#else\n"
+           "# define SWIFT_NORETURN\n"
            "#endif\n"
            "#if !defined(SWIFT_CLASS_EXTRA)\n"
            "# define SWIFT_CLASS_EXTRA\n"
