@@ -317,12 +317,6 @@ protocol _UTextable {
   func _mapNativeIndexToUTF16(_ u: UText, _ nativeIndex: Int64) -> Int32
 }
 
-extension _UTextable {
-  static func recovered(from u: UnsafeMutablePointer<UText>) -> _UTextable {
-    return u.pointee.context.assumingMemoryBound(to: _UTextable.self).pointee
-  }
-}
-
 protocol UnicodeStorage : _UTextable {
   associatedtype Encoding: UnicodeEncoding
   associatedtype CodeUnits: RandomAccessCollection
