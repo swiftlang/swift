@@ -790,8 +790,15 @@ OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
   // I need to talk with John about this. The proper thing to do is treat uses
   // of the result as uses of the base. For now, we just treat the mark
   // dependence as a use of the base.
-  if (getValue() == MDI->getValue())
+  if (getValue() == MDI->getValue()) {
     return {true, false};
+  }
+
+  // We can have an address base. We do not verify these.
+  if (compatibleWithOwnership(ValueOwnershipKind::Trivial)) {
+    return {true, false};
+  }
+
   return {compatibleWithOwnership(ValueOwnershipKind::Owned), false};
 }
 
