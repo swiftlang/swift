@@ -18,8 +18,10 @@ extension Sub {
     // CHECK-LABEL: sil hidden [thunk] @_T015objc_extensions3SubC4propSQySSGfgTo : $@convention(objc_method) (Sub) -> @autoreleased Optional<NSString> {
     // CHECK: bb0([[SELF:%.*]] : $Sub):
     // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
+    // CHECK: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK: [[GETTER_FUNC:%.*]] = function_ref @_T015objc_extensions3SubC4propSQySSGfg : $@convention(method) (@guaranteed Sub) -> @owned Optional<String>
-    // CHECK: apply [[GETTER_FUNC]]([[SELF_COPY]])
+    // CHECK: apply [[GETTER_FUNC]]([[BORROWED_SELF_COPY]])
+    // CHECK: end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
     // CHECK: destroy_value [[SELF_COPY]]
     // CHECK: } // end sil function '_T015objc_extensions3SubC4propSQySSGfgTo'
 
@@ -45,8 +47,10 @@ extension Sub {
     // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Sub
     // CHECK: bb1:
     // CHECK: bb3([[BRIDGED_NEW_VALUE:%.*]] : $Optional<String>):
+    // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK:   [[NORMAL_FUNC:%.*]] = function_ref @_T015objc_extensions3SubC4propSQySSGfs : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> ()
-    // CHECK:   apply [[NORMAL_FUNC]]([[BRIDGED_NEW_VALUE]], [[SELF_COPY]])
+    // CHECK:   apply [[NORMAL_FUNC]]([[BRIDGED_NEW_VALUE]], [[BORROWED_SELF_COPY]])
+    // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK: } // end sil function '_T015objc_extensions3SubC4propSQySSGfsTo'
 
