@@ -372,6 +372,30 @@ extension MutableCollection {
   }
 }
 
+extension MutableCollection where Self: BidirectionalCollection {
+  public subscript(bounds: Range<Index>) -> MutableBidirectionalSlice<Self> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return MutableBidirectionalSlice(base: self, bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+}
+
+extension MutableCollection where Self: RandomAccessCollection {
+  public subscript(bounds: Range<Index>) -> MutableRandomAccessSlice<Self> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return MutableRandomAccessSlice(base: self, bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+}
+
 @available(*, unavailable, renamed: "MutableCollection")
 public typealias MutableCollectionType = MutableCollection
 
