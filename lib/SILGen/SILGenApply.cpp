@@ -3673,11 +3673,13 @@ void ArgEmitter::emitShuffle(Expr *inner,
   // Emit the inner expression.
   SmallVector<ManagedValue, 8> innerArgs;
   SmallVector<InOutArgument, 2> innerInOutArgs;
-  ArgEmitter(SGF, Rep, ClaimedParamsRef(innerParams), innerArgs, innerInOutArgs,
-             /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
-             (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
-                                : Optional<ArgSpecialDestArray>()))
-    .emitTopLevel(ArgumentSource(inner), innerOrigParamType);
+  if (!innerParams.empty()) {
+    ArgEmitter(SGF, Rep, ClaimedParamsRef(innerParams), innerArgs, innerInOutArgs,
+               /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
+               (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
+                                  : Optional<ArgSpecialDestArray>()))
+      .emitTopLevel(ArgumentSource(inner), innerOrigParamType);
+  }
 
   // Make a second pass to split the inner arguments correctly.
   {
