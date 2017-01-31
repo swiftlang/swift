@@ -609,6 +609,7 @@ extension UnicodeStorage : _UTextable {
             u.chunkLength += 1
           }
           u.chunkNativeStart = codeUnits.offset(of: i.base)^
+          u.chunkOffset = u.chunkLength
         }
         var b = buffer // copy due to https://bugs.swift.org/browse/SR-3782
         b[..<buffer.index(atOffset: u.chunkLength)].reverse()
@@ -981,8 +982,11 @@ t.test("basic") {
 t.test("CharacterView") {
   // FIXME: precondition checks in Character prevent us from trying this last
   // one.
-  let s = "🇸🇸🇬🇱abc🇱🇸🇩🇯🇺🇸\n" // + "👩‍❤️‍👩"
-  let a: [Character] = ["🇸🇸", "🇬🇱", "a", "b", "c", "🇱🇸", "🇩🇯", "🇺🇸", "\n"] // + "👩‍❤️‍👩"
+  let s = "🇸🇸🇬🇱abc🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γ͙᷏̃̂᷀νω" // + "👩‍❤️‍👩"
+  let a: [Character] = [
+    "🇸🇸", "🇬🇱", "a", "b", "c", "🇱🇸", "🇩🇯", "🇺🇸", "\n",
+    "Σ", "ὲ", " ", "👥", "🥓", "γ͙᷏̃̂᷀", "ν", "ω"
+  ] // + "👩‍❤️‍👩"
   
   let v8 = CharacterView(Array(s.utf8), UTF8.self)
   expectEqual(a, Array(v8))
@@ -994,8 +998,15 @@ t.test("CharacterView") {
   expectEqual(a, Array(v16))
 
   // FIXME: reverse traversal doesn't work yet.
-  // expectEqual(Array(v8.reversed()), a.reversed())
-  // expectEqual(Array(v16.reversed()), a.reversed())
+  logging = true
+  for (n, (c, e)) in zip(v8.reversed(), a.reversed()).enumerated() {
+    debugLog("###### \(n): \(c) =?= \(e)")
+    expectEqual(e, c)
+  }
+  for (n, (c, e)) in zip(v16.reversed(), a.reversed()).enumerated() {
+    debugLog("###### \(n): \(c) =?= \(e)")
+    expectEqual(e, c)
+  }
 
   // This one demonstrates that we get grapheme breaking of regional indicators
   // (RI) right, while Swift 3 string does not.
