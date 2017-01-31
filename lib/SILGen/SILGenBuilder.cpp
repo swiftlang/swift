@@ -17,6 +17,40 @@ using namespace swift;
 using namespace Lowering;
 
 //===----------------------------------------------------------------------===//
+//                             Cleanup Forwarder
+//===----------------------------------------------------------------------===//
+
+namespace {
+class CleanupCloner {
+  SILGenFunction &gen;
+  bool hasCleanup;
+  bool isLValue;
+  ValueOwnershipKind ownershipKind;
+
+public:
+  CleanupCloner(SILGenBuilder &Builder, ManagedValue M)
+      : gen(Builder.getSILGenFunction()), hasCleanup(M.hasCleanup()),
+        isLValue(M.isLValue()), ownershipKind(M.getOwnershipKind()) {}
+
+  ManagedValue clone(SILValue value) {
+    if (isLValue) {
+      return ManagedValue::forLValue(value);
+    }
+
+    if (!hasCleanup) {
+      return ManagedValue::forUnmanaged(value);
+    }
+
+    if (value->getType().isAddress()) {
+      return gen.emitManagedBufferWithCleanup(value);
+    }
+
+    return gen.emitManagedRValueWithCleanup(value);
+  }
+};
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
 
@@ -514,25 +548,10 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
 
 ManagedValue SILGenBuilder::createUpcast(SILLocation Loc, ManagedValue Original,
                                          SILType Type) {
-  bool hadCleanup = Original.hasCleanup();
-  bool isLValue = Original.isLValue();
-
+  CleanupCloner Cloner(*this, Original);
   SILValue convertedValue =
       SILBuilder::createUpcast(Loc, Original.forward(gen), Type);
-
-  if (isLValue) {
-    return ManagedValue::forLValue(convertedValue);
-  }
-
-  if (!hadCleanup) {
-    return ManagedValue::forUnmanaged(convertedValue);
-  }
-
-  if (Type.isAddress()) {
-    return gen.emitManagedBufferWithCleanup(convertedValue);
-  }
-
-  return gen.emitManagedRValueWithCleanup(convertedValue);
+  return Cloner.clone(convertedValue);
 }
 
 ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
