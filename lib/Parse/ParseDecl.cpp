@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -1593,17 +1593,27 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
 ///   attribute-list:
 ///     /*empty*/
 ///     attribute-list-clause attribute-list
+///     'inout' attribute-list-clause attribute-list
 ///   attribute-list-clause:
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
 /// \endverbatim
-bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes) {
-  Attributes.AtLoc = Tok.getLoc();
-  do {
-    if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
-        parseTypeAttribute(Attributes))
+bool Parser::parseTypeAttributeListPresent(SourceLoc &InOutLoc,
+                                           TypeAttributes &Attributes) {
+  while (Tok.is(tok::kw_inout)) {
+    if (InOutLoc.isValid())
+      diagnose(Tok, diag::parameter_inout_var_let_repeated)
+        .fixItRemove(InOutLoc);
+    InOutLoc = consumeToken();
+  }
+
+  while (Tok.is(tok::at_sign)) {
+    if (Attributes.AtLoc.isInvalid())
+      Attributes.AtLoc = Tok.getLoc();
+    consumeToken();
+    if (parseTypeAttribute(Attributes))
       return true;
-  } while (Tok.is(tok::at_sign));
+  }
   
   return false;
 }
@@ -1741,6 +1751,31 @@ bool Parser::isStartOfDecl() {
   if (Tok.is(tok::kw_try))
     return peekToken().isAny(tok::kw_let, tok::kw_var);
   
+  // Look through attribute list, because it may be an *type* attribute list.
+  if (Tok.is(tok::at_sign)) {
+    BacktrackingScope backtrack(*this);
+    while (consumeIf(tok::at_sign)) {
+      // If not identifier or code complete token, consider '@' as an incomplete
+      // attribute.
+      if (Tok.isNot(tok::identifier, tok::code_complete))
+        continue;
+      consumeToken();
+      // Eat paren after attribute name; e.g. @foo(x)
+      if (consumeIf(tok::l_paren)) {
+        while (Tok.isNot(tok::r_brace, tok::eof, tok::pound_endif)) {
+          if (consumeIf(tok::r_paren)) break;
+          skipSingle();
+        }
+      }
+    }
+    // If this attribute is the last element in the block,
+    // consider it is a start of incomplete decl.
+    if (Tok.isAny(tok::r_brace, tok::eof, tok::pound_endif))
+      return true;
+
+    return isStartOfDecl();
+  }
+
   // Otherwise, the only hard case left is the identifier case.
   if (Tok.isNot(tok::identifier)) return true;
 
@@ -3102,8 +3137,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
       return new (P->Context) FixedTypeRepr(type, SourceLoc());
     };
     auto makePairType = [&](TypeRepr *fst, TypeRepr *snd) -> TypeRepr* {
-      return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange(),
-                                   SourceLoc(), 2);
+      return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange());
     };
 
     switch (addressorKind) {
@@ -3152,7 +3186,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
                              /*NameLoc=*/DeclLoc, /*Throws=*/false,
                              /*ThrowsLoc=*/SourceLoc(), AccessorKeywordLoc,
                              /*GenericParams=*/nullptr,
-                             Params, Type(), ReturnType, P->CurDeclContext);
+                             Params, ReturnType, P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
   // default to mutating.  get/address default to
@@ -3793,7 +3827,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      SmallVectorImpl<Decl *> &decls) {
   auto flagInvalidAccessor = [&](FuncDecl *&func) {
     if (func) {
-      func->setType(ErrorType::get(P.Context));
       func->setInterfaceType(ErrorType::get(P.Context));
       func->setInvalid();
     }
@@ -4546,7 +4579,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                           FuncLoc, FullName, NameLoc,
                           /*Throws=*/throwsLoc.isValid(), throwsLoc,
                           /*AccessorKeywordLoc=*/SourceLoc(),
-                          GenericParams, BodyParams, Type(), FuncRetTy,
+                          GenericParams, BodyParams, FuncRetTy,
                           CurDeclContext);
     
     diagnoseOperatorFixityAttributes(*this, Attributes, FD);
@@ -5290,7 +5323,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
                    ElementTy.get(), Indices.get(), Decls);
 
   if (Invalid) {
-    Subscript->setType(ErrorType::get(Context));
+    Subscript->setInterfaceType(ErrorType::get(Context));
     Subscript->setInvalid();
   }
 
@@ -5612,17 +5645,25 @@ ParserResult<PrecedenceGroupDecl>
 Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
                                  DeclAttributes &attributes) {
   SourceLoc precedenceGroupLoc = consumeToken(tok::kw_precedencegroup);
+  DebuggerContextChange DCC (*this);
+
+  if (!CodeCompletion && !DCC.movedToTopLevel() && !(flags & PD_AllowTopLevel))
+  {
+    diagnose(precedenceGroupLoc, diag::decl_inner_scope);
+    return nullptr;
+  }
 
   Identifier name;
   SourceLoc nameLoc;
   if (parseIdentifier(name, nameLoc, diag::expected_precedencegroup_name)) {
     // If the identifier is missing or a keyword or something, try to skip
     // skip the entire body.
-    if (consumeIf(tok::l_brace) ||
-        (peekToken().is(tok::l_brace), consumeToken(),
-         consumeIf(tok::l_brace))) {
+    if (consumeIf(tok::l_brace)) {
       skipUntilDeclRBrace();
       (void) consumeIf(tok::r_brace);
+    } else if (Tok.isNot(tok::eof) && peekToken().is(tok::l_brace)) {
+      consumeToken();
+      skipBracedBlock(*this);
     }
     return nullptr;
   }

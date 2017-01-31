@@ -1,9 +1,9 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct G<T> {}
 
 extension G {
-  struct H<U> { } // expected-error {{type 'H' cannot be nested in extension of generic type 'G'}}
+  struct H<U> { }
 }
 
 extension { // expected-error {{expected type name in extension declaration}}

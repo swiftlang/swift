@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 static func gf1() {} // expected-error {{static methods may only be declared on a type}}{{1-8=}}
 class func gf2() {} // expected-error {{class methods may only be declared on a type}}{{1-7=}}

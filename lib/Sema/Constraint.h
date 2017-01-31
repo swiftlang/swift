@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -491,6 +491,8 @@ public:
     case ConstraintKind::Disjunction:
       return ConstraintClassification::Disjunction;
     }
+
+    llvm_unreachable("Unhandled ConstraintKind in switch.");
   }
 
   /// \brief Retrieve the first type in the constraint.
@@ -584,16 +586,6 @@ struct ilist_traits<swift::constraints::Constraint>
 
   static Element *createNode(const Element &V) = delete;
   static void deleteNode(Element *V) { /* never deleted */ }
-
-  Element *createSentinel() const { return static_cast<Element *>(&Sentinel); }
-  static void destroySentinel(Element *) {}
-
-  Element *provideInitialHead() const { return createSentinel(); }
-  Element *ensureHead(Element *) const { return createSentinel(); }
-  static void noteHead(Element *, Element *) {}
-
-private:
-  mutable ilist_half_node<Element> Sentinel;
 };
 
 } // end namespace llvm

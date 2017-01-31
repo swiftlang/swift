@@ -1,5 +1,5 @@
-// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.51 -parse %s -verify
-// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.52 -parse %s -verify
+// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.51 -typecheck %s -verify
+// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.52 -typecheck %s -verify
 
 // REQUIRES: OS=macosx
 import Foundation

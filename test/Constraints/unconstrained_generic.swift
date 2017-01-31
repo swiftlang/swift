@@ -1,5 +1,5 @@
-// RUN: %target-parse-verify-swift
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func unconstrained<T>(_ x: T) {}
 

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -462,7 +462,8 @@ public:
     }
     virtual bool walkToDeclPre(Decl *D) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-        if (!VD->getType() || VD->getType()->hasError()) {
+        if (!VD->hasInterfaceType() ||
+            VD->getInterfaceType()->hasError()) {
           error = true;
           return false;
         }
@@ -913,6 +914,7 @@ public:
                                         MaybeLoadInitExpr->getType(),
                                         TypeCheckDC);
 
+    VD->setInterfaceType(VD->getType());
     VD->setImplicit();
 
     NamedPattern *NP = new (Context) NamedPattern(VD, /*implicit*/true);

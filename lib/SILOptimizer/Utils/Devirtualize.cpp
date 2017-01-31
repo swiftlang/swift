@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -238,7 +238,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
     if (!Arg)
       break;
 
-    auto *SinglePred = Arg->getParent()->getSinglePredecessor();
+    auto *SinglePred = Arg->getParent()->getSinglePredecessorBlock();
     if (!SinglePred) {
       if (!Arg->isFunctionArg())
         break;
@@ -366,7 +366,7 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
       continue;
     }
 
-    auto *SinglePred = Arg->getParent()->getSinglePredecessor();
+    auto *SinglePred = Arg->getParent()->getSinglePredecessorBlock();
     if (SinglePred) {
       // If it is a BB argument received on a success branch
       // of a checked_cast_br, then we know its exact type.
@@ -664,21 +664,21 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
     // - re-using a BB would create a critical edge
     // - or, the result of the new apply would be of different
     //   type than the argument of the original normal BB.
-    if (TAI->getNormalBB()->getSinglePredecessor())
+    if (TAI->getNormalBB()->getSinglePredecessorBlock())
       ResultBB = TAI->getNormalBB();
     else {
       ResultBB = B.getFunction().createBasicBlock();
-      ResultBB->createBBArg(ResultTy);
+      ResultBB->createArgument(ResultTy);
     }
 
     NormalBB = TAI->getNormalBB();
 
     SILBasicBlock *ErrorBB = nullptr;
-    if (TAI->getErrorBB()->getSinglePredecessor())
+    if (TAI->getErrorBB()->getSinglePredecessorBlock())
       ErrorBB = TAI->getErrorBB();
     else {
       ErrorBB = B.getFunction().createBasicBlock();
-      ErrorBB->createBBArg(TAI->getErrorBB()->getBBArg(0)->getType());
+      ErrorBB->createArgument(TAI->getErrorBB()->getArgument(0)->getType());
     }
 
     NewAI = B.createTryApply(AI.getLoc(), FRI, SubstCalleeSILType,
@@ -687,26 +687,27 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
     if (ErrorBB != TAI->getErrorBB()) {
       B.setInsertionPoint(ErrorBB);
       B.createBranch(TAI->getLoc(), TAI->getErrorBB(),
-                     {ErrorBB->getBBArg(0)});
+                     {ErrorBB->getArgument(0)});
     }
 
     // Does the result value need to be casted?
-    ResultCastRequired = ResultTy != NormalBB->getBBArg(0)->getType();
+    ResultCastRequired = ResultTy != NormalBB->getArgument(0)->getType();
 
     if (ResultBB != NormalBB)
       B.setInsertionPoint(ResultBB);
     else if (ResultCastRequired) {
       B.setInsertionPoint(NormalBB->begin());
       // Collect all uses, before casting.
-      for (auto *Use : NormalBB->getBBArg(0)->getUses()) {
+      for (auto *Use : NormalBB->getArgument(0)->getUses()) {
         OriginalResultUses.push_back(Use);
       }
-      NormalBB->getBBArg(0)->replaceAllUsesWith(SILUndef::get(AI.getType(), Mod));
-      NormalBB->replaceBBArg(0, ResultTy, nullptr);
+      NormalBB->getArgument(0)->replaceAllUsesWith(
+          SILUndef::get(AI.getType(), Mod));
+      NormalBB->replaceArgument(0, ResultTy, nullptr);
     }
 
     // The result value is passed as a parameter to the normal block.
-    ResultValue = ResultBB->getBBArg(0);
+    ResultValue = ResultBB->getArgument(0);
   }
 
   // Check if any casting is required for the return value.

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -798,7 +798,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        /*AccessorKeywordLoc=*/SourceLoc(),
                        /*generic params*/ nullptr,
                        params,
-                       Type(), TypeLoc(),
+                       TypeLoc(),
                        CurDeclContext);
   tempDecl->setImplicit();
   setLocalDiscriminator(tempDecl);
@@ -1352,7 +1352,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       // Although we require an initializer, recover by parsing as if it were
       // merely omitted.
       diagnose(Tok, diag::conditional_var_initializer_required);
-      Init = new (Context) ErrorExpr(Tok.getLoc());
+      Init = new (Context) ErrorExpr(ThePattern.get()->getEndLoc());
     }
     
     result.push_back({IntroducerLoc, ThePattern.get(), Init});
@@ -2101,8 +2101,7 @@ static BraceStmt *ConvertClosureToBraceStmt(Expr *E, ASTContext &Ctx) {
   // Silence downstream errors by giving it type ()->(), to match up with the
   // call we will produce.
   CE->setImplicit();
-  auto empty = TupleTypeRepr::create(Ctx, {}, CE->getStartLoc(), SourceLoc(),
-                                     0);
+  auto empty = TupleTypeRepr::createEmpty(Ctx, CE->getStartLoc());
   CE->setExplicitResultType(CE->getStartLoc(), empty);
   
   // The trick here is that the ClosureExpr provides a DeclContext for stuff

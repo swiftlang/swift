@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // If this test fails, the following types started to conditionally conform to
 // `Hashable`.  When that happens, please add a custom `AnyHashable`

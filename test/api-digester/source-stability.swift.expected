@@ -1,3 +1,13 @@
+/* DictionaryIndex => Dictionary.Index,
+ * SetIndex => Set.Index
+ *
+ * Note: The old names are still available via generic typealiases,
+ * however swift-api-digester doesn't pick that up yet. */
+TypeAlias Dictionary.Index has been removed
+TypeAlias Set.Index has been removed
+Struct DictionaryIndex has been removed
+Struct SetIndex has been removed
+
 /* Removed declarations */
 Protocol BidirectionalIndexable has been removed (deprecated)
 Protocol ExpressibleByStringInterpolation has been removed (deprecated)
@@ -7,11 +17,27 @@ Protocol MutableIndexable has been removed (deprecated)
 Protocol RandomAccessIndexable has been removed (deprecated)
 Protocol RangeReplaceableIndexable has been removed (deprecated)
 
-/* Moved declarations */
-// rdar://28456614 Swift 3 breaking change: static function 'abs' removed from Double/Float/Float80/CGFloat
-Func Double.abs(_:) has been moved to Func abs(_:)
-Func Float.abs(_:) has been moved to Func abs(_:)
-Func Float80.abs(_:) has been moved to Func abs(_:)
+/* More DictionaryIndex / SetIndex */
+Var Dictionary.endIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
+Var Dictionary.startIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
+Var Set.endIndex has declared type change from SetIndex<Element> to Set<Element>.Index
+Var Set.startIndex has declared type change from SetIndex<Element> to Set<Element>.Index
+Func Dictionary.index(after:) has return type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
+Func Dictionary.index(forKey:) has return type change from DictionaryIndex<Key, Value>? to Dictionary<Key, Value>.Index?
+Func Dictionary.remove(at:) has 1st parameter type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
+
+/* False positives due to archetype -> interface type change */
+Func OptionSet.insert(_:) has return type change from (inserted: Bool, memberAfterInsert: Self) to (inserted: Bool, memberAfterInsert: Self.Element)
+Func OptionSet.remove(_:) has return type change from Self? to Self.Element?
+Func OptionSet.update(with:) has return type change from Self? to Self.Element?
+Func RandomAccessCollection.distance(from:to:) has return type change from Self.IndexDistance to Self.Index.Stride
+Func RandomAccessCollection.index(_:offsetBy:) has 2nd parameter type change from Self.IndexDistance to Self.Index.Stride
+
+/* More DictionaryIndex / SetIndex */
+Func Set.index(after:) has return type change from SetIndex<Element> to Set<Element>.Index
+Func Set.index(of:) has return type change from SetIndex<Element>? to Set<Element>.Index?
+Func Set.remove(at:) has 1st parameter type change from SetIndex<Element> to Set<Element>.Index
 
 /* Function type change */
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has 3rd parameter type change from (UnsafeMutablePointer<T>) throws -> Result to (UnsafePointer<T>) throws -> Result
+

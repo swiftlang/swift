@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -116,16 +116,12 @@ ALWAYS_CANONICAL_TYPE(Module, Type)
 TYPE(DynamicSelf, Type)
 ABSTRACT_TYPE(Substitutable, Type)
   ALWAYS_CANONICAL_TYPE(Archetype, SubstitutableType)
-  ABSTRACT_TYPE(AbstractTypeParam, SubstitutableType)
-    TYPE(GenericTypeParam, AbstractTypeParamType)
-    SUGARED_TYPE(AssociatedType, AbstractTypeParamType)
-    TYPE_RANGE(AbstractTypeParam, GenericTypeParam, AssociatedType)
-  TYPE_RANGE(Substitutable, Archetype, AssociatedType)
+  TYPE(GenericTypeParam, SubstitutableType)
+  TYPE_RANGE(Substitutable, Archetype, GenericTypeParam)
 SUGARED_TYPE(Substituted, Type)
 TYPE(DependentMember, Type)
 ABSTRACT_TYPE(AnyFunction, Type)
   TYPE(Function, AnyFunctionType)
-  TYPE(PolymorphicFunction, AnyFunctionType)
   TYPE(GenericFunction, AnyFunctionType)
   TYPE_RANGE(AnyFunction, Function, GenericFunction)
 ARTIFICIAL_TYPE(SILFunction, Type)

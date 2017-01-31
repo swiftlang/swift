@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -142,8 +142,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
     tupleElts.push_back(argType);
   
   Type ArgType = TupleType::get(tupleElts, Context);
-  Type FnType;
-  FnType = FunctionType::get(ArgType, ResType, Info);
+  Type FnType = FunctionType::get(ArgType, ResType, Info);
 
   Module *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
@@ -168,7 +167,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                              /*AccessorKeywordLoc=*/SourceLoc(),
                              /*GenericParams=*/nullptr,
-                             paramList, FnType,
+                             paramList,
                              TypeLoc::withoutLoc(ResType), DC);
   FD->setInterfaceType(FnType);
   FD->setImplicit();
@@ -193,14 +192,13 @@ getBuiltinGenericFunction(Identifier Id,
   // Compute the interface type.
   SmallVector<GenericTypeParamType *, 1> GenericParamTypes;
   for (auto gp : *GenericParams) {
-    GenericParamTypes.push_back(gp->getDeclaredType()
+    GenericParamTypes.push_back(gp->getDeclaredInterfaceType()
                                   ->castTo<GenericTypeParamType>());
   }
   GenericSignature *Sig =
     GenericSignature::get(GenericParamTypes, { });
   GenericEnvironment *Env =
-      GenericEnvironment::get(Context, GenericParamTypes,
-                              InterfaceToArchetypeMap);
+    GenericEnvironment::get(Sig, InterfaceToArchetypeMap);
 
   Type InterfaceType = GenericFunctionType::get(Sig, ArgParamType, ResType,
                                                 AnyFunctionType::ExtInfo());
@@ -220,11 +218,6 @@ getBuiltinGenericFunction(Identifier Id,
   
   auto *paramList = ParameterList::create(Context, params);
   
-  // Compute the function type.
-  Type FnType = PolymorphicFunctionType::get(paramList->getType(Context),
-                                             ResBodyType, GenericParams,
-                                             AnyFunctionType::ExtInfo());
-  
   DeclName Name(Context, Id, paramList);
   auto func = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
                                StaticSpellingKind::None,
@@ -232,11 +225,10 @@ getBuiltinGenericFunction(Identifier Id,
                                Name, /*NameLoc=*/SourceLoc(),
                                /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                                /*AccessorKeywordLoc=*/SourceLoc(),
-                               GenericParams, paramList, FnType,
+                               GenericParams, paramList,
                                TypeLoc::withoutLoc(ResBodyType), DC);
     
   func->setInterfaceType(InterfaceType);
-  func->setGenericSignature(Sig);
   func->setGenericEnvironment(Env);
   func->setImplicit();
   func->setAccessibility(Accessibility::Public);
@@ -433,10 +425,9 @@ static std::pair<ArchetypeType*, GenericTypeParamDecl*>
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   Module *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  ArchetypeType *archetype
-    = ArchetypeType::getNew(ctx, nullptr,
-                            static_cast<AssociatedTypeDecl *>(nullptr),
-                            ident, ArrayRef<Type>(), Type(), false);
+  SmallVector<ProtocolDecl *, 1> protos;
+  ArchetypeType *archetype = ArchetypeType::getNew(ctx, nullptr, ident, protos,
+                                                   Type());
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
@@ -488,8 +479,8 @@ namespace {
                                              Archetypes, GenericTypeParams);
 
       for (unsigned i = 0, e = GenericTypeParams.size(); i < e; i++) {
-        auto paramTy = GenericTypeParams[i]->getDeclaredType()
-            ->getCanonicalType().getPointer();
+        auto paramTy = GenericTypeParams[i]->getDeclaredInterfaceType()
+          ->getCanonicalType()->castTo<GenericTypeParamType>();
         InterfaceToArchetypeMap[paramTy] = Archetypes[i];
       }
     }
@@ -526,7 +517,8 @@ namespace {
       unsigned Index;
       Type build(GenericSignatureBuilder &builder, bool forBody) const {
         return (forBody ? builder.Archetypes[Index]
-                        : builder.GenericTypeParams[Index]->getDeclaredType());
+                        : builder.GenericTypeParams[Index]
+                            ->getDeclaredInterfaceType());
       }
     };
     struct LambdaGenerator {

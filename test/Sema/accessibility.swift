@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 public protocol PublicProto {
   func publicReq()
@@ -22,7 +22,7 @@ public struct PublicStruct: PublicProto, InternalProto, FilePrivateProto, Privat
   private func publicReq() {} // expected-error {{method 'publicReq()' must be declared public because it matches a requirement in public protocol 'PublicProto'}} {{3-10=public}}
   private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
   private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
-  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'PrivateProto'}} {{3-10=fileprivate}}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }
@@ -32,7 +32,7 @@ internal struct InternalStruct: PublicProto, InternalProto, FilePrivateProto, Pr
   private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=internal}}
   private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
   private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
-  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'PrivateProto'}} {{3-10=fileprivate}}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }
@@ -42,7 +42,7 @@ fileprivate struct FilePrivateStruct: PublicProto, InternalProto, FilePrivatePro
   private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=fileprivate}}
   private func internalReq() {} // expected-error {{method 'internalReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'InternalProto'}} {{3-10=fileprivate}}
   private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
-  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'PrivateProto'}} {{3-10=fileprivate}}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }
@@ -52,7 +52,7 @@ private struct PrivateStruct: PublicProto, InternalProto, FilePrivateProto, Priv
   private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=fileprivate}}
   private func internalReq() {} // expected-error {{method 'internalReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'InternalProto'}} {{3-10=fileprivate}}
   private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
-  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'PrivateProto'}} {{3-10=fileprivate}}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }
@@ -276,28 +276,23 @@ private class PrivateSubPrivateSet: Base {
 public typealias PublicTA1 = PublicStruct
 public typealias PublicTA2 = InternalStruct // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
 public typealias PublicTA3 = FilePrivateStruct // expected-error {{type alias cannot be declared public because its underlying type uses a fileprivate type}}
-// FIXME: This type is actually private; it's just being reported as fileprivate because it's top-level.
-public typealias PublicTA4 = PrivateStruct // expected-error {{type alias cannot be declared public because its underlying type uses a fileprivate type}}
+public typealias PublicTA4 = PrivateStruct // expected-error {{type alias cannot be declared public because its underlying type uses a private type}}
 
 // expected-note@+1 {{type declared here}}
 internal typealias InternalTA1 = PublicStruct
 internal typealias InternalTA2 = InternalStruct
 internal typealias InternalTA3 = FilePrivateStruct // expected-error {{type alias cannot be declared internal because its underlying type uses a fileprivate type}}
-// FIXME: This type is actually private; it's just being reported as
-// fileprivate because it's top-level.
-internal typealias InternalTA4 = PrivateStruct // expected-error {{type alias cannot be declared internal because its underlying type uses a fileprivate type}}
+internal typealias InternalTA4 = PrivateStruct // expected-error {{type alias cannot be declared internal because its underlying type uses a private type}}
 
 public typealias PublicFromInternal = InternalTA1 // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
 
-// FIXME: These types are actually private; they're just being reported as
-// fileprivate because they're top-level.
-typealias FunctionType1 = (PrivateStruct) -> PublicStruct // expected-error {{type alias must be declared fileprivate because its underlying type uses a fileprivate type}}
-typealias FunctionType2 = (PublicStruct) -> PrivateStruct // expected-error {{type alias must be declared fileprivate because its underlying type uses a fileprivate type}}
-typealias FunctionType3 = (PrivateStruct) -> PrivateStruct // expected-error {{type alias must be declared fileprivate because its underlying type uses a fileprivate type}}
+typealias FunctionType1 = (PrivateStruct) -> PublicStruct // expected-error {{type alias must be declared private or fileprivate because its underlying type uses a private type}}
+typealias FunctionType2 = (PublicStruct) -> PrivateStruct // expected-error {{type alias must be declared private or fileprivate because its underlying type uses a private type}}
+typealias FunctionType3 = (PrivateStruct) -> PrivateStruct // expected-error {{type alias must be declared private or fileprivate because its underlying type uses a private type}}
 
-typealias ArrayType = [PrivateStruct] // expected-error {{type alias must be declared fileprivate because its underlying type uses a fileprivate type}}
-typealias DictType = [String : PrivateStruct] // expected-error {{type alias must be declared fileprivate because its underlying type uses a fileprivate type}}
-typealias GenericArgs = Optional<PrivateStruct> // expected-error {{type alias must be declared fileprivate because its underlying type uses a fileprivate type}}
+typealias ArrayType = [PrivateStruct] // expected-error {{type alias must be declared private or fileprivate because its underlying type uses a private type}}
+typealias DictType = [String : PrivateStruct] // expected-error {{type alias must be declared private or fileprivate because its underlying type uses a private type}}
+typealias GenericArgs = Optional<PrivateStruct> // expected-error {{type alias must be declared private or fileprivate because its underlying type uses a private type}}
 
 
 public protocol HasAssocType {
@@ -311,65 +306,54 @@ public struct AssocTypeImpl: HasAssocType {
 public let _: AssocTypeImpl.Inferred?
 
 
-// FIXME: These types are actually private; they're just being reported as
-// fileprivate because they're top-level.
-public let x: PrivateStruct = PrivateStruct() // expected-error {{constant cannot be declared public because its type uses a fileprivate type}}
-public var a: PrivateStruct?, b: PrivateStruct? // expected-error 2 {{variable cannot be declared public because its type uses a fileprivate type}}
-public var (c, d): (PrivateStruct?, PrivateStruct?) // expected-error {{variable cannot be declared public because its type uses a fileprivate type}}
+public let x: PrivateStruct = PrivateStruct() // expected-error {{constant cannot be declared public because its type uses a private type}}
+public var a: PrivateStruct?, b: PrivateStruct? // expected-error 2 {{variable cannot be declared public because its type uses a private type}}
+public var (c, d): (PrivateStruct?, PrivateStruct?) // expected-error {{variable cannot be declared public because its type uses a private type}}
 
-var internalVar: PrivateStruct? // expected-error {{variable must be declared fileprivate because its type uses a fileprivate type}}
+var internalVar: PrivateStruct? // expected-error {{variable must be declared private or fileprivate because its type uses a private type}}
 
-let internalConstant = PrivateStruct() // expected-error {{constant must be declared fileprivate because its type 'PrivateStruct' uses a fileprivate type}}
+let internalConstant = PrivateStruct() // expected-error {{constant must be declared private or fileprivate because its type 'PrivateStruct' uses a private type}}
 public let publicConstant = [InternalStruct]() // expected-error {{constant cannot be declared public because its type '[InternalStruct]' uses an internal type}}
 
 public struct Properties {
-  // FIXME: These types are actually private; they're just being reported as
-  // fileprivate because they're top-level.
-  public let x: PrivateStruct = PrivateStruct() // expected-error {{property cannot be declared public because its type uses a fileprivate type}}
-  public var a: PrivateStruct?, b: PrivateStruct? // expected-error 2 {{property cannot be declared public because its type uses a fileprivate type}}
-  public var (c, d): (PrivateStruct?, PrivateStruct?) // expected-error {{property cannot be declared public because its type uses a fileprivate type}}
+  public let x: PrivateStruct = PrivateStruct() // expected-error {{property cannot be declared public because its type uses a private type}}
+  public var a: PrivateStruct?, b: PrivateStruct? // expected-error 2 {{property cannot be declared public because its type uses a private type}}
+  public var (c, d): (PrivateStruct?, PrivateStruct?) // expected-error {{property cannot be declared public because its type uses a private type}}
 
-  let y = PrivateStruct() // expected-error {{property must be declared fileprivate because its type 'PrivateStruct' uses a fileprivate type}}
+  let y = PrivateStruct() // expected-error {{property must be declared fileprivate because its type 'PrivateStruct' uses a private type}}
 }
 
 public struct Subscripts {
-  // FIXME: These types are actually private; they're just being reported as
-  // fileprivate because they're top-level.
-  subscript (a: PrivateStruct) -> Int { return 0 } // expected-error {{subscript must be declared fileprivate because its index uses a fileprivate type}}
-  subscript (a: Int) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript must be declared fileprivate because its element type uses a fileprivate type}}
+  subscript (a: PrivateStruct) -> Int { return 0 } // expected-error {{subscript must be declared fileprivate because its index uses a private type}}
+  subscript (a: Int) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript must be declared fileprivate because its element type uses a private type}}
 
-  public subscript (a: PrivateStruct, b: Int) -> Int { return 0 } // expected-error {{subscript cannot be declared public because its index uses a fileprivate type}}
-  public subscript (a: Int, b: PrivateStruct) -> Int { return 0 } // expected-error {{subscript cannot be declared public because its index uses a fileprivate type}}
-  public subscript (a: InternalStruct, b: PrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared public because its index uses a fileprivate type}}
-  public subscript (a: PrivateStruct, b: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript cannot be declared public because its index uses a fileprivate type}}
+  public subscript (a: PrivateStruct, b: Int) -> Int { return 0 } // expected-error {{subscript cannot be declared public because its index uses a private type}}
+  public subscript (a: Int, b: PrivateStruct) -> Int { return 0 } // expected-error {{subscript cannot be declared public because its index uses a private type}}
+  public subscript (a: InternalStruct, b: PrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared public because its index uses a private type}}
+  public subscript (a: PrivateStruct, b: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript cannot be declared public because its index uses a private type}}
   public subscript (a: Int, b: Int) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared public because its element type uses an internal type}}
 }
 
 public struct Methods {
-  // FIXME: These types are actually private; they're just being reported as
-  // fileprivate because they're top-level.
-  func foo(a: PrivateStruct) -> Int { return 0 } // expected-error {{method must be declared fileprivate because its parameter uses a fileprivate type}}
-  func bar(a: Int) -> PrivateStruct { return PrivateStruct() } // expected-error {{method must be declared fileprivate because its result uses a fileprivate type}}
+  func foo(a: PrivateStruct) -> Int { return 0 } // expected-error {{method must be declared fileprivate because its parameter uses a private type}}
+  func bar(a: Int) -> PrivateStruct { return PrivateStruct() } // expected-error {{method must be declared fileprivate because its result uses a private type}}
 
-  public func a(a: PrivateStruct, b: Int) -> Int { return 0 } // expected-error {{method cannot be declared public because its parameter uses a fileprivate type}}
-  public func b(a: Int, b: PrivateStruct) -> Int { return 0 } // expected-error {{method cannot be declared public because its parameter uses a fileprivate type}}
-  public func c(a: InternalStruct, b: PrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its parameter uses a fileprivate type}}
-  public func d(a: PrivateStruct, b: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{method cannot be declared public because its parameter uses a fileprivate type}}
+  public func a(a: PrivateStruct, b: Int) -> Int { return 0 } // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  public func b(a: Int, b: PrivateStruct) -> Int { return 0 } // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  public func c(a: InternalStruct, b: PrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  public func d(a: PrivateStruct, b: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
   public func e(a: Int, b: Int) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its result uses an internal type}}
 }
-// FIXME: This type is actually private; it's just being reported as
-// fileprivate because it's top-level.
-func privateParam(a: PrivateStruct) {} // expected-error {{function must be declared fileprivate because its parameter uses a fileprivate type}}
+
+func privateParam(a: PrivateStruct) {} // expected-error {{function must be declared private or fileprivate because its parameter uses a private type}}
 
 public struct Initializers {
-  // FIXME: These types are actually private; they're just being reported as
-  // fileprivate because they're top-level.
-  init(a: PrivateStruct) {} // expected-error {{initializer must be declared fileprivate because its parameter uses a fileprivate type}}
+  init(a: PrivateStruct) {} // expected-error {{initializer must be declared fileprivate because its parameter uses a private type}}
 
-  public init(a: PrivateStruct, b: Int) {} // expected-error {{initializer cannot be declared public because its parameter uses a fileprivate type}}
-  public init(a: Int, b: PrivateStruct) {} // expected-error {{initializer cannot be declared public because its parameter uses a fileprivate type}}
-  public init(a: InternalStruct, b: PrivateStruct) {} // expected-error {{initializer cannot be declared public because its parameter uses a fileprivate type}}
-  public init(a: PrivateStruct, b: InternalStruct) { } // expected-error {{initializer cannot be declared public because its parameter uses a fileprivate type}}
+  public init(a: PrivateStruct, b: Int) {} // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
+  public init(a: Int, b: PrivateStruct) {} // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
+  public init(a: InternalStruct, b: PrivateStruct) {} // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
+  public init(a: PrivateStruct, b: InternalStruct) { } // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
 }
 
 
@@ -384,80 +368,65 @@ public protocol AssocTypes {
 
   associatedtype Internal: InternalClass // expected-error {{associated type in a public protocol uses an internal type in its requirement}}
   associatedtype InternalConformer: InternalProto // expected-error {{associated type in a public protocol uses an internal type in its requirement}}
-  // FIXME: These types are actually private; they're just being reported as
-  // fileprivate because they're top-level.
-  associatedtype PrivateConformer: PrivateProto // expected-error {{associated type in a public protocol uses a fileprivate type in its requirement}}
-  associatedtype PI: PrivateProto, InternalProto // expected-error {{associated type in a public protocol uses a fileprivate type in its requirement}}
-  associatedtype IP: InternalProto, PrivateProto // expected-error {{associated type in a public protocol uses a fileprivate type in its requirement}}
 
-  associatedtype PrivateDefault = PrivateStruct // expected-error {{associated type in a public protocol uses a fileprivate type in its default definition}}
+  associatedtype PrivateConformer: PrivateProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  associatedtype PI: PrivateProto, InternalProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  associatedtype IP: InternalProto, PrivateProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+
+  associatedtype PrivateDefault = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its default definition}}
   associatedtype PublicDefault = PublicStruct
-  associatedtype PrivateDefaultConformer: PublicProto = PrivateStruct // expected-error {{associated type in a public protocol uses a fileprivate type in its default definition}}
-  associatedtype PublicDefaultConformer: PrivateProto = PublicStruct // expected-error {{associated type in a public protocol uses a fileprivate type in its requirement}}
-  associatedtype PrivatePrivateDefaultConformer: PrivateProto = PrivateStruct // expected-error {{associated type in a public protocol uses a fileprivate type in its requirement}}
+  associatedtype PrivateDefaultConformer: PublicProto = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its default definition}}
+  associatedtype PublicDefaultConformer: PrivateProto = PublicStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  associatedtype PrivatePrivateDefaultConformer: PrivateProto = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
   associatedtype PublicPublicDefaultConformer: PublicProto = PublicStruct
 }
 
 public protocol RequirementTypes {
-  // FIXME: These types are actually private; they're just being reported as
-  // fileprivate because they're top-level.
-  var x: PrivateStruct { get } // expected-error {{property cannot be declared public because its type uses a fileprivate type}}
+  var x: PrivateStruct { get } // expected-error {{property cannot be declared public because its type uses a private type}}
   subscript(x: Int) -> InternalStruct { get set } // expected-error {{subscript cannot be declared public because its element type uses an internal type}}
-  func foo() -> PrivateStruct // expected-error {{method cannot be declared public because its result uses a fileprivate type}}
-  init(x: PrivateStruct) // expected-error {{initializer cannot be declared public because its parameter uses a fileprivate type}}
+  func foo() -> PrivateStruct // expected-error {{method cannot be declared public because its result uses a private type}}
+  init(x: PrivateStruct) // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
 }
 
-// FIXME: These types are actually private; they're just being reported as
-// fileprivate because they're top-level.
-protocol DefaultRefinesPrivate : PrivateProto {} // expected-error {{protocol must be declared fileprivate because it refines a fileprivate protocol}}
-public protocol PublicRefinesPrivate : PrivateProto {} // expected-error {{public protocol cannot refine a fileprivate protocol}}
+protocol DefaultRefinesPrivate : PrivateProto {} // expected-error {{protocol must be declared private or fileprivate because it refines a private protocol}}
+public protocol PublicRefinesPrivate : PrivateProto {} // expected-error {{public protocol cannot refine a private protocol}}
 public protocol PublicRefinesInternal : InternalProto {} // expected-error {{public protocol cannot refine an internal protocol}}
-public protocol PublicRefinesPI : PrivateProto, InternalProto {} // expected-error {{public protocol cannot refine a fileprivate protocol}}
-public protocol PublicRefinesIP : InternalProto, PrivateProto {} // expected-error {{public protocol cannot refine a fileprivate protocol}}
+public protocol PublicRefinesPI : PrivateProto, InternalProto {} // expected-error {{public protocol cannot refine a private protocol}}
+public protocol PublicRefinesIP : InternalProto, PrivateProto {} // expected-error {{public protocol cannot refine a private protocol}}
 
 
-// FIXME: These types are actually private; they're just being reported as
-// fileprivate because they're top-level.
 // expected-note@+1 * {{type declared here}}
 private typealias PrivateInt = Int
-enum DefaultRawPrivate : PrivateInt { // expected-error {{enum must be declared fileprivate because its raw type uses a fileprivate type}}
+enum DefaultRawPrivate : PrivateInt { // expected-error {{enum must be declared private or fileprivate because its raw type uses a private type}}
   case A
 }
-public enum PublicRawPrivate : PrivateInt { // expected-error {{enum cannot be declared public because its raw type uses a fileprivate type}}
+public enum PublicRawPrivate : PrivateInt { // expected-error {{enum cannot be declared public because its raw type uses a private type}}
   case A
 }
-public enum MultipleConformance : PrivateProto, PrivateInt { // expected-error {{enum cannot be declared public because its raw type uses a fileprivate type}} expected-error {{must appear first}} {{35-35=PrivateInt, }} {{47-59=}}
+public enum MultipleConformance : PrivateProto, PrivateInt { // expected-error {{enum cannot be declared public because its raw type uses a private type}} expected-error {{must appear first}} {{35-35=PrivateInt, }} {{47-59=}}
   case A
   func privateReq() {}
 }
 
-// FIXME: These types are actually private; they're just being reported as
-// fileprivate because they're top-level.
 public class PublicSubclassPublic : PublicClass {}
 public class PublicSubclassInternal : InternalClass {} // expected-error {{class cannot be declared public because its superclass is internal}}
-public class PublicSubclassPrivate : PrivateClass {} // expected-error {{class cannot be declared public because its superclass is fileprivate}}
+public class PublicSubclassPrivate : PrivateClass {} // expected-error {{class cannot be declared public because its superclass is private}}
 
 class DefaultSubclassPublic : PublicClass {}
 class DefaultSubclassInternal : InternalClass {}
-class DefaultSubclassPrivate : PrivateClass {} // expected-error {{class must be declared fileprivate because its superclass is fileprivate}}
+class DefaultSubclassPrivate : PrivateClass {} // expected-error {{class must be declared private or fileprivate because its superclass is private}}
 
 
 public enum PublicEnumPrivate {
-  // FIXME: These types is actually private; it's just being reported as
-  // fileprivate because it's top-level.
-  case A(PrivateStruct) // expected-error {{enum case in a public enum uses a fileprivate type}}
+  case A(PrivateStruct) // expected-error {{enum case in a public enum uses a private type}}
 }
 enum DefaultEnumPrivate {
-  // FIXME: This types is actually private; it's just being reported as
-  // fileprivate because it's top-level.
-  case A(PrivateStruct) // expected-error {{enum case in an internal enum uses a fileprivate type}}
+  case A(PrivateStruct) // expected-error {{enum case in an internal enum uses a private type}}
 }
 public enum PublicEnumPI {
   case A(InternalStruct) // expected-error {{enum case in a public enum uses an internal type}}
-  // FIXME: These types are actually private; they're just being reported as
-  // fileprivate because they're top-level.
-  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a fileprivate type}}
-  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses a fileprivate type}}
+  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}}
+  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses a private type}}
 }
 enum DefaultEnumPublic {
   case A(PublicStruct) // no-warning
@@ -465,28 +434,24 @@ enum DefaultEnumPublic {
 
 
 struct DefaultGeneric<T> {}
-// FIXME: These types are actually private; they're just being reported as
-// fileprivate because they're top-level.
-struct DefaultGenericPrivate<T: PrivateProto> {} // expected-error {{generic struct must be declared fileprivate because its generic parameter uses a fileprivate type}}
-struct DefaultGenericPrivate2<T: PrivateClass> {} // expected-error {{generic struct must be declared fileprivate because its generic parameter uses a fileprivate type}}
+
+struct DefaultGenericPrivate<T: PrivateProto> {} // expected-error {{generic struct must be declared private or fileprivate because its generic parameter uses a private type}}
+struct DefaultGenericPrivate2<T: PrivateClass> {} // expected-error {{generic struct must be declared private or fileprivate because its generic parameter uses a private type}}
 struct DefaultGenericPrivateReq<T> where T == PrivateClass {} // expected-error {{same-type requirement makes generic parameter 'T' non-generic}}
-// expected-error@-1 {{generic struct must be declared fileprivate because its generic requirement uses a fileprivate type}}
-struct DefaultGenericPrivateReq2<T> where T: PrivateProto {} // expected-error {{generic struct must be declared fileprivate because its generic requirement uses a fileprivate type}}
+// expected-error@-1 {{generic struct must be declared private or fileprivate because its generic requirement uses a private type}}
+struct DefaultGenericPrivateReq2<T> where T: PrivateProto {} // expected-error {{generic struct must be declared private or fileprivate because its generic requirement uses a private type}}
 
 public struct PublicGenericInternal<T: InternalProto> {} // expected-error {{generic struct cannot be declared public because its generic parameter uses an internal type}}
-// FIXME: These types are actually private; they're just being reported as
-// fileprivate because they're top-level.
-public struct PublicGenericPI<T: PrivateProto, U: InternalProto> {} // expected-error {{generic struct cannot be declared public because its generic parameter uses a fileprivate type}}
-public struct PublicGenericIP<T: InternalProto, U: PrivateProto> {} // expected-error {{generic struct cannot be declared public because its generic parameter uses a fileprivate type}}
-public struct PublicGenericPIReq<T: PrivateProto> where T: InternalProto {} // expected-error {{generic struct cannot be declared public because its generic parameter uses a fileprivate type}}
-public struct PublicGenericIPReq<T: InternalProto> where T: PrivateProto {} // expected-error {{generic struct cannot be declared public because its generic requirement uses a fileprivate type}}
+
+public struct PublicGenericPI<T: PrivateProto, U: InternalProto> {} // expected-error {{generic struct cannot be declared public because its generic parameter uses a private type}}
+public struct PublicGenericIP<T: InternalProto, U: PrivateProto> {} // expected-error {{generic struct cannot be declared public because its generic parameter uses a private type}}
+public struct PublicGenericPIReq<T: PrivateProto> where T: InternalProto {} // expected-error {{generic struct cannot be declared public because its generic parameter uses a private type}}
+public struct PublicGenericIPReq<T: InternalProto> where T: PrivateProto {} // expected-error {{generic struct cannot be declared public because its generic requirement uses a private type}}
 
 public func genericFunc<T: InternalProto>(_: T) {} // expected-error {{function cannot be declared public because its generic parameter uses an internal type}} {}
 public class GenericClass<T: InternalProto> { // expected-error {{generic class cannot be declared public because its generic parameter uses an internal type}}
-  // FIXME: These types are actually private; they're just being reported as
-  // fileprivate because they're top-level.
-  public init<T: PrivateProto>(_: T) {} // expected-error {{initializer cannot be declared public because its generic parameter uses a fileprivate type}}
-  public func genericMethod<T: PrivateProto>(_: T) {} // expected-error {{instance method cannot be declared public because its generic parameter uses a fileprivate type}}
+  public init<T: PrivateProto>(_: T) {} // expected-error {{initializer cannot be declared public because its generic parameter uses a private type}}
+  public func genericMethod<T: PrivateProto>(_: T) {} // expected-error {{instance method cannot be declared public because its generic parameter uses a private type}}
 }
 public enum GenericEnum<T: InternalProto> { // expected-error {{generic enum cannot be declared public because its generic parameter uses an internal type}}
   case A

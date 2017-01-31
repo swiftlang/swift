@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -285,8 +285,8 @@ ssize_t swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
     if (Capacity - Pos <= 1) {
       // Capacity changes to 128, 128*2, 128*4, 128*8, ...
       Capacity = Capacity ? Capacity * 2 : 128;
-      char *NextReadBuf =
-        static_cast<unsigned char *>(realloc(ReadBuf, Capacity));
+      unsigned char *NextReadBuf =
+          static_cast<unsigned char *>(realloc(ReadBuf, Capacity));
       if (NextReadBuf == nullptr) {
         if (ReadBuf)
           free(ReadBuf);

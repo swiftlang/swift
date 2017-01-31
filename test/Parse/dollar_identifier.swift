@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 // SR-1661: Dollar was accidentally allowed as an identifier in Swift 3.
 // SE-0144: Reject this behavior in the future.

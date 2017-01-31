@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "GenericTypeResolver.h"
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
@@ -210,7 +211,7 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
 static unsigned getNumArgs(ValueDecl *value) {
   if (!isa<FuncDecl>(value)) return ~0U;
 
-  AnyFunctionType *fnTy = value->getType()->castTo<AnyFunctionType>();
+  AnyFunctionType *fnTy = value->getInterfaceType()->castTo<AnyFunctionType>();
   if (value->getDeclContext()->isTypeContext())
     fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
   Type argTy = fnTy->getInput();
@@ -222,7 +223,7 @@ static unsigned getNumArgs(ValueDecl *value) {
 }
 
 static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
-  if (value->getType()->hasError())
+  if (value->getInterfaceType()->hasError())
     return true;
 
   switch (refKind) {
@@ -249,7 +250,7 @@ static bool containsDeclRefKind(LookupResult &lookupResult,
                                 DeclRefKind refKind) {
   for (auto candidate : lookupResult) {
     ValueDecl *D = candidate.Decl;
-    if (!D || !D->hasType())
+    if (!D || !D->hasInterfaceType())
       continue;
     if (matchesDeclRefKind(D, refKind))
       return true;
@@ -473,7 +474,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     }
 
     ValueDecl *D = Result.Decl;
-    if (!D->hasType()) validateDecl(D);
+    if (!D->hasInterfaceType()) validateDecl(D);
 
     // FIXME: The source-location checks won't make sense once
     // EnableASTScopeLookup is the default.
@@ -502,7 +503,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       return new (Context) DeclRefExpr(ResultValues[0], UDRE->getNameLoc(),
                                        /*implicit=*/false,
                                        AccessSemantics::Ordinary,
-                                       ResultValues[0]->getType());
+                                       ResultValues[0]->getInterfaceType());
     }
 
     return TypeExpr::createForDecl(Loc, cast<TypeDecl>(ResultValues[0]),
@@ -629,6 +630,8 @@ namespace {
     case FunctionRefKind::Compound:
       return FunctionRefKind::Compound;
     }
+
+    llvm_unreachable("Unhandled FunctionRefKind in switch.");
   }
 
   /// Update a direct callee expression node that has a function reference kind
@@ -792,10 +795,7 @@ namespace {
       // Fold sequence expressions.
       if (auto seqExpr = dyn_cast<SequenceExpr>(expr)) {
         auto result = TC.foldSequence(seqExpr, DC);
-        if (auto typeResult = simplifyTypeExpr(result)) {
-          return typeResult;
-        }
-        return result;
+        return result->walk(*this);
       }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.
@@ -928,13 +928,19 @@ namespace {
 /// true for single-expression closures, where we want the body to be considered
 /// part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
+  auto *PL = closure->getParameters();
+
   // Validate the parameters.
   TypeResolutionOptions options;
   options |= TR_AllowUnspecifiedTypes;
   options |= TR_AllowUnboundGenerics;
   options |= TR_InExpression;
   bool hadParameterError = false;
-  if (TC.typeCheckParameterList(closure->getParameters(), DC, options)) {
+
+  GenericTypeToArchetypeResolver resolver(
+      closure->getGenericEnvironmentOfContext());
+
+  if (TC.typeCheckParameterList(PL, DC, options, resolver)) {
     closure->setType(ErrorType::get(TC.Context));
 
     // If we encounter an error validating the parameter list, don't bail.
@@ -947,7 +953,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
       TC.validateType(closure->getExplicitResultTypeLoc(), DC,
-                      TR_InExpression)) {
+                      TR_InExpression, &resolver)) {
     closure->setType(ErrorType::get(TC.Context));
     return false;
   }
@@ -1057,8 +1063,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
            "the TypeExpr should have been built correctly in the first place");
     
     auto *NewTypeRepr = TupleTypeRepr::create(TC.Context, InnerTypeRepr,
-                                              PE->getSourceRange(),
-                                              SourceLoc(), 1);
+                                              PE->getSourceRange());
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
   
@@ -1070,6 +1075,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       return nullptr;
 
     SmallVector<TypeRepr *, 4> Elts;
+    SmallVector<Identifier, 4> EltNames;
+    SmallVector<SourceLoc, 4> EltNameLocs;
     unsigned EltNo = 0;
     for (auto Elt : TE->getElements()) {
       auto *eltTE = dyn_cast<TypeExpr>(Elt);
@@ -1081,15 +1088,21 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       // If the tuple element has a label, propagate it.
       auto *eltTR = eltTE->getTypeRepr();
       Identifier name = TE->getElementName(EltNo);
-      if (!name.empty())
-        eltTR = new (TC.Context) NamedTypeRepr(name, eltTR,
-                                               TE->getElementNameLoc(EltNo));
+      if (!name.empty()) {
+        if (EltNames.empty()) {
+          EltNames.resize(TE->getNumElements());
+          EltNameLocs.resize(TE->getNumElements());
+        }
+        EltNames[EltNo] = name;
+        EltNameLocs[EltNo] = TE->getElementNameLoc(EltNo);
+      }
 
       Elts.push_back(eltTR);
      ++EltNo;
     }
     auto *NewTypeRepr = TupleTypeRepr::create(TC.Context, Elts,
                                               TE->getSourceRange(),
+                                              EltNames, EltNameLocs, {},
                                               SourceLoc(), Elts.size());
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
@@ -1158,48 +1171,38 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   // FIXME: support 'inout', etc.
   if (auto *AE = dyn_cast<ArrowExpr>(E)) {
     if (!AE->isFolded()) return nullptr;
-    bool HadError = false;
 
-    TypeRepr *ArgsTypeRepr = nullptr;
-    if (auto TyE = dyn_cast<TypeExpr>(AE->getArgsExpr())) {
-      ArgsTypeRepr = TyE->getTypeRepr();
-    } else if (auto TE = dyn_cast<TupleExpr>(AE->getArgsExpr())) {
-      if (TE->getNumElements() == 0) {
-        ArgsTypeRepr = new (TC.Context) TupleTypeRepr({}, TE->getSourceRange(),
-            /*EllipsisLoc*/ SourceLoc(), /*EllipsisIdx*/ 0);
-      }
-    }
+    auto extractTypeRepr = [&](Expr *E) -> TypeRepr * {
+      if (!E)
+        return nullptr;
+      if (auto *TyE = dyn_cast<TypeExpr>(E))
+        return TyE->getTypeRepr();
+      if (auto *TE = dyn_cast<TupleExpr>(E))
+        if (TE->getNumElements() == 0)
+          return TupleTypeRepr::createEmpty(TC.Context, TE->getSourceRange());
+
+      // When simplifying a type expr like "P1 & P2 -> P3 & P4 -> Int",
+      // it may have been folded at the same time; recursively simplify it.
+      if (auto ArgsTypeExpr = simplifyTypeExpr(E))
+        return ArgsTypeExpr->getTypeRepr();
+      return nullptr;
+    };
+
+    TypeRepr *ArgsTypeRepr = extractTypeRepr(AE->getArgsExpr());
     if (!ArgsTypeRepr) {
       TC.diagnose(AE->getArgsExpr()->getLoc(),
                   diag::expected_type_before_arrow);
-      HadError = true;
+      ArgsTypeRepr =
+        new (TC.Context) ErrorTypeRepr(AE->getArgsExpr()->getSourceRange());
     }
 
-    TypeRepr *ResultTypeRepr = nullptr;
-    if (auto TyE = dyn_cast<TypeExpr>(AE->getResultExpr())) {
-      ResultTypeRepr = TyE->getTypeRepr();
-    } else if (auto TE = dyn_cast<TupleExpr>(AE->getResultExpr())) {
-      if (TE->getNumElements() == 0) {
-        ResultTypeRepr = new (TC.Context) TupleTypeRepr({},
-            TE->getSourceRange(), /*EllipsisLoc*/ SourceLoc(),
-            /*EllipsisIdx*/ 0);
-      }
-    } else if (isa<ArrowExpr>(AE->getResultExpr())) {
-      // When simplifying a type expr like "Int -> Int -> Int" the RHS may have
-      // been folded at the same time; recursively simplify it first if
-      // necessary.
-      auto ResultTypeExpr = simplifyTypeExpr(AE->getResultExpr());
-      if (ResultTypeExpr) {
-        ResultTypeRepr = ResultTypeExpr->getTypeRepr();
-      }
-    }
+    TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
       TC.diagnose(AE->getResultExpr()->getLoc(),
                   diag::expected_type_after_arrow);
-      HadError = true;
+      ResultTypeRepr =
+        new (TC.Context) ErrorTypeRepr(AE->getResultExpr()->getSourceRange());
     }
-
-    if (HadError) return nullptr;
 
     auto NewTypeRepr =
       new (TC.Context) FunctionTypeRepr(nullptr, ArgsTypeRepr,
@@ -1293,10 +1296,9 @@ void CleanupIllFormedExpressionRAII::doIt(Expr *expr, ASTContext &Context) {
 
     bool walkToDeclPre(Decl *D) override {
       // This handles parameter decls in ClosureExprs.
-      if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (auto VD = dyn_cast<VarDecl>(D)) {
         if (VD->hasType() && VD->getType()->hasTypeVariable()) {
-          VD->overwriteType(ErrorType::get(context));
-          VD->setInvalid();
+          VD->markInvalid();
         }
       }
       return true;
@@ -1902,8 +1904,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       if (var->hasType() && !var->getType()->hasError())
         return;
 
-      var->overwriteType(ErrorType::get(Context));
-      var->setInvalid();
+      var->markInvalid();
     });
   }
 
@@ -2232,8 +2233,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
         // compute a type for.
         if (var->hasType() && !var->getType()->hasError())
           return;
-        var->overwriteType(ErrorType::get(Context));
-        var->setInvalid();
+        var->markInvalid();
       });
     };
 
@@ -2286,6 +2286,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          Context.getIdentifier("$match"),
                                          rhsType,
                                          DC);
+  matchVar->setInterfaceType(DC->mapTypeOutOfContext(rhsType));
 
   matchVar->setImplicit();
   EP->setMatchVar(matchVar);

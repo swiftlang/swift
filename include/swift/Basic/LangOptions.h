@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -140,9 +140,6 @@ namespace swift {
 
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
-
-    /// \brief Enable experimental nested generic types feature.
-    bool EnableExperimentalNestedGenericTypes = false;
 
     /// \brief Staging flag for class resilience, which we do not want to enable
     /// fully until more code is in place, to allow the standard library to be

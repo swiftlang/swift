@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // <rdar://problem/20872721> QoI: warn about unused variables
 // <rdar://problem/15975935> warning that you can use 'let' not 'var'

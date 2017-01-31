@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -713,6 +713,8 @@ static bool omitNeedlessWordsInFunctionName(
     Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
     NameImporter &nameImporter) {
   clang::ASTContext &clangCtx = nameImporter.getClangContext();
+  const version::Version &swiftLanguageVersion =
+      nameImporter.getLangOpts().EffectiveLanguageVersion;
 
   // Collect the parameter type names.
   StringRef firstParamName;
@@ -741,7 +743,8 @@ static bool omitNeedlessWordsInFunctionName(
     bool hasDefaultArg =
         ClangImporter::Implementation::inferDefaultArgument(
             param->getType(),
-            getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[i]),
+            getParamOptionality(swiftLanguageVersion, param,
+                                !nonNullArgs.empty() && nonNullArgs[i]),
             nameImporter.getIdentifier(baseName), numParams, argumentName,
             i == 0, isLastParameter, nameImporter) != DefaultArgumentKind::None;
 
@@ -1081,6 +1084,18 @@ bool NameImporter::hasErrorMethodNameCollision(
                                enableObjCInterop());
 }
 
+/// Whether we should suppress this factory method being imported as an
+/// initializer. We want to do this when explicitly directed to, or when
+/// importing a property accessor.
+static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
+                                        ImportNameOptions options,
+                                        CtorInitializerKind initKind) {
+  return (method->isPropertyAccessor() ||
+          options.contains(ImportNameFlags::SuppressFactoryMethodAsInit)) &&
+         (initKind == CtorInitializerKind::Factory ||
+          initKind == CtorInitializerKind::ConvenienceFactory);
+}
+
 ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                                           ImportNameOptions options) {
   ImportedName result;
@@ -1091,7 +1106,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // Objective-C categories and extensions don't have names, despite
   // being "named" declarations.
   if (isa<clang::ObjCCategoryDecl>(D))
-    return {};
+    return ImportedName();
 
   // Dig out the definition, if there is one.
   if (auto def = getDefinitionForClangTypeDecl(D)) {
@@ -1103,7 +1118,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
   auto effectiveCtx = determineEffectiveContext(D, dc, options);
   if (!effectiveCtx)
-    return {};
+    return ImportedName();
   result.EffectiveContext = effectiveCtx;
 
   // FIXME: ugly to check here, instead perform unified check up front in
@@ -1189,15 +1204,13 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         if (!shouldImportAsInitializer(method, initPrefixLength,
                                        result.InitKind)) {
           // We cannot import this as an initializer anyway.
-          return {};
+          return ImportedName();
         }
 
         // If this swift_name attribute maps a factory method to an
         // initializer and we were asked not to do so, ignore the
         // custom name.
-        if (options.contains(ImportNameFlags::SuppressFactoryMethodAsInit) &&
-            (result.InitKind == CtorInitializerKind::Factory ||
-             result.InitKind == CtorInitializerKind::ConvenienceFactory)) {
+        if (suppressFactoryMethodAsInit(method, options, result.InitKind)) {
           skipCustomName = true;
         } else {
           // Note that this is an initializer.
@@ -1328,9 +1341,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     // If we would import a factory method as an initializer but were
     // asked not to, don't consider this as an initializer.
     if (isInitializer &&
-        options.contains(ImportNameFlags::SuppressFactoryMethodAsInit) &&
-        (result.InitKind == CtorInitializerKind::Factory ||
-         result.InitKind == CtorInitializerKind::ConvenienceFactory)) {
+        suppressFactoryMethodAsInit(objcMethod, options, result.InitKind)) {
       isInitializer = false;
     }
 
@@ -1619,16 +1630,16 @@ bool ClangImporter::shouldIgnoreMacro(StringRef Name,
   return ::shouldIgnoreMacro(Name, Macro);
 }
 
-Identifier importer::importMacroName(
-    const clang::IdentifierInfo *clangIdentifier, const clang::MacroInfo *macro,
-    clang::ASTContext &clangCtx, ASTContext &SwiftContext) {
+Identifier
+NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
+                              const clang::MacroInfo *macro) {
   // If we're supposed to ignore this macro, return an empty identifier.
   if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
     return Identifier();
 
   // No transformation is applied to the name.
   StringRef name = clangIdentifier->getName();
-  return SwiftContext.getIdentifier(name);
+  return swiftCtx.getIdentifier(name);
 }
 
 /// Determine the Swift name for a clang decl

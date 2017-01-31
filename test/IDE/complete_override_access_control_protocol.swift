@@ -1,5 +1,5 @@
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
-// RUN: %target-swift-frontend -parse -verify -disable-objc-attr-requires-foundation-module %t_no_errors.swift
+// RUN: %target-swift-frontend -typecheck -verify -disable-objc-attr-requires-foundation-module %t_no_errors.swift
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ABC
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ABC

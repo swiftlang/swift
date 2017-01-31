@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -168,7 +168,7 @@ public:
   struct Implementation;
   Implementation &Impl;
   
-  friend class ConstraintCheckerArenaRAII;
+  friend ConstraintCheckerArenaRAII;
 public:
   ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
              SourceManager &SourceMgr, DiagnosticEngine &Diags);
@@ -765,6 +765,11 @@ public:
   ArchetypeBuilder *getOrCreateArchetypeBuilder(CanGenericSignature sig,
                                                 ModuleDecl *mod);
 
+  /// Retrieve or create the canonical generic environment of a canonical
+  /// archetype builder.
+  GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
+                                                     ArchetypeBuilder *builder);
+
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,
                                               bool forInstance);
@@ -782,14 +787,14 @@ public:
   bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
 
 private:
-  friend class Decl;
+  friend Decl;
   Optional<RawComment> getRawComment(const Decl *D);
   void setRawComment(const Decl *D, RawComment RC);
 
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
 
-  friend class TypeBase;
+  friend TypeBase;
 
   /// \brief Set the substitutions for the given bound generic type.
   void setSubstitutions(TypeBase *type,
@@ -813,14 +818,12 @@ private:
   /// Unregister information about the given lazily-constructed archetype.
   void unregisterLazyArchetype(const ArchetypeType *archetype);
 
-  friend class ArchetypeType;
-  friend class ArchetypeBuilder::PotentialArchetype;
+  friend ArchetypeType;
+  friend ArchetypeBuilder::PotentialArchetype;
 
-  /// Provide context-level uniquing for SIL lowered type layouts.
+  /// Provide context-level uniquing for SIL lowered type layouts and boxes.
   friend SILLayout;
-  llvm::FoldingSet<SILLayout> *&getSILLayouts();
   friend SILBoxType;
-  llvm::DenseMap<CanType, SILBoxType *> &getSILBoxTypes();
 };
 
 /// Retrieve information about the given Objective-C method for

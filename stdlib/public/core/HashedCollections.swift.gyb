@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -268,14 +268,12 @@ internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
 internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bool
 #endif
 
-//===--- Hacks and workarounds --------------------------------------------===//
 
-// FIXME(ABI)#158 (Performance)
-// There used to be a now-fixed optimizer bug that prevented using
-// UnsafePointer<Unmanaged<AnyObject>> in Dictionary implementation.
-// rdar://problem/16861508
-/// Like `UnsafeMutablePointer<Unmanaged<AnyObject>>`, or `id
-/// __unsafe_unretained *` in Objective-C ARC.
+/// A temporary view of an array of AnyObject as an array of Unmanaged<AnyObject>
+/// for fast iteration and transformation of the elements.
+///
+/// Accesses the underlying raw memory as Unmanaged<AnyObject> using untyped
+/// memory accesses. The memory remains bound to managed AnyObjects.
 internal struct _UnmanagedAnyObjectArray {
   /// Underlying pointer.
   internal var value: UnsafeMutableRawPointer
@@ -452,9 +450,6 @@ public struct Set<Element : Hashable> :
   internal typealias _Self = Set<Element>
   internal typealias _VariantBuffer = _VariantSetBuffer<Element>
   internal typealias _NativeBuffer = _NativeSetBuffer<Element>
-
-  /// The index type for subscripting the set.
-  public typealias Index = SetIndex<Element>
 
   internal var _variantBuffer: _VariantBuffer
 
@@ -671,6 +666,8 @@ public struct Set<Element : Hashable> :
   }
 
   /// The number of elements in the set.
+  ///
+  /// - Complexity: O(1).
   public var count: Int {
     return _variantBuffer.count
   }
@@ -1163,6 +1160,12 @@ internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
   return (true, lhs.count == rhs.count)
 }
 
+// FIXME: rdar://problem/23549059 (Optimize == for Set)
+// Look into initially trying to compare the two sets by directly comparing the
+// contents of both buffers in order. If they happen to have the exact same
+// ordering we can get the `true` response without ever hashing. If the two
+// buffers' contents differ at all then we have to fall back to hashing the
+// rest of the elements (but we don't need to hash any prefix that did match).
 extension Set {
   /// Returns a Boolean value indicating whether two sets have equal elements.
   ///
@@ -1641,9 +1644,6 @@ public struct Dictionary<Key : Hashable, Value> :
   /// The element type of a dictionary: a tuple containing an individual
   /// key-value pair.
   public typealias Element = (key: Key, value: Value)
-
-  /// The index type of a dictionary.
-  public typealias Index = DictionaryIndex<Key, Value>
 
   internal var _variantBuffer: _VariantBuffer
 
@@ -2473,6 +2473,11 @@ collections = [
 /// keys, followed by the values.
 //
 // See the docs at the top of the file for more details on this type
+//
+// NOTE: The precise layout of this type is relied on in the runtime
+// to provide a statically allocated empty singleton. 
+// See stdlib/public/stubs/GlobalObjects.cpp for details.
+@objc_non_lazy_realization
 internal class _RawNative${Self}Storage:
   _SwiftNativeNS${Self}, _NS${Self}Core
 {
@@ -2496,31 +2501,10 @@ internal class _RawNative${Self}Storage:
   /// The empty singleton that is used for every single Dictionary that is
   /// created without any elements. The contents of the storage should never
   /// be mutated.
-  // FIXME: this should be set up in rodata like the Array singleton
-  internal static let empty: RawStorage = {
-    let storage = Builtin.allocWithTailElems_1(RawStorage.self,
-        1._builtinWordValue, UInt.self)
-    
-    // We set the capacity to 1 so that there's an empty hole to search.
-    // Any insertion will lead to a real storage being allocated, because 
-    // Dictionary guarantees there's always another empty hole after insertion.
-    storage.capacity = 1
-    storage.count = 0
-
-    // Initialize pointers to garbage; they should never be loaded
-    storage.keys  = UnsafeMutableRawPointer(bitPattern: 1)!
-  % if Self == 'Dictionary':
-    storage.values = UnsafeMutableRawPointer(bitPattern: 1)!
-  % end
-
-    let initializedEntries = _UnsafeBitMap(
-        storage: storage._initializedHashtableEntriesBitMapBuffer,
-        bitCount: 1)
-    initializedEntries.initializeToZero()
-
-    storage.initializedEntries = initializedEntries
-    return storage
-  }()
+  internal static var empty: RawStorage {
+    return Builtin.bridgeFromRawPointer(
+      Builtin.addressof(&_swiftEmpty${Self}Storage))
+  }
 
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
@@ -2830,6 +2814,7 @@ final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
 /// with _SwiftDeferredNS${Self}. What functionality actually relies on
 /// Hashable can be found in an extension.
 @_versioned
+@_fixed_layout
 internal struct _Native${Self}Buffer<${TypeParameters}> {
 
   internal typealias RawStorage = _RawNative${Self}Storage
@@ -3590,15 +3575,6 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
       object: _heapStorageBridgedPtr, desired: newStorage)
   }
 
-  /// Detach the buffer of bridged ${Self} elements.
-  ///
-  /// Call this before mutating the ${Self} buffer owned by this owner.
-  internal func deinitializeHeapStorageBridged() {
-    // Perform a non-atomic store because buffer should be
-    // uniquely-referenced.
-    _heapStorageBridgedPtr.pointee = nil
-  }
-
   /// Returns the bridged ${Self} values.
   internal var bridgedBuffer: BridgedBuffer {
     return BridgedBuffer(_storage: _bridgedStorage!)
@@ -3608,6 +3584,11 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     if _fastPath(_bridgedStorage != nil) {
       return
     }
+
+    // FIXME: rdar://problem/19486139 (split bridged buffers for keys and values)
+    // We bridge keys and values unconditionally here, even if one of them
+    // actually is verbatim bridgeable (e.g. Dictionary<Int, AnyObject>).
+    // Investigate only allocating the buffer for a Set in this case.
 
     // Create buffer for bridged data.
     let bridged = BridgedBuffer(capacity: nativeBuffer.capacity, unhashable: ())
@@ -3883,6 +3864,8 @@ internal struct _Cocoa${Self}Buffer : _HashBuffer {
   }
 }
 #else
+@_versioned
+@_fixed_layout
 internal struct _Cocoa${Self}Buffer {}
 #endif
 
@@ -4702,6 +4685,7 @@ internal enum ${Self}IndexRepresentation<${TypeParametersDecl}> {
   case _cocoa(_CocoaIndex)
 }
 
+extension ${Self} {
 %{
 if Self == 'Set':
   SubscriptingWithIndexDoc = """\
@@ -4723,12 +4707,7 @@ elif Self == 'Dictionary':
 }%
 
 ${SubscriptingWithIndexDoc}
-public struct ${Self}Index<${TypeParametersDecl}> :
-  Comparable {
-  // FIXME(ABI)#34 (Nesting types in generics): `DictionaryIndex` and `SetIndex` should
-  // be nested types (Dictionary.Index and Set.Index).
-  // rdar://problem/17002096
-
+public struct Index : Comparable {
   // Index for native buffer is efficient.  Index for bridged NS${Self} is
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
@@ -4747,12 +4726,12 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   internal var _value: ${Self}IndexRepresentation<${TypeParameters}>
 
   @_versioned
-  internal static func _native(_ index: _NativeIndex) -> ${Self}Index {
+  internal static func _native(_ index: _NativeIndex) -> Index {
     return ${Self}Index(_value: ._native(index))
   }
 #if _runtime(_ObjC)
   @_versioned
-  internal static func _cocoa(_ index: _CocoaIndex) -> ${Self}Index {
+  internal static func _cocoa(_ index: _CocoaIndex) -> Index {
     return ${Self}Index(_value: ._cocoa(index))
   }
 #endif
@@ -4786,10 +4765,15 @@ public struct ${Self}Index<${TypeParametersDecl}> :
 #endif
 }
 
-extension ${Self}Index {
+}
+
+public typealias ${Self}Index<${TypeParametersDecl}> =
+    ${Self}<${TypeParameters}>.Index
+
+extension ${Self}.Index {
   public static func == (
-    lhs: ${Self}Index<${TypeParameters}>,
-    rhs: ${Self}Index<${TypeParameters}>
+    lhs: ${Self}<${TypeParameters}>.Index,
+    rhs: ${Self}<${TypeParameters}>.Index
   ) -> Bool {
     if _fastPath(lhs._guaranteedNative) {
       return lhs._nativeIndex == rhs._nativeIndex
@@ -4810,8 +4794,8 @@ extension ${Self}Index {
   }
 
   public static func < (
-    lhs: ${Self}Index<${TypeParameters}>,
-    rhs: ${Self}Index<${TypeParameters}>
+    lhs: ${Self}<${TypeParameters}>.Index,
+    rhs: ${Self}<${TypeParameters}>.Index
   ) -> Bool {
     if _fastPath(lhs._guaranteedNative) {
       return lhs._nativeIndex < rhs._nativeIndex
@@ -5201,10 +5185,8 @@ extension Set {
   ///     print(attendees.isSubset(of: employees))
   ///     // Prints "true"
   ///
-  /// - Parameter other: A sequence of elements. `possibleSuperset` must be
-  ///   finite.
-  /// - Returns: `true` if the set is a subset of `possibleSuperset`;
-  ///   otherwise, `false`.
+  /// - Parameter other: Another set.
+  /// - Returns: `true` if the set is a subset of `other`; otherwise, `false`.
   public func isSubset(of other: Set<Element>) -> Bool {
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
@@ -5221,9 +5203,9 @@ extension Set {
   ///     print(employees.isSuperset(of: attendees))
   ///     // Prints "true"
   ///
-  /// - Parameter possibleSubset: Another set.
-  /// - Returns: `true` if the set is a superset of `possibleSubset`;
-  ///   otherwise, `false`.
+  /// - Parameter other: Another set.
+  /// - Returns: `true` if the set is a superset of `other`; otherwise,
+  ///   `false`.
   public func isSuperset(of other: Set<Element>) -> Bool {
     return other.isSubset(of: self)
   }
@@ -5283,9 +5265,9 @@ extension Set {
   ///     print(employees.isStrictSuperset(of: employees))
   ///     // Prints "false"
   ///
-  /// - Parameter possibleStrictSubset: Another set.
+  /// - Parameter other: Another set.
   /// - Returns: `true` if the set is a strict superset of
-  ///   `possibleStrictSubset`; otherwise, `false`.
+  ///   `other`; otherwise, `false`.
   public func isStrictSuperset(of other: Set<Element>) -> Bool {
     return self.isSuperset(of: other) && self != other
   }
@@ -5306,9 +5288,9 @@ extension Set {
   ///     print(attendees.isStrictSubset(of: attendees))
   ///     // Prints "false"
   ///
-  /// - Parameter possibleStrictSuperset: Another set.
+  /// - Parameter other: Another set.
   /// - Returns: `true` if the set is a strict subset of
-  ///   `possibleStrictSuperset`; otherwise, `false`.
+  ///   `other`; otherwise, `false`.
   public func isStrictSubset(of other: Set<Element>) -> Bool {
     return other.isStrictSuperset(of: self)
   }

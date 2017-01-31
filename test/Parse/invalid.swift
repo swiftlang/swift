@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func foo(_ a: Int) {
   // expected-error @+1 {{invalid character in source file}} {{8-9= }}
@@ -67,8 +67,7 @@ SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
 func SR979a(a : inout inout Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-23=}}
 func SR979b(inout inout b: Int) {} // expected-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{13-18=}} {{28-28=inout }} 
 // expected-error@-1 {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{19-25=}}
-func SR979c(let a: inout Int) {}	 // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-16=}} 
-// expected-error @-1 {{'let' as a parameter attribute is not allowed}} {{13-16=}}
+func SR979c(let a: inout Int) {} // expected-error {{'let' as a parameter attribute is not allowed}} {{13-16=}}
 func SR979d(let let a: Int) {}  // expected-error {{'let' as a parameter attribute is not allowed}} {{13-16=}} 
 // expected-error @-1 {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-21=}}
 func SR979e(inout x: inout String) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-18=}}
@@ -120,3 +119,9 @@ struct Weak<T: class> { // expected-error {{'class' constraint can only appear o
   weak var value: T // expected-error {{'weak' may only be applied to class and class-bound protocol types}}
   // expected-error@-1 {{use of undeclared type 'T'}}
 }
+
+let x: () = ()
+!() // expected-error {{missing argument for parameter #1 in call}}
+!(()) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+!(x) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+!x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}

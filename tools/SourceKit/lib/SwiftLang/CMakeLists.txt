@@ -38,6 +38,7 @@ add_sourcekit_library(SourceKitSwiftLang
       debuginfodwarf
       instrumentation
       ipo
+      lto
       mc
       mcparser
       option

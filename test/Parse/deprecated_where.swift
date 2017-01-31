@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 // FuncDecl: Choose 0
 func f1<T>(x: T) {}

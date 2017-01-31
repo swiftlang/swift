@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -28,10 +28,12 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/Edit.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMContext.h"
@@ -209,6 +211,12 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
                    diag::emit_reference_dependencies_without_primary_file);
     return true;
   }
+
+  // Before writing to the dependencies file path, preserve any previous file
+  // that may have been there. No error handling -- this is just a nicety, it
+  // doesn't matter if it fails.
+  llvm::sys::fs::rename(opts.ReferenceDependenciesFilePath,
+                        opts.ReferenceDependenciesFilePath + "~");
 
   std::error_code EC;
   llvm::raw_fd_ostream out(opts.ReferenceDependenciesFilePath, EC,
@@ -417,7 +425,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     auto rhsMangledName = mangleTypeAsContext(rhs->first.first);
     return lhsMangledName.compare(rhsMangledName);
   });
-  
+
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
     if (entry.first.first->hasAccessibility() &&
@@ -557,18 +565,17 @@ namespace {
 class JSONFixitWriter : public DiagnosticConsumer {
   std::unique_ptr<llvm::raw_ostream> OSPtr;
   bool FixitAll;
+  std::vector<SingleEdit> AllEdits;
 
 public:
   JSONFixitWriter(std::unique_ptr<llvm::raw_ostream> OS,
                   const DiagnosticOptions &DiagOpts)
     : OSPtr(std::move(OS)),
-      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {
-    *OSPtr << "[\n";
-  }
-  ~JSONFixitWriter() {
-    *OSPtr << "]\n";
-  }
+      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
+  ~JSONFixitWriter() {
+    swift::writeEditsInJson(llvm::makeArrayRef(AllEdits), *OSPtr);
+  }
 private:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind, StringRef Text,
@@ -576,7 +583,7 @@ private:
     if (!shouldFix(Kind, Info))
       return;
     for (const auto &Fix : Info.FixIts) {
-      writeEdit(SM, Fix.getRange(), Fix.getText(), *OSPtr);
+      AllEdits.push_back({SM, Fix.getRange(), Fix.getText()});
     }
   }
 
@@ -656,28 +663,6 @@ private:
 
     return false;
   }
-
-  void writeEdit(SourceManager &SM, CharSourceRange Range, StringRef Text,
-                 llvm::raw_ostream &OS) {
-    SourceLoc Loc = Range.getStart();
-    unsigned BufID = SM.findBufferContainingLoc(Loc);
-    unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufID);
-    unsigned Length = Range.getByteLength();
-    SmallString<200> Path =
-      StringRef(SM.getIdentifierForBuffer(BufID));
-
-    OS << " {\n";
-    OS << "  \"file\": \"";
-    OS.write_escaped(Path.str()) << "\",\n";
-    OS << "  \"offset\": " << Offset << ",\n";
-    if (Length != 0)
-      OS << "  \"remove\": " << Length << ",\n";
-    if (!Text.empty()) {
-      OS << "  \"text\": \"";
-      OS.write_escaped(Text) << "\",\n";
-    }
-    OS << " },\n";
-  }
 };
 
 } // anonymous namespace
@@ -751,11 +736,15 @@ static bool performCompile(CompilerInstance &Instance,
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
-  if (Action == FrontendOptions::DumpParse ||
+  if (Action == FrontendOptions::Parse ||
+      Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpInterfaceHash)
     Instance.performParseOnly();
   else
     Instance.performSema();
+
+  if (Action == FrontendOptions::Parse)
+    return false;
 
   if (observer) {
     observer->performedSemanticAnalysis(Instance);
@@ -868,8 +857,8 @@ static bool performCompile(CompilerInstance &Instance,
       opts.ImplicitObjCHeaderPath.empty() &&
       !Context.LangOpts.EnableAppExtensionRestrictions;
 
-  // We've just been told to perform a parse, so we can return now.
-  if (Action == FrontendOptions::Parse) {
+  // We've just been told to perform a typecheck, so we can return now.
+  if (Action == FrontendOptions::Typecheck) {
     if (!opts.ObjCHeaderOutputPath.empty())
       return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
                          opts.ImplicitObjCHeaderPath, moduleIsPublic);
@@ -1084,10 +1073,10 @@ static bool performCompile(CompilerInstance &Instance,
   // something is persisting across calls to performIRGeneration.
   auto &LLVMContext = getGlobalLLVMContext();
   if (PrimarySourceFile) {
-    performIRGeneration(IRGenOpts, *PrimarySourceFile, SM.get(),
+    performIRGeneration(IRGenOpts, *PrimarySourceFile, std::move(SM),
                         opts.getSingleOutputFilename(), LLVMContext);
   } else {
-    performIRGeneration(IRGenOpts, Instance.getMainModule(), SM.get(),
+    performIRGeneration(IRGenOpts, Instance.getMainModule(), std::move(SM),
                         opts.getSingleOutputFilename(), LLVMContext);
   }
 
@@ -1303,6 +1292,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   bool HadError =
     performCompile(Instance, Invocation, Args, ReturnValue, observer) ||
     Instance.getASTContext().hadError();
+
+  if (!HadError) {
+    NewMangling::printManglingStats();
+  }
 
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
     HadError = dumpAPI(Instance.getMainModule(),

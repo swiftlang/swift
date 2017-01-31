@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -269,12 +269,6 @@ public:
   /// protocol extension.
   ///
   /// Only valid if \c getAsProtocolOrProtocolExtensionContext().
-  GenericTypeParamDecl *getProtocolSelf() const;
-
-  /// \brief Retrieve the generic parameter 'Self' from a protocol or
-  /// protocol extension.
-  ///
-  /// Only valid if \c getAsProtocolOrProtocolExtensionContext().
   GenericTypeParamType *getProtocolSelfType() const;
 
   /// Gets the type being declared by this context.
@@ -294,12 +288,6 @@ public:
   /// - Generic types return a bound generic type using interface types.
   /// - Non-type contexts return a null type.
   Type getDeclaredInterfaceType() const;
-
-  /// Get the type of `self` in this context.
-  ///
-  /// - Protocol types return the `Self` archetype.
-  /// - Everything else falls back on getDeclaredTypeOfContext().
-  Type getSelfTypeOfContext() const;
 
   /// Get the type of `self` in this context.
   ///
@@ -326,7 +314,13 @@ public:
   /// \brief Retrieve the innermost archetypes of this context or any
   /// of its parents.
   GenericEnvironment *getGenericEnvironmentOfContext() const;
-  
+
+  /// Map an interface type to a contextual type within this context.
+  Type mapTypeIntoContext(Type type) const;
+
+  /// Map a type within this context to an interface type.
+  Type mapTypeOutOfContext(Type type) const;
+
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
   DeclContext *getLocalContext();

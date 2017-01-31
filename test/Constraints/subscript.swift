@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Simple subscript of arrays:
 func simpleSubscript(_ array: [Float], x: Int) -> Float {

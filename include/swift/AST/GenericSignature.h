@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -77,6 +77,8 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   /// Retrieve the archetype builder for the given generic signature.
   ArchetypeBuilder *getArchetypeBuilder(ModuleDecl &mod);
 
+  friend class ArchetypeType;
+
 public:
   /// Create a new generic signature with the given type parameters and
   /// requirements.
@@ -127,7 +129,16 @@ public:
                           SubstitutionMap &subMap) const;
 
   using LookupConformanceFn =
-      llvm::function_ref<ProtocolConformanceRef(CanType, Type, ProtocolType *)>;
+      llvm::function_ref<ProtocolConformanceRef(CanType dependentType,
+                                              Type conformingReplacementType,
+                                              ProtocolType *conformedProtocol)>;
+
+  /// Build an array of substitutions from an interface type substitution map,
+  /// using the given function to look up conformances.
+  void getSubstitutions(ModuleDecl &mod,
+                        TypeSubstitutionFn substitution,
+                        LookupConformanceFn lookupConformance,
+                        SmallVectorImpl<Substitution> &result) const;
 
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.

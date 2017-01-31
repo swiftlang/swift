@@ -5,13 +5,14 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AST.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
@@ -105,7 +106,7 @@ ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
            getAsGenericTypeOrGenericTypeExtensionContext());
 }
 
-GenericTypeParamDecl *DeclContext::getProtocolSelf() const {
+GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   auto *proto = getAsProtocolOrProtocolExtensionContext();
   assert(proto && "not a protocol");
 
@@ -117,14 +118,9 @@ GenericTypeParamDecl *DeclContext::getProtocolSelf() const {
   if (!isInnermostContextGeneric())
     return nullptr;
 
-  return getGenericParamsOfContext()->getParams().front();
-}
-
-GenericTypeParamType *DeclContext::getProtocolSelfType() const {
-  auto *param = getProtocolSelf();
-  if (!param)
-    return nullptr;
-  return param->getDeclaredType()->castTo<GenericTypeParamType>();
+  return getGenericParamsOfContext()->getParams().front()
+      ->getDeclaredInterfaceType()
+      ->castTo<GenericTypeParamType>();
 }
 
 enum class DeclTypeKind : unsigned {
@@ -303,6 +299,20 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
     }
     llvm_unreachable("bad DeclContextKind");
   }
+}
+
+Type DeclContext::mapTypeIntoContext(Type type) const {
+  if (auto genericEnv = getGenericEnvironmentOfContext())
+    return genericEnv->mapTypeIntoContext(getParentModule(), type);
+
+  return type;
+}
+
+Type DeclContext::mapTypeOutOfContext(Type type) const {
+  if (auto genericEnv = getGenericEnvironmentOfContext())
+    return genericEnv->mapTypeOutOfContext(getParentModule(), type);
+
+  return type;
 }
 
 DeclContext *DeclContext::getLocalContext() {
@@ -504,10 +514,14 @@ bool DeclContext::isValidGenericContext() const {
 ResilienceExpansion DeclContext::getResilienceExpansion() const {
   for (const auto *dc = this; dc->isLocalContext(); dc = dc->getParent()) {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
+      // If the function is a nested function, we will serialize its body if
+      // we serialize the parent's body.
+      if (AFD->getDeclContext()->isLocalContext())
+        continue;
+      
       // If the function is not externally visible, we will not be serializing
       // its body.
-      if (!AFD->getDeclContext()->isLocalContext() &&
-          AFD->getEffectiveAccess() < Accessibility::Public)
+      if (AFD->getEffectiveAccess() < Accessibility::Public)
         break;
 
       // Bodies of public transparent and always-inline functions are
@@ -749,8 +763,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);
     OS << " name=" << AFD->getName();
-    if (AFD->hasType())
-      OS << " : " << AFD->getType();
+    if (AFD->hasInterfaceType())
+      OS << " : " << AFD->getInterfaceType();
     else
       OS << " : (no type set)";
     break;
@@ -758,8 +772,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   case DeclContextKind::SubscriptDecl: {
     auto *SD = cast<SubscriptDecl>(this);
     OS << " name=" << SD->getName();
-    if (SD->hasType())
-      OS << " : " << SD->getType();
+    if (SD->hasInterfaceType())
+      OS << " : " << SD->getInterfaceType();
     else
       OS << " : (no type set)";
     break;
@@ -926,4 +940,27 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
         static_cast<const IterableDeclContext*>(cast<ID##Decl>(D)));
 #include "swift/AST/DeclNodes.def"
   }
+}
+
+AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
+    : Value(DC, isPrivate) {
+  if (!DC || isa<ModuleDecl>(DC))
+    assert(!isPrivate && "public or internal scope can't be private");
+}
+
+bool AccessScope::isFileScope() const {
+  auto DC = getDeclContext();
+  return DC && isa<FileUnit>(DC);
+}
+
+Accessibility AccessScope::accessibilityForDiagnostics() const {
+  if (isPublic())
+    return Accessibility::Public;
+  if (isa<ModuleDecl>(getDeclContext()))
+    return Accessibility::Internal;
+  if (getDeclContext()->isModuleScopeContext()) {
+    return isPrivate() ? Accessibility::Private : Accessibility::FilePrivate;
+  }
+
+  return Accessibility::Private;
 }

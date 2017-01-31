@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -361,7 +361,6 @@ namespace {
 
     Type operator()(Type type) {
       // Swift only supports rank-1 polymorphism.
-      assert(!type->is<PolymorphicFunctionType>());
       assert(!type->is<GenericFunctionType>());
 
       // Preserve parens when opening types.
@@ -704,6 +703,8 @@ static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
     // Never remove argument labels from a double application.
     return 0;
   }
+
+  llvm_unreachable("Unhandled FunctionRefKind in switch.");
 }
 
 std::pair<Type, Type>
@@ -771,8 +772,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   }
 
   // Determine the type of the value, opening up that type if necessary.
+  bool wantInterfaceType = true;
+  if (isa<VarDecl>(value))
+    wantInterfaceType = !value->getDeclContext()->isLocalContext();
   Type valueType = TC.getUnopenedTypeOfReference(value, Type(), DC, base,
-                                                 /*wantInterfaceType=*/true);
+                                                 wantInterfaceType);
 
   // If this is a let-param whose type is a type variable, this is an untyped
   // closure param that may be bound to an inout type later. References to the
@@ -1063,23 +1067,28 @@ ConstraintSystem::getTypeOfMemberReference(
     if (!baseObjTy->isExistentialType() &&
         baseObjTy->getAnyNominal()) {
       auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
-      ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(baseObjTy, proto, DC,
-                                ConformanceCheckFlags::InExpression,
-                                &conformance)) {
-        auto memberTy = conformance->getTypeWitness(assocType, &TC)
-          .getReplacement();
-        if (!isTypeReference)
-          memberTy = MetatypeType::get(memberTy);
+      if (auto conformance =
+            TC.conformsToProtocol(baseObjTy, proto, DC,
+                                  ConformanceCheckFlags::InExpression)) {
+        if (conformance->isConcrete()) {
+          auto memberTy = conformance->getConcrete()->getTypeWitness(assocType,
+                                                                     &TC)
+            .getReplacement();
+          if (!isTypeReference)
+            memberTy = MetatypeType::get(memberTy);
 
-        auto openedType = FunctionType::get(baseObjTy, memberTy);
-        return { openedType, memberTy };
+          auto openedType = FunctionType::get(baseObjTy, memberTy);
+          return { openedType, memberTy };
+        }
       }
     }
 
     // FIXME: Totally bogus fallthrough.
-    Type memberTy = isTypeReference? assocType->getDeclaredType()
-                                   : assocType->getType();
+    Type memberTy = isTypeReference
+        ? assocType->getDeclaredInterfaceType()
+        : assocType->getInterfaceType();
+    memberTy = ArchetypeBuilder::mapTypeIntoContext(
+        assocType->getProtocol(), memberTy);
     auto openedType = FunctionType::get(baseObjTy, memberTy);
     return { openedType, memberTy };
   }
@@ -1125,10 +1134,8 @@ ConstraintSystem::getTypeOfMemberReference(
       // We want to track if the generic context is represented by a
       // class-bound existential so we won't inappropriately wrap the
       // self type in an inout later on.
-      if (auto metatype = nominal->getType()->getAs<AnyMetatypeType>()) {
-        isClassBoundExistential = metatype->getInstanceType()->
-                                            isClassExistentialType();
-      }
+      isClassBoundExistential = nominal->getDeclaredType()
+          ->isClassExistentialType();
 
       if (outerDC->getAsProtocolOrProtocolExtensionContext()) {
         // Retrieve the type variable for 'Self'.
@@ -1244,11 +1251,13 @@ ConstraintSystem::getTypeOfMemberReference(
       // FIXME: Feels like a total hack.
     } else if (!baseOpenedTy->isExistentialType() &&
                !baseOpenedTy->is<ArchetypeType>()) {
-      ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(baseOpenedTy, proto, DC,
-                                ConformanceCheckFlags::InExpression,
-                                &conformance)) {
-        type = conformance->getTypeWitness(assocType, &TC).getReplacement();
+      if (auto conformance =
+            TC.conformsToProtocol(baseOpenedTy, proto, DC,
+                                  ConformanceCheckFlags::InExpression)) {
+        if (conformance->isConcrete()) {
+          type = conformance->getConcrete()->getTypeWitness(assocType, &TC)
+                   .getReplacement();
+        }
       }
     }
   } else if (!value->isInstanceMember() || isInstance) {
@@ -1445,7 +1454,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               refType};
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log.indent(solverState? solverState->depth * 2 : 2)
+    log.indent(solverState ? solverState->depth * 2 : 2)
       << "(overload set choice binding "
       << boundType->getString() << " := "
       << refType->getString() << ")\n";

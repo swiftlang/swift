@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 // REQUIRES: SWIFT_VERSION=3
 
 // This is allowed, in order to keep source compat with Swift version 3.0.

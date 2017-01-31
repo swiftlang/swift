@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -467,7 +467,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// its uses are ok.
     void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *ParentExpr=nullptr) {
       // This only cares about declarations of noescape function type.
-      auto AFT = DRE->getDecl()->getType()->getAs<AnyFunctionType>();
+      auto AFT = DRE->getDecl()->getInterfaceType()->getAs<AnyFunctionType>();
       if (!AFT || !AFT->isNoEscape())
         return;
 
@@ -528,9 +528,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // the missing ".self" as the subexpression of a parenthesized
         // expression, which is a historical bug.
         if (isa<ParenExpr>(ParentExpr) && CallArgs.count(ParentExpr) > 0) {
-          TC.diagnose(E->getEndLoc(), diag::warn_value_of_metatype_missing_self,
-                      E->getType()->getRValueInstanceType())
-            .fixItInsertAfter(E->getEndLoc(), ".self");
+          auto diag = TC.diagnose(E->getEndLoc(),
+              diag::warn_value_of_metatype_missing_self,
+              E->getType()->getRValueInstanceType());
+          if (E->canAppendCallParentheses()) {
+            diag.fixItInsertAfter(E->getEndLoc(), ".self");
+          } else {
+            diag.fixItInsert(E->getStartLoc(), "(");
+            diag.fixItInsertAfter(E->getEndLoc(), ").self");
+          }
           return;
         }
       }
@@ -539,18 +545,26 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       TC.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
 
-      // Add fix-t to insert '()', unless this is a protocol metatype.
-      bool isProtocolMetatype = false;
+      // Add fix-it to insert '()', only if this is a metatype of
+      // non-existential type and has any initializers.
+      bool isExistential = false;
       if (auto metaTy = E->getType()->getAs<MetatypeType>())
-        isProtocolMetatype = metaTy->getInstanceType()->is<ProtocolType>();
-      if (!isProtocolMetatype) {
+        isExistential = metaTy->getInstanceType()->isAnyExistentialType();
+      if (!isExistential &&
+          !TC.lookupConstructors(const_cast<DeclContext *>(DC),
+                                 E->getType()).empty()) {
         TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
           .fixItInsertAfter(E->getEndLoc(), "()");
       }
 
       // Add fix-it to insert ".self".
-      TC.diagnose(E->getEndLoc(), diag::add_self_to_type)
-        .fixItInsertAfter(E->getEndLoc(), ".self");
+      auto diag = TC.diagnose(E->getEndLoc(), diag::add_self_to_type);
+      if (E->canAppendCallParentheses()) {
+        diag.fixItInsertAfter(E->getEndLoc(), ".self");
+      } else {
+        diag.fixItInsert(E->getStartLoc(), "(");
+        diag.fixItInsertAfter(E->getEndLoc(), ").self");
+      }
     }
 
     void checkUnqualifiedAccessUse(const DeclRefExpr *DRE) {
@@ -1281,7 +1295,8 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
 
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     SourceRange typeRange = var->getTypeSourceRangeForDiagnostics();
-    return checkType(var->getType(), base->getType(), typeRange);
+    auto *baseVar = cast<VarDecl>(base);
+    return checkType(var->getType(), baseVar->getType(), typeRange);
   }
 
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -1296,9 +1311,14 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
+      auto resultType = ArchetypeBuilder::mapTypeIntoContext(
+          method, method->getResultInterfaceType());
+
       auto *baseMethod = cast<FuncDecl>(base);
-      fixedAny |= checkType(method->getBodyResultType(),
-                            baseMethod->getResultType(),
+      auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
+          baseMethod, baseMethod->getResultInterfaceType());
+
+      fixedAny |= checkType(resultType, baseResultType,
                             method->getBodyResultTypeLoc().getSourceRange());
     }
     return fixedAny;
@@ -1312,8 +1332,14 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
              [&](ParamDecl *param, const ParamDecl *baseParam) {
       fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
     });
-    fixedAny |= checkType(subscript->getElementType(),
-                          baseSubscript->getElementType(),
+
+    auto resultType = ArchetypeBuilder::mapTypeIntoContext(
+        subscript->getDeclContext(),
+        subscript->getElementInterfaceType());
+    auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
+        baseSubscript->getDeclContext(),
+        baseSubscript->getElementInterfaceType());
+    fixedAny |= checkType(resultType, baseResultType,
                           subscript->getElementTypeLoc().getSourceRange());
     return fixedAny;
   }
@@ -3804,19 +3830,6 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-
-Accessibility
-swift::accessibilityFromScopeForDiagnostics(const DeclContext *accessScope) {
-  if (!accessScope)
-    return Accessibility::Public;
-  if (isa<ModuleDecl>(accessScope))
-    return Accessibility::Internal;
-  if (accessScope->isModuleScopeContext()) {
-    return Accessibility::FilePrivate;
-  }
-  return Accessibility::Private;
-}
-
 void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
                                Accessibility desiredAccess, bool isForSetter) {
   StringRef fixItString;
@@ -3996,7 +4009,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->hasType())
+  if (!afd->hasInterfaceType())
     validateDecl(afd);
 
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
@@ -4031,7 +4044,8 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   bool returnsSelf = false;
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
-    resultType = func->getResultType();
+    resultType = func->getResultInterfaceType();
+    resultType = ArchetypeBuilder::mapTypeIntoContext(func, resultType);
     returnsSelf = func->hasDynamicSelf();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;

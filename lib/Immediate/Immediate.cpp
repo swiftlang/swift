@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -260,9 +260,10 @@ bool swift::immediate::IRGenImportedModules(
 
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
-    auto SubModule =
-        performIRGeneration(IRGenOpts, import, SILMod.get(),
-                            import->getName().str(), getGlobalLLVMContext());
+    auto SubModule = performIRGeneration(IRGenOpts, import,
+                                         std::move(SILMod),
+                                         import->getName().str(),
+                                         getGlobalLLVMContext());
 
     if (CI.getASTContext().hadError()) {
       hadError = true;
@@ -298,9 +299,10 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   auto *swiftModule = CI.getMainModule();
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
-  auto ModuleOwner =
-      performIRGeneration(IRGenOpts, swiftModule, CI.getSILModule(),
-                          swiftModule->getName().str(), getGlobalLLVMContext());
+  auto ModuleOwner = performIRGeneration(IRGenOpts, swiftModule,
+                                         CI.takeSILModule(),
+                                         swiftModule->getName().str(),
+                                         getGlobalLLVMContext());
   auto *Module = ModuleOwner.get();
 
   if (Context.hadError())

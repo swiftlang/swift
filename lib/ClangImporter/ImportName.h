@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -130,6 +130,8 @@ struct ImportedName {
     case ImportedAccessorKind::SubscriptSetter:
       return true;
     }
+    
+    llvm_unreachable("Invalid ImportedAccessorKind.");
   }
 };
 
@@ -137,17 +139,12 @@ struct ImportedName {
 /// in "Notification", or it there would be nothing left.
 StringRef stripNotification(StringRef name);
 
-/// Imports the name of the given Clang macro into Swift.
-Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                           const clang::MacroInfo *macro,
-                           clang::ASTContext &clangCtx,
-                           ASTContext &SwiftContext);
-
 // TODO: I'd like to remove the following
 /// Flags that control the import of names in importFullName.
 enum class ImportNameFlags {
   /// Suppress the factory-method-as-initializer transformation.
   SuppressFactoryMethodAsInit = 0x01,
+
   /// Produce the Swift 2 name of the given entity.
   Swift2Name = 0x02,
 };
@@ -187,6 +184,10 @@ public:
   ImportedName importName(const clang::NamedDecl *decl,
                           ImportNameOptions options);
 
+  /// Imports the name of the given Clang macro into Swift.
+  Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
+                             const clang::MacroInfo *macro);
+
   ASTContext &getContext() { return swiftCtx; }
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
 
@@ -206,7 +207,12 @@ public:
   }
 
   clang::Sema &getClangSema() { return clangSema; }
-  clang::ASTContext &getClangContext() { return getClangSema().getASTContext(); }
+  clang::ASTContext &getClangContext() {
+    return getClangSema().getASTContext();
+  }
+  clang::Preprocessor &getClangPreprocessor() {
+    return getClangSema().getPreprocessor();
+  }
 
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }

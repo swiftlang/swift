@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -942,6 +942,8 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::ValueMember:
     return false;
   }
+
+  llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
 ConstraintSystem::SolutionKind
@@ -1576,7 +1578,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return matchFunctionTypes(func1, func2, kind, flags, locator);
     }
 
-    case TypeKind::PolymorphicFunction:
     case TypeKind::GenericFunction:
       llvm_unreachable("Polymorphic function type should have been opened");
 
@@ -2260,9 +2261,6 @@ ConstraintSystem::simplifyConstructionConstraint(
     // Break out to handle the actual construction below.
     break;
 
-  case TypeKind::PolymorphicFunction:
-    llvm_unreachable("Polymorphic function type should have been opened");
-
   case TypeKind::UnboundGeneric:
     llvm_unreachable("Unbound generic type should have been opened");
 
@@ -2620,6 +2618,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   case CheckedCastKind::Unresolved:
     llvm_unreachable("Not a valid result");
   }
+
+  llvm_unreachable("Unhandled CheckedCastKind in switch.");
 }
 
 ConstraintSystem::SolutionKind
@@ -2934,12 +2934,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       if (favoredType && result.FavoredChoice == ~0U) {
         // Only try and favor monomorphic initializers.
         if (auto fnTypeWithSelf =
-            ctor->getType()->getAs<FunctionType>()) {
+            ctor->getInterfaceType()->getAs<FunctionType>()) {
           
           if (auto fnType =
                   fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
           
             auto argType = fnType->getInput()->getWithoutParens();
+            argType = ArchetypeBuilder::mapTypeIntoContext(
+                ctor.Decl->getInnermostDeclContext(), argType);
             if (argType->isEqual(favoredType))
               result.FavoredChoice = result.ViableCandidates.size();
           }
@@ -3072,7 +3074,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     }
     
     // If the result's type contains delayed members, we need to force them now.
-    if (auto NT = dyn_cast<NominalType>(cand->getType().getPointer())) {
+    if (auto NT = dyn_cast<NominalType>(cand->getInterfaceType().getPointer())) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(NT->getDecl())) {
         TC.forceExternalDeclMembers(NTD);
       }
@@ -4033,13 +4035,15 @@ ConstraintSystem::simplifyRestrictedConstraint(
   case SolutionKind::Error:
     return SolutionKind::Error;
   }
+
+  llvm_unreachable("Unhandled SolutionKind in switch.");
 }
 
 bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
   auto &ctx = getASTContext();
   if (ctx.LangOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
-    log.indent(solverState? solverState->depth * 2 + 2 : 0)
+    log.indent(solverState ? solverState->depth * 2 + 2 : 0)
       << "(attempting fix ";
     fix.print(log, this);
     log << " @";
@@ -4094,6 +4098,8 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
   case FixKind::CoerceToCheckedCast:
     llvm_unreachable("handled elsewhere");
   }
+
+  llvm_unreachable("Unhandled FixKind in switch.");
 }
 
 ConstraintSystem::SolutionKind
@@ -4146,6 +4152,8 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::Disjunction:
     llvm_unreachable("Use the correct addConstraint()");
   }
+
+  llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
 void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
@@ -4280,4 +4288,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     // Disjunction constraints are never solved here.
     return SolutionKind::Unsolved;
   }
+
+  llvm_unreachable("Unhandled ConstraintKind in switch.");
 }

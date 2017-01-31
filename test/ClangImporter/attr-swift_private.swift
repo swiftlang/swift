@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -typecheck %s -verify
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir %s -D IRGEN | %FileCheck %s
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -print-module -source-filename="%s" -module-to-print SwiftPrivateAttr > %t.txt
@@ -132,3 +132,10 @@ func testCF(_ a: __PrivCFType, b: __PrivCFSub, c: __PrivInt) {
 extension __PrivCFType {}
 extension __PrivCFSub {}
 _ = 1 as __PrivInt
+
+#if !IRGEN
+func testRawNames() {
+  let _ = Foo.__fooWithOneArg(0) // expected-error {{'__fooWithOneArg' is unavailable: use object construction 'Foo(__oneArg:)'}}
+  let _ = Foo.__foo // expected-error{{'__foo' is unavailable: use object construction 'Foo(__:)'}}
+}
+#endif

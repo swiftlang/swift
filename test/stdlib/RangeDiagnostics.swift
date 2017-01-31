@@ -5,11 +5,11 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 import StdlibUnittest
 
@@ -195,7 +195,7 @@ func disallowSubscriptingOnIntegers() {
     r2[0]       // expected-error {{cannot convert value of type 'Int' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
     r3[0]       // expected-error {{cannot convert value of type 'Int' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
 
-    r0[UInt(0)] // expected-error {{cannot subscript a value of type 'CountableRange<Int>' with an index of type 'UInt'}} expected-note {{overloads for 'subscript' exist}}
+    r0[UInt(0)] // expected-error {{ambiguous reference to member 'subscript'}}
     r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
     r2[UInt(0)] // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
     r3[UInt(0)] // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Range<ClosedRangeIndex<_>>'}}

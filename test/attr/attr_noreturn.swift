@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 @noreturn func noReturn1(_: Int) {}
 // expected-error@-1 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{1-11=}}{{33-33= -> Never }}

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -364,7 +364,8 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
 
   // ... or a multi-character token with the first character being the one that
   // we want to consume as a separate token.
-  restoreParserPosition(getParserPositionAfterFirstCharacter(Tok));
+  restoreParserPosition(getParserPositionAfterFirstCharacter(Tok),
+                        /*enableDiagnostics=*/true);
   return PreviousLoc;
 }
 
@@ -554,18 +555,23 @@ Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
                              const Diagnostic &D) {
   switch (Tok.getKind()) {
+  case tok::kw_throws:
   case tok::kw_rethrows:
+    if (!Context.isSwiftVersion3())
+      break;
+    // Swift3 accepts 'throws' and 'rethrows'
+    SWIFT_FALLTHROUGH;
   case tok::kw_self:
   case tok::kw_Self:
-  case tok::kw_throws:
   case tok::identifier:
     Loc = consumeIdentifier(&Result);
     return false;
   default:
-    checkForInputIncomplete();
-    diagnose(Tok, D);
-    return true;
+    break;
   }
+  checkForInputIncomplete();
+  diagnose(Tok, D);
+  return true;
 }
 
 bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,

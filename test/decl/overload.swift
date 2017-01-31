@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var var_redecl1: Int // expected-note {{previously declared here}}
 var_redecl1 = 0

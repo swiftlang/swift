@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // ---------------------------------------------------------------------------
 // Declaration of complete object initializers and basic semantic checking

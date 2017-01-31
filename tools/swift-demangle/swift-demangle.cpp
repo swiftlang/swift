@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/DemangleWrappers.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -104,7 +105,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
 
 static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
-  llvm::Regex maybeSymbol("_T[_a-zA-Z0-9$]+");
+  llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
 
   while (true) {
     char *inputLine = NULL;

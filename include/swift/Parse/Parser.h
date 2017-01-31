@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,12 +19,13 @@
 
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParserResult.h"
-#include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -320,8 +321,8 @@ public:
   /// \brief Return parser position after the first character of token T
   ParserPosition getParserPositionAfterFirstCharacter(Token T);
 
-  void restoreParserPosition(ParserPosition PP) {
-    L->restoreState(PP.LS);
+  void restoreParserPosition(ParserPosition PP, bool enableDiagnostics = false) {
+    L->restoreState(PP.LS, enableDiagnostics);
 
     // We might be at tok::eof now, so ensure that consumeToken() does not
     // assert about lexing past eof.
@@ -398,7 +399,8 @@ public:
   }
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
-    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self, tok::kw_throws));
+    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self,
+                     /* for Swift3 */tok::kw_throws, tok::kw_rethrows));
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
     return consumeToken();
@@ -710,12 +712,13 @@ public:
   bool parseVersionTuple(clang::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
 
-  bool parseTypeAttributeList(TypeAttributes &Attributes) {
-    if (Tok.is(tok::at_sign))
-      return parseTypeAttributeListPresent(Attributes);
+  bool parseTypeAttributeList(SourceLoc &InOutLoc, TypeAttributes &Attributes) {
+    if (Tok.is(tok::at_sign) || Tok.is(tok::kw_inout))
+      return parseTypeAttributeListPresent(InOutLoc, Attributes);
     return false;
   }
-  bool parseTypeAttributeListPresent(TypeAttributes &Attributes);
+  bool parseTypeAttributeListPresent(SourceLoc &InOutLoc,
+                                     TypeAttributes &Attributes);
   bool parseTypeAttribute(TypeAttributes &Attributes,
                           bool justChecking = false);
   
@@ -830,7 +833,8 @@ public:
   
   ParserResult<TypeRepr> parseType();
   ParserResult<TypeRepr> parseType(Diag<> MessageID,
-                                   bool HandleCodeCompletion = true);
+                                   bool HandleCodeCompletion = true,
+                                   bool IsSILFuncDecl = false);
 
   /// \brief Parse any type, but diagnose all types except type-identifier or
   /// type-composition with non-type-identifier.
@@ -861,7 +865,10 @@ public:
   ParserResult<TypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<CompositionTypeRepr> parseAnyType();
-
+  ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
+                                         const TypeAttributes &attrs,
+                                         Optional<Scope> &GenericsScope);
+  
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
 
@@ -881,7 +888,8 @@ public:
   bool isImplicitlyUnwrappedOptionalToken(const Token &T) const;
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
-  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr);
+  TypeRepr *applyAttributeToType(TypeRepr *Ty, SourceLoc InOutLoc,
+                                 const TypeAttributes &Attr);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing

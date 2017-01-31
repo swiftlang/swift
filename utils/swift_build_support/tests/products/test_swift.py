@@ -5,8 +5,8 @@
 # Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 # ----------------------------------------------------------------------------
 
 import argparse
@@ -55,7 +55,8 @@ class SwiftTestCase(unittest.TestCase):
             benchmark=False,
             benchmark_num_onone_iterations=3,
             benchmark_num_o_iterations=3,
-            enable_sil_ownership=False)
+            enable_sil_ownership=False,
+            compilation_db=False)
 
         # Setup shell
         shell.dry_run = True
@@ -275,4 +276,15 @@ class SwiftTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         self.assertEqual(
             ['-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE'],
+            swift.cmake_options)
+
+    def test_compilation_db_flags(self):
+        self.args.compilation_db = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE'],
             swift.cmake_options)

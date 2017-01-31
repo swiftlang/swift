@@ -13,9 +13,9 @@ typealias Int = Builtin.Int32
 
 // CHECK-LABEL: sil @_TTSf2i__promotable_box : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
 
-sil @promotable_box : $@convention(thin) (@box Int) -> Int {
-entry(%b : $@box Int):
-  %a = project_box %b : $@box Int, 0
+sil @promotable_box : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>) -> Int {
+entry(%b : $<τ_0_0> { var τ_0_0 } <Int>):
+  %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %v = load %a : $*Int
   return %v : $Int
 }
@@ -27,11 +27,11 @@ entry(%b : $@box Int):
 sil @call_promotable_box_from_generic : $@convention(thin) <T> (@in T, Int) -> @owned @callee_owned () -> Int {
 entry(%0 : $*T, %1 : $Int):
   destroy_addr %0 : $*T
-  %f = function_ref @promotable_box : $@convention(thin) (@box Int) -> Int
-  %b = alloc_box $@box Int
-  %a = project_box %b : $@box Int, 0
+  %f = function_ref @promotable_box : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>) -> Int
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %1 to %a : $*Int
-  %k = partial_apply %f(%b) : $@convention(thin) (@box Int) -> Int
+  %k = partial_apply %f(%b) : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>) -> Int
   return %k : $@callee_owned () -> Int
 }
 
@@ -46,9 +46,9 @@ protocol P {}
 // rdar://problem/28948735
 // CHECK-LABEL: sil @generic_promotable_box
 
-sil @generic_promotable_box : $@convention(thin) <T> (@in T, @box Int) -> Int {
-entry(%0 : $*T, %b : $@box Int):
-  %a = project_box %b : $@box Int, 0
+sil @generic_promotable_box : $@convention(thin) <T> (@in T, <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+entry(%0 : $*T, %b : $<τ_0_0> { var τ_0_0 } <Int>):
+  %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %v = load %a : $*Int
   return %v : $Int
 }
@@ -61,10 +61,10 @@ sil @call_generic_promotable_box_from_different_generic : $@convention(thin) <T,
 entry(%0 : $*T, %1 : $*U, %2 : $Int):
   destroy_addr %0 : $*T
   destroy_addr %1 : $*U
-  %f = function_ref @generic_promotable_box : $@convention(thin) <V> (@in V, @box Int) -> Int
-  %b = alloc_box $@box Int
-  %a = project_box %b : $@box Int, 0
+  %f = function_ref @generic_promotable_box : $@convention(thin) <V> (@in V, <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %2 to %a : $*Int
-  %k = partial_apply %f<U>(%b) : $@convention(thin) <V> (@in V, @box Int) -> Int
+  %k = partial_apply %f<U>(%b) : $@convention(thin) <V> (@in V, <τ_0_0> { var τ_0_0 } <Int>) -> Int
   return %k : $@callee_owned (@in U) -> Int
 }

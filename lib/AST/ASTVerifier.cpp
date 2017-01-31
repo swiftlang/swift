@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
@@ -413,7 +414,7 @@ struct ASTNodeBase {};
 
       // Check for type variables that escaped the type checker.
       if (type->hasTypeVariable()) {
-        Out << "a type variable escaped the type checker";
+        Out << "a type variable escaped the type checker\n";
         abort();
       }
 
@@ -446,8 +447,7 @@ struct ASTNodeBase {};
           // Get the primary archetype.
           auto *parent = archetype->getPrimary();
 
-          auto &map = GenericEnv.back()->getArchetypeToInterfaceMap();
-          if (map.find(parent) == map.end()) {
+          if (!GenericEnv.back()->containsPrimaryArchetype(parent)) {
             Out << "AST verification error: archetype "
                 << archetype->getString() << " not allowed in this context\n";
 
@@ -462,7 +462,10 @@ struct ASTNodeBase {};
           }
 
           // Make sure that none of the nested types are dependent.
-          for (const auto &nested : archetype->getNestedTypes()) {
+          for (const auto &nested : archetype->getKnownNestedTypes()) {
+            if (!nested.second)
+              continue;
+            
             if (auto nestedType = nested.second.getAsConcreteType()) {
               if (nestedType->hasTypeParameter()) {
                 Out << "Nested type " << nested.first.str()
@@ -634,12 +637,12 @@ struct ASTNodeBase {};
       if (D->hasName())
         checkMangling(D);
 
-      if (D->hasType())
-        verifyChecked(D->getType());
+      if (D->hasInterfaceType())
+        verifyChecked(D->getInterfaceType());
 
       if (D->hasAccessibility()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
-        if (D->getFormalAccessScope() == nullptr &&
+        if (D->getFormalAccessScope().isPublic() &&
             D->getFormalAccess() < Accessibility::Public) {
           Out << "non-public decl has no formal access scope\n";
           D->dump(Out);
@@ -663,7 +666,7 @@ struct ASTNodeBase {};
       }
       
       if (D->getAttrs().hasAttribute<OverrideAttr>()) {
-        if (!D->isInvalid() && D->hasType() &&
+        if (!D->isInvalid() && D->hasInterfaceType() &&
             !isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
           PrettyStackTraceDecl debugStack("verifying override", D);
@@ -700,7 +703,8 @@ struct ASTNodeBase {};
       auto func = Functions.back();
       Type resultType;
       if (FuncDecl *FD = dyn_cast<FuncDecl>(func)) {
-        resultType = FD->getResultType();
+        resultType = FD->getResultInterfaceType();
+        resultType = ArchetypeBuilder::mapTypeIntoContext(FD, resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
       } else {
@@ -801,7 +805,7 @@ struct ASTNodeBase {};
         E->dump(Out);
         abort();
       }
-      if (E->getType()->is<PolymorphicFunctionType>()) {
+      if (E->getType()->is<GenericFunctionType>()) {
         PrettyStackTraceExpr debugStack(Ctx, "verifying decl reference", E);
         Out << "unspecialized reference with polymorphic type "
           << E->getType().getString() << "\n";
@@ -1338,7 +1342,7 @@ struct ASTNodeBase {};
     void verifyChecked(SubscriptExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying SubscriptExpr", E);
 
-      if (!E->getDecl()) {
+      if (!E->hasDecl()) {
         Out << "Subscript expression is missing subscript declaration";
         abort();
       }
@@ -1916,20 +1920,8 @@ struct ASTNodeBase {};
         return;
 
       if (sig && env) {
-        auto &map = env->getInterfaceToArchetypeMap();
-        if (sig->getGenericParams().size() != map.size()) {
-          Out << "Mismatch between signature and environment parameter count\n";
-          abort();
-        }
-
         for (auto *paramTy : sig->getGenericParams()) {
-          auto found = map.find(paramTy->getCanonicalType().getPointer());
-          if (found == map.end()) {
-            Out << "Generic parameter present in signature but not "
-                   "in environment\n";
-            paramTy->dump();
-            abort();
-          }
+          (void)env->mapTypeIntoContext(paramTy);
         }
 
         return;
@@ -2029,7 +2021,7 @@ struct ASTNodeBase {};
           CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
             != Ctx.getImplicitlyUnwrappedOptionalDecl()) {
         OptionalTypeKind resultOptionality = OTK_None;
-        CD->getResultType()->getAnyOptionalObjectType(resultOptionality);
+        CD->getResultInterfaceType()->getAnyOptionalObjectType(resultOptionality);
         if (resultOptionality != CD->getFailability()) {
           Out << "Initializer has result optionality/failability mismatch\n";
           CD->dump(llvm::errs());
@@ -2173,7 +2165,7 @@ struct ASTNodeBase {};
 
       // If a decl has the Throws bit set, the function type should throw,
       // and vice versa.
-      auto fnTy = AFD->getType()->castTo<AnyFunctionType>();
+      auto fnTy = AFD->getInterfaceType()->castTo<AnyFunctionType>();
       for (unsigned i = 1, e = AFD->getNumParameterLists(); i != e; ++i)
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
 
@@ -2416,13 +2408,6 @@ struct ASTNodeBase {};
       type.print(Out);
       Out << "\n";
       abort();
-    }
-
-    void checkIsTypeOfRValue(ValueDecl *D, Type rvalueType, const char *what) {
-      auto declType = D->getType();
-      if (auto refType = declType->getAs<ReferenceStorageType>())
-        declType = refType->getReferentType();
-      checkSameType(declType, rvalueType, what);
     }
 
     void checkSameType(Type T0, Type T1, const char *what) {
@@ -2759,9 +2744,9 @@ struct ASTNodeBase {};
     void checkErrors(ValueDecl *D) {
       PrettyStackTraceDecl debugStack("verifying errors", D);
 
-      if (!D->hasType())
+      if (!D->hasInterfaceType())
         return;
-      if (D->getType()->hasError() && !D->isInvalid()) {
+      if (D->getInterfaceType()->hasError() && !D->isInvalid()) {
         Out << "Valid decl has error type!\n";
         D->dump(Out);
         abort();

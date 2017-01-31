@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -primary-file %S/../Inputs/empty.swift %s -verify
+// RUN: %target-swift-frontend -typecheck -primary-file %S/../Inputs/empty.swift %s -verify
 
 struct A: Collection {
   struct Index: Comparable {}

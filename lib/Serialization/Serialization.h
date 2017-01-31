@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -245,7 +245,8 @@ private:
   bool writeGenericParams(const GenericParamList *genericParams);
 
   /// Writes a set of generic requirements.
-  void writeGenericRequirements(ArrayRef<Requirement> requirements);
+  void writeGenericRequirements(ArrayRef<Requirement> requirements,
+                                const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
@@ -430,8 +431,8 @@ public:
 
   /// Writes a generic environment.
   void writeGenericEnvironment(GenericEnvironment *env,
-                         const std::array<unsigned, 256> &abbrCodes);
-
+                               const std::array<unsigned, 256> &abbrCodes,
+                               bool SILMode);
 };
 } // end namespace serialization
 } // end namespace swift

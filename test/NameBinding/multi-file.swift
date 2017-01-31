@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -parse-as-library -enable-source-import %s %S/Inputs/multi-file-2.swift %S/Inputs/multi-file-3.swift -module-name MultiFile -I %S/Inputs -sdk "" -verify
+// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-source-import %s %S/Inputs/multi-file-2.swift %S/Inputs/multi-file-3.swift -module-name MultiFile -I %S/Inputs -sdk "" -verify
 
 import ambiguous_left
 import tilde_tilde_low_precedence

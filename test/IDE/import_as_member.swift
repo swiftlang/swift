@@ -49,7 +49,7 @@
 
 // PRINTB-NOT: static var globalVar: Double
 
-// RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules
 
 import ImportAsMember.A
 import ImportAsMember.B

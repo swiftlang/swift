@@ -5,9 +5,9 @@
 
 import Builtin
 
-// CHECK-LABEL: sil @boxes : $@convention(thin) (@box Builtin.Int32, @box Builtin.Int32) -> () {
-sil @boxes : $@convention(thin) (@box Builtin.Int32, @box Builtin.Int32) -> () {
-// CHECK: bb0(%0 : $@box Builtin.Int32, %1 : $@box Builtin.Int32):
-entry(%0 : $@box Builtin.Int32, %1 : $@box Builtin.Int32):
+// CHECK-LABEL: sil @boxes : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>, <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> () {
+sil @boxes : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>, <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> () {
+// CHECK: bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
+entry(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
   return undef : $()
 }

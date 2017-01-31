@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -606,8 +606,11 @@ namespace {
 
       if (favoredConstraints.size() == 1) {
         auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
-        auto overloadType = overloadChoice.getDecl()->getType();
+        auto overloadType = overloadChoice.getDecl()->getInterfaceType();
         auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
+        resultType = ArchetypeBuilder::mapTypeIntoContext(
+            overloadChoice.getDecl()->getInnermostDeclContext(),
+            resultType);
         CS.setFavoredType(expr, resultType.getPointer());
       }
 
@@ -712,11 +715,11 @@ namespace {
   /// Return a pair, containing the total parameter count of a function, coupled
   /// with the number of non-default parameters.
   std::pair<size_t, size_t> getParamCount(ValueDecl *VD) {
-    auto fty = VD->getType()->getAs<AnyFunctionType>();
-    assert(fty && "attempting to count parameters of a non-function type");
+    auto fTy = VD->getInterfaceType()->getAs<AnyFunctionType>();
+    assert(fTy && "attempting to count parameters of a non-function type");
     
-    auto t = fty->getInput();
-    size_t nOperands = getOperandCount(t);
+    auto inputTy = fTy->getInput();
+    size_t nOperands = getOperandCount(inputTy);
     size_t nNoDefault = 0;
     
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
@@ -739,7 +742,7 @@ namespace {
                                    ConstraintSystem &CS) {
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-      auto valueTy = value->getType();
+      auto valueTy = value->getInterfaceType();
       
       auto fnTy = valueTy->getAs<AnyFunctionType>();
       if (!fnTy)
@@ -750,8 +753,10 @@ namespace {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
       
-      Type paramTy = fnTy->getInput();
-      auto resultTy = fnTy->getResult();
+      Type paramTy = ArchetypeBuilder::mapTypeIntoContext(
+          value->getInnermostDeclContext(), fnTy->getInput());
+      auto resultTy = ArchetypeBuilder::mapTypeIntoContext(
+          value->getInnermostDeclContext(), fnTy->getResult());
       auto contextualTy = CS.getContextualType(expr);
       
       return isFavoredParamAndArg(CS, paramTy, expr->getArg(),
@@ -775,7 +780,7 @@ namespace {
       bool haveMultipleApplicableOverloads = false;
       
       for (auto VD : ODR->getDecls()) {
-        if (VD->getType()->getAs<AnyFunctionType>()) {
+        if (VD->getInterfaceType()->is<AnyFunctionType>()) {
           auto nParams = getParamCount(VD);
           
           if (nArgs == nParams.first) {
@@ -790,12 +795,11 @@ namespace {
       
       // Determine whether the given declaration is favored.
       auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getType();
+        auto valueTy = value->getInterfaceType();
         
-        auto fnTy = valueTy->getAs<AnyFunctionType>();
-        if (!fnTy)
+        if (!valueTy->is<AnyFunctionType>())
           return false;
-        
+
         auto paramCount = getParamCount(value);
         
         return nArgs == paramCount.first ||
@@ -809,7 +813,7 @@ namespace {
     if (auto favoredTy = CS.getFavoredType(expr->getArg())) {
       // Determine whether the given declaration is favored.
       auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getType();
+        auto valueTy = value->getInterfaceType();
         
         auto fnTy = valueTy->getAs<AnyFunctionType>();
         if (!fnTy)
@@ -825,6 +829,8 @@ namespace {
           }
         }
         Type paramTy = fnTy->getInput();
+        paramTy = ArchetypeBuilder::mapTypeIntoContext(
+            value->getInnermostDeclContext(), paramTy);
         
         return favoredTy->isEqual(paramTy);
       };
@@ -868,7 +874,7 @@ namespace {
     
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-      auto valueTy = value->getType();
+      auto valueTy = value->getInterfaceType();
       
       auto fnTy = valueTy->getAs<AnyFunctionType>();
       if (!fnTy)
@@ -909,7 +915,8 @@ namespace {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
       
-      Type paramTy = fnTy->getInput();
+      Type paramTy = ArchetypeBuilder::mapTypeIntoContext(
+          value->getInnermostDeclContext(), fnTy->getInput());
       auto paramTupleTy = paramTy->getAs<TupleType>();
       if (!paramTupleTy || paramTupleTy->getNumElements() != 2)
         return false;
@@ -917,7 +924,8 @@ namespace {
       auto firstParamTy = paramTupleTy->getElement(0).getType();
       auto secondParamTy = paramTupleTy->getElement(1).getType();
       
-      auto resultTy = fnTy->getResult();
+      auto resultTy = ArchetypeBuilder::mapTypeIntoContext(
+          value->getInnermostDeclContext(), fnTy->getResult());
       auto contextualTy = CS.getContextualType(expr);
       
       return
@@ -1230,6 +1238,8 @@ namespace {
         return unsafeRawPointer->getDeclaredType();
       }
       }
+
+      llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
     }
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
@@ -1285,10 +1295,11 @@ namespace {
       // error recovery within a ClosureExpr.  Just create a new type variable
       // for the decl that isn't bound to anything.  This will ensure that it
       // is considered ambiguous.
-      if (E->getDecl()->hasType() &&
-          E->getDecl()->getType()->is<UnresolvedType>()) {
-        return CS.createTypeVariable(CS.getConstraintLocator(E),
-                                     TVO_CanBindToLValue);
+      if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
+        if (VD->hasType() && VD->getType()->is<UnresolvedType>()) {
+          return CS.createTypeVariable(CS.getConstraintLocator(E),
+                                       TVO_CanBindToLValue);
+        }
       }
 
       // If we're referring to an invalid declaration, don't type-check.
@@ -1310,9 +1321,10 @@ namespace {
                                         E->isSpecialized(),
                                         E->getFunctionRefKind()));
       
-      if (E->getDecl()->getType() &&
-          !E->getDecl()->getType()->getAs<TypeVariableType>()) {
-        CS.setFavoredType(E, E->getDecl()->getType().getPointer());
+      if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
+        if (VD->getType() && !VD->getType()->is<TypeVariableType>()) {
+          CS.setFavoredType(E, VD->getType().getPointer());
+        }
       }
 
       return tv;
@@ -1575,13 +1587,11 @@ namespace {
     }
 
     Type visitIdentityExpr(IdentityExpr *expr) {
-      expr->setType(expr->getSubExpr()->getType());
-      return expr->getType();
+      return expr->getSubExpr()->getType();
     }
 
     Type visitAnyTryExpr(AnyTryExpr *expr) {
-      expr->setType(expr->getSubExpr()->getType());
-      return expr->getType();
+      return expr->getSubExpr()->getType();
     }
 
     Type visitOptionalTryExpr(OptionalTryExpr *expr) {
@@ -1599,14 +1609,12 @@ namespace {
     }
 
     virtual Type visitParenExpr(ParenExpr *expr) {
-      auto &ctx = CS.getASTContext();
-      expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
-      
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-      
-      return expr->getType();
+
+      auto &ctx = CS.getASTContext();
+      return ParenType::get(ctx, expr->getSubExpr()->getType());
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -1869,7 +1877,8 @@ namespace {
         if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
           Type openedType = CS.openType(type, locator);
-          param->overwriteType(openedType);
+          param->setType(openedType);
+          param->setInterfaceType(openedType);
           continue;
         }
 
@@ -1877,7 +1886,8 @@ namespace {
         Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
                                         /*options=*/0);
         
-        param->overwriteType(ty);
+        param->setType(ty);
+        param->setInterfaceType(ty);
       }
       
       return params->getType(CS.getASTContext());
@@ -1979,8 +1989,7 @@ namespace {
 
     Type visitCaptureListExpr(CaptureListExpr *expr) {
       // The type of the capture list is just the type of its closure.
-      expr->setType(expr->getClosureBody()->getType());
-      return expr->getType();
+      return expr->getClosureBody()->getType();
     }
 
     /// \brief Walk a closure body to determine if it's possible for
@@ -2308,7 +2317,9 @@ namespace {
           if (FD->getHaveSearchedForCommonOverloadReturnType()) {
             
             if (FD->getHaveFoundCommonOverloadReturnType()) {
-              outputTy = FD->getType()->getAs<AnyFunctionType>()->getResult();
+              outputTy = FD->getInterfaceType()->getAs<AnyFunctionType>()
+                  ->getResult();
+              outputTy = ArchetypeBuilder::mapTypeIntoContext(FD, outputTy);
             }
             
           } else {
@@ -2320,7 +2331,7 @@ namespace {
             for (auto OD : OSR->getDecls()) {
               
               if (auto OFD = dyn_cast<FuncDecl>(OD)) {
-                auto OFT = OFD->getType()->getAs<AnyFunctionType>();
+                auto OFT = OFD->getInterfaceType()->getAs<AnyFunctionType>();
                 
                 if (!OFT) {
                   commonType = Type();
@@ -2328,6 +2339,8 @@ namespace {
                 }
                 
                 resultType = OFT->getResult();
+                resultType = ArchetypeBuilder::mapTypeIntoContext(
+                    OFD, resultType);
                 
                 if (commonType.isNull()) {
                   commonType = resultType;
@@ -2391,7 +2404,7 @@ namespace {
       return outputTy;
     }
 
-    Type getSuperType(ValueDecl *selfDecl,
+    Type getSuperType(VarDecl *selfDecl,
                       SourceLoc diagLoc,
                       Diag<> diag_not_in_class,
                       Diag<> diag_no_base_class) {
@@ -2455,7 +2468,10 @@ namespace {
 
     Type visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       auto &tc = CS.getTypeChecker();
-      
+      auto fromExpr = expr->getSubExpr();
+      if (!fromExpr) // Either wasn't constructed correctly or wasn't folded.
+        return nullptr;
+
       // Validate the resulting type.
       TypeResolutionOptions options = TR_AllowUnboundGenerics;
       options |= TR_InExpression;
@@ -2467,8 +2483,8 @@ namespace {
                                 CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
-      auto fromType = expr->getSubExpr()->getType();
-      auto locator = CS.getConstraintLocator(expr->getSubExpr());
+      auto fromType = fromExpr->getType();
+      auto locator = CS.getConstraintLocator(fromExpr);
 
       // The source type can be checked-cast to the destination type.
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
@@ -2517,6 +2533,9 @@ namespace {
 
     Type visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
       auto &tc = CS.getTypeChecker();
+      auto fromExpr = expr->getSubExpr();
+      if (!fromExpr) // Either wasn't constructed correctly or wasn't folded.
+        return nullptr;
 
       // Validate the resulting type.
       TypeResolutionOptions options = TR_AllowUnboundGenerics;
@@ -2529,8 +2548,8 @@ namespace {
                                 CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
-      auto fromType = expr->getSubExpr()->getType();
-      auto locator = CS.getConstraintLocator(expr->getSubExpr());
+      auto fromType = fromExpr->getType();
+      auto locator = CS.getConstraintLocator(fromExpr);
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
       return OptionalType::get(toType);
     }
@@ -2580,9 +2599,8 @@ namespace {
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSrc()->getType(), destTy,
                        CS.getConstraintLocator(expr->getSrc()));
-      
-      expr->setType(TupleType::getEmpty(CS.getASTContext()));
-      return expr->getType();
+
+      return TupleType::getEmpty(CS.getASTContext());
     }
     
     Type visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {

@@ -1,5 +1,5 @@
-// RUN: %target-parse-verify-swift -parse %s -verify
-// RUN: %target-parse-verify-swift -parse -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: %target-typecheck-verify-swift -typecheck %s -verify
+// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 { 
@@ -57,7 +57,7 @@ class Fox : P1 {
 class Box<T : Fox> {
 // CHECK-LABEL: .unpack@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : Fox [outer]
+// CHECK-NEXT:   T : Fox [explicit]
   func unpack(_ x: X1<T>) {}
 }
 

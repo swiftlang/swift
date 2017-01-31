@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -27,12 +27,36 @@
 using namespace swift;
 
 TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
+                                       SourceLoc InOutLoc,
                                        const TypeAttributes &attrs) {
   // Apply those attributes that do apply.
-  if (attrs.empty())
-    return ty;
+  if (!attrs.empty())
+    ty = new (Context) AttributedTypeRepr(attrs, ty);
 
-  return new (Context) AttributedTypeRepr(attrs, ty);
+  // Apply 'inout'
+  if (InOutLoc.isValid()) {
+    if (auto *fnTR = dyn_cast<FunctionTypeRepr>(ty)) {
+      // If the input to the function isn't parenthesized, apply the inout
+      // to the first (only) parameter, as we would in Swift 2. (This
+      // syntax is deprecated in Swift 3.)
+      TypeRepr *argsTR = fnTR->getArgsTypeRepr();
+      if (!isa<TupleTypeRepr>(argsTR)) {
+        auto *newArgsTR =
+          new (Context) InOutTypeRepr(argsTR, InOutLoc);
+        auto *newTR =
+          new (Context) FunctionTypeRepr(fnTR->getGenericParams(),
+              newArgsTR,
+              fnTR->getThrowsLoc(),
+              fnTR->getArrowLoc(),
+              fnTR->getResultTypeRepr());
+        newTR->setGenericEnvironment(fnTR->getGenericEnvironment());
+        return newTR;
+      }
+    }
+    ty = new (Context) InOutTypeRepr(ty, InOutLoc);
+  }
+
+  return ty;
 }
 
 ParserResult<TypeRepr> Parser::parseTypeSimple() {
@@ -153,6 +177,76 @@ ParserResult<TypeRepr> Parser::parseType() {
   return parseType(diag::expected_type);
 }
 
+ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
+                                               const TypeAttributes &attrs,
+                                               Optional<Scope> &GenericsScope) {
+  auto LBraceLoc = consumeToken(tok::l_brace);
+  
+  SmallVector<SILBoxTypeRepr::Field, 4> Fields;
+  if (!Tok.is(tok::r_brace)) {
+    for (;;) {
+      bool Mutable;
+      if (Tok.is(tok::kw_var)) {
+        Mutable = true;
+      } else if (Tok.is(tok::kw_let)) {
+        Mutable = false;
+      } else {
+        diagnose(Tok, diag::sil_box_expected_var_or_let);
+        return makeParserError();
+      }
+      SourceLoc VarOrLetLoc = consumeToken();
+      
+      auto fieldTy = parseType();
+      if (!fieldTy.getPtrOrNull())
+        return makeParserError();
+      Fields.push_back({VarOrLetLoc, Mutable, fieldTy.get()});
+      
+      if (consumeIf(tok::comma))
+        continue;
+      
+      break;
+    }
+  }
+  
+  if (!Tok.is(tok::r_brace)) {
+    diagnose(Tok, diag::sil_box_expected_r_brace);
+    return makeParserError();
+  }
+  
+  auto RBraceLoc = consumeToken(tok::r_brace);
+  
+  // The generic arguments are taken from the enclosing scope. Pop the
+  // box layout's scope now.
+  GenericsScope.reset();
+  
+  SourceLoc LAngleLoc, RAngleLoc;
+  SmallVector<TypeRepr*, 4> Args;
+  if (Tok.isContextualPunctuator("<")) {
+    LAngleLoc = consumeToken();
+    for (;;) {
+      auto argTy = parseType();
+      if (!argTy.getPtrOrNull())
+        return makeParserError();
+      Args.push_back(argTy.get());
+      if (consumeIf(tok::comma))
+        continue;
+      break;
+    }
+    if (!Tok.isContextualPunctuator(">")) {
+      diagnose(Tok, diag::sil_box_expected_r_angle);
+      return makeParserError();
+    }
+    
+    RAngleLoc = consumeToken();
+  }
+  
+  auto repr = SILBoxTypeRepr::create(Context, generics,
+                                     LBraceLoc, Fields, RBraceLoc,
+                                     LAngleLoc, Args, RAngleLoc);
+  return makeParserResult(applyAttributeToType(repr, SourceLoc(), attrs));
+}
+
+
 /// parseType
 ///   type:
 ///     attribute-list type-composition
@@ -162,16 +256,28 @@ ParserResult<TypeRepr> Parser::parseType() {
 ///     type-composition '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
-                                         bool HandleCodeCompletion) {
+                                         bool HandleCodeCompletion,
+                                         bool IsSILFuncDecl) {
   // Parse attributes.
+  SourceLoc inoutLoc;
   TypeAttributes attrs;
-  parseTypeAttributeList(attrs);
+  parseTypeAttributeList(inoutLoc, attrs);
 
-  // Parse Generic Parameters. Generic Parameters are visible in the function
-  // body.
+  Optional<Scope> GenericsScope;
+
+  // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
   if (isInSILMode()) {
+    // If this is part of a sil function decl, generic parameters are visible in
+    // the function body; otherwise, they are visible when parsing the type.
+    if (!IsSILFuncDecl)
+      GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
+  }
+  
+  // In SIL mode, parse box types { ... }.
+  if (isInSILMode() && Tok.is(tok::l_brace)) {
+    return parseSILBoxType(generics, attrs, GenericsScope);
   }
 
   ParserResult<TypeRepr> ty =
@@ -217,12 +323,11 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                                throwsLoc,
                                                arrowLoc,
                                                SecondHalf.get());
-    return makeParserResult(applyAttributeToType(fnTy, attrs));
+    return makeParserResult(applyAttributeToType(fnTy, inoutLoc, attrs));
   } else if (throwsLoc.isValid()) {
     // Don't consume 'throws', so we can emit a more useful diagnostic when
     // parsing a function decl.
     restoreParserPosition(beforeThrowsPos);
-    return ty;
   }
   
   // Only function types may be generic.
@@ -232,7 +337,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   }
 
   if (ty.isNonNull() && !ty.hasCodeCompletion()) {
-    ty = makeParserResult(applyAttributeToType(ty.get(), attrs));
+    ty = makeParserResult(applyAttributeToType(ty.get(), inoutLoc, attrs));
   }
   return ty;
 }
@@ -597,15 +702,13 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
                                   /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
+    TypeRepr *tyR;
+
     // If this is a deprecated use of the inout marker in an argument list,
     // consume the inout.
     SourceLoc InOutLoc;
-    bool hasAnyInOut = false;
-    bool hasValidInOut = false;
-    if (consumeIf(tok::kw_inout, InOutLoc)) {
-      hasAnyInOut = true;
-      hasValidInOut = false;
-    }
+    consumeIf(tok::kw_inout, InOutLoc);
+
     // If the tuple element starts with a potential argument label followed by a
     // ':' or another potential argument label, then the identifier is an
     // element tag, and it is followed by a type annotation.
@@ -632,65 +735,49 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
       SourceLoc postColonLoc = Tok.getLoc();
 
-      // Consume 'inout' if present.
-      if (!hasAnyInOut && consumeIf(tok::kw_inout, InOutLoc)) {
-        hasValidInOut = true;
-      }
-
-      SourceLoc extraneousInOutLoc;
-      while (consumeIf(tok::kw_inout, extraneousInOutLoc)) {
-        diagnose(Tok, diag::parameter_inout_var_let_repeated)
-          .fixItRemove(extraneousInOutLoc);
-      }
-
       // Parse the type annotation.
-      ParserResult<TypeRepr> type = parseType(diag::expected_type);
+      auto type = parseType(diag::expected_type);
       if (type.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
       if (type.isNull())
         return makeParserError();
+      tyR = type.get();
 
-      if (!hasValidInOut && hasAnyInOut) {
+      // Complain obsoleted 'inout' position; (inout name: Ty)
+      if (InOutLoc.isValid() && !isa<InOutTypeRepr>(tyR))
         diagnose(Tok.getLoc(), diag::inout_as_attr_disallowed)
           .fixItRemove(InOutLoc)
           .fixItInsert(postColonLoc, "inout ");
-      }
-
-      // If an 'inout' marker was specified, build the type.  Note that we bury
-      // the inout locator within the named locator.  This is weird but required
-      // by sema apparently.
-      if (InOutLoc.isValid())
-        type = makeParserResult(new (Context) InOutTypeRepr(type.get(),
-                                                            InOutLoc));
 
       // Record the label. We will look at these at the end.
-      if (Labels.empty()) {
-        Labels.assign(ElementsR.size(),
-                      std::make_tuple(Identifier(), SourceLoc(),
-                                      Identifier(), SourceLoc()));
-      }
-      Labels.push_back(std::make_tuple(name, nameLoc,
-                                       secondName, secondNameLoc));
-
-      ElementsR.push_back(type.get());
+      if (Labels.empty())
+        Labels.resize(ElementsR.size());
+      Labels.emplace_back(name, nameLoc, secondName, secondNameLoc);
     } else {
       // Otherwise, this has to be a type.
-      ParserResult<TypeRepr> type = parseType();
+      auto type = parseType();
       if (type.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
       if (type.isNull())
         return makeParserError();
-      if (InOutLoc.isValid())
-        type = makeParserResult(new (Context) InOutTypeRepr(type.get(),
-                                                            InOutLoc));
+      tyR = type.get();
 
-      if (!Labels.empty()) {
-        Labels.push_back(std::make_tuple(Identifier(), SourceLoc(),
-                                         Identifier(), SourceLoc()));
-      }
-
-      ElementsR.push_back(type.get());
+      if (!Labels.empty())
+        Labels.emplace_back();
     }
+
+    // If an 'inout' marker was specified, build inout type.
+    // Note that we bury the inout locator within the named locator.
+    // This is weird but required by Sema apparently.
+    if (InOutLoc.isValid()) {
+      if (isa<InOutTypeRepr>(tyR))
+        diagnose(Tok, diag::parameter_inout_var_let_repeated)
+          .fixItRemove(InOutLoc);
+      else
+        tyR = new (Context) InOutTypeRepr(tyR, InOutLoc);
+    }
+
+    ElementsR.push_back(tyR);
 
     // Parse '= expr' here so we can complain about it directly, rather
     // than dying when we see it.
@@ -723,12 +810,21 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   if (EllipsisLoc.isInvalid())
     EllipsisIdx = ElementsR.size();
 
+  SmallVector<Identifier, 4> ElementNames;
+  SmallVector<SourceLoc, 4> ElementNameLocs;
+  SmallVector<SourceLoc, 4> UnderscoreLocs;
   // If there were any labels, figure out which labels should go into the type
   // representation.
   if (!Labels.empty()) {
     assert(Labels.size() == ElementsR.size());
+
     bool isFunctionType = Tok.isAny(tok::arrow, tok::kw_throws,
                                     tok::kw_rethrows);
+    ElementNames.resize(ElementsR.size());
+    ElementNameLocs.resize(ElementsR.size());
+    if (isFunctionType)
+      UnderscoreLocs.resize(ElementsR.size());
+
     for (unsigned i : indices(ElementsR)) {
       auto &currentLabel = Labels[i];
 
@@ -752,8 +848,8 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         }
 
         // Form the named type representation.
-        ElementsR[i] = new (Context) NamedTypeRepr(firstName, ElementsR[i],
-                                                   firstNameLoc);
+        ElementNames[i] = firstName;
+        ElementNameLocs[i] = firstNameLoc;
         continue;
       }
 
@@ -772,8 +868,9 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
       if (firstNameLoc.isValid() || secondNameLoc.isValid()) {
         // Form the named parameter type representation.
-        ElementsR[i] = new (Context) NamedTypeRepr(secondName, ElementsR[i],
-                                                   secondNameLoc, firstNameLoc);
+        ElementNames[i] = secondName;
+        ElementNameLocs[i] = secondNameLoc;
+        UnderscoreLocs[i]  = firstNameLoc;
       }
     }
   }
@@ -781,6 +878,8 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   return makeParserResult(Status,
                           TupleTypeRepr::create(Context, ElementsR,
                                                 SourceRange(LPLoc, RPLoc),
+                                                ElementNames, ElementNameLocs,
+                                                UnderscoreLocs,
                                                 EllipsisLoc, EllipsisIdx));
 }
 
@@ -1004,6 +1103,9 @@ bool Parser::canParseGenericArguments() {
 }
 
 bool Parser::canParseType() {
+  // Accept 'inout' at for better recovery.
+  consumeIf(tok::kw_inout);
+
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:

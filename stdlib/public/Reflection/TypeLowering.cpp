@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -1251,8 +1251,7 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
 }
 
 const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
-                                                        unsigned start,
-                                                        unsigned align) {
+                                                        unsigned start) {
   const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
   if (FD == nullptr) {
     DEBUG(std::cerr << "No field descriptor: "; TR->dump());

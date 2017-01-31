@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -87,6 +87,8 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
   case TypeTraitResult::CanBe:
     return nullptr;
   }
+
+  llvm_unreachable("Unhandled TypeTraitResult in switch.");
 }
 
 static unsigned getTypeWidth(SILType Ty) {
@@ -441,12 +443,21 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   //   cmp_*_T . (zext U->T x, zext U->T y)
   //      => cmp_*_T (x, y)
   switch (I->getBuiltinInfo().ID) {
-  case BuiltinValueKind::ICMP_EQ:
-  case BuiltinValueKind::ICMP_NE:
+  case BuiltinValueKind::ICMP_ULT: {
+    if (auto *ILOp = dyn_cast<IntegerLiteralInst>(I->getArguments()[0])) {
+      if (ILOp->getValue().isMaxValue()) {
+        auto *Zero = Builder.createIntegerLiteral(I->getLoc(), I->getType(), 0);
+        replaceInstUsesWith(*I, Zero);
+        return eraseInstFromFunction(*I);
+      }
+    }
+  }
+    LLVM_FALLTHROUGH;
   case BuiltinValueKind::ICMP_ULE:
-  case BuiltinValueKind::ICMP_ULT:
   case BuiltinValueKind::ICMP_UGE:
-  case BuiltinValueKind::ICMP_UGT: {
+  case BuiltinValueKind::ICMP_UGT:
+  case BuiltinValueKind::ICMP_EQ:
+  case BuiltinValueKind::ICMP_NE: {
     SILValue LCast, RCast;
     if (match(I->getArguments()[0],
               m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,

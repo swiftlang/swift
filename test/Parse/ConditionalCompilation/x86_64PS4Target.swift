@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify -target x86_64-scei-ps4 -disable-objc-interop -parse-stdlib
+// RUN: %swift -typecheck %s -verify -target x86_64-scei-ps4 -disable-objc-interop -parse-stdlib
 // RUN: %swift-ide-test -test-input-complete -source-filename %s -target x86_64-scei-ps4
 
 #if os(FreeBSD)

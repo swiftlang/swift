@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -249,7 +249,6 @@ namespace {
       unreachable("bad demangling tree node");
     }
 
-    NodePointer getUnspecialized(Node *node);
     void mangleGenericArgs(Node *node, EntityContext &ctx);
     void mangleAnyNominalType(Node *node, EntityContext &ctx);
 
@@ -320,13 +319,13 @@ void Remangler::resetSubstitutions() {
   Substitutions.clear();
 }
 
-bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
-  auto isInSwiftModule = [](Node *node) -> bool {
-    auto context = node->begin()->get();
-    return (context->getKind() == Node::Kind::Module &&
-            context->getText() == STDLIB_NAME);
-  };
+static bool isInSwiftModule(Node *node) {
+  auto context = node->begin()->get();
+  return (context->getKind() == Node::Kind::Module &&
+          context->getText() == STDLIB_NAME);
+};
 
+bool Demangle::mangleStandardSubstitution(Node *node, DemanglerPrinter &Out) {
   // Look for known substitutions.
   switch (node->getKind()) {
 #define SUCCESS_IF_IS(VALUE, EXPECTED, SUBSTITUTION)            \
@@ -378,6 +377,12 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
 #undef SUCCESS_IF_TEXT_IS
 #undef SUCCESS_IF_IS
   }
+  return false;
+}
+
+bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
+  if (Demangle::mangleStandardSubstitution(node, Out))
+    return true;
 
   // Go ahead and initialize the substitution entry.
   entry.TheNode = node;
@@ -653,33 +658,13 @@ void Remangler::mangleDirectness(Node *node) {
 }
 
 void Remangler::mangleValueWitness(Node *node) {
-  auto getString = [](ValueWitnessKind kind) -> StringRef {
-    switch (kind) {
-    case ValueWitnessKind::AllocateBuffer: return "al";
-    case ValueWitnessKind::AssignWithCopy: return "ca";
-    case ValueWitnessKind::AssignWithTake: return "ta";
-    case ValueWitnessKind::DeallocateBuffer: return "de";
-    case ValueWitnessKind::Destroy: return "xx";
-    case ValueWitnessKind::DestroyBuffer: return "XX";
-    case ValueWitnessKind::InitializeBufferWithCopyOfBuffer: return "CP";
-    case ValueWitnessKind::InitializeBufferWithCopy: return "Cp";
-    case ValueWitnessKind::InitializeWithCopy: return "cp";
-    case ValueWitnessKind::InitializeBufferWithTake: return "Tk";
-    case ValueWitnessKind::InitializeWithTake: return "tk";
-    case ValueWitnessKind::ProjectBuffer: return "pr";
-    case ValueWitnessKind::InitializeBufferWithTakeOfBuffer: return "TK";
-    case ValueWitnessKind::DestroyArray: return "Xx";
-    case ValueWitnessKind::InitializeArrayWithCopy: return "Cc";
-    case ValueWitnessKind::InitializeArrayWithTakeFrontToBack: return "Tt";
-    case ValueWitnessKind::InitializeArrayWithTakeBackToFront: return "tT";
-    case ValueWitnessKind::StoreExtraInhabitant: return "xs";
-    case ValueWitnessKind::GetExtraInhabitantIndex: return "xg";
-    case ValueWitnessKind::GetEnumTag: return "ug";
-    case ValueWitnessKind::DestructiveProjectEnumData: return "up";
-    }
-    unreachable("bad value witness kind");
-  };
-  Out << 'w' << getString(ValueWitnessKind(node->getIndex()));
+  const char *Code = nullptr;
+  switch (ValueWitnessKind(node->getIndex())) {
+#define VALUE_WITNESS(MANGLING, NAME) \
+    case ValueWitnessKind::NAME: Code = #MANGLING; break;
+#include "swift/Basic/ValueWitnessMangling.def"
+  }
+  Out << 'w' << Code;
   mangleSingleChildNode(node); // type
 }
 
@@ -1516,7 +1501,7 @@ void Remangler::mangleProtocolWithoutPrefix(Node *node) {
   mangleNominalType(node, '\0', ctx);
 }
 
-static bool isSpecialized(Node *node) {
+bool Demangle::isSpecialized(Node *node) {
   switch (node->getKind()) {
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
@@ -1538,7 +1523,7 @@ static bool isSpecialized(Node *node) {
   }
 }
 
-NodePointer Remangler::getUnspecialized(Node *node) {
+NodePointer Demangle::getUnspecialized(Node *node) {
   switch (node->getKind()) {
   case Node::Kind::Structure:
   case Node::Kind::Enum:
@@ -1665,6 +1650,38 @@ void Remangler::mangleBoundGenericEnum(Node *node) {
 void Remangler::mangleTypeList(Node *node) {
   mangleChildNodes(node); // all types
   Out << '_';
+}
+
+void Remangler::mangleReflectionMetadataBuiltinDescriptor(Node *node) {
+  Out << "MRb";
+}
+
+void Remangler::mangleReflectionMetadataFieldDescriptor(Node *node) {
+  Out << "MRf";
+}
+
+void Remangler::mangleReflectionMetadataAssocTypeDescriptor(Node *node) {
+  Out << "MRa";
+}
+
+void Remangler::mangleReflectionMetadataSuperclassDescriptor(Node *node) {
+  Out << "MRc";
+}
+
+void Remangler::mangleCurryThunk(Node *node, EntityContext &ctx) {
+  Out << "<curry-thunk>";
+}
+
+void Remangler::mangleEmptyList(Node *node) {
+  Out << "<empty>";
+}
+
+void Remangler::mangleFirstElementMarker(Node *node) {
+  Out << "<first>";
+}
+
+void Remangler::mangleVariadicMarker(Node *node) {
+  Out << "<vararg>";
 }
 
 /// The top-level interface to the remangler.

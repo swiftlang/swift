@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -393,8 +393,10 @@ static void printAnnotatedDeclaration(const ValueDecl *VD,
                                       raw_ostream &OS) {
   AnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
-  if (BaseTy)
-    PO.setArchetypeSelfTransformForQuickHelp(BaseTy);
+  if (BaseTy) {
+    PO.setBaseType(BaseTy);
+    PO.PrintAsMember = true;
+  }
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -413,8 +415,10 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
                                                       raw_ostream &OS) {
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
-  if (BaseTy)
-    PO.setArchetypeSelfTransformForQuickHelp(BaseTy);
+  if (BaseTy) {
+    PO.setBaseType(BaseTy);
+    PO.PrintAsMember = true;
+  }
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -439,7 +443,8 @@ printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
       new SynthesizedExtensionAnalyzer(Target, PO));
     TargetToAnalyzerMap.insert({Target, std::move(Analyzer)});
   }
-  PO.initArchetypeTransformerForSynthesizedExtensions(Target);
+  PO.initForSynthesizedExtension(Target);
+  PO.PrintAsMember = true;
   VD->print(Printer, PO);
 }
 
@@ -493,7 +498,7 @@ static StringRef getSourceToken(unsigned Offset,
   return L.getTokenAt(Loc).getText();
 }
 
-static llvm::Optional<unsigned> 
+static llvm::Optional<unsigned>
 mapOffsetToOlderSnapshot(unsigned Offset,
                          ImmutableTextSnapshotRef NewSnap,
                          ImmutableTextSnapshotRef OldSnap) {
@@ -519,7 +524,7 @@ mapOffsetToOlderSnapshot(unsigned Offset,
   return Offset;
 }
 
-static llvm::Optional<unsigned> 
+static llvm::Optional<unsigned>
 mapOffsetToNewerSnapshot(unsigned Offset,
                          ImmutableTextSnapshotRef OldSnap,
                          ImmutableTextSnapshotRef NewSnap) {
@@ -643,7 +648,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned USREnd = SS.size();
 
   unsigned TypenameBegin = SS.size();
-  if (VD->hasType()) {
+  if (VD->hasInterfaceType()) {
     llvm::raw_svector_ostream OS(SS);
     PrintOptions Options;
     Options.PrintNameAliasUnderlyingType = true;
@@ -742,8 +747,10 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
         PO.SkipIntroducerKeywords = true;
         PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
         XMLEscapingPrinter Printer(OS);
-        if (BaseType)
-          PO.setArchetypeSelfTransform(BaseType);
+        if (BaseType) {
+          PO.setBaseType(BaseType);
+          PO.PrintAsMember = true;
+        }
         RelatedDecl->print(Printer, PO);
       } else {
         llvm::SmallString<128> Buf;
@@ -1023,43 +1030,6 @@ static void resolveRange(SwiftLangSupport &Lang,
     unsigned Length;
     std::function<void(const RangeInfo&)> Receiver;
 
-    static SourceLoc getNonwhitespaceLocBefore(SourceManager &SM,
-                                               unsigned BufferID,
-                                               unsigned Offset) {
-      CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
-      StringRef Buffer = SM.extractText(entireRange);
-
-      const char *BufStart = Buffer.data();
-      if (Offset >= Buffer.size())
-        return SourceLoc();
-
-      for (unsigned Off = Offset; Off != 0; Off --) {
-        if (!clang::isWhitespace(*(BufStart + Off))) {
-          return SM.getLocForOffset(BufferID, Off);
-        }
-      }
-      return clang::isWhitespace(*BufStart) ? SourceLoc() :
-        SM.getLocForOffset(BufferID, 0);
-    }
-
-    static SourceLoc getNonwhitespaceLocAfter(SourceManager &SM,
-                                              unsigned BufferID,
-                                              unsigned Offset) {
-      CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
-      StringRef Buffer = SM.extractText(entireRange);
-
-      const char *BufStart = Buffer.data();
-      if (Offset >= Buffer.size())
-        return SourceLoc();
-
-      for (unsigned Off = Offset; Off < Buffer.size(); Off ++) {
-        if (!clang::isWhitespace(*(BufStart + Off))) {
-          return SM.getLocForOffset(BufferID, Off);
-        }
-      }
-      return SourceLoc();
-    }
-
   public:
     RangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
                        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
@@ -1069,26 +1039,10 @@ static void resolveRange(SwiftLangSupport &Lang,
       Length(Length), Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
-      auto &CompIns = AstUnit->getCompilerInstance();
-
-      unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
-      SourceManager &SM = CompIns.getSourceMgr();
-      SourceLoc StartLoc = getNonwhitespaceLocAfter(SM, BufferID, Offset);
-      SourceLoc EndLoc = getNonwhitespaceLocBefore(SM, BufferID,
-                                                   Offset + Length - 1);
-
-      StartLoc = Lexer::getLocForStartOfToken(SM, StartLoc);
-      EndLoc = Lexer::getLocForStartOfToken(SM, EndLoc);
-
-      if (StartLoc.isInvalid() || EndLoc.isInvalid()) {
-        Receiver({});
-        return;
-      }
-
       if (trace::enabled()) {
         // FIXME: Implement tracing
       }
-      RangeResolver Resolver(AstUnit->getPrimarySourceFile(), StartLoc, EndLoc);
+      RangeResolver Resolver(AstUnit->getPrimarySourceFile(), Offset, Length);
       ResolvedRangeInfo Info = Resolver.resolve();
 
       CompilerInvocation CompInvok;
@@ -1306,8 +1260,10 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
       } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
         auto *DC = VD->getDeclContext();
         Type selfTy;
-        if (DC->isTypeContext())
-          selfTy = DC->getSelfTypeInContext();
+        if (DC->isTypeContext()) {
+          selfTy = DC->getSelfInterfaceType();
+          selfTy = VD->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
+        }
         bool Failed =
             passCursorInfoForDecl(VD, MainModule, selfTy, Type(),
                                   /*isRef=*/false, BufferID, Lang, CompInvok,

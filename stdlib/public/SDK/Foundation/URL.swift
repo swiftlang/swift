@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -1073,12 +1073,7 @@ public struct URL : ReferenceConvertible, Equatable {
     public func setResourceValues(_ keyedValues: [URLResourceKey : AnyObject]) throws {
         fatalError()
     }
-    
-    @available(*, unavailable, message: "Use struct URLResourceValues and URL.resourceValues(forKeys:) instead")
-    public func resourceValues(forKeys keys: [URLResourceKey]) throws -> [URLResourceKey : AnyObject] {
-        fatalError()
-    }
-    
+        
     @available(*, unavailable, message: "Use struct URLResourceValues and URL.setResourceValues(_:) instead")
     public func getResourceValue(_ value: AutoreleasingUnsafeMutablePointer<AnyObject?>, forKey key: URLResourceKey) throws {
         fatalError()

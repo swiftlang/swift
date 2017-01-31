@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -935,7 +935,7 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
 
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    auto funcType = FD->getType()->getAs<AnyFunctionType>();
+    auto funcType = FD->getInterfaceType()->getAs<AnyFunctionType>();
     if (DC->isTypeContext() && funcType && funcType->is<AnyFunctionType>() &&
         !IsImplicitlyCurriedInstanceMethod)
       funcType = funcType->getResult()->getAs<AnyFunctionType>();
@@ -949,10 +949,11 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
     }
   }
   if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    return std::max(calculateTypeRelation(NTD->getType(), ExpectedType, DC),
-                    calculateTypeRelation(NTD->getDeclaredType(), ExpectedType, DC));
+    return std::max(
+        calculateTypeRelation(NTD->getInterfaceType(), ExpectedType, DC),
+        calculateTypeRelation(NTD->getDeclaredInterfaceType(), ExpectedType, DC));
   }
-  return calculateTypeRelation(VD->getType(), ExpectedType, DC);
+  return calculateTypeRelation(VD->getInterfaceType(), ExpectedType, DC);
 }
 
 static CodeCompletionResult::ExpectedTypeRelation
@@ -1341,7 +1342,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
       // First, type check the parent DeclContext.
       typecheckContextImpl(DC->getParent());
-      if (NTD->hasType())
+      if (NTD->hasInterfaceType())
         return true;
       return typeCheckCompletionDecl(cast<NominalTypeDecl>(DC));
     }
@@ -1481,8 +1482,8 @@ static bool isTopLevelContext(const DeclContext *DC) {
 
 static Type getReturnTypeFromContext(const DeclContext *DC) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
-    if (FD->hasType()) {
-      if (auto FT = FD->getType()->getAs<FunctionType>()) {
+    if (FD->hasInterfaceType()) {
+      if (auto FT = FD->getInterfaceType()->getAs<FunctionType>()) {
         return FT->getResult();
       }
     }
@@ -2584,7 +2585,7 @@ public:
     Builder.addRightBracket();
 
     // Add a type annotation.
-    Type T = SD->getElementType();
+    Type T = SD->getElementInterfaceType();
     if (IsDynamicLookup) {
       // Values of properties that were found on a AnyObject have
       // Optional<T> type.
@@ -2620,7 +2621,7 @@ public:
     if (TAD->hasUnderlyingType() && !TAD->getUnderlyingType()->is<ErrorType>())
       addTypeAnnotation(Builder, TAD->getUnderlyingType());
     else {
-      addTypeAnnotation(Builder, TAD->getDeclaredType());
+      addTypeAnnotation(Builder, TAD->getAliasType());
     }
   }
 
@@ -2635,7 +2636,7 @@ public:
     Builder.setAssociatedDecl(GP);
     addLeadingDot(Builder);
     Builder.addTextChunk(GP->getName().str());
-    addTypeAnnotation(Builder, GP->getDeclaredType());
+    addTypeAnnotation(Builder, GP->getDeclaredInterfaceType());
   }
 
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT,
@@ -2677,8 +2678,8 @@ public:
     // Enum element is of function type such as EnumName.type -> Int ->
     // EnumName; however we should show Int -> EnumName as the type
     Type EnumType;
-    if (EED->hasType()) {
-      EnumType = EED->getType();
+    if (EED->hasInterfaceType()) {
+      EnumType = EED->getInterfaceType();
       if (auto FuncType = EnumType->getAs<AnyFunctionType>()) {
         EnumType = FuncType->getResult();
       }
@@ -2768,7 +2769,7 @@ public:
     if (IsKeyPathExpr && !KeyPathFilter(D, Reason))
       return;
         
-    if (!D->hasType())
+    if (!D->hasInterfaceType())
       TypeResolver->resolveDeclSignature(D);
     else if (isa<TypeAliasDecl>(D)) {
       // A TypeAliasDecl might have type set, but not the underlying type.
@@ -2809,9 +2810,10 @@ public:
           // type is the typealias instead of the underlying type of the alias.
           Optional<Type> Result = None;
           if (auto AT = MT->getInstanceType()) {
-            if (!CD->getType()->is<ErrorType>() &&
+            if (!CD->getInterfaceType()->is<ErrorType>() &&
                 AT->getKind() == TypeKind::NameAlias &&
-                AT->getDesugaredType() == CD->getResultType().getPointer())
+                AT->getDesugaredType() ==
+                    CD->getResultInterfaceType().getPointer())
               Result = AT;
           }
           addConstructorCall(CD, Reason, None, Result);
@@ -2854,7 +2856,8 @@ public:
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addNominalTypeRef(NTD, Reason);
-        addConstructorCallsForType(NTD->getType(), NTD->getName(), Reason);
+        addConstructorCallsForType(NTD->getInterfaceType(), NTD->getName(),
+                                   Reason);
         return;
       }
 
@@ -2868,7 +2871,7 @@ public:
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
         for (auto *protocol : GP->getConformingProtocols())
-          addConstructorCallsForType(protocol->getType(), GP->getName(),
+          addConstructorCallsForType(protocol->getInterfaceType(), GP->getName(),
                                      Reason);
         return;
       }
@@ -2922,7 +2925,8 @@ public:
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addNominalTypeRef(NTD, Reason);
-        addConstructorCallsForType(NTD->getType(), NTD->getName(), Reason);
+        addConstructorCallsForType(NTD->getInterfaceType(), NTD->getName(),
+                                   Reason);
         return;
       }
 
@@ -2936,7 +2940,7 @@ public:
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
         for (auto *protocol : GP->getConformingProtocols())
-          addConstructorCallsForType(protocol->getType(), GP->getName(),
+          addConstructorCallsForType(protocol->getInterfaceType(), GP->getName(),
                                      Reason);
         return;
       }
@@ -2979,7 +2983,7 @@ public:
   }
 
   bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason) {
-    if (!D->hasType())
+    if (!D->hasInterfaceType())
       TypeResolver->resolveDeclSignature(D);
 
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
@@ -2989,7 +2993,7 @@ public:
       llvm::DenseSet<EnumElementDecl *> Elements;
       ED->getAllElements(Elements);
       for (auto *Ele : Elements) {
-        if (!Ele->hasType())
+        if (!Ele->hasInterfaceType())
           TypeResolver->resolveDeclSignature(Ele);
         addEnumElementRef(Ele, Reason, /*HasTypeContext=*/true);
       }
@@ -3122,7 +3126,8 @@ public:
                                bool includePrivate,
                                std::vector<OperatorDecl *> &results) {
     for (auto &pair : map) {
-      if (pair.second.getInt() || includePrivate) {
+      if (pair.second.getPointer() &&
+          (pair.second.getInt() || includePrivate)) {
         results.push_back(pair.second.getPointer());
       }
     }
@@ -3628,12 +3633,6 @@ public:
       return std::binary_search(SortedNames.begin(), SortedNames.end(), Name);
     }
 
-    void collectEnumElementTypes(EnumElementDecl *EED) {
-      if (isNameHit(EED->getNameStr()) && EED->getType()) {
-        unboxType(EED->getType());
-      }
-    }
-
     void unboxType(Type T) {
       if (T->getKind() == TypeKind::Paren) {
         unboxType(T->getDesugaredType());
@@ -3674,8 +3673,8 @@ public:
           handleDeclRange(Ex->getMembers(), Reason);
         }
       } else if (isNameHit(VD->getNameStr())) {
-        if (VD->hasType())
-          unboxType(VD->getType());
+        if (VD->hasInterfaceType())
+          unboxType(VD->getInterfaceType());
       }
     }
   };
@@ -3689,13 +3688,13 @@ public:
         // same result type) as the contextual type.
         auto contextCanT = T->getCanonicalType();
         FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD, DeclVisibilityKind reason) {
-          if (!VD->hasType()) {
+          if (!VD->hasInterfaceType()) {
             TypeResolver->resolveDeclSignature(VD);
-            if (!VD->hasType())
+            if (!VD->hasInterfaceType())
               return false;
           }
 
-          auto T = VD->getType();
+          auto T = VD->getInterfaceType();
           while (auto FT = T->getAs<AnyFunctionType>())
             T = FT->getResult();
           return T->getCanonicalType() == contextCanT;
@@ -4103,7 +4102,7 @@ public:
       DeclNameOffsetLocatorPrinter Printer(OS);
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
-        Options.setArchetypeSelfTransform(transformType);
+        Options.setBaseType(transformType);
       Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(TAK_escaping);
@@ -4221,7 +4220,7 @@ public:
     if (D->getAttrs().hasAttribute<FinalAttr>())
       return;
 
-    if (!D->hasType())
+    if (!D->hasInterfaceType())
       TypeResolver->resolveDeclSignature(D);
 
     bool hasIntroducer = hasFuncIntroducer ||
@@ -5270,7 +5269,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::ReturnStmtExpr : {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
     if (auto FD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
-      if (auto FT = FD->getType()->getAs<FunctionType>()) {
+      if (auto FT = FD->getInterfaceType()->getAs<FunctionType>()) {
         Lookup.setExpectedTypes(FT->getResult());
       }
     }

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -860,9 +860,11 @@ private:
     // IRGen the current line(s).
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
-    auto LineModule =
-        performIRGeneration(IRGenOpts, REPLInputFile, sil.get(), "REPLLine",
-                            getGlobalLLVMContext(), RC.CurIRGenElem);
+    auto LineModule = performIRGeneration(IRGenOpts, REPLInputFile,
+                                          std::move(sil),
+                                          "REPLLine",
+                                          getGlobalLLVMContext(),
+                                          RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurElem;
     
     if (CI.getASTContext().hadError())

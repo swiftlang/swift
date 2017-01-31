@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -31,16 +31,14 @@
 using namespace swift;
 
 Witness::Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
-                 GenericSignature *syntheticSig,
                  GenericEnvironment *syntheticEnv,
                  SubstitutionMap reqToSynthesizedEnvMap) {
   auto &ctx = decl->getASTContext();
 
   auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
-  auto stored =
-    new (storedMem) StoredWitness{declRef, syntheticSig, syntheticEnv,
-                                  std::move(reqToSynthesizedEnvMap)};
+  auto stored = new (storedMem)
+      StoredWitness{declRef, syntheticEnv, std::move(reqToSynthesizedEnvMap)};
   ctx.addDestructorCleanup(*stored);
 
   storage = stored;
@@ -158,7 +156,7 @@ ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
 
 Type
 ProtocolConformance::getTypeWitnessByName(Type type,
-                                          ProtocolConformance *conformance,
+                                          ProtocolConformanceRef conformance,
                                           Identifier name,
                                           LazyResolver *resolver) {
   // For an archetype, retrieve the nested type with the appropriate
@@ -169,21 +167,25 @@ ProtocolConformance::getTypeWitnessByName(Type type,
 
   // Find the named requirement.
   AssociatedTypeDecl *assocType = nullptr;
-  auto members = conformance->getProtocol()->lookupDirect(name);
+  auto members = conformance.getRequirement()->lookupDirect(name);
   for (auto member : members) {
     assocType = dyn_cast<AssociatedTypeDecl>(member);
     if (assocType)
       break;
   }
 
+  // FIXME: Shouldn't this be a hard error?
   if (!assocType)
     return nullptr;
-  
-  assert(conformance && "Missing conformance information");
-  if (!conformance->hasTypeWitness(assocType, resolver)) {
+
+  if (conformance.isAbstract())
+    return DependentMemberType::get(type, assocType);
+
+  auto concrete = conformance.getConcrete();
+  if (!concrete->hasTypeWitness(assocType, resolver)) {
     return nullptr;
   }
-  return conformance->getTypeWitness(assocType, resolver).getReplacement();
+  return concrete->getTypeWitness(assocType, resolver).getReplacement();
 }
 
 Witness ProtocolConformance::getWitness(ValueDecl *requirement,
@@ -379,10 +381,9 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   auto conformingModule = conformingDC->getParentModule();
 
   auto *genericEnv = GenericConformance->getGenericEnvironment();
-  auto *genericSig = GenericConformance->getGenericSignature();
 
-  auto substitutionMap = genericEnv->getSubstitutionMap(
-      conformingModule, genericSig, GenericSubstitutions);
+  auto substitutionMap =
+      genericEnv->getSubstitutionMap(conformingModule, GenericSubstitutions);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
@@ -534,10 +535,9 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     auto *conformingDC = spec->getDeclContext();
     auto *conformingModule = conformingDC->getParentModule();
 
-    auto *sig = conformingDC->getGenericSignatureOfContext();
     auto *env = conformingDC->getGenericEnvironmentOfContext();
 
-    auto subMap = env->getSubstitutionMap(conformingModule, sig, subs);
+    auto subMap = env->getSubstitutionMap(conformingModule, subs);
 
     auto r = inherited->subst(conformingModule, getType(), subMap);
     assert(getType()->isEqual(r->getType())
