@@ -1,4 +1,4 @@
-// RUN: rm %t && %target-build-swift -I %S/icu -licucore %s -o %t
+// RUN: rm -f %t && %target-build-swift -I %S/icu -licucore %s -o %t
 // RUN: %target-run %t
 // REQUIRES: executable_test
 
