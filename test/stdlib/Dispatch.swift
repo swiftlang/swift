@@ -101,3 +101,31 @@ DispatchAPI.test("DispatchTime comparisons") {
         })
     }
 }
+
+DispatchAPI.test("DispatchTime.addSubtract") {
+	var then = DispatchTime.now() + Double.infinity
+	expectEqual(DispatchTime.distantFuture, then)
+
+	then = DispatchTime.now() + Double.nan
+	expectEqual(DispatchTime.distantFuture, then)
+
+	then = DispatchTime.now() - Double.infinity
+	expectEqual(DispatchTime(uptimeNanoseconds: 1), then)
+
+	then = DispatchTime.now() - Double.nan
+	expectEqual(DispatchTime(uptimeNanoseconds: 1), then)
+}
+
+DispatchAPI.test("DispatchWallTime.addSubtract") {
+	var then = DispatchWallTime.now() + Double.infinity
+	expectEqual(DispatchWallTime.distantFuture, then)
+
+	then = DispatchWallTime.now() + Double.nan
+	expectEqual(DispatchWallTime.distantFuture, then)
+
+	then = DispatchWallTime.now() - Double.infinity
+	expectEqual(DispatchWallTime.distantFuture.rawValue - UInt64(1), then.rawValue)
+
+	then = DispatchWallTime.now() - Double.nan
+	expectEqual(DispatchWallTime.distantFuture.rawValue - UInt64(1), then.rawValue)
+}
