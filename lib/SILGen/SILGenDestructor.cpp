@@ -12,6 +12,7 @@
 
 #include "SILGenFunction.h"
 #include "RValue.h"
+#include "Scope.h"
 #include "swift/AST/AST.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -96,9 +97,13 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
     = emitSiblingMethodRef(loc, selfValue, dtorConstant, subs);
 
   // Call the destroying destructor.
-  SILType objectPtrTy = SILType::getNativeObjectType(F.getASTContext());
-  selfValue = B.createApply(loc, dtorValue.forward(*this),
-                            dtorTy, objectPtrTy, subs, selfValue);
+  {
+    FullExpr CleanupScope(Cleanups, CleanupLocation::get(loc));
+    ManagedValue borrowedSelf = emitManagedBeginBorrow(loc, selfValue);
+    SILType objectPtrTy = SILType::getNativeObjectType(F.getASTContext());
+    selfValue = B.createApply(loc, dtorValue.forward(*this),
+                              dtorTy, objectPtrTy, subs, borrowedSelf.getUnmanagedValue());
+  }
 
   // Deallocate the object.
   selfValue = B.createUncheckedRefCast(loc, selfValue, classTy);
