@@ -1285,6 +1285,13 @@ public:
                       EndLifetimeInst(getSILDebugLocation(Loc), Operand));
   }
 
+  UncheckedOwnershipConversionInst *
+  createUncheckedOwnershipConversion(SILLocation Loc, SILValue Operand,
+                                     ValueOwnershipKind Kind) {
+    return insert(new (F.getModule()) UncheckedOwnershipConversionInst(
+        getSILDebugLocation(Loc), Operand, Kind));
+  }
+
   FixLifetimeInst *createFixLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule())
                       FixLifetimeInst(getSILDebugLocation(Loc), Operand));

@@ -1582,6 +1582,14 @@ bb0(%0 : $Builtin.NativeObject):
   return undef : $()
 }
 
+// CHECK-LABEL: sil @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: unchecked_ownership_conversion {{%.*}} : $Builtin.NativeObject, @guaranteed to @owned
+sil @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
+  return undef : $()
+}
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: {{.*}} : hidden _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
 // CHECK: #Foo.subscript!setter.1: {{.*}} : _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_

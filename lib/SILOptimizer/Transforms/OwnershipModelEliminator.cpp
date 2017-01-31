@@ -68,6 +68,12 @@ struct OwnershipModelEliminatorVisitor
     ELI->eraseFromParent();
     return true;
   }
+  bool visitUncheckedOwnershipConversionInst(
+      UncheckedOwnershipConversionInst *UOCI) {
+    UOCI->replaceAllUsesWith(UOCI->getOperand());
+    UOCI->eraseFromParent();
+    return true;
+  }
   bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *URVI);
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *URVI);
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *UAVI);

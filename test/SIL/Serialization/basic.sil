@@ -7,6 +7,14 @@
 
 import Builtin
 
+// CHECK-LABEL: sil @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: unchecked_ownership_conversion {{%.*}} : $Builtin.NativeObject, @guaranteed to @owned
+sil @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
+  return undef : $()
+}
+
 // CHECK-LABEL: sil @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: end_lifetime {{%.*}} : $Builtin.NativeObject
 sil @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
