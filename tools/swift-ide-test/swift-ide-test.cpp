@@ -1618,7 +1618,7 @@ public:
 
   void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
     StringRef HasDefault = "";
-    if (D->getKind() == DeclKind::Protocol) {
+    if (isa<ProtocolDecl>(D)) {
       InProtocol = true;
       DefaultImplementationMap.clear();
       ProtocolDecl *PD = const_cast<ProtocolDecl*>(dyn_cast<ProtocolDecl>(D));
@@ -1642,7 +1642,7 @@ public:
     OS << "</loc>";
   }
   void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
-    if (D->getKind() == DeclKind::Protocol) {
+    if (isa<ProtocolDecl>(D)) {
       InProtocol = false;
     }
     OS << "</decl>";
@@ -2235,7 +2235,7 @@ public:
       OS << " ";
       printDocComment(D);
       OS << "\n";
-    } else if (D->getKind() == DeclKind::Extension) {
+    } else if (isa<ExtensionDecl>(D)) {
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);
@@ -2761,6 +2761,37 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
   return 0;
 }
 
+static int doPrintIndexedSymbolsFromModule(const CompilerInvocation &InitInvok,
+                                           StringRef ModuleName) {
+  CompilerInvocation Invocation(InitInvok);
+
+  CompilerInstance CI;
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+
+  auto &Context = CI.getASTContext();
+
+  // Load standard library so that Clang importer can use it.
+  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
+  if (!Stdlib) {
+    llvm::errs() << "Failed loading stdlib\n";
+    return 1;
+  }
+
+  auto *M = getModuleByFullName(Context, ModuleName);
+  if (!M) {
+    llvm::errs() << "Failed loading " << ModuleName << "\n";
+    return 1;
+  }
+
+  PrintIndexDataConsumer consumer(llvm::outs());
+  indexModule(M, StringRef(), consumer);
+
+  return 0;
+}
 
 static int doPrintUSRs(const CompilerInvocation &InitInvok,
                        StringRef SourceFilename) {
@@ -3179,7 +3210,16 @@ int main(int argc, char *argv[]) {
                                 options::EndLineColumnPair);
     break;
   case ActionType::PrintIndexedSymbols:
-      ExitCode = doPrintIndexedSymbols(InitInvok, options::SourceFilename);
+      if (options::ModuleToPrint.empty()) {
+        ExitCode = doPrintIndexedSymbols(InitInvok, options::SourceFilename);
+      } else {
+        if (options::ModuleToPrint.size() > 1) {
+          llvm::errs() << "printing symbols for the first module name, the rest "
+            "are ignored";
+        }
+        ExitCode = doPrintIndexedSymbolsFromModule(InitInvok,
+                                               options::ModuleToPrint.front());
+      }
   }
 
   if (options::PrintStats)

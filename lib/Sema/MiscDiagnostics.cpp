@@ -576,7 +576,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       const TypeDecl *declParent =
           VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
       if (!declParent) {
-        assert(VD->getDeclContext()->isModuleScopeContext());
+        // If the declaration has been validated but not fully type-checked,
+        // the attribute might be applied to something invalid.
+        if (!VD->getDeclContext()->isModuleScopeContext())
+          return;
         declParent = VD->getDeclContext()->getParentModule();
       }
 
@@ -1862,8 +1865,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
 
 namespace {
 class VarDeclUsageChecker : public ASTWalker {
-  TypeChecker &TC;
-  
+  DiagnosticEngine &Diags;
   // Keep track of some information about a variable.
   enum {
     RK_Read        = 1,      ///< Whether it was ever read.
@@ -1891,7 +1893,7 @@ class VarDeclUsageChecker : public ASTWalker {
   void operator=(const VarDeclUsageChecker &) = delete;
 
 public:
-  VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : TC(TC) {
+  VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : Diags(TC.Diags) {
     // Track the parameters of the function.
     for (auto PL : AFD->getParameterLists())
       for (auto param : *PL)
@@ -1899,8 +1901,10 @@ public:
           VarDecls[param] = 0;
     
   }
-    
-  VarDeclUsageChecker(TypeChecker &TC, VarDecl *VD) : TC(TC) {
+
+  VarDeclUsageChecker(DiagnosticEngine &Diags) : Diags(Diags) {}
+
+  VarDeclUsageChecker(TypeChecker &TC, VarDecl *VD) : Diags(TC.Diags) {
     // Track a specific VarDecl
     VarDecls[VD] = 0;
   }
@@ -2006,6 +2010,35 @@ public:
       // Don't walk into it though, it may not even be type checked yet.
       return false;
     }
+    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      // If this is a TopLevelCodeDecl, scan for global variables
+      auto *body = TLCD->getBody();
+      for (auto node : body->getElements()) {
+        if (node.is<Decl *>()) {
+          // Flag all variables in a PatternBindingDecl
+          Decl *D = node.get<Decl *>();
+          PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D);
+          if (!PBD) continue;
+          for (PatternBindingEntry PBE : PBD->getPatternList()) {
+            PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
+              VarDecls[VD] = RK_Read|RK_Written;
+            });
+          }
+        } else if (node.is<Stmt *>()) {
+          // Flag all variables in guard statements
+          Stmt *S = node.get<Stmt *>();
+          GuardStmt *GS = dyn_cast<GuardStmt>(S);
+          if (!GS) continue;
+          for (StmtConditionElement SCE : GS->getCond()) {
+            if (auto pattern = SCE.getPatternOrNull()) {
+              pattern->forEachVariable([&](VarDecl *VD) {
+                VarDecls[VD] = RK_Read|RK_Written;
+              });
+            }
+          }
+        }
+      }
+    }
 
     
     // Note that we ignore the initialization behavior of PatternBindingDecls,
@@ -2088,8 +2121,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       // produce a fixit hint with a parent map, but this is a lot of effort for
       // a narrow case.
       if (access & RK_CaptureList) {
-        TC.diagnose(var->getLoc(), diag::capture_never_used,
-                    var->getName());
+        Diags.diagnose(var->getLoc(), diag::capture_never_used,
+                       var->getName());
         continue;
       }
       
@@ -2105,8 +2138,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
           SourceRange replaceRange(
               pbd->getStartLoc(),
               pbd->getPatternList()[0].getPattern()->getEndLoc());
-          TC.diagnose(var->getLoc(), diag::pbd_never_used,
-                      var->getName(), varKind)
+          Diags.diagnose(var->getLoc(), diag::pbd_never_used,
+                         var->getName(), varKind)
             .fixItReplace(replaceRange, "_");
           continue;
         }
@@ -2140,8 +2173,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                     noParens = isIsTest = true;
                   }
                   
-                  auto diagIF = TC.diagnose(var->getLoc(),
-                                            diag::pbd_never_used_stmtcond,
+                  auto diagIF = Diags.diagnose(var->getLoc(),
+                                               diag::pbd_never_used_stmtcond,
                                             var->getName());
                   auto introducerLoc = SC->getCond()[0].getIntroducerLoc();
                   diagIF.fixItReplaceChars(introducerLoc,
@@ -2168,8 +2201,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //    let (a,b) = foo()
       // Just rewrite the one variable with a _.
       unsigned varKind = var->isLet();
-      TC.diagnose(var->getLoc(), diag::variable_never_used,
-                  var->getName(), varKind)
+      Diags.diagnose(var->getLoc(), diag::variable_never_used,
+                     var->getName(), varKind)
         .fixItReplace(var->getLoc(), "_");
       continue;
     }
@@ -2202,18 +2235,18 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       // If this is a parameter explicitly marked 'var', remove it.
       unsigned varKind = isa<ParamDecl>(var);
       if (FixItLoc.isInvalid())
-        TC.diagnose(var->getLoc(), diag::variable_never_mutated,
-                    var->getName(), varKind);
+        Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
+                       var->getName(), varKind);
       else
-        TC.diagnose(var->getLoc(), diag::variable_never_mutated,
-                    var->getName(), varKind)
+        Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
+                       var->getName(), varKind)
           .fixItReplace(FixItLoc, "let");
       continue;
     }
     
     // If this is a variable that was only written to, emit a warning.
     if ((access & RK_Read) == 0) {
-      TC.diagnose(var->getLoc(), diag::variable_never_read, var->getName(),
+      Diags.diagnose(var->getLoc(), diag::variable_never_read, var->getName(),
                   isa<ParamDecl>(var));
       continue;
     }
@@ -2382,6 +2415,14 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigStmt *ICS) {
     for (auto elt : clause.Elements)
       elt.walk(ConservativeDeclMarker(*this));
   }
+}
+
+/// Apply the warnings managed by VarDeclUsageChecker to the top level
+/// code declarations that haven't been checked yet.
+void swift::
+performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD) {
+  VarDeclUsageChecker checker(TC.Diags);
+  TLCD->walk(checker);
 }
 
 /// Perform diagnostics for func/init/deinit declarations.

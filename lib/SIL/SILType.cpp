@@ -179,7 +179,7 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   if (EnumDecl *toEnum = toType.getEnumOrBoundGenericEnum()) {
     for (auto toElement : toEnum->getAllElements()) {
       ++numToElements;
-      if (!toElement->hasArgumentType())
+      if (!toElement->getArgumentInterfaceType())
         continue;
       // Bail on multiple payloads.
       if (!toElementTy.isNull())
@@ -203,7 +203,7 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   // If any of the fromElements can be cast by value to the singleton toElement,
   // then the overall enum can be cast by value.
   for (auto fromElement : fromElements) {
-    if (!fromElement->hasArgumentType())
+    if (!fromElement->getArgumentInterfaceType())
       continue;
 
     auto fromElementTy = fromType.getEnumElementType(fromElement, M);
@@ -311,7 +311,7 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
-  assert(elt->hasArgumentType());
+  assert(elt->getArgumentInterfaceType());
 
   if (auto objectType = getSwiftRValueType().getAnyOptionalObjectType()) {
     assert(elt == M.getASTContext().getOptionalSomeDecl());
@@ -414,7 +414,7 @@ bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
     // Then if we have an enum...
     if (EnumDecl *E = Ty.getEnumOrBoundGenericEnum()) {
       for (auto Elt : E->getAllElements())
-        if (Elt->hasArgumentType())
+        if (Elt->getArgumentInterfaceType())
           Worklist.push_back(Ty.getEnumElementType(Elt, Mod));
       continue;
     }
@@ -612,7 +612,7 @@ SILResultInfo::getOwnershipKind(SILModule &M,
 }
 
 SILModuleConventions::SILModuleConventions(const SILModule &M)
-    : loweredAddresses(true) {}
+    : loweredAddresses(!M.getASTContext().LangOpts.EnableSILOpaqueValues) {}
 
 bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
                                                      SILModule &M) {

@@ -321,11 +321,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitEnumElementDecl(EnumElementDecl *ED) {
-    if (ED->hasArgumentType()) {
-      if (auto TR = ED->getArgumentTypeLoc().getTypeRepr()) {
-        if (doIt(TR)) {
-          return true;
-        }
+    if (auto TR = ED->getArgumentTypeLoc().getTypeRepr()) {
+      if (doIt(TR)) {
+        return true;
       }
     }
 
@@ -984,7 +982,10 @@ public:
       // VarDecls are walked via their NamedPattern, ignore them if we encounter
       // then in the few cases where they are also pushed outside as members.
       // In all those cases we can walk them via the pattern binding decl.
-      if (Walker.Parent.getAsModule())
+      // This is used for when vising VarDecls from source, when visiting a
+      // module file we walk them as we encounter them.
+      if (Walker.Parent.getAsModule() &&
+          D->getDeclContext()->getParentSourceFile())
         return true;
       if (Decl *ParentD = Walker.Parent.getAsDecl())
         return (isa<NominalTypeDecl>(ParentD) || isa<ExtensionDecl>(ParentD));

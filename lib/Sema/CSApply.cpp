@@ -2081,44 +2081,31 @@ namespace {
       // Create a tuple containing all of the segments.
       SmallVector<Expr *, 4> segments;
       SmallVector<Identifier, 4> names;
-      unsigned index = 0;
       ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr));
       for (auto segment : expr->getSegments()) {
-        auto locator = cs.getConstraintLocator(
-                      locatorBuilder.withPathElement(
-                          LocatorPathElt::getInterpolationArgument(index++)));
-
-        // Find the initializer we chose.
-        auto choice = getOverloadChoice(locator);
-
-        auto memberRef = buildMemberRef(
-                           typeRef, choice.openedFullType,
-                           segment->getStartLoc(), choice.choice.getDecl(),
-                           DeclNameLoc(segment->getStartLoc()),
-                           choice.openedType,
-                           locator, locator, /*Implicit=*/true,
-                           choice.choice.getFunctionRefKind(),
-                           AccessSemantics::Ordinary,
-                           /*isDynamic=*/false);
         ApplyExpr *apply =
           CallExpr::createImplicit(
-            tc.Context, memberRef,
+            tc.Context, typeRef,
             { segment },
             { tc.Context.Id_stringInterpolationSegment });
         cs.cacheType(apply->getArg());
 
-        auto converted = finishApply(apply, openedType, locatorBuilder);
-        if (!converted)
-          return nullptr;
+        Expr *convertedSegment = apply;
+        if (tc.typeCheckExpressionShallow(convertedSegment, cs.DC))
+          continue;
 
-        segments.push_back(converted);
+        segments.push_back(convertedSegment);
 
-        if (index == 1) {
+        if (names.empty()) {
           names.push_back(tc.Context.Id_stringInterpolation);
         } else {
           names.push_back(Identifier());
         }
       }
+
+      // If all of the segments had errors, bail out.
+      if (segments.empty())
+        return nullptr;
 
       // Call the init(stringInterpolation:) initializer with the arguments.
       ApplyExpr *apply = CallExpr::createImplicit(tc.Context, memberRef,
@@ -4096,22 +4083,7 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
 
     unsigned newFlags = locator->getSummaryFlags();
 
-    // If we have an interpolation argument, dig out the constructor if we
-    // can.
-    // FIXME: This representation is actually quite awful
-    if (newPath.size() == 1 &&
-        newPath[0].getKind() == ConstraintLocator::InterpolationArgument) {
-      newPath.push_back(ConstraintLocator::ConstructorMember);
-
-      locator = cs.getConstraintLocator(locator->getAnchor(), newPath, newFlags);
-      auto known = solution.overloadChoices.find(locator);
-      if (known != solution.overloadChoices.end()) {
-        auto &choice = known->second.choice;
-        if (choice.getKind() == OverloadChoiceKind::Decl)
-          return cast<AbstractFunctionDecl>(choice.getDecl());
-      }
-      return nullptr;
-    } else if (isSubscript) {
+    if (isSubscript) {
       newPath.push_back(ConstraintLocator::SubscriptMember);
     } else {
       newPath.push_back(ConstraintLocator::ApplyFunction);
@@ -4793,6 +4765,9 @@ Expr *ExprRewriter::coerceCallArguments(
 
   bool matchCanFail = false;
 
+  if (paramType->hasUnresolvedType())
+    matchCanFail = true;
+
   // If you value your sanity, ignore the body of this 'if' statement.
   if (cs.getASTContext().isSwiftVersion3()) {
     // Total hack: In Swift 3 mode, we can end up with an arity mismatch due to
@@ -5424,7 +5399,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::DeepEquality:
-      llvm_unreachable("Equality handled above");
+      assert(toType->hasUnresolvedType() && "Should have handled this above");
+      break;
 
     case ConversionRestrictionKind::Superclass: {
       // Coercion from archetype to its (concrete) superclass.
@@ -5669,23 +5645,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
-  // Tuple-to-scalar conversion.
-  if (auto fromTuple = fromType->getAs<TupleType>()) {
-    if (fromTuple->getNumElements() == 1 &&
-        !fromTuple->getElement(0).isVararg() &&
-        !toType->is<TupleType>()) {
-      expr = cs.cacheType(new (cs.getASTContext())
-          TupleElementExpr(
-              expr,
-              expr->getLoc(),
-              0,
-              expr->getLoc(),
-              fromTuple->getElementType(0)));
-      expr->setImplicit(true);
-      return expr;
-    }
-  }
-
   // Coercions from an lvalue: load or perform implicit address-of. We perform
   // these coercions first because they are often the first step in a multi-step
   // coercion.
@@ -5849,7 +5808,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coercion from one metatype to another.
-  if (fromType->is<MetatypeType>()) {
+  if (fromType->is<MetatypeType>() &&
+      toType->is<MetatypeType>()) {
     auto toMeta = toType->castTo<MetatypeType>();
     return cs.cacheType(new (tc.Context) MetatypeConversionExpr(expr, toMeta));
   }
@@ -5860,11 +5820,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return coerceToType(expr, toType, locator);
   }
 
-  auto fromObjType = fromType->getLValueOrInOutObjectType();
-  auto toObjType = toType->getLValueOrInOutObjectType();
-
-  // Conversion to/from UnresolvedType (looking through @lvalue or inout).
-  if (fromObjType->hasUnresolvedType() || toObjType->hasUnresolvedType())
+  // Unresolved types come up in diagnostics for lvalue and inout types.
+  if (fromType->hasUnresolvedType() || toType->hasUnresolvedType())
     return cs.cacheType(new (tc.Context)
                             UnresolvedTypeConversionExpr(expr, toType));
 

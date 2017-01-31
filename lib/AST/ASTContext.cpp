@@ -3352,7 +3352,7 @@ DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
   // FIXME: The specific introduction of HasTypeParameter here is due to
   // type witness inference. See the use of mapErrorTypeToOriginal in
   // TypeCheckProtocol.cpp.
-  if (!properties.hasTypeVariable())
+  if (!properties.hasTypeVariable() && !properties.hasUnresolvedType())
     properties |= RecursiveTypeProperties::HasTypeParameter;
   auto arena = getArena(properties);
 
@@ -3374,7 +3374,7 @@ DependentMemberType *DependentMemberType::get(Type base,
   // FIXME: The specific introduction of HasTypeParameter here is due to
   // type witness inference. See the use of mapErrorTypeToOriginal in
   // TypeCheckProtocol.cpp.
-  if (!properties.hasTypeVariable())
+  if (!properties.hasTypeVariable() && !properties.hasUnresolvedType())
     properties |= RecursiveTypeProperties::HasTypeParameter;
   auto arena = getArena(properties);
 

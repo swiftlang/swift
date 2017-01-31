@@ -694,9 +694,10 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
         !cast<ArchetypeType>(selfValue.getSubstRValueType())->requiresClass())
       return;
 
-    auto selfParameter = getSelfParameter();
-    assert(gen.silConv.isSILIndirect(selfParameter));
-    (void)selfParameter;
+    assert(gen.silConv.useLoweredAddresses()
+           == gen.silConv.isSILIndirect(getSelfParameter()));
+    if (!gen.silConv.useLoweredAddresses())
+      return;
 
     SILLocation selfLoc = selfValue.getLocation();
 
@@ -4317,7 +4318,7 @@ namespace {
 
         // Get the payload argument.
         ArgumentSource payload;
-        if (element->hasArgumentType()) {
+        if (element->getArgumentInterfaceType()) {
           assert(uncurriedSites.size() == 2);
           formalResultType = formalType.getResult();
           claimNextParamClause(origFormalType);

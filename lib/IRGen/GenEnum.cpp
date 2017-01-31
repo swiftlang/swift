@@ -187,7 +187,9 @@ const {
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
-    return IGF.getTypeInfoForUnlowered(elt->getArgumentType())
+    auto argTy = elt->getParentEnum()->mapTypeIntoContext(
+      elt->getArgumentInterfaceType());
+    return IGF.getTypeInfoForUnlowered(argTy)
       .getUndefAddress();
   }
 
@@ -208,7 +210,9 @@ const {
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
-    return IGF.getTypeInfoForUnlowered(Case->getArgumentType())
+    auto argTy = Case->getParentEnum()->mapTypeIntoContext(
+      Case->getArgumentInterfaceType());
+    return IGF.getTypeInfoForUnlowered(argTy)
       .getUndefAddress();
   }
 
@@ -4980,7 +4984,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     // strategy. If the abstract layout of the enum is dependent on generic
     // parameters, then we additionally need to constrain any layout
     // optimizations we perform to things that are reproducible by the runtime.
-    Type origArgType = elt->getArgumentType();
+    Type origArgType = elt->getArgumentInterfaceType();
     if (origArgType.isNull()) {
       elementsWithNoPayload.push_back({elt, nullptr, nullptr});
       continue;
@@ -4993,6 +4997,8 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       elementsWithPayload.push_back({elt, nativeTI, nativeTI});
       continue;
     }
+
+    origArgType = theEnum->mapTypeIntoContext(origArgType);
 
     auto origArgLoweredTy = TC.IGM.getLoweredType(origArgType);
     const TypeInfo *origArgTI

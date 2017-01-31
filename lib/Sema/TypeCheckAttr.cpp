@@ -292,9 +292,12 @@ void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    NominalTypeDecl *extendedType = ED->getExtendedType()->getAnyNominal();
-    if (extendedType && !isa<ClassDecl>(extendedType))
-      return diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
+    if (auto extendedType = ED->getExtendedType()) {
+      if (auto *nominalDecl = extendedType->getAnyNominal()) {
+        if (!isa<ClassDecl>(nominalDecl))
+          return diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
+      }
+    }
   }
 }
 
@@ -1770,6 +1773,11 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   attr->setRequirements(DC->getASTContext(), convertedRequirements);
 }
 
+static Accessibility getAccessForDiagnostics(const ValueDecl *D) {
+  return std::min(D->getFormalAccess(),
+                  D->getEffectiveAccess());
+}
+
 void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
@@ -1777,7 +1785,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
     TC.diagnose(attr->getLocation(),
                 diag::fixed_layout_attr_on_internal_type,
                 VD->getName(),
-                VD->getFormalAccess())
+                getAccessForDiagnostics(VD))
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
   }
@@ -1800,7 +1808,7 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
     TC.diagnose(attr->getLocation(),
                 diag::versioned_attr_with_explicit_accessibility,
                 VD->getName(),
-                VD->getFormalAccess())
+                getAccessForDiagnostics(VD))
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
     return;

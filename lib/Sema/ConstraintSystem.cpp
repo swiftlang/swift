@@ -1577,8 +1577,11 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
                  lookupBaseType->getContextSubstitutions(
                     assocType->getDeclContext()));
 
-      // FIXME: Record failure somehow?
-      if (!result) return type;
+
+      if (!result) {
+        return DependentMemberType::get(
+          ErrorType::get(newBase), assocType);
+      }
 
       return result;
     }

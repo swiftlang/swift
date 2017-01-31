@@ -71,6 +71,17 @@ func foo6() -> Int {
   return a
 }
 
+func foo7(a : Int) -> Int {
+  switch a {
+  case 1:
+    return 0
+  case 2:
+    return 1
+  default:
+    return a
+  }
+}
+
 // RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
 // RUN: %target-swift-ide-test -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
@@ -88,6 +99,9 @@ func foo6() -> Int {
 // RUN: %target-swift-ide-test -range -pos=63:1 -end-pos=66:44 -source-filename %s | %FileCheck %s -check-prefix=CHECK15
 // RUN: %target-swift-ide-test -range -pos=63:1 -end-pos=68:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK16
 // RUN: %target-swift-ide-test -range -pos=67:1 -end-pos=67:19 -source-filename %s | %FileCheck %s -check-prefix=CHECK17
+// RUN: %target-swift-ide-test -range -pos=76:1 -end-pos=79:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK18
+// RUN: %target-swift-ide-test -range -pos=76:1 -end-pos=77:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK19
+// RUN: %target-swift-ide-test -range -pos=78:1 -end-pos=81:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK20
 
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
@@ -312,3 +326,33 @@ func foo6() -> Int {
 // CHECK17-NEXT: <Referenced>c</Referenced><Type>Int</Type>
 // CHECK17-NEXT: <ASTNodes>1</ASTNodes>
 // CHECK17-NEXT: <end>
+
+// CHECK18: <Kind>MultiStatement</Kind>
+// CHECK18-NEXT: <Content>case 1:
+// CHECK18-NEXT:     return 0
+// CHECK18-NEXT:   case 2:
+// CHECK18-NEXT:     return 1</Content>
+// CHECK18-NEXT: <Type>Void</Type>
+// CHECK18-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK18-NEXT: <Entry>Multi</Entry>
+// CHECK18-NEXT: <ASTNodes>2</ASTNodes>
+// CHECK18-NEXT: <end>
+
+// CHECK19: <Kind>SingleStatement</Kind>
+// CHECK19-NEXT: <Content>case 1:
+// CHECK19-NEXT:     return 0</Content>
+// CHECK19-NEXT: <Type>Void</Type>
+// CHECK19-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK19-NEXT: <ASTNodes>1</ASTNodes>
+// CHECK19-NEXT: <end>
+
+// CHECK20: <Kind>MultiStatement</Kind>
+// CHECK20-NEXT: <Content>case 2:
+// CHECK20-NEXT:     return 1
+// CHECK20-NEXT:   default:
+// CHECK20-NEXT:     return a</Content>
+// CHECK20-NEXT: <Type>Void</Type>
+// CHECK20-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK20-NEXT: <Entry>Multi</Entry>
+// CHECK20-NEXT: <ASTNodes>2</ASTNodes>
+// CHECK20-NEXT: <end>

@@ -517,7 +517,7 @@ OwnershipCompatibilityUseChecker::checkTerminatorArgumentMatchesDestBB(
   // Check if this enum has at least one case that is non-trivially typed.
   bool HasNonTrivialCase =
       llvm::any_of(E->getAllElements(), [this](EnumElementDecl *E) -> bool {
-        if (!E->hasArgumentType())
+        if (!E->getArgumentInterfaceType())
           return false;
         SILType EnumEltType = getType().getEnumElementType(E, Mod);
         return !EnumEltType.isTrivial(Mod);

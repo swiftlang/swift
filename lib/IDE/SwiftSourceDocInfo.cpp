@@ -211,6 +211,10 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   printContext(OS, RangeContext);
   OS << "</Context>\n";
 
+  if (!HasSingleEntry) {
+    OS << "<Entry>Multi</Entry>\n";
+  }
+
   for (auto &VD : DeclaredDecls) {
     OS << "<Declared>" << VD.VD->getNameStr() << "</Declared>";
     OS << "<OutscopeReference>";
@@ -296,23 +300,25 @@ private:
   ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {
     assert(!Node.isNull());
     assert(ContainedASTNodes.size() == 1);
+    // Single node implies single entry point, or is it?
+    bool SingleEntry = true;
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
                                resolveNodeType(Node), Content,
-                               getImmediateContext(),
+                               getImmediateContext(), SingleEntry,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
       return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
-                               Content, getImmediateContext(),
+                               Content, getImmediateContext(), SingleEntry,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
       return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content,
-                               getImmediateContext(),
+                               getImmediateContext(), SingleEntry,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
@@ -486,6 +492,22 @@ public:
     FurtherReferenceWalker(this).walk(getImmediateContext());
   }
 
+  bool hasSingleEntryPoint(ArrayRef<ASTNode> Nodes) {
+    unsigned CaseCount = 0;
+    // Count the number of case/default statements.
+    for (auto N : Nodes) {
+      if (Stmt *S = N.is<Stmt*>() ? N.get<Stmt*>() : nullptr) {
+        if (S->getKind() == StmtKind::Case)
+          CaseCount ++;
+      }
+    }
+    // If there are more than one case/default statements, there are more than
+    // one entry point.
+    if (CaseCount > 1)
+      return false;
+    return true;
+  }
+
   void analyze(ASTNode Node) {
     Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
     analyzeDecl(D);
@@ -529,7 +551,7 @@ public:
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */
                 resolveNodeType(DCInfo.EndMatches.back()), Content,
-                getImmediateContext(),
+                getImmediateContext(), hasSingleEntryPoint(ContainedASTNodes),
                 llvm::makeArrayRef(ContainedASTNodes),
                 llvm::makeArrayRef(DeclaredDecls),
                 llvm::makeArrayRef(ReferencedDecls)};

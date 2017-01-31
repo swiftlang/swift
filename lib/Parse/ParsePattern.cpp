@@ -431,6 +431,13 @@ mapParsedParameters(Parser &parser,
                            param.FirstName, param.FirstNameLoc);
     }
 
+    // Warn when an unlabeled parameter follows a variadic parameter
+    if (ellipsisLoc.isValid() && elements.back()->isVariadic() &&
+        param.FirstName.empty()) {
+      parser.diagnose(param.FirstNameLoc,
+                      diag::unlabeled_parameter_following_variadic_parameter);
+    }
+    
     // If this parameter had an ellipsis, check whether it's the last parameter.
     if (param.EllipsisLoc.isValid()) {
       if (ellipsisLoc.isValid()) {
@@ -499,12 +506,17 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
       llvm_unreachable("should never be here");
     }
 
-    auto diag = diagnose(Tok, diagID);
-    if (Tok.isAny(tok::l_brace, tok::arrow, tok::kw_throws, tok::kw_rethrows))
-      diag.fixItInsertAfter(PreviousLoc, "()");
+    {
+      auto diag = diagnose(Tok, diagID);
+      if (Tok.isAny(tok::l_brace, tok::arrow, tok::kw_throws, tok::kw_rethrows))
+        diag.fixItInsertAfter(PreviousLoc, "()");
 
+      if (skipIdentifier)
+        diag.fixItRemove(Tok.getLoc());
+    }
+
+    // We might diagnose again down here, so make sure 'diag' is out of scope.
     if (skipIdentifier) {
-      diag.fixItRemove(Tok.getLoc());
       consumeToken();
       skipSingle();
     }

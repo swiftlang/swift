@@ -1147,12 +1147,13 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
       // the storage size from the enum.
       ElemDbgTy = DebugTypeInfo(ED, ED->getRawType(), DbgTy.StorageType,
                                 DbgTy.size, DbgTy.align);
-    else if (ElemDecl->hasArgumentType()) {
+    else if (auto ArgTy = ElemDecl->getArgumentInterfaceType()) {
       // A discriminated union. This should really be described as a
       // DW_TAG_variant_type. For now only describing the data.
-      auto &TI = IGM.getTypeInfoForUnlowered(ElemDecl->getArgumentType());
+      ArgTy = ElemDecl->getParentEnum()->mapTypeIntoContext(ArgTy);
+      auto &TI = IGM.getTypeInfoForUnlowered(ArgTy);
       ElemDbgTy =
-          DebugTypeInfo::getFromTypeInfo(ED, ElemDecl->getArgumentType(), TI);
+          DebugTypeInfo::getFromTypeInfo(ED, ArgTy, TI);
     } else {
       // Discriminated union case without argument. Fallback to Int
       // as the element type; there is no storage here.

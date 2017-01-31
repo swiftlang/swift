@@ -99,3 +99,32 @@ func testShuffleTuple() {
   // CHECK-NEXT: dealloc_stack [[TEMP]]
   pair = (x: make_int(), y: make_p())
 }
+
+enum GenericEnum<T> {
+  case one(T)
+
+  static var callback: (T) -> Void { fatalError() }
+}
+
+// CHECK-LABEL: _T06tuples16testTupleUnsplatyyF
+func testTupleUnsplat() {
+  // CHECK: debug_value [[X:%.+]] : $Int, let, name "x"
+  // CHECK: debug_value [[Y:%.+]] : $Int, let, name "y"
+  let x = 1, y = 2
+
+  // CHECK: [[TUPLE:%.+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
+  // CHECK: enum $GenericEnum<(Int, Int)>, #GenericEnum.one!enumelt.1, [[TUPLE]]
+  _ = GenericEnum<(Int, Int)>.one((x, y))
+  // CHECK: [[TUPLE:%.+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
+  // CHECK: enum $GenericEnum<(Int, Int)>, #GenericEnum.one!enumelt.1, [[TUPLE]]
+  _ = GenericEnum<(Int, Int)>.one(x, y)
+
+  // CHECK: [[THUNK:%.+]] = function_ref @_T0Si_SitIxi_SiSiIxyy_TR
+  // CHECK: [[REABSTRACTED:%.+]] = partial_apply [[THUNK]]({{%.+}})
+  // CHECK: apply [[REABSTRACTED]]([[X]], [[Y]])
+  _ = GenericEnum<(Int, Int)>.callback((x, y))
+  // CHECK: [[THUNK:%.+]] = function_ref @_T0Si_SitIxi_SiSiIxyy_TR
+  // CHECK: [[REABSTRACTED:%.+]] = partial_apply [[THUNK]]({{%.+}})
+  // CHECK: apply [[REABSTRACTED]]([[X]], [[Y]])
+  _ = GenericEnum<(Int, Int)>.callback(x, y)
+} // CHECK: end sil function '_T06tuples16testTupleUnsplatyyF'

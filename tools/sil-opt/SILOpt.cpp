@@ -79,6 +79,10 @@ static llvm::cl::opt<bool>
 EnableSILOwnershipOpt("enable-sil-ownership",
                  llvm::cl::desc("Compile the module with sil-ownership initially enabled for all functions"));
 
+static llvm::cl::opt<bool>
+EnableSILOpaqueValues("enable-sil-opaque-values",
+                      llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
+
 static llvm::cl::opt<std::string>
 ResourceDir("resource-dir",
     llvm::cl::desc("The directory that holds the compiler resource files"));
@@ -238,6 +242,7 @@ int main(int argc, char **argv) {
       ASTVerifierProcessCount;
   Invocation.getLangOptions().ASTVerifierProcessId =
       ASTVerifierProcessId;
+  Invocation.getLangOptions().EnableSILOpaqueValues = EnableSILOpaqueValues;
 
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();

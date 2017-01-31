@@ -58,10 +58,10 @@ do {
 }
 
 do {
-  var a = 3
-  var b = 4
-  var c = (3)
-  var d = (a, b)
+  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var c = (3) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
+  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
 
   concrete(a)
   concrete((a))
@@ -565,9 +565,9 @@ do {
 }
 
 do {
-  var a = 3
-  var b = 4
-  var c = (a, b)
+  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var c = (a, b) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
 
   _ = InitTwo(a, b)
   _ = InitTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
@@ -621,9 +621,9 @@ do {
 }
 
 do {
-  var a = 3
-  var b = 4
-  var d = (a, b)
+  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
 
   var s1 = SubscriptTwo()
   _ = s1[a, b]
@@ -1028,9 +1028,9 @@ do {
 }
 
 do {
-  var a = 3
-  var b = 4
-  var c = (a, b)
+  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var c = (a, b) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
 
   // _ = GenericInit<(Int, Int)>(a, b) // Crashes in Swift 3
   _ = GenericInit<(Int, Int)>((a, b)) // expected-error {{expression type 'GenericInit<(Int, Int)>' is ambiguous without more context}}
@@ -1109,9 +1109,9 @@ do {
 }
 
 do {
-  var a = 3.0
-  var b = 4.0
-  var d = (a, b)
+  var a = 3.0 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4.0 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
 
   var s1 = GenericSubscript<(Double, Double)>()
   _ = s1[a, b]

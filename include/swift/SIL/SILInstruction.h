@@ -22,7 +22,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
-#include "swift/SIL/SILArgumentConvention.h"
+#include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"

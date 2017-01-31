@@ -124,7 +124,7 @@ class AnnotatingPrinter : public StreamPrinter {
   }
 
   void deinitDefaultMapToUse(const Decl*D) {
-    if (D->getKind() == DeclKind::Extension) {
+    if (isa<ExtensionDecl>(D)) {
       DefaultMapToUse = nullptr;
     }
   }
@@ -154,7 +154,7 @@ public:
   bool shouldContinuePre(const Decl *D, Optional<BracketOptions> Bracket) {
     assert(Bracket.hasValue());
     if (!Bracket.getValue().shouldOpenExtension(D) &&
-        D->getKind() == DeclKind::Extension)
+        isa<ExtensionDecl>(D))
       return false;
     return true;
   }
@@ -164,7 +164,7 @@ public:
     if (!Bracket.getValue().shouldCloseNominal(D) && dyn_cast<NominalTypeDecl>(D))
       return false;
     if (!Bracket.getValue().shouldCloseExtension(D) &&
-        D->getKind() == DeclKind::Extension)
+        isa<ExtensionDecl>(D))
       return false;
     return true;
   }

@@ -325,8 +325,11 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// \brief Whether or not this element directly or indirectly references
     /// the enum type.
     unsigned Recursiveness : 2;
+
+    /// \brief Whther or not this element has an associated value.
+    unsigned HasArgumentType : 1;
   };
-  enum { NumEnumElementDeclBits = NumValueDeclBits + 2 };
+  enum { NumEnumElementDeclBits = NumValueDeclBits + 3 };
   static_assert(NumEnumElementDeclBits <= 32, "fits in an unsigned");
   
   class AbstractFunctionDeclBitfields {
@@ -5323,6 +5326,7 @@ class EnumElementDecl : public ValueDecl {
 public:
   EnumElementDecl(SourceLoc IdentifierLoc, Identifier Name,
                   TypeLoc ArgumentType,
+                  bool HasArgumentType,
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,
                   DeclContext *DC)
@@ -5333,14 +5337,13 @@ public:
   {
     EnumElementDeclBits.Recursiveness =
         static_cast<unsigned>(ElementRecursiveness::NotRecursive);
+    EnumElementDeclBits.HasArgumentType = HasArgumentType;
   }
 
   /// \returns false if there was an error during the computation rendering the
   /// EnumElementDecl invalid, true otherwise.
   bool computeType();
 
-  bool hasArgumentType() const { return !ArgumentType.getType().isNull(); }
-  Type getArgumentType() const { return ArgumentType.getType(); }
   Type getArgumentInterfaceType() const;
 
   TypeLoc &getArgumentTypeLoc() { return ArgumentType; }

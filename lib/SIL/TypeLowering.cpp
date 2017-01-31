@@ -487,12 +487,15 @@ bool SILType::isAddressOnly(CanType type, SILModule &M,
 }
 
 namespace {
-  /// A class for loadable types.
+  /// A class for types that can be loaded and stored in SIL.
+  /// This always include loadable types, but can include address-only types if
+  /// opaque values are passed by value.
   class LoadableTypeLowering : public TypeLowering {
   protected:
     LoadableTypeLowering(SILType type, IsTrivial_t isTrivial,
+                         IsAddressOnly_t isAddressOnly,
                          IsReferenceCounted_t isRefCounted)
-      : TypeLowering(type, isTrivial, IsNotAddressOnly, isRefCounted) {}
+      : TypeLowering(type, isTrivial, isAddressOnly, isRefCounted) {}
 
   public:
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
@@ -518,7 +521,8 @@ namespace {
   class TrivialTypeLowering final : public LoadableTypeLowering {
   public:
     TrivialTypeLowering(SILType type)
-      : LoadableTypeLowering(type, IsTrivial, IsNotReferenceCounted) {}
+      : LoadableTypeLowering(type, IsTrivial, IsNotAddressOnly,
+                             IsNotReferenceCounted) {}
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
                             IsTake_t isTake) const override {
@@ -579,8 +583,9 @@ namespace {
   class NonTrivialLoadableTypeLowering : public LoadableTypeLowering {
   public:
     NonTrivialLoadableTypeLowering(SILType type,
+                                   IsAddressOnly_t isAddressOnly,
                                    IsReferenceCounted_t isRefCounted)
-      : LoadableTypeLowering(type, IsNotTrivial, isRefCounted) {}
+      : LoadableTypeLowering(type, IsNotTrivial, isAddressOnly, isRefCounted) {}
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
                             SILValue addr, IsTake_t isTake) const override {
@@ -671,6 +676,7 @@ namespace {
   public:
     LoadableAggTypeLowering(CanType type)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
+                                       IsNotAddressOnly,
                                        IsNotReferenceCounted) {
     }
 
@@ -849,6 +855,7 @@ namespace {
   public:
     LoadableEnumTypeLowering(CanType type)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
+                                       IsNotAddressOnly,
                                        IsNotReferenceCounted) {}
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
@@ -892,8 +899,10 @@ namespace {
 
   class LeafLoadableTypeLowering : public NonTrivialLoadableTypeLowering {
   public:
-    LeafLoadableTypeLowering(SILType type, IsReferenceCounted_t isRefCounted)
-      : NonTrivialLoadableTypeLowering(type, isRefCounted) {}
+    LeafLoadableTypeLowering(SILType type,
+                             IsAddressOnly_t isAddressOnly,
+                             IsReferenceCounted_t isRefCounted)
+      : NonTrivialLoadableTypeLowering(type, isAddressOnly, isRefCounted) {}
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
@@ -912,7 +921,7 @@ namespace {
   class ReferenceTypeLowering : public LeafLoadableTypeLowering {
   public:
     ReferenceTypeLowering(SILType type)
-      : LeafLoadableTypeLowering(type, IsReferenceCounted) {}
+      : LeafLoadableTypeLowering(type, IsNotAddressOnly, IsReferenceCounted) {}
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
@@ -940,7 +949,7 @@ namespace {
   class LoadableUnownedTypeLowering final : public LeafLoadableTypeLowering {
   public:
     LoadableUnownedTypeLowering(SILType type)
-      : LeafLoadableTypeLowering(type, IsReferenceCounted) {}
+      : LeafLoadableTypeLowering(type, IsNotAddressOnly, IsReferenceCounted) {}
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
@@ -1051,6 +1060,80 @@ namespace {
     }
   };
 
+  /// Lower address only types as opaque values.
+  ///
+  /// Opaque values behave like loadable leaf types in SIL.
+  ///
+  /// FIXME: When you remove an unreachable, just delete the method.
+  class OpaqueValueTypeLowering : public LeafLoadableTypeLowering {
+  public:
+    OpaqueValueTypeLowering(SILType type)
+      : LeafLoadableTypeLowering(type, IsAddressOnly, IsReferenceCounted) {}
+
+    // --- Same as LoadableTypeLowering.
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      llvm_unreachable("destroy address");
+    }
+
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      llvm_unreachable("destroy value");
+    }
+
+    void emitCopyInto(SILBuilder &B, SILLocation loc,
+                      SILValue src, SILValue dest, IsTake_t isTake,
+                      IsInitialization_t isInit) const override {
+      llvm_unreachable("copy into");
+    }
+
+    // --- Same as NonTrivialLoadableTypeLowering
+
+    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
+                            SILValue addr, IsTake_t isTake) const override {
+      llvm_unreachable("load copy");
+    }
+
+    void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
+                         SILValue newValue, SILValue addr,
+                         IsInitialization_t isInit) const override {
+      llvm_unreachable("store copy");
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      llvm_unreachable("store");
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      llvm_unreachable("store");
+    }
+
+    // --- Same as LeafLoadableTypeLowering.
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
+      llvm_unreachable("lowered copy");
+    }
+
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
+                                 LoweringStyle style) const override {
+      llvm_unreachable("destroy value");
+    }
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      return B.createCopyValue(loc, value);
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      B.createDestroyValue(loc, value);
+    }
+  };
+
   /// Build the appropriate TypeLowering subclass for the given type,
   /// which is assumed to already have been lowered.
   class LowerType
@@ -1075,8 +1158,12 @@ namespace {
     }
 
     const TypeLowering *handleAddressOnly(CanType type) {
-      auto silType = SILType::getPrimitiveAddressType(type);
-      return new (TC, Dependent) AddressOnlyTypeLowering(silType);
+      if (SILModuleConventions(M).useLoweredAddresses()) {
+        auto silType = SILType::getPrimitiveAddressType(type);
+        return new (TC, Dependent) AddressOnlyTypeLowering(silType);
+      }
+      auto silType = SILType::getPrimitiveObjectType(type);
+      return new (TC, Dependent) OpaqueValueTypeLowering(silType);
     }
 
     const TypeLowering *
@@ -1157,7 +1244,7 @@ namespace {
       bool trivial = true;
       for (auto elt : D->getAllElements()) {
         // No-payload elements do not affect address-only-ness.
-        if (!elt->hasArgumentType())
+        if (!elt->getArgumentInterfaceType())
           continue;
 
         // Indirect elements make the type nontrivial, but don't affect

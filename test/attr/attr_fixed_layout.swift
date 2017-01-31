@@ -50,8 +50,12 @@ struct Rectangle {
 // Diagnostics
 //
 
-@_fixed_layout struct InternalStruct {}
+@_fixed_layout struct InternalStruct {
 // expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@_versioned' or public declarations, but 'InternalStruct' is internal}}
+
+  @_fixed_layout public struct NestedStruct {}
+  // expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@_versioned' or public declarations, but 'NestedStruct' is internal}}
+}
 
 @_fixed_layout fileprivate struct FileprivateStruct {}
 // expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@_versioned' or public declarations, but 'FileprivateStruct' is fileprivate}}
