@@ -339,7 +339,7 @@ protected:
   }
 
   /// Retrieve the visibility information from the AST.
-  bool isVisibleExternally(ValueDecl *decl) {
+  bool isVisibleExternally(const ValueDecl *decl) {
     Accessibility accessibility = decl->getEffectiveAccess();
     SILLinkage linkage;
     switch (accessibility) {
@@ -558,15 +558,27 @@ class DeadFunctionElimination : FunctionLivenessComputation {
           makeAlive(&WT);
       }
     }
+
     // Check default witness methods.
     for (SILDefaultWitnessTable &WT : Module->getDefaultWitnessTableList()) {
-      for (const SILDefaultWitnessTable::Entry &entry : WT.getEntries()) {
-        if (!entry.isValid())
-          continue;
+      if (isVisibleExternally(WT.getProtocol())) {
+        // The default witness table is visible from "outside". Therefore all
+        // methods might be called and we mark all methods as alive.
+        for (const SILDefaultWitnessTable::Entry &entry : WT.getEntries()) {
+          if (!entry.isValid())
+            continue;
 
-        auto *fd = cast<AbstractFunctionDecl>(entry.getRequirement().getDecl());
-        MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ true);
-        ensureAliveProtocolMethod(mi);
+          auto *fd =
+              cast<AbstractFunctionDecl>(entry.getRequirement().getDecl());
+          assert(fd == getBase(fd) &&
+                 "key in default witness table is overridden");
+          SILFunction *F = entry.getWitness();
+          if (!F)
+            continue;
+
+          MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ true);
+          ensureAliveProtocolMethod(mi);
+        }
       }
     }
   }
@@ -592,6 +604,24 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         if (!isAlive(MW.Witness)) {
           DEBUG(llvm::dbgs() << "  erase dead witness method " <<
                 MW.Witness->getName() << "\n");
+          return true;
+        }
+        return false;
+      });
+    }
+
+    auto DefaultWitnessTables = Module->getDefaultWitnessTables();
+    for (auto WI = DefaultWitnessTables.begin(),
+              EI = DefaultWitnessTables.end();
+         WI != EI;) {
+      SILDefaultWitnessTable *WT = &*WI;
+      WI++;
+      WT->clearMethods_if([this](SILFunction *MW) -> bool {
+        if (!MW)
+          return false;
+        if (!isAlive(MW)) {
+          DEBUG(llvm::dbgs() << "  erase dead default witness method "
+                             << MW->getName() << "\n");
           return true;
         }
         return false;
