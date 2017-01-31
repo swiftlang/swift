@@ -43,28 +43,36 @@ def update_single_repository(args):
     try:
         print("Updating '" + repo_path + "'")
         with shell.pushd(repo_path, dry_run=False, echo=False):
-            shell.run(["git", "fetch", "--recurse-submodules=yes"], echo=True)
-
+            # The clean option should restore a repository to pristine condition.
             if should_clean:
                 shell.run(['git', 'clean', '-fdx'], echo=True)
                 shell.run(['git', 'submodule', 'foreach', '--recursive', 'git',
                             'clean', '-fdx'], echo=True)
                 shell.run(['git', 'submodule', 'foreach', '--recursive', 'git',
                             'reset', '--hard', 'HEAD'], echo=True)
-                shell.run(['git', 'reset', '--hard', 'HEAD'],
-                                    echo=True)
+                shell.run(['git', 'reset', '--hard', 'HEAD'], echo=True)
+                # It is possible to reset --hard and still be in the middle of a rebase.
+                try:
+                    shell.run(['git', 'rebase', '--abort'], echo=True)
+                except:
+                    pass
 
             if branch:
                 shell.run(['git', 'status', '--porcelain', '-uno'],
                                        echo=False)
                 shell.run(['git', 'checkout', branch], echo=True)
 
-                # If we were asked to reset to the specified branch, do the hard
-                # reset and return.
-                if reset_to_remote and not cross_repo:
-                    shell.run(['git', 'reset', '--hard', "origin/%s" % branch],
-                               echo=True)
-                    return
+            # It's important that we checkout, fetch, and rebase, in order.
+            # .git/FETCH_HEAD updates the not-for-merge attributes based on which
+            # branch was checked out during the fetch.
+            shell.run(["git", "fetch", "--recurse-submodules=yes"], echo=True)
+
+            # If we were asked to reset to the specified branch, do the hard
+            # reset and return.
+            if branch and reset_to_remote and not cross_repo:
+                shell.run(['git', 'reset', '--hard', "origin/%s" % branch],
+                           echo=True)
+                return
 
             # Prior to Git 2.6, this is the way to do a "git pull
             # --rebase" that respects rebase.autostash.  See
