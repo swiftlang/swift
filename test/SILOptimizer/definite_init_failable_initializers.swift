@@ -1265,6 +1265,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
 // CHECK:       bb3([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    store %1 to [[SELF_BOX]]
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
 // CHECK:       bb4([[ERROR1:%.*]] : $Error):
 // CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1

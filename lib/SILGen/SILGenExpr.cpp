@@ -499,6 +499,114 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
   llvm_unreachable("bad access strategy");
 }
 
+namespace {
+
+/// Thie is a simple cleanup class that is only meant to help with delegating
+/// initializers. Specifically, if the delegating initializer fails to consume
+/// the loaded self, we want to write back self into the slot to ensure that
+/// ownership is preserved.
+struct DelegateInitSelfWritebackCleanup : Cleanup {
+
+  /// We store our own loc so that we can ensure that DI ignores our writeback.
+  SILLocation loc;
+
+  SILValue lvalueAddress;
+  SILValue value;
+
+  DelegateInitSelfWritebackCleanup(SILLocation loc, SILValue lvalueAddress,
+                                   SILValue value)
+      : loc(loc), lvalueAddress(lvalueAddress), value(value) {}
+
+  void emit(SILGenFunction &gen, CleanupLocation) override {
+    gen.emitSemanticStore(loc, value, lvalueAddress,
+                          gen.F.getTypeLowering(lvalueAddress->getType()),
+                          IsInitialization);
+  }
+
+  void dump(SILGenFunction &gen) const override {
+#ifndef NDEBUG
+    llvm::errs() << "SimpleWritebackCleanup "
+                 << "State:" << getState() << "\n"
+                 << "lvalueAddress:" << lvalueAddress << "value:" << value
+                 << "\n";
+#endif
+  }
+};
+
+} // end anonymous namespace
+
+CleanupHandle SILGenFunction::enterDelegateInitSelfWritebackCleanup(
+    SILLocation loc, SILValue address, SILValue newValue) {
+  Cleanups.pushCleanup<DelegateInitSelfWritebackCleanup>(loc, address,
+                                                         newValue);
+  return Cleanups.getTopCleanup();
+}
+
+RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
+                                                         CanType refType,
+                                                         SILValue addr,
+                                                         SGFContext C) {
+  assert(SelfInitDelegationState != SILGenFunction::NormalSelf &&
+         "This should never be called unless we are in a delegation sequence");
+  assert(F.getTypeLowering(addr->getType()).isLoadable() &&
+         "Make sure that we are not dealing with semantic rvalues");
+
+  // If we are currently in the WillSharedBorrowSelf state, then we know that
+  // old self is not the self to our delegating initializer. Self in this case
+  // to the delegating initializer is a metatype. Thus, we perform a
+  // load_borrow. And move from WillSharedBorrowSelf -> DidSharedBorrowSelf.
+  if (SelfInitDelegationState == SILGenFunction::WillSharedBorrowSelf) {
+    SelfInitDelegationState = SILGenFunction::DidSharedBorrowSelf;
+    ManagedValue result =
+        B.createFormalAccessLoadBorrow(loc, ManagedValue::forUnmanaged(addr));
+    return RValue(*this, loc, refType, result);
+  }
+
+  // If we are already in the did shared borrow self state, just return the
+  // shared borrow value.
+  if (SelfInitDelegationState == SILGenFunction::DidSharedBorrowSelf) {
+    ManagedValue result =
+        B.createFormalAccessLoadBorrow(loc, ManagedValue::forUnmanaged(addr));
+    return RValue(*this, loc, refType, result);
+  }
+
+  // If we are in WillExclusiveBorrowSelf, then we need to perform an exclusive
+  // borrow (i.e. a load take) and then move to DidExclusiveBorrowSelf.
+  if (SelfInitDelegationState == SILGenFunction::WillExclusiveBorrowSelf) {
+    const auto &typeLowering = F.getTypeLowering(addr->getType());
+    SelfInitDelegationState = SILGenFunction::DidExclusiveBorrowSelf;
+    SILValue self =
+        emitLoad(loc, addr, typeLowering, C, IsTake, false).forward(*this);
+    // Forward our initial value for init delegation self and create a new
+    // cleanup that performs a writeback at the end of lexical scope if our
+    // value is not consumed.
+    InitDelegationSelf = ManagedValue(
+        self, enterDelegateInitSelfWritebackCleanup(*InitDelegationLoc, addr, self));
+    InitDelegationSelfBox = addr;
+    return RValue(*this, loc, refType, InitDelegationSelf);
+  }
+
+  // If we hit this point, we must have DidExclusiveBorrowSelf. Thus borrow
+  // self.
+  assert(SelfInitDelegationState == SILGenFunction::DidExclusiveBorrowSelf);
+
+  // If we do not have a super init delegation self, just perform a formal
+  // access borrow and return. This occurs with delegating initializers.
+  if (!SuperInitDelegationSelf) {
+    return RValue(*this, loc, refType,
+                  InitDelegationSelf.formalAccessBorrow(*this, loc));
+  }
+
+  // Otherwise, we had an upcast of some sort due to a chaining
+  // initializer. This means that we need to perform a borrow from
+  // SuperInitDelegationSelf and then downcast that borrow.
+  ManagedValue borrowedUpcast =
+      SuperInitDelegationSelf.formalAccessBorrow(*this, loc);
+  SILValue castedBorrowedType = B.createUncheckedRefCast(
+      loc, borrowedUpcast.getValue(), InitDelegationSelf.getType());
+  return RValue(*this, loc, refType,
+                ManagedValue::forUnmanaged(castedBorrowedType));
+}
 
 RValue SILGenFunction::
 emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
@@ -543,10 +651,11 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
     // If this VarDecl is represented as an address, emit it as an lvalue, then
     // perform a load to get the rvalue.
-    if (auto Result = emitLValueForDecl(loc, var, refType,
-                                        AccessKind::Read, semantics)) {
+    if (ManagedValue result =
+            emitLValueForDecl(loc, var, refType, AccessKind::Read, semantics)) {
       bool guaranteedValid = false;
-      
+      IsTake_t shouldTake = IsNotTake;
+
       // We should only end up in this path for local and global variables,
       // i.e. ones whose lifetime is assured for the duration of the evaluation.
       // Therefore, if the variable is a constant, the value is guaranteed
@@ -554,35 +663,18 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
       if (var->isLet())
         guaranteedValid = true;
 
-      // 'self' may need to be taken during an 'init' delegation.
-      if (!C.isGuaranteedPlusZeroOk() &&
-          var->getName() == getASTContext().Id_self) {
-        switch (SelfInitDelegationState) {
-        case NormalSelf:
-          // Don't consume self.
-          break;
-        
-        case WillConsumeSelf:
-          // Consume self, and remember we did so.
-          SelfInitDelegationState = DidConsumeSelf;
-          C = SGFContext::AllowGuaranteedPlusZero;
-          guaranteedValid = true;
-          break;
-            
-        case DidConsumeSelf:
-          // We already consumed self, but there may be subsequent loads if
-          // the call to 'super.init' or 'self.init' involves instance variables.
-          // Just borrow the previous self value, since it will be guaranteed
-          // up until the 'super.init' or 'self.init' call.
-          C = SGFContext::AllowGuaranteedPlusZero;
-          guaranteedValid = true;
-          break;
-        }
+      // If we have self, see if we are in an 'init' delegation sequence. If so,
+      // call out to the special delegation init routine. Otherwise, use the
+      // normal RValue emission logic.
+      if (var->getName() == getASTContext().Id_self &&
+          SelfInitDelegationState != NormalSelf) {
+        return emitRValueForSelfInDelegationInit(loc, refType,
+                                                 result.getLValueAddress(), C);
       }
 
       return RValue(*this, loc, refType,
-                    emitLoad(loc, Result.getLValueAddress(),
-                             getTypeLowering(refType), C, IsNotTake,
+                    emitLoad(loc, result.getLValueAddress(),
+                             getTypeLowering(refType), C, shouldTake,
                              guaranteedValid));
     }
 
@@ -902,17 +994,19 @@ RValue RValueEmitter::visitTypeExpr(TypeExpr *E, SGFContext C) {
 RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-  auto Self = SGF.emitRValueForDecl(E, E->getSelf(),
-                                    E->getSelf()->getType(),
-                                    AccessSemantics::Ordinary)
-                 .getScalarValue();
+
+  // If we have a normal self call, then use the emitRValueForDecl call. This
+  // will emit self at +0 since it is guaranteed.
+  ManagedValue Self =
+      SGF.emitRValueForDecl(E, E->getSelf(), E->getSelf()->getType(),
+                            AccessSemantics::Ordinary)
+          .getScalarValue();
 
   // Perform an upcast to convert self to the indicated super type.
   auto Result = SGF.B.createUpcast(E, Self.getValue(),
                                    SGF.getLoweredType(E->getType()));
 
   return RValue(SGF, E, ManagedValue(Result, Self.getCleanup()));
-
 }
 
 RValue RValueEmitter::
@@ -2380,6 +2474,21 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
   return SGF.emitManagedRValueWithCleanup(result, resultTL);
 }
 
+static ManagedValue
+computeNewSelfForRebindSelfInConstructorExpr(SILGenFunction &SGF,
+                                             RebindSelfInConstructorExpr *E) {
+  // Get newSelf, forward the cleanup for newSelf and clean everything else
+  // up.
+  FormalEvaluationScope Scope(SGF);
+  ManagedValue newSelfWithCleanup =
+      SGF.emitRValueAsSingleValue(E->getSubExpr());
+
+  SGF.InitDelegationSelf = ManagedValue();
+  SGF.SuperInitDelegationSelf = ManagedValue();
+  SGF.InitDelegationLoc.reset();
+  return newSelfWithCleanup;
+}
+
 RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                 RebindSelfInConstructorExpr *E, SGFContext C) {
   auto selfDecl = E->getSelf();
@@ -2402,10 +2511,12 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   // The subexpression consumes the current 'self' binding.
   assert(SGF.SelfInitDelegationState == SILGenFunction::NormalSelf
          && "already doing something funky with self?!");
-  SGF.SelfInitDelegationState = SILGenFunction::WillConsumeSelf;
-  
-  // Emit the subexpression.
-  ManagedValue newSelf = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  SGF.SelfInitDelegationState = SILGenFunction::WillSharedBorrowSelf;
+  SGF.InitDelegationLoc.emplace(E);
+
+  // Emit the subexpression, computing new self. New self is always returned at
+  // +1.
+  ManagedValue newSelf = computeNewSelfForRebindSelfInConstructorExpr(SGF, E);
 
   // We know that self is a box, so get its address.
   SILValue selfAddr =
@@ -2471,18 +2582,33 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   switch (SGF.SelfInitDelegationState) {
   case SILGenFunction::NormalSelf:
     llvm_unreachable("self isn't normal in a constructor delegation");
-    
-  case SILGenFunction::WillConsumeSelf:
-    // We didn't consume, so reassign.
+
+  case SILGenFunction::WillSharedBorrowSelf:
+    // We did not perform any borrow of self, exclusive or shared. This means
+    // that old self is still located in the relevant box. This will ensure that
+    // old self is destroyed.
     newSelf.assignInto(SGF, E, selfAddr);
     break;
-  
-  case SILGenFunction::DidConsumeSelf:
-    // We did consume, so reinitialize.
+
+  case SILGenFunction::DidSharedBorrowSelf:
+    // We performed a shared borrow of self. This means that old self is still
+    // located in the self box. Perform an assign to destroy old self.
+    newSelf.assignInto(SGF, E, selfAddr);
+    break;
+
+  case SILGenFunction::WillExclusiveBorrowSelf:
+    llvm_unreachable("Should never have newSelf without finishing an exclusive "
+                     "borrow scope");
+
+  case SILGenFunction::DidExclusiveBorrowSelf:
+    // We performed an exclusive borrow of self and have a new value to
+    // writeback. Writeback the self value into the now empty box.
     newSelf.forwardInto(SGF, E, selfAddr);
     break;
   }
+
   SGF.SelfInitDelegationState = SILGenFunction::NormalSelf;
+  SGF.InitDelegationSelf = ManagedValue();
 
   // If we are using Objective-C allocation, the caller can return
   // nil. When this happens with an explicitly-written super.init or

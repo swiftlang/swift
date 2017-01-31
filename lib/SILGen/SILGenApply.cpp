@@ -1282,7 +1282,7 @@ public:
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
     Expr *arg = apply->getArg();
-    ManagedValue super = SGF.emitRValueAsSingleValue(arg);
+    ManagedValue super;
 
     // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
@@ -1296,6 +1296,27 @@ public:
 
       if (ctorRef->getDeclRef().isSpecialized())
         substitutions = ctorRef->getDeclRef().getSubstitutions();
+
+      assert(SGF.SelfInitDelegationState ==
+             SILGenFunction::WillSharedBorrowSelf);
+      SGF.SelfInitDelegationState = SILGenFunction::WillExclusiveBorrowSelf;
+      super = SGF.emitRValueAsSingleValue(arg);
+      assert(SGF.SelfInitDelegationState ==
+             SILGenFunction::DidExclusiveBorrowSelf);
+
+      // Check if super is not the same as our base type. This means that we
+      // performed an upcast. Set SuperInitDelegationState to super.
+      if (super.getValue() != SGF.InitDelegationSelf.getValue()) {
+        assert(super.getCleanup() == SGF.InitDelegationSelf.getCleanup());
+        SILValue underlyingSelf = SGF.InitDelegationSelf.forward(SGF);
+        SGF.InitDelegationSelf = ManagedValue::forUnmanaged(underlyingSelf);
+        CleanupHandle newWriteback = SGF.enterDelegateInitSelfWritebackCleanup(
+            SGF.InitDelegationLoc.getValue(), SGF.InitDelegationSelfBox,
+            super.getValue());
+        SGF.SuperInitDelegationSelf =
+            ManagedValue(super.getValue(), newWriteback);
+        super = SGF.SuperInitDelegationSelf;
+      }
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
       constant = SILDeclRef(declRef->getDecl(),
@@ -1305,8 +1326,10 @@ public:
 
       if (declRef->getDeclRef().isSpecialized())
         substitutions = declRef->getDeclRef().getSubstitutions();
-    } else
+      super = SGF.emitRValueAsSingleValue(arg);
+    } else {
       llvm_unreachable("invalid super callee");
+    }
 
     CanType superFormalType = arg->getType()->getCanonicalType();
     setSelfParam(ArgumentSource(arg, RValue(SGF, apply, superFormalType, super)),
@@ -1432,14 +1455,14 @@ public:
 
       // If the initializer is a C function imported as a member,
       // there is no 'self' parameter. Mark it undef.
-      if (ctorRef->getDecl()->isImportAsMember())
+      if (ctorRef->getDecl()->isImportAsMember()) {
         self = SGF.emitUndef(expr, selfFormalType);
-      else if (SGF.AllocatorMetatype)
+      } else if (SGF.AllocatorMetatype) {
         self = emitCorrespondingSelfValue(
-                 ManagedValue::forUnmanaged(SGF.AllocatorMetatype),
-                 arg);
-      else
+            ManagedValue::forUnmanaged(SGF.AllocatorMetatype), arg);
+      } else {
         self = ManagedValue::forUnmanaged(SGF.emitMetatypeOfValue(expr, arg));
+      }
     } else {
       // If we're in a protocol extension initializer, we haven't allocated
       // "self" yet at this point. Do so. Use alloc_ref_dynamic since we should
@@ -1455,7 +1478,12 @@ public:
         // Perform any adjustments needed to 'self'.
         self = emitCorrespondingSelfValue(self, arg);
       } else {
+        assert(SGF.SelfInitDelegationState ==
+               SILGenFunction::WillSharedBorrowSelf);
+        SGF.SelfInitDelegationState = SILGenFunction::WillExclusiveBorrowSelf;
         self = SGF.emitRValueAsSingleValue(arg);
+        assert(SGF.SelfInitDelegationState ==
+               SILGenFunction::DidExclusiveBorrowSelf);
       }
     }
 
@@ -3207,6 +3235,11 @@ namespace {
         }
       } else {
         value = std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
+      }
+
+      if (param.isConsumed() &&
+          value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+        value = value.copyUnmanaged(SGF, arg.getLocation());
       }
       Args.push_back(value);
     }

@@ -1417,6 +1417,16 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
           recordFailableInitCall(User);
         }
 
+        // If this load's value is being stored back into the delegating
+        // mark_uninitialized buffer and it is a self init use, skip the
+        // use. This is to handle situations where due to usage of a metatype to
+        // allocate, we do not actually consume self.
+        if (auto *SI = dyn_cast<StoreInst>(User)) {
+          if (SI->getDest() == MUI && isSelfInitUse(User)) {
+            continue;
+          }
+        }
+
         // A simple reference to "type(of:)" is always fine,
         // even if self is uninitialized.
         if (isa<ValueMetatypeInst>(User)) {
