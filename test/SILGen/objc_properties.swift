@@ -4,7 +4,6 @@
 
 import Foundation
 
-
 class A {
   dynamic var prop: Int
   dynamic var computedProp: Int {
@@ -181,6 +180,31 @@ class HasUnmanaged : NSObject {
   // CHECK-NEXT: return [[RESULT:%.*]]
   // CHECK: } // end sil function '_T015objc_properties12HasUnmanagedC3refs0D0Vys9AnyObject_pGSgfsTo'
   var ref: Unmanaged<AnyObject>?
+}
+
+@_silgen_name("autoreleasing_user")
+func useAutoreleasingUnsafeMutablePointer(_ a: AutoreleasingUnsafeMutablePointer<NSObject>)
+
+class NonObjCClassWithObjCProperty {
+  var property: NSObject
+
+  init(_ newValue: NSObject) {
+    property = newValue
+  }
+
+  // CHECK-LABEL: sil hidden @_T015objc_properties016NonObjCClassWithD9CPropertyC11usePropertyyyF : $@convention(method) (@guaranteed NonObjCClassWithObjCProperty) -> () {
+  // CHECK: bb0([[ARG:%.*]] : $NonObjCClassWithObjCProperty):
+  // CHECK: [[MATERIALIZE_FOR_SET:%.*]] = class_method [[ARG]] : $NonObjCClassWithObjCProperty, #NonObjCClassWithObjCProperty.property!materializeForSet.1
+  // CHECK: [[TUPLE:%.*]] = apply [[MATERIALIZE_FOR_SET]]({{.*}}, {{.*}}, [[ARG]])
+  // CHECK: [[RAW_POINTER:%.*]] = tuple_extract [[TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
+  // CHECK: [[OBJECT:%.*]] = pointer_to_address [[RAW_POINTER]] : $Builtin.RawPointer to [strict] $*NSObject
+  // CHECK: [[OBJECT_DEP:%.*]] = mark_dependence [[OBJECT]] : $*NSObject on [[ARG]]
+  // CHECK: [[LOADED_OBJECT:%.*]] = load_borrow [[OBJECT_DEP]]
+  // CHECK: [[UNMANAGED_OBJECT:%.*]] = ref_to_unmanaged [[LOADED_OBJECT]] : $NSObject to $@sil_unmanaged NSObject
+  // CHECK: end_borrow [[LOADED_OBJECT]] from [[OBJECT_DEP]]
+  func useProperty() {
+    useAutoreleasingUnsafeMutablePointer(&property)
+  }
 }
 
 
