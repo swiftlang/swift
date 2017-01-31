@@ -2373,6 +2373,11 @@ clang::ASTContext &ClangImporter::getClangASTContext() const {
 clang::Preprocessor &ClangImporter::getClangPreprocessor() const {
   return Impl.getClangPreprocessor();
 }
+
+const clang::CompilerInstance &ClangImporter::getClangInstance() const {
+  return *Impl.Instance;
+}
+
 const clang::Module *ClangImporter::getClangOwningModule(ClangNode Node) const {
   return ::getClangOwningModule(Node, getClangASTContext());
 }

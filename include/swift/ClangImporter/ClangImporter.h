@@ -241,6 +241,7 @@ public:
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
   clang::Sema &getClangSema() const override;
+  const clang::CompilerInstance &getClangInstance() const override;
   clang::CodeGenOptions &getClangCodeGenOpts() const;
 
   std::string getClangModuleHash() const;
