@@ -59,3 +59,14 @@ func return_any() -> AnyObject! { return nil }
 func bind_any() {
   let object : AnyObject? = return_any()
 }
+
+// CHECK-LABEL: sil hidden @_TF29implicitly_unwrapped_optional6sr3758FT_T_
+func sr3758() {
+  // Verify that there are no additional reabstractions introduced.
+  // CHECK: [[CLOSURE:%.+]] = function_ref @_TFF29implicitly_unwrapped_optional6sr3758FT_T_U_FGSQP__T_ : $@convention(thin) (@in Optional<Any>) -> ()
+  // CHECK: [[F:%.+]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (@in Optional<Any>) -> () to $@callee_owned (@in Optional<Any>) -> ()
+  // CHECK: [[CALLEE:%.+]] = copy_value [[F]] : $@callee_owned (@in Optional<Any>) -> ()
+  // CHECK: = apply [[CALLEE]]({{%.+}}) : $@callee_owned (@in Optional<Any>) -> ()
+  let f: ((Any?) -> Void) = { (arg: Any!) in }
+  f(nil)
+} // CHECK: end sil function '_TF29implicitly_unwrapped_optional6sr3758FT_T_'

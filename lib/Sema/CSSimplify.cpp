@@ -2011,11 +2011,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             conversionsOrFixes.push_back(
                        ConversionRestrictionKind::OptionalToOptional);
           } else if (optionalKind2 == OTK_ImplicitlyUnwrappedOptional &&
-                     kind >= ConstraintKind::Conversion &&
                      decl1 == TC.Context.getOptionalDecl()) {
-            assert(boundGenericType1->getGenericArgs().size() == 1);
-            conversionsOrFixes.push_back(
-                       ConversionRestrictionKind::OptionalToOptional);
+            if (kind >= ConstraintKind::Conversion ||
+                locator.isFunctionConversion()) {
+              assert(boundGenericType1->getGenericArgs().size() == 1);
+              conversionsOrFixes.push_back(
+                         ConversionRestrictionKind::OptionalToOptional);
+            }
           }
         }
         
