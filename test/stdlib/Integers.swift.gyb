@@ -249,7 +249,7 @@ tests.test("CountLeadingZeros") {
 tests.test("CountTrainlingZeros") {
   expectEqual(0, UInt8.max.trailingZeroBits)
   expectEqual(8, UInt8.min.trailingZeroBits)
-  expectEqual(6, Int8.max.trailingZeroBits)
+  expectEqual(0, Int8.max.trailingZeroBits)
   expectEqual(7, Int8.min.trailingZeroBits)
 }
 
