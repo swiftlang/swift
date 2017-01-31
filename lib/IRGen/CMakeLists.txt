@@ -1,4 +1,5 @@
 add_swift_library(swiftIRGen STATIC
+  AllocStackHoisting.cpp
   DebugTypeInfo.cpp
   EnumPayload.cpp
   ExtraInhabitants.cpp
@@ -45,6 +46,7 @@ add_swift_library(swiftIRGen STATIC
     swiftLLVMPasses
     swiftSIL
     swiftSILGen
+    swiftSILOptimizer
 
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -32,11 +32,6 @@ public:
 
   /// This method is called after visiting a type's children.
   virtual Action walkToTypePost(Type ty) { return Action::Continue; }
-
-  /// Controls whether the original type of a SubstitutedType is visited.
-  ///
-  /// By default, it is not.
-  virtual bool shouldVisitOriginalSubstitutedType() { return false; }
 
 protected:
   TypeWalker() = default;

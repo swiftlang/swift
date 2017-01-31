@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -40,6 +40,7 @@
 #include "swift/SILOptimizer/Utils/FunctionSignatureOptUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILFunction.h"
@@ -114,7 +115,8 @@ class FunctionSignatureTransform {
   EpilogueARCAnalysis *EA;
 
   // The function signature mangler we are using.
-  FunctionSignatureSpecializationMangler &FM;
+  FunctionSignatureSpecializationMangler &OldFM;
+  NewMangling::FunctionSignatureSpecializationMangler &NewFM;
 
   // Keep tracks to argument mapping.
   ArgumentIndexMap &AIM;
@@ -230,11 +232,12 @@ public:
   /// Constructor.
   FunctionSignatureTransform(SILFunction *F,
                              RCIdentityAnalysis *RCIA, EpilogueARCAnalysis *EA,
-                             FunctionSignatureSpecializationMangler &FM,
+                             FunctionSignatureSpecializationMangler &OldFM,
+                    NewMangling::FunctionSignatureSpecializationMangler &NewFM,
                              ArgumentIndexMap &AIM,
                              llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
                              llvm::SmallVector<ResultDescriptor, 4> &RDL)
-    : F(F), NewF(nullptr), RCIA(RCIA), EA(EA), FM(FM),
+    : F(F), NewF(nullptr), RCIA(RCIA), EA(EA), OldFM(OldFM), NewFM(NewFM),
       AIM(AIM), shouldModifySelfArgument(false), ArgumentDescList(ADL),
       ResultDescList(RDL) {}
 
@@ -332,7 +335,8 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   for (unsigned i : indices(ArgumentDescList)) {
     const ArgumentDescriptor &Arg = ArgumentDescList[i];
     if (Arg.IsEntirelyDead) {
-      FM.setArgumentDead(i);
+      OldFM.setArgumentDead(i);
+      NewFM.setArgumentDead(i);
       // No point setting other attribute if argument is dead.
       continue;
     }   
@@ -340,23 +344,37 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
     // If we have an @owned argument and found a callee release for it,
     // convert the argument to guaranteed.
     if (Arg.OwnedToGuaranteed) {
-      FM.setArgumentOwnedToGuaranteed(i);
+      OldFM.setArgumentOwnedToGuaranteed(i);
+      NewFM.setArgumentOwnedToGuaranteed(i);
     }
 
     // If this argument is not dead and we can explode it, add 's' to the
     // mangling.
     if (Arg.Explode) {
-      FM.setArgumentSROA(i);
-    }   
+      OldFM.setArgumentSROA(i);
+      NewFM.setArgumentSROA(i);
+    }
   }
 
   // Handle return value's change.
   // FIXME: handle multiple direct results here
-  if (ResultDescList.size() == 1 && !ResultDescList[0].CalleeRetain.empty())
-    FM.setReturnValueOwnedToUnowned();
+  if (ResultDescList.size() == 1 && !ResultDescList[0].CalleeRetain.empty()) {
+    OldFM.setReturnValueOwnedToUnowned();
+    NewFM.setReturnValueOwnedToUnowned();
+  }
 
-  FM.mangle();
-  return FM.getMangler().finalize();
+  OldFM.mangle();
+  SILModule &M = F->getModule();
+  std::string Old = getUniqueName(OldFM.getMangler().finalize(), M);
+
+  int UniqueID = 0;
+  std::string New;
+  do {
+    New = NewFM.mangle(UniqueID);
+    ++UniqueID;
+  } while (M.lookUpFunction(New));
+
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// Compute what the function interface will look like based on the
@@ -433,16 +451,16 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
   // back into the all-results list.
   llvm::SmallVector<SILResultInfo, 8> InterfaceResults;
   auto &ResultDescs = ResultDescList;
-  for (SILResultInfo InterfaceResult : FTy->getAllResults()) {
-    if (InterfaceResult.isDirect()) {
+  for (SILResultInfo InterfaceResult : FTy->getResults()) {
+    if (InterfaceResult.isFormalDirect()) {
       auto &RV = ResultDescs[0];
       if (!RV.CalleeRetain.empty()) {
         ++NumOwnedConvertedToNotOwnedResult;
         InterfaceResults.push_back(SILResultInfo(InterfaceResult.getType(),
                                                  ResultConvention::Unowned));
         continue;
-      }   
-    }   
+      }
+    }
 
     InterfaceResults.push_back(InterfaceResult);
   }
@@ -462,19 +480,18 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
 void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Create the optimized function !
   SILModule &M = F->getModule();
-  std::string Name = getUniqueName(createOptimizedSILFunctionName(), M);
+  std::string Name = createOptimizedSILFunctionName();
   SILLinkage linkage = F->getLinkage();
   if (isAvailableExternally(linkage))
     linkage = SILLinkage::Shared;
 
   DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
-  
+
   NewF = M.createFunction(
-      linkage, Name,
-      createOptimizedSILFunctionType(), nullptr, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isFragile(), F->isThunk(), F->getClassVisibility(),
-      F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
-      F->getDeclContext());
+      linkage, Name, createOptimizedSILFunctionType(), nullptr,
+      F->getLocation(), F->isBare(), F->isTransparent(), F->isFragile(),
+      F->isThunk(), F->getClassVisibility(), F->getInlineStrategy(),
+      F->getEffectsKind(), nullptr, F->getDebugScope(), F->getDeclContext());
   if (F->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
@@ -503,7 +520,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   F->setInlineStrategy(AlwaysInline);
   SILBasicBlock *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgumentDescList) {
-    ThunkBody->createArgument(ArgDesc.Arg->getType(), ArgDesc.Decl);
+    ThunkBody->createFunctionArgument(ArgDesc.Arg->getType(), ArgDesc.Decl);
   }
 
   SILLocation Loc = ThunkBody->getParent()->getLocation();
@@ -522,17 +539,19 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // now.
   SILValue ReturnValue;
   SILType LoweredType = NewF->getLoweredType();
-  SILType ResultType = LoweredType.getFunctionInterfaceResultType();
+  SILType ResultType = NewF->getConventions().getSILResultType();
   auto FunctionTy = LoweredType.castTo<SILFunctionType>();
   if (FunctionTy->hasErrorResult()) {
     // We need a try_apply to call a function with an error result.
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
-    ReturnValue = NormalBlock->createArgument(ResultType, 0);
+    ReturnValue =
+        NormalBlock->createPHIArgument(ResultType, ValueOwnershipKind::Owned);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createArgument(Error, 0);
+    auto *ErrorArg =
+        ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
@@ -563,7 +582,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
   // Did we decide we should optimize any parameter?
   bool SignatureOptimize = false;
-  ArrayRef<SILArgument *> Args = F->begin()->getArguments();
+  auto Args = F->begin()->getFunctionArguments();
 
   // Analyze the argument information.
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
@@ -606,7 +625,7 @@ void FunctionSignatureTransform::DeadArgumentFinalizeOptimizedFunction() {
 /// Owned to Guaranteed transformation.                       ///
 /// ----------------------------------------------------------///
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
-  ArrayRef<SILArgument *> Args = F->begin()->getArguments();
+  auto Args = F->begin()->getFunctionArguments();
   // A map from consumed SILArguments to the release associated with an
   // argument.
   //
@@ -652,9 +671,9 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
 }
 
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeResults() {
-  auto FTy = F->getLoweredFunctionType();
+  auto fnConv = F->getConventions();
   // For now, only do anything if there's a single direct result.
-  if (FTy->getDirectResults().size() != 1)
+  if (fnConv.getNumDirectSILResults() != 1)
     return false; 
 
   bool SignatureOptimize = false;
@@ -689,6 +708,10 @@ void FunctionSignatureTransform::OwnedToGuaranteedTransformFunctionParameters() 
     for (auto &X : AD.CalleeReleaseInThrowBlock) { 
       X->eraseFromParent();
     }
+
+    // Now we need to replace the FunctionArgument so that we have the correct
+    // ValueOwnershipKind.
+    AD.Arg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
   }
 }
 
@@ -783,7 +806,7 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
 bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
   // Did we decide we should optimize any parameter?
   bool SignatureOptimize = false;
-  ArrayRef<SILArgument *> Args = F->begin()->getArguments();
+  auto Args = F->begin()->getFunctionArguments();
   ConsumedArgToEpilogueReleaseMatcher ArgToReturnReleaseMap(RCIA->get(F), F);
 
   // Analyze the argument information.
@@ -829,10 +852,12 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     // order of leaf values matches the order of leaf types.
     llvm::SmallVector<const ProjectionTreeNode*, 8> LeafNodes;
     AD.ProjTree.getLeafNodes(LeafNodes);
-    for (auto Node : LeafNodes) {
-      LeafValues.push_back(
-          BB->insertArgument(ArgOffset++, Node->getType(),
-                             BB->getArgument(OldArgIndex)->getDecl()));
+
+    for (auto *Node : LeafNodes) {
+      auto OwnershipKind = *AD.getTransformedOwnershipKind(Node->getType());
+      LeafValues.push_back(BB->insertFunctionArgument(
+          ArgOffset++, Node->getType(), OwnershipKind,
+          BB->getArgument(OldArgIndex)->getDecl()));
       AIM[TotalArgIndex - 1] = AD.Index;
       TotalArgIndex ++;
     }
@@ -906,8 +931,10 @@ public:
     // going to change, make sure the mangler is aware of all the changes done
     // to the function.
     Mangle::Mangler M;
-    auto P = SpecializationPass::FunctionSignatureOpts;
-    FunctionSignatureSpecializationMangler FM(P, M, F->isFragile(), F);
+    auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
+    FunctionSignatureSpecializationMangler OldFM(P, M, F->isFragile(), F);
+    NewMangling::FunctionSignatureSpecializationMangler NewFM(P, F->isFragile(),
+                                                              F);
 
     /// Keep a map between the exploded argument index and the original argument
     /// index.
@@ -920,16 +947,16 @@ public:
     // Allocate the argument and result descriptors.
     llvm::SmallVector<ArgumentDescriptor, 4> ArgumentDescList;
     llvm::SmallVector<ResultDescriptor, 4> ResultDescList;
-    ArrayRef<SILArgument *> Args = F->begin()->getArguments();
+    auto Args = F->begin()->getFunctionArguments();
     for (unsigned i = 0, e = Args.size(); i != e; ++i) {
       ArgumentDescList.emplace_back(Args[i]);
     }
-    for (SILResultInfo IR : F->getLoweredFunctionType()->getAllResults()) {
+    for (SILResultInfo IR : F->getLoweredFunctionType()->getResults()) {
       ResultDescList.emplace_back(IR);
     }
 
     // Owned to guaranteed optimization.
-    FunctionSignatureTransform FST(F, RCIA, EA, FM, AIM,
+    FunctionSignatureTransform FST(F, RCIA, EA, OldFM, NewFM, AIM,
                                    ArgumentDescList, ResultDescList);
 
     bool Changed = false;

@@ -10,7 +10,7 @@ import Swift
 sil @capture_helper_2 : $@convention(thin) (Int32) -> ()
 
 // CHECK-LABEL: test_capture_propagation
-// CHECK: %[[FR:[0-9]+]] = function_ref @_TTSf3cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ : $@convention(thin) (@in Int32) -> ()
+// CHECK: %[[FR:[0-9]+]] = function_ref @_TTSf3n_cpfr24_TF8capturep6helperFSiT____TTRXFo_dSi_dT__XFo_iSi_dT__ : $@convention(thin) (@in Int32) -> ()
 // CHECK: thin_to_thick_function %[[FR]] : $@convention(thin) (@in Int32) -> ()
 sil private @test_capture_propagation : $@convention(thin) () -> () {
 bb0:

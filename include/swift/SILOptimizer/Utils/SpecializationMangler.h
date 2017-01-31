@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -66,10 +66,9 @@ protected:
 class GenericSpecializationMangler : public SpecializationMangler {
 
   ArrayRef<Substitution> Subs;
+  bool isReAbstracted;
 
 public:
-
-  bool isReAbstracted;
 
   GenericSpecializationMangler(SILFunction *F,
                                ArrayRef<Substitution> Subs,
@@ -77,6 +76,22 @@ public:
                                bool isReAbstracted)
     : SpecializationMangler(SpecializationPass::GenericSpecializer, Fragile, F),
       Subs(Subs), isReAbstracted(isReAbstracted) {}
+
+  std::string mangle();
+};
+
+class PartialSpecializationMangler : public SpecializationMangler {
+
+  CanSILFunctionType SpecializedFnTy;
+  bool isReAbstracted;
+  
+public:
+  PartialSpecializationMangler(SILFunction *F,
+                               CanSILFunctionType SpecializedFnTy,
+                               IsFragile_t Fragile,
+                               bool isReAbstracted)
+    : SpecializationMangler(SpecializationPass::GenericSpecializer, Fragile, F),
+      SpecializedFnTy(SpecializedFnTy), isReAbstracted(isReAbstracted) {}
 
   std::string mangle();
 };
@@ -117,7 +132,10 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
 
   using ArgInfo = std::pair<ArgumentModifierIntBase,
                             NullablePtr<SILInstruction>>;
-  llvm::SmallVector<ArgInfo, 8> Args;
+  // Information for each SIL argument in the original function before
+  // specialization. This includes SIL indirect result argument required for
+  // the original function type at the current stage of compilation.
+  llvm::SmallVector<ArgInfo, 8> OrigArgs;
 
   ReturnValueModifierIntBase ReturnValue;
 
@@ -125,17 +143,18 @@ public:
   FunctionSignatureSpecializationMangler(SpecializationPass Pass,
                                          IsFragile_t Fragile,
                                          SILFunction *F);
-  void setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI);
-  void setArgumentClosureProp(unsigned ArgNo, PartialApplyInst *PAI);
-  void setArgumentClosureProp(unsigned ArgNo, ThinToThickFunctionInst *TTTFI);
-  void setArgumentDead(unsigned ArgNo);
-  void setArgumentOwnedToGuaranteed(unsigned ArgNo);
-  void setArgumentSROA(unsigned ArgNo);
-  void setArgumentBoxToValue(unsigned ArgNo);
-  void setArgumentBoxToStack(unsigned ArgNo);
+  void setArgumentConstantProp(unsigned OrigArgIdx, LiteralInst *LI);
+  void setArgumentClosureProp(unsigned OrigArgIdx, PartialApplyInst *PAI);
+  void setArgumentClosureProp(unsigned OrigArgIdx,
+                              ThinToThickFunctionInst *TTTFI);
+  void setArgumentDead(unsigned OrigArgIdx);
+  void setArgumentOwnedToGuaranteed(unsigned OrigArgIdx);
+  void setArgumentSROA(unsigned OrigArgIdx);
+  void setArgumentBoxToValue(unsigned OrigArgIdx);
+  void setArgumentBoxToStack(unsigned OrigArgIdx);
   void setReturnValueOwnedToUnowned();
 
-  std::string mangle();
+  std::string mangle(int UniqueID = 0);
   
 private:
   void mangleConstantProp(LiteralInst *LI);

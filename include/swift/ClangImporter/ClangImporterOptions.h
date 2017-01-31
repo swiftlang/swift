@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -34,6 +34,9 @@ public:
   ///
   /// Equivalent to Clang's -mcpu=.
   std::string TargetCPU;
+
+  // The bridging header or PCH that will be imported.
+  std::string BridgingHeader;
 
   /// \see Mode
   enum class Modes {
@@ -70,6 +73,10 @@ public:
 
   /// If true ignore the swift bridged attribute.
   bool DisableSwiftBridgeAttr = false;
+
+  /// When set, don't validate module system headers. If a header is modified
+  /// and this is not set, clang will rebuild the module.
+  bool DisableModulesValidateSystemHeaders = false;
 };
 
 } // end namespace swift

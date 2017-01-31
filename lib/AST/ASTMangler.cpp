@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -36,26 +36,27 @@
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
-using namespace NewMangling;
+using namespace swift::NewMangling;
 
 std::string NewMangling::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
-  if (useNewMangling()) {
-    ASTMangler::ASTMangler NewMangler(/* DWARF */ true);
-    return NewMangler.mangleType(Ty, DC);
-  }
   Mangle::Mangler OldMangler(/* DWARF */ true);
   OldMangler.mangleTypeForDebugger(Ty, DC);
-  return OldMangler.finalize();
+  std::string Old = OldMangler.finalize();
+  ASTMangler NewMangler(/* DWARF */ true);
+  std::string New = NewMangler.mangleTypeForDebugger(Ty, DC);
+
+  // The old mangling is broken in some cases, so we don't check if the new
+  // mangling is equivalent to the old mangling.
+  return selectMangling(Old, New, /*compareTrees*/ false);
 }
 
 std::string NewMangling::mangleTypeAsUSR(Type Ty) {
-  if (useNewMangling()) {
-    ASTMangler::ASTMangler NewMangler;
-    return NewMangler.mangleTypeAsUSR(Ty);
-  }
   Mangle::Mangler OldMangler;
   OldMangler.mangleType(Ty, /*uncurry*/ 0);
-  return OldMangler.finalize();
+  std::string Old = OldMangler.finalize();
+  ASTMangler NewMangler;
+  std::string New = NewMangler.mangleTypeAsUSR(Ty);
+  return selectMangling(Old, New);
 }
 
 
@@ -238,7 +239,7 @@ std::string ASTMangler::mangleGlobalInit(const VarDecl *decl, int counter,
   return finalize();
 }
 
-std::string ASTMangler::mangleReabstructionThunkHelper(
+std::string ASTMangler::mangleReabstractionThunkHelper(
                                             CanSILFunctionType ThunkType,
                                             Type FromType,
                                             Type ToType,
@@ -258,7 +259,7 @@ std::string ASTMangler::mangleReabstructionThunkHelper(
   return finalize();
 }
 
-std::string ASTMangler::mangleType(Type Ty, const DeclContext *DC) {
+std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   assert(DWARFMangling && "DWARFMangling expected when mangling for debugger");
 
   beginMangling();
@@ -267,6 +268,7 @@ std::string ASTMangler::mangleType(Type Ty, const DeclContext *DC) {
   DeclCtx = DC;
 
   appendType(Ty);
+  appendOperator("D");
   return finalize();
 }
 
@@ -298,6 +300,16 @@ std::string ASTMangler::mangleDeclAsUSR(ValueDecl *Decl, StringRef USRPrefix) {
   }
   return finalize();
 }
+
+std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
+                                                  AddressorKind addressorKind,
+                                                  const ValueDecl *decl,
+                                                  StringRef USRPrefix) {
+  Buffer << USRPrefix;
+  appendAccessorEntity(kind, addressorKind, decl, /*isStatic*/ false);
+  return finalize();
+}
+
 
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
@@ -335,13 +347,15 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     appendIdentifier(translateOperator(decl->getName().str()));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
-        return appendOperator("op");
+        appendOperator("op");
+        break;
       case UnaryOperatorKind::Postfix:
-        return appendOperator("oP");
+        appendOperator("oP");
+        break;
       case UnaryOperatorKind::None:
-        return appendOperator("oi");
+        appendOperator("oi");
+        break;
     }
-    llvm_unreachable("bad UnaryOperatorKind");
   } else {
     appendIdentifier(decl->getName().str());
   }
@@ -366,7 +380,7 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     assert(!discriminator.empty());
     assert(!isNonAscii(discriminator.str()) &&
            "discriminator contains non-ASCII characters");
-    (void)isNonAscii;
+    (void)&isNonAscii;
     assert(!clang::isDigit(discriminator.str().front()) &&
            "not a valid identifier");
 
@@ -384,6 +398,13 @@ static const char *getMetatypeRepresentationOp(MetatypeRepresentation Rep) {
     case MetatypeRepresentation::ObjC:
       return "o";
   }
+
+  llvm_unreachable("Unhandled MetatypeRepresentation in switch.");
+}
+
+static bool isStdlibType(const NominalTypeDecl *decl) {
+  DeclContext *dc = decl->getDeclContext();
+  return dc->isModuleScopeContext() && dc->getParentModule()->isStdlibModule();
 }
 
 /// Mangle a type into the buffer.
@@ -401,7 +422,7 @@ void ASTMangler::appendType(Type type) {
 
     case TypeKind::Error:
     case TypeKind::Unresolved:
-      Buffer << ".ERR.";
+      appendOperator("Xe");
       return;
 
       // We don't care about these types being a bit verbose because we
@@ -446,7 +467,7 @@ void ASTMangler::appendType(Type type) {
       TypeAliasDecl *decl = NameAliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
         // It's not possible to mangle the context of the builtin module.
-        return appendType(decl->getUnderlyingType());
+        return appendType(NameAliasTy->getSinglyDesugaredType());
       }
 
       // For the DWARF output we want to mangle the type alias + context,
@@ -458,8 +479,6 @@ void ASTMangler::appendType(Type type) {
 
     case TypeKind::Paren:
       return appendSugaredType<ParenType>(type);
-    case TypeKind::Substituted:
-      return appendSugaredType<SubstitutedType>(type);
     case TypeKind::ArraySlice: /* fallthrough */
     case TypeKind::Optional:
       return appendSugaredType<SyntaxSugarType>(type);
@@ -537,8 +556,17 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::BoundGenericEnum:
     case TypeKind::BoundGenericStruct:
       if (type->isSpecialized()) {
-        appendBoundGenericArgs(type);
-        appendNominalType(type->getAnyNominal());
+        NominalTypeDecl *NDecl = type->getAnyNominal();
+        if (isStdlibType(NDecl) && NDecl->getName().str() == "Optional") {
+          auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
+          assert(GenArgs.size() == 1);
+          appendType(GenArgs[0]);
+          return appendOperator("Sg");
+        }
+
+        appendNominalType(NDecl);
+        bool isFirstArgList = true;
+        appendBoundGenericArgs(type, isFirstArgList);
         return appendOperator("G");
       }
       appendNominalType(tybase->getAnyNominal());
@@ -550,6 +578,8 @@ void ASTMangler::appendType(Type type) {
       // type ::= archetype
     case TypeKind::Archetype: {
       auto *archetype = cast<ArchetypeType>(tybase);
+
+      assert(DWARFMangling && "Cannot mangle free-standing archetypes");
 
       // Mangle the associated type of a parent archetype.
       if (auto parent = archetype->getParent()) {
@@ -571,33 +601,24 @@ void ASTMangler::appendType(Type type) {
 
       // Find the archetype information.
       const DeclContext *DC = DeclCtx;
-      auto GTPT = ArchetypeBuilder::mapTypeOutOfContext(DC, archetype)
-                    ->castTo<GenericTypeParamType>();
+      auto GTPT = DC->mapTypeOutOfContext(archetype)
+          ->castTo<GenericTypeParamType>();
 
-      if (DWARFMangling) {
-        Buffer << 'q' << Index(GTPT->getIndex());
-
-        // The DWARF output created by Swift is intentionally flat,
-        // therefore archetypes are emitted with their DeclContext if
-        // they appear at the top level of a type.
-        DWARFMangling = false;
-        while (DC && DC->isGenericContext()) {
-          if (DC->isInnermostContextGeneric() &&
-              DC->getGenericParamsOfContext()->getDepth() == GTPT->getDepth())
-            break;
-          DC = DC->getParent();
-        }
-        assert(DC && "no decl context for archetype found");
-        if (!DC) return;
-        appendContext(DC);
-        DWARFMangling = true;
-        return appendOperator("Qq", Index(GTPT->getIndex()));
+      // The DWARF output created by Swift is intentionally flat,
+      // therefore archetypes are emitted with their DeclContext if
+      // they appear at the top level of a type.
+      DWARFMangling = false;
+      while (DC && DC->isGenericContext()) {
+        if (DC->isInnermostContextGeneric() &&
+            DC->getGenericParamsOfContext()->getDepth() == GTPT->getDepth())
+          break;
+        DC = DC->getParent();
       }
-      if (GTPT->getDepth() != 0) {
-        return appendOperator("Qd", Index(GTPT->getDepth() - 1),
-                              Index(GTPT->getIndex()));
-      }
-      return appendOperator("Q", Index(GTPT->getIndex()));
+      assert(DC && "no decl context for archetype found");
+      if (!DC) return;
+      appendContext(DC);
+      DWARFMangling = true;
+      return appendOperator("Qq", Index(GTPT->getIndex()));
     }
 
     case TypeKind::DynamicSelf: {
@@ -657,9 +678,35 @@ void ASTMangler::appendType(Type type) {
       appendFunctionType(cast<FunctionType>(tybase));
       return;
       
-    case TypeKind::SILBox:
-      appendType(cast<SILBoxType>(tybase)->getBoxedType());
-      return appendOperator("Xb");
+    case TypeKind::SILBox: {
+      auto box = cast<SILBoxType>(tybase);
+      auto layout = box->getLayout();
+      SmallVector<TupleTypeElt, 4> fieldsList;
+      for (auto &field : layout->getFields()) {
+        auto fieldTy = field.getLoweredType();
+        // Use the `inout` mangling to represent a mutable field.
+        if (field.isMutable())
+          fieldTy = CanInOutType::get(fieldTy);
+        fieldsList.push_back(TupleTypeElt(fieldTy));
+      }
+      appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
+                       ->getCanonicalType());
+
+      if (auto sig = layout->getGenericSignature()) {
+        fieldsList.clear();
+        for (auto &arg : box->getGenericArgs()) {
+          fieldsList.push_back(TupleTypeElt(arg.getReplacement()));
+        }
+        appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
+                         ->getCanonicalType());
+        appendGenericSignature(sig);
+        appendOperator("XX");
+      } else {
+        appendOperator("Xx");
+      }
+
+      return;
+    }
 
     case TypeKind::SILBlockStorage:
       llvm_unreachable("should never be mangled");
@@ -738,25 +785,29 @@ void ASTMangler::bindGenericParameters(const DeclContext *DC) {
     bindGenericParameters(sig->getCanonicalSignature());
 }
 
-void ASTMangler::appendBoundGenericArgs(Type type) {
+void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
+  BoundGenericType *boundType = nullptr;
   if (auto *unboundType = type->getAs<UnboundGenericType>()) {
-    if (auto parent = unboundType->getParent())
-      appendBoundGenericArgs(parent);
-    return appendOperator("y");
+    if (Type parent = unboundType->getParent())
+      appendBoundGenericArgs(parent, isFirstArgList);
+  } else if (auto *nominalType = type->getAs<NominalType>()) {
+    if (Type parent = nominalType->getParent())
+      appendBoundGenericArgs(parent, isFirstArgList);
+  } else {
+    boundType = type->castTo<BoundGenericType>();
+    if (Type parent = boundType->getParent())
+      appendBoundGenericArgs(parent, isFirstArgList);
   }
-  if (auto *nominalType = type->getAs<NominalType>()) {
-    if (auto parent = nominalType->getParent())
-      appendBoundGenericArgs(parent);
-    return appendOperator("y");
+  if (isFirstArgList) {
+    appendOperator("y");
+    isFirstArgList = false;
+  } else {
+    appendOperator("_");
   }
-  auto *boundType = type->castTo<BoundGenericType>();
-  if (auto parent = boundType->getParent())
-    appendBoundGenericArgs(parent);
-
-  bool firstArg = true;
-  for (Type arg : boundType->getGenericArgs()) {
-    appendType(arg);
-    appendListSeparator(firstArg);
+  if (boundType) {
+    for (Type arg : boundType->getGenericArgs()) {
+      appendType(arg);
+    }
   }
 }
 
@@ -771,7 +822,6 @@ static char getParamConvention(ParameterConvention conv) {
     case ParameterConvention::Direct_Owned: return 'x';
     case ParameterConvention::Direct_Unowned: return 'y';
     case ParameterConvention::Direct_Guaranteed: return 'g';
-    case ParameterConvention::Direct_Deallocating: return 'e';
   }
   llvm_unreachable("bad parameter convention");
 };
@@ -832,7 +882,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   }
 
   // Mangle the results.
-  for (auto result : fn->getAllResults()) {
+  for (auto result : fn->getResults()) {
     OpArgs.push_back(getResultConvention(result.getConvention()));
     appendType(result.getType());
   }
@@ -920,24 +970,26 @@ namespace {
 #define PATTERN(ID, BASE)
 #include "swift/AST/PatternNodes.def"
   };
-}
+} // end anonymous namespace
 
 /// Find the first identifier bound by the given binding.  This
 /// assumes that field and global-variable bindings always bind at
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
-static VarDecl *findFirstVariable(PatternBindingDecl *binding) {
+static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
   for (auto entry : binding->getPatternList()) {
     auto var = FindFirstVariable().visit(entry.getPattern());
     if (var) return var;
   }
-  llvm_unreachable("pattern-binding bound no variables?");
+  // Pattern-binding bound without variables exists in erroneous code, e.g.
+  // during code completion.
+  return None;
 }
 
 void ASTMangler::appendContext(const DeclContext *ctx) {
   switch (ctx->getContextKind()) {
   case DeclContextKind::Module:
-    return appendModule(cast<Module>(ctx));
+    return appendModule(cast<ModuleDecl>(ctx));
 
   case DeclContextKind::FileUnit:
     assert(!isa<BuiltinUnit>(ctx) && "mangling member of builtin module!");
@@ -957,8 +1009,8 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
     }
     case LocalDeclContextKind::PatternBindingInitializer: {
       auto patternInit = cast<SerializedPatternBindingInitializer>(local);
-      auto var = findFirstVariable(patternInit->getBinding());
-      appendInitializerEntity(var);
+      if (auto var = findFirstVariable(patternInit->getBinding()))
+        appendInitializerEntity(var.getValue());
       return;
     }
     case LocalDeclContextKind::TopLevelCodeDecl:
@@ -1040,8 +1092,9 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
 
     case InitializerKind::PatternBinding: {
       auto patternInit = cast<PatternBindingInitializer>(ctx);
-      auto var = findFirstVariable(patternInit->getBinding());
-      return appendInitializerEntity(var);
+      if (auto var = findFirstVariable(patternInit->getBinding()))
+        appendInitializerEntity(var.getValue());
+      return;
     }
     }
     llvm_unreachable("bad initializer kind");
@@ -1054,7 +1107,7 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
   llvm_unreachable("bad decl context");
 }
 
-void ASTMangler::appendModule(const Module *module) {
+void ASTMangler::appendModule(const ModuleDecl *module) {
   assert(!module->getParent() && "cannot mangle nested modules!");
 
   // Try the special 'swift' substitution.
@@ -1190,16 +1243,19 @@ void ASTMangler::appendGenericSignature(const GenericSignature *sig) {
 void ASTMangler::appendRequirement(const Requirement &reqt) {
 
   Type FirstTy = reqt.getFirstType()->getCanonicalType();
-  Type SecondTy = reqt.getSecondType();
 
   switch (reqt.getKind()) {
-    case RequirementKind::Conformance:
-      appendProtocolName(SecondTy->castTo<ProtocolType>()->getDecl());
-      break;
-    case RequirementKind::Superclass:
-    case RequirementKind::SameType:
-      appendType(SecondTy->getCanonicalType());
-      break;
+  case RequirementKind::Layout: {
+  } break;
+  case RequirementKind::Conformance: {
+    Type SecondTy = reqt.getSecondType();
+    appendProtocolName(SecondTy->castTo<ProtocolType>()->getDecl());
+  } break;
+  case RequirementKind::Superclass:
+  case RequirementKind::SameType: {
+    Type SecondTy = reqt.getSecondType();
+    appendType(SecondTy->getCanonicalType());
+  } break;
   }
 
   if (auto *DT = FirstTy->getAs<DependentMemberType>()) {
@@ -1208,6 +1264,10 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
       switch (reqt.getKind()) {
         case RequirementKind::Conformance:
           return appendOperator("RQ");
+        case RequirementKind::Layout:
+          appendOperator("RL");
+          appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
+          return;
         case RequirementKind::Superclass:
           return appendOperator("RB");
         case RequirementKind::SameType:
@@ -1222,6 +1282,10 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
       case RequirementKind::Conformance:
         return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RP" : "Rp",
                                              gpBase);
+      case RequirementKind::Layout:
+        appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RM" : "Rm", gpBase);
+        appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
+        return;
       case RequirementKind::Superclass:
         return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RC" : "Rc",
                                              gpBase);
@@ -1235,6 +1299,10 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
   switch (reqt.getKind()) {
     case RequirementKind::Conformance:
       return appendOpWithGenericParamIndex("R", gpBase);
+    case RequirementKind::Layout:
+      appendOpWithGenericParamIndex("Rl", gpBase);
+      appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
+      return;
     case RequirementKind::Superclass:
       return appendOpWithGenericParamIndex("Rb", gpBase);
     case RequirementKind::SameType:
@@ -1294,6 +1362,11 @@ void ASTMangler::appendGenericSignatureParts(
   appendOperator("r", StringRef(OpStorage.data(), OpStorage.size()));
 }
 
+bool ASTMangler::
+checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params) {
+  return Mangle::Mangler::checkGenericParamsOrder(params);
+}
+
 void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   auto assocTy = dmt->getAssocType();
 
@@ -1337,7 +1410,7 @@ void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
   if (!Ty)
     Ty = ErrorType::get(localContext->getASTContext());
 
-  Ty = ArchetypeBuilder::mapTypeOutOfContext(parentContext, Ty);
+  Ty = parentContext->mapTypeOutOfContext(Ty);
   appendType(Ty->getCanonicalType());
   appendOperator(isImplicit ? "fu" : "fU", Index(discriminator));
 }
@@ -1422,6 +1495,7 @@ Type ASTMangler::getDeclTypeForMangling(const ValueDecl *decl,
       for (auto &reqt : sig->getRequirements()) {
         switch (reqt.getKind()) {
         case RequirementKind::Conformance:
+        case RequirementKind::Layout:
         case RequirementKind::Superclass:
           // We don't need the requirement if the constrained type is above the
           // method depth.
@@ -1459,16 +1533,17 @@ void ASTMangler::appendDeclType(const ValueDecl *decl) {
 
   // Mangle the generic signature, if any.
   if (!genericParams.empty() || !requirements.empty()) {
-    appendGenericSignatureParts(genericParams, initialParamDepth,
-                                requirements);
-    appendOperator("u");
+    if (checkGenericParamsOrder(genericParams)) {
+      appendGenericSignatureParts(genericParams, initialParamDepth,
+                                  requirements);
+      appendOperator("u");
+    }
   }
 }
 
 bool ASTMangler::tryAppendStandardSubstitution(const NominalTypeDecl *decl) {
   // Bail out if our parent isn't the swift standard library.
-  DeclContext *dc = decl->getDeclContext();
-  if (!dc->isModuleScopeContext() || !dc->getParentModule()->isStdlibModule())
+  if (!isStdlibType(decl))
     return false;
 
   StringRef name = decl->getName().str();
@@ -1622,7 +1697,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   appendDeclName(decl);
 
   ArrayRef<GenericTypeParamType *> genericParams;
-  unsigned initialParamDepth;
+  unsigned initialParamDepth = 0;
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();
@@ -1639,8 +1714,9 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 
   // Mangle the generic signature, if any.
   if (!genericParams.empty() || !requirements.empty()) {
-    appendGenericSignatureParts(genericParams, initialParamDepth,
-                                requirements);
+    if (checkGenericParamsOrder(genericParams))
+      appendGenericSignatureParts(genericParams, initialParamDepth,
+                                  requirements);
   }
   appendOperator("F");
   if (decl->isStatic())
@@ -1665,5 +1741,37 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
   }
   if (GenericSignature *Sig = conformance->getGenericSignature()) {
     appendGenericSignature(Sig);
+  }
+}
+
+void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {
+  assert(layout);
+  switch (layout->getKind()) {
+  case LayoutConstraintKind::UnknownLayout:
+    appendOperatorParam("U");
+    break;
+  case LayoutConstraintKind::RefCountedObject:
+    appendOperatorParam("R");
+    break;
+  case LayoutConstraintKind::NativeRefCountedObject:
+    appendOperatorParam("N");
+    break;
+  case LayoutConstraintKind::Trivial:
+    appendOperatorParam("T");
+    break;
+  case LayoutConstraintKind::TrivialOfExactSize:
+    if (!layout->getAlignment())
+      appendOperatorParam("e", Index(layout->getTrivialSizeInBits()));
+    else
+      appendOperatorParam("E", Index(layout->getTrivialSizeInBits()),
+                     Index(layout->getAlignment()));
+    break;
+  case LayoutConstraintKind::TrivialOfAtMostSize:
+    if (!layout->getAlignment())
+      appendOperatorParam("m", Index(layout->getTrivialSizeInBits()));
+    else
+      appendOperatorParam("M", Index(layout->getTrivialSizeInBits()),
+                     Index(layout->getAlignment()));
+    break;
   }
 }

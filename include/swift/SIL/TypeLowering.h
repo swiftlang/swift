@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -127,15 +127,16 @@ public:
 
   virtual ~TypeLowering() {}
 
-  /// \brief Are r-values of this type passed as arguments indirectly?
-  bool isPassedIndirectly() const {
-    return isAddressOnly();
-  }
+  /// \brief Are r-values of this type passed as arguments indirectly by formal
+  /// convention?
+  ///
+  /// This is independent of whether the SIL argument is address type.
+  bool isFormallyPassedIndirectly() const { return isAddressOnly(); }
 
-  /// \brief Are r-values of this type returned indirectly?
-  bool isReturnedIndirectly() const {
-    return isAddressOnly();
-  }
+  /// \brief Are r-values of this type returned indirectly by formal convention?
+  ///
+  /// This is independent of whether the SIL result is address type.
+  bool isFormallyReturnedIndirectly() const { return isAddressOnly(); }
 
   /// isAddressOnly - Returns true if the type is an address-only type. A type
   /// is address-only if it is a resilient value type, or if it is a fragile
@@ -167,6 +168,11 @@ public:
   /// in SIL.
   SILType getLoweredType() const {
     return LoweredType;
+  }
+
+  /// Returns true if the SIL type is an address.
+  bool isAddress() const {
+    return LoweredType.isAddress();
   }
 
   /// Return the semantic type.
@@ -795,6 +801,20 @@ public:
   CanSILFunctionType
   getUncachedSILFunctionTypeForConstant(SILDeclRef constant,
                                   CanAnyFunctionType origInterfaceType);
+  
+  /// Get the boxed interface type to use for a capture of the given decl.
+  CanSILBoxType
+  getInterfaceBoxTypeForCapture(ValueDecl *captured,
+                                CanType loweredInterfaceType,
+                                bool isMutable);
+  /// Get the boxed contextual type to use for a capture of the given decl
+  /// in the given generic environment.
+  CanSILBoxType
+  getContextBoxTypeForCapture(ValueDecl *captured,
+                              CanType loweredContextType,
+                              GenericEnvironment *env,
+                              bool isMutable);
+
 private:
   CanType getLoweredRValueType(AbstractionPattern origType, CanType substType,
                                unsigned uncurryLevel);

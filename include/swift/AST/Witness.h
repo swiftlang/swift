@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -156,15 +156,6 @@ public:
   /// types from the synthetic environment.
   ArrayRef<Substitution> getSubstitutions() const {
     return getDeclRef().getSubstitutions();
-  }
-
-  /// Retrieve the generic signature of the synthetic environment.
-  GenericSignature *getSyntheticSignature() const {
-    assert(requiresSubstitution() && "No substitutions required for witness");
-    if (auto *env = getSyntheticEnvironment())
-      return env->getGenericSignature();
-    else
-      return nullptr;
   }
 
   /// Retrieve the synthetic generic environment.

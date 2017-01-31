@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -61,6 +61,7 @@
 /// have a consistent type interface.
 @_fixed_layout
 public struct Bool {
+  @_versioned
   internal var _value: Builtin.Int1
 
   /// Creates an instance initialized to `false`.
@@ -227,7 +228,7 @@ extension Bool {
   @_transparent
   @inline(__always)
   public static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
-      -> Bool{
+      -> Bool {
     return lhs ? try rhs() : false
   }
 

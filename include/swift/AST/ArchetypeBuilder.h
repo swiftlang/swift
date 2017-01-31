@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -83,6 +83,10 @@ public:
     ///
     /// These are dropped when building the GenericSignature.
     Inherited,
+
+    /// The requirement is the Self: Protocol requirement, when computing a
+    /// protocol's requirement signature.
+    ProtocolRequirementSignatureSelf,
   };
 
   RequirementSource(Kind kind, SourceLoc loc) : StoredKind(kind), Loc(loc) { }
@@ -117,11 +121,13 @@ public:
   /// type or some type derived from it.
   class PotentialArchetype;
 
+  using RequirementRHS =
+      llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+
 private:
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
 
-  ModuleDecl &Mod;
   ASTContext &Context;
   DiagnosticEngine &Diags;
   struct Implementation;
@@ -187,8 +193,10 @@ private:
 public:
   /// Construct a new archetype builder.
   ///
-  /// \param mod The module in which the builder will create archetypes.
-  explicit ArchetypeBuilder(ModuleDecl &mod);
+  /// \param lookupConformance Conformance-lookup routine that will be used
+  /// to satisfy conformance requirements for concrete types.
+  explicit ArchetypeBuilder(ASTContext &ctx,
+                            std::function<GenericFunction> lookupConformance);
 
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
@@ -196,8 +204,8 @@ public:
   /// Retrieve the AST context.
   ASTContext &getASTContext() const { return Context; }
 
-  /// Retrieve the module.
-  ModuleDecl &getModule() const { return Mod; }
+  /// Retrieve the conformance-lookup function used by this archetype builder.
+  std::function<GenericFunction> getLookupConformanceFn() const;
 
   /// Retrieve the lazy resolver, if there is one.
   LazyResolver *getLazyResolver() const;
@@ -210,9 +218,8 @@ public:
   void enumerateRequirements(llvm::function_ref<
                       void (RequirementKind kind,
                             PotentialArchetype *archetype,
-                            llvm::PointerUnion<Type, PotentialArchetype *> type,
+                            RequirementRHS constraint,
                             RequirementSource source)> f);
-  
 
 private:
   PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,
@@ -242,10 +249,13 @@ public:
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
   void addRequirement(const Requirement &req, RequirementSource source);
-  
+
+  bool addLayoutRequirement(PotentialArchetype *PAT,
+                            LayoutConstraint Layout,
+                            RequirementSource Source);
+
   /// \brief Add all of a generic signature's parameters and requirements.
-  void addGenericSignature(GenericSignature *sig,
-                           GenericEnvironment *genericEnv);
+  void addGenericSignature(GenericSignature *sig);
 
   /// \brief Build the generic signature.
   GenericSignature *getGenericSignature();
@@ -304,22 +314,6 @@ public:
   /// For any type that cannot refer to an archetype, this routine returns null.
   PotentialArchetype *resolveArchetype(Type type);
 
-  /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(const DeclContext *dc, Type type);
-
-  /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(ModuleDecl *M,
-                                 GenericEnvironment *genericEnv,
-                                 Type type);
-
-  /// Map a contextual type to an interface type.
-  static Type mapTypeOutOfContext(const DeclContext *dc, Type type);
-
-  /// Map a contextual type to an interface type.
-  static Type mapTypeOutOfContext(ModuleDecl *M,
-                                  GenericEnvironment *genericEnv,
-                                  Type type);
-
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),
@@ -357,6 +351,12 @@ class ArchetypeBuilder::PotentialArchetype {
 
   /// \brief The list of protocols to which this archetype will conform.
   llvm::MapVector<ProtocolDecl *, RequirementSource> ConformsTo;
+
+  /// \brief The layout constraint of this archetype, if specified.
+  LayoutConstraint Layout;
+
+  /// The source of the layout constraint requirement.
+  Optional<RequirementSource> LayoutSource;
 
   /// \brief The set of nested types of this archetype.
   ///
@@ -452,6 +452,13 @@ class ArchetypeBuilder::PotentialArchetype {
     return getGenericParam();
   }
 
+  /// \brief Retrieve the representative for this archetype, performing
+  /// path compression on the way.
+  PotentialArchetype *getRepresentative();
+
+  friend class ArchetypeBuilder;
+  friend class GenericSignature;
+
 public:
   ~PotentialArchetype();
 
@@ -534,6 +541,14 @@ public:
     return *SuperclassSource;
   } 
 
+  /// Retrieve the layout constraint of this archetype.
+  LayoutConstraint getLayout() const { return Layout; }
+
+  /// Retrieve the requirement source for the layout constraint requirement.
+  const RequirementSource &getLayoutSource() const {
+    return *LayoutSource;
+  }
+
   /// Retrieve the set of nested types.
   const llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>> &
   getNestedTypes() const{
@@ -543,10 +558,6 @@ public:
   /// \brief Determine the nesting depth of this potential archetype, e.g.,
   /// the number of associated type references.
   unsigned getNestingDepth() const;
-
-  /// \brief Retrieve the representative for this archetype, performing
-  /// path compression on the way.
-  PotentialArchetype *getRepresentative();
 
   /// Retrieve the equivalence class containing this potential archetype.
   ArrayRef<PotentialArchetype *> getEquivalenceClass() {
@@ -567,11 +578,14 @@ public:
   PotentialArchetype *getNestedType(Identifier Name,
                                     ArchetypeBuilder &builder);
 
+  /// \brief Retrieve (or create) a nested type with a known associated type.
+  PotentialArchetype *getNestedType(AssociatedTypeDecl *assocType,
+                                    ArchetypeBuilder &builder);
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype within the given generic environment.
-  ArchetypeType::NestedType getTypeInContext(ArchetypeBuilder &builder,
-                                             GenericEnvironment *genericEnv);
+  Type getTypeInContext(ArchetypeBuilder &builder,
+                        GenericEnvironment *genericEnv);
 
   /// Retrieve the dependent type that describes this potential
   /// archetype.
@@ -630,17 +644,10 @@ public:
   /// Note that we already diagnosed this rename.
   void setAlreadyDiagnosedRename() { DiagnosedRename = true; }
 
-  /// Whether this potential archetype makes a better archetype anchor than
-  /// the given archetype anchor.
-  bool isBetterArchetypeAnchor(PotentialArchetype *other) const;
-
   void dump(llvm::raw_ostream &Out, SourceManager *SrcMgr,
             unsigned Indent);
 
   friend class ArchetypeBuilder;
-
-private:
-  bool hasConcreteTypeInPath() const;
 };
 
 } // end namespace swift

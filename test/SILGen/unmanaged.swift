@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil %s | %FileCheck %s
 
 class C {}
 
@@ -6,7 +6,7 @@ struct Holder {
   unowned(unsafe) var value: C
 }
 _ = Holder(value: C())
-// CHECK-LABEL:sil hidden @_TFV9unmanaged6HolderC{{.*}} : $@convention(method) (@owned C, @thin Holder.Type) -> Holder
+// CHECK-LABEL:sil hidden @_T09unmanaged6HolderV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned C, @thin Holder.Type) -> Holder
 // CHECK: bb0([[T0:%.*]] : $C,
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[T0]] : $C to $@sil_unmanaged C
 // CHECK-NEXT:   strong_release [[T0]] : $C
@@ -16,9 +16,9 @@ _ = Holder(value: C())
 func set(holder holder: inout Holder) {
   holder.value = C()
 }
-// CHECK-LABEL:sil hidden @_TF9unmanaged3setFT6holderRVS_6Holder_T_ : $@convention(thin) (@inout Holder) -> ()
+// CHECK-LABEL:sil hidden @_T09unmanaged3setyAA6HolderVz6holder_tF : $@convention(thin) (@inout Holder) -> ()
 // CHECK: bb0([[ADDR:%.*]] : $*Holder):
-// CHECK:        [[T0:%.*]] = function_ref @_TFC9unmanaged1CC{{.*}}
+// CHECK:        [[T0:%.*]] = function_ref @_T09unmanaged1CC{{[_0-9a-zA-Z]*}}fC
 // CHECK:        [[C:%.*]] = apply [[T0]](
 // CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[ADDR]] : $*Holder, #Holder.value
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[C]]
@@ -30,7 +30,7 @@ func set(holder holder: inout Holder) {
 func get(holder holder: inout Holder) -> C {
   return holder.value
 }
-// CHECK-LABEL:sil hidden @_TF9unmanaged3getFT6holderRVS_6Holder_CS_1C : $@convention(thin) (@inout Holder) -> @owned C
+// CHECK-LABEL:sil hidden @_T09unmanaged3getAA1CCAA6HolderVz6holder_tF : $@convention(thin) (@inout Holder) -> @owned C
 // CHECK: bb0([[ADDR:%.*]] : $*Holder):
 // CHECK-NEXT:   debug_value_addr %0 : $*Holder, var, name "holder", argno 1 
 // CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[ADDR]] : $*Holder, #Holder.value
@@ -42,7 +42,7 @@ func get(holder holder: inout Holder) -> C {
 func project(fn fn: () -> Holder) -> C {
   return fn().value
 }
-// CHECK-LABEL:sil hidden @_TF9unmanaged7projectFT2fnFT_VS_6Holder_CS_1C : $@convention(thin) (@owned @callee_owned () -> Holder) -> @owned C
+// CHECK-LABEL:sil hidden @_T09unmanaged7projectAA1CCAA6HolderVyc2fn_tF : $@convention(thin) (@owned @callee_owned () -> Holder) -> @owned C
 // CHECK: bb0([[FN:%.*]] : $@callee_owned () -> Holder):
 // CHECK:        strong_retain [[FN]]
 // CHECK-NEXT: [[T0:%.*]] = apply [[FN]]()

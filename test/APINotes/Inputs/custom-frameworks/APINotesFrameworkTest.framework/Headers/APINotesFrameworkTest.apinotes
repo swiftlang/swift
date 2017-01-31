@@ -39,6 +39,27 @@ SwiftVersions:
   - Version: 3.0
     Classes:
       - Name: TestProperties
+        Methods:
+          - Selector: accessorsOnlyRenamedRetyped
+            MethodKind: Instance
+            SwiftName: 'renamedAndRetyped()'
+            ResultType: 'id _Nonnull'
+          - Selector: 'setAccessorsOnlyRenamedRetyped:'
+            MethodKind: Instance
+            SwiftName: 'setRenamedAndRetyped(_:)'
+            Parameters:
+              - Position: 0
+                Type: 'id _Nullable'
+          - Selector: accessorsOnlyRenamedRetypedClass
+            MethodKind: Class
+            SwiftName: 'renamedAndRetypedClass()'
+            ResultType: 'id _Nonnull'
+          - Selector: 'setAccessorsOnlyRenamedRetypedClass:'
+            MethodKind: Class
+            SwiftName: 'setRenamedAndRetypedClass(_:)'
+            Parameters:
+              - Position: 0
+                Type: 'id _Nullable'
         Properties:
           - Name: accessorsOnlyInVersion3
             PropertyKind:    Instance
@@ -52,6 +73,12 @@ SwiftVersions:
           - Name: accessorsOnlyForClassExceptInVersion3
             PropertyKind:    Class
             SwiftImportAsAccessors: false
+          - Name: accessorsOnlyRenamedRetyped
+            PropertyKind:    Instance
+            SwiftImportAsAccessors: true
+          - Name: accessorsOnlyRenamedRetypedClass
+            PropertyKind:    Class
+            SwiftImportAsAccessors: true
     Functions:
       - Name: acceptDoublePointer
         SwiftName: 'acceptPointer(_:)'

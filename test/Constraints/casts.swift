@@ -30,7 +30,7 @@ var bad_d_is_b:Bool = D() is B // expected-warning{{always true}}
 func base_class_archetype_casts<T : B>(_ t: T) {
   var _ : B = t
   _ = B() as! T
-  var _ : T = B() // expected-error{{'B' is not convertible to 'T'; did you mean to use 'as!' to force downcast?}}
+  var _ : T = B() // expected-error{{cannot convert value of type 'B' to specified type 'T'}}
 
   let b = B()
 
@@ -206,3 +206,7 @@ func forcedDowncastToOptional(_ b: B) {
 
 _ = b1 as Int    // expected-error {{cannot convert value of type 'Bool' to type 'Int' in coercion}}
 _ = seven as Int // expected-error {{cannot convert value of type 'Double' to type 'Int' in coercion}}
+
+func rdar29894174(v: B?) {
+  let _ = [v].flatMap { $0 as? D }
+}

@@ -110,7 +110,7 @@ func testClike2(x: CLike2) -> Int {
   }
 }
 
-// CHECK-LABEL: define hidden i32 @_TF8test_v7k10testClike8{{.*}}(i32, i3)
+// CHECK-LABEL: define hidden i32 @_TF8test_v7k10testClike8{{.*}}(i32, i8)
 // CHECK: [[ID:%[0-9]+]] = phi i32 [ -1, {{.*}} ], [ 1, {{.*}} ]
 // CHECK: ret i32 [[ID]]
 // V7K-LABEL: __TF8test_v7k10testClike8
@@ -164,7 +164,7 @@ func testSingleP(x: SinglePayload) -> Double {
   }
 }
 
-// CHECK-LABEL: define hidden double @_TF8test_v7k10testMultiP{{.*}}(i32, i32, i2)
+// CHECK-LABEL: define hidden double @_TF8test_v7k10testMultiP{{.*}}(i32, i32, i8)
 // CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
 // CHECK: [[SECOND:%[0-9]+]] = zext i32 %1 to i64
 // CHECK: [[TEMP:%[0-9]+]] = shl i64 [[SECOND]], 32

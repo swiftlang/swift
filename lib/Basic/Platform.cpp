@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -90,6 +90,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     llvm_unreachable("unknown OS");
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
+  case llvm::Triple::Fuchsia:
   case llvm::Triple::KFreeBSD:
   case llvm::Triple::Lv2:
   case llvm::Triple::NetBSD:
@@ -107,6 +108,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::AMDHSA:
   case llvm::Triple::ELFIAMCU:
   case llvm::Triple::Mesa3D:
+  case llvm::Triple::Contiki:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
@@ -119,7 +121,17 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::FreeBSD:
     return "freebsd";
   case llvm::Triple::Win32:
-    return "windows";
+    switch (triple.getEnvironment()) {
+    case llvm::Triple::Cygnus:
+      return "cygwin";
+    case llvm::Triple::GNU:
+      return "mingw";
+    case llvm::Triple::MSVC:
+    case llvm::Triple::Itanium:
+      return "windows";
+    default:
+      llvm_unreachable("unsupported Windows environment");
+    }
   case llvm::Triple::PS4:
     return "ps4";
   }

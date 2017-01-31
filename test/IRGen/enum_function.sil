@@ -16,12 +16,7 @@ bb0:
 // CHECK-32:  define hidden void @test1([[WORD:i32]], [[WORD]])
 sil hidden @test1 : $@convention(thin) (@owned Optional<() -> ()>) -> () {
 bb0(%0 : $Optional<() -> ()>):
-  // CHECK: [[T0:%.*]] = icmp eq [[WORD]] %0, 0
-  // CHECK: br i1 [[T0]], label
-  // CHECK: [[FNPTR:%.*]] = inttoptr [[WORD]] %0 to i8*
-  // CHECK: [[CTX:%.*]] = inttoptr [[WORD]] %1 to %swift.refcounted*
-  // CHECK: call void @swift_rt_swift_retain(%swift.refcounted* [[CTX]])
-  // CHECK: br label
+  // CHECK: call void @_T0SqWy
   retain_value %0 : $Optional<() -> ()>
 
   // CHECK: icmp eq i64 %0, 0

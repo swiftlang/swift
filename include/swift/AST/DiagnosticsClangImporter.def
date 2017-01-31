@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -53,6 +53,9 @@ ERROR(bridging_header_error,Fatal,
 WARNING(could_not_rewrite_bridging_header,none,
   "failed to serialize bridging header; "
   "target may not be debuggable outside of its original project", ())
+ERROR(bridging_header_pch_error,Fatal,
+   "failed to emit precompiled header '%0' for bridging header '%1'",
+   (StringRef, StringRef))
 
 WARNING(invalid_swift_name_method,none,
   "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
@@ -75,6 +78,11 @@ WARNING(inconsistent_swift_name,none,
 WARNING(unresolvable_clang_decl,none,
         "imported declaration '%0' could not be mapped to '%1'",
         (StringRef, StringRef))
+
+WARNING(implicit_bridging_header_imported_from_module,none,
+        "implicit import of bridging header '%0' via module %1 "
+        "is deprecated and will be removed in a later version of Swift",
+        (StringRef, Identifier))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

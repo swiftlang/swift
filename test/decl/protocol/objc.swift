@@ -45,7 +45,7 @@ class C2a : P2 {
   func method(_: Int, class: ObjCClass) { }
 
   var empty: Bool {
-    get { } // expected-error{{Objective-C method 'empty' provided by getter for 'empty' does not match the requirement's selector ('checkIfEmpty')}}
+    get { }
   }
 }
 
@@ -53,7 +53,7 @@ class C2b : P2 {
   @objc func method(_: Int, class: ObjCClass) { }
 
   @objc var empty: Bool {
-    @objc get { } // expected-error{{Objective-C method 'empty' provided by getter for 'empty' does not match the requirement's selector ('checkIfEmpty')}}{{10-10=(checkIfEmpty)}}
+    @objc get { }
   }
 }
 
@@ -145,4 +145,104 @@ class C4_5a : P4, P5 {
 
 class C6a : P6 {
   func doSomething(sender: AnyObject?) { } // expected-error{{method 'doSomething(sender:)' has different argument names from those required by protocol 'P6' ('doSomething')}}{{20-20=_ }}{{none}}
+}
+
+
+
+@objc protocol P7 {
+  var prop: Int {
+    @objc(getTheProp) get
+    @objc(setTheProp:) set
+  }
+}
+
+class C7 : P7 {
+  var prop: Int {
+    get { return 0 }
+    set {}
+  }
+}
+
+class C7a : P7 {
+  @objc var prop: Int {
+    get { return 0 }
+    set {}
+  }
+}
+
+class C7b : P7 {
+  @objc var prop: Int {
+    @objc(getTheProp) get { return 0 }
+    @objc(setTheProp:) set {}
+  }
+}
+
+class C7c : P7 {
+  var prop: Int = 0
+}
+
+class C7d : P7 {
+  @objc var prop: Int = 0
+}
+
+class C7e : P7 {
+  // FIXME: This should probably still complain.
+  @objc(notProp) var prop: Int {
+    get { return 0 }
+    set {}
+  }
+}
+
+class C7f : P7 {
+  var prop: Int {
+    @objc(getProp) get { return 0 } // expected-error {{Objective-C method 'getProp' provided by getter for 'prop' does not match the requirement's selector ('getTheProp')}} {{11-18=getTheProp}}
+    set {}
+  }
+}
+
+class C7g : P7 {
+  var prop: Int {
+    get { return 0 }
+    @objc(prop:) set {} // expected-error {{Objective-C method 'prop:' provided by setter for 'prop' does not match the requirement's selector ('setTheProp:')}} {{11-16=setTheProp:}}
+  }
+}
+
+class C7h : P7 {
+  @objc var prop: Int = 0 {
+    didSet {}
+  }
+}
+
+class C7i : P7 {
+  @objc var prop: Int {
+    unsafeAddress { fatalError() }
+    unsafeMutableAddress { fatalError() }
+  }
+}
+
+@objc protocol P8 {
+  @objc optional var prop: Int {
+    @objc(getTheProp) get
+  }
+}
+
+class C8Base: P8 {}
+class C8Sub: C8Base {
+  var prop: Int { return 0 } // expected-note {{getter for 'prop' declared here}}
+
+  @objc(getTheProp) func collision() {} // expected-error {{method 'collision()' with Objective-C selector 'getTheProp' conflicts with getter for 'prop' with the same Objective-C selector}}
+}
+class C8SubA: C8Base {
+  var prop: Int {
+    @objc get { return 0 } // expected-note {{getter for 'prop' declared here}}
+  }
+
+  @objc(getTheProp) func collision() {} // expected-error {{method 'collision()' with Objective-C selector 'getTheProp' conflicts with getter for 'prop' with the same Objective-C selector}}
+}
+class C8SubB: C8Base {
+  var prop: Int {
+    @objc(getProp) get { return 0 }
+  }
+
+  @objc(getTheProp) func collision() {} // okay
 }

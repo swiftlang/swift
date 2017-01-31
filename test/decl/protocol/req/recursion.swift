@@ -10,29 +10,52 @@ extension SomeProtocol where T == Optional<T> { } // expected-error{{same-type c
 
 class X<T> where T == X { // expected-error{{same-type constraint 'T' == 'X<T>' is recursive}}
 // expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
+// expected-error@-2{{same-type requirement makes generic parameter 'T' non-generic}}
     var type: T { return type(of: self) }
 }
 
-protocol Y {
-  associatedtype Z = Z // expected-error{{type alias 'Z' circularly references itself}}
+// FIXME: The "associated type 'Foo' is not a member type of 'Self'" diagnostic
+// should also become "associated type 'Foo' references itself"
+protocol CircularAssocTypeDefault {
+  associatedtype Z = Z // expected-error{{associated type 'Z' references itself}}
+  // expected-note@-1{{type declared here}}
+  // expected-note@-2{{protocol requires nested type 'Z'; do you want to add it?}}
+
+  associatedtype Z2 = Z3 // expected-note{{type declared here}}
+  // expected-note@-1{{protocol requires nested type 'Z2'; do you want to add it?}}
+  associatedtype Z3 = Z2 // expected-error{{associated type 'Z2' references itself}}
+  // expected-note@-1{{protocol requires nested type 'Z3'; do you want to add it?}}
+
+  associatedtype Z4 = Self.Z4 // expected-error{{associated type 'Z4' is not a member type of 'Self'}}
+  // expected-note@-1{{protocol requires nested type 'Z4'; do you want to add it?}}
+
+  associatedtype Z5 = Self.Z6
+  // expected-note@-1{{protocol requires nested type 'Z5'; do you want to add it?}}
+  associatedtype Z6 = Self.Z5 // expected-error{{associated type 'Z5' is not a member type of 'Self'}}
+  // expected-note@-1{{protocol requires nested type 'Z6'; do you want to add it?}}
 }
 
-// rdar://problem/20000145
+struct ConformsToCircularAssocTypeDefault : CircularAssocTypeDefault { }
+// expected-error@-1 {{type 'ConformsToCircularAssocTypeDefault' does not conform to protocol 'CircularAssocTypeDefault'}}
 
-// This typechecks now, however there's no way to define a concrete type
-// which satisfies 'A' in the signature of S<A>.
+// rdar://problem/20000145
 public protocol P {
   associatedtype T
 }
 
 public struct S<A: P> where A.T == S<A> {
+// expected-note@-1 {{type declared here}}
+// expected-error@-2 {{generic struct 'S' references itself}}
   func f(a: A.T) {
     g(a: id(t: a))
+    // expected-error@-1 {{cannot convert value of type 'A.T' to expected argument type 'S<_>'}}
     _ = A.T.self
   }
 
   func g(a: S<A>) {
     f(a: id(t: a))
+    // expected-note@-1 {{expected an argument list of type '(a: A.T)'}}
+    // expected-error@-2 {{cannot invoke 'f' with an argument list of type '(a: S<A>)'}}
     _ = S<A>.self
   }
 
@@ -43,7 +66,7 @@ public struct S<A: P> where A.T == S<A> {
 
 protocol I {
   // FIXME: these are spurious
-  init() // expected-note 2{{protocol requires initializer 'init()' with type '()'}}
+  init() // expected-note {{protocol requires initializer 'init()' with type '()'}}
 }
 
 protocol PI {
@@ -51,6 +74,8 @@ protocol PI {
 }
 
 struct SI<A: PI> : I where A : I, A.T == SI<A> {
+// expected-note@-1 {{type declared here}}
+// expected-error@-2 {{generic struct 'SI' references itself}}
   func ggg<T : I>(t: T.Type) -> T {
     return T()
   }
@@ -58,13 +83,11 @@ struct SI<A: PI> : I where A : I, A.T == SI<A> {
   func foo() {
     _ = A()
 
-    // FIXME: bogus errors
-    _ = A.T() // expected-error{{cannot invoke value of type 'SI<A>.Type' with argument list '()'}}
-    _ = SI<A>() // expected-error{{cannot invoke initializer for type 'SI<A>' with no arguments}}
+    _ = A.T()
+    _ = SI<A>()
 
-    // FIXME: Strange bug in unqualified lookup
-    _ = ggg(t: A.self) // expected-error{{use of unresolved identifier 'ggg'}}
-    _ = ggg(t: A.T.self) // expected-error{{use of unresolved identifier 'ggg'}}
+    _ = ggg(t: A.self)
+    _ = ggg(t: A.T.self)
 
     _ = self.ggg(t: A.self)
     _ = self.ggg(t: A.T.self)

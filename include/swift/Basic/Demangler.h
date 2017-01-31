@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -166,12 +166,6 @@ private:
     return createWithChild(kind, popNode(Node::Kind::Type));
   }
 
-  NodePointer swapWith(Node::Kind kind) {
-    NodePointer Nd = popNode();
-    pushNode(NodeFactory::create(kind));
-    return Nd;
-  }
-
   NodePointer changeKind(NodePointer Node, Node::Kind NewKind);
 
   NodePointer demangleOperator();
@@ -202,7 +196,9 @@ private:
   NodePointer popTypeList();
   NodePointer popProtocol();
   NodePointer demangleBoundGenericType();
-  NodePointer demangleBoundGenericArgs(NodePointer nominalType);
+  NodePointer demangleBoundGenericArgs(NodePointer nominalType,
+                                    const std::vector<NodePointer> &TypeLists,
+                                    size_t TypeListIdx);
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention();
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
@@ -227,7 +223,8 @@ private:
   NodePointer addFuncSpecParamNumber(NodePointer Param,
                               FunctionSigSpecializationParamKind Kind);
 
-  NodePointer demangleSpecAttributes(Node::Kind SpecKind);
+  NodePointer demangleSpecAttributes(Node::Kind SpecKind,
+                                     bool demangleUniqueID = false);
 
   NodePointer demangleWitness();
   NodePointer demangleSpecialType();

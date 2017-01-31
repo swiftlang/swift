@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -268,7 +268,8 @@ public:
   llvm::CallInst *CreateCall(llvm::Value *Callee, ArrayRef<llvm::Value *> Args,
                              const Twine &Name = "",
                              llvm::MDNode *FPMathTag = nullptr) {
-    assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
+    // assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on
+    // call");
     auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;
@@ -288,7 +289,8 @@ public:
                              ArrayRef<llvm::Value *> Args,
                              const Twine &Name = "",
                              llvm::MDNode *FPMathTag = nullptr) {
-    assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
+    // assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on
+    // call");
     auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -318,6 +318,12 @@ std::string mangleNode(const NodePointer &root);
 
 std::string mangleNodeNew(const NodePointer &root);
 
+inline std::string mangleNode(const NodePointer &root, bool NewMangling) {
+  if (NewMangling)
+    return mangleNodeNew(root);
+  return mangleNode(root);
+}
+
 /// \brief Transform the node structure to a string.
 ///
 /// Typical usage:
@@ -411,6 +417,14 @@ static inline bool isDigit(int c) {
 }
   
 } // end namespace Demangle
+
+
+/// Returns true if the new mangling scheme should be used.
+///
+/// TODO: remove this function when the old mangling is removed.
+bool useNewMangling(Demangle::NodePointer Node);
+
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_DEMANGLE_H

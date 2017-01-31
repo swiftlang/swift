@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -31,7 +31,7 @@ namespace {
   };
 
   typedef std::pair<types::ID, std::string> OutputPair;
-}
+} // end anonymous namespace
 
 namespace swift {
 namespace json {
@@ -73,8 +73,8 @@ namespace json {
       return seq[index];
     }
   };
-}
-}
+} // namespace json
+} // namespace swift
 
 namespace {
 
@@ -140,7 +140,7 @@ public:
     });
   }
 
-  virtual void provideMapping(swift::json::Output &out) {
+  void provideMapping(swift::json::Output &out) override {
     Message::provideMapping(out);
     out.mapRequired("command", CommandLine);
     out.mapOptional("inputs", Inputs);
@@ -154,7 +154,7 @@ public:
   TaskBasedMessage(StringRef Kind, const Job &Cmd, ProcessId Pid) :
       CommandBasedMessage(Kind, Cmd), Pid(Pid) {}
 
-  virtual void provideMapping(swift::json::Output &out) {
+  void provideMapping(swift::json::Output &out) override {
     CommandBasedMessage::provideMapping(out);
     out.mapRequired("pid", Pid);
   }
@@ -166,7 +166,7 @@ public:
   BeganMessage(const Job &Cmd, ProcessId Pid) :
       DetailedCommandBasedMessage("began", Cmd), Pid(Pid) {}
 
-  virtual void provideMapping(swift::json::Output &out) {
+  void provideMapping(swift::json::Output &out) override {
     DetailedCommandBasedMessage::provideMapping(out);
     out.mapRequired("pid", Pid);
   }
@@ -179,7 +179,7 @@ public:
                     StringRef Output) : TaskBasedMessage(Kind, Cmd, Pid),
                                         Output(Output) {}
 
-  virtual void provideMapping(swift::json::Output &out) {
+  void provideMapping(swift::json::Output &out) override {
     TaskBasedMessage::provideMapping(out);
     out.mapOptional("output", Output, std::string());
   }
@@ -193,7 +193,7 @@ public:
                                                       Output),
                                     ExitStatus(ExitStatus) {}
 
-  virtual void provideMapping(swift::json::Output &out) {
+  void provideMapping(swift::json::Output &out) override {
     TaskOutputMessage::provideMapping(out);
     out.mapRequired("exit-status", ExitStatus);
   }
@@ -201,15 +201,17 @@ public:
 
 class SignalledMessage : public TaskOutputMessage {
   std::string ErrorMsg;
+  Optional<int> Signal;
 public:
   SignalledMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
-                   StringRef ErrorMsg) : TaskOutputMessage("signalled", Cmd,
-                                                           Pid, Output),
-                                         ErrorMsg(ErrorMsg) {}
+                   StringRef ErrorMsg, Optional<int> Signal) :
+      TaskOutputMessage("signalled", Cmd, Pid, Output), ErrorMsg(ErrorMsg),
+      Signal(Signal) {}
 
-  virtual void provideMapping(swift::json::Output &out) {
+  void provideMapping(swift::json::Output &out) override {
     TaskOutputMessage::provideMapping(out);
     out.mapOptional("error-message", ErrorMsg, std::string());
+    out.mapOptional("signal", Signal);
   }
 };
 
@@ -219,7 +221,7 @@ public:
       DetailedCommandBasedMessage("skipped", Cmd) {}
 };
 
-}
+} // end anonymous namespace
 
 namespace swift {
 namespace json {
@@ -231,8 +233,8 @@ struct ObjectTraits<Message> {
   }
 };
 
-} // end namespace yaml
-} // end namespace llvm
+} // namespace json
+} // namespace swift
 
 static void emitMessage(raw_ostream &os, Message &msg) {
   std::string JSONString;
@@ -260,8 +262,9 @@ void parseable_output::emitFinishedMessage(raw_ostream &os,
 void parseable_output::emitSignalledMessage(raw_ostream &os,
                                             const Job &Cmd, ProcessId Pid,
                                             StringRef ErrorMsg,
-                                            StringRef Output) {
-  SignalledMessage msg(Cmd, Pid, Output, ErrorMsg);
+                                            StringRef Output,
+                                            Optional<int> Signal) {
+  SignalledMessage msg(Cmd, Pid, Output, ErrorMsg, Signal);
   emitMessage(os, msg);
 }
 

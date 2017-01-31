@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -501,12 +501,10 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
     if (Substs.size() == 1) {
       Substitution Subst = Substs[0];
       Type ElemType = Subst.getReplacement();
-      if (ElemType->isCanonical() && ElemType->isLegalSILType()) {
-        SILType SILElemTy = SILType::getPrimitiveObjectType(CanType(ElemType));
-        // Destroying an array of trivial types is a no-op.
-        if (SILElemTy.isTrivial(I->getModule()))
-          return eraseInstFromFunction(*I);
-      }
+      auto &SILElemTy = I->getModule().Types.getTypeLowering(ElemType);
+      // Destroying an array of trivial types is a no-op.
+      if (SILElemTy.isTrivial())
+        return eraseInstFromFunction(*I);
     }
     break;
   }

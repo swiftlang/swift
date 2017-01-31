@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-sil -o - -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -emit-sil -o - -verify | %FileCheck %s
 
 // These tests are deliberately shallow, because I do not want to depend on the
 // specifics of SIL generation, which might change for reasons unrelated to this
@@ -8,7 +8,7 @@ func foo(_ x: Float) -> Float {
   return bar(x);
 }
 
-// CHECK-LABEL: sil hidden @_TF18mandatory_inlining3foo
+// CHECK-LABEL: sil hidden @_T018mandatory_inlining3foo{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $Float):
 // CHECK-NEXT: debug_value %0 : $Float, let, name "x"
 // CHECK-NEXT: return %0
@@ -17,7 +17,7 @@ func foo(_ x: Float) -> Float {
   return baz(x)
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_TF18mandatory_inlining3bar
+// CHECK-LABEL: sil hidden [transparent] @_T018mandatory_inlining3bar{{[_0-9a-zA-Z]*}}F
   // CHECK-NOT: function_ref
   // CHECK-NOT: apply
   // CHECK: return
@@ -26,21 +26,21 @@ func foo(_ x: Float) -> Float {
   return x
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_TF18mandatory_inlining3baz
+// CHECK-LABEL: sil hidden [transparent] @_T018mandatory_inlining3baz{{[_0-9a-zA-Z]*}}F
 // CHECK: return
 
 func spam(_ x: Int) -> Int {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF18mandatory_inlining4spam
+// CHECK-LABEL: sil hidden @_T018mandatory_inlining4spam{{[_0-9a-zA-Z]*}}F
 
 @_transparent func ham(_ x: Int) -> Int {
   return spam(x)
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_TF18mandatory_inlining3ham
-  // CHECK: function_ref @_TF18mandatory_inlining4spam
+// CHECK-LABEL: sil hidden [transparent] @_T018mandatory_inlining3ham{{[_0-9a-zA-Z]*}}F
+  // CHECK: function_ref @_T018mandatory_inlining4spam{{[_0-9a-zA-Z]*}}F
   // CHECK: apply
   // CHECK: return
 
@@ -48,8 +48,8 @@ func eggs(_ x: Int) -> Int {
   return ham(x)
 }
 
-// CHECK-LABEL: sil hidden @_TF18mandatory_inlining4eggs
-  // CHECK: function_ref @_TF18mandatory_inlining4spam
+// CHECK-LABEL: sil hidden @_T018mandatory_inlining4eggs{{[_0-9a-zA-Z]*}}F
+  // CHECK: function_ref @_T018mandatory_inlining4spam{{[_0-9a-zA-Z]*}}F
   // CHECK: apply
   // CHECK: return
 
@@ -75,7 +75,7 @@ func test_auto_closure_without_capture() -> Bool {
 
 // This should be fully inlined and simply return false, which is easier to check for
 
-// CHECK-LABEL: sil hidden @_TF18mandatory_inlining33test_auto_closure_without_captureFT_Sb
+// CHECK-LABEL: sil hidden @_T018mandatory_inlining33test_auto_closure_without_captureSbyF
   // CHECK: [[FV:%.*]] = integer_literal $Builtin.Int1, 0
   // CHECK: [[FALSE:%.*]] = struct $Bool ([[FV:%.*]] : $Builtin.Int1)
   // CHECK: return [[FALSE]]
@@ -107,7 +107,7 @@ func test_chained_short_circuit(_ x: Bool, y: Bool, z: Bool) -> Bool {
 // left (i.e. the autoclosure and the short-circuiting boolean operators are
 // recursively inlined properly)
 
-// CHECK-LABEL: sil hidden @_TF18mandatory_inlining26test_chained_short_circuit
+// CHECK-LABEL: sil hidden @_T018mandatory_inlining26test_chained_short_circuit{{[_0-9a-zA-Z]*}}F
   // CHECK-NOT = apply [transparent]
   // CHECK: return
 
@@ -120,7 +120,7 @@ enum X {
 
 func testInlineUnionElement() -> X {
   return X.onetransp
-  // CHECK-LABEL: sil hidden @_TF18mandatory_inlining22testInlineUnionElementFT_OS_1X
+  // CHECK-LABEL: sil hidden @_T018mandatory_inlining22testInlineUnionElementAA1XOyF
   // CHECK: enum $X, #X.onetransp!enumelt
   // CHECK-NOT = apply
   // CHECK: return
@@ -136,6 +136,8 @@ func call_let_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
 // CHECK: sil hidden @{{.*}}test_let_auto_closure_with_value_capture
 // CHECK: bb0(%0 : $Bool):
 // CHECK-NEXT: debug_value %0 : $Bool
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
 // CHECK-NEXT: return %0 : $Bool
 
 func test_let_auto_closure_with_value_capture(_ x: Bool) -> Bool {
@@ -145,16 +147,16 @@ func test_let_auto_closure_with_value_capture(_ x: Bool) -> Bool {
 
 class C {}
 
-// CHECK-LABEL: sil hidden [transparent] @_TF18mandatory_inlining25class_constrained_generic
+// CHECK-LABEL: sil hidden [transparent] @_T018mandatory_inlining25class_constrained_generic{{[_0-9a-zA-Z]*}}F
 @_transparent
 func class_constrained_generic<T : C>(_ o: T) -> AnyClass? {
   // CHECK: return
   return T.self
 }
 
-// CHECK-LABEL: sil hidden @_TF18mandatory_inlining6invokeFCS_1CT_ : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: sil hidden @_T018mandatory_inlining6invokeyAA1CCF : $@convention(thin) (@owned C) -> () {
 func invoke(_ c: C) {
-  // CHECK-NOT: function_ref @_TF18mandatory_inlining25class_constrained_generic
+  // CHECK-NOT: function_ref @_T018mandatory_inlining25class_constrained_generic{{[_0-9a-zA-Z]*}}F
   // CHECK-NOT: apply
   // CHECK: init_existential_metatype
   _ = class_constrained_generic(c)

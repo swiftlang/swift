@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -50,9 +50,18 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
   stack.push_back(decl);
 
   ClangDeclRefFinder refFinder([&](const clang::DeclRefExpr *DRE) {
-    const clang::ValueDecl *D = DRE->getDecl();
-    if (!D->hasLinkage() || D->isExternallyVisible())
-      return;
+    const clang::Decl *D = DRE->getDecl();
+    // Check that this is a file-level declaration and not inside a function.
+    // If it's a member of a file-level decl, like a C++ static member variable,
+    // we want to add the entire file-level declaration because Clang doesn't
+    // expect to see members directly here.
+    for (auto *DC = D->getDeclContext();; DC = DC->getParent()) {
+      if (DC->isFunctionOrMethod())
+        return;
+      if (DC->isFileContext())
+        break;
+      D = cast<const clang::Decl>(DC);
+    }
     if (!GlobalClangDecls.insert(D->getCanonicalDecl()).second)
       return;
     stack.push_back(D);

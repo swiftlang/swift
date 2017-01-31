@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -68,7 +68,11 @@ unsigned TaskQueue::getNumberOfParallelTasks() const {
 }
 
 void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
-                        ArrayRef<const char *> Env, void *Context) {
+                        ArrayRef<const char *> Env, void *Context,
+                        bool SeparateErrors) {
+  // This implementation of TaskQueue ignores SeparateErrors.
+  // We need to reference SeparateErrors to avoid warnings, though.
+  (void)SeparateErrors;
   std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context));
   QueuedTasks.push(std::move(T));
 }
@@ -112,8 +116,8 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // Wait() returning a return code of -2 indicates the process received
       // a signal during execution.
       if (Signalled) {
-        TaskFinishedResponse Response = Signalled(PI.Pid, ErrMsg, StringRef(),
-                                                  T->Context);
+        TaskFinishedResponse Response =
+            Signalled(PI.Pid, ErrMsg, StringRef(), StringRef(), T->Context, None);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else {
         // If we don't have a Signalled callback, unconditionally stop.
@@ -124,7 +128,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // finished.
       if (Finished) {
         TaskFinishedResponse Response = Finished(PI.Pid, PI.ReturnCode,
-        StringRef(), T->Context);
+        StringRef(), StringRef(), T->Context);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else if (PI.ReturnCode != 0) {
         ContinueExecution = false;

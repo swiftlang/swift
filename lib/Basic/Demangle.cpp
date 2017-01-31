@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -58,7 +58,7 @@ struct QuotedString {
 
   explicit QuotedString(std::string Value) : Value(Value) {}
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 static DemanglerPrinter &operator<<(DemanglerPrinter &printer,
                                     const QuotedString &QS) {
@@ -325,6 +325,12 @@ public:
   ///
   /// \return true if the mangling succeeded
   NodePointer demangleTopLevel() {
+#ifndef NO_NEW_DEMANGLING
+    if (Mangled.str().startswith(MANGLING_PREFIX_STR)) {
+      NewMangling::Demangler D(Mangled.str());
+      return D.demangleTopLevel();
+    }
+#endif
     if (!Mangled.nextIf("_T"))
       return nullptr;
 
@@ -1129,6 +1135,9 @@ private:
   }
 
   NodePointer demangleBoundGenericArgs(NodePointer nominalType) {
+    if (nominalType->getNumChildren() == 0)
+      return nullptr;
+
     // Generic arguments for the outermost type come first.
     NodePointer parentOrModule = nominalType->getChild(0);
 
@@ -1415,15 +1424,6 @@ private:
     return entity;
   }
 
-  NodePointer demangleArchetypeRef(Node::IndexType depth, Node::IndexType i) {
-    // FIXME: Name won't match demangled context generic signatures correctly.
-    auto ref = NodeFactory::create(Node::Kind::ArchetypeRef,
-                                   archetypeName(i, depth));
-    ref->addChild(NodeFactory::create(Node::Kind::Index, depth));
-    ref->addChild(NodeFactory::create(Node::Kind::Index, i));
-    return ref;
-  }
-
   NodePointer getDependentGenericParamType(unsigned depth, unsigned index) {
     DemanglerPrinter PrintName;
     PrintName << archetypeName(index, depth);
@@ -1637,6 +1637,69 @@ private:
       return reqt;
     }
 
+    if (Mangled.nextIf('l')) {
+      StringRef name;
+      Node::Kind kind;
+      Node::IndexType size = SIZE_MAX;
+      Node::IndexType alignment = SIZE_MAX;
+      if (Mangled.nextIf('U')) {
+        kind = Node::Kind::Identifier;
+        name = "U";
+      } else if (Mangled.nextIf('R')) {
+        kind = Node::Kind::Identifier;
+        name = "R";
+      } else if (Mangled.nextIf('N')) {
+        kind = Node::Kind::Identifier;
+        name = "N";
+      } else if (Mangled.nextIf('T')) {
+        kind = Node::Kind::Identifier;
+        name = "T";
+      } else if (Mangled.nextIf('E')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        if (!Mangled.nextIf('_'))
+          return nullptr;
+        if (!demangleNatural(alignment))
+          return nullptr;
+        name = "E";
+      } else if (Mangled.nextIf('e')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        name = "e";
+      } else if (Mangled.nextIf('M')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        if (!Mangled.nextIf('_'))
+          return nullptr;
+        if (!demangleNatural(alignment))
+          return nullptr;
+        name = "M";
+      } else if (Mangled.nextIf('m')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size))
+          return nullptr;
+        name = "m";
+      } else {
+        unreachable("Unknown layout constraint");
+      }
+
+      NodePointer second = NodeFactory::create(kind, name);
+      if (!second) return nullptr;
+      auto reqt = NodeFactory::create(
+        Node::Kind::DependentGenericLayoutRequirement);
+      reqt->addChild(constrainedType);
+      reqt->addChild(second);
+      if (size != SIZE_MAX) {
+        reqt->addChild(NodeFactory::create(Node::Kind::Number, size));
+        if (alignment != SIZE_MAX)
+          reqt->addChild(NodeFactory::create(Node::Kind::Number, alignment));
+      }
+      return reqt;
+    }
+
     // Base class constraints are introduced by a class type mangling, which
     // will begin with either 'C' or 'S'.
     if (!Mangled)
@@ -1704,14 +1767,6 @@ private:
       NodePointer stdlib = NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
       return makeAssociatedType(stdlib);
     }
-    if (Mangled.nextIf('d')) {
-      Node::IndexType depth, index;
-      if (!demangleIndex(depth))
-        return nullptr;
-      if (!demangleIndex(index))
-        return nullptr;
-      return demangleArchetypeRef(depth + 1, index);
-    }
     if (Mangled.nextIf('q')) {
       NodePointer index = demangleIndexAsNode();
       if (!index)
@@ -1726,10 +1781,7 @@ private:
       qual_atype->addChild(decl_ctx);
       return qual_atype;
     }
-    Node::IndexType index;
-    if (!demangleIndex(index))
-      return nullptr;
-    return demangleArchetypeRef(0, index);
+    return nullptr;
   }
 
   NodePointer demangleTuple(IsVariadic isV) {
@@ -1913,6 +1965,50 @@ private:
           return nullptr;
         NodePointer boxType = NodeFactory::create(Node::Kind::SILBoxType);
         boxType->addChild(type);
+        return boxType;
+      }
+      if (Mangled.nextIf('B')) {
+        NodePointer signature;
+        if (Mangled.nextIf('G')) {
+          signature = demangleGenericSignature(/*pseudogeneric*/ false);
+          if (!signature)
+            return nullptr;
+        }
+        NodePointer layout = NodeFactory::create(Node::Kind::SILBoxLayout);
+        while (!Mangled.nextIf('_')) {
+          Node::Kind kind;
+          if (Mangled.nextIf('m'))
+            kind = Node::Kind::SILBoxMutableField;
+          else if (Mangled.nextIf('i'))
+            kind = Node::Kind::SILBoxImmutableField;
+          else
+            return nullptr;
+          
+          auto type = demangleType();
+          if (!type)
+            return nullptr;
+          auto field = NodeFactory::create(kind);
+          field->addChild(type);
+          layout->addChild(field);
+        }
+        NodePointer genericArgs;
+        if (signature) {
+          genericArgs = NodeFactory::create(Node::Kind::TypeList);
+          while (!Mangled.nextIf('_')) {
+            auto type = demangleType();
+            if (!type)
+              return nullptr;
+            genericArgs->addChild(type);
+          }
+        }
+        NodePointer boxType =
+          NodeFactory::create(Node::Kind::SILBoxTypeWithLayout);
+        boxType->addChild(layout);
+        if (signature) {
+          boxType->addChild(signature);
+          assert(genericArgs);
+          boxType->addChild(genericArgs);
+        }
         return boxType;
       }
     }
@@ -2336,7 +2432,6 @@ private:
   bool isSimpleType(NodePointer pointer) {
     switch (pointer->getKind()) {
     case Node::Kind::Archetype:
-    case Node::Kind::ArchetypeRef:
     case Node::Kind::AssociatedType:
     case Node::Kind::AssociatedTypeRef:
     case Node::Kind::BoundGenericClass:
@@ -2359,6 +2454,7 @@ private:
     case Node::Kind::QualifiedArchetype:
     case Node::Kind::ReturnType:
     case Node::Kind::SILBoxType:
+    case Node::Kind::SILBoxTypeWithLayout:
     case Node::Kind::Structure:
     case Node::Kind::TupleElementName:
     case Node::Kind::Type:
@@ -2387,6 +2483,7 @@ private:
     case Node::Kind::DependentGenericSignature:
     case Node::Kind::DependentGenericParamCount:
     case Node::Kind::DependentGenericConformanceRequirement:
+    case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericSameTypeRequirement:
     case Node::Kind::DependentPseudogenericSignature:
     case Node::Kind::Destructor:
@@ -2406,6 +2503,8 @@ private:
     case Node::Kind::FunctionType:
     case Node::Kind::GenericProtocolWitnessTable:
     case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
+    case Node::Kind::GenericPartialSpecialization:
+    case Node::Kind::GenericPartialSpecializationNotReAbstracted:
     case Node::Kind::GenericSpecialization:
     case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericSpecializationParam:
@@ -2456,6 +2555,9 @@ private:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::Setter:
+    case Node::Kind::SILBoxLayout:
+    case Node::Kind::SILBoxMutableField:
+    case Node::Kind::SILBoxImmutableField:
     case Node::Kind::SpecializationIsFragile:
     case Node::Kind::SpecializationPassID:
     case Node::Kind::Static:
@@ -2483,10 +2585,13 @@ private:
     case Node::Kind::ReflectionMetadataFieldDescriptor:
     case Node::Kind::ReflectionMetadataAssocTypeDescriptor:
     case Node::Kind::ReflectionMetadataSuperclassDescriptor:
+    case Node::Kind::GenericTypeParamDecl:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
     case Node::Kind::VariadicMarker:
+    case Node::Kind::OutlinedCopy:
+    case Node::Kind::OutlinedConsume:
       return false;
     }
     unreachable("bad node kind");
@@ -2665,6 +2770,9 @@ private:
 
   unsigned printFunctionSigSpecializationParam(NodePointer pointer,
                                                unsigned Idx);
+
+  void printSpecializationPrefix(NodePointer node, StringRef Description,
+                                 StringRef ParamPrefix = StringRef());
 };
 } // end anonymous namespace
 
@@ -2748,6 +2856,41 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer pointer,
       "Invalid OptionSet");
   print(pointer->getChild(Idx++));
   return Idx;
+}
+
+void NodePrinter::printSpecializationPrefix(NodePointer node,
+                                            StringRef Description,
+                                            StringRef ParamPrefix) {
+  if (!Options.DisplayGenericSpecializations) {
+    Printer << "specialized ";
+    return;
+  }
+  Printer << Description << " <";
+  const char *Separator = "";
+  for (unsigned i = 0, e = node->getNumChildren(); i < e; ++i) {
+    switch (node->getChild(i)->getKind()) {
+      case Node::Kind::SpecializationPassID:
+        // We skip the SpecializationPassID since it does not contain any
+        // information that is useful to our users.
+        break;
+
+      case Node::Kind::SpecializationIsFragile:
+        Printer << Separator;
+        Separator = ", ";
+        print(node->getChild(i));
+        break;
+
+      default:
+        // Ignore empty specializations.
+        if (node->getChild(i)->hasChildren()) {
+          Printer << Separator << ParamPrefix;
+          Separator = ", ";
+          print(node->getChild(i));
+        }
+        break;
+    }
+  }
+  Printer << "> of ";
 }
 
 static bool isClassType(NodePointer pointer) {
@@ -2880,6 +3023,14 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "curry thunk of ";
     print(pointer->getChild(0), asContext, suppressType);
     return;
+  case Node::Kind::OutlinedCopy:
+    Printer << "outlined copy of ";
+    print(pointer->getChild(0), asContext, suppressType);
+    return;
+  case Node::Kind::OutlinedConsume:
+    Printer << "outlined consume of ";
+    print(pointer->getChild(0), asContext, suppressType);
+    return;
   case Node::Kind::Directness:
     Printer << toString(Directness(pointer->getIndex())) << " ";
     return;
@@ -2899,6 +3050,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::Variable:
   case Node::Kind::Function:
   case Node::Kind::Subscript:
+  case Node::Kind::GenericTypeParamDecl:
     printEntity(true, true, "");
     return;
   case Node::Kind::ExplicitClosure:
@@ -3068,46 +3220,20 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "override ";
     return;
   case Node::Kind::FunctionSignatureSpecialization:
+    return printSpecializationPrefix(pointer,
+              "function signature specialization");
+  case Node::Kind::GenericPartialSpecialization:
+    return printSpecializationPrefix(pointer,
+              "generic partial specialization", "Signature = ");
+  case Node::Kind::GenericPartialSpecializationNotReAbstracted:
+    return printSpecializationPrefix(pointer,
+              "generic not-reabstracted partial specialization", "Signature = ");
   case Node::Kind::GenericSpecialization:
-  case Node::Kind::GenericSpecializationNotReAbstracted: {
-    if (!Options.DisplayGenericSpecializations) {
-      Printer << "specialized ";
-      return;
-    }
-    if (pointer->getKind() == Node::Kind::FunctionSignatureSpecialization) {
-      Printer << "function signature specialization <";
-    } else if (pointer->getKind() == Node::Kind::GenericSpecialization) {
-      Printer << "generic specialization <";
-    } else {
-      Printer << "generic not re-abstracted specialization <";
-    }
-    bool hasPrevious = false;
-    for (unsigned i = 0, e = pointer->getNumChildren(); i < e; ++i) {
-      auto child = pointer->getChild(i);
-
-      switch (pointer->getChild(i)->getKind()) {
-      case Node::Kind::SpecializationPassID:
-        // We skip the SpecializationPassID since it does not contain any
-        // information that is useful to our users.
-        continue;
-
-      case Node::Kind::SpecializationIsFragile:
-        break;
-
-      default:
-        // Ignore empty specializations.
-        if (!pointer->getChild(i)->hasChildren())
-          continue;
-      }
-
-      if (hasPrevious)
-        Printer << ", ";
-      print(pointer->getChild(i));
-      hasPrevious = true;
-    }
-    Printer << "> of ";
-    return;
-  }
+    return printSpecializationPrefix(pointer,
+              "generic specialization");
+  case Node::Kind::GenericSpecializationNotReAbstracted:
+    return printSpecializationPrefix(pointer,
+              "generic not re-abstracted specialization");
   case Node::Kind::SpecializationIsFragile:
     Printer << "preserving fragile attribute";
     return;
@@ -3430,9 +3556,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << pointer->getText();
     return;
   }
-  case Node::Kind::ArchetypeRef:
-    Printer << pointer->getText();
-    return;
   case Node::Kind::AssociatedTypeRef:
     print(pointer->getChild(0));
     Printer << '.' << pointer->getChild(1)->getText();
@@ -3540,12 +3663,22 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     NodePointer child0 = pointer->getChild(0);
     NodePointer child1 = pointer->getChild(1);
     NodePointer child2 = pointer->getChild(2);
-    print(child0);
-    if (Options.DisplayProtocolConformances) {
+    if (pointer->getNumChildren() == 4) {
+      // TODO: check if this is correct
+      Printer << "property behavior storage of ";
+      print(child2);
+      Printer << " in ";
+      print(child0);
       Printer << " : ";
       print(child1);
-      Printer << " in ";
-      print(child2);
+    } else {
+      print(child0);
+      if (Options.DisplayProtocolConformances) {
+        Printer << " : ";
+        print(child1);
+        Printer << " in ";
+        print(child2);
+      }
     }
     return;
   }
@@ -3622,6 +3755,40 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     print(reqt);
     return;
   }
+  case Node::Kind::DependentGenericLayoutRequirement: {
+    NodePointer type = pointer->getChild(0);
+    NodePointer layout = pointer->getChild(1);
+    print(type);
+    Printer << ": ";
+    assert(layout->getKind() == Node::Kind::Identifier);
+    assert(layout->getText().size() == 1);
+    char c = layout->getText()[0];
+    StringRef name;
+    if (c == 'U') {
+      name = "_UnknownLayout";
+    } else if (c == 'R') {
+      name = "_RefCountedObject";
+    } else if (c == 'N') {
+      name = "_NativeRefCountedObject";
+    } else if (c == 'T') {
+      name = "_Trivial";
+    } else if (c == 'E' || c == 'e') {
+      name = "_Trivial";
+    } else if (c == 'M' || c == 'm') {
+      name = "_TrivialAtMost";
+    }
+    Printer << name;
+    if (pointer->getNumChildren() > 2) {
+      Printer << "(";
+      print(pointer->getChild(2));
+      if (pointer->getNumChildren() > 3) {
+        Printer << ", ";
+        print(pointer->getChild(3));
+      }
+      Printer << ")";
+    }
+    return;
+  }
   case Node::Kind::DependentGenericSameTypeRequirement: {
     NodePointer fst = pointer->getChild(0);
     NodePointer snd = pointer->getChild(1);
@@ -3683,6 +3850,51 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::VariadicMarker:
     Printer << " variadic-marker ";
+    return;
+  case Node::Kind::SILBoxTypeWithLayout: {
+    assert(pointer->getNumChildren() == 1 || pointer->getNumChildren() == 3);
+    NodePointer layout = pointer->getChild(0);
+    assert(layout->getKind() == Node::Kind::SILBoxLayout);
+    NodePointer signature, genericArgs;
+    if (pointer->getNumChildren() == 3) {
+      signature = pointer->getChild(1);
+      assert(signature->getKind() == Node::Kind::DependentGenericSignature);
+      genericArgs = pointer->getChild(2);
+      assert(signature->getKind() == Node::Kind::TypeList);
+      
+      print(signature);
+      Printer << ' ';
+    }
+    print(layout);
+    if (genericArgs) {
+      Printer << " <";
+      for (unsigned i = 0, e = genericArgs->getNumChildren(); i < e; ++i) {
+        if (i > 0)
+          Printer << ", ";
+        print(genericArgs->getChild(i));
+      }
+      Printer << '>';
+    }
+    return;
+  }
+  case Node::Kind::SILBoxLayout:
+    Printer << '{';
+    for (unsigned i = 0; i < pointer->getNumChildren(); ++i) {
+      if (i > 0)
+        Printer << ',';
+      Printer << ' ';
+      print(pointer->getChild(i));
+    }
+    Printer << " }";
+    return;
+  case Node::Kind::SILBoxImmutableField:
+  case Node::Kind::SILBoxMutableField:
+    Printer << (pointer->getKind() == Node::Kind::SILBoxImmutableField
+      ? "let "
+      : "var ");
+    assert(pointer->getNumChildren() == 1
+           && pointer->getChild(0)->getKind() == Node::Kind::Type);
+    print(pointer->getChild(0));
     return;
   }
   unreachable("bad node kind!");

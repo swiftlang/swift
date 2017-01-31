@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -67,7 +67,7 @@ protected:
   }
 };
 
-} // End anonymous namespace.
+} // end anonymous namespace
 
 void LoopCloner::cloneLoop() {
   auto *Header = Loop->getHeader();
@@ -83,8 +83,8 @@ void LoopCloner::cloneLoop() {
 
   // Clone the arguments.
   for (auto *Arg : Header->getArguments()) {
-    SILValue MappedArg =
-        ClonedHeader->createArgument(getOpType(Arg->getType()));
+    SILValue MappedArg = ClonedHeader->createPHIArgument(
+        getOpType(Arg->getType()), ValueOwnershipKind::Owned);
     ValueMap.insert(std::make_pair(Arg, MappedArg));
   }
 
@@ -122,7 +122,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
 
   // Match an add 1 recurrence.
-  SILArgument *RecArg;
+  SILPHIArgument *RecArg;
   IntegerLiteralInst *End;
   SILValue RecNext;
 
@@ -132,7 +132,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
   if (!match(RecNext,
              m_TupleExtractInst(m_ApplyInst(BuiltinValueKind::SAddOver,
-                                            m_SILArgument(RecArg), m_One()),
+                                            m_SILPHIArgument(RecArg), m_One()),
                                 0)))
     return None;
 
@@ -457,7 +457,7 @@ class LoopUnrolling : public SILFunctionTransform {
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 SILTransform *swift::createLoopUnroll() {
   return new LoopUnrolling();

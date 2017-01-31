@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -102,11 +102,9 @@ updated without updating swift.py?")
     @property
     def _sil_ownership_flags(self):
         if not self.args.enable_sil_ownership:
-            return []
+            return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE"]
         return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE"]
 
     @property
     def _compile_db_flags(self):
-        if not self.args.compilation_db:
-            return []
         return ['-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE']

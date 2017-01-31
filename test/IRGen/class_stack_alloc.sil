@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -30,7 +30,7 @@ sil_vtable BigClass {}
 
 // CHECK-LABEL: define{{( protected)?}} void @simple_promote
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
-// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_TMa[[C]]()
+// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_T017class_stack_alloc9TestClassCMa()
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
@@ -81,7 +81,7 @@ bb0:
 
 // CHECK-LABEL: define{{( protected)?}} void @promoted_with_devirtualized_release
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
-// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_TMa[[C]]()
+// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_T017class_stack_alloc9TestClassCMa()
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
@@ -104,7 +104,7 @@ bb0:
 
 // CHECK-LABEL: define{{( protected)?}} void @promoted_with_inlined_devirtualized_release
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
-// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_TMa[[C]]()
+// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_T017class_stack_alloc9TestClassCMa()
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*

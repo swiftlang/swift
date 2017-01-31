@@ -1,5 +1,4 @@
 // RUN: not %target-sil-opt %s
-// REQUIRES: asserts
 protocol a
 protocol a{typealias b=a
 typealias b=c

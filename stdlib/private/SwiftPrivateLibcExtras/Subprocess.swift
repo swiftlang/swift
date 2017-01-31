@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,7 +13,7 @@
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
 import Glibc
 #endif
 
@@ -264,13 +264,23 @@ public enum ProcessTerminationStatus : CustomStringConvertible {
 
 public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
   var status: CInt = 0
+#if CYGWIN
+  withUnsafeMutablePointer(to: &status) {
+    statusPtr in
+    let statusPtrWrapper = __wait_status_ptr_t(__int_ptr: statusPtr)
+    if waitpid(pid, statusPtrWrapper, 0) < 0 {
+      preconditionFailure("waitpid() failed")
+    }
+  }
+#else
   if waitpid(pid, &status, 0) < 0 {
     preconditionFailure("waitpid() failed")
   }
-  if (WIFEXITED(status)) {
+#endif
+  if WIFEXITED(status) {
     return .exit(Int(WEXITSTATUS(status)))
   }
-  if (WIFSIGNALED(status)) {
+  if WIFSIGNALED(status) {
     return .signal(Int(WTERMSIG(status)))
   }
   preconditionFailure("did not understand what happened to child process")
@@ -289,6 +299,8 @@ internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?
 #elseif os(PS4)
   return environ
 #elseif os(Android)
+  return environ
+#elseif CYGWIN
   return environ
 #else
   return __environ

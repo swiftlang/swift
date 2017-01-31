@@ -1,0 +1,49 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: rm -rfv %t
+// RUN: mkdir %t
+// FIXME: <rdar://problem/29281364> sil-opt -verify is broken
+// RUN: %target-sil-opt %s -enable-sil-opaque-values -emit-sib -o %t/tmp.sib -module-name opaqueval
+// RUN: %target-sil-opt %t/tmp.sib -enable-sil-opaque-values -verify -o %t/tmp.2.sib -module-name opaqueval
+// RUN: %target-sil-opt %t/tmp.2.sib -enable-sil-opaque-values -emit-sorted-sil -verify -module-name opaqueval | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// Test @in/@out serialization.
+// ----
+
+// CHECK-LABEL: sil hidden @serialize_identity : $@convention(thin) <T> (@in T) -> @out T {
+sil hidden @serialize_identity : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0(%0 : $T):
+bb0(%0 : $T):
+  // CHECK: return %0 : $T
+  return %0 : $T
+}
+// CHECK-LABEL: } // end sil function 'serialize_identity'
+
+// Test @in_guaranteed serialization.
+// ----
+
+protocol Foo {
+  func foo()
+}
+
+struct S : Foo {
+  func foo()
+  init()
+}
+
+sil @doWithS : $@convention(method) (S) -> ()
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @serialize_mutating : $@convention(witness_method) (@in_guaranteed S) -> () {
+sil hidden [transparent] [thunk] @serialize_mutating : $@convention(witness_method) (@in_guaranteed S) -> () {
+// CHECK: bb0(%0 : $S):
+bb0(%0 : $S):
+  %f = function_ref @doWithS : $@convention(method) (S) -> ()
+  // CHECK: apply %{{.*}}(%0) : $@convention(method) (S) -> ()
+  %a = apply %f(%0) : $@convention(method) (S) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+// CHECK-LABEL: } // end sil function 'serialize_mutating'

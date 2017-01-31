@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -208,13 +208,24 @@ public:
   /// Bind the given type variable to the given fixed type.
   void bindTypeVariable(TypeVariableType *typeVar, Type fixedType);
 
+  /// Describes which constraints \c gatherConstraints should gather.
+  enum class GatheringKind {
+    /// Gather constraints associated with all of the variables within the
+    /// same equivalence class as the given type variable.
+    EquivalenceClass,
+    /// Gather all constraints that mention this type variable or type variables
+    /// that it is equivalent to.
+    AllMentions,
+  };
+
   /// Gather the set of constraints that involve the given type variable,
   /// i.e., those constraints that will be affected when the type variable
   /// gets merged or bound to a fixed type.
   ///
   /// The resulting set of constraints may contain duplicates.
   void gatherConstraints(TypeVariableType *typeVar,
-                         SmallVectorImpl<Constraint *> &constraints);
+                         SmallVectorImpl<Constraint *> &constraints,
+                         GatheringKind kind);
 
   /// Retrieve the type variables that correspond to nodes in the graph.
   ///
@@ -371,7 +382,7 @@ private:
   friend class ConstraintGraphScope;
 };
 
-} // end namespace swift::constraints
+} // end namespace constraints
 
 } // end namespace swift
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -72,7 +72,7 @@ namespace {
       return 0;
     }
   };
-}
+} // end anonymous namespace
 
 struct TypeMetadataState {
   ConcurrentMap<TypeMetadataCacheEntry> Cache;
@@ -231,7 +231,6 @@ _typeByMangledName(const llvm::StringRef typeName) {
 /// by swift_getTypeName() is non-unique, so we used mangled names
 /// internally.
 SWIFT_RUNTIME_EXPORT
-extern "C"
 const Metadata *
 swift_getTypeByMangledName(const char *typeName, size_t typeNameLength) {
   llvm::StringRef name(typeName, typeNameLength);

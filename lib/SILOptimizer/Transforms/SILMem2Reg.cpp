@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -86,18 +86,18 @@ public:
   /// C'tor.
   StackAllocationPromoter(AllocStackInst *Asi, DominanceInfo *Di,
                           DomTreeLevelMap &DomTreeLevels, SILBuilder &B)
-      : ASI(Asi), DSI(0), DT(Di), DomTreeLevels(DomTreeLevels), B(B) {
-        // Scan the users in search of a deallocation instruction.
-        for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
-          if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
-            // Don't record multiple dealloc instructions.
-            if (DSI) {
-              DSI = 0;
-              break;
-            }
-            // Record the deallocation instruction.
-            DSI = D;
-          }
+      : ASI(Asi), DSI(nullptr), DT(Di), DomTreeLevels(DomTreeLevels), B(B) {
+    // Scan the users in search of a deallocation instruction.
+    for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
+      if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
+        // Don't record multiple dealloc instructions.
+        if (DSI) {
+          DSI = nullptr;
+          break;
+        }
+        // Record the deallocation instruction.
+        DSI = D;
+      }
       }
 
   /// Promote the Allocation.
@@ -173,7 +173,7 @@ public:
   bool run();
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 /// Returns true if \p I is an address of a LoadInst, skipping struct and
 /// tuple address projections. Sets \p singleBlock to null if the load (or
@@ -505,6 +505,15 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
         break;
       }
     }
+
+    // Remove dead address instructions that may be uses of the allocation.
+    while (Inst->use_empty() && (isa<StructElementAddrInst>(Inst) ||
+                                 isa<TupleElementAddrInst>(Inst))) {
+      SILValue Next = Inst->getOperand(0);
+      Inst->eraseFromParent();
+      NumInstRemoved++;
+      Inst = cast<SILInstruction>(Next);
+    }
   }
 }
 
@@ -512,7 +521,7 @@ void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
   DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
   for (auto *Block : PhiBlocks)
-    Block->createArgument(ASI->getElementType());
+    Block->createPHIArgument(ASI->getElementType(), ValueOwnershipKind::Owned);
 }
 
 SILValue

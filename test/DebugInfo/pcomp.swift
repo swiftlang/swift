@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -10,7 +10,7 @@ protocol B {
   func y()
 }
 
-// CHECK-DAG: _TtP5pcomp1AS_1B_
+// CHECK-DAG: _T05pcomp1A_AA1Bp
 func f(_ arg : A & B) {
 }
 
@@ -28,7 +28,7 @@ class SomeOtherClass : SomeClass {
   override func f() -> Int64 { return 1 }
 }
 // This is an indirect value.
-// CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "SomeProto",{{.*}} identifier: "_TtP5pcomp9SomeProto_"
+// CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "SomeProto",{{.*}} identifier: "_T05pcomp9SomeProto_pD"
 func main() {
   var p : SomeProto = SomeOtherClass()
   markUsed("\(p.f())")

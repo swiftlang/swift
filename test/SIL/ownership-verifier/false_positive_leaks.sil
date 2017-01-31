@@ -1,0 +1,139 @@
+// RUN: %target-sil-opt -module-name Swift -enable-sil-ownership -enable-sil-verify-all=0 -o /dev/null 2>&1  %s
+// REQUIRES: asserts
+
+// This file is meant to contain dataflow tests that if they fail are false
+// positives.
+
+//////////////////
+// Declarations //
+//////////////////
+
+sil_stage canonical
+
+import Builtin
+
+sil @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+protocol Error {}
+sil @error_func : $@convention(thin) () -> (Builtin.Int32, @error Error)
+sil @allocate_object : $@convention(thin) () -> (@owned Builtin.NativeObject)
+
+///////////
+// Tests //
+///////////
+
+sil @leak_loop_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = begin_borrow %0 : $Builtin.NativeObject
+  store_borrow %2 to %1 : $*Builtin.NativeObject
+  %3 = function_ref @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %3(%1) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb5
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb1
+
+bb4:
+  br bb1
+
+bb5:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This test makes sure in the context of arguments, that if we have one
+// lifetime ending user and that lifetime ending user is in the same block as
+// the producer, we do not consider the predecessor blocks where our value is
+// not defined. In the following test case, the bad predecessor is bb0.
+sil @single_block_consume_with_arg_and_unreachable : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @error_func : $@convention(thin) () -> (Builtin.Int32, @error Error)
+  try_apply %0() : $@convention(thin) () -> (Builtin.Int32, @error Error), normal bb1, error bb2
+
+bb1(%2 : @trivial $Builtin.Int32):
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2(%3 : @owned $Error):
+  destroy_value %3 : $Error
+  unreachable
+}
+
+// This test makes sure in the context of instructions that produce new owned
+// values, that if we have one lifetime ending user and that lifetime ending
+// user is in the same block as the producer, we do not consider the predecessor
+// blocks where our value is not defined. In the following test case, the bad
+// predecessor is bb0.
+sil @single_block_consume_with_allocated_arg_and_unreachable : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2:
+  %0 = function_ref @allocate_object : $@convention(thin) () -> (@owned Builtin.NativeObject)
+  %1 = apply %0() : $@convention(thin) () -> (@owned Builtin.NativeObject)
+  destroy_value %1 : $Builtin.NativeObject
+  unreachable
+}
+
+// This test makes sure in the context of instructions in a diamond that produce
+// new owned values, that if we have one lifetime ending user and that lifetime
+// ending user is in the same block as the producer, we do not consider the
+// predecessor blocks where our value is not defined. In the following test
+// case, the bad predecessor is bb0.
+sil @single_block_consume_with_diamond : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %0 = function_ref @allocate_object : $@convention(thin) () -> (@owned Builtin.NativeObject)
+  %1 = apply %0() : $@convention(thin) () -> (@owned Builtin.NativeObject)
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This test makes sure that we do not consider successors of our lifetime
+// ending users as successors that we must visit. The target block is bb4.
+sil @multiple_block_consume_with_diamond : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb4
+
+bb1:
+  %0 = function_ref @allocate_object : $@convention(thin) () -> (@owned Builtin.NativeObject)
+  %1 = apply %0() : $@convention(thin) () -> (@owned Builtin.NativeObject)
+  cond_br undef, bb2, bb3
+
+bb2:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb5
+
+bb3:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb4
+
+bb4:
+  br bb5
+
+bb5:
+  %9999 = tuple()
+  return %9999 : $()
+}

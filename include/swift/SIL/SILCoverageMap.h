@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -67,17 +67,11 @@ private:
   // The coverage hash of the function covered by this mapping.
   uint64_t Hash;
 
-  // The number of mapped regions.
-  unsigned NumMappedRegions;
-
-  // The number of counter expressions.
-  unsigned NumExpressions;
-
   // Tail-allocated region mappings.
-  MappedRegion *MappedRegions;
+  MutableArrayRef<MappedRegion> MappedRegions;
 
   // Tail-allocated expression list.
-  llvm::coverage::CounterExpression *Expressions;
+  MutableArrayRef<llvm::coverage::CounterExpression> Expressions;
 
   // Disallow copying into temporary objects.
   SILCoverageMap(const SILCoverageMap &other) = delete;
@@ -107,13 +101,11 @@ public:
   uint64_t getHash() const { return Hash; }
 
   /// Return all of the mapped regions.
-  ArrayRef<MappedRegion> getMappedRegions() const {
-    return {MappedRegions, NumMappedRegions};
-  }
+  ArrayRef<MappedRegion> getMappedRegions() const { return MappedRegions; }
 
   /// Return all of the counter expressions.
   ArrayRef<llvm::coverage::CounterExpression> getExpressions() const {
-    return {Expressions, NumExpressions};
+    return Expressions;
   }
 
   void printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C) const;

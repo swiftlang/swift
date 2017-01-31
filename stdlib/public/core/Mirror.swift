@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -748,7 +748,7 @@ public protocol _DefaultCustomPlaygroundQuickLookable {
 /// `DictionaryLiteral`. In particular, to find the value matching a key, you
 /// must search through every element of the collection. The call to
 /// `index(where:)` in the following example must traverse the whole
-/// collection to make sure that no element matches the given predicate:
+/// collection to find the element that matches the predicate:
 ///
 ///     let runner = "Marlies Gohr"
 ///     if let index = recordTimes.index(where: { $0.0 == runner }) {
@@ -817,7 +817,7 @@ extension DictionaryLiteral : RandomAccessCollection {
   /// `startIndex`.
   public var endIndex: Int { return _elements.endIndex }
 
-  // FIXME: a typealias is needed to prevent <rdar://20248032>
+  // FIXME(ABI)#174 (Type checker): a typealias is needed to prevent <rdar://20248032>
   /// The element type of a `DictionaryLiteral`: a tuple containing an
   /// individual key-value pair.
   public typealias Element = (key: Key, value: Value)

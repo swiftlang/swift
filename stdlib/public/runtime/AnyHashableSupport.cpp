@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -123,7 +123,7 @@ const Metadata *swift::hashable_support::findHashableBaseType(
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void _swift_stdlib_makeAnyHashableUsingDefaultRepresentation(
+void _swift_stdlib_makeAnyHashableUsingDefaultRepresentation(
   const OpaqueValue *value,
   const void *anyHashableResultPointer,
   const Metadata *T,
@@ -131,7 +131,7 @@ extern "C" void _swift_stdlib_makeAnyHashableUsingDefaultRepresentation(
 );
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
+void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
   OpaqueValue *value,
   const void *anyHashableResultPointer,
   const Metadata *type,

@@ -1,13 +1,13 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 struct A {
         func g<U>(_ recur: (A, U) -> U) -> (A, U) -> U {
                 return { _, x in return x }
         }
-        // CHECK-LABEL: sil hidden @_TFV24call_chain_reabstraction1A1f
-        // CHECK:         [[G:%.*]] = function_ref @_TFV24call_chain_reabstraction1A1g
+        // CHECK-LABEL: sil hidden @_T024call_chain_reabstraction1AV1f{{[_0-9a-zA-Z]*}}F
+        // CHECK:         [[G:%.*]] = function_ref @_T024call_chain_reabstraction1AV1g{{[_0-9a-zA-Z]*}}F
         // CHECK:         [[G2:%.*]] = apply [[G]]<A>
-        // CHECK:         [[REABSTRACT_THUNK:%.*]] = function_ref @_TTRXFo_dV24call_chain_reabstraction1AiS0__iS0__XFo_dS0_dS0__dS0__
+        // CHECK:         [[REABSTRACT_THUNK:%.*]] = function_ref @_T024call_chain_reabstraction1AVAcCIxyir_AccCIxyyd_TR
         // CHECK:         [[REABSTRACT:%.*]] = partial_apply [[REABSTRACT_THUNK]]([[G2]])
         // CHECK:         apply [[REABSTRACT]]([[SELF:%.*]], [[SELF]])
         func f() {

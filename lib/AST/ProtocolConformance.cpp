@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -162,7 +162,7 @@ ProtocolConformance::getTypeWitnessByName(Type type,
   // For an archetype, retrieve the nested type with the appropriate
   // name. There are no conformance tables.
   if (auto archetype = type->getAs<ArchetypeType>()) {
-    return archetype->getNestedTypeValue(name);
+    return archetype->getNestedType(name);
   }
 
   // Find the named requirement.
@@ -221,6 +221,8 @@ GenericEnvironment *ProtocolConformance::getGenericEnvironment() const {
     // FIXME: We could return a meaningful GenericEnvironment here
     return nullptr;
   }
+
+  llvm_unreachable("Unhandled ProtocolConformanceKind in switch.");
 }
 
 GenericSignature *ProtocolConformance::getGenericSignature() const {
@@ -237,6 +239,8 @@ GenericSignature *ProtocolConformance::getGenericSignature() const {
     // type variables.
     return nullptr;
   }
+
+  llvm_unreachable("Unhandled ProtocolConformanceKind in switch.");
 }
 
 bool ProtocolConformance::isBehaviorConformance() const {
@@ -414,8 +418,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
     assert((conforms ||
             specializedType->isTypeVariableOrMember() ||
             specializedType->isTypeParameter() ||
-            specializedType->hasError() ||
-            specializedType->getCanonicalType()->hasError()) &&
+            specializedType->hasError()) &&
            "Improperly checked substitution");
     conformances.push_back(conforms ? *conforms 
                                     : ProtocolConformanceRef(proto));
@@ -462,9 +465,10 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
   return true;
 }
 
-ProtocolConformance *ProtocolConformance::subst(Module *module,
-                                      Type substType,
-                                      const SubstitutionMap &subMap) const {
+ProtocolConformance *ProtocolConformance::subst(ModuleDecl *module,
+                                       Type substType,
+                                       TypeSubstitutionFn subs,
+                                       LookupConformanceFn conformances) const {
   if (getType()->isEqual(substType))
     return const_cast<ProtocolConformance *>(this);
   
@@ -476,7 +480,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
       assert(getType()->getNominalOrBoundGenericNominal()
                == substType->getNominalOrBoundGenericNominal()
              && "substitution mapped to different nominal?!");
-      return module->getASTContext()
+      return substType->getASTContext()
         .getSpecializedConformance(substType,
                            const_cast<ProtocolConformance *>(this),
                            substType->gatherAllSubstitutions(module, nullptr));
@@ -491,12 +495,13 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
     ProtocolConformance *newBase;
     if (inheritedConformance->getType()->isSpecialized()) {
-      newBase = inheritedConformance->subst(module, substType, subMap);
+      newBase = inheritedConformance->subst(module, substType,
+                                            subs, conformances);
     } else {
       newBase = inheritedConformance;
     }
 
-    return module->getASTContext()
+    return substType->getASTContext()
       .getInheritedConformance(substType, newBase);
   }
   case ProtocolConformanceKind::Specialized: {
@@ -505,11 +510,11 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
     SmallVector<Substitution, 8> newSubs;
     newSubs.reserve(spec->getGenericSubstitutions().size());
     for (auto &sub : spec->getGenericSubstitutions())
-      newSubs.push_back(sub.subst(module, subMap));
+      newSubs.push_back(sub.subst(module, subs, conformances));
     
-    auto ctxNewSubs = module->getASTContext().AllocateCopy(newSubs);
+    auto ctxNewSubs = substType->getASTContext().AllocateCopy(newSubs);
     
-    return module->getASTContext()
+    return substType->getASTContext()
       .getSpecializedConformance(substType, spec->getGenericConformance(),
                                  ctxNewSubs);
   }
@@ -539,7 +544,9 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
 
     auto subMap = env->getSubstitutionMap(conformingModule, subs);
 
-    auto r = inherited->subst(conformingModule, getType(), subMap);
+    auto r = inherited->subst(conformingModule, getType(),
+                              QueryTypeSubstitutionMap{subMap.getMap()},
+                              LookUpConformanceInSubstitutionMap(subMap));
     assert(getType()->isEqual(r->getType())
            && "substitution didn't produce conformance for same type?!");
     return r;
@@ -645,7 +652,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
 }
 
 bool NominalTypeDecl::lookupConformance(
-       Module *module, ProtocolDecl *protocol,
+       ModuleDecl *module, ProtocolDecl *protocol,
        SmallVectorImpl<ProtocolConformance *> &conformances) const {
   prepareConformanceTable();
   return ConformanceTable->lookupConformance(

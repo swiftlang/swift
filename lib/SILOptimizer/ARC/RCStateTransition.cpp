@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -53,10 +53,9 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
   case ValueKind::ReleaseValueInst:
     return RCStateTransitionKind::StrongDecrement;
 
-  case ValueKind::SILArgument: {
-    auto *Arg = cast<SILArgument>(V);
-    if (Arg->isFunctionArg() &&
-        Arg->hasConvention(SILArgumentConvention::Direct_Owned))
+  case ValueKind::SILFunctionArgument: {
+    auto *Arg = cast<SILFunctionArgument>(V);
+    if (Arg->hasConvention(SILArgumentConvention::Direct_Owned))
       return RCStateTransitionKind::StrongEntrance;
     return RCStateTransitionKind::Unknown;
   }
@@ -72,7 +71,7 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
     // TODO: When we support pairing retains with @owned parameters, we will
     // need to be able to handle the potential of multiple state transition
     // kinds.
-    for (auto result : AI->getSubstCalleeType()->getDirectResults()) {
+    for (auto result : AI->getSubstCalleeConv().getDirectSILResults()) {
       if (result.getConvention() == ResultConvention::Owned)
         return RCStateTransitionKind::StrongEntrance;
     }

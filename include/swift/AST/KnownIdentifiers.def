@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -43,6 +43,7 @@ IDENTIFIER(Foundation)
 IDENTIFIER(fromRaw)
 IDENTIFIER(hashValue)
 IDENTIFIER(init)
+IDENTIFIER(initialize)
 IDENTIFIER(initStorage)
 IDENTIFIER(initialValue)
 IDENTIFIER(Key)
@@ -76,6 +77,13 @@ IDENTIFIER(Value)
 IDENTIFIER(value)
 IDENTIFIER_WITH_NAME(value_, "_value")
 IDENTIFIER(with)
+
+// Kinds of layout constraints
+IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")
+IDENTIFIER_WITH_NAME(TrivialLayout, "_Trivial")
+IDENTIFIER_WITH_NAME(TrivialAtMostLayout, "_TrivialAtMost")
+IDENTIFIER_WITH_NAME(RefCountedObjectLayout, "_RefCountedObject")
+IDENTIFIER_WITH_NAME(NativeRefCountedObjectLayout, "_NativeRefCountedObject")
 
 // Operators
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")

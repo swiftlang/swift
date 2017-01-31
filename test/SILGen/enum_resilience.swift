@@ -1,11 +1,14 @@
-// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-silgen -enable-resilience %s | %FileCheck %s
+// RUN: rm -rf %t && mkdir %t
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -I %t -emit-silgen -enable-resilience %s | %FileCheck %s
 
 import resilient_enum
 
 // Resilient enums are always address-only, and switches must include
 // a default case
 
-// CHECK-LABEL: sil hidden @_TF15enum_resilience15resilientSwitchFO14resilient_enum6MediumT_ : $@convention(thin) (@in Medium) -> ()
+// CHECK-LABEL: sil hidden @_T015enum_resilience15resilientSwitchy0c1_A06MediumOF : $@convention(thin) (@in Medium) -> ()
 // CHECK:         [[BOX:%.*]] = alloc_stack $Medium
 // CHECK-NEXT:    copy_addr %0 to [initialization] [[BOX]]
 // CHECK-NEXT:    switch_enum_addr [[BOX]] : $*Medium, case #Medium.Paper!enumelt: bb1, case #Medium.Canvas!enumelt: bb2, case #Medium.Pamphlet!enumelt.1: bb3, case #Medium.Postcard!enumelt.1: bb4, default bb5
@@ -47,5 +50,5 @@ func resilientSwitch(_ m: Medium) {
 // as part of the value, so we cannot resiliently make assumptions about the
 // enum's size
 
-// CHECK-LABEL: sil hidden @_TF15enum_resilience21indirectResilientEnumFO14resilient_enum16IndirectApproachT_ : $@convention(thin) (@in IndirectApproach) -> ()
+// CHECK-LABEL: sil hidden @_T015enum_resilience21indirectResilientEnumy010resilient_A016IndirectApproachOF : $@convention(thin) (@in IndirectApproach) -> ()
 func indirectResilientEnum(_ ia: IndirectApproach) {}

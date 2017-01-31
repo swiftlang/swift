@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -82,9 +82,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d.count)
-    d.enumerateKeysAndObjects({
-      (anyKey: Any, anyValue: Any,
-       stop: UnsafeMutablePointer<ObjCBool>) in
+    d.enumerateKeysAndObjects({ (anyKey: Any, anyValue: Any, _) in
       let anyObjectKey = anyKey as AnyObject
       let anyObjectValue = anyValue as AnyObject
       builder.add(
@@ -130,9 +128,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d!.count)
-    d!.enumerateKeysAndObjects({
-      (anyKey: Any, anyValue: Any,
-       stop: UnsafeMutablePointer<ObjCBool>) in
+    d!.enumerateKeysAndObjects({ (anyKey: Any, anyValue: Any, _) in
       builder.add(
           key: Swift._forceBridgeFromObjectiveC(anyKey as AnyObject, Key.self),
           value: Swift._forceBridgeFromObjectiveC(anyValue as AnyObject, Value.self))
@@ -209,8 +205,8 @@ extension NSDictionary {
   /// Initializes a newly allocated dictionary and adds to it objects from
   /// another given dictionary.
   ///
-  /// - Returns: An initialized dictionary—which might be different
-  ///   than the original receiver—containing the keys and values
+  /// - Returns: An initialized dictionary--which might be different
+  ///   than the original receiver--containing the keys and values
   ///   found in `otherDictionary`.
   @objc(_swiftInitWithDictionary_NSDictionary:)
   public convenience init(dictionary otherDictionary: NSDictionary) {

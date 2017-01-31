@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -28,19 +28,18 @@ using namespace constraints;
 // Constraint solver statistics
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "Constraint solver overall"
-#define JOIN(X,Y) JOIN2(X,Y)
 #define JOIN2(X,Y) X##Y
 STATISTIC(NumSolutionAttempts, "# of solution attempts");
 STATISTIC(TotalNumTypeVariables, "# of type variables created");
 
 #define CS_STATISTIC(Name, Description) \
-  STATISTIC(JOIN2(Overall,Name), Description);
+  STATISTIC(Overall##Name, Description);
 #include "ConstraintSolverStats.def"
 
 #undef DEBUG_TYPE
 #define DEBUG_TYPE "Constraint solver largest system"
 #define CS_STATISTIC(Name, Description) \
-  STATISTIC(JOIN2(Largest,Name), Description);
+  STATISTIC(Largest##Name, Description);
 #include "ConstraintSolverStats.def"
 STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 
@@ -80,7 +79,9 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
 
       // Look for a literal-conformance constraint on the type variable.
       SmallVector<Constraint *, 8> constraints;
-      cs.getConstraintGraph().gatherConstraints(bindingTypeVar, constraints);
+      cs.getConstraintGraph().gatherConstraints(
+                              bindingTypeVar, constraints,
+                              ConstraintGraph::GatheringKind::EquivalenceClass);
       for (auto constraint : constraints) {
         if (constraint->getKind() == ConstraintKind::LiteralConformsTo &&
             constraint->getProtocol()->isSpecificProtocol(
@@ -243,7 +244,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
     if (!getFixedType(binding.first) && !binding.second->hasTypeVariable())
-      assignFixedType(binding.first, binding.second, /*updateScore=*/false);
+      assignFixedType(binding.first, binding.second, /*updateState=*/false);
   }
 
   // Register overload choices.
@@ -359,7 +360,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
       }
 
       if (solverState)
-        solverState->retiredConstraints.push_front(constraint);
+        solverState->retireConstraint(constraint);
 
       CG.removeConstraint(constraint);
       break;
@@ -369,7 +370,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
         ++solverState->NumSimplifiedConstraints;
 
         // This constraint has already been solved; retire it.
-        solverState->retiredConstraints.push_front(constraint);
+        solverState->retireConstraint(constraint);
       }
 
       // Remove the constraint from the constraint graph.
@@ -470,16 +471,15 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   resolvedOverloadSets = cs.resolvedOverloadSets;
   numTypeVariables = cs.TypeVariables.size();
   numSavedBindings = cs.solverState->savedBindings.size();
-  firstRetired = cs.solverState->retiredConstraints.begin();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
-  numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
+  cs.solverState->registerScope(this);
   ++cs.solverState->NumStatesExplored;
 }
 
@@ -495,7 +495,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
                                    numSavedBindings);
 
   // Move any remaining active constraints into the inactive list.
-  while (!cs.ActiveConstraints.empty()) {
+  if (!cs.ActiveConstraints.empty()) {
     for (auto &constraint : cs.ActiveConstraints) {
       constraint.setActive(false);
     }
@@ -503,20 +503,10 @@ ConstraintSystem::SolverScope::~SolverScope() {
                                   cs.ActiveConstraints);
   }
 
-  // Add the retired constraints back into circulation.
-  cs.InactiveConstraints.splice(cs.InactiveConstraints.end(), 
-                                cs.solverState->retiredConstraints,
-                                cs.solverState->retiredConstraints.begin(),
-                                firstRetired);
-
-  // Remove any constraints that were generated here.
-  auto &generatedConstraints = cs.solverState->generatedConstraints;
-  auto genStart = generatedConstraints.begin() + numGeneratedConstraints,
-       genEnd = generatedConstraints.end();
-  for (auto genI = genStart; genI != genEnd; ++genI) {
-    cs.InactiveConstraints.erase(ConstraintList::iterator(*genI));
-  }
-  generatedConstraints.erase(genStart, genEnd);
+  // Rollback all of the changes done to constraints by the current scope,
+  // e.g. add retired constraints back to the circulation and remove generated
+  // constraints introduced by the current scope.
+  cs.solverState->rollback(this);
 
   // Remove any constraint restrictions.
   truncate(cs.ConstraintRestrictions, numConstraintRestrictions);
@@ -696,7 +686,7 @@ namespace {
       out << ")\n";
     }
   };
-}
+} // end anonymous namespace
 
 /// \brief Return whether a relational constraint between a type variable and a
 /// trivial wrapper type (autoclosure, unary tuple) should result in the type
@@ -710,7 +700,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::Subtype:
     return true;
   case ConstraintKind::Bind:
@@ -718,6 +708,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -726,6 +717,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::OptionalObject:
     return false;
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
@@ -755,7 +747,7 @@ static void findInferableTypeVars(
     explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVars)
       : typeVars(typeVars) { }
 
-    virtual Action walkToTypePre(Type ty) override {
+    Action walkToTypePre(Type ty) override {
       if (ty->is<DependentMemberType>())
         return Action::SkipChildren;
 
@@ -780,7 +772,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   // Gather the constraints associated with this type variable.
   SmallVector<Constraint *, 8> constraints;
   llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
-  cs.getConstraintGraph().gatherConstraints(typeVar, constraints);
+  cs.getConstraintGraph().gatherConstraints(
+                              typeVar, constraints,
+                              ConstraintGraph::GatheringKind::EquivalenceClass);
 
   PotentialBindings result;
   Optional<unsigned> lastSupertypeIndex;
@@ -835,7 +829,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
-    case ConstraintKind::ExplicitConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
@@ -844,14 +837,11 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // Relational constraints: break out to look for types above/below.
       break;
 
+    case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
-      // FIXME: Relational constraints for which we could perhaps do better
-      // than the default.
-      break;
-
     case ConstraintKind::DynamicTypeOf:
+    case ConstraintKind::EscapableFunctionOf:
       // Constraints from which we can't do anything.
-      // FIXME: Record this somehow?
       continue;
 
     case ConstraintKind::Defaultable:
@@ -878,6 +868,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
       SWIFT_FALLTHROUGH;
         
+    case ConstraintKind::Layout:
     case ConstraintKind::LiteralConformsTo: {
       // If there is a 'nil' literal constraint, we might need optional
       // supertype bindings.
@@ -1057,11 +1048,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
           type = funcTy->getResult();
       }
 
-      if (auto tupleTy = type->getAs<TupleType>()) {
-        if (tupleTy->getNumElements() == 1 &&
-            !tupleTy->getElement(0).isVararg())
-          type = tupleTy->getElementType(0);
-      }
+      type = type->getWithoutImmediateLabel();
     }
 
     // Don't deduce IUO types.
@@ -1258,14 +1245,9 @@ static bool tryTypeVariableBindings(
   auto &tc = cs.getTypeChecker();
   ++cs.solverState->NumTypeVariablesBound;
   
-  // If the solver has allocated an excessive amount of memory when solving for
-  // this expression, short-circuit the binding operation and mark the parent
-  // expression as "too complex".
-  if (cs.TC.Context.getSolverMemory() >
-        cs.TC.Context.LangOpts.SolverMemoryThreshold) {
-    cs.setExpressionTooComplex(true);
+  // If we've already explored a lot of potential solutions, bail.
+  if (cs.getExpressionTooComplex())
     return true;
-  }
 
   for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
     // Try each of the bindings in turn.
@@ -1467,20 +1449,45 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
 }
 
 bool ConstraintSystem::Candidate::solve() {
+  // Don't attempt to solve candidate if there is closure
+  // expression involved, because it's handled specially
+  // by parent constraint system (e.g. parameter lists).
+  bool containsClosure = false;
+  E->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+    if (isa<ClosureExpr>(childExpr)) {
+      containsClosure = true;
+      return nullptr;
+    }
+    return childExpr;
+  });
+
+  if (containsClosure)
+    return false;
+
+  auto cleanupImplicitExprs = [&](Expr *expr) {
+    expr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+      Type type = childExpr->getType();
+      if (childExpr->isImplicit() && type && type->hasTypeVariable())
+        childExpr->setType(Type());
+      return childExpr;
+    });
+  };
+
+  // Allocate new constraint system for sub-expression.
+  ConstraintSystem cs(TC, DC, None);
+
   // Cleanup after constraint system generation/solving,
   // because it would assign types to expressions, which
   // might interfere with solving higher-level expressions.
   ExprCleaner cleaner(E);
 
-  // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(TC, DC, None);
-
   // Generate constraints for the new system.
   if (auto generatedExpr = cs.generateConstraints(E)) {
     E = generatedExpr;
   } else {
-    // Failure to generate constraint system for sub-expression means we can't
-    // continue solving sub-expressions.
+    // Failure to generate constraint system for sub-expression
+    // means we can't continue solving sub-expressions.
+    cleanupImplicitExprs(E);
     return true;
   }
 
@@ -1491,7 +1498,7 @@ bool ConstraintSystem::Candidate::solve() {
     if (CTP == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
 
-    cs.addConstraint(constraintKind, E->getType(), CT,
+    cs.addConstraint(constraintKind, cs.getType(E), CT,
                      cs.getConstraintLocator(E), /*isFavored=*/true);
   }
 
@@ -1506,14 +1513,16 @@ bool ConstraintSystem::Candidate::solve() {
     cs.solveRec(solutions, FreeTypeVariableBinding::Allow);
   }
 
-  // No solutions for the sub-expression means that either main expression
-  // needs salvaging or it's inconsistent (read: doesn't have solutions).
-  if (solutions.empty())
-    return true;
-
   // Record found solutions as suggestions.
   this->applySolutions(solutions);
-  return false;
+
+  // Let's double-check if we have any implicit expressions
+  // with type variables and nullify their types.
+  cleanupImplicitExprs(E);
+
+  // No solutions for the sub-expression means that either main expression
+  // needs salvaging or it's inconsistent (read: doesn't have solutions).
+  return solutions.empty();
 }
 
 void ConstraintSystem::Candidate::applySolutions(
@@ -1606,8 +1615,9 @@ void ConstraintSystem::shrink(Expr *expr) {
         return {false, expr};
       }
 
-      // Let's not attempt to type-check closures, which has already been
-      // type checked anyway.
+      // Let's not attempt to type-check closures or expressions
+      // which constrain closures, because they require special handling
+      // when dealing with context and parameters declarations.
       if (isa<ClosureExpr>(expr)) {
         return {false, expr};
       }
@@ -1629,6 +1639,24 @@ void ConstraintSystem::shrink(Expr *expr) {
       }
 
       return { true, expr };
+    }
+
+    /// Determine whether this is an arithmetic expression comprised entirely
+    /// of literals.
+    static bool isArithmeticExprOfLiterals(Expr *expr) {
+      expr = expr->getSemanticsProvidingExpr();
+
+      if (auto prefix = dyn_cast<PrefixUnaryExpr>(expr))
+        return isArithmeticExprOfLiterals(prefix->getArg());
+
+      if (auto postfix = dyn_cast<PostfixUnaryExpr>(expr))
+        return isArithmeticExprOfLiterals(postfix->getArg());
+
+      if (auto binary = dyn_cast<BinaryExpr>(expr))
+        return isArithmeticExprOfLiterals(binary->getArg()->getElement(0)) &&
+               isArithmeticExprOfLiterals(binary->getArg()->getElement(1));
+
+      return isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr);
     }
 
     Expr *walkToExprPost(Expr *expr) override {
@@ -1678,7 +1706,7 @@ void ConstraintSystem::shrink(Expr *expr) {
       // If there are fewer than two overloads in the chain
       // there is no point of solving this expression,
       // because we won't be able to reduce its domain.
-      if (numOverloadSets > 1)
+      if (numOverloadSets > 1 && !isArithmeticExprOfLiterals(expr))
         Candidates.push_back(Candidate(CS, expr));
 
       return expr;
@@ -1896,7 +1924,7 @@ ConstraintSystem::solve(Expr *&expr,
       });
     }
 
-    addConstraint(constraintKind, expr->getType(), convertType,
+    addConstraint(constraintKind, getType(expr), convertType,
                   getConstraintLocator(expr), /*isFavored*/ true);
   }
 
@@ -1918,7 +1946,16 @@ ConstraintSystem::solve(Expr *&expr,
 
   // If there are no solutions let's mark system as unsolved,
   // and solved otherwise even if there are multiple solutions still present.
-  return solutions.empty() ? SolutionKind::Unsolved : SolutionKind::Solved;
+
+  // There was a Swift 3 bug that allowed us to return Solved if we
+  // had found at least one solution before deciding an expression was
+  // "too complex". Maintain that behavior, but for Swift > 3 return
+  // Unsolved in these cases.
+  auto tooComplex = getExpressionTooComplex() &&
+    !getASTContext().isSwiftVersion3();
+  auto unsolved = tooComplex || solutions.empty();
+
+  return unsolved ? SolutionKind::Unsolved : SolutionKind::Solved;
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
@@ -2208,11 +2245,7 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   if (auto restriction = constraint->getRestriction()) {
     // Non-optional conversions are better than optional-to-optional
     // conversions.
-    if (*restriction == ConversionRestrictionKind::OptionalToOptional ||
-        *restriction
-          == ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional ||
-        *restriction
-          == ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional)
+    if (*restriction == ConversionRestrictionKind::OptionalToOptional)
       return true;
     
     // Array-to-pointer conversions are better than inout-to-pointer conversions.
@@ -2407,11 +2440,11 @@ bool ConstraintSystem::solveSimplified(
     case SolutionKind::Error:
       if (!failedConstraint)
         failedConstraint = constraint;
-      solverState->retiredConstraints.push_back(constraint);
+      solverState->retireConstraint(constraint);
       break;
 
     case SolutionKind::Solved:
-      solverState->retiredConstraints.push_back(constraint);
+      solverState->retireConstraint(constraint);
       break;
 
     case SolutionKind::Unsolved:
@@ -2421,7 +2454,7 @@ bool ConstraintSystem::solveSimplified(
     }
 
     // Record this as a generated constraint.
-    solverState->generatedConstraints.push_back(constraint);
+    solverState->addGeneratedConstraint(constraint);
 
     if (!solveRec(solutions, allowFreeTypeVariables)) {
       firstSolvedConstraint = constraint;
@@ -2430,17 +2463,6 @@ bool ConstraintSystem::solveSimplified(
       // FIXME: This should be more general.
       if (auto restriction = constraint->getRestriction()) {
         if (*restriction == ConversionRestrictionKind::TupleToTuple)
-          break;
-      }
-
-      // Or, if we see a conversion successfully applied to a string
-      // interpolation argument, we're done.
-      // FIXME: Probably should be more general, as mentioned above.
-      if (auto locator = disjunction->getLocator()) {
-        if (!locator->getPath().empty() &&
-            locator->getPath().back().getKind()
-              == ConstraintLocator::InterpolationArgument &&
-            constraint->getKind() == ConstraintKind::Conversion)
           break;
       }
     }
@@ -2455,5 +2477,12 @@ bool ConstraintSystem::solveSimplified(
   InactiveConstraints.insert(afterDisjunction, disjunction);
   CG.addConstraint(disjunction);
 
-  return !firstSolvedConstraint;
+  // If we are exiting due to an expression that is too complex, do
+  // not allow our caller to continue as if we have been successful.
+  // Maintain the broken behavior under Swift 3 mode though, to avoid
+  // breaking code.
+  auto tooComplex = getExpressionTooComplex() &&
+    !getASTContext().isSwiftVersion3();
+
+  return tooComplex || !firstSolvedConstraint;
 }

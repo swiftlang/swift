@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -477,9 +477,10 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
   switch (Builtin.ID) {
   default: break;
 
+  case BuiltinValueKind::ZExtOrBitCast:
   case BuiltinValueKind::SExtOrBitCast: {
     const SILValue &Op = Args[0];
-    // extOrBitCast_N_N(x) -> x
+    // [s|z]extOrBitCast_N_N(x) -> x
     if (Op->getType() == BI->getType())
       return Op;
   }

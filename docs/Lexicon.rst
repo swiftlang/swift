@@ -18,11 +18,52 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
 
 .. glossary::
 
+  abstraction pattern
+    The unsubstituted generic type of a property or function parameter, which
+    sets constraints on its representation in memory. For example, given the
+    following definitions::
+    
+      struct Foo<T> {
+        var value: T
+        // Foo.value has abstraction pattern <T> T
+    
+      struct Bar<T, U> {
+        var value: (T) -> U
+        // Bar.value has abstraction pattern <T, U> (T) -> U
+      }
+      struct Bas {
+        var value: (Int) -> String
+        // Bas.value has abstraction pattern (Int) -> String
+      }
+      let transform: (Int) -> String = { "\($0)" }
+      let foo = Foo<(Int) -> String>(value: transform)
+      let bar = Bar<Int, String>(value: transform)
+      let bas = Bas(value: transform)
+    
+    although ``foo.value``, ``bar.value``, and ``bas.value`` all have the same
+    function type ``(Int) -> String``, they have different *abstraction
+    patterns*. Because a value of type ``Foo`` or ``Bar`` may be used in a
+    generic context and invoke ``value`` with a parameter or result type 
+    of unknown size, the compiler has to pick a more conservative representation
+    for the closure that uses indirect argument passing, whereas ``Bas.value``
+    has a fully concrete closure type so can always use a more specialized
+    direct register-based calling convention. The compiler transparently
+    introduces `reabstraction` conversions when a value is used with a
+    different abstraction pattern. (This is where the infamous "reabstraction
+    thunk helpers" sometimes seen in Swift backtraces come from.)
+
   archetype
     A placeholder for a generic parameter or an associated type within a
     generic context. Sometimes known as a "rigid type variable" in formal
     CS literature. Directly stores its conforming protocols and nested
     archetypes, if any.
+    
+  AST
+    "Abstract syntax tree", although in practice it's more of a directed graph.
+    A parsed representation of code used by a compiler.
+
+  bitcode
+    Serialized LLVM `IR`.
 
   canonical SIL
     SIL after the
@@ -83,6 +124,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     themselves. They can be compared across declarations but cannot be used
     directly from within the context.
 
+  IR
+    1. "intermediate representation": a generic term for a format representing
+       code in a way that is easy for a compiler or tool to manipulate.
+    2. "LLVM IR": a particular IR used by the LLVM libraries for optimization
+       and generation of machine code.
+
   IUO (implicitly unwrapped optional)
     A type like Optional, but it implicitly converts to its wrapped type. If
     the value is ``nil`` during such a conversion, the program traps just as
@@ -99,6 +146,14 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
   LGTM
     "Looks good to me." Used in code review to indicate approval with no further
     comments.
+
+  LLVM IR
+    See `IR`.
+
+  lvalue
+    Pronounced "L-value". Refers to an expression that can be assigned to or
+    passed ``inout``. The term originally comes from C; the "L" refers to the
+    "l"eft side of an assignment operator. See also `rvalue`.
 
   main module
     The module for the file or files currently being compiled.
@@ -176,6 +231,17 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     library on the system when the library on the system cannot be modified.
     Apple has a number of overlays for its own SDKs in stdlib/public/SDK/.
 
+  PCH
+    Precompiled header, a type of file ending in .pch. A precompiled header is
+    like a precompiled module, in the sense that it's the same file format and
+    is just a cache file produced by clang and read by ``clang::ASTReader``. The
+    difference is that PCH files are not "modular": they do not correspond to a
+    named module, and cannot be read in any order or imported by module-name;
+    rather they must be the first file parsed by the compiler. PCHs are used
+    only to accelerate the process of reading C/C++/Objective-C headers, such as
+    the bridging headers read in by the ``-import-objc-header`` command-line
+    flag to swiftc.
+
   PR
     1. "Problem Report": An issue reported in `LLVM's bug tracker`__.
        See also `SR`.
@@ -198,6 +264,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     behavior of the compiler--it is not just a general statement that the code
     needs to be improved.
 
+    It's possible that this term was originally "quality of life", written as
+    "Qol", referring to the experience of end users. At some point along its
+    history, the lowercase "L" was misinterpreted as an uppercase "i", and a
+    new meaning derived. Swift inherited this term from LLVM, which got it from
+    GCC.
+
   Radar
     `Apple's bug-tracking system`__, or an issue reported on that system.
 
@@ -208,6 +280,10 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     IR generation.
     See `mandatory passes <mandatory passes / mandatory optimizations>`.
 
+  reabstraction
+    An implicit representation change that occurs when a value is used with
+    a different `abstraction pattern` from its current representation.
+
   resilient
     Describes a type or function where making certain changes will not break
     binary compatibility. See :doc:`LibraryEvolution.rst <LibraryEvolution>`.
@@ -216,6 +292,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     Code that implements a language's dynamic features that aren't just
     compiled down to plain instructions. For example, Swift's runtime library
     includes support for dynamic casting and for the Mirror-based reflection.
+
+  rvalue
+    Pronounced "R-value". Represents an expression that can be used as a value;
+    in Swift this is nearly every expression, so we don't use the term very
+    often. The term originally comes from C; the "R" refers to the "r"ight side
+    of an assignment operator. Contrast with `lvalue`.
 
   script mode
     The parsing mode that allows top-level imperative code in a source file.
@@ -241,6 +323,13 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     "Standard library". Sometimes this just means the "Swift" module (also
     known as "swiftCore"); sometimes it means everything in the stdlib/
     directory. Pronounced "stid-lib" or "ess-tee-dee-lib".
+
+  thunk
+    In the Swift compiler, a synthesized function whose only purpose is to
+    perform some kind of adjustment in order to call another function. For
+    example, Objective-C and Swift have different calling conventions, so the
+    Swift compiler generates a thunk for use in Objective-C that calls through
+    to the real Swift implementation.
 
   trap
     A deterministic runtime failure. Can be used as both as a noun ("Using an

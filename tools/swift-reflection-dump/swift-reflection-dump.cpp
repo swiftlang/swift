@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,7 +24,11 @@
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/CommandLine.h"
 
+#if defined(_WIN32)
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 
 #include <algorithm>
 #include <iostream>
@@ -54,8 +58,7 @@ Action(llvm::cl::desc("Mode:"),
                     "Dump the field reflection section"),
          clEnumValN(ActionType::DumpTypeLowering,
                     "dump-type-lowering",
-                    "Dump the field layout for typeref strings read from stdin"),
-         clEnumValEnd),
+                    "Dump the field layout for typeref strings read from stdin")),
        llvm::cl::init(ActionType::DumpReflectionSections));
 
 static llvm::cl::list<std::string>

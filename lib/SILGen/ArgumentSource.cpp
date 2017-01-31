@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -55,8 +55,38 @@ bool ArgumentSource::requiresCalleeToEvaluate() {
   case Kind::LValue:
     return false;
   case Kind::Expr:
-    return isa<TupleShuffleExpr>(asKnownExpr());
+    // FIXME: TupleShuffleExprs come in two flavors:
+    //
+    // 1) as apply arguments, where they're used to insert default
+    // argument value and collect varargs
+    //
+    // 2) as tuple conversions, where they can introduce, eliminate
+    // and re-order fields
+    //
+    // Case 1) must be emitted by ArgEmitter, and Case 2) must be
+    // emitted by RValueEmitter.
+    //
+    // It would be good to split up TupleShuffleExpr into these two
+    // cases, and simplify ArgEmitter since it no longer has to deal
+    // with re-ordering. However for now, SubscriptExpr emits the
+    // index argument via the RValueEmitter, so the RValueEmitter has
+    // to know about varargs, duplicating some of the logic in
+    // ArgEmitter.
+    //
+    // Once this is fixed, we can also consider allowing subscripts
+    // to have default arguments.
+    if (auto *shuffleExpr = dyn_cast<TupleShuffleExpr>(asKnownExpr())) {
+      for (auto index : shuffleExpr->getElementMapping()) {
+        if (index == TupleShuffleExpr::DefaultInitialize ||
+            index == TupleShuffleExpr::CallerDefaultInitialize ||
+            index == TupleShuffleExpr::Variadic)
+          return true;
+      }
+    }
+    return false;
   }
+
+  llvm_unreachable("Unhandled Kind in switch.");
 }
 
 RValue ArgumentSource::getAsRValue(SILGenFunction &gen, SGFContext C) && {

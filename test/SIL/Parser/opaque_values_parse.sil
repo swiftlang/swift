@@ -1,0 +1,62 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all -emit-sorted-sil %s | %FileCheck %s
+
+import Builtin
+
+sil_stage canonical
+
+// Test @callee_guaranteed parsing.
+// ----
+
+sil @dummy : $@convention(thin) (Builtin.Int64) -> ()
+
+// SILFunctionType.getCalleeConvention requires all ParameterConventions to fit
+// inside SILFunctionTypeBits. The only way to test this is with @callee_guaranteed.
+// CHECK-LABEL: sil hidden @parse_callee_guaranteed : $@convention(thin) () -> @callee_guaranteed () -> () {
+sil hidden @parse_callee_guaranteed : $@convention(thin) () -> @callee_guaranteed () -> () {
+entry:
+  %f = function_ref @dummy : $@convention(thin) (Builtin.Int64) -> ()
+  %z = integer_literal $Builtin.Int64, 0
+  // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] {{.*}} $@convention(thin) (Builtin.Int64) -> ()
+  %g = partial_apply [callee_guaranteed] %f(%z) : $@convention(thin) (Builtin.Int64) -> ()
+  // CHECK: return [[PA]] : $@callee_guaranteed () -> ()
+  return %g : $@callee_guaranteed () -> ()
+}
+// CHECK-LABEL: } // end sil function 'parse_callee_guaranteed'
+
+// Test @in/@out parsing.
+// ----
+//
+// CHECK-LABEL: sil hidden @parse_identity : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0(%0 : $T):
+// CHECK: return %0 : $T
+// CHECK-LABEL: } // end sil function 'parse_identity'
+sil hidden @parse_identity : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $T):
+  return %0 : $T
+}
+
+// Test @in_guaranteed parsing.
+// ----
+
+protocol Foo {
+  func foo()
+}
+
+struct S : Foo {
+  func foo()
+  init()
+}
+
+sil @doWithS : $@convention(method) (S) -> ()
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @parse_mutating : $@convention(witness_method) (@in_guaranteed S) -> () {
+sil hidden [transparent] [thunk] @parse_mutating : $@convention(witness_method) (@in_guaranteed S) -> () {
+// CHECK: bb0(%0 : $S):
+bb0(%0 : $S):
+  %f = function_ref @doWithS : $@convention(method) (S) -> ()
+  // CHECK: apply %{{.*}}(%0) : $@convention(method) (S) -> ()
+  %a = apply %f(%0) : $@convention(method) (S) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+// CHECK-LABEL: } // end sil function 'parse_mutating'

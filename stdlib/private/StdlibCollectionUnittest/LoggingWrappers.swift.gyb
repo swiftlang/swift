@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -215,7 +215,7 @@ public struct ${Self}<
 
   public typealias Iterator = LoggingIterator<Base.Iterator>
 
-  public func makeIterator() -> LoggingIterator<Base.Iterator> {
+  public func makeIterator() -> Iterator {
     Log.makeIterator[selfType] += 1
     return LoggingIterator(wrapping: base.makeIterator())
   }
@@ -321,10 +321,11 @@ public struct ${Self}<
 
   /// Copy a Sequence into an array.
   public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
-  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
     Log._copyContents[selfType] += 1
-    return base._copyContents(initializing: ptr)
+    let (it,idx) = base._copyContents(initializing: buffer)
+    return (Iterator(wrapping: it),idx)
   }
 
 %     if Kind in ['Collection', 'MutableCollection', 'RangeReplaceableCollection']:
@@ -540,7 +541,6 @@ public struct ${Self}<
     return base.removeFirst()
   }
 
-  @discardableResult
   public mutating func removeFirst(_ n: Int) {
     Log.removeFirstN[selfType] += 1
     base.removeFirst(n)

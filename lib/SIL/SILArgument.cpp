@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,16 +23,19 @@ using namespace swift;
 // SILArgument Implementation
 //===----------------------------------------------------------------------===//
 
-SILArgument::SILArgument(SILBasicBlock *ParentBB, SILType Ty,
+SILArgument::SILArgument(ValueKind ChildKind, SILBasicBlock *ParentBB,
+                         SILType Ty, ValueOwnershipKind OwnershipKind,
                          const ValueDecl *D)
-  : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB), Decl(D) {
+    : ValueBase(ChildKind, Ty), ParentBB(ParentBB), Decl(D),
+      OwnershipKind(OwnershipKind) {
   ParentBB->insertArgument(ParentBB->args_end(), this);
 }
 
-SILArgument::SILArgument(SILBasicBlock *ParentBB,
+SILArgument::SILArgument(ValueKind ChildKind, SILBasicBlock *ParentBB,
                          SILBasicBlock::arg_iterator Pos, SILType Ty,
+                         ValueOwnershipKind OwnershipKind,
                          const ValueDecl *D)
-    : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB), Decl(D) {
+    : ValueBase(ChildKind, Ty), ParentBB(ParentBB), Decl(D), OwnershipKind(OwnershipKind) {
   // Function arguments need to have a decl.
   assert(
     !ParentBB->getParent()->isBare() &&
@@ -46,6 +49,7 @@ SILArgument::SILArgument(SILBasicBlock *ParentBB,
 SILFunction *SILArgument::getFunction() {
   return getParent()->getParent();
 }
+
 const SILFunction *SILArgument::getFunction() const {
   return getParent()->getParent();
 }
@@ -53,6 +57,10 @@ const SILFunction *SILArgument::getFunction() const {
 SILModule &SILArgument::getModule() const {
   return getFunction()->getModule();
 }
+
+//===----------------------------------------------------------------------===//
+//                              SILBlockArgument
+//===----------------------------------------------------------------------===//
 
 static SILValue getIncomingValueForPred(const SILBasicBlock *BB,
                                         const SILBasicBlock *Pred,
@@ -84,7 +92,7 @@ static SILValue getIncomingValueForPred(const SILBasicBlock *BB,
   llvm_unreachable("Unhandled TermKind?!");
 }
 
-SILValue SILArgument::getSingleIncomingValue() const {
+SILValue SILPHIArgument::getSingleIncomingValue() const {
   const SILBasicBlock *Parent = getParent();
   const SILBasicBlock *PredBB = Parent->getSinglePredecessorBlock();
   if (!PredBB)
@@ -92,7 +100,8 @@ SILValue SILArgument::getSingleIncomingValue() const {
   return getIncomingValueForPred(Parent, PredBB, getIndex());
 }
 
-bool SILArgument::getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
+bool SILPHIArgument::getIncomingValues(
+    llvm::SmallVectorImpl<SILValue> &OutArray) {
   SILBasicBlock *Parent = getParent();
 
   if (Parent->pred_empty())
@@ -109,7 +118,7 @@ bool SILArgument::getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
   return true;
 }
 
-bool SILArgument::getIncomingValues(
+bool SILPHIArgument::getIncomingValues(
     llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray) {
   SILBasicBlock *Parent = getParent();
 
@@ -127,7 +136,7 @@ bool SILArgument::getIncomingValues(
   return true;
 }
 
-SILValue SILArgument::getIncomingValue(unsigned BBIndex) {
+SILValue SILPHIArgument::getIncomingValue(unsigned BBIndex) {
   SILBasicBlock *Parent = getParent();
 
   if (Parent->pred_empty())
@@ -157,7 +166,7 @@ SILValue SILArgument::getIncomingValue(unsigned BBIndex) {
   return SILValue();
 }
 
-SILValue SILArgument::getIncomingValue(SILBasicBlock *BB) {
+SILValue SILPHIArgument::getIncomingValue(SILBasicBlock *BB) {
   SILBasicBlock *Parent = getParent();
 
   assert(!Parent->pred_empty() && "Passed in non-predecessor BB!");
@@ -173,15 +182,11 @@ SILValue SILArgument::getIncomingValue(SILBasicBlock *BB) {
   return getIncomingValueForPred(Parent, BB, Index);
 }
 
-bool SILArgument::isSelf() const {
-  // First make sure that we are actually a function argument. We use an assert
-  // boolean return here since in release builds we want to conservatively
-  // return false and in debug builds assert since this is a logic error.
-  bool isArg = isFunctionArg();
-  assert(isArg && "Only function arguments can be self");
-  if (!isArg)
-    return false;
+//===----------------------------------------------------------------------===//
+//                            SILFunctionArgument
+//===----------------------------------------------------------------------===//
 
+bool SILFunctionArgument::isSelf() const {
   // Return true if we are the last argument of our BB and that our parent
   // function has a call signature with self.
   return getFunction()->hasSelfParam() &&

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -212,6 +212,7 @@ void PolymorphicConvention::enumerateRequirements(const RequirementCallback &cal
       // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
+      case RequirementKind::Layout:
         continue;
 
       case RequirementKind::Conformance: {
@@ -351,7 +352,6 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Deallocating:
       // Classes are sources of metadata.
       if (type->getClassOrBoundGenericClass()) {
         considerNewTypeSource(MetadataSource::Kind::ClassPointer,
@@ -544,7 +544,8 @@ void EmitPolymorphicParameters::bindParameterSources(const GetParameterFn &getPa
 void EmitPolymorphicParameters::bindParameterSource(SILParameterInfo param, unsigned paramIndex,
                          const GetParameterFn &getParameter) {
   // Ignore indirect parameters for now.  This is potentially dumb.
-  if (param.isIndirect()) return;
+  if (IGF.IGM.silConv.isSILIndirect(param))
+    return;
 
   CanType paramType = getArgTypeInContext(paramIndex);
 
@@ -633,10 +634,7 @@ static unsigned getDependentTypeIndex(CanGenericSignature generics,
   // Make a pass over all the dependent types.
   unsigned index = 0;
   for (auto depTy : generics->getAllDependentTypes()) {
-    // Unfortunately, we can't rely on either depTy or type actually
-    // being the marked witness type in the generic signature, so we have
-    // to ask the generic signature whether the types are equal.
-    if (generics->areSameTypeParameterInContext(depTy, type, M))
+    if (depTy->isEqual(type))
       return index;
     index++;
   }
@@ -657,11 +655,8 @@ getProtocolConformanceIndex(CanGenericSignature generics, ModuleDecl &M,
   // Make a pass over all the dependent types.
   unsigned index = 0;
   for (auto reqt : generics->getRequirements()) {
-    // Unfortunately, we can't rely on either depTy or type actually
-    // being the marked witness type in the generic signature, so we have
-    // to ask the generic signature whether the types are equal.
     if (reqt.getKind() == RequirementKind::Conformance &&
-        generics->areSameTypeParameterInContext(reqt.getFirstType(), type, M)) {
+        reqt.getFirstType()->isEqual(type)) {
       if (reqt.getSecondType()->getAnyNominal() == protocol)
         return index;
       index++;
@@ -921,7 +916,7 @@ static bool isDependentConformance(IRGenModule &IGM,
 
 /// Detail about how an object conforms to a protocol.
 class irgen::ConformanceInfo {
-  friend class ProtocolInfo;
+  friend ProtocolInfo;
 public:
   virtual ~ConformanceInfo() {}
   virtual llvm::Value *getTable(IRGenFunction &IGF,
@@ -995,7 +990,7 @@ namespace {
 
 /// Conformance info for a witness table that can be directly generated.
 class DirectConformanceInfo : public ConformanceInfo {
-  friend class ProtocolInfo;
+  friend ProtocolInfo;
 
   const NormalProtocolConformance *RootConformance;
 public:
@@ -1015,7 +1010,7 @@ public:
 
 /// Conformance info for a witness table that is (or may be) dependent.
 class AccessorConformanceInfo : public ConformanceInfo {
-  friend class ProtocolInfo;
+  friend ProtocolInfo;
 
   const NormalProtocolConformance *Conformance;
 public:
@@ -1277,14 +1272,13 @@ public:
       auto declCtx = Conformance.getDeclContext();
       if (auto generics = declCtx->getGenericSignatureOfContext()) {
         auto getInContext = [&](CanType type) -> CanType {
-          return ArchetypeBuilder::mapTypeIntoContext(declCtx, type)
-              ->getCanonicalType();
+          return declCtx->mapTypeIntoContext(type)->getCanonicalType();
         };
         bindArchetypeAccessPaths(IGF, generics, getInContext);
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Build the witness table.
 void WitnessTableBuilder::build() {
@@ -2358,7 +2352,7 @@ static CanType getSubstSelfType(CanSILFunctionType origFnType,
   // - even if they could, they would conform as a value type 'self' and thus
   //   be passed indirectly as an @in or @inout parameter.
   if (auto meta = dyn_cast<MetatypeType>(inputType)) {
-    if (!selfParam.isIndirect())
+    if (!selfParam.isFormalIndirect())
       inputType = meta.getInstanceType();
   }
   
@@ -2415,7 +2409,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
@@ -2579,6 +2573,8 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // Figure out what we're actually still required to pass 
   PolymorphicConvention convention(IGM, fnType);
   convention.enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
+    assert(generics->isCanonicalTypeInContext(reqt.TypeParameter,
+                                              *IGM.getSwiftModule()));
     Requirements.push_back(reqt);
   });
 
@@ -2768,7 +2764,7 @@ namespace {
       llvm_unreachable("bad source kind");
     }
   };
-}
+} // end anonymous namespace
 
 /// Given a generic signature, add the argument types required in order to call it.
 void irgen::expandPolymorphicSignature(IRGenModule &IGM,

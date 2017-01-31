@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-var func6 : (_ fn : ((Int, Int)) -> Int) -> ()
+var func6 : (_ fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
 var func6b : (Int, (Int, Int) -> Int) -> ()
 func func6c(_ f: (Int, Int) -> Int, _ n: Int = 0) {} // expected-warning{{prior to parameters}}
@@ -22,6 +22,11 @@ var closure6 = $0  // expected-error {{anonymous closure argument not contained 
 var closure7 : Int =
    { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{9-9=()}}
 
+var capturedVariable = 1
+var closure8 = { [capturedVariable] in
+  capturedVariable += 1 // expected-error {{left side of mutating operator isn't mutable: 'capturedVariable' is an immutable capture}}
+}
+
 func funcdecl1(_ a: Int, _ y: Int) {}
 func funcdecl3() -> Int {}
 func funcdecl4(_ a: ((Int) -> Int), _ b: Int) {}
@@ -33,7 +38,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   
   func6({$0 + $1})       // Closure with two named anonymous arguments
   func6({($0) + $1})    // Closure with sequence expr inferred type
-  func6({($0) + $0})    // // expected-error {{binary operator '+' cannot be applied to two '(Int, Int)' operands}} expected-note {{overloads for '+' exist with these partially matching parameter lists}}
+  func6({($0) + $0})    // // expected-error {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
 
 
   var testfunc : ((), Int) -> Int  // expected-note {{'testfunc' declared here}}
@@ -65,7 +70,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   func6({a,b in 4.0 })  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
   
   // TODO: This diagnostic can be improved: rdar://22128205
-  func6({(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, _) -> Int' to expected argument type '((Int, Int)) -> Int'}}
+  func6({(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, _) -> Int' to expected argument type '(Int, Int) -> Int'}}
 
   
   

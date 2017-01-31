@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -174,7 +174,7 @@ namespace {
     Yes,
     Partial
   };
-}
+} // end anonymous namespace
 
 /// This implements the lattice merge operation for 2 optional DIKinds.
 static Optional<DIKind> mergeKinds(Optional<DIKind> OK1, Optional<DIKind> OK2) {
@@ -321,7 +321,7 @@ namespace {
     AS.dump(OS);
     return OS;
   }
-}
+} // end anonymous namespace
 
 
 namespace {
@@ -2615,7 +2615,8 @@ static bool processMemoryObject(SILInstruction *I) {
   SmallVector<SILInstruction*, 4> Releases;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, false);
+  collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, false,
+                           /*TreatAddressToPointerAsInout*/ true);
 
   LifetimeChecker(MemInfo, Uses, FailableInits, Releases).doIt();
   return true;

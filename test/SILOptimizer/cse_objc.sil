@@ -39,7 +39,7 @@ bb0(%0 : $Bar):
   %1 = alloc_stack $Bar, let, name "sf"              // users: %2, %6, %9, %10
   store %0 to %1 : $*Bar                        // id: %2
   %3 = upcast %0 : $Bar to $NSObject              // user: %7
-  %4 = super_method [volatile] %0 : $Bar, #NSObject.init!initializer.1.foreign : (NSObject.Type) -> () -> NSObject , $@convention(objc_method) (@owned NSObject) -> @owned NSObject // user: %7
+  %4 = super_method [volatile] %0 : $Bar, #NSObject.init!initializer.1.foreign : (NSObject.Type) -> () -> NSObject, $@convention(objc_method) (@owned NSObject) -> @owned NSObject // user: %7
   %7 = apply %4(%3) : $@convention(objc_method) (@owned NSObject) -> @owned NSObject // user: %8
   %8 = unchecked_ref_cast %7 : $NSObject to $Bar  // users: %9, %11
   store %8 to %1 : $*Bar                        // id: %9
@@ -89,7 +89,7 @@ bb0(%0 : $Bar):
 sil hidden @_TFC4test3BarD : $@convention(method) (@owned Bar) -> () {
 bb0(%0 : $Bar):
   debug_value %0 : $Bar, let, name "self" // id: %1
-  %2 = super_method %0 : $Bar, #NSObject.deinit!deallocator.foreign : (NSObject) -> () -> () , $@convention(objc_method) (NSObject) -> ()  // user: %4
+  %2 = super_method %0 : $Bar, #NSObject.deinit!deallocator.foreign : (NSObject) -> () -> (), $@convention(objc_method) (NSObject) -> ()  // user: %4
   %3 = upcast %0 : $Bar to $NSObject              // user: %4
   %4 = apply %2(%3) : $@convention(objc_method) (NSObject) -> ()
   %5 = tuple ()                                   // user: %6

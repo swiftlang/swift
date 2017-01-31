@@ -31,7 +31,7 @@ function check_thin_archive_for_bitcode() {
     mkdir -p "${LIB_TEMP_DIR}"
     cd "${LIB_TEMP_DIR}"
     ar -x ${ARCHIVE}
-    if [[ -n "$(find ./ -iname '*.o' -exec file {} \; | grep bit-code)" ]]; then
+    if [[ -n "$(find ./ -iname '*.o' -exec file {} \; | grep -e bitcode -e bit-code)" ]]; then
         echo "Found bitcode file in thin archive: ${ARCHIVE}"
         exit 1
     else
@@ -73,7 +73,7 @@ function check_thick_archive_for_bitcode() {
         cd ${arch}
         ar -x "${LIB_ARCHIVE_DIR}/${THIN_ARCHIVE}"
 
-        if [[ -n "$(find ./ -iname '*.o' -exec file {} \; | grep bit-code)" ]]; then
+        if [[ -n "$(find ./ -iname '*.o' -exec file {} \; | grep -e bitcode -e bit-code)" ]]; then
             echo "Found bitcode file in thin archive: ${THIN_ARCHIVE}. Taken from thick archive: ${ARCHIVE}"
             exit 1
         else

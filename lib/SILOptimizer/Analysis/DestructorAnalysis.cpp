@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -40,13 +40,9 @@ bool DestructorAnalysis::cacheResult(CanType Type, bool Result) {
   return Result;
 }
 
-bool DestructorAnalysis::isSafeType(Type Ty) {
-  CanType Canonical = Ty.getCanonicalTypeOrNull();
-  if (Canonical.isNull())
-    return false;
-
+bool DestructorAnalysis::isSafeType(CanType Ty) {
   // Don't visit types twice.
-  auto CachedRes = Cached.find(Canonical);
+  auto CachedRes = Cached.find(Ty);
   if (CachedRes != Cached.end()) {
     return CachedRes->second;
   }
@@ -55,43 +51,43 @@ bool DestructorAnalysis::isSafeType(Type Ty) {
   // position it is safe in the absence of another fact that proves otherwise.
   // We will reset this value to the correct value once we return from the
   // recursion below.
-  cacheResult(Canonical, true);
+  cacheResult(Ty, true);
 
   // Trivial value types.
-  if (Canonical->getKind() == TypeKind::BuiltinInteger)
-    return cacheResult(Canonical, true);
-  if (Canonical->getKind() == TypeKind::BuiltinFloat)
-    return cacheResult(Canonical, true);
+  if (Ty->is<BuiltinIntegerType>())
+    return cacheResult(Ty, true);
+  if (Ty->is<BuiltinFloatType>())
+    return cacheResult(Ty, true);
 
   // A struct is safe if
   //   * either it implements the _DestructorSafeContainer protocol and
   //     all the type parameters are safe types.
   //   * or all stored properties are safe types.
-  if (auto *Struct = Canonical->getStructOrBoundGenericStruct()) {
+  if (auto *Struct = Ty->getStructOrBoundGenericStruct()) {
 
     if (implementsDestructorSafeContainerProtocol(Struct) &&
-        areTypeParametersSafe(Canonical))
-      return cacheResult(Canonical, true);
+        areTypeParametersSafe(Ty))
+      return cacheResult(Ty, true);
 
     // Check the stored properties.
     for (auto SP : Struct->getStoredProperties())
-      if (!isSafeType(SP->getType()))
-        return cacheResult(Canonical, false);
+      if (!isSafeType(SP->getInterfaceType()->getCanonicalType()))
+        return cacheResult(Ty, false);
 
-    return cacheResult(Canonical, true);
+    return cacheResult(Ty, true);
   }
 
   // A tuple type is safe if its elements are safe.
-  if (auto Tuple = dyn_cast<TupleType>(Canonical)) {
+  if (auto Tuple = dyn_cast<TupleType>(Ty)) {
     for (auto &Elt : Tuple->getElements())
-      if (!isSafeType(Elt.getType()))
-        return cacheResult(Canonical, false);
-    return cacheResult(Canonical, true);
+      if (!isSafeType(Elt.getType()->getCanonicalType()))
+        return cacheResult(Ty, false);
+    return cacheResult(Ty, true);
   }
 
   // TODO: enum types.
 
-  return cacheResult(Canonical, false);
+  return cacheResult(Ty, false);
 }
 
 bool DestructorAnalysis::implementsDestructorSafeContainerProtocol(
@@ -113,7 +109,7 @@ bool DestructorAnalysis::areTypeParametersSafe(CanType Ty) {
 
   // Make sure all type parameters are safe.
   for (auto TP : BGT->getGenericArgs()) {
-    if (!isSafeType(TP))
+    if (!isSafeType(TP->getCanonicalType()))
       return false;
   }
   return true;

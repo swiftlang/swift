@@ -29,7 +29,7 @@ sil [_semantics "array.uninitialized"] @adoptStorage : $@convention(thin) (@owne
 sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
 sil [_semantics "array.get_element"] @getElement : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> @out MyInt
 sil [_semantics "array.uninitialized"] @allocateUninitialized : $@convention(thin) (MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
-sil [_semantics "array.init"] @initCountRepeatedValue : $@convention(thin) (MyInt, @in MyInt, @thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>
+sil [_semantics "array.init"] @initRepeatedValueCount : $@convention(thin) (@in MyInt, MyInt, @thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>
 sil [_semantics "array.init"] @initEmpty : $@convention(thin) (@thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>
 
 // CHECK-LABEL: sil @test_adoptStorage
@@ -90,21 +90,21 @@ bb0:
 }
 
 
-// CHECK-LABEL: sil @test_initCountRepeatedValue
+// CHECK-LABEL: sil @test_initRepeatedValueCount
 // CHECK: [[COUNTVAL:%.*]] = integer_literal $Builtin.Int64, 3
 // CHECK: [[COUNT:%.*]] = struct $MyInt ([[COUNTVAL]]
 // CHECK: [[GETCOUNTFUN:%.*]] = function_ref @getCount
 // CHECK-NOT: apply [[GETCOUNTFUN]]
 // CHECK: return [[COUNT]]
-sil @test_initCountRepeatedValue : $@convention(thin) () -> MyInt {
+sil @test_initRepeatedValueCount : $@convention(thin) () -> MyInt {
 bb0:
  %0 = integer_literal $Builtin.Int64, 3
  %1 = alloc_stack $MyInt
  %3 = struct $MyInt(%0 : $Builtin.Int64)
  store %3 to %1: $*MyInt
  %4 = metatype $@thin MyArray<MyInt>.Type
- %5 = function_ref @initCountRepeatedValue : $@convention(thin) (MyInt, @in MyInt, @thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>
- %6 = apply %5(%3, %1, %4) : $@convention(thin) (MyInt, @in MyInt, @thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>
+ %5 = function_ref @initRepeatedValueCount : $@convention(thin) (@in MyInt, MyInt, @thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>
+ %6 = apply %5(%1, %3, %4) : $@convention(thin) (@in MyInt, MyInt, @thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>
  debug_value %6 : $MyArray<MyInt>
  %9 = function_ref @getCount : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
  %10 = apply %9(%6) : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt

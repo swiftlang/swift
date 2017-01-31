@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -28,6 +29,29 @@ ConcreteDeclRef::SpecializedDeclRef::create(
   size_t size = totalSizeToAlloc<Substitution>(substitutions.size());
   void *memory = ctx.Allocate(size, alignof(SpecializedDeclRef));
   return new (memory) SpecializedDeclRef(decl, substitutions);
+}
+
+ConcreteDeclRef
+ConcreteDeclRef::getOverriddenDecl(ASTContext &ctx,
+                                   LazyResolver *resolver) const {
+  auto *derivedDecl = getDecl();
+  auto *baseDecl = derivedDecl->getOverriddenDecl();
+
+  auto *baseSig = baseDecl->getInnermostDeclContext()
+      ->getGenericSignatureOfContext();
+  auto *derivedSig = derivedDecl->getInnermostDeclContext()
+      ->getGenericSignatureOfContext();
+
+  SmallVector<Substitution, 4> subs = {};
+  if (baseSig) {
+    SubstitutionMap subMap;
+    if (derivedSig)
+      derivedSig->getSubstitutionMap(getSubstitutions(), subMap);
+    subMap = SubstitutionMap::getOverrideSubstitutions(
+        baseDecl, derivedDecl, subMap, resolver);
+    baseSig->getSubstitutions(subMap, subs);
+  }
+  return ConcreteDeclRef(ctx, baseDecl, subs);
 }
 
 void ConcreteDeclRef::dump(raw_ostream &os) {

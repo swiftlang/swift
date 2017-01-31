@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -211,7 +211,7 @@ internal func sendBytes() {
   let count = Int(readUInt())
   debugLog("Parent requested \(count) bytes from \(address)")
   var totalBytesWritten = 0
-  var pointer = unsafeBitCast(address, to: UnsafeMutableRawPointer.self)
+  var pointer = UnsafeMutableRawPointer(bitPattern: address)
   while totalBytesWritten < count {
     let bytesWritten = Int(fwrite(pointer, 1, Int(count), stdout))
     fflush(stdout)
@@ -219,7 +219,7 @@ internal func sendBytes() {
       printErrnoAndExit()
     }
     totalBytesWritten += bytesWritten
-    pointer = pointer.advanced(by: bytesWritten)
+    pointer = pointer?.advanced(by: bytesWritten)
   }
 }
 
@@ -228,7 +228,7 @@ internal func sendSymbolAddress() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let name = readLine()!
   name.withCString {
-    let handle = unsafeBitCast(Int(-2), to: UnsafeMutableRawPointer.self)
+    let handle = UnsafeMutableRawPointer(bitPattern: Int(-2))!
     let symbol = dlsym(handle, $0)
     let symbolAddress = unsafeBitCast(symbol, to: UInt.self)
     sendValue(symbolAddress)
@@ -239,7 +239,7 @@ internal func sendSymbolAddress() {
 internal func sendStringLength() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let address = readUInt()
-  let cString = unsafeBitCast(address, to: UnsafePointer<CChar>.self)
+  let cString = UnsafePointer<CChar>(bitPattern: address)!
   let count = String(validatingUTF8: cString)!.utf8.count
   sendValue(count)
 }
@@ -359,7 +359,7 @@ public func reflect<T>(any: T) {
   let any: Any = any
   let anyPointer = UnsafeMutablePointer<Any>.allocate(capacity: MemoryLayout<Any>.size)
   anyPointer.initialize(to: any)
-  let anyPointerValue = unsafeBitCast(anyPointer, to: UInt.self)
+  let anyPointerValue = UInt(bitPattern: anyPointer)
   reflect(instanceAddress: anyPointerValue, kind: .Existential)
   anyPointer.deallocate(capacity: MemoryLayout<Any>.size)
 }
@@ -394,22 +394,22 @@ public func reflect<T: Error>(error: T) {
 
 /// Wraps a thick function with arity 0.
 struct ThickFunction0 {
-  var function: () -> ()
+  var function: () -> Void
 }
 
 /// Wraps a thick function with arity 1.
 struct ThickFunction1 {
-  var function: (Int) -> ()
+  var function: (Int) -> Void
 }
 
 /// Wraps a thick function with arity 2.
 struct ThickFunction2 {
-  var function: (Int, String) -> ()
+  var function: (Int, String) -> Void
 }
 
 /// Wraps a thick function with arity 3.
 struct ThickFunction3 {
-  var function: (Int, String, AnyObject?) -> ()
+  var function: (Int, String, AnyObject?) -> Void
 }
 
 struct ThickFunctionParts {
@@ -419,13 +419,15 @@ struct ThickFunctionParts {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping () -> ()) {
+public func reflect(function: @escaping () -> Void) {
   let fn = UnsafeMutablePointer<ThickFunction0>.allocate(
     capacity: MemoryLayout<ThickFunction0>.size)
   fn.initialize(to: ThickFunction0(function: function))
 
-  let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
-  let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
+  let contextPointer = fn.withMemoryRebound(
+    to: ThickFunctionParts.self, capacity: 1) {
+      UInt(bitPattern: $0.pointee.context)
+  }
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
@@ -434,14 +436,16 @@ public func reflect(function: @escaping () -> ()) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping (Int) -> ()) {
+public func reflect(function: @escaping (Int) -> Void) {
   let fn =
   UnsafeMutablePointer<ThickFunction1>.allocate(
     capacity: MemoryLayout<ThickFunction1>.size)
   fn.initialize(to: ThickFunction1(function: function))
 
-  let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
-  let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
+  let contextPointer = fn.withMemoryRebound(
+    to: ThickFunctionParts.self, capacity: 1) {
+      UInt(bitPattern: $0.pointee.context)
+  }
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
@@ -450,13 +454,15 @@ public func reflect(function: @escaping (Int) -> ()) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping (Int, String) -> ()) {
+public func reflect(function: @escaping (Int, String) -> Void) {
   let fn = UnsafeMutablePointer<ThickFunction2>.allocate(
       capacity: MemoryLayout<ThickFunction2>.size)
   fn.initialize(to: ThickFunction2(function: function))
 
-  let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
-  let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
+  let contextPointer = fn.withMemoryRebound(
+    to: ThickFunctionParts.self, capacity: 1) {
+      UInt(bitPattern: $0.pointee.context)
+  }
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
@@ -465,13 +471,15 @@ public func reflect(function: @escaping (Int, String) -> ()) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping (Int, String, AnyObject?) -> ()) {
+public func reflect(function: @escaping (Int, String, AnyObject?) -> Void) {
   let fn = UnsafeMutablePointer<ThickFunction3>.allocate(
       capacity: MemoryLayout<ThickFunction3>.size)
   fn.initialize(to: ThickFunction3(function: function))
 
-  let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
-  let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
+  let contextPointer = fn.withMemoryRebound(
+    to: ThickFunctionParts.self, capacity: 1) {
+      UInt(bitPattern: $0.pointee.context)
+  }
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 

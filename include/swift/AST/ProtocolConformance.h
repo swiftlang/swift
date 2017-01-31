@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,6 +24,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Witness.h"
+#include "swift/Basic/Compiler.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -265,7 +266,7 @@ public:
   
   // Make vanilla new/delete illegal for protocol conformances.
   void *operator new(size_t bytes) = delete;
-  void operator delete(void *data) = delete;
+  void operator delete(void *data) SWIFT_DELETE_OPERATOR_DELETED;
 
   // Only allow allocation of protocol conformances using the allocator in
   // ASTContext or by doing a placement new.
@@ -297,7 +298,8 @@ private:
   /// applies to the substituted type.
   ProtocolConformance *subst(ModuleDecl *module,
                              Type substType,
-                             const SubstitutionMap &subMap) const;
+                             TypeSubstitutionFn subs,
+                             LookupConformanceFn conformances) const;
 };
 
 /// Normal protocol conformance, which involves mapping each of the protocol
@@ -610,7 +612,7 @@ public:
     // some crazy cases that also require major diagnostic work, where the
     // substitutions involve conformances of the same type to the same
     // protocol drawn from different imported modules.
-    ID.AddPointer(type->getCanonicalType().getPointer());
+    ID.AddPointer(type.getPointer());
     ID.AddPointer(genericConformance);
   }
 

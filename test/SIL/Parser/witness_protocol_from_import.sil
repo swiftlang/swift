@@ -34,14 +34,14 @@ sil @_TF5test2oi2eeFTOS_1XS0__Sb : $@convention(thin) (X, X) -> Bool
 sil @_TFO5test21Xg9hashValueSi : $@convention(method) (X) -> Int
 
 // CHECK-LABEL: sil_witness_table X: Equatable module
-// CHECK: method #Equatable."=="!1: @_TTWO5test21Xs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb
+// CHECK: method #Equatable."=="!1: {{.*}} : @_TTWO5test21Xs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb
 sil_witness_table X: Equatable module test2 {
   method #Equatable."=="!1: @_TTWO5test21Xs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb
 }
 
 // CHECK-LABEL: sil_witness_table X: Hashable module
 // CHECK: base_protocol Equatable: X: Equatable module
-// CHECK: method #Hashable.hashValue!getter.1: @_TTWO5test21Xs8HashableS_FS1_g9hashValueSi
+// CHECK: method #Hashable.hashValue!getter.1: {{.*}} : @_TTWO5test21Xs8HashableS_FS1_g9hashValueSi
 sil_witness_table X: Hashable module test2 {
   base_protocol Equatable: X: Equatable module test2
   method #Hashable.hashValue!getter.1: @_TTWO5test21Xs8HashableS_FS1_g9hashValueSi

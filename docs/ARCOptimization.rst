@@ -232,7 +232,8 @@ this is true. The rule for conversions is that a conversion that preserves RC
 identity must have the following properties:
 
 1. Both of its arguments must be non-trivial values with the same ownership
-   semantics (i.e. unowned, strong, weak). This means that conversions such as:
+   semantics (i.e. unowned, strong, weak). This means that the following
+   conversions do not propagate RC identity:
 
    - address_to_pointer
    - pointer_to_address
@@ -886,7 +887,7 @@ Consider the following pseudo-Swift example::
 
   var GLOBAL_D : D = D1()
 
-  class C { deinit { GLOBAL_D = D2 } }
+  class C { deinit { GLOBAL_D = D2() } }
 
   func main() {
     let c = C()

@@ -68,7 +68,7 @@ def run_once_with_primary(args, ast, rng, primary_idx):
 
         mode = "-c"
         if args.typecheck:
-            mode = "-typechec"
+            mode = "-typecheck"
 
         focus = ["-primary-file", primary]
         if args.whole_module_optimization:

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -49,9 +49,20 @@ public:
         DynamicSelfCaptureLoc(DynamicSelfCaptureLoc),
         DynamicSelf(DynamicSelf),
         AFR(AFR) {
-    if (auto AFD = AFR.getAbstractFunctionDecl())
-      CaptureLoc = AFD->getLoc();
-    else {
+    if (auto AFD = AFR.getAbstractFunctionDecl()) {
+      if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+        if (FD->isDeferBody()) {
+          // HACK: Defer statements generate implicit FuncDecls, and hence do
+          // not have valid source locations.  Instead, use the location of
+          // the body.
+          CaptureLoc = FD->getBody()->getLBraceLoc();
+        } else {
+          CaptureLoc = AFD->getLoc();
+        }
+      } else {
+        CaptureLoc = AFD->getLoc();
+      }
+    } else {
       auto ACE = AFR.getAbstractClosureExpr();
       if (auto closure = dyn_cast<ClosureExpr>(ACE))
         CaptureLoc = closure->getInLoc();
@@ -614,7 +625,7 @@ public:
   }
 };
 
-}  // namespace
+} // end anonymous namespace
 
 void TypeChecker::maybeDiagnoseCaptures(Expr *E, AnyFunctionRef AFR) {
   if (!AFR.getCaptureInfo().hasBeenComputed()) {
@@ -658,7 +669,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   AFR.getBody()->walk(finder);
 
   unsigned inoutCount = 0;
-  for (auto C: Captures) {
+  for (auto C : Captures) {
     if (auto PD = dyn_cast<ParamDecl>(C.getDecl()))
       if (PD->hasType())
         if (auto type = PD->getType())
@@ -668,12 +679,12 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
 
   if (inoutCount > 0) {
     if (auto e = AFR.getAbstractFunctionDecl()) {
-      for (auto returnOccurrence: getEscapingFunctionAsReturnValue(e)) {
+      for (auto returnOccurrence : getEscapingFunctionAsReturnValue(e)) {
         diagnose(returnOccurrence->getReturnLoc(),
           diag::nested_function_escaping_inout_capture);
       }
       auto occurrences = getEscapingFunctionAsArgument(e);
-      for (auto occurrence: occurrences) {
+      for (auto occurrence : occurrences) {
         diagnose(occurrence->getLoc(),
           diag::nested_function_with_implicit_capture_argument,
           inoutCount > 1);

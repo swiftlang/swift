@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -28,7 +28,7 @@ public protocol _RandomAccessIndexable : _BidirectionalIndexable {
 
 /// A collection that supports efficient random-access index traversal.
 ///
-/// Random-access collections can measure move indices any distance and can
+/// Random-access collections can move indices any distance and 
 /// measure the distance between indices in O(1) time. Therefore, the
 /// fundamental difference between random-access and bidirectional collections
 /// is that operations that depend on index movement or distance measurement
@@ -56,7 +56,7 @@ public protocol RandomAccessCollection :
   // FIXME(ABI)#102 (Recursive Protocol Constraints):
   // associatedtype SubSequence : RandomAccessCollection
 
-  /// A type that can represent the indices that are valid for subscripting the
+  /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : _RandomAccessIndexable, BidirectionalCollection
     = DefaultRandomAccessIndices<Self>
@@ -67,10 +67,10 @@ public protocol RandomAccessCollection :
   /// order.
   ///
   /// A collection's `indices` property can hold a strong reference to the
-  /// collection itself, causing the collection to be non-uniquely referenced.
+  /// collection itself, causing the collection to be nonuniquely referenced.
   /// If you mutate the collection while iterating over its indices, a strong
-  /// reference can cause an unexpected copy of the collection. To avoid the
-  /// unexpected copy, use the `index(after:)` method starting with
+  /// reference can result in an unexpected copy of the collection. To avoid
+  /// the unexpected copy, use the `index(after:)` method starting with
   /// `startIndex` to produce indices instead.
   ///
   ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
@@ -161,8 +161,8 @@ extension _RandomAccessIndexable {
   ///     // Prints "50"
   ///
   /// The next example attempts to retrieve an index ten positions from
-  /// `numbers.startIndex`, but fails, because that distance is beyond the index
-  /// passed as `limit`.
+  /// `numbers.startIndex`, but fails, because that distance is beyond the
+  /// index passed as `limit`.
   ///
   ///     let j = numbers.index(numbers.startIndex,
   ///                           offsetBy: 10,
@@ -170,9 +170,9 @@ extension _RandomAccessIndexable {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
-  /// `limit` prevents offsetting beyond those bounds.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
@@ -204,21 +204,6 @@ where Index : Strideable,
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
-  ///
-  /// A collection's `indices` property can hold a strong reference to the
-  /// collection itself, causing the collection to be non-uniquely referenced.
-  /// If you mutate the collection while iterating over its indices, a strong
-  /// reference can cause an unexpected copy of the collection. To avoid the
-  /// unexpected copy, use the `index(after:)` method starting with
-  /// `startIndex` to produce indices instead.
-  ///
-  ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
-  ///     var i = c.startIndex
-  ///     while i != c.endIndex {
-  ///         c[i] /= 5
-  ///         i = c.index(after: i)
-  ///     }
-  ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
   public var indices: CountableRange<Index> {
     return startIndex..<endIndex
   }
@@ -258,8 +243,8 @@ where Index : Strideable,
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -269,9 +254,6 @@ where Index : Strideable,
   ///   If `n` is negative, this is the same value as the result of `-n` calls
   ///   to `index(before:)`.
   ///
-  /// - Precondition:
-  ///   - If `n > 0`, `n <= self.distance(from: i, to: self.endIndex)`
-  ///   - If `n < 0`, `n >= self.distance(from: i, to: self.startIndex)`
   /// - Complexity: O(1)
   public func index(_ i: Index, offsetBy n: Index.Stride) -> Index {
     let result = i.advanced(by: n)

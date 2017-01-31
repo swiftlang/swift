@@ -12,11 +12,11 @@
 func optionalMethodGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : $T):
-  // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
   // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
-  // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<@callee_owned (Int) -> ()>>
+  // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_owned (Int) -> ()> }
   // CHECK:   project_box [[OPT_BOX]]
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[PT]] : $*T
   // CHECK:   alloc_stack $Optional<@callee_owned (Int) -> ()>
@@ -29,11 +29,11 @@ func optionalMethodGeneric<T : P1>(t t : T) {
 func optionalPropertyGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : $T):
-  // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
   // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
-  // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<Int>>
+  // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<Int> }
   // CHECK:   project_box [[OPT_BOX]]
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[PT]] : $*T
   // CHECK:   alloc_stack $Optional<Int>
@@ -46,11 +46,11 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
 func optionalSubscriptGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : $T):
-  // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
   // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
-  // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<Int>>
+  // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<Int> }
   // CHECK:   project_box [[OPT_BOX]]
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[PT]] : $*T
   // CHECK:   [[INTCONV:%[0-9]+]] = function_ref @_TFSiC

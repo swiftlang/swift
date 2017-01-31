@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 import Builtin
 
@@ -20,7 +20,7 @@ class C {}
 
 sil_vtable C {}
 
-// CHECK: @_TMPO26enum_dynamic_multi_payload8EitherOr = {{.*}} %swift.type* (%swift.type_pattern*, i8**)* [[CREATE_GENERIC_METADATA:@[A-Za-z0-9_]+]]
+// CHECK: @_T026enum_dynamic_multi_payload8EitherOrOMP = {{.*}} %swift.type* (%swift.type_pattern*, i8**)* [[CREATE_GENERIC_METADATA:@[A-Za-z0-9_]+]]
 
 // -- The runtime doesn't track spare bits, so fixed instances of the dynamic
 //    type can't use them.

@@ -93,9 +93,13 @@ __weak id globalWeakVar;
 - (id)getObjectFromVarArgs:(id)first, ...;
 @end
 
-@interface ExtraSelectors
+@interface StrangeSelectors
 - (void)foo:(int)a bar:(int)b :(int)c;
 + (void)cStyle:(int)a, int b, int c;
++ (StrangeSelectors *):(int)x; // factory-method-like
++ (StrangeSelectors *):(int)x b:(int)y __attribute__((swift_name("init(a:b:)")));
+- (void):(int)x;
+- (void):(int)x :(int)y __attribute__((swift_name("empty(_:_:)")));
 @end
 
 @interface DeprecatedFactoryMethod
@@ -167,4 +171,9 @@ typedef SomeCell <NSCopying> *CopyableSomeCell;
 @interface FailBase : NSObject
 - (nullable instancetype)initWithValue:(NSInteger)val error:(NSError **)error;
 + (BOOL)processValueAndReturnError:(NSError **)error;
+@end
+
+@interface SelectorSplittingAccessors : NSObject
+// Note the custom setter name here; this is important.
+@property (setter=takeFooForBar:) BOOL fooForBar;
 @end

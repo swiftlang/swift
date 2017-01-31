@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -169,14 +169,14 @@ struct SwiftError : SwiftErrorHeader {
 /// If value is null, the box's contents will be left uninitialized, and
 /// \c isTake should be false.
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
-extern "C" BoxPair::Return swift_allocError(const Metadata *type,
-                                          const WitnessTable *errorConformance,
-                                          OpaqueValue *value, bool isTake);
+BoxPair::Return swift_allocError(const Metadata *type,
+                                 const WitnessTable *errorConformance,
+                                 OpaqueValue *value, bool isTake);
   
 /// Deallocate an error object whose contained object has already been
 /// destroyed.
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_deallocError(SwiftError *error, const Metadata *type);
+void swift_deallocError(SwiftError *error, const Metadata *type);
 
 struct ErrorValueResult {
   const OpaqueValue *value;
@@ -192,28 +192,28 @@ struct ErrorValueResult {
 /// that buffer if the error object is a toll-free-bridged NSError instead of
 /// a native Swift error, in which case the object itself is the "boxed" value.
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_getErrorValue(const SwiftError *errorObject,
-                                    void **scratch,
-                                    ErrorValueResult *out);
+void swift_getErrorValue(const SwiftError *errorObject,
+                         void **scratch,
+                         ErrorValueResult *out);
 
 /// Retain and release SwiftError boxes.
 SWIFT_RUNTIME_EXPORT
-extern "C" SwiftError *swift_errorRetain(SwiftError *object);
+SwiftError *swift_errorRetain(SwiftError *object);
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_errorRelease(SwiftError *object);
+void swift_errorRelease(SwiftError *object);
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_errorInMain(SwiftError *object);
+void swift_errorInMain(SwiftError *object);
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_willThrow(SwiftError *object);
+void swift_willThrow(SwiftError *object);
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_unexpectedError(SwiftError *object)
+void swift_unexpectedError(SwiftError *object)
     __attribute__((__noreturn__));
 
 #if SWIFT_OBJC_INTEROP
 
 /// Initialize an Error box to make it usable as an NSError instance.
 SWIFT_RUNTIME_EXPORT
-extern "C" id swift_bridgeErrorToNSError(SwiftError *errorObject);
+id swift_bridgeErrorToNSError(SwiftError *errorObject);
 
 /// Attempt to dynamically cast an NSError instance to a Swift ErrorType
 /// implementation using the _ObjectiveCBridgeableErrorType protocol.
@@ -234,11 +234,9 @@ const Metadata *getNSErrorMetadata();
 #endif
 
 SWIFT_RUNTIME_EXPORT
-extern "C"
 const size_t _swift_lldb_offsetof_SwiftError_typeMetadata;
 
 SWIFT_RUNTIME_EXPORT
-extern "C"
 const size_t _swift_lldb_sizeof_SwiftError;
 
 } // namespace swift

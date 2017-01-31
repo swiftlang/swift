@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 class A {}
 class B : A {}
 
-// CHECK-LABEL: sil hidden @_TF4main3fooFGSqCS_1A_T_ : $@convention(thin) (@owned Optional<A>) -> () {
+// CHECK-LABEL: sil hidden @_T04main3fooyAA1ACSgF : $@convention(thin) (@owned Optional<A>) -> () {
 // CHECK:    bb0([[ARG:%.*]] : $Optional<A>):
-// CHECK:      [[X:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<B>>, var, name "x"
+// CHECK:      [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 //   Check whether the temporary holds a value.
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -41,9 +41,9 @@ func foo(_ y : A?) {
   var x = (y as? B)
 }
 
-// CHECK-LABEL: sil hidden @_TF4main3barFGSqGSqGSqGSqCS_1A____T_ : $@convention(thin) (@owned Optional<Optional<Optional<Optional<A>>>>) -> () {
+// CHECK-LABEL: sil hidden @_T04main3baryAA1ACSgSgSgSgF : $@convention(thin) (@owned Optional<Optional<Optional<Optional<A>>>>) -> () {
 // CHECK:    bb0([[ARG:%.*]] : $Optional<Optional<Optional<Optional<A>>>>):
-// CHECK:      [[X:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<Optional<Optional<B>>>>, var, name "x"
+// CHECK:      [[X:%.*]] = alloc_box ${ var Optional<Optional<Optional<B>>> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 
 // Check for some(...)
@@ -107,9 +107,9 @@ func bar(_ y : A????) {
 }
 
 
-// CHECK-LABEL: sil hidden @_TF4main3bazFGSqPs9AnyObject__T_ : $@convention(thin) (@owned Optional<AnyObject>) -> () {
+// CHECK-LABEL: sil hidden @_T04main3bazys9AnyObject_pSgF : $@convention(thin) (@owned Optional<AnyObject>) -> () {
 // CHECK:       bb0([[ARG:%.*]] : $Optional<AnyObject>):
-// CHECK:         [[X:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<B>>, var, name "x"
+// CHECK:         [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:         [[T1:%.*]] = select_enum [[ARG_COPY]]
@@ -120,7 +120,7 @@ func bar(_ y : A????) {
 // CHECK:       [[IS_B]](
 // CHECK:       [[NOT_B]]:
 // CHECK:         destroy_value [[VAL]]
-// CHECK: } // end sil function '_TF4main3bazFGSqPs9AnyObject__T_'
+// CHECK: } // end sil function '_T04main3bazys9AnyObject_pSgF'
 func baz(_ y : AnyObject?) {
   var x = (y as? B)
 }
@@ -128,31 +128,28 @@ func baz(_ y : AnyObject?) {
 
 // <rdar://problem/17013042> T! <-> T? conversions should not produce a diamond
 
-// CHECK-LABEL: sil hidden @_TF4main18opt_to_opt_trivialFGSqSi_GSQSi_
+// CHECK-LABEL: sil hidden @_T04main07opt_to_B8_trivialSQySiGSiSgF
 // CHECK:       bb0(%0 : $Optional<Int>):
 // CHECK-NEXT:  debug_value %0 : $Optional<Int>, let, name "x"
-// CHECK-NEXT:  %2 = unchecked_trivial_bit_cast %0 : $Optional<Int> to $Optional<Int>
-// CHECK-NEXT:  return %2 : $Optional<Int>
+// CHECK-NEXT:  return %0 : $Optional<Int>
 // CHECK-NEXT:}
 func opt_to_opt_trivial(_ x: Int?) -> Int! {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF4main20opt_to_opt_referenceFGSQCS_1C_GSqS0__ :
+// CHECK-LABEL: sil hidden @_T04main07opt_to_B10_referenceAA1CCSgSQyADGF :
 // CHECK:  bb0([[ARG:%.*]] : $Optional<C>):
 // CHECK:    debug_value [[ARG]] : $Optional<C>, let, name "x"
-// CHECK:    [[COPY_ARG:%.*]] = copy_value [[ARG]]
-// CHECK:    [[RESULT:%.*]] = unchecked_ref_cast [[COPY_ARG]] : $Optional<C> to $Optional<C>
+// CHECK:    [[RESULT:%.*]] = copy_value [[ARG]]
 // CHECK:    destroy_value [[ARG]]
 // CHECK:    return [[RESULT]] : $Optional<C>
-// CHECK: } // end sil function '_TF4main20opt_to_opt_referenceFGSQCS_1C_GSqS0__'
+// CHECK: } // end sil function '_T04main07opt_to_B10_referenceAA1CCSgSQyADGF'
 func opt_to_opt_reference(_ x : C!) -> C? { return x }
 
-// CHECK-LABEL: sil hidden @_TF4main22opt_to_opt_addressOnly
+// CHECK-LABEL: sil hidden @_T04main07opt_to_B12_addressOnly{{[_0-9a-zA-Z]*}}F
 // CHECK:       bb0(%0 : $*Optional<T>, %1 : $*Optional<T>):
 // CHECK-NEXT:  debug_value_addr %1 : $*Optional<T>, let, name "x"
-// CHECK-NEXT:  %3 = unchecked_addr_cast %0 : $*Optional<T> to $*Optional<T>
-// CHECK-NEXT:  copy_addr %1 to [initialization] %3
+// CHECK-NEXT:  copy_addr %1 to [initialization] %0
 // CHECK-NEXT:  destroy_addr %1
 func opt_to_opt_addressOnly<T>(_ x : T!) -> T? { return x }
 
@@ -161,25 +158,23 @@ class C {}
 public struct TestAddressOnlyStruct<T> {
   func f(_ a : T?) {}
   
-  // CHECK-LABEL: sil hidden @_TFV4main21TestAddressOnlyStruct8testCall
+  // CHECK-LABEL: sil hidden @_T04main21TestAddressOnlyStructV8testCall{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0(%0 : $*Optional<T>, %1 : $TestAddressOnlyStruct<T>):
   // CHECK: [[TMPBUF:%.*]] = alloc_stack $Optional<T>
-  // CHECK: [[TMPCAST:%.*]] = unchecked_addr_cast [[TMPBUF]]
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPCAST]]
+  // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPBUF]]
   // CHECK-NEXT: apply {{.*}}<T>([[TMPBUF]], %1)
   func testCall(_ a : T!) {
     f(a)
   }
 }
 
-// CHECK-LABEL: sil hidden @_TF4main35testContextualInitOfNonAddrOnlyTypeFGSqSi_T_
+// CHECK-LABEL: sil hidden @_T04main35testContextualInitOfNonAddrOnlyTypeySiSgF
 // CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
-// CHECK-NEXT: [[X:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<Int>>, var, name "x"
+// CHECK-NEXT: [[X:%.*]] = alloc_box ${ var Optional<Int> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
-// CHECK-NEXT: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*Optional<Int> to $*Optional<Int>
-// CHECK-NEXT: store %0 to [trivial] [[CAST]] : $*Optional<Int>
-// CHECK-NEXT: destroy_value [[X]] : $<τ_0_0> { var τ_0_0 } <Optional<Int>>
+// CHECK-NEXT: store %0 to [trivial] [[PB]] : $*Optional<Int>
+// CHECK-NEXT: destroy_value [[X]] : ${ var Optional<Int> }
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
   var x: Int! = a
 }

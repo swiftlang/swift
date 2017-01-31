@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -48,7 +48,7 @@ typedef void (*RuntimeEntry)();
 #define DEFINE_SYMBOL(SymbolName, Name, CC)                                    \
   SWIFT_RT_ENTRY_IMPL_VISIBILITY extern "C" void Name()                        \
       SWIFT_CC(CC);                                                            \
-  SWIFT_RUNTIME_EXPORT extern "C" RuntimeEntry SymbolName =                    \
+  SWIFT_RUNTIME_EXPORT RuntimeEntry SymbolName =                    \
       reinterpret_cast<RuntimeEntry>(Name);
 
 #define FUNCTION1(Id, Name, CC, ReturnTys, ArgTys, Attrs)                      \
@@ -79,5 +79,5 @@ namespace swift {
 // This is done only for entry points using a new calling convention or
 // for those entry points which explicitly require it.
 #include "swift/Runtime/RuntimeFunctions.def"
-}
+} // namespace swift
 

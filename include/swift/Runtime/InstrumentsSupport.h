@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,50 +21,50 @@
 namespace swift {
 
 SWIFT_RUNTIME_EXPORT
-extern "C" HeapObject *(*_swift_allocObject)(HeapMetadata const *metadata,
+HeapObject *(*_swift_allocObject)(HeapMetadata const *metadata,
                                              size_t requiredSize,
                                              size_t requiredAlignmentMask);
 
 SWIFT_RUNTIME_EXPORT
-extern "C" BoxPair::Return (*_swift_allocBox)(Metadata const *type);
+BoxPair::Return (*_swift_allocBox)(Metadata const *type);
 
 SWIFT_RUNTIME_EXPORT
-extern "C" void (*_swift_retain)(HeapObject *object);
+void (*_swift_retain)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
-extern "C" void (*_swift_retain_n)(HeapObject *object, uint32_t n);
+void (*_swift_retain_n)(HeapObject *object, uint32_t n);
 SWIFT_RUNTIME_EXPORT
-extern "C" void (*_swift_nonatomic_retain)(HeapObject *object);
+void (*_swift_nonatomic_retain)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
-extern "C" HeapObject *(*_swift_tryRetain)(HeapObject *object);
+HeapObject *(*_swift_tryRetain)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
-extern "C" bool (*_swift_isDeallocating)(HeapObject *object);
+bool (*_swift_isDeallocating)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
-extern "C" void (*_swift_release)(HeapObject *object);
+void (*_swift_release)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
-extern "C" void (*_swift_release_n)(HeapObject *object, uint32_t n);
+void (*_swift_release_n)(HeapObject *object, uint32_t n);
 SWIFT_RUNTIME_EXPORT
-extern "C" void (*_swift_nonatomic_release)(HeapObject *object);
+void (*_swift_nonatomic_release)(HeapObject *object);
 
 // liboainject on iOS 8 patches the function pointers below if present. 
 // Do not reuse these names unless you do what oainject expects you to do.
 typedef size_t AllocIndex;
 SWIFT_RUNTIME_EXPORT
-extern "C" void *(*_swift_alloc)(AllocIndex idx);
+void *(*_swift_alloc)(AllocIndex idx);
 SWIFT_RUNTIME_EXPORT
-extern "C" void *(*_swift_tryAlloc)(AllocIndex idx);
+void *(*_swift_tryAlloc)(AllocIndex idx);
 SWIFT_RUNTIME_EXPORT
-extern "C" void *(*_swift_slowAlloc)(size_t bytes, size_t alignMask,
+void *(*_swift_slowAlloc)(size_t bytes, size_t alignMask,
                                      uintptr_t flags);
 SWIFT_RUNTIME_EXPORT
-extern "C" void (*_swift_dealloc)(void *ptr, AllocIndex idx);
+void (*_swift_dealloc)(void *ptr, AllocIndex idx);
 SWIFT_RUNTIME_EXPORT
-extern "C" void (*_swift_slowDealloc)(void *ptr, size_t bytes, size_t alignMask);
+void (*_swift_slowDealloc)(void *ptr, size_t bytes, size_t alignMask);
 SWIFT_RUNTIME_EXPORT
-extern "C" size_t _swift_indexToSize(AllocIndex idx);
+size_t _swift_indexToSize(AllocIndex idx);
 SWIFT_RUNTIME_EXPORT
-extern "C" int _swift_sizeToIndex(size_t size);
+int _swift_sizeToIndex(size_t size);
 SWIFT_RUNTIME_EXPORT
-extern "C" void _swift_zone_init(void);
+void _swift_zone_init(void);
 
 };
 

@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend -O %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O %s -emit-sil | %FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances.
 
-// CHECK-LABEL: sil @_TF28devirt_inherited_conformance6driverFT_T_ : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @_T028devirt_inherited_conformance6driveryyF : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK: [[UNKNOWN2a:%.*]] = function_ref @unknown2a : $@convention(thin) () -> ()
 // CHECK: apply [[UNKNOWN2a]]
@@ -161,7 +161,7 @@ public func compareComparable<T:Comparable>(_ x: T, _ y:T) -> Bool {
 }
 
 // Check that a call of inherited Equatable.== can be devirtualized.
-// CHECK-LABEL: sil @_TF28devirt_inherited_conformance17testCompareEqualsFT_Sb : $@convention(thin) () -> Bool {
+// CHECK-LABEL: sil @_T028devirt_inherited_conformance17testCompareEqualsSbyF : $@convention(thin) () -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: struct $Bool
@@ -173,8 +173,8 @@ public func testCompareEquals() -> Bool {
 
 
 
-// Check that  acall of inherited Simple.== can be devirtualized.
-// CHECK-LABEL: sil @_TF28devirt_inherited_conformance20testCompareMinMinMinFT_Sb : $@convention(thin) () -> Bool {
+// Check that a call of inherited Simple.== can be devirtualized.
+// CHECK-LABEL: sil @_T028devirt_inherited_conformance014testCompareMinfF0SbyF : $@convention(thin) () -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: struct $Bool
@@ -184,7 +184,7 @@ public func testCompareMinMinMin() -> Bool {
 }
 
 // Check that a call of inherited Comparable.== can be devirtualized.
-// CHECK-LABEL: sil @_TF28devirt_inherited_conformance21testCompareComparableFT_Sb : $@convention(thin) () -> Bool {
+// CHECK-LABEL: sil @_T028devirt_inherited_conformance21testCompareComparableSbyF : $@convention(thin) () -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: struct $Bool
@@ -198,7 +198,7 @@ public func BooCall<T:Simple>(_ x:T, _ y:T) -> Bool {
 }
 
 // Check that a call of inherited Simple.boo can be devirtualized.
-// CHECK-LABEL: sil @_TF28devirt_inherited_conformance11testBooCallFT_Sb : $@convention(thin) () -> Bool {
+// CHECK-LABEL: sil @_T028devirt_inherited_conformance11testBooCallSbyF : $@convention(thin) () -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: struct $Bool

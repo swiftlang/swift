@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,23 +25,19 @@ using llvm::ArrayRef;
 namespace swift {
 namespace NewMangling {
 
-/// Returns true if the new mangling scheme should be used.
-///
-/// TODO: remove this function when the old mangling is removed.
-bool useNewMangling();
-  
 /// Select an old or new mangled string, based on useNewMangling().
 ///
 /// Also performs test to check if the demangling of both string yield the same
 /// demangling tree.
 /// TODO: remove this function when the old mangling is removed.
-std::string selectMangling(const std::string &Old, const std::string &New);
+std::string selectMangling(const std::string &Old, const std::string &New,
+                           bool compareTrees = true);
 
 void printManglingStats();
 
 /// The basic Swift symbol mangler.
 ///
-/// This class serves as a abstract base class for specific manglers. It
+/// This class serves as an abstract base class for specific manglers. It
 /// provides some basic utilities, like handling of substitutions, mangling of
 /// identifiers, etc.
 class Mangler {
@@ -161,6 +157,21 @@ protected:
       appendListSeparator();
       isFirstListItem = false;
     }
+  }
+  void appendOperatorParam(StringRef op) {
+    Buffer << op;
+  }
+  void appendOperatorParam(StringRef op, int natural) {
+    Buffer << op << natural << '_';
+  }
+  void appendOperatorParam(StringRef op, Index index) {
+    Buffer << op << index;
+  }
+  void appendOperatorParam(StringRef op, Index index1, Index index2) {
+    Buffer << op << index1 << index2;
+  }
+  void appendOperatorParam(StringRef op, StringRef arg) {
+    Buffer << op << arg;
   }
 };
 

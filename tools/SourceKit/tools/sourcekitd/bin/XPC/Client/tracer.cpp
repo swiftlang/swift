@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,12 +21,12 @@
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/TimeValue.h"
 #include "llvm/Support/YAMLTraits.h"
 
 #include <xpc/xpc.h>
 
 #include <algorithm>
+#include <chrono>
 #include <deque>
 #include <functional>
 #include <iomanip>
@@ -70,7 +70,8 @@ static void fsWriteFile(const char *Path, StringRef Text) {
 
 static void fsInitTraceRoot(path_t &RootDir, uint64_t Id) {
   RootDir = trace_root_dir;
-  std::string DirName = llvm::sys::TimeValue::now().str();
+  std::string DirName =
+    std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
   std::for_each(DirName.begin(), DirName.end(),
                 [] (char &C) { if (!isalnum(C)) C = '-'; });
   DirName += '-';
@@ -91,7 +92,7 @@ static void fsAddFileWithRevision(path_t &Path,
 typedef SourceKit::trace::OperationKind OperationKind;
 
 struct OperationInfo {
-  sys::TimeValue StartedAt;
+  std::chrono::system_clock::time_point StartedAt;
   OperationKind Kind;
   std::string SwiftArgs;
   trace::StringPairs OpArgs;
@@ -101,7 +102,7 @@ struct OperationInfo {
                 std::string &&SwiftArgs,
                 trace::StringPairs &&Files,
                 trace::StringPairs &&OpArgs)
-    : StartedAt(sys::TimeValue::now()),
+    : StartedAt(std::chrono::system_clock::now()),
       Kind(K), SwiftArgs(SwiftArgs), OpArgs(OpArgs), Files(Files) {}
 
   OperationInfo() = default;

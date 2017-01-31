@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_SILBUILDER_H
 #define SWIFT_SIL_SILBUILDER_H
 
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -327,9 +328,9 @@ public:
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn, ArrayRef<SILValue> Args,
                          bool isNonThrowing) {
-    auto FnTy = Fn->getType();
-    return createApply(Loc, Fn, FnTy,
-                       FnTy.castTo<SILFunctionType>()->getSILResult(),
+    SILFunctionConventions conventions(Fn->getType().castTo<SILFunctionType>(),
+                                       getModule());
+    return createApply(Loc, Fn, Fn->getType(), conventions.getSILResultType(),
                        ArrayRef<Substitution>(), Args, isNonThrowing);
   }
 
@@ -468,7 +469,8 @@ public:
     assert((Qualifier == LoadOwnershipQualifier::Unqualified) ||
            F.hasQualifiedOwnership() &&
                "Qualified inst in unqualified function");
-    assert(LV->getType().isLoadable(F.getModule()));
+    assert(!SILModuleConventions(F.getModule()).useLoweredAddresses()
+           || LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
@@ -486,6 +488,11 @@ public:
     assert(LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
+  }
+
+  BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV) {
+    return insert(new (F.getModule())
+                      BeginBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
@@ -509,15 +516,27 @@ public:
     return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
-  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue Src,
-                                 SILValue DestAddr) {
-    return insert(new (F.getModule())
-                      EndBorrowInst(getSILDebugLocation(Loc), Src, DestAddr));
+  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue BorrowedValue,
+                                 SILValue OriginalValue) {
+    return insert(new (F.getModule()) EndBorrowInst(
+        getSILDebugLocation(Loc), BorrowedValue, OriginalValue));
+  }
+
+  EndBorrowArgumentInst *createEndBorrowArgument(SILLocation Loc,
+                                                 SILValue Arg) {
+    return insert(new (F.getModule()) EndBorrowArgumentInst(
+        getSILDebugLocation(Loc), cast<SILArgument>(Arg)));
   }
 
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
     return insert(new (F.getModule())
                       AssignInst(getSILDebugLocation(Loc), Src, DestAddr));
+  }
+
+  StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
+                                     SILValue DestAddr) {
+    return insert(new (F.getModule())
+                      StoreBorrowInst(getSILDebugLocation(Loc), Src, DestAddr));
   }
 
   MarkUninitializedInst *
@@ -792,9 +811,29 @@ public:
                                                        operand, atomicity));
   }
 
+  UnmanagedRetainValueInst *createUnmanagedRetainValue(SILLocation Loc,
+                                                       SILValue operand) {
+    assert(F.hasQualifiedOwnership());
+    return insert(new (F.getModule()) UnmanagedRetainValueInst(
+        getSILDebugLocation(Loc), operand));
+  }
+
+  UnmanagedReleaseValueInst *createUnmanagedReleaseValue(SILLocation Loc,
+                                                         SILValue operand) {
+    assert(F.hasQualifiedOwnership());
+    return insert(new (F.getModule()) UnmanagedReleaseValueInst(
+        getSILDebugLocation(Loc), operand));
+  }
+
   CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
     return insert(new (F.getModule())
                       CopyValueInst(getSILDebugLocation(Loc), operand));
+  }
+
+  CopyUnownedValueInst *createCopyUnownedValue(SILLocation Loc,
+                                               SILValue operand) {
+    return insert(new (F.getModule()) CopyUnownedValueInst(
+        getSILDebugLocation(Loc), operand, getModule()));
   }
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
@@ -1270,7 +1309,7 @@ public:
   ProjectBoxInst *createProjectBox(SILLocation Loc, SILValue boxOperand,
                                    unsigned index) {
     auto boxTy = boxOperand->getType().castTo<SILBoxType>();
-    auto fieldTy = boxTy->getFieldType(index);
+    auto fieldTy = boxTy->getFieldType(getModule(), index);
 
     return insert(new (F.getModule()) ProjectBoxInst(
         getSILDebugLocation(Loc), boxOperand, index, fieldTy));
@@ -1631,6 +1670,11 @@ private:
       InsertedInstrs->push_back(TheInst);
 
     BB->insert(InsertPt, TheInst);
+// TODO: We really shouldn't be creating instructions unless we are going to
+// insert them into a block... This failed in SimplifyCFG.
+#ifndef NDEBUG
+    TheInst->verifyOperandOwnership();
+#endif
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {

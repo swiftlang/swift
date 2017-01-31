@@ -27,7 +27,7 @@ class Bas : NSObject {
 
 sil [fragile] @test_super_method : $@convention(method) (@guaranteed Bas) -> Bas
 sil [fragile] @swift_StringToNSString : $@convention(thin) (@inout String) -> @owned NSString
-sil [fragile] @_TFSSCfMSSFT_SS : $@convention(thin) (@thin String.Type) -> @owned String
+sil [fragile] @_T0SSSSycSSmcfC : $@convention(thin) (@thin String.Type) -> @owned String
 
 protocol SomeClassProtocol : class {}
 
@@ -55,7 +55,7 @@ entry:
 public func serialize_all() {
 }
 
-sil [fragile] [transparent] @_TF14def_basic_objc13serialize_allFT_T_ : $@convention(thin) () -> () {
+sil [fragile] [transparent] @_T014def_basic_objc13serialize_allyyF : $@convention(thin) () -> () {
 bb0:
   %26 = function_ref @objc_classes : $@convention(thin) (@thick NSObject.Type) -> ()
 

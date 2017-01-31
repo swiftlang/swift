@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -65,7 +65,6 @@ static const uint8_t _swift_stdlib_GraphemeClusterBreakPropertyTrieImpl[] = {
 };
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
 const uint8_t *_swift_stdlib_GraphemeClusterBreakPropertyTrie =
     _swift_stdlib_GraphemeClusterBreakPropertyTrieImpl;
 
@@ -92,7 +91,7 @@ struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy {
 };
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" const struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy
+const struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy
 _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadata = {
   ${trie_generator.bmp_first_level_index_bits},
   ${trie_generator.bmp_data_offset_bits},
@@ -129,7 +128,6 @@ static const uint16_t _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix
 % end
 };
 
-extern "C"
 SWIFT_RUNTIME_STDLIB_INTERFACE
 const uint16_t *_swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix =
     _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrixImpl;

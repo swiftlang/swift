@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
@@ -57,8 +56,7 @@ static Type deriveRawRepresentable_Raw(TypeChecker &tc, Decl *parentDecl,
   //   typealias Raw = SomeType
   // }
   auto rawInterfaceType = enumDecl->getRawType();
-  return ArchetypeBuilder::mapTypeIntoContext(cast<DeclContext>(parentDecl),
-                                              rawInterfaceType);
+  return cast<DeclContext>(parentDecl)->mapTypeIntoContext(rawInterfaceType);
 }
 
 static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
@@ -82,7 +80,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
-  rawTy = ArchetypeBuilder::mapTypeIntoContext(toRawDecl, rawTy);
+  rawTy = toRawDecl->mapTypeIntoContext(rawTy);
 
   for (auto elt : enumDecl->getAllElements()) {
     assert(elt->getTypeCheckedRawValueExpr() &&
@@ -183,7 +181,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
-  rawTy = ArchetypeBuilder::mapTypeIntoContext(initDecl, rawTy);
+  rawTy = initDecl->mapTypeIntoContext(rawTy);
   
   for (auto elt : enumDecl->getAllElements()) {
     assert(elt->getTypeCheckedRawValueExpr() &&
@@ -329,30 +327,29 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   return initDecl;
 }
 
-static bool canSynthesizeRawRepresentable(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
+static bool canSynthesizeRawRepresentable(TypeChecker &tc, Decl *parentDecl,
+                                          EnumDecl *enumDecl) {
 
   // It must have a valid raw type.
   Type rawType = enumDecl->getRawType();
   if (!rawType)
     return false;
   auto parentDC = cast<DeclContext>(parentDecl);
-  rawType       = ArchetypeBuilder::mapTypeIntoContext(parentDC, rawType);
+  rawType       = parentDC->mapTypeIntoContext(rawType);
 
   if (!enumDecl->getInherited().empty() &&
       enumDecl->getInherited().front().isError())
     return false;
 
-  // The raw type must be Equatable, so that we have a suitable ~= for synthesized switch statements.
+  // The raw type must be Equatable, so that we have a suitable ~= for
+  // synthesized switch statements.
   auto equatableProto = tc.getProtocol(enumDecl->getLoc(),
                                        KnownProtocolKind::Equatable);
   if (!equatableProto)
     return false;
 
-  if (!tc.conformsToProtocol(rawType, equatableProto, enumDecl, None)) {
-    SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
-    tc.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
+  if (!tc.conformsToProtocol(rawType, equatableProto, enumDecl, None))
     return false;
-  }
   
   // There must be enum elements.
   if (enumDecl->getAllElements().empty())

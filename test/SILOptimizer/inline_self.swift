@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -emit-sil  -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -O -emit-sil  -primary-file %s | %FileCheck %s
 //
 // This is a .swift test because the SIL parser does not support Self.
 
@@ -64,19 +64,19 @@ _ = Z().capturesSelf()
 
 // CHECK-LABEL: sil @main : $@convention(c)
 // CHECK: function_ref static inline_self.C.factory (Swift.Int) -> Self
-// CHECK: [[F:%[0-9]+]] = function_ref @_TZFC11inline_self1C7factory{{.*}} : $@convention(method) (Int, @thick C.Type) -> @owned C
+// CHECK: [[F:%[0-9]+]] = function_ref @_T011inline_self1CC7factory{{[_0-9a-zA-Z]*}}FZ : $@convention(method) (Int, @thick C.Type) -> @owned C
 // CHECK: apply [[F]](%{{.+}}, %{{.+}}) : $@convention(method) (Int, @thick C.Type) -> @owned C
 
 // CHECK: function_ref inline_self.Z.capturesSelf () -> Self
-// CHECK: [[F:%[0-9]+]] = function_ref @_TFC11inline_self1Z12capturesSelffT_DS0_ : $@convention(method) (@guaranteed Z) -> @owned Z
+// CHECK: [[F:%[0-9]+]] = function_ref @_T011inline_self1ZC12capturesSelfACXDyF : $@convention(method) (@guaranteed Z) -> @owned Z
 // CHECK: [[Z:%.*]] = alloc_ref $Z
 // CHECK: apply [[F]]([[Z]]) : $@convention(method) (@guaranteed Z) -> @owned
 // CHECK: return
 
-// CHECK-LABEL: sil hidden @_TFC11inline_self1Z16callCapturesSelffT_DS0_ : $@convention(method)
-// CHECK-NOT: function_ref @_TFC11inline_self1Z12capturesSelffT_DS0_
+// CHECK-LABEL: sil hidden @_T011inline_self1ZC16callCapturesSelfACXDyF : $@convention(method)
+// CHECK-NOT: function_ref @_T011inline_self1ZC12capturesSelfACXDyF :
 // CHECK: }
 
-// CHECK-LABEL: sil hidden @_TFC11inline_self1Z20callBaseCapturesSelffT_DS0_
-// CHECK-NOT: function_ref @_TFC11inline_self5BaseZ16baseCapturesSelffT_DS0_
+// CHECK-LABEL: sil hidden @_T011inline_self1ZC20callBaseCapturesSelfACXDyF
+// CHECK-NOT: function_ref @_T011inline_self5BaseZC16baseCapturesSelfACXDyF :
 // CHECK: }

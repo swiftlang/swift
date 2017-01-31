@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -294,26 +294,6 @@ public protocol RangeReplaceableCollection
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Iterator.Element
 
-  /*
-  We could have these operators with default implementations, but the compiler
-  crashes:
-
-  <rdar://problem/16566712> Dependent type should have been substituted by Sema
-  or SILGen
-
-  func + <S : Sequence>(_: Self, _: S) -> Self
-    where S.Iterator.Element == Iterator.Element
-
-  func + <S : Sequence>(_: S, _: Self) -> Self
-    where S.Iterator.Element == Iterator.Element
-
-  func + <S : Collection>(_: Self, _: S) -> Self
-    where S.Iterator.Element == Iterator.Element
-
-  func + <RC : RangeReplaceableCollection>(_: Self, _: S) -> Self
-    where RC.Iterator.Element == Iterator.Element
-  */
-
   /// Prepares the collection to store the specified number of elements, when
   /// doing so is appropriate for the underlying type.
   ///
@@ -370,16 +350,6 @@ public protocol RangeReplaceableCollection
   ///   collection.
   mutating func append(_ newElement: Iterator.Element)
 
-  /*
-  The 'append(contentsOf:)' requirement should be an operator, but the compiler crashes:
-
-  <rdar://problem/16566712> Dependent type should have been substituted by Sema
-  or SILGen
-
-  func += <S : Sequence>(inout _: Self, _: S)
-    where S.Iterator.Element == Iterator.Element
-  */
-
   /// Adds the elements of a sequence or collection to the end of this
   /// collection.
   ///
@@ -398,6 +368,8 @@ public protocol RangeReplaceableCollection
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting
   ///   collection.
+  // FIXME(ABI)#166 (Evolution): Consider replacing .append(contentsOf) with +=
+  // suggestion in SE-91
   mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Iterator.Element
 
@@ -821,6 +793,43 @@ extension RangeReplaceableCollection {
   public mutating func reserveCapacity(_ n: IndexDistance) {}
 }
 
+// Offer the most specific slice type available for each possible combination of
+// RangeReplaceable * (1 + Bidirectional + RandomAccess) * (1 + Mutable)
+// collections.
+
+% for capability in ['', 'Bidirectional', 'RandomAccess']:
+%   if capability:
+extension RangeReplaceableCollection where
+    Self: ${capability}Collection,
+    Self.SubSequence == RangeReplaceable${capability}Slice<Self> {
+  public subscript(bounds: Range<Index>)
+      -> RangeReplaceable${capability}Slice<Self> {
+    return RangeReplaceable${capability}Slice(base: self, bounds: bounds)
+  }
+}
+%   end
+
+extension RangeReplaceableCollection where
+  Self: MutableCollection,
+%   if capability:
+  Self: ${capability}Collection,
+%   end
+  Self.SubSequence == MutableRangeReplaceable${capability}Slice<Self>
+{
+  public subscript(bounds: Range<Index>)
+      -> MutableRangeReplaceable${capability}Slice<Self> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return MutableRangeReplaceable${capability}Slice(base: self,
+                                                       bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+}
+% end
+
 extension RangeReplaceableCollection where SubSequence == Self {
   /// Removes and returns the first element of the collection.
   ///
@@ -1169,6 +1178,29 @@ public func +<
   lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
   lhs.append(contentsOf: rhs)
   return lhs
+}
+
+/// Appends the elements of a sequence to a range-replaceable collection.
+///
+/// Use this operator to append the elements of a sequence to the end of
+/// range-replaceable collection with same `Element` type. This example appends
+/// the elements of a `Range<Int>` instance to an array of integers.
+///
+///     var numbers = [1, 2, 3, 4, 5]
+///     numbers += 10...15
+///     print(numbers)
+///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
+///
+/// - Parameters:
+///   - lhs: The array to append to.
+///   - rhs: A collection or finite sequence.
+///
+/// - Complexity: O(*n*), where *n* is the length of the resulting array.
+public func += <
+  R : RangeReplaceableCollection, S : Sequence
+>(lhs: inout R, rhs: S) 
+ where R.Iterator.Element == S.Iterator.Element {
+  lhs.append(contentsOf: rhs)
 }
 
 @available(*, unavailable, renamed: "RangeReplaceableCollection")

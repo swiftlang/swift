@@ -220,7 +220,7 @@ bb0:
   %O = unchecked_ref_cast %C : $C to $Builtin.UnknownObject
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
-  %2 = class_method %C : $C, #C.doIt!1 : (C) -> () -> () , $@convention(method) (@guaranteed C) -> ()
+  %2 = class_method %C : $C, #C.doIt!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
 
   // CHECK: alloc_ref $D
   %D = alloc_ref $D
@@ -1569,10 +1569,12 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 }
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
-// CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
+// CHECK: #Foo.subscript!getter.1: {{.*}} : hidden _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+// CHECK: #Foo.subscript!setter.1: {{.*}} : _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
 // CHECK: }
 sil_vtable Foo {
-  #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
-  #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
+  // Override the linke to check if it is parsed correctly.
+  #Foo.subscript!getter.1: hidden _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+  // The public linkage is the same as the function's linkage and should not be printed.
+  #Foo.subscript!setter.1: public _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
 }

@@ -64,10 +64,10 @@ print("")
 
 func isPalindrome0<
   S : BidirectionalCollection
-  where
-  S.Iterator.Element : Equatable,
-  S.Indices.Iterator.Element == S.Index
->(_ seq: S) -> Bool {
+>(_ seq: S) -> Bool
+where
+S.Iterator.Element : Equatable,
+S.Indices.Iterator.Element == S.Index {
   typealias Index = S.Index
 
   let a = seq.indices
@@ -89,10 +89,10 @@ print(isPalindrome0(MinimalBidirectionalCollection(elements: "GoHangaSalamiimala
 
 func isPalindrome1<
   S : BidirectionalCollection
-  where
-  S.Iterator.Element : Equatable,
-  S.Indices.Iterator.Element == S.Index
->(_ seq: S) -> Bool {
+>(_ seq: S) -> Bool
+where
+S.Iterator.Element : Equatable,
+S.Indices.Iterator.Element == S.Index {
 
   let a = PermutationGenerator(elements: seq, indices: seq.indices)
   var b = seq.lazy.reversed().makeIterator()
@@ -106,10 +106,10 @@ func isPalindrome1<
 
 func isPalindrome1_5<
   S: BidirectionalCollection
-  where
-  S.Iterator.Element == S.Iterator.Element,
-  S.Iterator.Element: Equatable
->(_ seq: S) -> Bool {
+>(_ seq: S) -> Bool
+where
+S.Iterator.Element == S.Iterator.Element,
+S.Iterator.Element: Equatable {
 
   var b = seq.lazy.reversed().makeIterator()
   for nextChar in seq {
@@ -134,9 +134,9 @@ print(isPalindrome1_5(MinimalBidirectionalCollection(elements: "FleetoMeReMoteel
 // BidirectionalCollection traversal finally pays off!
 func isPalindrome2<
   S: BidirectionalCollection
-  where
-  S.Iterator.Element: Equatable
->(_ seq: S) -> Bool {
+>(_ seq: S) -> Bool
+where
+S.Iterator.Element: Equatable {
 
   var b = seq.startIndex, e = seq.endIndex
 
@@ -167,10 +167,10 @@ print(isPalindrome2(MinimalBidirectionalCollection(elements: "Zerimar-O-ramireZ"
 
 func isPalindrome4<
   S: BidirectionalCollection
-  where
-  S.Iterator.Element : Equatable,
-  S.Indices.Iterator.Element == S.Index
->(_ seq: S) -> Bool {
+>(_ seq: S) -> Bool
+where
+S.Iterator.Element : Equatable,
+S.Indices.Iterator.Element == S.Index {
   typealias Index = S.Index
 
   let a = PermutationGenerator(elements: seq, indices: seq.indices)

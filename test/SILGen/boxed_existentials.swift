@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s --check-prefix=GUARANTEED
 
 func test_type_lowering(_ x: Error) { }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials18test_type_loweringFPs5Error_T_ : $@convention(thin) (@owned Error) -> () {
+// CHECK-LABEL: sil hidden @_T018boxed_existentials18test_type_loweringys5Error_pF : $@convention(thin) (@owned Error) -> () {
 // CHECK:         destroy_value %0 : $Error
 
 class Document {}
@@ -17,7 +17,7 @@ enum ClericalError: Error {
 func test_concrete_erasure(_ x: ClericalError) -> Error {
   return x
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_concrete_erasureFOS_13ClericalErrorPs5Error_
+// CHECK-LABEL: sil hidden @_T018boxed_existentials21test_concrete_erasures5Error_pAA08ClericalF0OF
 // CHECK:       bb0([[ARG:%.*]] : $ClericalError):
 // CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $Error, $ClericalError
 // CHECK:         [[ADDR:%.*]] = project_existential_box $ClericalError in [[EXISTENTIAL]] : $Error
@@ -31,7 +31,7 @@ protocol HairType {}
 func test_composition_erasure(_ x: HairType & Error) -> Error {
   return x
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials24test_composition_erasureFPs5ErrorS_8HairType_PS0__
+// CHECK-LABEL: sil hidden @_T018boxed_existentials24test_composition_erasures5Error_psAC_AA8HairTypepF
 // CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr [[OLD_EXISTENTIAL:%.*]] : $*Error & HairType to $*[[VALUE_TYPE:@opened\(.*\) Error & HairType]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
@@ -44,7 +44,7 @@ protocol HairClass: class {}
 func test_class_composition_erasure(_ x: HairClass & Error) -> Error {
   return x
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPs5ErrorS_9HairClass_PS0__
+// CHECK-LABEL: sil hidden @_T018boxed_existentials30test_class_composition_erasures5Error_psAC_AA9HairClasspF
 // CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $Error & HairClass to $[[VALUE_TYPE:@opened\(.*\) Error & HairClass]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
@@ -55,7 +55,7 @@ func test_class_composition_erasure(_ x: HairClass & Error) -> Error {
 func test_property(_ x: Error) -> String {
   return x._domain
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials13test_propertyFPs5Error_SS
+// CHECK-LABEL: sil hidden @_T018boxed_existentials13test_propertySSs5Error_pF
 // CHECK:         [[VALUE:%.*]] = open_existential_box %0 : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
 // FIXME: Extraneous copy here
 // CHECK-NEXT:    [[COPY:%[0-9]+]] = alloc_stack $[[VALUE_TYPE]]
@@ -72,9 +72,9 @@ func test_property_of_lvalue(_ x: Error) -> String {
   return x._domain
 }
 
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPs5Error_SS :
+// CHECK-LABEL: sil hidden @_T018boxed_existentials23test_property_of_lvalueSSs5Error_pF :
 // CHECK:       bb0([[ARG:%.*]] : $Error):
-// CHECK:         [[VAR:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Error>
+// CHECK:         [[VAR:%.*]] = alloc_box ${ var Error }
 // CHECK:         [[PVAR:%.*]] = project_box [[VAR]]
 // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Error
 // CHECK:         store [[ARG_COPY]] to [init] [[PVAR]]
@@ -90,12 +90,12 @@ func test_property_of_lvalue(_ x: Error) -> String {
 // CHECK:         destroy_value [[VAR]]
 // CHECK:         destroy_value [[ARG]]
 // CHECK:         return [[RESULT]]
-// CHECK:      } // end sil function '_TF18boxed_existentials23test_property_of_lvalueFPs5Error_SS'
+// CHECK:      } // end sil function '_T018boxed_existentials23test_property_of_lvalueSSs5Error_pF'
 extension Error {
   final func extensionMethod() { }
 }
 
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_extension_methodFPs5Error_T_
+// CHECK-LABEL: sil hidden @_T018boxed_existentials21test_extension_methodys5Error_pF
 func test_extension_method(_ error: Error) {
   // CHECK: [[VALUE:%.*]] = open_existential_box %0
   // CHECK: [[METHOD:%.*]] = function_ref
@@ -111,14 +111,14 @@ func test_extension_method(_ error: Error) {
 
 func plusOneError() -> Error { }
 
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPs5Error_PS0___T_
-// GUARANTEED-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPs5Error_PS0___T_
+// CHECK-LABEL: sil hidden @_T018boxed_existentials31test_open_existential_semanticsys5Error_p_sAC_ptF
+// GUARANTEED-LABEL: sil hidden @_T018boxed_existentials31test_open_existential_semanticsys5Error_p_sAC_ptF
 func test_open_existential_semantics(_ guaranteed: Error,
                                      _ immediate: Error) {
   var immediate = immediate
-  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Error>
+  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
-  // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Error>
+  // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }
   // GUARANTEED: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
 
   // CHECK-NOT: copy_value %0
@@ -175,11 +175,11 @@ func test_open_existential_semantics(_ guaranteed: Error,
   plusOneError().extensionMethod()
 }
 
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials14erasure_to_anyFTPs5Error_PS0___P_
+// CHECK-LABEL: sil hidden @_T018boxed_existentials14erasure_to_anyyps5Error_p_sAC_ptF
 // CHECK:       bb0([[OUT:%.*]] : $*Any, [[GUAR:%.*]] : $Error,
 func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
   var immediate = immediate
-  // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Error>
+  // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }
   // CHECK:       [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
   if true {
     // CHECK-NOT: copy_value [[GUAR]]

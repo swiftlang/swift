@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,6 +23,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
@@ -97,13 +98,12 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
   if (it == Map.end()) return nullptr;
   auto &chain = it->second;
 
-  CacheEntry *best = nullptr, *bestPrev = nullptr;
+  CacheEntry *best = nullptr;
   Optional<unsigned> bestCost;
 
-  CacheEntry *next = chain.Root, *nextPrev = nullptr;
+  CacheEntry *next = chain.Root;
   while (next) {
-    CacheEntry *cur = next, *curPrev = nextPrev;
-    nextPrev = cur;
+    CacheEntry *cur = next;
     next = cur->getNext();
 
     // Ignore abstract entries if so requested.
@@ -130,7 +130,6 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
       bestCost = curCost;
     }
     best = cur;
-    bestPrev = curPrev;
   }
 
   // If we didn't find anything, we're done.

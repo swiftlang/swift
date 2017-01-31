@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -343,7 +343,7 @@ class SHA1 : Hash {
 
     // Append the original message length as 64bit big endian:
     let len_in_bits = Int64(messageLength)*8
-    for i in 0..<8 {
+    for i in 0..<(8 as Int64) {
       let val = (len_in_bits >> ((7-i)*8)) & 0xFF
       data[dataLength] = UInt8(val)
       dataLength += 1
@@ -481,7 +481,7 @@ class SHA256 :  Hash {
 
     // Append the original message length as 64bit big endian:
     let len_in_bits = Int64(messageLength)*8
-    for i in 0..<8 {
+    for i in 0..<(8 as Int64) {
       let val = (len_in_bits >> ((7-i)*8)) & 0xFF
       data[dataLength] = UInt8(val)
       dataLength += 1

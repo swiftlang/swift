@@ -17,12 +17,16 @@ add_swift_library(swiftSema STATIC
   ITCDecl.cpp
   ITCNameLookup.cpp
   ITCType.cpp
+  InstrumenterSupport.cpp
   IterativeTypeChecker.cpp
   MiscDiagnostics.cpp
   NameBinding.cpp
+  PCMacro.cpp
   PlaygroundTransform.cpp
+  ResilienceDiagnostics.cpp
   SourceLoader.cpp
   TypeCheckAttr.cpp
+  TypeCheckAvailability.cpp
   TypeCheckCaptures.cpp
   TypeCheckConstraints.cpp
   TypeCheckDecl.cpp

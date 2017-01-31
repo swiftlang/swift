@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
-// REQUIRES: rdar:27506150> SILOptimizer/swap_refcnt.swift fails after noreturn -> Never changes
+// REQUIRES: rdar:30181104 SILOptimizer/swap_refcnt.swift fails on linux.
 
 // Make sure we can swap two values in an array without retaining anything.
 

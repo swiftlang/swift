@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,14 +16,15 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -67,7 +68,7 @@ struct ASTNodeBase {};
 #include "swift/AST/PatternNodes.def"
 
   class Verifier : public ASTWalker {
-    PointerUnion<Module *, SourceFile *> M;
+    PointerUnion<ModuleDecl *, SourceFile *> M;
     ASTContext &Ctx;
     llvm::raw_ostream &Out;
     const bool HadError;
@@ -102,9 +103,9 @@ struct ASTNodeBase {};
                    llvm::SmallBitVector> ClosureDiscriminators;
     DeclContext *CanonicalTopLevelContext = nullptr;
 
-    Verifier(PointerUnion<Module *, SourceFile *> M, DeclContext *DC)
+    Verifier(PointerUnion<ModuleDecl *, SourceFile *> M, DeclContext *DC)
       : M(M),
-        Ctx(M.is<Module *>() ? M.get<Module *>()->getASTContext()
+        Ctx(M.is<ModuleDecl *>() ? M.get<ModuleDecl *>()->getASTContext()
                              : M.get<SourceFile *>()->getASTContext()),
         Out(llvm::errs()),
         HadError(Ctx.hadError())
@@ -114,8 +115,8 @@ struct ASTNodeBase {};
     }
 
   public:
-    Verifier(Module *M, DeclContext *DC)
-      : Verifier(PointerUnion<Module *, SourceFile *>(M), DC) { }
+    Verifier(ModuleDecl *M, DeclContext *DC)
+      : Verifier(PointerUnion<ModuleDecl *, SourceFile *>(M), DC) { }
     Verifier(SourceFile &SF, DeclContext *DC)
       : Verifier(&SF, DC) { }
 
@@ -451,11 +452,12 @@ struct ASTNodeBase {};
             Out << "AST verification error: archetype "
                 << archetype->getString() << " not allowed in this context\n";
 
-            auto knownDC = Ctx.ArchetypeContexts.find(parent);
-            if (knownDC != Ctx.ArchetypeContexts.end()) {
-              llvm::errs() << "archetype came from:\n";
-              knownDC->second->dumpContext();
-              llvm::errs() << "\n";
+            if (auto env = parent->getGenericEnvironment()) {
+              if (auto owningDC = env->getOwningDeclContext()) {
+                llvm::errs() << "archetype came from:\n";
+                owningDC->dumpContext();
+                llvm::errs() << "\n";
+              }
             }
 
             return true;
@@ -466,7 +468,7 @@ struct ASTNodeBase {};
             if (!nested.second)
               continue;
             
-            if (auto nestedType = nested.second.getAsConcreteType()) {
+            if (auto nestedType = nested.second) {
               if (nestedType->hasTypeParameter()) {
                 Out << "Nested type " << nested.first.str()
                     << " of archetype " << archetype->getString()
@@ -476,7 +478,7 @@ struct ASTNodeBase {};
               }
             }
 
-            verifyChecked(nested.second.getValue(), visitedArchetypes);
+            verifyChecked(nested.second, visitedArchetypes);
           }
         }
 
@@ -567,6 +569,7 @@ struct ASTNodeBase {};
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
 
+      assert(!OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues[expr->getOpaqueValue()] = 0;
       assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==0);
       OpenedExistentialArchetypes.insert(expr->getOpenedArchetype());
@@ -574,9 +577,24 @@ struct ASTNodeBase {};
     }
 
     void cleanup(OpenExistentialExpr *expr) {
+      assert(OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues.erase(expr->getOpaqueValue());
       assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==1);
       OpenedExistentialArchetypes.erase(expr->getOpenedArchetype());
+    }
+
+    bool shouldVerify(MakeTemporarilyEscapableExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+      
+      assert(!OpaqueValues.count(expr->getOpaqueValue()));
+      OpaqueValues[expr->getOpaqueValue()] = 0;
+      return true;
+    }
+    
+    void cleanup(MakeTemporarilyEscapableExpr *expr) {
+      assert(OpaqueValues.count(expr->getOpaqueValue()));
+      OpaqueValues.erase(expr->getOpaqueValue());
     }
 
     // Keep a stack of the currently-live optional evaluations.
@@ -665,7 +683,8 @@ struct ASTNodeBase {};
         }
       }
       
-      if (D->getAttrs().hasAttribute<OverrideAttr>()) {
+      if (D->didEarlyAttrValidation() &&
+          D->getAttrs().hasAttribute<OverrideAttr>()) {
         if (!D->isInvalid() && D->hasInterfaceType() &&
             !isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
@@ -704,7 +723,7 @@ struct ASTNodeBase {};
       Type resultType;
       if (FuncDecl *FD = dyn_cast<FuncDecl>(func)) {
         resultType = FD->getResultInterfaceType();
-        resultType = ArchetypeBuilder::mapTypeIntoContext(FD, resultType);
+        resultType = FD->mapTypeIntoContext(resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
       } else {
@@ -1232,9 +1251,9 @@ struct ASTNodeBase {};
         Out << "\n";
         abort();
       }
-      CanType InputExprTy = E->getArg()->getType()->getCanonicalType();
-      CanType ResultExprTy = E->getType()->getCanonicalType();
-      if (ResultExprTy != FT->getResult()->getCanonicalType()) {
+      Type InputExprTy = E->getArg()->getType();
+      Type ResultExprTy = E->getType();
+      if (!ResultExprTy->isEqual(FT->getResult())) {
         Out << "result of ApplyExpr does not match result type of callee:";
         E->getType().print(Out);
         Out << " vs. ";
@@ -1242,7 +1261,7 @@ struct ASTNodeBase {};
         Out << "\n";
         abort();
       }
-      if (InputExprTy != FT->getInput()->getCanonicalType()) {
+      if (!InputExprTy->isEqual(FT->getInput())) {
         TupleType *TT = FT->getInput()->getAs<TupleType>();
         if (isa<SelfApplyExpr>(E)) {
           Type InputExprObjectTy;
@@ -1257,8 +1276,7 @@ struct ASTNodeBase {};
           checkSameOrSubType(InputExprObjectTy, FunctionInputObjectTy,
                              "object argument and 'self' parameter");
         } else if (!TT || TT->getNumElements() != 1 ||
-                   TT->getElement(0).getType()->getCanonicalType()
-                     != InputExprTy) {
+                   !TT->getElement(0).getType()->isEqual(InputExprTy)) {
           Out << "Argument type does not match parameter type in ApplyExpr:"
                  "\nArgument type: ";
           E->getArg()->getType().print(Out);
@@ -1497,7 +1515,6 @@ struct ASTNodeBase {};
         return TT->getElementType(i);
       };
 
-      unsigned varargsIndex = 0;
       Type varargsType;
       unsigned callerDefaultArgIndex = 0;
       for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
@@ -1505,7 +1522,6 @@ struct ASTNodeBase {};
         if (subElem == TupleShuffleExpr::DefaultInitialize)
           continue;
         if (subElem == TupleShuffleExpr::Variadic) {
-          varargsIndex = i;
           varargsType = TT->getElement(i).getVarargBaseTy();
           break;
         }
@@ -1634,6 +1650,48 @@ struct ASTNodeBase {};
       }
       verifyCheckedBase(E);
     }
+    
+    void verifyChecked(MakeTemporarilyEscapableExpr *E) {
+      PrettyStackTraceExpr debugStack(
+        Ctx, "verifying MakeTemporarilyEscapableExpr", E);
+      
+      // Expression type should match subexpression.
+      if (!E->getType()->isEqual(E->getSubExpr()->getType())) {
+        Out << "MakeTemporarilyEscapableExpr type does not match subexpression";
+        abort();
+      }
+      
+      // Closure and opaque value should both be functions, with the closure
+      // noescape and the opaque value escapable but otherwise matching.
+      auto closureFnTy = E->getNonescapingClosureValue()->getType()
+        ->getAs<FunctionType>();
+      if (!closureFnTy) {
+        Out << "MakeTemporarilyEscapableExpr closure type is not a closure";
+        abort();
+      }
+      auto opaqueValueFnTy = E->getOpaqueValue()->getType()
+        ->getAs<FunctionType>();
+      if (!opaqueValueFnTy) {
+        Out<<"MakeTemporarilyEscapableExpr opaque value type is not a closure";
+        abort();
+      }
+      if (!closureFnTy->isNoEscape()) {
+        Out << "MakeTemporarilyEscapableExpr closure type should be noescape";
+        abort();
+      }
+      if (opaqueValueFnTy->isNoEscape()) {
+        Out << "MakeTemporarilyEscapableExpr opaque value type should be "
+               "escaping";
+        abort();
+      }
+      if (!closureFnTy->isEqual(
+            opaqueValueFnTy->withExtInfo(opaqueValueFnTy->getExtInfo()
+                                                        .withNoEscape()))) {
+        Out << "MakeTemporarilyEscapableExpr closure and opaque value type "
+               "don't match";
+        abort();
+      }
+    }
 
     static bool hasEnclosingFunctionContext(DeclContext *dc) {
       switch (dc->getContextKind()) {
@@ -1653,6 +1711,8 @@ struct ASTNodeBase {};
       case DeclContextKind::SubscriptDecl:
         return hasEnclosingFunctionContext(dc->getParent());
       }
+
+      llvm_unreachable("Unhandled DeclContextKind in switch.");
     }
 
     void verifyChecked(ValueDecl *VD) {
@@ -1705,7 +1765,7 @@ struct ASTNodeBase {};
 
       // Variables must have materializable type, unless they are parameters,
       // in which case they must either have l-value type or be anonymous.
-      if (!var->getType()->isMaterializable()) {
+      if (!var->getInterfaceType()->isMaterializable()) {
         if (!isa<ParamDecl>(var)) {
           Out << "Non-parameter VarDecl has non-materializable type: ";
           var->getType().print(Out);
@@ -1713,7 +1773,7 @@ struct ASTNodeBase {};
           abort();
         }
 
-        if (!var->getType()->is<InOutType>() && var->hasName()) {
+        if (!var->getInterfaceType()->is<InOutType>() && var->hasName()) {
           Out << "ParamDecl may only have non-materializable tuple type "
                  "when it is anonymous: ";
           var->getType().print(Out);
@@ -1725,7 +1785,7 @@ struct ASTNodeBase {};
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
       if (var->getAttrs().hasAttribute<OwnershipAttr>() !=
-          isa<ReferenceStorageType>(var->getType().getPointer())) {
+          isa<ReferenceStorageType>(var->getInterfaceType().getPointer())) {
         if (var->getAttrs().hasAttribute<OwnershipAttr>()) {
           Out << "VarDecl has an ownership attribute, but its type"
                  " is not a ReferenceStorageType: ";
@@ -1733,9 +1793,58 @@ struct ASTNodeBase {};
           Out << "VarDecl has no ownership attribute, but its type"
                  " is a ReferenceStorageType: ";
         }
-        var->getType().print(Out);
+        var->getInterfaceType().print(Out);
         abort();
       }
+
+      Type typeForAccessors =
+          var->getInterfaceType()->getReferenceStorageReferent();
+      typeForAccessors =
+          var->getDeclContext()->mapTypeIntoContext(typeForAccessors);
+      if (const FuncDecl *getter = var->getGetter()) {
+        if (getter->getParameterLists().back()->size() != 0) {
+          Out << "property getter has parameters\n";
+          abort();
+        }
+        Type getterResultType = getter->getResultInterfaceType();
+        getterResultType =
+            var->getDeclContext()->mapTypeIntoContext(getterResultType);
+        if (!getterResultType->isEqual(typeForAccessors)) {
+          Out << "property and getter have mismatched types: '";
+          typeForAccessors.print(Out);
+          Out << "' vs. '";
+          getterResultType.print(Out);
+          Out << "'\n";
+          abort();
+        }
+      }
+
+      if (const FuncDecl *setter = var->getSetter()) {
+        if (!setter->getResultInterfaceType()->isVoid()) {
+          Out << "property setter has non-Void result type\n";
+          abort();
+        }
+        if (setter->getParameterLists().back()->size() == 0) {
+          Out << "property setter has no parameters\n";
+          abort();
+        }
+        if (setter->getParameterLists().back()->size() != 1) {
+          Out << "property setter has 2+ parameters\n";
+          abort();
+        }
+        const ParamDecl *param = setter->getParameterLists().back()->get(0);
+        Type paramType = param->getInterfaceType();
+        paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
+        if (!paramType->isEqual(typeForAccessors)) {
+          Out << "property and setter param have mismatched types: '";
+          typeForAccessors.print(Out);
+          Out << "' vs. '";
+          paramType.print(Out);
+          Out << "'\n";
+          abort();
+        }
+      }
+
       verifyCheckedBase(var);
     }
 
@@ -1786,8 +1895,7 @@ struct ASTNodeBase {};
         return;
       }
 
-      if (type->getCanonicalType() !=
-            conformance.getConcrete()->getType()->getCanonicalType()) {
+      if (!type->isEqual(conformance.getConcrete()->getType())) {
         Out << "conforming type does not match conformance\n";
         Out << "conforming type:\n";
         type.dump(Out, 2);
@@ -1885,9 +1993,15 @@ struct ASTNodeBase {};
         if (auto *FD = dyn_cast<FuncDecl>(member))
           if (FD->isAccessor())
             continue;
-        
+
+
         if (auto req = dyn_cast<ValueDecl>(member)) {
           if (!normal->hasWitness(req)) {
+            if (req->getAttrs().isUnavailable(Ctx) &&
+                proto->isObjC()) {
+              continue;
+            }
+
             dumpRef(decl);
             Out << " is missing witness for "
                 << conformance->getProtocol()->getName().str() 
@@ -1975,6 +2089,38 @@ struct ASTNodeBase {};
 
     void verifyParsed(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
+
+      // All of the parameter names should match.
+      if (!isa<DestructorDecl>(AFD)) { // Destructor has no non-self params.
+        auto paramNames = AFD->getFullName().getArgumentNames();
+        bool checkParamNames = (bool)AFD->getFullName();
+        bool hasSelf =
+          isa<ConstructorDecl>(AFD) || AFD->getDeclContext()->isTypeContext();
+        auto *firstParams = AFD->getParameterList(hasSelf ? 1 : 0);
+
+        if (checkParamNames &&
+            paramNames.size() != firstParams->size()) {
+          Out << "Function name does not match its argument pattern ("
+              << paramNames.size() << " elements instead of "
+              << firstParams->size() << ")\n";
+          AFD->dump(Out);
+          abort();
+        }
+
+        // This doesn't use for_each because paramNames shouldn't be checked
+        // when the function is anonymous.
+        for (size_t i = 0, e = firstParams->size(); i < e; ++i) {
+          auto &param = firstParams->get(i);
+
+          if (checkParamNames &&
+              param->getArgumentName() != paramNames[i]) {
+            Out << "Function full name doesn't match parameter's arg name\n";
+            AFD->dump(Out);
+            abort();
+          }
+        }
+      }
+
       verifyParsedBase(AFD);
     }
 
@@ -2005,7 +2151,7 @@ struct ASTNodeBase {};
     void verifyChecked(ConstructorDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
 
-      auto *ND = CD->getExtensionType()->getNominalOrBoundGenericNominal();
+      auto *ND = CD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
       if (!isa<ClassDecl>(ND) && !isa<StructDecl>(ND) && !isa<EnumDecl>(ND) &&
           !isa<ProtocolDecl>(ND) && !CD->isInvalid()) {
         Out << "ConstructorDecls outside structs, classes or enums "
@@ -2067,36 +2213,6 @@ struct ASTNodeBase {};
     void verifyChecked(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
 
-      // All of the parameter names should match.
-      if (!isa<DestructorDecl>(AFD)) { // Destructor has no non-self params.
-        auto paramNames = AFD->getFullName().getArgumentNames();
-        bool checkParamNames = (bool)AFD->getFullName();
-        bool hasSelf = AFD->getDeclContext()->isTypeContext();
-        auto *firstParams = AFD->getParameterList(hasSelf ? 1 : 0);
-
-        if (checkParamNames &&
-            paramNames.size() != firstParams->size()) {
-          Out << "Function name does not match its argument pattern ("
-              << paramNames.size() << " elements instead of "
-              << firstParams->size() << ")\n";
-          AFD->dump(Out);
-          abort();
-        }
-
-        // This doesn't use for_each because paramNames shouldn't be checked
-        // when the function is anonymous.
-        for (size_t i = 0, e = firstParams->size(); i < e; ++i) {
-          auto &param = firstParams->get(i);
-
-          if (checkParamNames &&
-              param->getArgumentName() != paramNames[i]) {
-            Out << "Function full name doesn't match variable name\n";
-            AFD->dump(Out);
-            abort();
-          }
-        }
-      }
-
       // If this function is generic or is within a generic context, it should
       // have an interface type.
       if (AFD->isGenericContext() !=
@@ -2108,7 +2224,8 @@ struct ASTNodeBase {};
 
       // If the function has a generic interface type, it should also have a
       // generic signature.
-      if (AFD->isGenericContext() != AFD->isValidGenericContext()) {
+      if (AFD->isGenericContext() !=
+          (AFD->getGenericEnvironment() != nullptr)) {
         Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
         abort();
@@ -2188,7 +2305,7 @@ struct ASTNodeBase {};
     void verifyChecked(DestructorDecl *DD) {
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
-      auto *ND = DD->getExtensionType()->getNominalOrBoundGenericNominal();
+      auto *ND = DD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
       if (!isa<ClassDecl>(ND) && !DD->isInvalid()) {
         Out << "DestructorDecls outside classes should be marked invalid";
         abort();
@@ -2232,7 +2349,7 @@ struct ASTNodeBase {};
         case AccessorKind::IsDidSet:
         case AccessorKind::IsMaterializeForSet:
           if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
-            Out << "non-addressor accessor has an addressor kind";
+            Out << "non-addressor accessor has an addressor kind\n";
             abort();
           }
           break;
@@ -2240,7 +2357,7 @@ struct ASTNodeBase {};
         case AccessorKind::IsAddressor:
         case AccessorKind::IsMutableAddressor:
           if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
-            Out << "addressor does not have an addressor kind";
+            Out << "addressor does not have an addressor kind\n";
             abort();
           }
           break;
@@ -2256,7 +2373,7 @@ struct ASTNodeBase {};
       unsigned MinParamPatterns = FD->getImplicitSelfDecl() ? 2 : 1;
       if (FD->getParameterLists().size() < MinParamPatterns) {
         Out << "should have at least " << MinParamPatterns
-            << " parameter patterns";
+            << " parameter patterns\n";
         abort();
       }
 
@@ -2265,7 +2382,7 @@ struct ASTNodeBase {};
         if (FD->getImplicitSelfDecl())
           NumExpectedParamPatterns++;
         if (FD->getParameterLists().size() != NumExpectedParamPatterns) {
-          Out << "accessors should not be curried";
+          Out << "accessors should not be curried\n";
           abort();
         }
       }
@@ -2273,7 +2390,7 @@ struct ASTNodeBase {};
       if (auto *VD = FD->getAccessorStorageDecl()) {
         if (isa<VarDecl>(VD)
             && cast<VarDecl>(VD)->isStatic() != FD->isStatic()) {
-          Out << "getter or setter static-ness must match static-ness of var";
+          Out << "getter or setter static-ness must match static-ness of var\n";
           abort();
         }
       }
@@ -2293,13 +2410,13 @@ struct ASTNodeBase {};
         }
         if (NumDestructors != 1) {
           Out << "every class should have exactly one destructor, "
-                 "explicitly provided or created by the type checker";
+                 "explicitly provided or created by the type checker\n";
           abort();
         }
       }
       
       if (!CD->hasDestructor()) {
-        Out << "every class's 'has destructor' bit must be set";
+        Out << "every class's 'has destructor' bit must be set\n";
         abort();
       }
 
@@ -2312,7 +2429,7 @@ struct ASTNodeBase {};
       auto *DC = ATD->getDeclContext();
       if (!isa<NominalTypeDecl>(DC) ||
           !isa<ProtocolDecl>(cast<NominalTypeDecl>(DC))) {
-        Out << "AssociatedTypeDecl should only occur inside a protocol";
+        Out << "AssociatedTypeDecl should only occur inside a protocol\n";
         abort();
       }
       verifyParsedBase(ATD);
@@ -2411,7 +2528,7 @@ struct ASTNodeBase {};
     }
 
     void checkSameType(Type T0, Type T1, const char *what) {
-      if (T0->getCanonicalType() == T1->getCanonicalType())
+      if (T0->isEqual(T1))
         return;
 
       Out << "different types for " << what << ": ";
@@ -2461,7 +2578,7 @@ struct ASTNodeBase {};
     }
 
     void checkSameOrSubType(Type T0, Type T1, const char *what) {
-      if (T0->getCanonicalType() == T1->getCanonicalType())
+      if (T0->isEqual(T1))
         return;
 
       // Protocol subtyping.
@@ -2753,7 +2870,7 @@ struct ASTNodeBase {};
       }
     }
   };
-}
+} // end anonymous namespace
 
 void swift::verify(SourceFile &SF) {
 #if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))

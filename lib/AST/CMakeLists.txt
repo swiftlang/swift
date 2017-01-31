@@ -26,6 +26,7 @@ add_swift_library(swiftAST STATIC
   GenericEnvironment.cpp
   GenericSignature.cpp
   Identifier.cpp
+  LayoutConstraint.cpp
   LookupVisibleDecls.cpp
   Mangle.cpp
   Module.cpp
@@ -52,6 +53,7 @@ add_swift_library(swiftAST STATIC
     swiftMarkup
     swiftBasic
 
+  INTERFACE_LINK_LIBRARIES
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
     clangCodeGen
@@ -74,7 +76,7 @@ add_swift_library(swiftAST STATIC
     clangBasic
 
   LLVM_COMPONENT_DEPENDS
-    bitreader bitwriter coverage irreader debuginfoDWARF
+    bitreader bitwriter coroutines coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
     bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
   )

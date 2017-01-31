@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -42,7 +42,6 @@
 using namespace swift;
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 HeapObject *
 swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredSize,
@@ -100,7 +99,7 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.
 SWIFT_RUNTIME_EXPORT
-extern "C" HeapObject* swift_bufferAllocate(
+HeapObject* swift_bufferAllocate(
   HeapMetadata const* bufferType, size_t size, size_t alignMask)
 {
   return swift::SWIFT_RT_ENTRY_CALL(swift_allocObject)(bufferType, size,
@@ -108,7 +107,7 @@ extern "C" HeapObject* swift_bufferAllocate(
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" intptr_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
+intptr_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
 
 namespace {
 /// Heap object destructor for a generic box allocated with swift_allocBox.
@@ -196,14 +195,12 @@ _swift_release_dealloc(HeapObject *object) SWIFT_CC(RegisterPreservingCC_IMPL)
     __attribute__((__noinline__, __used__));
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_retain(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_ENTRY_REF(swift_retain)(object);
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_nonatomic_retain(HeapObject *object) {
   SWIFT_RT_ENTRY_REF(swift_nonatomic_retain)(object);
 }
@@ -215,7 +212,6 @@ void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain)(HeapObject *object) {
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_nonatomic_release(HeapObject *object) {
   return SWIFT_RT_ENTRY_REF(swift_nonatomic_release)(object);
 }
@@ -237,7 +233,6 @@ void SWIFT_RT_ENTRY_IMPL(swift_retain)(HeapObject *object)
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_retain_n(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_ENTRY_REF(swift_retain_n)(object, n);
@@ -253,7 +248,6 @@ void SWIFT_RT_ENTRY_IMPL(swift_retain_n)(HeapObject *object, uint32_t n)
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_ENTRY_REF(swift_nonatomic_retain_n)(object, n);
@@ -269,7 +263,6 @@ void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain_n)(HeapObject *object, uint32_t 
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_release(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_ENTRY_REF(swift_release)(object);
@@ -354,7 +347,6 @@ void swift::swift_unownedRelease(HeapObject *object)
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_unownedRetain_n(HeapObject *object, int n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   if (!object)
@@ -364,7 +356,6 @@ void swift::swift_unownedRetain_n(HeapObject *object, int n)
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C"
 void swift::swift_unownedRelease_n(HeapObject *object, int n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   if (!object)
@@ -448,7 +439,6 @@ HeapObject *SWIFT_RT_ENTRY_IMPL(swift_tryRetain)(HeapObject *object)
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C"
 bool swift_isDeallocating(HeapObject *object) {
   return SWIFT_RT_ENTRY_REF(swift_isDeallocating)(object);
 }
@@ -532,10 +522,10 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 
 /// Variant of the above used in constructor failure paths.
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_deallocPartialClassInstance(HeapObject *object,
-                                                  HeapMetadata const *metadata,
-                                                  size_t allocatedSize,
-                                                  size_t allocatedAlignMask) {
+void swift_deallocPartialClassInstance(HeapObject *object,
+                                       HeapMetadata const *metadata,
+                                       size_t allocatedSize,
+                                       size_t allocatedAlignMask) {
   if (!object)
     return;
 

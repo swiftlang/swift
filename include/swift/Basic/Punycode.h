@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,7 +18,7 @@
 // - Encoding digits are represented using [a-zA-J] instead of [a-z0-9], because
 //   symbol names are case-sensitive, and Swift mangled identifiers cannot begin
 //   with a digit.
-// - Optinally, non-symbol ASCII characters (characters except [$_a-zA-Z0-9])
+// - Optionally, non-symbol ASCII characters (characters except [$_a-zA-Z0-9])
 //   are mapped to the code range 0xD800 - 0xD880 and are also encoded like
 //   non-ASCII unicode characters.
 //

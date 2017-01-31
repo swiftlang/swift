@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -parse-as-library -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -parse-as-library -O -emit-sil | %FileCheck %s
 //
 // Test speculative devirtualization.
 
@@ -29,7 +29,7 @@ class Sub6 : Base {
 class Sub7 : Base {
   override func foo() {}
 }
-// CHECK: @_TF16devirt_speculate28testMaxNumSpeculativeTargetsFCS_4BaseT_
+// CHECK: @_T016devirt_speculate28testMaxNumSpeculativeTargetsyAA4BaseCF
 // CHECK: checked_cast_br [exact] %0 : $Base to $Base
 // CHECK: checked_cast_br [exact] %0 : $Base to $Sub1
 // CHECK: checked_cast_br [exact] %0 : $Base to $Sub2
@@ -38,7 +38,7 @@ class Sub7 : Base {
 // CHECK: checked_cast_br [exact] %0 : $Base to $Sub5
 // CHECK: checked_cast_br [exact] %0 : $Base to $Sub6
 // CHECK-NOT: checked_cast_br
-// CHECK: %[[CM:[0-9]+]] = class_method %0 : $Base, #Base.foo!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK: %[[CM:[0-9]+]] = class_method %0 : $Base, #Base.foo!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
 // CHECK: apply %[[CM]](%0) : $@convention(method) (@guaranteed Base) -> ()
 public func testMaxNumSpeculativeTargets(_ b: Base) {
   b.foo()

@@ -326,3 +326,32 @@ extension P12 {
 struct X12 : P12 {
   typealias A = String
 }
+
+// Infinite recursion -- we would try to use the extension
+// initializer's argument type of 'Dough' as a candidate for
+// the associated type
+protocol Cookie {
+  associatedtype Dough
+  // expected-note@-1 {{protocol requires nested type 'Dough'; do you want to add it?}}
+
+  init(t: Dough)
+}
+
+extension Cookie {
+  init(t: Dough?) {}
+}
+
+struct Thumbprint : Cookie {}
+// expected-error@-1 {{type 'Thumbprint' does not conform to protocol 'Cookie'}}
+
+// Looking through typealiases
+protocol Vector {
+  associatedtype Element
+  typealias Elements = [Element]
+
+  func process(elements: Elements)
+}
+
+struct Int8Vector : Vector {
+  func process(elements: [Int8]) { }
+}

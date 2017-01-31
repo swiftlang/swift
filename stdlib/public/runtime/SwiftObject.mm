@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Config.h"
+
 #if SWIFT_OBJC_INTEROP
 #include <objc/NSObject.h>
 #include <objc/runtime.h>
@@ -389,7 +390,6 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 /// type, but note that does not imply being known to be a ClassMetadata
 /// due to the existence of ObjCClassWrapper.
 SWIFT_RUNTIME_EXPORT
-extern "C"
 bool
 swift_objc_class_usesNativeSwiftReferenceCounting(const Metadata *theClass) {
 #if SWIFT_OBJC_INTEROP
@@ -1145,7 +1145,7 @@ bool swift::classConformsToObjCProtocol(const void *theClass,
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
+const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
                                                  const Metadata *type,
                                                  size_t numProtocols,
                                                  Protocol * const *protocols) {
@@ -1194,7 +1194,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
+const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
                                                 const Metadata *type,
                                                 size_t numProtocols,
                                                 Protocol * const *protocols) {
@@ -1241,9 +1241,9 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" id swift_dynamicCastObjCProtocolUnconditional(id object,
-                                                 size_t numProtocols,
-                                                 Protocol * const *protocols) {
+id swift_dynamicCastObjCProtocolUnconditional(id object,
+                                              size_t numProtocols,
+                                              Protocol * const *protocols) {
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
       Class sourceType = object_getClass(object);
@@ -1256,9 +1256,9 @@ extern "C" id swift_dynamicCastObjCProtocolUnconditional(id object,
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" id swift_dynamicCastObjCProtocolConditional(id object,
-                                                 size_t numProtocols,
-                                                 Protocol * const *protocols) {
+id swift_dynamicCastObjCProtocolConditional(id object,
+                                            size_t numProtocols,
+                                            Protocol * const *protocols) {
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
       return nil;
@@ -1283,7 +1283,7 @@ void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C" Class swift_getInitializedObjCClass(Class c)
+Class swift_getInitializedObjCClass(Class c)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   // Used when we have class metadata and we want to ensure a class has been
   // initialized by the Objective-C runtime. We need to do this because the
@@ -1462,7 +1462,6 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
 using ClassExtents = TwoWordPair<size_t, size_t>;
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
-extern "C"
 ClassExtents::Return
 swift_class_getInstanceExtents(const Metadata *c) {
   assert(c && c->isClassObject());
@@ -1476,7 +1475,6 @@ swift_class_getInstanceExtents(const Metadata *c) {
 #if SWIFT_OBJC_INTEROP
 
 SWIFT_RUNTIME_EXPORT
-extern "C"
 ClassExtents::Return
 swift_objc_class_unknownGetInstanceExtents(const ClassMetadata* c) {
   // Pure ObjC classes never have negative extents.

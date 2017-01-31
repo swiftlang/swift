@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -250,7 +250,7 @@ AllocOptimize::AllocOptimize(SILInstruction *TheMemory,
   if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory)) {
     assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
            && "optimizing multi-field boxes not implemented");
-    MemoryType = ABI->getBoxType()->getFieldType(0);
+    MemoryType = ABI->getBoxType()->getFieldType(ABI->getModule(), 0);
   } else {
     assert(isa<AllocStackInst>(TheMemory));
     MemoryType = cast<AllocStackInst>(TheMemory)->getElementType();
@@ -982,7 +982,8 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
       SmallVector<SILInstruction*, 4> Releases;
       
       // Walk the use list of the pointer, collecting them.
-      collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, true);
+      collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, true,
+                               /*TreatAddressToPointerAsInout*/ false);
       
       Changed |= AllocOptimize(Inst, Uses, Releases).doIt();
       

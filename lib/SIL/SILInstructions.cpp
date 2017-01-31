@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/AssertImplements.h"
@@ -35,9 +36,9 @@ using namespace Lowering;
 // \p openedArchetypes is being used as a set. We don't use a real set type here
 // for performance reasons.
 static void
-collectDependentTypeInfo(CanType Ty,
-                        SmallVectorImpl<CanType> &openedArchetypes,
-                        bool &hasDynamicSelf) {
+collectDependentTypeInfo(Type Ty,
+                         SmallVectorImpl<ArchetypeType *> &openedArchetypes,
+                         bool &hasDynamicSelf) {
   if (!Ty)
     return;
   if (Ty->hasDynamicSelfType())
@@ -50,9 +51,10 @@ collectDependentTypeInfo(CanType Ty,
       // We don't use a set here, because the number of open archetypes
       // is usually very small and using a real set may introduce too
       // much overhead.
+      auto *archetypeTy = t->castTo<ArchetypeType>();
       if (std::find(openedArchetypes.begin(), openedArchetypes.end(),
-                    t->getCanonicalType()) == openedArchetypes.end())
-        openedArchetypes.push_back(t.getCanonicalTypeOrNull());
+                    archetypeTy) == openedArchetypes.end())
+        openedArchetypes.push_back(archetypeTy);
     }
   });
 }
@@ -60,14 +62,13 @@ collectDependentTypeInfo(CanType Ty,
 // Takes a set of open archetypes as input and produces a set of
 // references to open archetype definitions.
 static void buildTypeDependentOperands(
-    SmallVectorImpl<CanType> &OpenedArchetypes,
+    SmallVectorImpl<ArchetypeType *> &OpenedArchetypes,
     bool hasDynamicSelf,
     SmallVectorImpl<SILValue> &TypeDependentOperands,
     SILOpenedArchetypesState &OpenedArchetypesState, SILFunction &F) {
 
   for (auto archetype : OpenedArchetypes) {
-    auto Def = OpenedArchetypesState.getOpenedArchetypeDef(
-        F.getModule().Types.getLoweredType(archetype).getSwiftRValueType());
+    auto Def = OpenedArchetypesState.getOpenedArchetypeDef(archetype);
     assert(Def);
     assert(getOpenedArchetypeOf(Def->getType().getSwiftRValueType()) &&
            "Opened archetype operands should be of an opened existential type");
@@ -87,18 +88,18 @@ static void collectTypeDependentOperands(
                       SmallVectorImpl<SILValue> &TypeDependentOperands,
                       SILOpenedArchetypesState &OpenedArchetypesState,
                       SILFunction &F,
-                      CanType Ty,
+                      Type Ty,
                       ArrayRef<Substitution> subs = ArrayRef<Substitution>()) {
-  SmallVector<CanType, 32> openedArchetypes;
+  SmallVector<ArchetypeType *, 4> openedArchetypes;
   bool hasDynamicSelf = false;
   collectDependentTypeInfo(Ty, openedArchetypes, hasDynamicSelf);
   for (auto sub : subs) {
-    auto ReplTy = sub.getReplacement().getCanonicalTypeOrNull();
+    auto ReplTy = sub.getReplacement();
     collectDependentTypeInfo(ReplTy, openedArchetypes, hasDynamicSelf);
   }
   buildTypeDependentOperands(openedArchetypes, hasDynamicSelf,
-                                 TypeDependentOperands,
-                                 OpenedArchetypesState, F);
+                             TypeDependentOperands,
+                             OpenedArchetypesState, F);
 }
 
 //===----------------------------------------------------------------------===//
@@ -662,10 +663,19 @@ StoreInst::StoreInst(
     : SILInstruction(ValueKind::StoreInst, Loc), Operands(this, Src, Dest),
       OwnershipQualifier(Qualifier) {}
 
+StoreBorrowInst::StoreBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
+                                 SILValue Dest)
+    : SILInstruction(ValueKind::StoreBorrowInst, DebugLoc, Dest->getType()),
+      Operands(this, Src, Dest) {}
+
 EndBorrowInst::EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
                              SILValue Dest)
     : SILInstruction(ValueKind::EndBorrowInst, DebugLoc),
       Operands(this, Src, Dest) {}
+
+EndBorrowArgumentInst::EndBorrowArgumentInst(SILDebugLocation DebugLoc,
+                                             SILArgument *Arg)
+    : UnaryInstructionBase(DebugLoc, SILValue(Arg)) {}
 
 AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
     : SILInstruction(ValueKind::AssignInst, Loc), Operands(this, Src, Dest) {}
@@ -971,6 +981,8 @@ bool TermInst::isFunctionExiting() const {
     case TermKind::ThrowInst:
       return true;
   }
+
+  llvm_unreachable("Unhandled TermKind in switch.");
 }
 
 BranchInst::BranchInst(SILDebugLocation Loc, SILBasicBlock *DestBB,
@@ -1331,7 +1343,7 @@ namespace {
 
     return nullptr;
   }
-}
+} // end anonymous namespace
 
 NullablePtr<EnumElementDecl> SelectEnumInstBase::getUniqueCaseForDefault() {
   return getUniqueCaseForDefaultValue(this, getEnumOperand());

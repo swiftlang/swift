@@ -1,0 +1,7 @@
+// RUN: %target-sil-opt -O -enable-sil-opaque-values -emit-sorted-sil %s | %FileCheck %s
+
+import Builtin
+
+sil_stage raw
+
+// CHECK-LABEL: sil_stage

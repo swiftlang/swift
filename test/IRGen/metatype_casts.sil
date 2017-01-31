@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=i386_or_x86_64
 // XFAIL: linux
@@ -71,7 +71,7 @@ sil_vtable OtherClass {}
 // CHECK-LABEL: define{{( protected)?}} void @value_metatype_cast(%C14metatype_casts9SomeClass*)
 // CHECK:         [[T0:%.*]] = bitcast %C14metatype_casts9SomeClass* %0 to %swift.type**
 // CHECK:         [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]]
-// CHECK:         [[T2:%.*]] = icmp eq %swift.type* [[T1]], {{.*}} @_TMfC14metatype_casts10OtherClass
+// CHECK:         [[T2:%.*]] = icmp eq %swift.type* [[T1]], {{.*}} @_T014metatype_casts10OtherClassCMf
 sil @value_metatype_cast : $@convention(thin) (SomeClass) -> () {
 entry(%0 : $SomeClass):
   %1 = value_metatype $@thick SomeClass.Type, %0 : $SomeClass
@@ -88,7 +88,7 @@ end:
 }
 
 // CHECK-LABEL: define{{( protected)?}} %swift.type* @checked_cast_to_anyobject_type
-// CHECK:         [[METATYPE:%.*]] = call %swift.type* @_TMaC14metatype_casts9SomeClass()
+// CHECK:         [[METATYPE:%.*]] = call %swift.type* @_T014metatype_casts9SomeClassCMa()
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* [[METATYPE]] to i8*
 // CHECK:         [[CAST:%.*]] = call { i8* } @dynamic_cast_existential_0_class_unconditional(i8* [[T0]], %swift.type* [[METATYPE]])
 // CHECK:         [[RESULT0:%.*]] = extractvalue { i8* } [[CAST]], 0

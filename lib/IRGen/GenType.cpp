@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
@@ -602,7 +603,7 @@ namespace {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
   };
-}
+} // end anonymous namespace
 
 /// Constructs a type info which performs simple loads and stores of
 /// the given IR type.
@@ -1078,10 +1079,18 @@ static void profileArchetypeConstraints(
   for (auto proto : arch->getConformsTo()) {
     ID.AddPointer(proto);
   }
-  
+
+  // Skip nested types if this is an opened existential, since those
+  // won't resolve. Normally opened existentials cannot have nested
+  // types, but one case we missed compiled in Swift 3 so we support
+  // it here.
+  if (arch->getOpenedExistentialType()) {
+    return;
+  }
+
   // Recursively profile nested archetypes.
   for (auto nested : arch->getAllNestedTypes()) {
-    profileArchetypeConstraints(nested.second.getValue(), ID, seen);
+    profileArchetypeConstraints(nested.second, ID, seen);
   }
 }
 
@@ -1117,14 +1126,19 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
   // FIXME: A generic SILFunctionType should not contain any nondependent
   // archetypes.
   if (isa<SILFunctionType>(contextTy)
-      && cast<SILFunctionType>(contextTy)->isPolymorphic())
+      && cast<SILFunctionType>(contextTy)->isPolymorphic()) {
     return contextTy;
-  else
-    return CanType(contextTy.transform([&](Type t) -> Type {
-      if (auto arch = dyn_cast<ArchetypeType>(t.getPointer()))
-        return getExemplarArchetype(arch);
-      return t;
-    }));
+  } else {
+    auto exemplified = contextTy.subst(
+      [&](SubstitutableType *type) -> Type {
+        if (auto arch = dyn_cast<ArchetypeType>(type))
+          return getExemplarArchetype(arch);
+        return type;
+      },
+      MakeAbstractConformanceForGenericType(),
+      SubstFlags::AllowLoweredTypes);
+    return CanType(exemplified);
+  }
 }
 
 TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
@@ -1485,7 +1499,7 @@ namespace {
         return false;
 
       for (auto elt : decl->getAllElements()) {
-        if (elt->hasArgumentType() &&
+        if (elt->getArgumentInterfaceType() &&
             !elt->isIndirect() &&
             visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
@@ -1521,7 +1535,7 @@ namespace {
       return true;
     }
   };
-}
+} // end anonymous namespace
 
 static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
   assert(!isa<ProtocolDecl>(decl));
@@ -1594,14 +1608,14 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
     llvm_unreachable("classes are always considered dependent for now");
 
   case DeclKind::Enum: {
-    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto type = decl->getDeclaredTypeInContext()->getCanonicalType();
     auto result = convertEnumType(key, type, cast<EnumDecl>(decl));
     overwriteForwardDecl(Cache, key, result);
     return result;
   }
 
   case DeclKind::Struct: {
-    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto type = decl->getDeclaredTypeInContext()->getCanonicalType();
     auto result = convertStructType(key, type, cast<StructDecl>(decl));
     overwriteForwardDecl(Cache, key, result);
     return result;
@@ -1888,7 +1902,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
-        && (*theCase)->hasArgumentType())
+        && (*theCase)->getArgumentInterfaceType())
       return t.getEnumElementType(*theCase, IGM.getSILModule());
 
     return SILType();

@@ -1,0 +1,21 @@
+// RUN: %scale-test --sum-multi --typecheck --begin 5 --end 16 --step 5 --select validateDecl %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+enum Enum${N} {
+    case OK
+    case Error
+
+% if int(N) > 1:
+    func method(_: Enum${int(N)-1}) {}
+    static var prop = Enum${int(N)-1}.OK
+    subscript(n: Int) -> Enum${int(N)-1} { return Enum${int(N)-1}.OK }
+% else:
+    func method() {}
+    static var prop = 0
+    subscript(n: Int) -> Int { return 0 }
+% end
+
+    struct Nested {}
+}
+

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,7 +23,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/TimeValue.h"
+#include "llvm/Support/Chrono.h"
 
 #include <memory>
 #include <vector>
@@ -99,12 +99,12 @@ private:
   ///
   /// This should be as close as possible to when the driver was invoked, since
   /// it's used as a lower bound.
-  llvm::sys::TimeValue BuildStartTime;
+  llvm::sys::TimePoint<> BuildStartTime;
 
   /// The time of the last build.
   ///
   /// If unknown, this will be some time in the past.
-  llvm::sys::TimeValue LastBuildTime = llvm::sys::TimeValue::MinTime();
+  llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
 
   /// The number of commands which this compilation should attempt to run in
   /// parallel.
@@ -145,7 +145,7 @@ public:
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
-              StringRef ArgsHash, llvm::sys::TimeValue StartTime,
+              StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool SkipTaskExecution = false,
@@ -199,7 +199,7 @@ public:
     CompilationRecordPath = path;
   }
 
-  void setLastBuildTime(llvm::sys::TimeValue time) {
+  void setLastBuildTime(llvm::sys::TimePoint<> time) {
     LastBuildTime = time;
   }
 

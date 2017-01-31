@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -89,7 +89,7 @@ class OverloadChoice {
   llvm::PointerIntPair<Type, 3, unsigned> BaseAndBits;
 
   /// \brief Either the declaration pointer (if the low bit is clear) or the
-  /// overload choice kind shifted by 1 with the low bit set.
+  /// overload choice kind shifted two bits with the low bit set.
   uintptr_t DeclOrKind;
 
   /// The kind of function reference.
@@ -105,6 +105,7 @@ public:
                  FunctionRefKind functionRefKind)
     : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
       TheFunctionRefKind(functionRefKind) {
+    assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
            "Badly aligned decl");
     
@@ -115,6 +116,7 @@ public:
                  FunctionRefKind functionRefKind)
     : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
       TheFunctionRefKind(functionRefKind) {
+    assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0
            && "Badly aligned decl");
     DeclOrKind = reinterpret_cast<uintptr_t>(type) | 0x01;
@@ -125,6 +127,7 @@ public:
         DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x03),
         TheFunctionRefKind(FunctionRefKind::Unapplied) {
     assert(base && "Must have a base type for overload choice");
+    assert(!base->hasTypeParameter());
     assert(kind != OverloadChoiceKind::Decl &&
            kind != OverloadChoiceKind::DeclViaDynamic &&
            kind != OverloadChoiceKind::TypeDecl &&
@@ -257,6 +260,7 @@ public:
   }
 };
 
-} } // end namespace swift::constraints
+} // end namespace constraints
+} // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_OVERLOADCHOICE_H

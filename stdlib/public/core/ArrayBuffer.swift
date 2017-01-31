@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -62,7 +62,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
     _sanityCheck(_isClassOrObjCExistential(U.self))
     
     // FIXME: can't check that U is derived from Element pending
-    // <rdar://problem/19915280> generic metatype casting doesn't work
+    // <rdar://problem/20028320> generic metatype casting doesn't work
     // _sanityCheck(U.self is Element.Type)
 
     return _ArrayBuffer<U>(
@@ -80,6 +80,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
     _storage = storage
   }
 
+  @_versioned
   internal var _storage: _ArrayBridgeStorage
 }
 

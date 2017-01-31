@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,7 +20,8 @@
 // WIN32 doesn't natively support <uuid/uuid.h>. Instead, we use Win32 APIs.
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
-#include <rpc.h>
+#define NOMINMAX
+#include <objbase.h>
 #include <string>
 #else
 #include <uuid/uuid.h>
@@ -31,7 +32,7 @@ using namespace swift;
 swift::UUID::UUID(FromRandom_t) {
 #if defined(_WIN32)
   ::UUID uuid;
-  UuidCreate(&uuid);
+  ::CoCreateGuid(&uuid);
 
   memcpy(Value, &uuid, Size);
 #else
@@ -41,8 +42,8 @@ swift::UUID::UUID(FromRandom_t) {
 
 swift::UUID::UUID(FromTime_t) {
 #if defined(_WIN32)
-  ::UUID uuid;
-  UuidCreate(&uuid);
+  ::GUID uuid;
+  ::CoCreateGuid(&uuid);
 
   memcpy(Value, &uuid, Size);
 #else
@@ -52,8 +53,7 @@ swift::UUID::UUID(FromTime_t) {
 
 swift::UUID::UUID() {
 #if defined(_WIN32)
-  ::UUID uuid = *((::UUID *)&Value);
-  UuidCreateNil(&uuid);
+  ::GUID uuid = GUID();
 
   memcpy(Value, &uuid, Size);
 #else
@@ -63,11 +63,18 @@ swift::UUID::UUID() {
 
 Optional<swift::UUID> swift::UUID::fromString(const char *s) {
 #if defined(_WIN32)
-  RPC_CSTR t = const_cast<RPC_CSTR>(reinterpret_cast<const unsigned char*>(s));
+  int length = strlen(s) + 1;
+  wchar_t *unicodeString = new wchar_t[length];
 
-  ::UUID uuid;
-  RPC_STATUS status = UuidFromStringA(t, &uuid);
-  if (status == RPC_S_INVALID_STRING_UUID) {
+  size_t convertedChars = 0;
+  errno_t conversionResult =
+    mbstowcs_s(&convertedChars, unicodeString, length, s, length);
+  assert(conversionResult == 0 &&
+    "expected successful conversion of char* to wchar_t*");
+
+  ::GUID uuid;
+  HRESULT parseResult = CLSIDFromString(unicodeString, &uuid);
+  if (parseResult != 0) {
     return None;
   }
 
@@ -85,14 +92,19 @@ Optional<swift::UUID> swift::UUID::fromString(const char *s) {
 void swift::UUID::toString(llvm::SmallVectorImpl<char> &out) const {
   out.resize(UUID::StringBufferSize);
 #if defined(_WIN32)
-  ::UUID uuid;
+  ::GUID uuid;
   memcpy(&uuid, Value, Size);
 
-  RPC_CSTR str;
-  UuidToStringA(&uuid, &str);
+  LPOLESTR unicodeStr;
+  StringFromCLSID(uuid, &unicodeStr);
 
-  char* signedStr = reinterpret_cast<char*>(str);
-  memcpy(out.data(), signedStr, StringBufferSize);
+  char str[StringBufferSize];
+  int strLen = wcstombs(str, unicodeStr, sizeof(str));
+
+  assert(strLen == 37 && "expected ascii convertible output from StringFromCLSID.");
+  (void)strLen;
+
+  memcpy(out.data(), str, StringBufferSize);
 #else
   uuid_unparse_upper(Value, out.data());
 #endif
@@ -103,14 +115,13 @@ void swift::UUID::toString(llvm::SmallVectorImpl<char> &out) const {
 
 int swift::UUID::compare(UUID y) const {
 #if defined(_WIN32)
-  RPC_STATUS s;
-  ::UUID uuid1;
+  ::GUID uuid1;
   memcpy(&uuid1, Value, Size);
 
-  ::UUID uuid2;
+  ::GUID uuid2;
   memcpy(&uuid2, y.Value, Size);
 
-  return UuidCompare(&uuid1, &uuid2, &s);
+  return memcmp(Value, y.Value, Size);
 #else
   return uuid_compare(Value, y.Value);
 #endif

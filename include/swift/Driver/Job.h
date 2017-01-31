@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,7 +23,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/TimeValue.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <memory>
@@ -118,7 +118,7 @@ private:
   FilelistInfo FilelistFileInfo;
 
   /// The modification time of the main input file, if any.
-  llvm::sys::TimeValue InputModTime = llvm::sys::TimeValue::MaxTime();
+  llvm::sys::TimePoint<> InputModTime = llvm::sys::TimePoint<>::max();
 
 public:
   Job(const JobAction &Source,
@@ -152,11 +152,11 @@ public:
     SourceAndCondition.setInt(Cond);
   }
 
-  void setInputModTime(llvm::sys::TimeValue time) {
+  void setInputModTime(llvm::sys::TimePoint<> time) {
     InputModTime = time;
   }
 
-  llvm::sys::TimeValue getInputModTime() const {
+  llvm::sys::TimePoint<> getInputModTime() const {
     return InputModTime;
   }
 

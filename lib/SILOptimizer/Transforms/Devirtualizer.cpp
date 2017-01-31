@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -55,6 +55,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
   llvm::SmallVector<SILInstruction *, 8> DeadApplies;
   llvm::SmallVector<ApplySite, 8> NewApplies;
 
+  SmallVector<FullApplySite, 16> Applies;
   for (auto &BB : F) {
     for (auto It = BB.begin(), End = BB.end(); It != End;) {
       auto &I = *It++;
@@ -64,20 +65,22 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
       auto Apply = FullApplySite::isa(&I);
       if (!Apply)
         continue;
+      Applies.push_back(Apply);
+   }
+  }
+  for (auto Apply : Applies) {
+    auto NewInstPair = tryDevirtualizeApply(Apply, CHA);
+    if (!NewInstPair.second)
+      continue;
 
-      auto NewInstPair = tryDevirtualizeApply(Apply, CHA);
-      if (!NewInstPair.second)
-        continue;
+    Changed = true;
 
-      Changed = true;
+    auto *AI = Apply.getInstruction();
+    if (!isa<TryApplyInst>(AI))
+      AI->replaceAllUsesWith(NewInstPair.first);
 
-      auto *AI = Apply.getInstruction();
-      if (!isa<TryApplyInst>(AI))
-        AI->replaceAllUsesWith(NewInstPair.first);
-
-      DeadApplies.push_back(AI);
-      NewApplies.push_back(NewInstPair.second);
-    }
+    DeadApplies.push_back(AI);
+    NewApplies.push_back(NewInstPair.second);
   }
 
   // Remove all the now-dead applies.

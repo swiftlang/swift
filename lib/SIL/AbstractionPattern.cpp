@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -68,29 +68,30 @@ static const clang::Type *getClangType(const clang::Decl *decl) {
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(VarDecl *var) {
-  CanType swiftType = var->getType()->getCanonicalType();
-  if (auto inout = dyn_cast<InOutType>(swiftType)) {
+  CanGenericSignature genericSig;
+  if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
+    genericSig = sig->getCanonicalSignature();
+
+  CanType swiftType = var->getInterfaceType()->getCanonicalType();
+  if (auto inout = dyn_cast<InOutType>(swiftType))
     swiftType = inout.getObjectType();
-  }
 
   if (auto clangDecl = var->getClangDecl()) {
-    CanGenericSignature genericSig;
-    if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
-      genericSig = sig->getCanonicalSignature();
     auto clangType = getClangType(clangDecl);
-    swiftType = getLoweredBridgedType(AbstractionPattern(genericSig, swiftType, clangType),
-                                      swiftType,
-                               SILFunctionTypeRepresentation::CFunctionPointer,
-                                      TypeConverter::ForMemory)
-      ->getCanonicalType();
+    auto contextType = var->getDeclContext()->mapTypeIntoContext(swiftType);
+    swiftType = getLoweredBridgedType(
+        AbstractionPattern(genericSig, swiftType, clangType),
+        contextType,
+        SILFunctionTypeRepresentation::CFunctionPointer,
+        TypeConverter::ForMemory)->getCanonicalType();
     return AbstractionPattern(genericSig, swiftType, clangType);
-  } else {
-    return AbstractionPattern(swiftType);
   }
+
+  return AbstractionPattern(genericSig, swiftType);
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
-  assert(decl->hasArgumentType());
+  assert(decl->getArgumentInterfaceType());
   assert(!decl->hasClangNode());
 
   // This cannot be implemented correctly for Optional.Some.
@@ -302,7 +303,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
       if (errorInfo.isErrorParameterReplacedWithVoid()) {
         if (paramIndex == errorParamIndex) {
           assert(isVoidLike(swiftEltType));
-          (void) isVoidLike;
+          (void)&isVoidLike;
           return AbstractionPattern(swiftEltType);
         }
       } else {

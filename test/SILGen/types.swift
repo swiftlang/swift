@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-as-library -emit-silgen %s | %FileCheck %s
 
 class C {
   var member: Int = 0
 
   // Methods have method calling convention.
-  // CHECK-LABEL: sil hidden @_TFC5types1C3foofT1xSi_T_ : $@convention(method) (Int, @guaranteed C) -> () {
+  // CHECK-LABEL: sil hidden @_T05types1CC3fooySi1x_tF : $@convention(method) (Int, @guaranteed C) -> () {
   func foo(x x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $C):
     member = x
@@ -14,33 +14,32 @@ class C {
     // CHECK: apply [[FN]](%0, %1) : $@convention(method) (Int, @guaranteed C) -> ()
     // CHECK-NOT: destroy_value
   }
-  // CHECK: } // end sil function '_TFC5types1C3foofT1xSi_T_'
+  // CHECK: } // end sil function '_T05types1CC3fooySi1x_tF'
 }
 
 struct S {
   var member: Int
 
-  // CHECK-LABEL: sil hidden  @{{.*}}1S3foo{{.*}} : $@convention(method) (Int, @inout S) -> ()
+  // CHECK-LABEL: sil hidden  @{{.*}}1SV3foo{{.*}} : $@convention(method) (Int, @inout S) -> ()
   mutating
   func foo(x x: Int) {
     var x = x
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
-    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+    // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
     // CHECK: [[X:%[0-9]+]] = project_box [[XADDR]]
     // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS]] : $*S, #S.member
     // CHECK: copy_addr [[X]] to [[MEMBER]]
   }
 
   class SC {
-    // CHECK-LABEL: sil hidden  @_TFCV5types1S2SC3bar{{.*}}
+    // CHECK-LABEL: sil hidden @_T05types1SV2SCC3bar{{.*}}
     func bar() {}
   }
 }
 
 func f() {
   class FC {
-    // CHECK-LABEL: sil shared @_TFCF5types1fFT_T_L_2FC3zim{{.*}}
     func zim() {}
   }
 }
@@ -48,12 +47,10 @@ func f() {
 func g(b b : Bool) {
   if (b) {
     class FC {
-      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L_2FC3zim{{.*}}
       func zim() {}
     }
   } else {
     class FC {
-      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L0_2FC3zim{{.*}}
       func zim() {}
     }
   }
@@ -69,17 +66,26 @@ enum ReferencedFromFunctionEnum {
   case g((ReferencedFromFunctionStruct) -> ())
 }
 
-// CHECK-LABEL: sil hidden @_TF5types34referencedFromFunctionStructFieldsFVS_28ReferencedFromFunctionStructTFS0_T_FOS_26ReferencedFromFunctionEnumT__
-// CHECK:         [[F:%.*]] = struct_extract [[X:%.*]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.f
-// CHECK:         [[F]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()
-// CHECK:         [[G:%.*]] = struct_extract [[X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.g
-// CHECK:         [[G]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()
+// CHECK-LABEL: sil hidden @_T05types34referencedFromFunctionStructFieldsyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF{{.*}} : $@convention(thin) (@owned ReferencedFromFunctionStruct) -> (@owned @callee_owned (@owned ReferencedFromFunctionStruct) -> (), @owned @callee_owned (@owned ReferencedFromFunctionEnum) -> ()) {
+// CHECK: bb0([[X:%.*]] : $ReferencedFromFunctionStruct):
+// CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
+// CHECK:   [[F:%.*]] = struct_extract [[BORROWED_X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.f
+// CHECK:   [[COPIED_F:%.*]] = copy_value [[F]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()
+// CHECK:   [[BORROWED_X_2:%.*]] = begin_borrow [[X]]
+// CHECK:   [[G:%.*]] = struct_extract [[BORROWED_X_2]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.g
+// CHECK:   [[COPIED_G:%.*]] = copy_value [[G]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()
+// CHECK:   end_borrow [[BORROWED_X_2]] from [[X]]
+// CHECK:   end_borrow [[BORROWED_X]] from [[X]]
+// CHECK:   destroy_value [[X]]
+// CHECK:   [[RESULT:%.*]] = tuple ([[COPIED_F]] : {{.*}}, [[COPIED_G]] : {{.*}})
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function '_T05types34referencedFromFunctionStructFieldsyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF'
 func referencedFromFunctionStructFields(_ x: ReferencedFromFunctionStruct)
     -> ((ReferencedFromFunctionStruct) -> (), (ReferencedFromFunctionEnum) -> ()) {
   return (x.f, x.g)
 }
 
-// CHECK-LABEL: sil hidden @_TF5types32referencedFromFunctionEnumFieldsFOS_26ReferencedFromFunctionEnumTGSqFS0_T__GSqFVS_28ReferencedFromFunctionStructT___
+// CHECK-LABEL: sil hidden @_T05types32referencedFromFunctionEnumFieldsyAA010ReferencedcdE0OcSg_yAA0gcD6StructVcSgtADF
 // CHECK:       bb{{[0-9]+}}([[F:%.*]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()):
 // CHECK:       bb{{[0-9]+}}([[G:%.*]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()):
 func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
@@ -94,3 +100,7 @@ func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
     return (nil, g)
   }
 }
+
+// CHECK-LABEL: sil shared @_T05types1fyyF2FCL_C3zimyyF
+// CHECK-LABEL: sil shared @_T05types1gySb1b_tF2FCL_C3zimyyF
+// CHECK-LABEL: sil shared @_T05types1gySb1b_tF2FCL0_C3zimyyF

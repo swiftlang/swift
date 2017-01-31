@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -133,17 +133,15 @@ fail:
 //
 // If no exception is thrown by the block, returns an empty dictionary.
 
-XCT_EXPORT NSDictionary *_XCTRunThrowableBlockBridge(void (^block)());
+XCT_EXPORT NSDictionary<NSString *, NSString *> *_XCTRunThrowableBlockBridge(void (^block)());
 
-NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
+NSDictionary<NSString *, NSString *> *_XCTRunThrowableBlockBridge(void (^block)())
 {
-    NSDictionary *result;
+    NSDictionary<NSString *, NSString *> *result = nil;
 
     @try {
         block();
-        result = @{};
     }
-
     @catch (NSException *exception) {
         result = @{
                    @"type": @"objc",
@@ -152,12 +150,11 @@ NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
                    @"reason": exception.reason,
                    };
     }
-
     @catch (...) {
         result = @{
                    @"type": @"unknown",
                    };
     }
 
-    return [result retain];
+    return result;
 }

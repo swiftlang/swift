@@ -3,7 +3,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -48,9 +48,8 @@ protocol MyArrayProtocol
 
   func += <
     S : Sequence
-    where
-    S.Iterator.Element == Iterator.Element
   >(lhs: inout Self, rhs: S)
+  where S.Iterator.Element == Iterator.Element
 }
 extension MyArrayProtocol {
   var _bufferID: _BufferID {
@@ -74,10 +73,10 @@ func checkReallocation<T : MyArrayProtocol>(
 
 func checkEqual<
   S1 : Sequence, S2 : Sequence
-  where
-  S1.Iterator.Element == S2.Iterator.Element,
-  S1.Iterator.Element : Equatable
->(_ a1: S1, _ a2: S2, _ expected: Bool) {
+>(_ a1: S1, _ a2: S2, _ expected: Bool)
+where
+S1.Iterator.Element == S2.Iterator.Element, 
+S1.Iterator.Element : Equatable {
   if a1.elementsEqual(a2) != expected {
     let un = expected ? "un" : ""
     print("unexpectedly \(un)equal sequences!")
@@ -86,12 +85,12 @@ func checkEqual<
 
 func test<
   T : MyArrayProtocol
-  where
-  T.Iterator.Element == LifetimeTracked,
-  T.Iterator.Element == T.Element,
-  T.Index == Int,
-  T.IndexDistance == Int
->(_: T.Type, _ label: String) {
+>(_: T.Type, _ label: String)
+where
+T.Iterator.Element == LifetimeTracked,
+T.Iterator.Element == T.Element,
+T.Index == Int,
+T.IndexDistance == Int {
   print("test: \(label)...", terminator: "")
 
   var x: T = [

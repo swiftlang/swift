@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,7 +19,6 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -32,6 +31,7 @@
 namespace swift {
   class ASTWalker;
   class DeclContext;
+  class GenericEnvironment;
   class IdentTypeRepr;
   class ValueDecl;
 
@@ -309,6 +309,10 @@ public:
     : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
       GenericArgs(GenericArgs), AngleBrackets(AngleBrackets) {
     assert(!GenericArgs.empty());
+#ifndef NDEBUG
+    for (auto arg : GenericArgs)
+      assert(arg != nullptr);
+#endif
   }
 
   ArrayRef<TypeRepr*> getGenericArgs() const { return GenericArgs; }
@@ -413,9 +417,6 @@ public:
 
   GenericParamList *getGenericParams() const { return GenericParams; }
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
-  GenericSignature *getGenericSignature() const {
-    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
-  }
 
   void setGenericEnvironment(GenericEnvironment *genericEnv) {
     assert(GenericEnv == nullptr);
@@ -914,9 +915,6 @@ public:
   
   GenericParamList *getGenericParams() const {
     return GenericParams;
-  }
-  GenericSignature *getGenericSignature() const {
-    return GenericEnv->getGenericSignature();
   }
   GenericEnvironment *getGenericEnvironment() const {
     return GenericEnv;

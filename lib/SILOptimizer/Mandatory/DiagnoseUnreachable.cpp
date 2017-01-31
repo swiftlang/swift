@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -334,7 +334,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   if (SwitchValueInst *SUI = dyn_cast<SwitchValueInst>(TI)) {
     if (IntegerLiteralInst *SwitchVal =
           dyn_cast<IntegerLiteralInst>(SUI->getOperand())) {
-      SILBasicBlock *TheSuccessorBlock = 0;
+      SILBasicBlock *TheSuccessorBlock = nullptr;
       for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
         APInt AI;
         SILValue EI;
@@ -794,7 +794,7 @@ namespace {
     
     StringRef getName() override { return "NoReturnFolding"; }
   };
-}
+} // end anonymous namespace
 
 SILTransform *swift::createNoReturnFolding() {
   return new NoReturnFolding();
@@ -810,7 +810,7 @@ namespace {
 
     StringRef getName() override { return "Diagnose Unreachable"; }
   };
-}
+} // end anonymous namespace
 
 SILTransform *swift::createDiagnoseUnreachable() {
   return new DiagnoseUnreachable();

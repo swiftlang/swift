@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -180,8 +180,8 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
     if (Value == DomValue)
       return Value;
 
-    // We know how to propagate through BBArgs only.
-    auto *V = dyn_cast<SILArgument>(Value);
+    // We know how to propagate through phi arguments only.
+    auto *V = dyn_cast<SILPHIArgument>(Value);
     if (!V)
       return SILValue();
 
@@ -375,7 +375,7 @@ bool CheckedCastBrJumpThreading::checkCloningConstraints() {
 bool CheckedCastBrJumpThreading::
 areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
                                       SILValue DomCondition) {
-  auto *Arg = dyn_cast<SILArgument>(Condition);
+  auto *Arg = dyn_cast<SILPHIArgument>(Condition);
   if (!Arg)
     return false;
 

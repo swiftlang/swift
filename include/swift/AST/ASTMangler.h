@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -109,17 +109,22 @@ public:
   std::string mangleGlobalInit(const VarDecl *decl, int counter,
                                bool isInitFunc);
 
-  std::string mangleReabstructionThunkHelper(CanSILFunctionType ThunkType,
+  std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
 
-  std::string mangleType(Type decl, const DeclContext *DC);
+  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
   std::string mangleTypeAsUSR(Type type);
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
   std::string mangleDeclAsUSR(ValueDecl *Decl, StringRef USRPrefix);
+
+  std::string mangleAccessorEntityAsUSR(AccessorKind kind,
+                                        AddressorKind addressorKind,
+                                        const ValueDecl *decl,
+                                        StringRef USRPrefix);
 
 protected:
 
@@ -149,7 +154,7 @@ protected:
     appendType(BlandTy);
   }
 
-  void appendBoundGenericArgs(Type type);
+  void appendBoundGenericArgs(Type type, bool &isFirstArgList);
 
   void appendImplFunctionType(SILFunctionType *fn);
 
@@ -217,6 +222,10 @@ protected:
   void appendEntity(const ValueDecl *decl);
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
+
+  void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
+
+  static bool checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params);
 };
 
 } // end namespace NewMangling

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -113,7 +113,9 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
       // Forward the existing return argument to a new BBArg.
       MergedBB = RetBB->split(RetInst->getIterator());
       SILValue OldRetVal = RetInst->getOperand(0);
-      RetInst->setOperand(0, MergedBB->createArgument(OldRetVal->getType()));
+      RetInst->setOperand(
+          0, MergedBB->createPHIArgument(OldRetVal->getType(),
+                                         ValueOwnershipKind::Owned));
       Builder.setInsertionPoint(RetBB);
       Builder.createBranch(Loc, MergedBB, {OldRetVal});
     }
@@ -152,6 +154,8 @@ emitApplyWithRethrow(SILBuilder &Builder,
                      void (*EmitCleanup)(SILBuilder&, SILLocation)) {
 
   auto &F = Builder.getFunction();
+  SILFunctionConventions fnConv(CanSILFuncTy, Builder.getModule());
+
   SILBasicBlock *ErrorBB = F.createBasicBlock();
   SILBasicBlock *NormalBB = F.createBasicBlock();
   Builder.createTryApply(Loc,
@@ -164,8 +168,8 @@ emitApplyWithRethrow(SILBuilder &Builder,
   {
     // Emit the rethrow logic.
     Builder.emitBlock(ErrorBB);
-    SILValue Error =
-        ErrorBB->createArgument(CanSILFuncTy->getErrorResult().getSILType());
+    SILValue Error = ErrorBB->createPHIArgument(fnConv.getSILErrorType(),
+                                                ValueOwnershipKind::Owned);
 
     Builder.createBuiltin(Loc,
                           Builder.getASTContext().getIdentifier("willThrow"),
@@ -180,7 +184,8 @@ emitApplyWithRethrow(SILBuilder &Builder,
   // result value.
   Builder.clearInsertionPoint();
   Builder.emitBlock(NormalBB);
-  return Builder.getInsertionBB()->createArgument(CanSILFuncTy->getSILResult());
+  return Builder.getInsertionBB()->createPHIArgument(fnConv.getSILResultType(),
+                                                     ValueOwnershipKind::Owned);
 }
 
 /// Emits code to invoke the specified nonpolymorphic CalleeFunc using the
@@ -217,8 +222,11 @@ namespace {
 /// Helper class for emitting code to dispatch to a specialized function.
 class EagerDispatch {
   SILFunction *GenericFunc;
+#if 0
   const SILSpecializeAttr &SA;
+#endif
   const ReabstractionInfo &ReInfo;
+  const SILFunctionConventions substConv;
 
   SILBuilder Builder;
   SILLocation Loc;
@@ -228,23 +236,24 @@ public:
   // original generic function.
   EagerDispatch(SILFunction *GenericFunc, const SILSpecializeAttr &SA,
                 const ReabstractionInfo &ReInfo)
-    : GenericFunc(GenericFunc), SA(SA), ReInfo(ReInfo), Builder(*GenericFunc),
-      Loc(GenericFunc->getLocation()) {
+      : GenericFunc(GenericFunc), ReInfo(ReInfo),
+        substConv(ReInfo.getSubstitutedType(), GenericFunc->getModule()),
+        Builder(*GenericFunc), Loc(GenericFunc->getLocation()) {
 
     Builder.setCurrentDebugScope(GenericFunc->getDebugScope());
   }
-  
+
   void emitDispatchTo(SILFunction *NewFunc);
 
 protected:
   void emitTypeCheck(SILBasicBlock *FailedTypeCheckBB,
                      SubstitutableType *ParamTy, Type SubTy);
 
-  SILValue emitArgumentCast(SILArgument *OrigArg, unsigned Idx);
-  
+  SILValue emitArgumentCast(SILFunctionArgument *OrigArg, unsigned Idx);
+
   SILValue emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs);
 };
-}
+} // end anonymous namespace
 
 /// Inserts type checks in the original generic function for dispatching to the
 /// given specialized function. Converts call arguments. Emits an invocation of
@@ -261,8 +270,12 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   // Iterate over all dependent types in the generic signature, which will match
   // the specialized attribute's substitution list. Visit only
   // SubstitutableTypes, skipping DependentTypes.
+  // TODO: Uncomment when Generics.cpp is updated to use the
+  // new @_specialize attribute for partial specializations.
+#if 0
   auto GenericSig =
     GenericFunc->getLoweredFunctionType()->getGenericSignature();
+
   auto SubIt = SA.getSubstitutions().begin();
   auto SubEnd = SA.getSubstitutions().end();
   for (auto DepTy : GenericSig->getAllDependentTypes()) {
@@ -274,7 +287,9 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   }
   assert(SubIt == SubEnd && "Too many substitutions.");
   (void) SubEnd;
-
+#else
+  static_cast<void>(FailedTypeCheckBB);
+#endif
   // 2. Convert call arguments, casting and adjusting for calling convention.
 
   SmallVector<SILValue, 8> CallArgs;
@@ -305,8 +320,8 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   if (NewFunc->isNoReturnFunction())
     Builder.createUnreachable(Loc);
   else {
-    auto GenResultTy = GenericFunc->mapTypeIntoContext(
-      GenericFunc->getLoweredFunctionType()->getSILResult());
+    auto resultTy = GenericFunc->getConventions().getSILResultType();
+    auto GenResultTy = GenericFunc->mapTypeIntoContext(resultTy);
     auto CastResult = Builder.createUncheckedBitCast(Loc, Result, GenResultTy);
     addReturnValue(Builder.getInsertionBB(), CastResult);
   }
@@ -358,12 +373,15 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
 }
 
 /// Cast a generic argument to its specialized type.
-SILValue EagerDispatch::emitArgumentCast(SILArgument *OrigArg, unsigned Idx) {
-
-  auto CastTy = ReInfo.getSubstitutedType()->getSILArgumentType(Idx);
-  assert(CastTy.isAddress() ==
-         (OrigArg->isIndirectResult()
-          || OrigArg->getKnownParameterInfo().isIndirect()) && "bad arg type");
+SILValue EagerDispatch::emitArgumentCast(SILFunctionArgument *OrigArg,
+                                         unsigned Idx) {
+  SILFunctionConventions substConv(ReInfo.getSubstitutedType(),
+                                   Builder.getModule());
+  auto CastTy = substConv.getSILArgumentType(Idx);
+  assert(CastTy.isAddress()
+             == (OrigArg->isIndirectResult()
+                 || substConv.isSILIndirect(OrigArg->getKnownParameterInfo()))
+         && "bad arg type");
 
   if (CastTy.isAddress())
     return Builder.createUncheckedAddrCast(Loc, OrigArg, CastTy);
@@ -380,33 +398,42 @@ SILValue EagerDispatch::emitArgumentCast(SILArgument *OrigArg, unsigned Idx) {
 /// has a direct result.
 SILValue EagerDispatch::
 emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
-  auto OrigArgs = GenericFunc->getArguments();
-  assert(OrigArgs.size() == ReInfo.getNumArguments() && "signature mismatch");
-  
+  auto OrigArgs = GenericFunc->begin()->getFunctionArguments();
+  assert(OrigArgs.size() == substConv.getNumSILArguments()
+         && "signature mismatch");
+
   CallArgs.reserve(OrigArgs.size());
   SILValue StoreResultTo;
   for (auto *OrigArg : OrigArgs) {
-    unsigned Idx = OrigArg->getIndex();
+    unsigned ArgIdx = OrigArg->getIndex();
 
-    auto CastArg = emitArgumentCast(OrigArg, Idx);
+    auto CastArg = emitArgumentCast(OrigArg, ArgIdx);
     DEBUG(dbgs() << "  Cast generic arg: "; CastArg->print(dbgs()));
 
-    if (ReInfo.isArgConverted(OrigArg->getIndex())) {
-      if (ReInfo.isResultIndex(Idx)) {
+    if (ArgIdx < substConv.getSILArgIndexOfFirstParam()) {
+      // Handle result arguments.
+      unsigned formalIdx =
+          substConv.getIndirectFormalResultIndexForSILArg(ArgIdx);
+      if (ReInfo.isFormalResultConverted(formalIdx)) {
         // The result is converted from indirect to direct. We need to insert
         // a store later.
         assert(!StoreResultTo);
         StoreResultTo = CastArg;
-      } else {
+        continue;
+      }
+    } else {
+      // Handle arguments for formal parameters.
+      unsigned paramIdx = ArgIdx - substConv.getSILArgIndexOfFirstParam();
+      if (ReInfo.isParamConverted(paramIdx)) {
         // An argument is converted from indirect to direct. Instead of the
         // address we pass the loaded value.
         SILValue Val = Builder.createLoad(Loc, CastArg,
                                           LoadOwnershipQualifier::Unqualified);
         CallArgs.push_back(Val);
+        continue;
       }
-    } else {
-      CallArgs.push_back(CastArg);
     }
+    CallArgs.push_back(CastArg);
   }
   return StoreResultTo;
 }
@@ -422,8 +449,11 @@ public:
 
   StringRef getName() override { return "Eager Specializer"; }
 };
-}
+} // end anonymous namespace
 
+    // TODO: Uncomment when Generics.cpp is updated to use the
+    // new @_specialize attribute for partial specializations.
+#if 0
 /// Specializes a generic function for a concrete type list.
 static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
                                     const SILSpecializeAttr &SA,
@@ -443,6 +473,9 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
         SA.print(dbgs()); dbgs() << "\n");
   
   // Create a specialized function.
+  // TODO: Uncomment when Generics.cpp is updated to use the
+  // new @_specialize attribute for partial specializations.
+#if 0
   GenericFuncSpecializer
         FuncSpecializer(GenericFunc, SA.getSubstitutions(),
                         GenericFunc->isFragile(), ReInfo);
@@ -450,9 +483,12 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)
     DEBUG(dbgs() << "  Failed. Cannot specialize function.\n");
-
   return NewFunc;
+#else
+  return nullptr;
+#endif
 }
+#endif
 
 /// Run the pass.
 void EagerSpecializerTransform::run() {
@@ -476,6 +512,9 @@ void EagerSpecializerTransform::run() {
     SmallVector<ReabstractionInfo, 4> ReInfoVec;
     ReInfoVec.reserve(F.getSpecializeAttrs().size());
 
+    // TODO: Uncomment when Generics.cpp is updated to use the
+    // new @_specialize attribute for partial specializations.
+#if 0
     for (auto *SA : F.getSpecializeAttrs()) {
       ReInfoVec.emplace_back(&F, SA->getSubstitutions());
       auto *NewFunc = eagerSpecialize(&F, *SA, ReInfoVec.back());
@@ -491,6 +530,7 @@ void EagerSpecializerTransform::run() {
         EagerDispatch(&F, *SA, ReInfo).emitDispatchTo(NewFunc);
       }
     });
+#endif
     // As specializations are created, the attributes should be removed.
     F.clearSpecializeAttrs();
   }

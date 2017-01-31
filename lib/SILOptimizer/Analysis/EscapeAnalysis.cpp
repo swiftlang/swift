@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -109,14 +109,10 @@ getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded) {
   
   CGNode * &Node = Values2Nodes[V];
   if (!Node) {
-    if (SILArgument *Arg = dyn_cast<SILArgument>(V)) {
-      if (Arg->isFunctionArg()) {
-        Node = allocNode(V, NodeType::Argument);
-        if (!isSummaryGraph)
-          Node->mergeEscapeState(EscapeState::Arguments);
-      } else {
-        Node = allocNode(V, NodeType::Value);
-      }
+    if (isa<SILFunctionArgument>(V)) {
+      Node = allocNode(V, NodeType::Argument);
+      if (!isSummaryGraph)
+        Node->mergeEscapeState(EscapeState::Arguments);
     } else {
       Node = allocNode(V, NodeType::Value);
     }
@@ -732,7 +728,6 @@ namespace llvm {
   /// GraphTraits specialization so the CGForDotView can be
   /// iterable by generic graph iterators.
   template <> struct GraphTraits<CGForDotView::Node *> {
-    typedef CGForDotView::Node NodeType;
     typedef CGForDotView::child_iterator ChildIteratorType;
     typedef CGForDotView::Node *NodeRef;
 
@@ -752,11 +747,13 @@ namespace llvm {
 
     static NodeRef getEntryNode(GraphType F) { return nullptr; }
 
-    typedef CGForDotView::iterator nodes_iterator;
+    typedef pointer_iterator<CGForDotView::iterator> nodes_iterator;
     static nodes_iterator nodes_begin(GraphType OCG) {
-      return OCG->Nodes.begin();
+      return nodes_iterator(OCG->Nodes.begin());
     }
-    static nodes_iterator nodes_end(GraphType OCG) { return OCG->Nodes.end(); }
+    static nodes_iterator nodes_end(GraphType OCG) {
+      return nodes_iterator(OCG->Nodes.end());
+    }
     static unsigned size(GraphType CG) { return CG->Nodes.size(); }
   };
 
@@ -793,7 +790,7 @@ namespace llvm {
       llvm_unreachable("Unhandled CGForDotView in switch.");
     }
   };
-} // end llvm namespace
+} // namespace llvm
 
 #endif
 
@@ -1026,7 +1023,7 @@ static bool isOrContainsReference(SILType Ty, SILModule *Mod) {
   }
   if (auto En = Ty.getEnumOrBoundGenericEnum()) {
     for (auto *ElemDecl : En->getAllElements()) {
-      if (ElemDecl->hasArgumentType() &&
+      if (ElemDecl->getArgumentInterfaceType() &&
           isOrContainsReference(Ty.getEnumElementType(ElemDecl, *Mod), Mod))
         return true;
     }
@@ -1160,14 +1157,13 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
     // The object is local, but we cannot determine its type.
     return false;
   }
-  // If Ty is a an optional, its deallocation is equivalent to the deallocation
+  // If Ty is an optional, its deallocation is equivalent to the deallocation
   // of its payload.
   // TODO: Generalize it. Destructor of an aggregate type is equivalent to calling
   // destructors for its components.
   while (Ty.getSwiftRValueType()->getAnyOptionalObjectType())
     Ty = M.Types.getLoweredType(Ty.getSwiftRValueType()
-                                    ->getAnyOptionalObjectType()
-                                    .getCanonicalTypeOrNull());
+                                  .getAnyOptionalObjectType());
   auto Class = Ty.getSwiftRValueType().getClassOrBoundGenericClass();
   if (!Class || !Class->hasDestructor())
     return false;
@@ -1272,12 +1268,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         break;
     }
 
-    if (FAS.getReferencedFunction() &&
-        FAS.getReferencedFunction()->hasSemanticsAttr(
-            "self_no_escaping_closure") &&
-        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 3) ||
-         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 2)) &&
-        FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunction()
+        && FAS.getReferencedFunction()->hasSemanticsAttr(
+               "self_no_escaping_closure")
+        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3)
+            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 2))
+        && FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.
@@ -1287,12 +1283,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     }
 
-    if (FAS.getReferencedFunction() &&
-        FAS.getReferencedFunction()->hasSemanticsAttr(
-            "pair_no_escaping_closure") &&
-        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 4) ||
-         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 3)) &&
-        FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunction()
+        && FAS.getReferencedFunction()->hasSemanticsAttr(
+               "pair_no_escaping_closure")
+        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 4)
+            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3))
+        && FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.

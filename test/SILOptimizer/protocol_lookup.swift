@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil -primary-file %s | %FileCheck %s
 
 // Check that this file can be compiled using -O at all (it used to crash due to a bug in the SILCloner)
 // Check that it can be compiled correctly.
@@ -10,7 +10,7 @@ protocol StaticFoo {
 
 class StaticBar {
   // Check that the cast is not folded as a failing cast.
-  // CHECK-LABEL: sil hidden [noinline] @_TZFC15protocol_lookup9StaticBar12mightHaveFoo
+  // CHECK-LABEL: sil hidden [noinline] @_T015protocol_lookup9StaticBarC12mightHaveFoo{{[_0-9a-zA-Z]*}}FZ
   // Check that the cast was not eliminated.
   // CHECK: checked_cast_br
   @inline(never)

@@ -51,7 +51,7 @@ function(handle_gyb_source_single dependency_out_var_name)
       COMMAND
           "${CMAKE_COMMAND}" -E make_directory "${dir}"
       COMMAND
-          "${gyb_tool}" "${gyb_flags}"
+          "${PYTHON_EXECUTABLE}" "${gyb_tool}" "${gyb_flags}"
           -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
       COMMAND
           "${CMAKE_COMMAND}" -E copy_if_different
@@ -113,10 +113,20 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
     if(src STREQUAL src_sans_gyb)
       list(APPEND de_gybbed_sources "${src}")
     else()
-      if (arch)
-        set(dir "${CMAKE_CURRENT_BINARY_DIR}/${ptr_size}")
+
+      # On Windows (using Visual Studio), the generated project files assume that the
+      # generated GYB files will be in the source, not binary directory.
+      # We can work around this by modifying the root directory when generating VS projects.
+      if ("${CMAKE_GENERATOR_PLATFORM}" MATCHES "Visual Studio")
+        set(dir_root ${CMAKE_CURRENT_SOURCE_DIR})
       else()
-        set(dir "${CMAKE_CURRENT_BINARY_DIR}")
+        set(dir_root ${CMAKE_CURRENT_BINARY_DIR})
+      endif()
+      
+      if (arch)
+        set(dir "${dir_root}/${ptr_size}")
+      else()
+        set(dir "${dir_root}")
       endif()
       set(output_file_name "${dir}/${src_sans_gyb}")
       list(APPEND de_gybbed_sources "${output_file_name}")

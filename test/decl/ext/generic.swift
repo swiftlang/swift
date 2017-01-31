@@ -151,4 +151,10 @@ struct S4<Q>: P4 {
   init(_: Q) { }
 }
 
-extension S4 where T : P5 {} // expected-error{{type 'T' in conformance requirement does not refer to a generic parameter or associated type}}
+extension S4 where T : P5 {}
+
+struct S5<Q> {
+  init(_: Q) { }
+}
+
+extension S5 : P4 {}

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -119,6 +119,10 @@ def autolink_library : Separate<["-"], "autolink-library">,
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
+def disable_serialization_nested_type_lookup_table :
+  Flag<["-"], "disable-serialization-nested-type-lookup-table">,
+  HelpText<"Force module merging to use regular lookups to find nested types">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
@@ -147,6 +151,8 @@ def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
   HelpText<"Prints the time taken by each compilation phase">;
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
+def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-type-checking">,
+  HelpText<"Dumps the time it takes to type-check each expression">;
 
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
@@ -227,14 +233,23 @@ def disable_sil_linking : Flag<["-"], "disable-sil-linking">,
 def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
   HelpText<"Dump Clang diagnostics to stderr">;
 
+def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
+  HelpText<"Disable validating system headers in the Clang importer">;
+
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
+
+def emit_pch : Flag<["-"], "emit-pch">,
+  HelpText<"Emit PCH for imported Objective-C header file">, ModeOpt;
 
 def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
   HelpText<"Enable the SIL Ownership Model">;
 
 def assume_parsing_unqualified_ownership_sil : Flag<["-"], "assume-parsing-unqualified-ownership-sil">,
   HelpText<"Assume unqualified SIL ownership when parsing SIL">;
+
+def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
+  HelpText<"Enable SIL Opaque Values">;
 
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
@@ -274,6 +289,9 @@ def playground_high_performance : Flag<["-"], "playground-high-performance">,
 
 def disable_playground_transform : Flag<["-"], "disable-playground-transform">,
   HelpText<"Disable playground transformation">;
+
+def pc_macro : Flag<["-"], "pc-macro">,
+  HelpText<"Apply the 'program counter simulation' macro">;
 
 def use_jit : Flag<["-"], "use-jit">,
   HelpText<"Register Objective-C classes as if the JIT were in use">;

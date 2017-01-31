@@ -175,3 +175,14 @@ struct R_28051973 {
 
 let r28051973: Int = 42
 R_28051973().f(r28051973) // expected-error {{cannot use mutating member on immutable value: function call returns immutable value}}
+
+
+// Fix for CSDiag vs CSSolver disagreement on what constitutes a
+// valid overload.
+
+func overloadedMethod(n: Int) {} // expected-note {{'overloadedMethod(n:)' declared here}}
+func overloadedMethod<T>() {}
+// expected-error@-1 {{generic parameter 'T' is not used in function signature}}
+
+overloadedMethod()
+// expected-error@-1 {{missing argument for parameter 'n' in call}}
