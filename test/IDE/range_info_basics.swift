@@ -82,6 +82,29 @@ func foo7(a : Int) -> Int {
   }
 }
 
+func foo8(a : [Int]) {
+  for v in a {
+    if v > 3 {
+      break
+    }
+    if v < 3 {
+      continue
+    }
+  }
+  var i : Int
+  i = 0
+  repeat {
+    print(i)
+    i = i + 1
+    if i < 10 {
+      continue
+    }
+    if i > 80 {
+      break
+    }
+  } while i < 100
+}
+
 // RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
 // RUN: %target-swift-ide-test -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
@@ -102,6 +125,12 @@ func foo7(a : Int) -> Int {
 // RUN: %target-swift-ide-test -range -pos=76:1 -end-pos=79:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK18
 // RUN: %target-swift-ide-test -range -pos=76:1 -end-pos=77:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK19
 // RUN: %target-swift-ide-test -range -pos=78:1 -end-pos=81:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK20
+// RUN: %target-swift-ide-test -range -pos=87:1 -end-pos=89:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK21
+// RUN: %target-swift-ide-test -range -pos=90:1 -end-pos=92:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK22
+// RUN: %target-swift-ide-test -range -pos=99:1 -end-pos=101:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK23
+// RUN: %target-swift-ide-test -range -pos=102:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK24
+// RUN: %target-swift-ide-test -range -pos=87:1 -end-pos=92:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK25
+// RUN: %target-swift-ide-test -range -pos=97:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK26
 
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
@@ -356,3 +385,10 @@ func foo7(a : Int) -> Int {
 // CHECK20-NEXT: <Entry>Multi</Entry>
 // CHECK20-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK20-NEXT: <end>
+
+// CHECK21: <Orphan>Break</Orphan>
+// CHECK22: <Orphan>Continue</Orphan>
+// CHECK23: <Orphan>Continue</Orphan>
+// CHECK24: <Orphan>Break</Orphan>
+// CHECK25: <Orphan>Break</Orphan>
+// CHECK26: <Orphan>Continue</Orphan>
