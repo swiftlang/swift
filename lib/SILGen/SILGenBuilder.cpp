@@ -192,6 +192,16 @@ InitExistentialRefInst *SILGenBuilder::createInitExistentialRef(
       loc, existentialType, formalConcreteType, concreteValue, conformances);
 }
 
+ManagedValue SILGenBuilder::createInitExistentialRef(
+    SILLocation Loc, SILType ExistentialType, CanType FormalConcreteType,
+    ManagedValue Concrete, ArrayRef<ProtocolConformanceRef> Conformances) {
+  CleanupCloner Cloner(*this, Concrete);
+  InitExistentialRefInst *IERI =
+      createInitExistentialRef(Loc, ExistentialType, FormalConcreteType,
+                               Concrete.forward(gen), Conformances);
+  return Cloner.clone(IERI);
+}
+
 AllocExistentialBoxInst *SILGenBuilder::createAllocExistentialBox(
     SILLocation loc, SILType existentialType, CanType concreteType,
     ArrayRef<ProtocolConformanceRef> conformances) {
