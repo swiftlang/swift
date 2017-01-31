@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 // See also rdar://15626843.
 static var gvu1: Int // expected-error {{static properties may only be declared on a type}}{{1-8=}}
@@ -262,16 +262,5 @@ public struct Foo { // expected-note {{to match this opening '{'}}}
     // expected-error@-2{{'let' declarations cannot be computed properties}}
     // expected-error@-3{{use of unresolved identifier 'a'}}
 }
-
-// FIXME: Remove -verify-ignore-unknown.
-// <unknown>:0: error: unexpected error produced: only classes and class members may be marked with 'final'
-// <unknown>:0: error: unexpected error produced: only classes and class members may be marked with 'final'
-// <unknown>:0: error: unexpected error produced: only classes and class members may be marked with 'final'
-// <unknown>:0: error: unexpected error produced: only classes and class members may be marked with 'final'
-// <unknown>:0: error: unexpected error produced: only classes and class members may be marked with 'final'
-// <unknown>:0: error: unexpected error produced: only classes and class members may be marked with 'final'
-// <unknown>:0: error: unexpected error produced: only classes and class members may be marked with 'final'
-// <unknown>:0: error: unexpected error produced: only classes and class members may be marked with 'final'
-// <unknown>:0: error: unexpected error produced: only classes and class members may be marked with 'final'
 
 // expected-error@+1 {{expected '}' in struct}}
