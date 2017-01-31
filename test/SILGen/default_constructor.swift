@@ -54,8 +54,10 @@ class E {
 // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized
 // CHECK: [[INIT:%[0-9]+]] = function_ref @_TIvC19default_constructor1E1iVs5Int64i : $@convention(thin) () -> Int64
 // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[INIT]]() : $@convention(thin) () -> Int64
-// CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[SELF]] : $E, #E.i
+// CHECK-NEXT: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $E, #E.i
 // CHECK-NEXT: assign [[VALUE]] to [[IREF]] : $*Int64
+// CHECK-NEXT: end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK-NEXT: destroy_value [[SELF]]
 // CHECK-NEXT: return [[SELF_COPY]] : $E
