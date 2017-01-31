@@ -1431,8 +1431,8 @@ public protocol BinaryInteger :
   ///
   ///     let x = Int8(bitPattern: 0b1111_1000)
   ///     // x == -8
-  ///     // x.trailingZeros == 3
-  var trailingZeros: Int { get }
+  ///     // x.trailingZeroBits == 3
+  var trailingZeroBits: Int { get }
 
 % for x in chain(*binaryArithmetic.values()):
   // defaulted using an in-place counterpart, but can be used as an
@@ -2048,8 +2048,8 @@ ${overflowOperationComment(x.operator)}
   ///
   ///     let x: Int8 = 0b0001_1111
   ///     // x == 31
-  ///     // x.leadingZeros == 3
-  var leadingZeros: Int { get }
+  ///     // x.leadingZeroBits == 3
+  var leadingZeroBits: Int { get }
 
   /// Creates an integer from its big-endian representation, changing the
   /// byte order if necessary.
@@ -2696,7 +2696,7 @@ public struct ${Self}
   public var bitWidth: Int { return ${bits} }
 
   @_transparent
-  public var leadingZeros: Int {
+  public var leadingZeroBits: Int {
     return Int(
       ${Self}(
         Builtin.int_ctlz_Int${bits}(self._value, false._value)
@@ -2704,7 +2704,7 @@ public struct ${Self}
   }
 
   @_transparent
-  public var trailingZeros: Int {
+  public var trailingZeroBits: Int {
     return Int(
       ${Self}(
         Builtin.int_cttz_Int${bits}(self._value, false._value)
@@ -3295,11 +3295,11 @@ public struct DoubleWidth<T : FixedWidthInteger>
     return "(\(_storage.high), \(_storage.low))"
   }
 
-  public var leadingZeros: Int {
+  public var leadingZeroBits: Int {
     fatalError()
   }
 
-  public var trailingZeros: Int {
+  public var trailingZeroBits: Int {
     fatalError()
   }
 

@@ -32,7 +32,7 @@ builtinIntLiteralBits = 2048
 %for bits in [32,64]:
 extension UInt${bits} {
   var signBitIndex: Int {
-    return ${bits-1} - leadingZeros
+    return ${bits-1} - leadingZeroBits
   }
 }
 %end
@@ -650,13 +650,13 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   public var significandWidth: Int {
-    let trailingZeros = significandBitPattern.trailingZeros
+    let trailingZeroBits = significandBitPattern.trailingZeroBits
     if isNormal {
       guard significandBitPattern != 0 else { return 0 }
-      return ${Self}.significandBitCount - trailingZeros
+      return ${Self}.significandBitCount - trailingZeroBits
     }
     if isSubnormal {
-      return significandBitPattern.signBitIndex - trailingZeros
+      return significandBitPattern.signBitIndex - trailingZeroBits
     }
     return -1
   }
