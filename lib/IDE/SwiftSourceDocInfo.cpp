@@ -215,6 +215,21 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     OS << "<Entry>Multi</Entry>\n";
   }
 
+  if (Orphan != OrphanKind::None) {
+    OS << "<Orphan>";
+    switch (Orphan) {
+    case OrphanKind::Continue:
+      OS << "Continue";
+      break;
+    case OrphanKind::Break:
+      OS << "Break";
+      break;
+    case OrphanKind::None:
+      llvm_unreachable("cannot enter here.");
+    }
+    OS << "</Orphan>";
+  }
+
   for (auto &VD : DeclaredDecls) {
     OS << "<Declared>" << VD.VD->getNameStr() << "</Declared>";
     OS << "<OutscopeReference>";
@@ -302,23 +317,24 @@ private:
     assert(ContainedASTNodes.size() == 1);
     // Single node implies single entry point, or is it?
     bool SingleEntry = true;
+    OrphanKind Kind = getOrphanKind(ContainedASTNodes);
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
                                resolveNodeType(Node), Content,
-                               getImmediateContext(), SingleEntry,
+                               getImmediateContext(), SingleEntry, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
       return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
-                               Content, getImmediateContext(), SingleEntry,
+                               Content, getImmediateContext(), SingleEntry, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
       return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content,
-                               getImmediateContext(), SingleEntry,
+                               getImmediateContext(), SingleEntry, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
@@ -508,6 +524,42 @@ public:
     return true;
   }
 
+  OrphanKind getOrphanKind(ArrayRef<ASTNode> Nodes) {
+
+    // Prepare the entire range.
+    SourceRange WholeRange(Nodes.front().getStartLoc(),
+                           Nodes.back().getEndLoc());
+    struct ControlFlowStmtSelector : public SourceEntityWalker {
+      std::vector<std::pair<SourceRange, OrphanKind>> Ranges;
+      bool walkToStmtPre(Stmt *S) override {
+        // For each continue/break statement, record its target's range and the
+        // orphan kind.
+        if (auto *CS = dyn_cast<ContinueStmt>(S)) {
+          Ranges.emplace_back(CS->getTarget()->getSourceRange(),
+                              OrphanKind::Continue);
+        } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
+          Ranges.emplace_back(BS->getTarget()->getSourceRange(),
+                              OrphanKind::Break);
+        }
+        return true;
+      }
+    };
+    for (auto N : Nodes) {
+      ControlFlowStmtSelector TheWalker;
+      N.walk(TheWalker);
+      for (auto Pair : TheWalker.Ranges) {
+
+        // If the entire range does not include the target's range, we find
+        // an orphan.
+        if (!SM.rangeContains(WholeRange, Pair.first))
+          return Pair.second;
+      }
+    }
+
+    // We find no orphan.
+    return OrphanKind::None;
+  }
+
   void analyze(ASTNode Node) {
     Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
     analyzeDecl(D);
@@ -552,6 +604,7 @@ public:
                 /* Last node has the type */
                 resolveNodeType(DCInfo.EndMatches.back()), Content,
                 getImmediateContext(), hasSingleEntryPoint(ContainedASTNodes),
+                getOrphanKind(ContainedASTNodes),
                 llvm::makeArrayRef(ContainedASTNodes),
                 llvm::makeArrayRef(DeclaredDecls),
                 llvm::makeArrayRef(ReferencedDecls)};
