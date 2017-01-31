@@ -36,6 +36,8 @@ case trivial_payload(Builtin.Int32)
 case nontrivial_payload(Builtin.NativeObject)
 }
 
+sil @three_differing_payload_enum_user : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
+
 struct TrivialStruct {
   var f1: Builtin.Int32
   var f2: Builtin.Int32
@@ -280,6 +282,15 @@ bb0(%0 : @owned $RefWithInt):
   %2 = ref_element_addr %1 : $RefWithInt, #RefWithInt.value
   end_borrow %1 from %0 : $RefWithInt, $RefWithInt
   destroy_value %0 : $RefWithInt
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @trivial_payload_enum_pass_to_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
+  %1 = function_ref @three_differing_payload_enum_user : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
+  apply %1(%0, %0, %0) : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
   %9999 = tuple()
   return %9999 : $()
 }

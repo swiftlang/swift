@@ -171,6 +171,10 @@ public:
   OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I) {
     return visitForwardingInst(I, I->getAllOperands());
   }
+  OwnershipUseCheckerResult
+  visitApplyArgument(ValueOwnershipKind RequiredConvention, bool ShouldCheck);
+  OwnershipUseCheckerResult
+  visitNonTrivialEnum(EnumDecl *E, ValueOwnershipKind RequiredConvention);
 
   /// Check if \p User as compatible ownership with the SILValue that we are
   /// checking.
@@ -518,37 +522,7 @@ OwnershipCompatibilityUseChecker::checkTerminatorArgumentMatchesDestBB(
             getOwnershipKind() == ValueOwnershipKind::Owned};
   }
 
-  // Otherwise, first see if the enum is completely trivial. In such a case, we
-  // need an argument with a trivial convention. If we have an enum with at
-  // least 1 non-trivial case, then we need an argument with a non-trivial
-  // convention. If our parameter is trivial, then we just let it through in
-  // such a case. Otherwise we need to make sure that the non-trivial ownership
-  // convention matches the one on the argument parameter.
-
-  // Check if this enum has at least one case that is non-trivially typed.
-  bool HasNonTrivialCase =
-      llvm::any_of(E->getAllElements(), [this](EnumElementDecl *E) -> bool {
-        if (!E->getArgumentInterfaceType())
-          return false;
-        SILType EnumEltType = getType().getEnumElementType(E, Mod);
-        return !EnumEltType.isTrivial(Mod);
-      });
-
-  // If we have all trivial cases, make sure we are compatible with a trivial
-  // ownership kind.
-  if (!HasNonTrivialCase) {
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
-  }
-
-  // Otherwise, if this value is a trivial ownership kind, return.
-  if (compatibleWithOwnership(ValueOwnershipKind::Trivial)) {
-    return {true, false};
-  }
-
-  // And finally finish by making sure that if we have a non-trivial ownership
-  // kind that it matches the argument's convention.
-  return {compatibleWithOwnership(DestBlockArgOwnershipKind),
-          compatibleWithOwnership(ValueOwnershipKind::Owned)};
+  return visitNonTrivialEnum(E, DestBlockArgOwnershipKind);
 }
 
 OwnershipUseCheckerResult
@@ -688,6 +662,56 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitCallee(
   llvm_unreachable("Unhandled ParameterConvention in switch.");
 }
 
+OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitNonTrivialEnum(
+    EnumDecl *E, ValueOwnershipKind RequiredKind) {
+  // Otherwise, first see if the enum is completely trivial. In such a case, we
+  // need an argument with a trivial convention. If we have an enum with at
+  // least 1 non-trivial case, then we need an argument with a non-trivial
+  // convention. If our parameter is trivial, then we just let it through in
+  // such a case. Otherwise we need to make sure that the non-trivial ownership
+  // convention matches the one on the argument parameter.
+
+  // Check if this enum has at least one case that is non-trivially typed.
+  bool HasNonTrivialCase =
+      llvm::any_of(E->getAllElements(), [this](EnumElementDecl *E) -> bool {
+        if (!E->getArgumentInterfaceType())
+          return false;
+        SILType EnumEltType = getType().getEnumElementType(E, Mod);
+        return !EnumEltType.isTrivial(Mod);
+      });
+
+  // If we have all trivial cases, make sure we are compatible with a trivial
+  // ownership kind.
+  if (!HasNonTrivialCase) {
+    return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+  }
+
+  // Otherwise, if this value is a trivial ownership kind, return.
+  if (compatibleWithOwnership(ValueOwnershipKind::Trivial)) {
+    return {true, false};
+  }
+
+  // And finally finish by making sure that if we have a non-trivial ownership
+  // kind that it matches the argument's convention.
+  return {compatibleWithOwnership(RequiredKind),
+          compatibleWithOwnership(ValueOwnershipKind::Owned)};
+}
+
+// We allow for trivial cases of enums with non-trivial cases to be passed in
+// non-trivial argument positions. This fits with modeling of a
+// SILFunctionArgument as a phi in a global program graph.
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitApplyArgument(ValueOwnershipKind Kind,
+                                                     bool ShouldCheck) {
+  // Check if we have an enum. If not, then we just check against the passed inc
+  // onvention.
+  EnumDecl *E = getType().getEnumOrBoundGenericEnum();
+  if (!E) {
+    return {compatibleWithOwnership(Kind), ShouldCheck};
+  }
+  return visitNonTrivialEnum(E, Kind);
+}
+
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitApplyInst(ApplyInst *I) {
   // If we are visiting the callee, handle it specially.
@@ -702,14 +726,14 @@ OwnershipCompatibilityUseChecker::visitApplyInst(ApplyInst *I) {
   case SILArgumentConvention::Indirect_Out:
     return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
   case SILArgumentConvention::Direct_Owned:
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
+    return visitApplyArgument(ValueOwnershipKind::Owned, true);
   case SILArgumentConvention::Direct_Unowned:
     if (isAddressOrTrivialType())
       return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
     // We accept unowned, owned, and guaranteed in unowned positions.
     return {true, false};
   case SILArgumentConvention::Direct_Guaranteed:
-    return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed), false};
+    return visitApplyArgument(ValueOwnershipKind::Guaranteed, false);
   case SILArgumentConvention::Direct_Deallocating:
     llvm_unreachable("No ownership associated with deallocating");
   }
@@ -729,16 +753,16 @@ OwnershipCompatibilityUseChecker::visitTryApplyInst(TryApplyInst *I) {
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
   case SILArgumentConvention::Indirect_Out:
-    return {true, false};
+    return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
   case SILArgumentConvention::Direct_Owned:
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
+    return visitApplyArgument(ValueOwnershipKind::Owned, true);
   case SILArgumentConvention::Direct_Unowned:
     if (isAddressOrTrivialType())
       return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
     // We accept unowned, owned, and guaranteed in unowned positions.
     return {true, false};
   case SILArgumentConvention::Direct_Guaranteed:
-    return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed), false};
+    return visitApplyArgument(ValueOwnershipKind::Guaranteed, false);
   case SILArgumentConvention::Direct_Deallocating:
     llvm_unreachable("No ownership associated with deallocating");
   }
