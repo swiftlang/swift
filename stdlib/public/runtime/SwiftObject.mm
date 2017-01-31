@@ -1340,10 +1340,8 @@ static bool usesNativeSwiftReferenceCounting_nonNull(
 }
 #endif
 
-SWIFT_RT_ENTRY_VISIBILITY
-bool swift::swift_isUniquelyReferenced_nonNull_native(
-  const HeapObject* object
-) SWIFT_CC(RegisterPreservingCC_IMPL) {
+bool swift::swift_isUniquelyReferenced_nonNull_native(const HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
   assert(object != nullptr);
   assert(!object->refCount.isDeallocating());
   return object->refCount.isUniquelyReferenced();
@@ -1439,21 +1437,17 @@ bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
 // Given a non-@objc object reference, return true iff the
 // object is non-nil and either has a strong reference count of 1
 // or is pinned.
-SWIFT_RT_ENTRY_VISIBILITY
-bool swift::swift_isUniquelyReferencedOrPinned_native(
-  const HeapObject* object)
+bool swift::swift_isUniquelyReferencedOrPinned_native(const HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  return object != nullptr
-    && swift_isUniquelyReferencedOrPinned_nonNull_native(object);
+  return object != nullptr &&
+         swift_isUniquelyReferencedOrPinned_nonNull_native(object);
 }
 
 /// Given a non-nil native swift object reference, return true if
 /// either the object has a strong reference count of 1 or its
 /// pinned flag is set.
-SWIFT_RT_ENTRY_VISIBILITY
 bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
-                                                    const HeapObject* object)
-  SWIFT_CC(RegisterPreservingCC_IMPL) {
+    const HeapObject *object) SWIFT_CC(RegisterPreservingCC_IMPL) {
   assert(object != nullptr);
   assert(!object->refCount.isDeallocating());
   return object->refCount.isUniquelyReferencedOrPinned();
