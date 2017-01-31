@@ -91,8 +91,6 @@ public:
     SubscriptIndex,
     /// \brief The result of a subscript expression.
     SubscriptResult,
-    /// \brief An argument to string interpolation.
-    InterpolationArgument,
     /// \brief The lookup for a constructor member.
     ConstructorMember,
     /// \brief Rvalue adjustment.
@@ -155,7 +153,6 @@ public:
       return 0;
 
     case GenericArgument:
-    case InterpolationArgument:
     case NamedTupleElement:
     case TupleElement:
       return 1;
@@ -204,7 +201,6 @@ public:
     case Archetype:
     case AssociatedType:
     case GenericArgument:
-    case InterpolationArgument:
     case NamedTupleElement:
     case TupleElement:
     case Requirement:
@@ -333,12 +329,6 @@ public:
     /// its position.
     static PathElement getGenericArgument(unsigned position) {
       return PathElement(GenericArgument, position);
-    }
-
-    /// \brief Retrieve a path element for an argument to string
-    /// interpolation.
-    static PathElement getInterpolationArgument(unsigned position) {
-      return PathElement(InterpolationArgument, position);
     }
 
     /// \brief Retrieve the kind of path element.
