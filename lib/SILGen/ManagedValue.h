@@ -76,6 +76,10 @@ public:
   ManagedValue(SILValue value, CleanupHandle cleanup)
     : valueAndFlag(value, false), cleanup(cleanup) {
     assert(value && "No value specified?!");
+    assert((!getType().isObject() ||
+            value.getOwnershipKind() != ValueOwnershipKind::Trivial ||
+            !hasCleanup()) &&
+           "Objects with trivial ownership should never have a cleanup");
   }
 
   /// Create a managed value for a +0 rvalue.
