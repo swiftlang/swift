@@ -2438,7 +2438,8 @@ namespace {
                          NominalTypeDecl::StoredPropertyRange storedProperties){
     SmallVector<FieldTypeInfo, 4> types;
     for (VarDecl *prop : storedProperties) {
-      auto propertyType = prop->getType()->getCanonicalType();
+      auto propertyType = type->mapTypeIntoContext(prop->getInterfaceType())
+                              ->getCanonicalType();
       types.push_back(FieldTypeInfo(propertyType,
                                     /*indirect*/ false,
                                     propertyType->is<WeakStorageType>()));
@@ -3213,7 +3214,8 @@ static llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
   Address firstField;
   unsigned index = 0;
   for (auto prop : storedProperties) {
-    auto propFormalTy = prop->getType()->getCanonicalType();
+    auto propFormalTy = target->mapTypeIntoContext(prop->getInterfaceType())
+                            ->getCanonicalType();
     SILType propLoweredTy = IGF.IGM.getLoweredType(propFormalTy);
     auto &propTI = IGF.getTypeInfo(propLoweredTy);
     auto sizeAndAlignMask
