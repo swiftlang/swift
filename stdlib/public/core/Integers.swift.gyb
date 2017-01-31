@@ -38,9 +38,9 @@ binaryArithmetic = {
     struct(operator='+', name='adding',      firstArg='_',  llvmName='add', kind='+'),
     struct(operator='-', name='subtracting', firstArg='_',  llvmName='sub', kind='-'),
     struct(operator='*', name='multiplied',  firstArg='by', llvmName='mul', kind='*'),
-    struct(operator='/', name='divided',     firstArg='by', llvmName='div', kind='/'),
   ],
   'BinaryInteger' : [
+    struct(operator='/', name='divided',     firstArg='by', llvmName='div', kind='/'),
     struct(operator='%', name='remainder',   firstArg='dividingBy', llvmName='rem', kind='/'),
   ],
 }
@@ -1434,7 +1434,7 @@ public protocol BinaryInteger :
   ///     // x.trailingZeros == 3
   var trailingZeros: Int { get }
 
-% for x in binaryArithmetic['BinaryInteger']:
+% for x in chain(*binaryArithmetic.values()):
   // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
 ${operatorComment(x.operator)}
@@ -1969,7 +1969,7 @@ public protocol FixedWidthInteger : BinaryInteger, BitwiseOperations {
   /// exponentiation.
   static var min: Self { get }
 
-% for x in binaryArithmetic['Arithmetic']:
+% for x in binaryArithmetic['Arithmetic'] + binaryArithmetic['BinaryInteger'][:1]:
 ${overflowOperationComment(x.operator)}
   func ${x.name}WithOverflow(
     ${x.firstArg} rhs: Self
@@ -2166,7 +2166,7 @@ extension FixedWidthInteger {
     else { self = Self(extendingOrTruncating: source) }
   }
 
-% for x in binaryArithmetic['Arithmetic']:
+% for x in binaryArithmetic['Arithmetic'] + binaryArithmetic["BinaryInteger"][:1]:
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 // FIXME(integers): pending optimizer work on handling the case where the
 // boolean value is wrapped into a two-case enum and then immediately
@@ -2576,7 +2576,7 @@ public struct ${Self}
 // boolean value is wrapped into a two-case enum and then immediately
 // unwrapped. <rdar://problem/29004429>
 // See corresponding definitions in the FixedWidthInteger extension.
-%       for x in binaryArithmetic['Arithmetic']:
+%       for x in binaryArithmetic['Arithmetic'] + binaryArithmetic["BinaryInteger"][:1]:
   @_transparent
   public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
 %   if x.kind == '/':
