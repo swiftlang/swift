@@ -793,6 +793,43 @@ extension RangeReplaceableCollection {
   public mutating func reserveCapacity(_ n: IndexDistance) {}
 }
 
+// Offer the most specific slice type available for each possible combination of
+// RangeReplaceable * (1 + Bidirectional + RandomAccess) * (1 + Mutable)
+// collections.
+
+% for capability in ['', 'Bidirectional', 'RandomAccess']:
+%   if capability:
+extension RangeReplaceableCollection where
+    Self: ${capability}Collection,
+    Self.SubSequence == RangeReplaceable${capability}Slice<Self> {
+  public subscript(bounds: Range<Index>)
+      -> RangeReplaceable${capability}Slice<Self> {
+    return RangeReplaceable${capability}Slice(base: self, bounds: bounds)
+  }
+}
+%   end
+
+extension RangeReplaceableCollection where
+  Self: MutableCollection,
+%   if capability:
+  Self: ${capability}Collection,
+%   end
+  Self.SubSequence == MutableRangeReplaceable${capability}Slice<Self>
+{
+  public subscript(bounds: Range<Index>)
+      -> MutableRangeReplaceable${capability}Slice<Self> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return MutableRangeReplaceable${capability}Slice(base: self,
+                                                       bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+}
+% end
+
 extension RangeReplaceableCollection where SubSequence == Self {
   /// Removes and returns the first element of the collection.
   ///
