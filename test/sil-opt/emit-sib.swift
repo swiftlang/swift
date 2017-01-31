@@ -1,4 +1,5 @@
-// <rdar://problem/27394237> IR generation CFG order isn't deterministic (XFAIL: test/sil-opt/emit-sib.swift)
+// <rdar://problem/27394237> IR generation CFG order isn't deterministic
+XFAIL: *
 
 // RUN: rm -rf %t && mkdir -p %t
 
