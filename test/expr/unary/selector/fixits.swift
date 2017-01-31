@@ -24,7 +24,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift 2> %t.result
 
 // RUN: %FileCheck %s < %t.result
-// RUN: grep -c "warning:" %t.result | grep 3
+// RUN: grep -c "warning:" %t.result | grep 6
 
 // CHECK: warning: no method declared with Objective-C selector 'unknownMethodWithValue:label:'
 // CHECK: warning: string literal is not a valid Objective-C selector
