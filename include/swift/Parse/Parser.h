@@ -464,9 +464,6 @@ public:
   /// Parse an #endif.
   bool parseEndIfDirective(SourceLoc &Loc);
   
-  /// True if Tok is the second consecutive identifier in a variable decl.
-  bool isSecondVarIdentifier();
-
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -496,7 +493,8 @@ public:
   
   /// Add a fix-it to remove the space in consecutive identifiers.
   /// Add a camel-cased option if it is different than the first option.
-  void diagnoseConsecutiveIDs(Token First, Token Second);
+  void diagnoseConsecutiveIDs(StringRef First, SourceLoc FirstLoc,
+                              StringRef DeclKindName);
      
   /// \brief Check whether the current token starts with '<'.
   bool startsWithLess(Token Tok) {

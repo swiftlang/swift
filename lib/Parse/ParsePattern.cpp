@@ -790,6 +790,10 @@ ParserResult<Pattern> Parser::parsePattern() {
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);
     bool isLet = InVarOrLetPattern != IVOLP_InVar;
+
+    if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword())
+      diagnoseConsecutiveIDs(name.str(), loc, isLet ? "constant" : "variable");
+
     return makeParserResult(createBindingFromPattern(loc, name, isLet));
   }
     
