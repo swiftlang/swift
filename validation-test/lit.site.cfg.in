@@ -74,6 +74,8 @@ if "@CMAKE_GENERATOR@" == "Xcode":
     config.environment['PATH'] = \
       os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
 
+config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
+
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
 lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/validation-test/lit.cfg")
