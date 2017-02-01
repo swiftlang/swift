@@ -108,7 +108,7 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift)
 TwoWordPair<const char *, uintptr_t>::Return
 swift::swift_getTypeName(const Metadata *type, bool qualified) {
   using Pair = TwoWordPair<const char *, uintptr_t>;
