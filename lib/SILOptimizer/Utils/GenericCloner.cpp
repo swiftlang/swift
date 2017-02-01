@@ -83,6 +83,9 @@ void GenericCloner::populateCloned() {
       AllocStacks.push_back(ASI);
     };
     auto handleConversion = [&]() {
+      if (!origConv.useLoweredAddresses())
+        return false;
+
       if (ArgIdx < origConv.getSILArgIndexOfFirstParam()) {
         // Handle result arguments.
         unsigned formalIdx =
