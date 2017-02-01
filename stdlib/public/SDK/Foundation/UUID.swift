@@ -13,6 +13,20 @@
 @_exported import Foundation // Clang module
 import Darwin.uuid
 
+func withUnsafeMutablePointer<T, U, Result>(
+  to arg: inout T,
+  as type: U.Type,
+  capacity count: Int,
+  _ body: (UnsafeMutablePointer<U>) -> Result
+  ) -> Result
+{
+    return withUnsafeMutablePointer(to: &arg) {
+        $0.withMemoryRebound(to: type, capacity: count) { ptr in
+            body(ptr)
+        }
+    }
+}
+
 /// Represents UUID strings, which can be used to uniquely identify types, interfaces, and other items.
 @available(OSX 10.8, iOS 6.0, *)
 public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConvertible {
@@ -22,15 +36,15 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     
     /* Create a new UUID with RFC 4122 version 4 random bytes */
     public init() {
-        withUnsafeMutablePointer(to: &uuid) {
-            uuid_generate_random(unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self))
+        withUnsafeMutablePointer(to: &uuid, as: UInt8.self, capacity: MemoryLayout.size(ofValue: uuid)) {
+            uuid_generate_random($0)
         }
     }
     
     fileprivate init(reference: NSUUID) {
         var bytes: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        withUnsafeMutablePointer(to: &bytes) {
-            reference.getBytes(unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self))
+        withUnsafeMutablePointer(to: &bytes, as: UInt8.self, capacity: MemoryLayout.size(ofValue: bytes)) {
+            reference.getBytes($0)
         }
         uuid = bytes
     }
@@ -39,8 +53,8 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     /// 
     /// Returns nil for invalid strings.
     public init?(uuidString string: String) {
-        let res = withUnsafeMutablePointer(to: &uuid) {
-            return uuid_parse(string, unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self))
+        let res = withUnsafeMutablePointer(to: &uuid, as: UInt8.self, capacity: MemoryLayout.size(ofValue: uuid)) {
+            uuid_parse(string, $0)
         }
         if res != 0 {
             return nil
@@ -56,18 +70,20 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     public var uuidString: String {
         var bytes: uuid_string_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         var localValue = uuid
-        return withUnsafeMutablePointer(to: &localValue) { val in
-            withUnsafeMutablePointer(to: &bytes) { str in
-                uuid_unparse(unsafeBitCast(val, to: UnsafePointer<UInt8>.self), unsafeBitCast(str, to: UnsafeMutablePointer<Int8>.self))
-                return String(cString: unsafeBitCast(str, to: UnsafePointer<CChar>.self), encoding: .utf8)!
+        return withUnsafeMutablePointer(to: &localValue, as: UInt8.self, capacity: MemoryLayout.size(ofValue: localValue)) { val in
+            withUnsafeMutablePointer(to: &bytes, as: Int8.self, capacity: MemoryLayout.size(ofValue: bytes)) { str in
+                uuid_unparse(val, str)
+                return str.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: bytes)) {
+                    String(cString: $0, encoding: .utf8)!
+                }
             }
         }
     }
     
     public var hashValue: Int {
         var localValue = uuid
-        return withUnsafeMutablePointer(to: &localValue) {
-            return Int(bitPattern: CFHashBytes(unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self), CFIndex(MemoryLayout<uuid_t>.size)))
+        return withUnsafeMutablePointer(to: &localValue, as: UInt8.self, capacity: MemoryLayout.size(ofValue: localValue)) {
+            return Int(bitPattern: CFHashBytes($0, CFIndex(MemoryLayout<uuid_t>.size)))
         }
     }
     
@@ -83,8 +99,8 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     
     fileprivate var reference: NSUUID {
         var bytes = uuid
-        return withUnsafePointer(to: &bytes) {
-            return NSUUID(uuidBytes: unsafeBitCast($0, to: UnsafePointer<UInt8>.self))
+        return withUnsafeMutablePointer(to: &bytes, as: UInt8.self, capacity: MemoryLayout.size(ofValue: bytes)) {
+            return NSUUID(uuidBytes: $0)
         }
     }
 
