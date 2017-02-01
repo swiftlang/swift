@@ -135,6 +135,6 @@ func testInGenericFunc1<A, B : FooProtocol, C : FooProtocol & BarProtocol>(_ a: 
 }
 
 func testInGenericFunc2<T : QuxProtocol, U : QuxProtocol>() where T.Qux == U.Qux {}
-// CHECK: FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, U.Qux == T.Qux> () -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, U.Qux == T.Qux> () -> (){{$}}
+// CHECK: FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> () -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> () -> (){{$}}
 

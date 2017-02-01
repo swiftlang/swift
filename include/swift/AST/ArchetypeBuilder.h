@@ -340,8 +340,9 @@ class ArchetypeBuilder::PotentialArchetype {
   /// to which this potential archetype belongs.
   PotentialArchetype *Representative;
 
-  /// \brief The source of a same-type requirement.
-  Optional<RequirementSource> SameTypeSource;
+  /// Same-type constraints between this potential archetype and any other
+  /// archetype in its equivalence class.
+  llvm::MapVector<PotentialArchetype *, RequirementSource> SameTypeConstraints;
 
   /// \brief The superclass of this archetype, if specified.
   Type Superclass;
@@ -369,6 +370,9 @@ class ArchetypeBuilder::PotentialArchetype {
   /// The concrete type to which a this potential archetype has been
   /// constrained.
   Type ConcreteType;
+
+  /// The source of the concrete type requirement.
+  Optional<RequirementSource> ConcreteTypeSource;
 
   /// \brief Recursively conforms to itself.
   unsigned IsRecursive : 1;
@@ -568,10 +572,24 @@ public:
   /// potential archetype computations.
   PotentialArchetype *getArchetypeAnchor();
 
-  /// Retrieve the source of the same-type constraint that applies to this
-  /// potential archetype.
-  const RequirementSource &getSameTypeSource() const {
-    return *SameTypeSource;
+  /// Add a same-type constraint between this archetype and the given
+  /// other archetype.
+  void addSameTypeConstraint(PotentialArchetype *otherPA,
+                             const RequirementSource& source);
+
+  /// Retrieve the same-type constraints.
+  llvm::iterator_range<
+    std::vector<std::pair<PotentialArchetype *, RequirementSource>>
+       ::const_iterator>
+  getSameTypeConstraints() const {
+    return llvm::make_range(SameTypeConstraints.begin(),
+                            SameTypeConstraints.end());
+  }
+
+  /// Retrieve the source of the same-type constraint that maps this potential
+  /// archetype to a concrete type.
+  const RequirementSource &getConcreteTypeSource() const {
+    return *ConcreteTypeSource;
   }
 
   /// \brief Retrieve (or create) a nested type with the given name.
