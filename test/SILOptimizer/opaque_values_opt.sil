@@ -1,7 +1,24 @@
-// RUN: %target-sil-opt -O -enable-sil-opaque-values -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -O -enable-sil-opaque-values -emit-sorted-sil -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
 
 import Builtin
 
-sil_stage raw
+// CHECK-LABEL: sil_stage canonical
+sil_stage canonical
 
-// CHECK-LABEL: sil_stage
+public typealias Int = Builtin.Int64
+
+// CHECK:  sil shared [noinline] @_TTSg5Bi64___genericIdentity : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK: bb0(%0 : $Builtin.Int64):
+// CHECK:  return %0 : $Builtin.Int64
+// CHECK: } // end sil function '_TTSg5Bi64___genericIdentity'
+sil hidden [noinline] @genericIdentity : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $T):
+  return %0 : $T
+}
+
+sil @callGeneric : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %2 = function_ref @genericIdentity : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %3 = apply %2<Builtin.Int64>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  return %3 : $Builtin.Int64
+}
