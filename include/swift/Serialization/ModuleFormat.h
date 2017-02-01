@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 309; // Last change: remove enum argument type
+const uint16_t VERSION_MINOR = 310; // Last change: static/non-static values
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -1199,7 +1199,8 @@ namespace decls_block {
     XREF_VALUE_PATH_PIECE,
     TypeIDField,       // type
     IdentifierIDField, // name
-    BCFixed<1>         // restrict to protocol extension
+    BCFixed<1>,        // restrict to protocol extension
+    BCFixed<1>         // static?
   >;
 
   using XRefInitializerPathPieceLayout = BCRecordLayout<
