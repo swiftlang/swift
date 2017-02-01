@@ -2335,6 +2335,67 @@ private:
 };
 } // end anonymous namespace
 
+
+bool
+swift::Demangle::isSwiftSymbol(const char *mangledName,
+                               size_t mangledNameLength) {
+  StringRef Name(mangledName, mangledNameLength);
+  // The old mangling.
+  if (Name.startswith("_T"))
+    return true;
+
+#ifndef NO_NEW_DEMANGLING
+  // The new mangling.
+  if (Name.startswith(MANGLING_PREFIX_STR))
+    return true;
+#endif // !NO_NEW_DEMANGLING
+  return false;
+}
+
+bool
+swift::Demangle::isThunkSymbol(const char *mangledName,
+                               size_t mangledNameLength) {
+  StringRef Name(mangledName, mangledNameLength);
+#ifndef NO_NEW_DEMANGLING
+  if (Name.startswith(MANGLING_PREFIX_STR)) {
+    // First do a quick check
+    if (Name.endswith("TA") ||  // partial application forwarder
+        Name.endswith("Ta") ||  // ObjC partial application forwarder
+        Name.endswith("To") ||  // swift-as-ObjC thunk
+        Name.endswith("TO")) {  // ObjC-as-swift thunk
+
+      // To avoid false positives, we need to fully demangle the symbol.
+      NodePointer Nd = demangleSymbolAsNode(mangledName, mangledNameLength);
+      if (!Nd || Nd->getKind() != Node::Kind::Global ||
+          Nd->getNumChildren() == 0)
+        return false;
+
+      switch (Nd->getFirstChild()->getKind()) {
+        case Node::Kind::ObjCAttribute:
+        case Node::Kind::NonObjCAttribute:
+        case Node::Kind::PartialApplyObjCForwarder:
+        case Node::Kind::PartialApplyForwarder:
+          return true;
+        default:
+          break;
+      }
+    }
+    return false;
+  }
+#endif // !NO_NEW_DEMANGLING
+
+  if (Name.startswith("_T")) {
+    // Old mangling.
+    StringRef Remaining = Name.substr(2);
+    if (Remaining.startswith("To") ||   // swift-as-ObjC thunk
+        Remaining.startswith("TO") ||   // ObjC-as-swift thunk
+        Remaining.startswith("PA")) {  // (ObjC) partial application forwarder
+      return true;
+    }
+  }
+  return false;
+}
+
 NodePointer
 swift::Demangle::demangleSymbolAsNode(const char *MangledName,
                                       size_t MangledNameLength,
