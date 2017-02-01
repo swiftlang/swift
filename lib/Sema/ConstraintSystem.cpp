@@ -1570,6 +1570,10 @@ Type ConstraintSystem::simplifyType(Type type) {
       if (newBase.getPointer() == depMemTy->getBase().getPointer())
         return type;
 
+      // Dependent member types should only be created for associated types.
+      auto assocType = depMemTy->getAssocType();
+      assert(depMemTy->getAssocType());
+
       Type lookupBaseType = newBase->getLValueOrInOutObjectType();
 
       // If the new base is still something we can't handle, just build a
@@ -1582,10 +1586,6 @@ Type ConstraintSystem::simplifyType(Type type) {
           return DependentMemberType::get(newBase, assocType);
       }
 
-      // Dependent member types should only be created for associated types.
-      auto assocType = depMemTy->getAssocType();
-      assert(depMemTy->getAssocType());
-
       if (!lookupBaseType->mayHaveMembers()) return type;
 
       auto result = assocType->getDeclaredInterfaceType()
@@ -1593,10 +1593,34 @@ Type ConstraintSystem::simplifyType(Type type) {
                  lookupBaseType->getContextSubstitutions(
                     assocType->getDeclContext()));
 
-      // FIXME: Record failure somehow?
-      if (!result) return type;
+      if (result)
+        return result;
 
-      return result;
+      // FIXME: Record failure somehow?
+      if (!lookupBaseType->getImplicitlyUnwrappedOptionalObjectType())
+        return type;
+
+      // "Force" the IUO for substitution purposes. We can end up in
+      // this situation if we use the results of overload resolution
+      // as a generic type and the overload resolution resulted in an
+      // IUO-typed entity.
+      while (auto objectType =
+             lookupBaseType->getImplicitlyUnwrappedOptionalObjectType()) {
+        lookupBaseType = objectType;
+      }
+
+      if (!lookupBaseType->mayHaveMembers()) return type;
+
+      result = assocType->getDeclaredInterfaceType()
+          .subst(DC->getParentModule(),
+                 lookupBaseType->getContextSubstitutions(
+                    assocType->getDeclContext()));
+
+      if (result)
+        return result;
+
+      // FIXME: Record failure somehow?
+      return type;
     }
 
     // If this is a FunctionType and we inferred new function attributes, apply
