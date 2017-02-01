@@ -28,3 +28,21 @@ func bar() {
   // CHECK: apply [[ZANG_DFLT_1]]<Int, Double>
   Zim<Int>.zang(Double.self, 22)
 }
+
+protocol Initializable {
+  init()
+}
+struct Generic<T: Initializable> {
+  init(_ value: T = T()) {}
+}
+struct InitializableImpl: Initializable {
+  init() {}
+}
+// CHECK-LABEL: sil hidden @_TF25default_arguments_generic17testInitializableFT_T_
+func testInitializable() {
+  // The ".init" is required to trigger the crash that used to happen.
+  _ = Generic<InitializableImpl>.init()
+  // CHECK: [[INIT:%.+]] = function_ref @_TFV25default_arguments_generic7GenericCfxGS0_x_
+  // CHECK: function_ref @_TIFV25default_arguments_generic7GenericcFxGS0_x_A_ : $@convention(thin) <τ_0_0 where τ_0_0 : Initializable> () -> @out τ_0_0
+  // CHECK: apply [[INIT]]<InitializableImpl>({{%.+}}, {{%.+}}) : $@convention(method) <τ_0_0 where τ_0_0 : Initializable> (@in τ_0_0, @thin Generic<τ_0_0>.Type) -> Generic<τ_0_0>
+} // CHECK: end sil function '_TF25default_arguments_generic17testInitializableFT_T_'
