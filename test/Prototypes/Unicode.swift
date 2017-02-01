@@ -998,7 +998,6 @@ t.test("CharacterView") {
   let v16 = CharacterView(Array(s.utf16), UTF16.self)
   expectEqual(a, Array(v16))
 
-  // FIXME: reverse traversal doesn't work yet.
   logging = true
   for (n, (c, e)) in zip(v8.reversed(), a.reversed()).enumerated() {
     debugLog("###### \(n): \(c) =?= \(e)")
