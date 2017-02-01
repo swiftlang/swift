@@ -437,3 +437,8 @@ func sr3497_unfold<A, B>(_ a0: A, next: (inout A) -> B) {}
 func sr3497() {
   let _ = sr3497_unfold((0, 0)) { s in 0 } // ok
 }
+
+// SR-3758: Swift 3.1 fails to compile 3.0 code involving closures and IUOs
+let _: ((Any?) -> Void) = { (arg: Any!) in }
+// This example was rejected in 3.0 as well, but accepting it is correct.
+let _: ((Int?) -> Void) = { (arg: Int!) in }
