@@ -2621,35 +2621,35 @@ enum class TokenProperty {
   StartsWithLess,
 };
 
-static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
-                                            SourceLoc &Loc, tok ResyncT1,
-                                            tok ResyncT2, tok ResyncT3,
-                                            tok ResyncT4,
-                                            TokenProperty ResyncP1,
-                                            const Diagnostic &D) {
-  switch (P.Tok.getKind()) {
-  case tok::identifier:
-    Result = P.Context.getIdentifier(P.Tok.getText());
-    Loc = P.Tok.getLoc();
-    P.consumeToken();
-    return makeParserSuccess();
+static ParserStatus
+parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
+                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
+                        tok ResyncT3, tok ResyncT4,
+                        TokenProperty ResyncP1) {
+  if (P.Tok.is(tok::identifier)) {
+    Loc = P.consumeIdentifier(&Result);
 
-  default:
-    P.checkForInputIncomplete();
-    if (!D.is(diag::invalid_diagnostic)) {
-      if (P.Tok.isKeyword()) {
-        P.diagnose(P.Tok, diag::keyword_cant_be_identifier, P.Tok.getText());
-        P.diagnose(P.Tok, diag::backticks_to_escape)
-          .fixItReplace(P.Tok.getLoc(), "`" + P.Tok.getText().str() + "`");
-      } else {
-        P.diagnose(P.Tok, D);
-      }
-    }
-    if (P.Tok.isKeyword() &&
-        (P.peekToken().is(ResyncT1) || P.peekToken().is(ResyncT2) ||
-         P.peekToken().is(ResyncT3) || P.peekToken().is(ResyncT4) ||
-         (ResyncP1 != TokenProperty::None &&
-          P.startsWithLess(P.peekToken())))) {
+    // We parsed an identifier for the declaration. If we see another
+    // identifier, it might've been a single identifier that got broken by a
+    // space or newline accidentally.
+    if (P.Tok.isIdentifierOrUnderscore() && !P.Tok.isContextualDeclKeyword())
+      P.diagnoseConsecutiveIDs(Result.str(), Loc, DeclKindName);
+
+    // Return success anyway
+    return makeParserSuccess();
+  }
+
+  P.checkForInputIncomplete();
+
+  if (P.Tok.isKeyword()) {
+    P.diagnose(P.Tok, diag::keyword_cant_be_identifier, P.Tok.getText());
+    P.diagnose(P.Tok, diag::backticks_to_escape)
+      .fixItReplace(P.Tok.getLoc(), "`" + P.Tok.getText().str() + "`");
+
+    // Recover if the next token is one of the expected tokens.
+    auto Next = P.peekToken();
+    if (Next.isAny(ResyncT1, ResyncT2, ResyncT3, ResyncT4) ||
+        (ResyncP1 != TokenProperty::None && P.startsWithLess(Next))) {
       llvm::SmallString<32> Name(P.Tok.getText());
       // Append an invalid character so that nothing can resolve to this name.
       Name += "#";
@@ -2661,63 +2661,68 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
     }
     return makeParserError();
   }
+
+  P.diagnose(P.Tok, diag::expected_identifier_in_decl, DeclKindName);
+  return makeParserError();
 }
 
-template <typename... DiagArgTypes, typename... ArgTypes>
 static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        tok ResyncT1, tok ResyncT2, Diag<DiagArgTypes...> ID,
-                        ArgTypes... Args) {
-  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2,
+                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2) {
+  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
                                  tok::NUM_TOKENS, tok::NUM_TOKENS,
-                                 TokenProperty::None,
-                                 Diagnostic(ID, Args...));
+                                 TokenProperty::None);
 }
 
-template <typename... DiagArgTypes, typename... ArgTypes>
 static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        tok ResyncT1, tok ResyncT2, tok ResyncT3,
-                        Diag<DiagArgTypes...> ID, ArgTypes... Args) {
-  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, ResyncT3,
-                                 tok::NUM_TOKENS, TokenProperty::None,
-                                 Diagnostic(ID, Args...));
+                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
+                        tok ResyncT3, tok ResyncT4) {
+  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
+                                 ResyncT3, ResyncT4, TokenProperty::None);
 }
 
-template <typename... DiagArgTypes, typename... ArgTypes>
 static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        tok ResyncT1, tok ResyncT2, tok ResyncT3, tok ResyncT4,
-                        Diag<DiagArgTypes...> ID, ArgTypes... Args) {
-  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, ResyncT3,
-                                 ResyncT4, TokenProperty::None,
-                                 Diagnostic(ID, Args...));
+                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
+                        TokenProperty ResyncP1) {
+  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
+                                 tok::NUM_TOKENS, tok::NUM_TOKENS, ResyncP1);
 }
 
-
-template <typename... DiagArgTypes, typename... ArgTypes>
 static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        tok ResyncT1, tok ResyncT2, TokenProperty ResyncP1,
-                        Diag<DiagArgTypes...> ID, ArgTypes... Args) {
-  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2,
-                                 tok::NUM_TOKENS, tok::NUM_TOKENS,
-                                 ResyncP1, Diagnostic(ID, Args...));
+                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
+                        tok ResyncT3, TokenProperty ResyncP1) {
+  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
+                                 ResyncT3, tok::NUM_TOKENS, ResyncP1);
 }
 
 /// Add a fix-it to remove the space in consecutive identifiers.
 /// Add a camel-cased option if it is different than the first option.
-void Parser::diagnoseConsecutiveIDs(Token First, Token Second) {
-  auto Joined = (First.getText() + Second.getText()).str();
-  SourceRange Range(First.getLoc(), Second.getLoc());
-  diagnose(Second.getLoc(), diag::join_identifiers).fixItReplace(Range, Joined);
-  
-  SmallString<8> Scratch;
-  auto SentenceCased = camel_case::toSentencecase(Tok.getText(), Scratch);
-  auto CamelCased = (First.getText() + SentenceCased).str();
-  if (Joined != CamelCased) {
-    diagnose(Second.getLoc(), diag::join_identifiers_camel_case)
-      .fixItReplace(Range, CamelCased);
+void Parser::diagnoseConsecutiveIDs(StringRef First, SourceLoc FirstLoc,
+                                    StringRef DeclKindName) {
+  assert(Tok.isAny(tok::identifier, tok::kw__));
+
+  diagnose(Tok, diag::repeated_identifier, DeclKindName);
+  auto Second = Tok.getText();
+  auto SecondLoc = consumeToken();
+
+  SourceRange FixRange(FirstLoc, SecondLoc);
+  // Provide two fix-its: a direct concatenation of the two identifiers
+  // and a camel-cased version.
+  //
+  auto DirectConcatenation = First.str() + Second.str();
+  diagnose(SecondLoc, diag::join_identifiers)
+    .fixItReplace(FixRange, DirectConcatenation);
+
+  SmallString<8> CapitalizedScratch;
+  auto Capitalized = camel_case::toSentencecase(Second,
+                                                CapitalizedScratch);
+  if (Capitalized != Second) {
+    auto CamelCaseConcatenation = First.str() + Capitalized.str();
+    diagnose(SecondLoc, diag::join_identifiers_camel_case)
+      .fixItReplace(FixRange, CamelCaseConcatenation);
   }
 }
 
@@ -2738,20 +2743,9 @@ static ParserStatus parseDeclItem(Parser &P,
   // If the previous declaration didn't have a semicolon and this new
   // declaration doesn't start a line, complain.
   if (!PreviousHadSemi && !P.Tok.isAtStartOfLine() && !P.Tok.is(tok::unknown)) {
-    // Add a fix-it to remove the space in consecutive identifiers
-    // in a property or enum case decl.
-    auto PreviousTok = P.L->getTokenAt(P.PreviousLoc);
-    if (P.Tok.is(tok::identifier) && PreviousTok.is(tok::identifier)) {
-      auto enumContext = P.CurDeclContext->getAsEnumOrEnumExtensionContext();
-      auto TypeName = enumContext ? "enum case" : "property";
-      P.diagnose(P.Tok.getLoc(), diag::repeated_identifier, TypeName);
-      P.diagnoseConsecutiveIDs(PreviousTok, P.Tok);
-      P.skipUntilDeclRBrace(tok::semi, tok::pound_endif);
-    } else {
-      auto endOfPrevious = P.getEndOfPreviousLoc();
-      P.diagnose(endOfPrevious, diag::declaration_same_line_without_semi)
-        .fixItInsert(endOfPrevious, ";");
-    }
+    auto endOfPrevious = P.getEndOfPreviousLoc();
+    P.diagnose(endOfPrevious, diag::declaration_same_line_without_semi)
+      .fixItInsert(endOfPrevious, ";");
   }
 
   auto Result = P.parseDecl(Options, handler);
@@ -3110,9 +3104,8 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc IdLoc;
   ParserStatus Status;
 
-  Status |=
-      parseIdentifierDeclName(*this, Id, IdLoc, tok::colon, tok::equal,
-                              diag::expected_identifier_in_decl, "typealias");
+  Status |= parseIdentifierDeclName(*this, Id, IdLoc, "typealias",
+                                    tok::colon, tok::equal);
   if (Status.isError())
     return nullptr;
     
@@ -3214,9 +3207,8 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
     AssociatedTypeLoc = consumeToken(tok::kw_associatedtype);
   }
   
-  Status =
-      parseIdentifierDeclName(*this, Id, IdLoc, tok::colon, tok::equal,
-                              diag::expected_identifier_in_decl, "associatedtype");
+  Status = parseIdentifierDeclName(*this, Id, IdLoc, "associatedtype",
+                                   tok::colon, tok::equal);
   if (Status.isError())
     return nullptr;
   
@@ -4654,42 +4646,38 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   }
   Identifier SimpleName;
   Token NameTok = Tok;
-  SourceLoc NameLoc = Tok.getLoc();
+  SourceLoc NameLoc;
 
-  // Within a protocol, recover from a missing 'static'.
-  if (Tok.isAnyOperator() && (Flags & PD_InProtocol)) {
-    switch (StaticSpelling) {
-    case StaticSpellingKind::None:
-      diagnose(NameLoc, diag::operator_static_in_protocol, NameTok.getText())
-        .fixItInsert(FuncLoc, "static ");
-      StaticSpelling = StaticSpellingKind::KeywordStatic;
-      break;
-
-    case StaticSpellingKind::KeywordStatic:
-      // Okay, this is correct.
-      break;
-
-    case StaticSpellingKind::KeywordClass:
-      llvm_unreachable("should have been fixed above");
-    }
-  }
-
-  if (parseAnyIdentifier(SimpleName, diag::expected_identifier_in_decl,
-                         "function")) {
+  if (Tok.is(tok::identifier) || Tok.isKeyword()) {
     ParserStatus NameStatus =
-        parseIdentifierDeclName(*this, SimpleName, NameLoc, tok::l_paren,
-                                tok::arrow, tok::l_brace,
-                                diag::invalid_diagnostic);
+        parseIdentifierDeclName(*this, SimpleName, NameLoc, "function",
+                                tok::l_paren, tok::arrow, tok::l_brace,
+                                TokenProperty::StartsWithLess);
     if (NameStatus.isError())
       return nullptr;
   } else {
-    // We parsed an identifier for the function declaration. If we see another
-    // identifier, it might've been a single identifier that got broken by a
-    // space or newline accidentally.
-    if (Tok.isIdentifierOrUnderscore() && SimpleName.str().back() != '<') {
-      diagnose(Tok.getLoc(), diag::repeated_identifier, "function");
-      diagnoseConsecutiveIDs(NameTok, Tok);
-      consumeToken();
+    // May be operator.
+    if (parseAnyIdentifier(SimpleName, NameLoc,
+                           diag::expected_identifier_in_decl, "function")) {
+      return nullptr;
+    }
+    assert(SimpleName.isOperator());
+    // Within a protocol, recover from a missing 'static'.
+    if (Flags & PD_InProtocol) {
+      switch (StaticSpelling) {
+      case StaticSpellingKind::None:
+        diagnose(NameLoc, diag::operator_static_in_protocol, SimpleName.str())
+          .fixItInsert(FuncLoc, "static ");
+        StaticSpelling = StaticSpellingKind::KeywordStatic;
+        break;
+
+      case StaticSpellingKind::KeywordStatic:
+        // Okay, this is correct.
+        break;
+
+      case StaticSpellingKind::KeywordClass:
+        llvm_unreachable("should have been fixed above");
+      }
     }
   }
 
@@ -4907,10 +4895,9 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   SourceLoc EnumNameLoc;
   ParserStatus Status;
 
-  Status |=
-      parseIdentifierDeclName(*this, EnumName, EnumNameLoc, tok::colon,
-                              tok::l_brace, TokenProperty::StartsWithLess,
-                              diag::expected_identifier_in_decl, "enum");
+  Status |= parseIdentifierDeclName(*this, EnumName, EnumNameLoc, "enum",
+                                    tok::colon, tok::l_brace,
+                                    TokenProperty::StartsWithLess);
   if (Status.isError())
     return nullptr;
 
@@ -4947,14 +4934,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     if (whereStatus.shouldStopParsing())
       return whereStatus;
     ED->setGenericParams(GenericParams);
-  }
-
-  // Add a fix-it to remove the space in consecutive identifiers
-  // in an enum decl.
-  if (Tok.is(tok::identifier)) {
-    diagnose(Tok.getLoc(), diag::repeated_identifier, "enum");
-    diagnoseConsecutiveIDs(L->getTokenAt(EnumNameLoc), Tok);
-    consumeToken();
   }
 
   SourceLoc LBLoc, RBLoc;
@@ -5005,29 +4984,33 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     SourceLoc DotLoc;
     consumeIf(tok::period_prefix, DotLoc);
 
-    const bool NameIsNotIdentifier = Tok.isNot(tok::identifier);
-    const bool NameIsKeyword = Tok.isKeyword();
-    StringRef TokText = Tok.getText();
-    SourceLoc TokLoc = Tok.getLoc();
-    if (parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren,
-                                tok::kw_case, tok::colon, tok::r_brace,
-                                diag::invalid_diagnostic).isError()) {
-      NameLoc = CaseLoc;
+    // Handle the likely case someone typed 'case X, case Y'.
+    if (Tok.is(tok::kw_case) && CommaLoc.isValid()) {
+      diagnose(Tok, diag::expected_identifier_after_case_comma);
+      Status.setIsParseError();
+      return Status;
+    }
 
-      // Handle the likely case someone typed 'case X, case Y'.
-      if (Tok.is(tok::kw_case) && CommaLoc.isValid()) {
-        diagnose(Tok, diag::expected_identifier_after_case_comma);
-        Status.setIsParseError();
-        return Status;
-      }
-      
+    if (Tok.is(tok::identifier)) {
+      Status |= parseIdentifierDeclName(*this, Name, NameLoc, "enum 'case'",
+                                        tok::l_paren, tok::kw_case, tok::colon,
+                                        tok::r_brace);
+      assert(Status.isSuccess());
+      if (DotLoc.isValid())
+        diagnose(DotLoc, diag::enum_case_dot_prefix)
+          .fixItRemove(DotLoc);
+    } else {
+      NameLoc = CaseLoc;
+      bool NameIsKeyword = Tok.isKeyword();
+      SourceLoc TokLoc = Tok.getLoc();
+      StringRef TokText = Tok.getText();
+
       // For recovery, see if the user typed something resembling a switch
       // "case" label.
       llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
       parseMatchingPattern(/*isExprBasic*/false);
-    }
-    if (NameIsNotIdentifier) {
+
       if (consumeIf(tok::colon)) {
         diagnose(CaseLoc, diag::case_outside_of_switch, "case");
         Status.setIsParseError();
@@ -5045,9 +5028,6 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       } else {
         diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
       }
-    } else if (DotLoc.isValid()) {
-      diagnose(DotLoc, diag::enum_case_dot_prefix)
-        .fixItRemove(DotLoc);
     }
 
     // See if there's a following argument type.
@@ -5169,10 +5149,9 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   SourceLoc StructNameLoc;
   ParserStatus Status;
 
-  Status |=
-      parseIdentifierDeclName(*this, StructName, StructNameLoc, tok::colon,
-                              tok::l_brace, TokenProperty::StartsWithLess,
-                              diag::expected_identifier_in_decl, "struct");
+  Status |= parseIdentifierDeclName(*this, StructName, StructNameLoc, "struct",
+                                    tok::colon, tok::l_brace,
+                                    TokenProperty::StartsWithLess);
   if (Status.isError())
     return nullptr;
 
@@ -5214,13 +5193,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     SD->setGenericParams(GenericParams);
   }
 
-  // Add a fix-it to remove the space in consecutive identifiers
-  // in a struct decl.
-  if (Tok.is(tok::identifier)) {
-    diagnose(Tok.getLoc(), diag::repeated_identifier, "struct");
-    diagnoseConsecutiveIDs(L->getTokenAt(StructNameLoc), Tok);
-    consumeToken();
-  }
   
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
@@ -5260,10 +5232,9 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   SourceLoc ClassNameLoc;
   ParserStatus Status;
 
-  Status |=
-      parseIdentifierDeclName(*this, ClassName, ClassNameLoc, tok::colon,
-                              tok::l_brace, TokenProperty::StartsWithLess,
-                              diag::expected_identifier_in_decl, "class");
+  Status |= parseIdentifierDeclName(*this, ClassName, ClassNameLoc, "class",
+                                    tok::colon, tok::l_brace,
+                                    TokenProperty::StartsWithLess);
   if (Status.isError())
     return nullptr;
 
@@ -5303,14 +5274,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
     if (whereStatus.shouldStopParsing())
       return whereStatus;
     CD->setGenericParams(GenericParams);
-  }
-
-  // Add a fix-it to remove the space in consecutive identifiers
-  // in a class decl.
-  if (Tok.is(tok::identifier)) {
-    diagnose(Tok.getLoc(), diag::repeated_identifier, "class");
-    diagnoseConsecutiveIDs(L->getTokenAt(ClassNameLoc), Tok);
-    consumeToken();
   }
 
   SourceLoc LBLoc, RBLoc;
@@ -5363,10 +5326,8 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   Identifier ProtocolName;
   ParserStatus Status;
 
-  Status |=
-      parseIdentifierDeclName(*this, ProtocolName, NameLoc, tok::colon,
-                              tok::l_brace, diag::expected_identifier_in_decl,
-                              "protocol");
+  Status |= parseIdentifierDeclName(*this, ProtocolName, NameLoc, "protocol",
+                                    tok::colon, tok::l_brace);
   if (Status.isError())
     return nullptr;
 

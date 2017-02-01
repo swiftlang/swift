@@ -569,9 +569,13 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
     if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overridden))
       return false;
   }
-  for (auto Conf : D->getSatisfiedProtocolRequirements()) {
-    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Conf))
-      return false;
+  // FIXME: This is quite expensive and not worth the cost for indexing purposes
+  // of system modules. Revisit if this becomes more efficient.
+  if (!isSystemModule) {
+    for (auto Conf : D->getSatisfiedProtocolRequirements()) {
+      if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Conf))
+        return false;
+    }
   }
 
   if (auto Parent = getParentDecl()) {
