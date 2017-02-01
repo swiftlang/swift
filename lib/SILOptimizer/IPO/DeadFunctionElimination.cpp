@@ -28,6 +28,10 @@ using namespace swift;
 STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 STATISTIC(NumEliminatedExternalDefs, "Number of external function definitions eliminated");
 
+llvm::cl::opt<bool> RemoveDeadConformances(
+    "remove-dead-conformances", llvm::cl::init(false),
+    llvm::cl::desc("Remove dead conformances"));
+
 namespace {
 
 /// This is a base class for passes that are based on function liveness
@@ -318,7 +322,8 @@ protected:
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
           ensureAlive(FRI->getReferencedFunction());
         }
-        FoundConformances.collect(&I);
+        if (RemoveDeadConformances)
+          FoundConformances.collect(&I);
       }
     }
     // Now we scan all _new_ conformances we found in the function.
@@ -546,7 +551,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
 
       ProtocolConformance *C = WT.getConformance();
       CanType ConformingTy = C->getType()->getCanonicalType();
-      if (ConformingTy.isAnyClassReferenceType()) {
+      if (!RemoveDeadConformances || ConformingTy.isAnyClassReferenceType()) {
         // We are very conservative with class conformances. Even if a private/
         // internal class is never instantiated, it might be created via
         // reflection by using the stdlib's _getTypeByMangledName function.

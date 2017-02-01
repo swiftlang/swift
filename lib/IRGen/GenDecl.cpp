@@ -1856,6 +1856,9 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
 
 void IRGenModule::checkEligibleConf(const ProtocolConformance *Conf) {
 #ifndef NDEBUG
+  if (!ConformanceCollector::verifyInIRGen())
+    return;
+
   if (EligibleConfs.isUsed(Conf))
     return;
 
@@ -1876,6 +1879,9 @@ void IRGenModule::checkEligibleConf(const ProtocolConformance *Conf) {
 
 void IRGenModule::checkEligibleMetaType(NominalTypeDecl *NT) {
 #ifndef NDEBUG
+  if (!ConformanceCollector::verifyInIRGen())
+    return;
+
   if (!NT || EligibleConfs.isMetaTypeEscaping(NT))
     return;
 
