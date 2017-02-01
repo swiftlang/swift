@@ -118,6 +118,11 @@ static bool canUseStaticDispatch(SILGenFunction &gen,
 
   if (funcDecl->isFinal())
     return true;
+  // Extension methods currently must be statically dispatched, unless they're
+  // @objc or dynamic.
+  if (funcDecl->getDeclContext()->isExtensionContext()
+      && !constant.isForeign)
+    return true;
 
   // We cannot form a direct reference to a method body defined in
   // Objective-C.
