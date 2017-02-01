@@ -1223,7 +1223,7 @@ getActualCtorInitializerKind(uint8_t raw) {
 /// from Clang can also appear in any module.
 static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
                          CanGenericSignature expectedGenericSig, bool isType,
-                         bool inProtocolExt,
+                         bool inProtocolExt, bool isStatic,
                          Optional<swift::CtorInitializerKind> ctorInit,
                          SmallVectorImpl<ValueDecl *> &values) {
   CanType canTy;
@@ -1237,6 +1237,8 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
     if (!value->hasInterfaceType())
       return true;
     if (canTy && value->getInterfaceType()->getCanonicalType() != canTy)
+      return true;
+    if (value->isStatic() != isStatic)
       return true;
     // FIXME: Should be able to move a value from an extension in a derived
     // module to the original definition in a base module.
@@ -1309,10 +1311,12 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     bool isType = (recordID == XREF_TYPE_PATH_PIECE);
     bool onlyInNominal = false;
     bool inProtocolExt = false;
+    bool isStatic = false;
     if (isType)
       XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
     else
-      XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt);
+      XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
+                                           isStatic);
 
     Identifier name = getIdentifier(IID);
     pathTrace.addValue(name);
@@ -1327,8 +1331,8 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     M->lookupQualified(ModuleType::get(M), name,
                        NL_QualifiedDefault | NL_KnownNoDependency,
                        /*typeResolver=*/nullptr, values);
-    filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, None,
-                 values);
+    filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, isStatic,
+                 None, values);
 
     // HACK HACK HACK: Omit-needless-words hack to try to cope with
     // the "NS" prefix being added/removed. No "real" compiler mode
@@ -1484,6 +1488,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
       bool isType = false;
       bool onlyInNominal = false;
       bool inProtocolExt = false;
+      bool isStatic = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
@@ -1495,7 +1500,8 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
 
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
-        XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt);
+        XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
+                                             isStatic);
         memberName = getIdentifier(IID);
         break;
       }
@@ -1534,8 +1540,8 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
 
       auto members = nominal->lookupDirect(memberName, onlyInNominal);
       values.append(members.begin(), members.end());
-      filterValues(filterTy, M, genericSig, isType, inProtocolExt, ctorInit,
-                   values);
+      filterValues(filterTy, M, genericSig, isType, inProtocolExt, isStatic,
+                   ctorInit, values);
       break;
     }
 

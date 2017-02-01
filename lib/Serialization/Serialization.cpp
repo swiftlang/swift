@@ -1622,7 +1622,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty),
                                          addIdentifierRef(SD->getName()),
-                                         isProtocolExt);
+                                         isProtocolExt,
+                                         SD->isStatic());
     break;
   }
       
@@ -1637,7 +1638,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
         abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
         XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                              addTypeRef(ty), nameID,
-                                             isProtocolExt);
+                                             isProtocolExt,
+                                             storage->isStatic());
 
         abbrCode =
           DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
@@ -1671,7 +1673,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty),
                                          addIdentifierRef(fn->getName()),
-                                         isProtocolExt);
+                                         isProtocolExt,
+                                         fn->isStatic());
 
     if (fn->isOperator()) {
       // Encode the fixity as a filter on the func decls, to distinguish prefix
@@ -1752,7 +1755,8 @@ void Serializer::writeCrossReference(const Decl *D) {
   XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        addTypeRef(ty),
                                        addIdentifierRef(val->getName()),
-                                       isProtocolExt);
+                                       isProtocolExt,
+                                       val->isStatic());
 }
 
 /// Translate from the AST associativity enum to the Serialization enum
