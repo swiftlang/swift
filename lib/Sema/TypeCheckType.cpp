@@ -3558,6 +3558,10 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
     return Result;
 
   SourceRange TypeRange = VD->getTypeSourceRangeForDiagnostics();
+  // TypeRange can be invalid; e.g. '@objc let foo = SwiftType()'
+  if (TypeRange.isInvalid())
+    TypeRange = VD->getNameLoc();
+
   diagnose(VD->getLoc(), diag::objc_invalid_on_var,
            getObjCDiagnosticAttrKind(Reason))
       .highlight(TypeRange);
