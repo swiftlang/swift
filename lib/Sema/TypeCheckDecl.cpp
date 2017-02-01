@@ -6926,6 +6926,27 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateExtension(ext);
     if (!ext->hasValidSignature())
       return;
+  } else if (dc->isLocalContext()) {
+    auto *parentDC = dc;
+    while (parentDC->isLocalContext() &&
+           !isa<AbstractFunctionDecl>(parentDC))
+      parentDC = parentDC->getParent();
+    if (parentDC->isLocalContext()) {
+      auto *AFD = cast<AbstractFunctionDecl>(parentDC);
+      validateDecl(AFD);
+      if (!AFD->hasValidSignature())
+        return;
+    }
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(parentDC)) {
+      validateDecl(nominal);
+      if (!nominal->hasValidSignature())
+        return;
+    }
+    if (auto *ext = dyn_cast<ExtensionDecl>(parentDC)) {
+      validateExtension(ext);
+      if (!ext->hasValidSignature())
+        return;
+    }
   }
 
   SWIFT_FUNC_STAT;

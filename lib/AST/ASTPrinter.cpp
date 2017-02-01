@@ -4006,9 +4006,7 @@ public:
         return;
       }
 
-      PrintNameContext context = PrintNameContext::Normal;
-      if (Name == T->getASTContext().Id_Self)
-        context = PrintNameContext::GenericParameter;
+      PrintNameContext context = PrintNameContext::GenericParameter;
       Printer.printName(Name, context);
     }
   }

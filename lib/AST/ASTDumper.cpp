@@ -519,7 +519,11 @@ namespace {
 
     void visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
       printAbstractTypeParamCommon(decl, "generic_type_param");
-      OS << " depth=" << decl->getDepth() << " index=" << decl->getIndex();
+      if (decl->hasDepth())
+        OS << " depth=" << decl->getDepth();
+      else
+        OS << " depth=<<not set>>";
+      OS << " index=" << decl->getIndex();
       OS << ")";
     }
 

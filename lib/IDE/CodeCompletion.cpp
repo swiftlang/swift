@@ -2791,12 +2791,16 @@ public:
     if (IsKeyPathExpr && !KeyPathFilter(D, Reason))
       return;
         
+    if (isa<AbstractTypeParamDecl>(D)) {
+      if (auto *generic = dyn_cast<GenericTypeDecl>(D->getDeclContext()))
+        TypeResolver->resolveDeclSignature(generic);
+      if (auto *func = dyn_cast<AbstractFunctionDecl>(D->getDeclContext()))
+        TypeResolver->resolveDeclSignature(func);
+      if (auto *ext = dyn_cast<ExtensionDecl>(D->getDeclContext()))
+        TypeResolver->bindExtension(ext);
+    }
     if (!D->hasInterfaceType())
       TypeResolver->resolveDeclSignature(D);
-    else if (isa<TypeAliasDecl>(D)) {
-      // A TypeAliasDecl might have type set, but not the underlying type.
-      TypeResolver->resolveDeclSignature(D);
-    }
 
     switch (Kind) {
     case LookupKind::ValueExpr:
