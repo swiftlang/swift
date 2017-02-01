@@ -38,7 +38,7 @@ func repr(_ x: NSString) -> String {
 func repr(_ x: _StringCore) -> String {
   if x.hasContiguousStorage {
     if let b = x.nativeBuffer {
-    var offset = x.elementWidth == 2
+    let offset = x.elementWidth == 2
       ? b.start - UnsafeMutableRawPointer(x.startUTF16)
       : b.start - UnsafeMutableRawPointer(x.startASCII)
       return "Contiguous(owner: "
@@ -110,13 +110,7 @@ print("\(repr(s))")
 s += "C"
 print("\(repr(s))")
 
-/// An additional reference to the same buffer doesn't, by itself,
-/// impede the use of available capacity
 var s1 = s
-
-// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer4]][0...50], capacity = 96))
-s += "F"
-print("\(repr(s))")
 
 // CHECK-NEXT: String(Contiguous(owner: .native@[[buffer4]][0...49], capacity = 96))
 print("\(repr(s1))")
