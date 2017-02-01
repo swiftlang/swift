@@ -223,11 +223,17 @@ struct ReferencedDecl {
   bool operator==(const ReferencedDecl& other);
 };
 
+enum class OrphanKind : int8_t {
+  None,
+  Break,
+  Continue,
+};
 struct ResolvedRangeInfo {
   RangeKind Kind;
   Type Ty;
   StringRef Content;
   bool HasSingleEntry;
+  OrphanKind Orphan;
 
   // The topmost ast nodes contained in the given range.
   ArrayRef<ASTNode> ContainedNodes;
@@ -237,17 +243,19 @@ struct ResolvedRangeInfo {
   ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content,
                     DeclContext* RangeContext,
                     bool HasSingleEntry,
+                    OrphanKind Orphan,
                     ArrayRef<ASTNode> ContainedNodes,
                     ArrayRef<DeclaredDecl> DeclaredDecls,
                     ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
                       Ty(Ty), Content(Content), HasSingleEntry(HasSingleEntry),
+                      Orphan(Orphan),
                       ContainedNodes(ContainedNodes),
                       DeclaredDecls(DeclaredDecls),
                       ReferencedDecls(ReferencedDecls),
                       RangeContext(RangeContext) {}
   ResolvedRangeInfo() :
   ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef(), nullptr,
-                    /*Single entry*/true, {}, {}, {}) {}
+                    /*Single entry*/true, OrphanKind::None, {}, {}, {}) {}
   void print(llvm::raw_ostream &OS);
 };
 

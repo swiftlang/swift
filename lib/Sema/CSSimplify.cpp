@@ -1232,7 +1232,7 @@ static bool isPotentiallyMoreOptionalThan(Type objType1,
 /// Enumerate all of the applicable optional conversion restrictions
 static void enumerateOptionalConversionRestrictions(
                     Type type1, Type type2,
-                    ConstraintKind kind,
+                    ConstraintKind kind, ConstraintLocatorBuilder locator,
                     llvm::function_ref<void(ConversionRestrictionKind)> fn) {
   SmallVector<Type, 2> optionals1;
   Type objType1 = type1->lookThroughAllAnyOptionalTypes(optionals1);
@@ -1251,6 +1251,7 @@ static void enumerateOptionalConversionRestrictions(
     // Break cyclic conversions between T? and U! by only allowing it for
     // conversion constraints.
     if (kind >= ConstraintKind::Conversion ||
+        locator.isFunctionConversion() ||
         !(optionalKind1 == OTK_Optional &&
           optionalKind2 == OTK_ImplicitlyUnwrappedOptional))
       fn(ConversionRestrictionKind::OptionalToOptional);
@@ -2055,9 +2056,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // A value of type T, T?, or T! can be converted to type U? or U! if
   // T is convertible to U.
   if (concrete && kind >= ConstraintKind::Subtype) {
-    enumerateOptionalConversionRestrictions(type1, type2, kind,
-      [&](ConversionRestrictionKind restriction) {
-        conversionsOrFixes.push_back(restriction);
+    enumerateOptionalConversionRestrictions(
+        type1, type2, kind, locator,
+        [&](ConversionRestrictionKind restriction) {
+      conversionsOrFixes.push_back(restriction);
     });
   }
 

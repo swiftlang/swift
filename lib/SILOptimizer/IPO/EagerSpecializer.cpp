@@ -410,6 +410,10 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
     auto CastArg = emitArgumentCast(OrigArg, ArgIdx);
     DEBUG(dbgs() << "  Cast generic arg: "; CastArg->print(dbgs()));
 
+    if (!substConv.useLoweredAddresses()) {
+      CallArgs.push_back(CastArg);
+      continue;
+    }
     if (ArgIdx < substConv.getSILArgIndexOfFirstParam()) {
       // Handle result arguments.
       unsigned formalIdx =
