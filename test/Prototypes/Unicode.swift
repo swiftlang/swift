@@ -136,18 +136,19 @@ extension Collection {
 
 //===--- someCollection[...] notation -------------------------------------===//
 // Thanks to Joe Groff for the technique
-enum FullSlice {}
-postfix func ... (_:())->FullSlice {
-  fatalError("do not call me")
+enum UnboundedRange_ {
+  static postfix func ... (_: UnboundedRange_) -> () { fatalError("uncallable") }
 }
+typealias UnboundedRange = (UnboundedRange_)->()
+
 extension Collection {
-  subscript(_:(())->FullSlice) -> SubSequence {
-    return self[startIndex...]
+  subscript(_: UnboundedRange) -> SubSequence {
+    return self[startIndex..<endIndex]
   }
 }
 
 extension MutableCollection {
-  subscript(_:(())->FullSlice) -> SubSequence {
+  subscript(_: UnboundedRange) -> SubSequence {
     get {
       return self[startIndex...]
     }
