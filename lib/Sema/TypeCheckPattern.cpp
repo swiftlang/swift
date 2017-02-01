@@ -350,6 +350,9 @@ public:
   
   // Convert a paren expr to a pattern if it contains a pattern.
   Pattern *visitParenExpr(ParenExpr *E) {
+    if (E->hasTrailingClosure())
+      return nullptr;
+
     Pattern *subPattern = getSubExprPattern(E->getSubExpr());
     return new (TC.Context) ParenPattern(E->getLParenLoc(), subPattern,
                                          E->getRParenLoc());
@@ -357,6 +360,9 @@ public:
   
   // Convert all tuples to patterns.
   Pattern *visitTupleExpr(TupleExpr *E) {
+    if (E->hasTrailingClosure())
+      return nullptr;
+
     // Construct a TuplePattern.
     SmallVector<TuplePatternElt, 4> patternElts;
 
