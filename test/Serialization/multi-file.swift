@@ -24,8 +24,8 @@ func bar() {
   foo(EquatableEnum.A)
 }
 
-// THIS-FILE-DAG: CLASS_DECL
-// OTHER-FILE-NEG-NOT: CLASS_DECL
+// THIS-FILE-DAG: PROTOCOL_DECL
+// OTHER-FILE-NEG-NOT: PROTOCOL_DECL
 // OTHER-FILE-DAG: ENUM_DECL
 // THIS-FILE-NEG-NOT: ENUM_DECL
 
@@ -53,4 +53,9 @@ private protocol SomeProto {
 
 private struct Generic<T> {
   // THIS-FILE-DAG: GENERIC_TYPE_PARAM_DECL
+}
+
+class Sub: Base {
+  override class var conflict: Int { return 100 }
+  override var conflict: Int { return 200 }
 }
