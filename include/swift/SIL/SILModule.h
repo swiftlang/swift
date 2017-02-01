@@ -8,7 +8,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===----------------------------------------------------------------------===//
+//===---------------------------------------------------------------------===//
 //
 // This file defines the SILModule class.
 //
@@ -74,10 +74,15 @@ enum class SILStage {
   Canonical,
 
   /// \brief Lowered SIL, which has been prepared for IRGen and will no longer
-  /// be passed to SIL transform passes.
+  /// be passed to canonical SIL transform passes.
   ///
-  /// Lowered SIL requires explicit storage for all address-only and resilient
+  /// In lowered SIL, the SILType of all SILValues is its SIL storage
+  /// type. Explicit storage is required for all address-only and resilient
   /// types.
+  ///
+  /// Generating the initial Raw SIL is typically referred to as lowering (from
+  /// the AST). To disambiguate, refer to the process of generating the lowered
+  /// stage of SIL as "address lowering".
   Lowered,
 };
 
