@@ -544,7 +544,7 @@ public func testInlineAgg(_ rect: MyRect) -> Float {
 }
 
 // We need to allocate enough memory on the stack to hold the argument value we load.
-// arm64-ios: define void @_TF8abitypes14testBOOLStructFT_T_()
+// arm64-ios: define void @_T08abitypes14testBOOLStructyyF()
 // arm64-ios:  [[COERCED:%.*]] = alloca i64
 // arm64-ios:  [[STRUCTPTR:%.*]] = bitcast i64* [[COERCED]] to %VSC14FiveByteStruct
 // arm64-ios:  [[PTR0:%.*]] = getelementptr inbounds %VSC14FiveByteStruct, %VSC14FiveByteStruct* [[STRUCTPTR]], {{i.*}} 0, {{i.*}} 0
