@@ -134,13 +134,6 @@ Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
   if (gpDecl->isInvalid())
     return ErrorType::get(gpDecl->getASTContext());
 
-  // Retrieve the potential archetype corresponding to this generic type
-  // parameter.
-  // FIXME: When generic parameters can map down to specific types, do so
-  // here.
-  auto pa = Builder.resolveArchetype(gp);
-  (void)pa;
-
   return gp;
 }
 

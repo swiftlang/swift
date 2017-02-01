@@ -2835,7 +2835,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     declOrOffset = param;
 
-    param->setInterfaceType(getType(interfaceTypeID));
+    auto paramTy = getType(interfaceTypeID);
+    if (paramTy->hasError()) {
+      error();
+      return nullptr;
+    }
+
+    param->setInterfaceType(paramTy);
     break;
   }
 

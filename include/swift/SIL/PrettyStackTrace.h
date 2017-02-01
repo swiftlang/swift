@@ -50,6 +50,8 @@ public:
   PrettyStackTraceSILFunction(const char *action, SILFunction *F)
     : TheFn(F), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
+protected:
+  void printFunctionInfo(llvm::raw_ostream &out) const;
 };
 
 } // end namespace swift

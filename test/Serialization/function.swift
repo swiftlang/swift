@@ -81,7 +81,7 @@ struct IntWrapper2 : Wrapped {
   func getValue() -> Int { return 2 }
 }
 
-// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_T08def_func16differentWrappedSbx1a_q_1btAA0D0RzAaER_5ValueQzAFRt_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_1.Value == τ_0_0.Value> (@in τ_0_0, @in τ_0_1) -> Bool
+// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_T08def_func16differentWrappedSbx1a_q_1btAA0D0RzAaER_5ValueQy_AFRtzr0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_0.Value == τ_0_1.Value> (@in τ_0_0, @in τ_0_1) -> Bool
 
 
 _ = differentWrapped(a: IntWrapper1(), b: IntWrapper2())

@@ -13,7 +13,7 @@
 #ifndef SWIFT_FRONTEND_APPLEHOSTVERSIONDETECTION_H
 #define SWIFT_FRONTEND_APPLEHOSTVERSIONDETECTION_H
 
-#import "clang/Basic/VersionTuple.h"
+#include "clang/Basic/VersionTuple.h"
 
 namespace swift {
 

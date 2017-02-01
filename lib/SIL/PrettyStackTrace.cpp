@@ -22,6 +22,10 @@
 
 using namespace swift;
 
+llvm::cl::opt<bool>
+SILPrintOnError("sil-print-on-error", llvm::cl::init(false),
+                llvm::cl::desc("Printing SIL function bodies in crash diagnostics."));
+
 void swift::printSILLocationDescription(llvm::raw_ostream &out,
                                         SILLocation loc,
                                         ASTContext &Context) {
@@ -52,11 +56,19 @@ void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
     return;
   }
 
+  printFunctionInfo(out);
+}
+
+void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) const {  
+  out << "\"";
   TheFn->printName(out);
+  out << "\".\n";
 
   if (!TheFn->getLocation().isNull()) {
     out << " for ";
     printSILLocationDescription(out, TheFn->getLocation(),
                                 TheFn->getModule().getASTContext());
   }
+  if (SILPrintOnError)
+    TheFn->print(out);
 }

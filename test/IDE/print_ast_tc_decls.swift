@@ -1217,12 +1217,12 @@ struct GenericParams5<T : QuxProtocol> where T.Qux : FooProtocol & BarProtocol {
 // PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams5<T> where T : QuxProtocol, T.Qux : BarProtocol, T.Qux : FooProtocol {{{$}}
 
 struct GenericParams6<T : QuxProtocol, U : QuxProtocol> where T.Qux == U.Qux {}
-// PREFER_TYPE_PRINTING: {{^}}struct GenericParams6<T, U> where T : QuxProtocol, U : QuxProtocol, U.Qux == T.Qux {{{$}}
-// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams6<T, U> where T : QuxProtocol, U : QuxProtocol, U.Qux == T.Qux {{{$}}
+// PREFER_TYPE_PRINTING: {{^}}struct GenericParams6<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux {{{$}}
+// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams6<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux {{{$}}
 
 struct GenericParams7<T : QuxProtocol, U : QuxProtocol> where T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == U.Qux.Qux {}
-// PREFER_TYPE_PRINTING: {{^}}struct GenericParams7<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux : QuxProtocol, U.Qux : QuxProtocol, U.Qux.Qux == T.Qux.Qux {{{$}}
-// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams7<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux : QuxProtocol, U.Qux : QuxProtocol, U.Qux.Qux == T.Qux.Qux {{{$}}
+// PREFER_TYPE_PRINTING: {{^}}struct GenericParams7<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == U.Qux.Qux {{{$}}
+// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams7<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == U.Qux.Qux {{{$}}
 
 //===---
 //===--- Tupe sugar for library types.
