@@ -374,7 +374,7 @@ getSubstitutionMap(ModuleDecl *mod,
       continue;
     }
 
-    assert(contextTy->is<ErrorType>());
+    assert(contextTy->hasError());
   }
 
   for (auto reqt : getGenericSignature()->getRequirements()) {

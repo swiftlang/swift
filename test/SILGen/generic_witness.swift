@@ -50,7 +50,7 @@ struct Canvas<I : Ink> where I.Paint : Pen {
 
 extension Canvas : Medium {}
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T015generic_witness6CanvasVyxGAA6MediumAaA3InkRzAA3Pen5PaintRpzlAaDP4drawy7Texture_AGQZ5paint_qd__6penciltAA6PencilRd__6StrokeQyd__ALRSlFTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_1_0.Stroke == τ_0_0.Paint> (@in τ_0_0.Paint, @in τ_1_0, @in_guaranteed Canvas<τ_0_0>) -> () {
-// CHECK: [[FN:%.*]] = function_ref @_T015generic_witness6CanvasV4drawy5PaintQz5paint_qd__6penciltAA6PencilRd__AF6StrokeRtd__lF : $@convention(method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_1_0.Stroke == τ_0_0.Paint> (@in τ_0_0.Paint, @in τ_1_0, Canvas<τ_0_0>) -> ()
-// CHECK: apply [[FN]]<τ_0_0, τ_1_0>({{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_1_0.Stroke == τ_0_0.Paint> (@in τ_0_0.Paint, @in τ_1_0, Canvas<τ_0_0>) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T015generic_witness6CanvasVyxGAA6MediumAaA3InkRzAA3Pen5PaintRpzlAaDP4drawy7Texture_AGQZ5paint_qd__6penciltAA6PencilRd__AL6StrokeRtd__lFTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_0_0.Paint == τ_1_0.Stroke> (@in τ_0_0.Paint, @in τ_1_0, @in_guaranteed Canvas<τ_0_0>) -> () {
+// CHECK: [[FN:%.*]] = function_ref @_T015generic_witness6CanvasV4drawy5PaintQz5paint_qd__6penciltAA6PencilRd__6StrokeQyd__AFRSlF : $@convention(method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_0_0.Paint == τ_1_0.Stroke> (@in τ_0_0.Paint, @in τ_1_0, Canvas<τ_0_0>) -> ()
+// CHECK: apply [[FN]]<τ_0_0, τ_1_0>({{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_0_0.Paint == τ_1_0.Stroke> (@in τ_0_0.Paint, @in τ_1_0, Canvas<τ_0_0>) -> ()
 // CHECK: }

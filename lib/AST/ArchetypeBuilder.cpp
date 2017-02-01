@@ -321,10 +321,13 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
     // Otherwise, create a new potential archetype for this associated type
     // and make it equivalent to the first potential archetype we encountered.
     auto otherPA = new PotentialArchetype(this, assocType);
+    otherPA->addSameTypeConstraint(known->second.front(), redundantSource);
+
+    // Update the equivalence class.
     auto frontRep = known->second.front()->getRepresentative();
     otherPA->Representative = frontRep;
     frontRep->EquivalenceClass.push_back(otherPA);
-    otherPA->SameTypeSource = redundantSource;
+
     known->second.push_back(otherPA);
 
     // If there's a superclass constraint that conforms to the protocol,
@@ -563,10 +566,11 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
 
         // Produce a same-type constraint between the two same-named
         // potential archetypes.
+        pa->addSameTypeConstraint(nested.front(), redundantSource);
+
         auto frontRep = nested.front()->getRepresentative();
         pa->Representative = frontRep;
         frontRep->EquivalenceClass.push_back(pa);
-        pa->SameTypeSource = redundantSource;
       } else
         nested.push_back(pa);
 
@@ -627,7 +631,7 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
           .second) {
       // Complain about the recursion, if we haven't done so already.
       if (!representative->RecursiveConcreteType) {
-        ctx.Diags.diagnose(representative->SameTypeSource->getLoc(),
+        ctx.Diags.diagnose(representative->ConcreteTypeSource->getLoc(),
                            diag::recursive_same_type_constraint,
                            getDependentType(genericParams,
                                             /*allowUnresolved=*/true),
@@ -718,7 +722,7 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
       // FIXME: THIS ASSIGNMENT IS REALLY WEIRD. We shouldn't be discovering
       // that a same-type constraint affects this so late in the game.
-      representative->SameTypeSource = parent->SameTypeSource;
+      representative->ConcreteTypeSource = parent->ConcreteTypeSource;
 
       return genericEnv->mapTypeIntoContext(memberType,
                                             builder.getLookupConformanceFn());
@@ -1101,7 +1105,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
   if (T->isConcreteType()) {
     Type concrete = T->getConcreteType();
     if (!Superclass->isExactSuperclassOf(concrete, getLazyResolver())) {
-      Diags.diagnose(T->getSameTypeSource().getLoc(),
+      Diags.diagnose(T->getConcreteTypeSource().getLoc(),
                      diag::type_does_not_inherit,
                      T->getDependentType(/*FIXME:*/{ },
                                          /*allowUnresolved=*/true),
@@ -1190,14 +1194,34 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
   return false;
 }
 
+void ArchetypeBuilder::PotentialArchetype::addSameTypeConstraint(
+                                             PotentialArchetype *otherPA,
+                                             const RequirementSource &source) {
+  // If the types are the same, there's nothing to do.
+  if (this == otherPA) return;
+
+  // Update the same-type constraints of this PA to reference the other PA.
+  auto insertedIntoThis = SameTypeConstraints.insert({otherPA, source});
+  if (!insertedIntoThis.second)
+    updateRequirementSource(insertedIntoThis.first->second, source);
+
+  // Update the same-type constraints of the other PA to reference this PA.
+  auto insertedIntoOther = otherPA->SameTypeConstraints.insert({this, source});
+  if (!insertedIntoOther.second)
+    updateRequirementSource(insertedIntoOther.first->second, source);
+}
+
 bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
-       PotentialArchetype *T1,
-       PotentialArchetype *T2,
+       PotentialArchetype *OrigT1,
+       PotentialArchetype *OrigT2,
        RequirementSource Source) 
 {
+  // Record the same-type constraint.
+  OrigT1->addSameTypeConstraint(OrigT2, Source);
+
   // Operate on the representatives
-  T1 = T1->getRepresentative();
-  T2 = T2->getRepresentative();
+  auto T1 = OrigT1->getRepresentative();
+  auto T2 = OrigT2->getRepresentative();
 
   // If the representatives are already the same, we're done.
   if (T1 == T2)
@@ -1225,12 +1249,12 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
     assert(!T2->ConcreteType
            && "already formed archetype for concrete-constrained parameter");
     T2->ConcreteType = concrete1;
-    T2->SameTypeSource = T1->SameTypeSource;
+    T2->ConcreteTypeSource = T1->ConcreteTypeSource;
   } else if (concrete2) {
     assert(!T1->ConcreteType
            && "already formed archetype for concrete-constrained parameter");
     T1->ConcreteType = concrete2;
-    T1->SameTypeSource = T2->SameTypeSource;
+    T1->ConcreteTypeSource = T2->ConcreteTypeSource;
   }
 
   // Don't mark requirements as redundant if they come from one of our
@@ -1248,7 +1272,6 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->Representative = T1;
-  T2->SameTypeSource = Source;
   for (auto equiv : T2->EquivalenceClass)
     T1->EquivalenceClass.push_back(equiv);
 
@@ -1320,7 +1343,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   
   // Record the requirement.
   T->ConcreteType = Concrete;
-  T->SameTypeSource = Source;
+  T->ConcreteTypeSource = Source;
 
   // Make sure the concrete type fulfills the superclass requirement
   // of the archetype.
@@ -1850,7 +1873,7 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
       // Don't allow a generic parameter to be equivalent to a concrete type,
       // because then we don't actually have a parameter.
       if (rep->getConcreteType()) {
-        auto &Source = rep->SameTypeSource;
+        auto &Source = rep->ConcreteTypeSource;
 
         // For auto-generated locations, we should have diagnosed the problem
         // elsewhere already.
@@ -1866,20 +1889,30 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
       // Don't allow two generic parameters to be equivalent, because then we
       // don't actually have two parameters.
       for (auto other : rep->getEquivalenceClass()) {
-        if (pa != other && other->getParent() == nullptr) {
-          auto &Source = (other == rep ? pa->SameTypeSource
-                                       : other->SameTypeSource);
+        // If it isn't a generic parameter, skip it.
+        if (other == pa || other->getParent() != nullptr) continue;
 
-          // For auto-generated locations, we should have diagnosed the problem
-          // elsewhere already.
-          if (!Source->getLoc().isValid())
-            continue;
+        SourceLoc constraintLoc;
+        for (const auto &sameType : pa->getSameTypeConstraints()) {
+          SourceLoc sameTypeLoc = sameType.second.getLoc();
+          if (sameTypeLoc.isInvalid()) continue;
 
-          Diags.diagnose(Source->getLoc(),
-                         diag::requires_generic_params_made_equal,
-                         pa->getName(), other->getName());
-          break;
+          if (sameType.first == other) {
+            constraintLoc = sameTypeLoc;
+            break;
+          }
+
+          if (constraintLoc.isInvalid())
+            constraintLoc = sameTypeLoc;
         }
+
+        if (constraintLoc.isInvalid())
+          constraintLoc = loc;
+
+        Diags.diagnose(constraintLoc,
+                       diag::requires_generic_params_made_equal,
+                       pa->getName(), other->getName());
+        break;
       }
     }
   }
@@ -1960,6 +1993,111 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
   }
 }
 
+namespace {
+  using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
+}
+
+/// Perform a depth-first search from the given potential archetype through
+/// the *implicit* same-type constraints.
+///
+/// \param pa The potential archetype to visit.
+/// \param visited The set of potential archetypes that have already been
+/// seen.
+/// \param found Used to record each potential archetype visited
+static void sameTypeDFS(PotentialArchetype *pa,
+                        SmallPtrSetImpl<PotentialArchetype *> &visited,
+                        SmallVectorImpl<PotentialArchetype *> &found) {
+  // If we've already visited this potential archetype, we're done.
+  if (!visited.insert(pa).second) return;
+
+  // Note that we've found this potential archetype.
+  found.push_back(pa);
+
+  // Visit its adjacent potential archetypes.
+  for (const auto &sameType : pa->getSameTypeConstraints()) {
+    switch (sameType.second.getKind()) {
+    case RequirementSource::Explicit:
+    case RequirementSource::Inferred:
+    case RequirementSource::ProtocolRequirementSignatureSelf:
+      // Skip explicit constraints.
+      continue;
+
+    case RequirementSource::Inherited:
+    case RequirementSource::Protocol:
+    case RequirementSource::Redundant:
+      break;
+    }
+
+    sameTypeDFS(sameType.first, visited, found);
+  }
+}
+
+/// Computes the ordered set of archetype anchors required to form a minimum
+/// spanning tree among the connected components formed by only the implied
+/// same-type requirements within the equivalence class of \c rep.
+///
+/// The equivalance class of the given representative potential archetype
+/// (\c rep) contains all potential archetypes that are made equivalent by
+/// the known set of same-type constraints, which includes both directly-
+/// stated same-type constraints (e.g., \c T.A == T.B) as well as same-type
+/// constraints that are implied either because the names coincide (e.g.,
+/// \c T[.P1].A == T[.P2].A) or due to a requirement in a protocol.
+///
+/// The equivalance class of the given representative potential archetype
+/// (\c rep) is formed from a graph whose vertices are the potential archetypes
+/// and whose edges are the same-type constraints. These edges include both
+/// directly-stated same-type constraints (e.g., \c T.A == T.B) as well as
+/// same-type constraints that are implied either because the names coincide
+/// (e.g., \c T[.P1].A == T[.P2].A) or due to a requirement in a protocol.
+/// The equivalence class forms a single connected component.
+///
+/// Within that graph is a subgraph that includes only those edges that are
+/// implied (and, therefore, excluding those edges that were explicitly stated).
+/// The connected components within that subgraph describe the potential
+/// archetypes that would be equivalence even with all of the (explicit)
+/// same-type constraints removed.
+///
+/// The entire equivalence class can be restored by introducing edges between
+/// the connected components. This function computes a minimal, canonicalized
+/// set of edges (same-type constraints) needed to describe the equivalence
+/// class, which is suitable for the generation of the canonical generic
+/// signature.
+///
+/// The resulting set of "edges" is returned as a set of vertices, one per
+/// connected component (of the subgraph). Each is the anchor for that
+/// connected component (as determined by \c compareDependentTypes()), and the
+/// set itself is ordered by \c compareDependentTypes(). The actual set of
+/// canonical edges connects vertex i to vertex i+1 for i in 0..<size-1.
+static SmallVector<PotentialArchetype *, 2> getSameTypeComponentAnchors(
+                                                     PotentialArchetype *rep) {
+  SmallPtrSet<PotentialArchetype *, 8> visited;
+  SmallVector<PotentialArchetype *, 2> componentAnchors;
+  for (auto pa : rep->getEquivalenceClass()) {
+    // If we've already seen this potential archetype, there's nothing else to
+    // do.
+    if (visited.count(pa) != 0) continue;
+
+    // Find all of the potential archetypes within this connected component.
+    SmallVector<PotentialArchetype *, 2> component;
+    sameTypeDFS(pa, visited, component);
+
+    // Find the best anchor for this component.
+    PotentialArchetype *anchor = component[0];
+    for (auto componentPA : ArrayRef<PotentialArchetype *>(component).slice(1)){
+      if (compareDependentTypes(&componentPA, &anchor) < 0)
+        anchor = componentPA;
+    }
+
+    // Record the anchor.
+    componentAnchors.push_back(anchor);
+  }
+
+  llvm::array_pod_sort(componentAnchors.begin(), componentAnchors.end(),
+                       compareDependentTypes);
+
+  return componentAnchors;
+}
+
 void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
                      void (RequirementKind kind,
                            PotentialArchetype *archetype,
@@ -1974,6 +2112,21 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
   llvm::array_pod_sort(archetypes.begin(), archetypes.end(),
                        compareDependentTypes);
 
+  // Track the anchors for each of the implied connected components within the
+  // equivalance class of each representative.
+  llvm::DenseMap<PotentialArchetype *, SmallVector<PotentialArchetype *, 2>>
+    sameTypeComponentAnchors;
+  auto getSameTypeComponentAnchors =
+    [&](PotentialArchetype *rep) -> ArrayRef<PotentialArchetype *> {
+      assert(rep->getRepresentative() == rep);
+      auto known = sameTypeComponentAnchors.find(rep);
+      if (known != sameTypeComponentAnchors.end())
+        return known->second;
+
+      return sameTypeComponentAnchors.insert(
+               {rep, ::getSameTypeComponentAnchors(rep) }).first->second;
+    };
+
   for (auto *archetype : archetypes) {
     // Invalid archetypes are never representatives in well-formed or corrected
     // signature, so we don't need to visit them.
@@ -1985,21 +2138,43 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     auto rep = archetype->getRepresentative();
     if (auto concreteType = rep->getConcreteType()) {
       f(RequirementKind::SameType, archetype, concreteType,
-        (archetype->SameTypeSource ? archetype->getSameTypeSource()
-                                   : rep->getSameTypeSource()));
+        rep->getConcreteTypeSource());
       continue;
     }
 
-    // If this type is not the anchor, we emit a same-type constraint to the
-    // anchor.
-    if (archetype->getArchetypeAnchor() != archetype) {
-      auto *anchor = archetype->getArchetypeAnchor();
+    // Check whether this archetype is one of the anchors within its
+    // connected component. If so, we may need to emit an archetype anchor.
+    //
+    // FIXME: O(n) in the number of implied connected components within the
+    // equivalence class. The equivalence class should be small, but...
+    auto componentAnchors = getSameTypeComponentAnchors(rep);
+    auto knownAnchor = std::find(componentAnchors.begin(),
+                                 componentAnchors.end(),
+                                 archetype);
+    std::function<void()> deferredSameTypeRequirement;
 
-      f(RequirementKind::SameType, archetype, anchor,
-        (archetype->SameTypeSource ? archetype->getSameTypeSource()
-                                   : anchor->getSameTypeSource()));
-      continue;
+    if (knownAnchor != componentAnchors.end()) {
+      // If we're at the last anchor in the component, do nothing;
+      auto nextAnchor = knownAnchor;
+      ++nextAnchor;
+      if (nextAnchor != componentAnchors.end()) {
+        // Form a same-type constraint from this anchor within the component
+        // to the next.
+        // FIXME: Distinguish between explicit and inferred here?
+        auto otherPA = *nextAnchor;
+        deferredSameTypeRequirement = [&f, archetype, otherPA] {
+          f(RequirementKind::SameType, archetype, otherPA,
+            RequirementSource(RequirementSource::Explicit, SourceLoc()));
+        };
+      }
     }
+    SWIFT_DEFER {
+      if (deferredSameTypeRequirement) deferredSameTypeRequirement();
+    };
+
+    // If this is not the archetype anchor, we're done.
+    if (archetype != archetype->getArchetypeAnchor())
+      continue;
 
     // If we have a superclass, produce a superclass requirement
     if (Type superclass = rep->getSuperclass()) {
