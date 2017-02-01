@@ -225,10 +225,8 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
 }
 
 /// The primary entrypoint.
-SWIFT_RT_ENTRY_VISIBILITY
-const Metadata *
-swift::swift_getGenericMetadata(GenericMetadata *pattern,
-                                const void *arguments)
+const Metadata *swift::swift_getGenericMetadata(GenericMetadata *pattern,
+                                                const void *arguments)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   auto genericArgs = (const void * const *) arguments;
   size_t numGenericArgs = pattern->NumKeyArguments;
@@ -2364,7 +2362,6 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
 
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
-SWIFT_RT_ENTRY_VISIBILITY
 const ExistentialTypeMetadata *
 swift::swift_getExistentialTypeMetadata(size_t numProtocols,
                                         const ProtocolDescriptor **protocols)
@@ -2772,12 +2769,9 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
   return entry;
 }
 
-SWIFT_RT_ENTRY_VISIBILITY
-const WitnessTable *
-swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
-                                    const Metadata *type,
-                                    void * const *instantiationArgs)
-    SWIFT_CC(RegisterPreservingCC_IMPL) {
+const WitnessTable *swift::swift_getGenericWitnessTable(
+    GenericWitnessTable *genericTable, const Metadata *type,
+    void *const *instantiationArgs) SWIFT_CC(RegisterPreservingCC_IMPL) {
   if (doesNotRequireInstantiation(genericTable)) {
     return genericTable->Pattern;
   }
