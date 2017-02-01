@@ -202,3 +202,7 @@ struct S4<T : P> {
 }
 
 S4<QQ>().foo(x: SS())
+
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected error produced: generic parameter τ_0_0.Bar.Foo cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'

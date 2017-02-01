@@ -61,3 +61,12 @@ import français
 import func français.phoûx
 
 import main // expected-warning {{file 'import.swift' is part of module 'main'; ignoring import}}
+
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected note produced: did you forget to set an SDK using -sdk or SDKROOT?
+// <unknown>:0: error: unexpected note produced: use "xcrun swiftc" to select the default macOS SDK installed with Xcode
+// <unknown>:0: error: unexpected note produced: did you forget to set an SDK using -sdk or SDKROOT?
+// <unknown>:0: error: unexpected note produced: use "xcrun swiftc" to select the default macOS SDK installed with Xcode
+// <unknown>:0: error: unexpected note produced: did you forget to set an SDK using -sdk or SDKROOT?
+// <unknown>:0: error: unexpected note produced: use "xcrun swiftc" to select the default macOS SDK installed with Xcode

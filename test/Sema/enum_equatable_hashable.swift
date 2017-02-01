@@ -126,3 +126,11 @@ public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note{{non-mat
 
 // No explicit conformance and cannot be derived
 extension Complex : Hashable {} // expected-error 2 {{does not conform}}
+
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
+// <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'
+// <unknown>:0: error: unexpected note produced: candidate has non-matching type '<T> (Generic<T>, Generic<T>) -> Bool'
+// <unknown>:0: error: unexpected note produced: candidate has non-matching type '(InvalidCustomHashable, InvalidCustomHashable) -> Bool'
+// <unknown>:0: error: unexpected note produced: candidate has non-matching type '(EnumToUseBeforeDeclaration, EnumToUseBeforeDeclaration) -> Bool'

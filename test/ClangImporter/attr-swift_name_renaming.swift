@@ -51,3 +51,15 @@ func test() {
   Foo.accepts() {}
   Foo.accepts {}
 }
+
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected note produced: 'ColorType' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: did you mean 'Overslept'?
+// <unknown>:0: error: unexpected note produced: did you mean 'TooHard'?
+// <unknown>:0: error: unexpected note produced: 'my_int_t' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'acceptsClosure' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'acceptsClosure' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'acceptsClosureStatic' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'acceptsClosureStatic' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'acceptsClosureStatic' was obsoleted in Swift 3

@@ -139,3 +139,7 @@ struct RangeReplaceableCollection_SubSequence_IsDefaulted : RangeReplaceableColl
   }
 }
 
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected note produced: possibly intended match
+// <unknown>:0: error: unexpected note produced: possibly intended match

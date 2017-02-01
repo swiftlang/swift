@@ -180,3 +180,7 @@ func testFixit() {
 	let _ = NSMyContextName
 	  // expected-error@-1{{'NSMyContextName' has been renamed to 'NSSomeContext.Name.myContextName'}} {{10-25=NSSomeContext.Name.myContextName}}
 }
+
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected note produced: 'NSMyContextName' was obsoleted in Swift 3

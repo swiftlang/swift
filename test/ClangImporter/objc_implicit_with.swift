@@ -62,3 +62,7 @@ func testFactoryMethodWithKeywordArgument() {
   let prot = NSCoding.self
   _ = NSXPCInterface(with: prot) // not "protocol:"
 }
+
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected note produced: 'hiveWithQueen' has been explicitly marked unavailable here

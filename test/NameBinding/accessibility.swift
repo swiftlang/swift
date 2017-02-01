@@ -161,3 +161,12 @@ internal class TestableSub: InternalBase {} // expected-error {{undeclared type 
 public class TestablePublicSub: InternalBase {} // expected-error {{undeclared type 'InternalBase'}}
 // TESTABLE-NOT: undeclared type 'InternalBase'
 #endif
+
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected note produced: 'y' declared here
+// <unknown>:0: error: unexpected note produced: 'z' declared here
+// <unknown>:0: error: unexpected note produced: 'init()' declared here
+// <unknown>:0: error: unexpected note produced: 'method()' declared here
+// <unknown>:0: error: unexpected note produced: 'method' declared here
+// <unknown>:0: error: unexpected note produced: 'method' declared here

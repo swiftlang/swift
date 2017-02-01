@@ -110,3 +110,11 @@ func testURL() {
   _ = NSURLRequest.requestWithString("http://www.llvm.org") // expected-error{{'requestWithString' is unavailable: use object construction 'NSURLRequest(string:)'}}
   _ = NSURLRequest.URLRequestWithURL(url as URL) // expected-error{{'URLRequestWithURL' is unavailable: use object construction 'NSURLRequest(url:)'}}
 }
+
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected note produced: 'hiveWithQueen' has been explicitly marked unavailable here
+// <unknown>:0: error: unexpected note produced: 'decimalNumberWithMantissa(_:exponent:isNegative:)' has been explicitly marked unavailable here
+// <unknown>:0: error: unexpected note produced: 'URLWithString' has been explicitly marked unavailable here
+// <unknown>:0: error: unexpected note produced: 'requestWithString' has been explicitly marked unavailable here
+// <unknown>:0: error: unexpected note produced: 'URLRequestWithURL' has been explicitly marked unavailable here

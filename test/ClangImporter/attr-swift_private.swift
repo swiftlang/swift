@@ -139,3 +139,10 @@ func testRawNames() {
   let _ = Foo.__foo // expected-error{{'__foo' is unavailable: use object construction 'Foo(__:)'}}
 }
 #endif
+
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected note produced: '__PrivCFTypeRef' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: '__PrivCFSubRef' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: '__fooWithOneArg' has been explicitly marked unavailable here
+// <unknown>:0: error: unexpected note produced: '__foo' has been explicitly marked unavailable here

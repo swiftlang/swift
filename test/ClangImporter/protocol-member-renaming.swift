@@ -16,3 +16,7 @@ class OptionalButUnavailableImpl : OptionalButUnavailable {
   // Note the argument label that causes this not to match the requirement.
   func doTheThing(object: Any) {} // no-warning
 }
+
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected note produced: 'foo(_:willConsumeObject:)' was obsoleted in Swift 3

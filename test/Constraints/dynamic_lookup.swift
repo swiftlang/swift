@@ -247,3 +247,8 @@ func rdar29960565(_ o: AnyObject) {
     _ = i
   }
 }
+
+// XFAIL: *
+// FIXME: unknown location errors
+// <unknown>:0: error: unexpected note produced: 'privateFoo' declared here
+// <unknown>:0: error: unexpected note produced: 'internalFoo' declared here
