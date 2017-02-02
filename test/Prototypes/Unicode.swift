@@ -362,34 +362,32 @@ extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
   }
 }
 
-/// Given `CodeUnits` representing text that has been encoded with
-/// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
-/// representing the same text.
-struct TranscodedView<
-  CodeUnits : RandomAccessCollection,
-  FromEncoding : UnicodeEncoding,
-  ToEncoding : UnicodeEncoding
-> 
-where FromEncoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : RandomAccessCollection,
-  CodeUnits.SubSequence.Index == CodeUnits.Index,
-  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
-{
-  // We could just be a generic typealias as this type, but it turns
-  // out to be impossible, or nearly so, to write the init() below.
-  // Instead, we wrap an instance of Base.
-  typealias Base = FlattenBidirectionalCollection<
-    LazyMapBidirectionalCollection<
-      UnicodeStorage<CodeUnits, FromEncoding>.EncodedScalars,
-      ToEncoding.EncodedScalar
+extension UnicodeStorage {
+  /// Given `CodeUnits` representing text that has been encoded with
+  /// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
+  /// representing the same text.
+  struct TranscodedView<ToEncoding : UnicodeEncoding> {
+    typealias FromEncoding = Encoding
+    
+    // We could just be a generic typealias as this type, but it turns
+    // out to be impossible, or nearly so, to write the init() below.
+    // Instead, we wrap an instance of Base.
+    typealias Base = FlattenBidirectionalCollection<
+      LazyMapBidirectionalCollection<
+        UnicodeStorage<CodeUnits, FromEncoding>.EncodedScalars,
+        ToEncoding.EncodedScalar
+      >
     >
-  >
-  let base: Base
+    let base: Base
+
+    typealias SubSequence = BidirectionalSlice<TranscodedView>
+  }
 }
 
-extension TranscodedView : BidirectionalCollection {
-  typealias SubSequence = BidirectionalSlice<TranscodedView>
+extension UnicodeStorage.TranscodedView : BidirectionalCollection {
+  
+
+  
   
   public var startIndex : Base.Index {
     return base.startIndex
@@ -637,7 +635,11 @@ extension UnicodeStorage : _UTextable {
       let base = codeUnits[
         codeUnits.index(atOffset: s)..<codeUnits.index(atOffset: l)
       ]
-      let source = TranscodedView(base, from: Encoding.self, to: UTF16.self)
+      // FIXME: we should be using an associated UTF16View type here rather than
+      // the generic TranscodedView, which is likely to be less efficient in
+      // some common cases.
+      let source = UnicodeStorage<CodeUnits.SubSequence,Encoding>.TranscodedView(
+        base, from: Encoding.self, to: UTF16.self)
       var d = destination // copy due to https://bugs.swift.org/browse/SR-3782
       let (limit, remainder) = d.copy(from: source)
       
@@ -682,7 +684,7 @@ extension UnicodeStorage : _UTextable {
       ..<
       codeUnits.index(atOffset: nativeIndex)]
     
-    return TranscodedView(
+    return UnicodeStorage<CodeUnits.SubSequence,Encoding>.TranscodedView(
       nativeChunk, from: Encoding.self, to: UTF16.self
     ).count^
   }
@@ -882,21 +884,23 @@ Base.Iterator.Element == UInt8,
 Base.SubSequence.Iterator.Element == Base.Iterator.Element {
   typealias Encoding = Latin1
   typealias CodeUnits = Base
-  let codeUnits: CodeUnits
+  typealias Storage = UnicodeStorage<Base, Latin1>
+  let storage: Storage
   let _isASCII: Bool?
+  var codeUnits: CodeUnits { return storage.codeUnits }
 
   init(_ codeUnits: CodeUnits, isASCII: Bool? = nil) {
-    self.codeUnits = codeUnits
+    self.storage = UnicodeStorage(codeUnits)
     self._isASCII = isASCII
   }
   
-  typealias ValidUTF8View = TranscodedView<CodeUnits, Encoding, UTF8>
+  typealias ValidUTF8View = Storage.TranscodedView<UTF8>
   var utf8: ValidUTF8View { return ValidUTF8View(codeUnits) }
   
-  typealias ValidUTF16View = TranscodedView<CodeUnits, Encoding, UTF16>
+  typealias ValidUTF16View = Storage.TranscodedView<UTF16>
   var utf16: ValidUTF16View { return ValidUTF16View(codeUnits) }
   
-  typealias ValidUTF32View = TranscodedView<CodeUnits, Encoding, UTF32>
+  typealias ValidUTF32View = Storage.TranscodedView<UTF32>
   var utf32: ValidUTF32View { return ValidUTF32View(codeUnits) }
   
   typealias ExtendedASCII = LazyMapRandomAccessCollection<CodeUnits, UInt32>
@@ -942,10 +946,10 @@ t.test("basic") {
   let s32 = s.unicodeScalars.lazy.map { $0.value }
   let s16 = s.utf16
   let s8 = Array(s.utf8)
-  let s16to32 = TranscodedView(s16, from: UTF16.self, to: UTF32.self)
-  let s16to8 = TranscodedView(s16, from: UTF16.self, to: UTF8.self)
-  let s8to16 = TranscodedView(s8, from: UTF8.self, to: UTF16.self)
-  let s8Vto16 = TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
+  let s16to32 = UnicodeStorage.TranscodedView(s16, from: UTF16.self, to: UTF32.self)
+  let s16to8 = UnicodeStorage.TranscodedView(s16, from: UTF16.self, to: UTF8.self)
+  let s8to16 = UnicodeStorage.TranscodedView(s8, from: UTF8.self, to: UTF16.self)
+  let s8Vto16 = UnicodeStorage.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
   expectTrue(s32.elementsEqual(s16to32))
   expectTrue(s8.elementsEqual(s16to8))
   expectTrue(s16.elementsEqual(s8to16))
