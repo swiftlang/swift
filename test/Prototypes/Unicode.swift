@@ -534,14 +534,14 @@ extension UnicodeStorage : _UTextable {
     _ deep: Bool, _ status: UnsafeMutablePointer<UErrorCode>?
   ) ->  UnsafeMutablePointer<UText> {
     UnsafeMutablePointer(mutating: src).pointee.validate()
-    debugLog("_clone with dst = \(String(describing: dst))")
-    debugLog("src: \(src.pointee)")
+    // debugLog("_clone with dst = \(String(describing: dst))")
+    // debugLog("src: \(src.pointee)")
     let r = dst
       ?? UnsafeMutablePointer.allocate(capacity: MemoryLayout<UText>.size)
     r.pointee = src.pointee
     r.pointee.setup()
     r.pointee.validate()
-    debugLog("clone result: \(r.pointee)")
+    // debugLog("clone result: \(r.pointee)")
     return r
   }
 
@@ -549,7 +549,7 @@ extension UnicodeStorage : _UTextable {
     _ u: inout UText, _ nativeTargetIndex: Int64, _ forward: Bool
   ) -> Bool {
 
-    debugLog("_access(u: \(u), nativeTargetIndex: \(nativeTargetIndex), forward: \(forward))")
+    // debugLog("_access(u: \(u), nativeTargetIndex: \(nativeTargetIndex), forward: \(forward))")
     u.validate()
     u.chunkOffset = 0
 
@@ -566,7 +566,7 @@ extension UnicodeStorage : _UTextable {
       }
       return true
     }
-    debugLog("_access: filling buffer")
+    // debugLog("_access: filling buffer")
     
     guard (0...codeUnits.count^).contains(nativeTargetIndex)
     else { return false }
@@ -584,7 +584,7 @@ extension UnicodeStorage : _UTextable {
           // don't overfill the buffer
           if newChunkLength > buffer.count^ { break }
           for unit in scalar.utf16 {
-            debugLog("# unit: \(String(unit, radix: 16))")
+            // debugLog("# unit: \(String(unit, radix: 16))")
             buffer[u.chunkLength^] = unit
             u.chunkLength += 1
           }
@@ -614,7 +614,7 @@ extension UnicodeStorage : _UTextable {
         b[..<buffer.index(atOffset: u.chunkLength)].reverse()
       }
     }
-    debugLog("_access filled buffer, u = \(u)")
+    // debugLog("_access filled buffer, u = \(u)")
     return true
   }
   
@@ -624,7 +624,7 @@ extension UnicodeStorage : _UTextable {
     _ destination: UnsafeMutableBufferPointer<UChar>,
     _ error: UnsafeMutablePointer<UErrorCode>?
   ) -> Int32 {
-    debugLog("_extract: \(u)")
+    // debugLog("_extract: \(u)")
     u.validate()
 
     let s = nativeStart.clamped(to: 0...codeUnits.count^)
@@ -672,7 +672,7 @@ extension UnicodeStorage : _UTextable {
   }
   
   fileprivate func _mapNativeIndexToUTF16(_ u: UnsafePointer<UText>, _ nativeIndex: Int64) -> Int32 {
-    debugLog("_mapNativeIndexToUTF16: \(u)")
+    // debugLog("_mapNativeIndexToUTF16: \(u)")
     UnsafeMutablePointer(mutating: u).pointee.validate()
     
     if u.pointee.chunkNativeStart == nativeIndex { return 0 }
@@ -697,23 +697,23 @@ extension UnicodeStorage : _UTextable {
         tableSize: Int32(MemoryLayout<UTextFuncs>.stride),
         reserved1: 0, reserved2: 0, reserved3: 0,
         clone: { dst, u, deep, err in
-          debugLog("clone(\(dst!), \(u!), \(deep), \(String(describing: err)))")
+          // debugLog("clone(\(dst!), \(u!), \(deep), \(String(describing: err)))")
           let _self = u!.pointee.context.assumingMemoryBound(
             to: _UTextable.self).pointee
           return _self._clone(dst, u!, deep != 0, err)
         },
         
         nativeLength: { u in
-          debugLog("nativeLength(\(u!))")
+          // debugLog("nativeLength(\(u!))")
           let _self = u!.pointee.context.assumingMemoryBound(
             to: _UTextable.self).pointee
           let r = _self._nativeLength(&u!.pointee)
-          debugLog("# nativeLength: \(r)")
+          // debugLog("# nativeLength: \(r)")
           return r
         },
         
         access: { u, nativeIndex, forward in
-          debugLog("access(\(u!), \(nativeIndex), \(forward))")
+          // debugLog("access(\(u!), \(nativeIndex), \(forward))")
           let _self = u!.pointee.context.assumingMemoryBound(
             to: _UTextable.self).pointee
           return _self._access(&u!.pointee, nativeIndex, forward != 0) 
@@ -721,7 +721,7 @@ extension UnicodeStorage : _UTextable {
         },
         
         extract: { u, nativeStart, nativeLimit, dest, destCapacity, status in
-          debugLog("extract(\(u!), \(nativeStart), \(nativeLimit), \(dest!), \(destCapacity), \(String(describing: status)))")
+          // debugLog("extract(\(u!), \(nativeStart), \(nativeLimit), \(dest!), \(destCapacity), \(String(describing: status)))")
           let _self = u!.pointee.context.assumingMemoryBound(
             to: _UTextable.self).pointee
           
@@ -736,20 +736,20 @@ extension UnicodeStorage : _UTextable {
         copy: nil,
         
         mapOffsetToNative: { u in 
-          debugLog("mapOffsetToNative(\(u!.pointee.chunkOffset))")
+          // debugLog("mapOffsetToNative(\(u!.pointee.chunkOffset))")
           let _self = u!.pointee.context.assumingMemoryBound(
             to: _UTextable.self).pointee
           let r = _self._mapOffsetToNative(u!)
-          debugLog("# mapOffsetToNative: \(r)")
+          // debugLog("# mapOffsetToNative: \(r)")
           return r
         },
         
         mapNativeIndexToUTF16: { u, nativeIndex in 
-          debugLog("mapNativeIndexToUTF16(nativeIndex: \(nativeIndex), u: \(u!.pointee))")
+          // debugLog("mapNativeIndexToUTF16(nativeIndex: \(nativeIndex), u: \(u!.pointee))")
           let _self = u!.pointee.context.assumingMemoryBound(
             to: _UTextable.self).pointee
           let r = _self._mapNativeIndexToUTF16(u!, nativeIndex)
-          debugLog("# mapNativeIndexToUTF16: \(r)")
+          // debugLog("# mapNativeIndexToUTF16: \(r)")
           return r
         },
         close: nil,
@@ -823,7 +823,7 @@ extension CharacterView : BidirectionalCollection {
   ) -> R {
     var err = U_ZERO_ERROR;
 
-    debugLog("ubrk_open")
+    // debugLog("ubrk_open")
     let bi = ubrk_open(
       /*type:*/ UBRK_CHARACTER, /*locale:*/ nil,
       /*text:*/ nil, /*textLength:*/ 0, /*status:*/ &err)
@@ -832,8 +832,8 @@ extension CharacterView : BidirectionalCollection {
     
     return storage.withUText { u in
       //let access = u.pointee.pFuncs.pointee.access(u, storage.codeUnits.offset(of: i)^, 1)
-      //debugLog("access result:", access)
-      debugLog("ubrk_setUText")
+      //// debugLog("access result:", access)
+      // debugLog("ubrk_setUText")
       ubrk_setUText(bi, u, &err)
       precondition(err.isSuccess, "unexpected ubrk_setUText failure: \(err)")
       return body(bi!)
@@ -841,11 +841,11 @@ extension CharacterView : BidirectionalCollection {
   }
   
   subscript(i: Index) -> Character {
-    debugLog("subscript: i=\(i)")
+    // debugLog("subscript: i=\(i)")
     let j = index(after: i)
-    debugLog("subscript: j=\(j)")
+    // debugLog("subscript: j=\(j)")
     let scalars = UnicodeStorage(storage.codeUnits[i..<j], Encoding.self).scalars
-    debugLog("scalars: \(Array(scalars))")
+    // debugLog("scalars: \(Array(scalars))")
     return Character(scalars.lazy.map { UnicodeScalar($0) })
   }    
 
@@ -853,11 +853,11 @@ extension CharacterView : BidirectionalCollection {
     // FIXME: there is always a grapheme break between two scalars that are both
     // < U+0300.  Use that to optimize.  Can we make a stronger statement, that
     // there's always a break before any scalar < U+0300?
-    debugLog("index(after: \(i))")
+    // debugLog("index(after: \(i))")
     let nextOffset = _withUBreakIterator(at: i) {
       ubrk_following($0, storage.codeUnits.offset(of: i)^)
     }
-    debugLog("  index(after: \(i)): \(nextOffset)")
+    // debugLog("  index(after: \(i)): \(nextOffset)")
     return storage.codeUnits.index(atOffset: nextOffset)
   }
   
@@ -865,11 +865,11 @@ extension CharacterView : BidirectionalCollection {
     // FIXME: there is always a grapheme break between two scalars that are both
     // < U+0300.  Use that to optimize.  Can we make a stronger statement, that
     // there's always a break before any scalar < U+0300?
-    debugLog("index(before: \(i))")
+    // debugLog("index(before: \(i))")
     let previousOffset = _withUBreakIterator(at: i) {
       ubrk_preceding($0, storage.codeUnits.offset(of: i)^)
     }
-    debugLog("  -> \(previousOffset)")
+    // debugLog("  -> \(previousOffset)")
     return storage.codeUnits.index(atOffset: previousOffset)
   }
 }
@@ -991,7 +991,7 @@ t.test("CharacterView") {
   let v8 = CharacterView(Array(s.utf8), UTF8.self)
   expectEqual(a, Array(v8))
   for (n, (c, e)) in zip(v8, a).enumerated() {
-    debugLog("###### \(n): \(c) =?= \(e)")
+    // debugLog("###### \(n): \(c) =?= \(e)")
     expectEqual(e, c)
   }
   let v16 = CharacterView(Array(s.utf16), UTF16.self)
@@ -999,11 +999,11 @@ t.test("CharacterView") {
 
   logging = true
   for (n, (c, e)) in zip(v8.reversed(), a.reversed()).enumerated() {
-    debugLog("###### \(n): \(c) =?= \(e)")
+    // debugLog("###### \(n): \(c) =?= \(e)")
     expectEqual(e, c)
   }
   for (n, (c, e)) in zip(v16.reversed(), a.reversed()).enumerated() {
-    debugLog("###### \(n): \(c) =?= \(e)")
+    // debugLog("###### \(n): \(c) =?= \(e)")
     expectEqual(e, c)
   }
 
