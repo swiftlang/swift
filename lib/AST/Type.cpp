@@ -20,6 +20,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
@@ -2680,6 +2681,24 @@ Type ArchetypeType::getNestedType(Identifier Name) const {
   }
 
   return Pos->second;
+}
+
+Optional<ProtocolConformanceRef>
+ArchetypeType::getNestedTypeConformance(Identifier Name,
+                                        ProtocolDecl *Proto) const {
+  auto *genericEnv = getGenericEnvironment();
+  assert(genericEnv && "No generic environment for archetype?");
+
+  auto depTy = genericEnv->mapTypeOutOfContext(
+    const_cast<ArchetypeType *>(this))->getCanonicalType();
+  auto *genericSig = genericEnv->getGenericSignature();
+
+  for (auto conformance : genericSig->getConformances()) {
+    if (conformance.depTy == depTy)
+      return conformance.ref;
+  }
+
+  return None;
 }
 
 Optional<Type> ArchetypeType::getNestedTypeIfKnown(Identifier Name) const {
