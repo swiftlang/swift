@@ -900,12 +900,8 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
         return std::make_pair(true, false);
 
       // Conformance check failure case.
-      if (!result.second) {
-        if (listener && loc.isValid())
-          listener->diagnosed(&req);
-
+      if (!result.second)
         return std::make_pair(false, false);
-      }
 
       continue;
     }
@@ -929,9 +925,6 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
                  genericSig->gatherGenericParamBindingsText(
                      {req.getFirstType(), req.getSecondType()}, substitutions));
 
-        if (listener)
-          listener->diagnosed(&req);
-
         return std::make_pair(false, false);
       }
       continue;
@@ -945,9 +938,6 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
                  req.getSecondType(),
                  genericSig->gatherGenericParamBindingsText(
                      {req.getFirstType(), req.getSecondType()}, substitutions));
-
-        if (listener)
-          listener->diagnosed(&req);
 
         return std::make_pair(false, false);
       }

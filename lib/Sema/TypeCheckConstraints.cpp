@@ -1388,9 +1388,6 @@ bool GenericRequirementsCheckListener::shouldCheck(RequirementKind kind,
   return true;
 }
 
-void GenericRequirementsCheckListener::diagnosed(
-    const Requirement *requirement) {}
-
 bool TypeChecker::
 solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    FreeTypeVariableBinding allowFreeTypeVariables,

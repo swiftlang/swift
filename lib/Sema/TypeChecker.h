@@ -352,12 +352,6 @@ public:
   ///
   /// \returns true if it's ok to validate requirement, false otherwise.
   virtual bool shouldCheck(RequirementKind kind, Type first, Type second);
-
-  /// Callback invoked when given requirement has been diagnosed as invalid.
-  ///
-  /// \param requirement The requirement which didn't pass the check.
-  ///
-  virtual void diagnosed(const Requirement *requirement);
 };
 
 /// Flags that describe the context of type checking a pattern or

@@ -5738,31 +5738,23 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   class RequirementsListener : public GenericRequirementsCheckListener {
-  private:
-    bool DiagnosedAny = false;
-
   public:
     bool shouldCheck(RequirementKind kind, Type first, Type second) override {
       // This means that we have encountered requirement which references
       // generic parameter not used in the arguments, we can't diagnose it here.
       return !(first->hasTypeParameter() || first->isTypeVariableOrMember());
     }
-
-    void diagnosed(const Requirement *requirement) override {
-      DiagnosedAny = true;
-    }
-
-    bool foundProblems() const { return DiagnosedAny; }
   };
 
   RequirementsListener genericReqListener;
-  TC.checkGenericArguments(env->getOwningDeclContext(), argExpr->getLoc(),
-                           AFD->getLoc(), AFD->getInterfaceType(),
-                           env->getGenericSignature(), substitutions, nullptr,
-                           ConformanceCheckFlags::SuppressDependencyTracking,
-                           &genericReqListener);
+  auto result =
+    TC.checkGenericArguments(env->getOwningDeclContext(), argExpr->getLoc(),
+                             AFD->getLoc(), AFD->getInterfaceType(),
+                             env->getGenericSignature(), substitutions, nullptr,
+                             ConformanceCheckFlags::SuppressDependencyTracking,
+                             &genericReqListener);
 
-  return genericReqListener.foundProblems();
+  return !result.second;
 }
 
 /// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,
