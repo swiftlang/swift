@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -typecheck %s -Xfrontend -verify
+// RUN: %target-build-swift -typecheck %s -Xfrontend -verify -Xfrontend -verify-ignore-unknown
 // RUN: %target-build-swift -emit-ir -g %s -DNO_ERROR > /dev/null
 // REQUIRES: executable_test
 
@@ -23,8 +23,7 @@ typealias PanRecognizer2 = AppKit.NSPanGestureRecognizer
 _ = glVertexPointer // expected-error{{use of unresolved identifier 'glVertexPointer'}}
 #endif
 
-// XFAIL: *
-// FIXME: unknown location errors
+// FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected warning produced: 'cacheParamsComputed' is deprecated
 // <unknown>:0: error: unexpected warning produced: 'cacheAlphaComputed' is deprecated
 // <unknown>:0: error: unexpected warning produced: 'keepCacheWindow' is deprecated

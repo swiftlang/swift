@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -target x86_64-apple-macosx10.51 -typecheck %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -target x86_64-apple-macosx10.51 -typecheck %s -verify -verify-ignore-unknown
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
@@ -111,8 +111,7 @@ func testURL() {
   _ = NSURLRequest.URLRequestWithURL(url as URL) // expected-error{{'URLRequestWithURL' is unavailable: use object construction 'NSURLRequest(url:)'}}
 }
 
-// XFAIL: *
-// FIXME: unknown location errors
+// FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'hiveWithQueen' has been explicitly marked unavailable here
 // <unknown>:0: error: unexpected note produced: 'decimalNumberWithMantissa(_:exponent:isNegative:)' has been explicitly marked unavailable here
 // <unknown>:0: error: unexpected note produced: 'URLWithString' has been explicitly marked unavailable here

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -import-objc-header %S/Inputs/protocol-member-renaming.h -verify %s
+// RUN: %target-swift-frontend -typecheck -import-objc-header %S/Inputs/protocol-member-renaming.h -verify %s -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 
@@ -17,6 +17,5 @@ class OptionalButUnavailableImpl : OptionalButUnavailable {
   func doTheThing(object: Any) {} // no-warning
 }
 
-// XFAIL: *
-// FIXME: unknown location errors
+// FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'foo(_:willConsumeObject:)' was obsoleted in Swift 3

@@ -33,7 +33,7 @@ namespace swift {
   ///
   /// This returns true if there are any mismatches found.
   bool verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
-                         bool autoApplyFixes);
+                         bool autoApplyFixes, bool ignoreUnknown);
 }
 
 #endif

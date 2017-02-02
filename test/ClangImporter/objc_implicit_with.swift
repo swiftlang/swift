@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 
@@ -63,6 +63,5 @@ func testFactoryMethodWithKeywordArgument() {
   _ = NSXPCInterface(with: prot) // not "protocol:"
 }
 
-// XFAIL: *
-// FIXME: unknown location errors
+// FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'hiveWithQueen' has been explicitly marked unavailable here

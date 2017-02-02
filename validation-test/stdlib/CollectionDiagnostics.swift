@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -139,7 +139,6 @@ struct RangeReplaceableCollection_SubSequence_IsDefaulted : RangeReplaceableColl
   }
 }
 
-// XFAIL: *
-// FIXME: unknown location errors
+// FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: possibly intended match
 // <unknown>:0: error: unexpected note produced: possibly intended match

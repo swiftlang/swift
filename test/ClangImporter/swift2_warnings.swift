@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/../IDE/Inputs/custom-modules) -emit-sil -I %S/Inputs/custom-modules %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/../IDE/Inputs/custom-modules) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 
@@ -105,8 +105,7 @@ func useLowercasedEnumCase(x: NSRuncingMode) {
   }
 }
 
-// XFAIL: *
-// FIXME: unknown location errors
+// FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'NSProgressReporting' was obsoleted in Swift 3
 // <unknown>:0: error: unexpected note produced: 'NSPostingStyle' was obsoleted in Swift 3
 // <unknown>:0: error: unexpected note produced: 'NSPostingStyle' was obsoleted in Swift 3

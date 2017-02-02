@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify -import-cf-types -I %S/Inputs/custom-modules %s
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify -import-cf-types -I %S/Inputs/custom-modules %s -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 
@@ -161,7 +161,6 @@ protocol SwiftProto {}
 extension CCRefrigerator: ObjCProto {} // expected-error {{Core Foundation class 'CCRefrigerator' cannot conform to @objc protocol 'ObjCProto' because Core Foundation types are not classes in Objective-C}}
 extension CCRefrigerator: SwiftProto {}
 
-// XFAIL: *
-// FIXME: unknown location errors
+// FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'CCFridgeRef' was obsoleted in Swift 3
 // <unknown>:0: error: unexpected note produced: 'NotAProblemRef' was obsoleted in Swift 3

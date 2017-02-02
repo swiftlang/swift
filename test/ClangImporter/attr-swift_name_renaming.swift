@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -typecheck -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -typecheck -verify -verify-ignore-unknown %s
 
 // XFAIL: linux
 
@@ -52,8 +52,7 @@ func test() {
   Foo.accepts {}
 }
 
-// XFAIL: *
-// FIXME: unknown location errors
+// FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'ColorType' was obsoleted in Swift 3
 // <unknown>:0: error: unexpected note produced: did you mean 'Overslept'?
 // <unknown>:0: error: unexpected note produced: did you mean 'TooHard'?

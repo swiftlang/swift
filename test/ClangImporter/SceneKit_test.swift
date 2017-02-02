@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -236,8 +236,7 @@ func useRenamedAPIs(actionable: SCNActionable, action: SCNAction, data: Data,
                         handler: bufferBindingBlock)
 }
 
-// XFAIL: *
-// FIXME: unknown location errors
+// FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'SCNGeometrySourceSemantic' was obsoleted in Swift 3
 // <unknown>:0: error: unexpected note produced: 'SCNLightType' was obsoleted in Swift 3
 // <unknown>:0: error: unexpected note produced: 'SCNLightingModel' was obsoleted in Swift 3

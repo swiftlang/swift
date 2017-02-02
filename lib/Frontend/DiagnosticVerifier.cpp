@@ -715,7 +715,7 @@ void swift::enableDiagnosticVerifier(SourceManager &SM) {
 }
 
 bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
-                              bool autoApplyFixes) {
+                              bool autoApplyFixes, bool ignoreUnknown) {
   auto *Verifier = (DiagnosticVerifier*)SM.getLLVMSourceMgr().getDiagContext();
   SM.getLLVMSourceMgr().setDiagHandler(nullptr, nullptr);
   
@@ -723,7 +723,8 @@ bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
 
   for (auto &BufferID : BufferIDs)
     HadError |= Verifier->verifyFile(BufferID, autoApplyFixes);
-  HadError |= Verifier->verifyUnknown();
+  if (!ignoreUnknown)
+    HadError |= Verifier->verifyUnknown();
 
   delete Verifier;
 
