@@ -251,6 +251,8 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
 
+  typealias FromEncoding = Encoding
+  
   init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
     self.codeUnits = codeUnits
   }
@@ -362,33 +364,28 @@ extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
   }
 }
 
-/// Given `CodeUnits` representing text that has been encoded with
-/// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
-/// representing the same text.
-struct TranscodedView<
-  CodeUnits : RandomAccessCollection,
-  FromEncoding : UnicodeEncoding,
-  ToEncoding : UnicodeEncoding
-> 
-where FromEncoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : RandomAccessCollection,
-  CodeUnits.SubSequence.Index == CodeUnits.Index,
-  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
-{
-  // We could just be a generic typealias as this type, but it turns
-  // out to be impossible, or nearly so, to write the init() below.
-  // Instead, we wrap an instance of Base.
-  typealias Base = FlattenBidirectionalCollection<
-    LazyMapBidirectionalCollection<
-      UnicodeStorage<CodeUnits, FromEncoding>.EncodedScalars,
-      ToEncoding.EncodedScalar
+extension UnicodeStorage {
+  /// Given `CodeUnits` representing text that has been encoded with
+  /// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
+  /// representing the same text.
+  public struct TranscodedView <
+    ToEncoding : UnicodeEncoding
+  > 
+  {
+    // We could just be a generic typealias as this type, but it turns
+    // out to be impossible, or nearly so, to write the init() below.
+    // Instead, we wrap an instance of Base.
+    typealias Base = FlattenBidirectionalCollection<
+      LazyMapBidirectionalCollection<
+        UnicodeStorage<CodeUnits, FromEncoding>.EncodedScalars,
+        ToEncoding.EncodedScalar
+      >
     >
-  >
-  let base: Base
+    let base: Base
+  }
 }
 
-extension TranscodedView : BidirectionalCollection {
+extension UnicodeStorage.TranscodedView : BidirectionalCollection {
   typealias SubSequence = BidirectionalSlice<TranscodedView>
   
   public var startIndex : Base.Index {
