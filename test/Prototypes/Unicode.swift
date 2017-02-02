@@ -237,26 +237,42 @@ func debugLog(_ arg0: @autoclosure ()->Any, _ arg1: @autoclosure ()->Any) {
   print(arg0(), arg1())
 }
 //===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
-/// A lazy collection of `Encoding.EncodedScalar` that results
-/// from parsing an instance of codeUnits using that `Encoding`.
-public struct ParsedUnicode<
-  CodeUnits: BidirectionalCollection,
-  Encoding: UnicodeEncoding
+/// A collection of `CodeUnit`s to be interpreted by some `Encoding`
+struct UnicodeStorage<
+  CodeUnits : RandomAccessCollection,
+  Encoding : UnicodeEncoding
 >
 where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : BidirectionalCollection,
+  CodeUnits.SubSequence : RandomAccessCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
-  let codeUnits: CodeUnits
-  
+
   init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
     self.codeUnits = codeUnits
   }
+  
+  let codeUnits: CodeUnits
 }
 
-extension ParsedUnicode {
+
+/// A lazy collection of `Encoding.EncodedScalar` that results
+/// from parsing an instance of codeUnits using that `Encoding`.
+extension UnicodeStorage {
+
+  public struct EncodedScalars {
+    let codeUnits: CodeUnits
+    
+    init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
+      self.codeUnits = codeUnits
+    }
+  }
+}
+
+extension UnicodeStorage.EncodedScalars {
   // Because parsing produces a buffer and a new index, to avoid
   // repeatedly decoding the same data, this index stores that buffer
   // and the next index.  This would obviously be more complicated if
@@ -283,7 +299,7 @@ extension ParsedUnicode {
 }
 
 /// Collection Conformance
-extension ParsedUnicode : BidirectionalCollection {
+extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
   public var startIndex: Index {
     if _slowPath(codeUnits.isEmpty) { return endIndex }
     let s = codeUnits.startIndex
@@ -350,12 +366,12 @@ extension ParsedUnicode : BidirectionalCollection {
 /// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
 /// representing the same text.
 struct TranscodedView<
-  CodeUnits : BidirectionalCollection,
+  CodeUnits : RandomAccessCollection,
   FromEncoding : UnicodeEncoding,
   ToEncoding : UnicodeEncoding
 > 
 where FromEncoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : BidirectionalCollection,
+  CodeUnits.SubSequence : RandomAccessCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
@@ -365,7 +381,7 @@ where FromEncoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   // Instead, we wrap an instance of Base.
   typealias Base = FlattenBidirectionalCollection<
     LazyMapBidirectionalCollection<
-      ParsedUnicode<CodeUnits, FromEncoding>,
+      UnicodeStorage<CodeUnits, FromEncoding>.EncodedScalars,
       ToEncoding.EncodedScalar
     >
   >
@@ -388,7 +404,7 @@ extension TranscodedView : BidirectionalCollection {
     from src: FromEncoding.Type = FromEncoding.self,
     to dst: ToEncoding.Type = ToEncoding.self
   ) {
-    base = Base(ParsedUnicode(codeUnits, src).lazy.map {
+    base = Base(UnicodeStorage<CodeUnits, FromEncoding>.EncodedScalars(codeUnits, src).lazy.map {
         dst.encode($0)!
       })
   }
@@ -434,24 +450,6 @@ protocol Unicode {
   func isNormalizedNFC(scan: Bool/* = true*/) -> Bool
   func isNormalizedNFD(scan: Bool/* = true*/) -> Bool
   func isInFastCOrDForm(scan: Bool/* = true*/) -> Bool
-}
-
-
-struct UnicodeStorage<
-  CodeUnits : RandomAccessCollection,
-  Encoding : UnicodeEncoding
->
-where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : RandomAccessCollection,
-  CodeUnits.SubSequence.Index == CodeUnits.Index,
-  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
-
-  init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
-    self.codeUnits = codeUnits
-  }
-  
-  let codeUnits: CodeUnits
 }
 
 extension UText {
@@ -519,15 +517,15 @@ extension UnicodeStorage : _UTextable {
   fileprivate func _parsedSlice(
     _ offset: Int64,
     _ slice: (CodeUnits.Index) -> CodeUnits.SubSequence
-  ) -> ParsedUnicode<CodeUnits.SubSequence,Encoding>.SubSequence {
-    return ParsedUnicode(
+  ) -> UnicodeStorage<CodeUnits.SubSequence,Encoding>.EncodedScalars.SubSequence {
+    return UnicodeStorage<CodeUnits.SubSequence, Encoding>(
       slice(codeUnits.index(atOffset: offset)), Encoding.self
-    ).dropFirst(0)
+    ).scalars.dropFirst(0)
   }
 
   fileprivate func _parsedSuffix(
     fromOffset offset: Int64
-  ) -> ParsedUnicode<CodeUnits.SubSequence,Encoding>.SubSequence {
+  ) -> UnicodeStorage<CodeUnits.SubSequence,Encoding>.EncodedScalars.SubSequence {
     return _parsedSlice(offset, codeUnits.suffix(from:))
   }
 
@@ -784,8 +782,8 @@ extension UnicodeStorage : _UTextable {
 }
 
 extension UnicodeStorage {
-  var scalars: ParsedUnicode<CodeUnits, Encoding> {
-    return ParsedUnicode(codeUnits, Encoding.self)
+  var scalars: EncodedScalars {
+    return EncodedScalars(codeUnits, Encoding.self)
   }
 }
 
@@ -846,7 +844,7 @@ extension CharacterView : BidirectionalCollection {
     debugLog("subscript: i=\(i)")
     let j = index(after: i)
     debugLog("subscript: j=\(j)")
-    let scalars = ParsedUnicode(storage.codeUnits[i..<j], Encoding.self)
+    let scalars = UnicodeStorage(storage.codeUnits[i..<j], Encoding.self).scalars
     debugLog("scalars: \(Array(scalars))")
     return Character(scalars.lazy.map { UnicodeScalar($0) })
   }    
@@ -879,6 +877,7 @@ extension CharacterView : BidirectionalCollection {
 struct Latin1String<Base : RandomAccessCollection> : Unicode
 where Base.Iterator.Element == UInt8, Base.Index == Base.SubSequence.Index,
 Base.SubSequence.SubSequence == Base.SubSequence,
+Base.SubSequence : RandomAccessCollection,
 Base.Iterator.Element == UInt8,
 Base.SubSequence.Iterator.Element == Base.Iterator.Element {
   typealias Encoding = Latin1
