@@ -91,7 +91,7 @@ func missingControllingExprInIf() {
   if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-warning {{boolean literal is unused}}
   }
 
-  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{boolean literal is unused}}
+  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error {{expression resolves to an unused function}} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>
@@ -113,7 +113,7 @@ func missingControllingExprInWhile() {
   while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-warning {{boolean literal is unused}}
   }
 
-  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{boolean literal is unused}}
+  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error {{expression resolves to an unused function}} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>
@@ -223,7 +223,7 @@ func missingControllingExprInSwitch() {
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 
-  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error {{consecutive statements on a line must be separated by ';'}} {{16-16=;}} expected-error {{cannot call value of non-function type '()'}}
+  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error {{braced block of statements is an unused closure}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error {{expression resolves to an unused function}}
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 }
