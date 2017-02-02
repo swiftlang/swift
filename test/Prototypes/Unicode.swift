@@ -380,15 +380,12 @@ extension UnicodeStorage {
     >
     let base: Base
 
+    // FIXME: this should go in the extension below but for <rdar://30320012>
     typealias SubSequence = BidirectionalSlice<TranscodedView>
   }
 }
 
 extension UnicodeStorage.TranscodedView : BidirectionalCollection {
-  
-
-  
-  
   public var startIndex : Base.Index {
     return base.startIndex
   }
@@ -796,26 +793,31 @@ extension UErrorCode {
 }
 typealias UBreakIterator = OpaquePointer
 
-struct CharacterView<
-  CodeUnits : RandomAccessCollection,
-  Encoding : UnicodeEncoding
-> 
-where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : RandomAccessCollection,
-  CodeUnits.SubSequence.Index == CodeUnits.Index,
-  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
-
-  init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
-    self.storage = UnicodeStorage(codeUnits)
-  }
+extension UnicodeStorage {
   
-  fileprivate let storage: UnicodeStorage<CodeUnits, Encoding>
+  struct CharacterView<
+    CodeUnits : RandomAccessCollection,
+    Encoding : UnicodeEncoding
+  > 
+  where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+    CodeUnits.SubSequence : RandomAccessCollection,
+    CodeUnits.SubSequence.Index == CodeUnits.Index,
+    CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+    CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+
+    init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
+      self.storage = UnicodeStorage<CodeUnits,Encoding>(codeUnits)
+    }
+
+    fileprivate let storage: UnicodeStorage<CodeUnits, Encoding>
+
+    // FIXME: this should go in the extension below but for <rdar://30320012>
+    typealias SubSequence = BidirectionalSlice<CharacterView>
+  }
 }
 
-extension CharacterView : BidirectionalCollection {
+extension UnicodeStorage.CharacterView : BidirectionalCollection {
   typealias Index = CodeUnits.Index
-  typealias SubSequence = BidirectionalSlice<CharacterView>
   
   public var startIndex: Index { return storage.codeUnits.startIndex }
   public var endIndex: Index { return storage.codeUnits.endIndex }
@@ -991,17 +993,19 @@ t.test("CharacterView") {
     "🇸🇸", "🇬🇱", "a", "b", "c", "🇱🇸", "🇩🇯", "🇺🇸", "\n",
     "Σ", "ὲ", " ", "👥", "🥓", "γ͙᷏̃̂᷀", "ν", "ω"
   ] // + "👩‍❤️‍👩"
-  
-  let v8 = CharacterView(Array(s.utf8), UTF8.self)
+
+  // FIXME: the generic arguments should be deducible, but aren't; <rdar://30323161>
+  let v8 = UnicodeStorage<Array<UInt8>, UTF8>.CharacterView(Array(s.utf8), UTF8.self)
   expectEqual(a, Array(v8))
   for (n, (c, e)) in zip(v8, a).enumerated() {
     // debugLog("###### \(n): \(c) =?= \(e)")
     expectEqual(e, c)
   }
-  let v16 = CharacterView(Array(s.utf16), UTF16.self)
+  
+  // FIXME: the generic arguments should be deducible; <rdar://30323161>
+  let v16 = UnicodeStorage<Array<UInt16>, UTF16>.CharacterView(Array(s.utf16), UTF16.self)
   expectEqual(a, Array(v16))
 
-  logging = true
   for (n, (c, e)) in zip(v8.reversed(), a.reversed()).enumerated() {
     // debugLog("###### \(n): \(c) =?= \(e)")
     expectEqual(e, c)
