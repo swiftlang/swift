@@ -469,3 +469,12 @@ public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
 }
 #endif
 
+//===----------------------------------------------------------------------===//
+// /usr/include/sys/_pthread/pthread_t.h
+//===----------------------------------------------------------------------===//
+
+extension UnsafeMutablePointer where Pointee == _opaque_pthread_t {
+  public init?() {
+    return nil
+  }
+}
