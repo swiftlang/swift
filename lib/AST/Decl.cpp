@@ -3005,16 +3005,22 @@ void ProtocolDecl::createGenericParamsIfMissing() {
     setGenericParams(createGenericParams(this));
 }
 
-GenericSignature *ProtocolDecl::getRequirementSignature() {
+void ProtocolDecl::computeRequirementSignature() {
+  assert(!RequirementSignature && "already computed requirement signature");
+
   auto module = getParentModule();
 
   auto genericSig = getGenericSignature();
   // The signature should look like <Self where Self : ThisProtocol>, and we
   // reuse the two parts of it because the parameter and the requirement are
   // exactly what we need.
-  assert(genericSig->getGenericParams().size() == 1 &&
-         genericSig->getRequirements().size() == 1 &&
-         "getRequirementSignature with unexpected generic signature");
+  auto validSig = genericSig->getGenericParams().size() == 1 &&
+                  genericSig->getRequirements().size() == 1;
+  if (!validSig) {
+    // This doesn't look like a protocol we can handle, so some other error must
+    // have occured (usually a protocol nested within another declaration)
+    return;
+  }
 
   auto selfType = genericSig->getGenericParams()[0];
   auto requirement = genericSig->getRequirements()[0];
@@ -3027,7 +3033,7 @@ GenericSignature *ProtocolDecl::getRequirementSignature() {
   builder.addRequirement(requirement, source);
   builder.finalize(SourceLoc(), { selfType });
   
-  return builder.getGenericSignature();
+  RequirementSignature = builder.getGenericSignature();
 }
 
 /// Returns the default witness for a requirement, or nullptr if there is
