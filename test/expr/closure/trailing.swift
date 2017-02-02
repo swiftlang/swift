@@ -37,6 +37,30 @@ func notPostfix() {
   _ = 1 + takeFunc { $0 }
 }
 
+func notLiterals() {
+  struct SR3671 { // <https://bugs.swift.org/browse/SR-3671>
+    var v: Int = 1 { // expected-error {{variable with getter/setter cannot have an initial value}}
+      get {
+        return self.v
+      }
+    }
+  }
+
+  var x: Int? = nil { get { } } // expected-error {{variable with getter/setter cannot have an initial value}}
+  _ = 1 {}
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-2 {{braced block of statements is an unused closure}} expected-error@-2 {{expression resolves to an unused function}}
+  _ = "hello" {}
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-2 {{braced block of statements is an unused closure}} expected-error@-2 {{expression resolves to an unused function}}
+  _ = [42] {}
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-2 {{braced block of statements is an unused closure}} expected-error@-2 {{expression resolves to an unused function}}
+  _ = (6765, 10946, 17711) {}
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-2 {{braced block of statements is an unused closure}} expected-error@-2 {{expression resolves to an unused function}}
+}
+
 class C {
   func map(_ x: (Int) -> Int) -> C { return self }
   func filter(_ x: (Int) -> Bool) -> C { return self }

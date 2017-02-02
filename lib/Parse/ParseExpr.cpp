@@ -1581,8 +1581,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     if (Tok.is(tok::l_brace) && isValidTrailingClosure(isExprBasic, *this)) {
       // FIXME: if Result has a trailing closure, break out.
 
+      // Stop after literal expressions, which may never have trailing closures.
+      const auto *callee = Result.get();
+      if (isa<LiteralExpr>(callee) || isa<CollectionExpr>(callee) ||
+          isa<TupleExpr>(callee))
+        break;
+
       ParserResult<Expr> closure =
-        parseTrailingClosure(Result.get()->getSourceRange());
+        parseTrailingClosure(callee->getSourceRange());
       if (closure.isNull()) return nullptr;
 
       // Trailing closure implicitly forms a call.
