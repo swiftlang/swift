@@ -93,12 +93,12 @@ Optional<T> SubstitutionMap::forEachConformance(
             return found;
         }
       } else {
-       auto sub = conformance.getConcrete()->getTypeWitnessSubstAndDecl(
+        auto sub = conformance.getConcrete()->getTypeWitnessSubstAndDecl(
                                            protoAssocType, nullptr).first;
-       for (auto subConformance : sub.getConformances()) {
-         if (auto found = fn(subConformance))
-           return found;
-       }
+        for (auto subConformance : sub.getConformances()) {
+          if (auto found = fn(subConformance))
+            return found;
+        }
       }
     }
 
@@ -233,8 +233,7 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
     auto baseClassTy = derivedClassTy->getSuperclassForDecl(baseClass, resolver);
 
     auto *M = baseClass->getParentModule();
-    auto subs = baseClassTy->gatherAllSubstitutions(M, resolver);
-    genericSig->getSubstitutionMap(subs, subMap);
+    subMap = baseClassTy->getContextSubstitutionMap(M, baseClass);
 
     minDepth = genericSig->getGenericParams().back()->getDepth() + 1;
   }

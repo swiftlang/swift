@@ -873,6 +873,10 @@ public:
   /// the context of the extension above will produce substitutions T
   /// -> Int and U -> String suitable for mapping the type of
   /// \c SomeArray.
+  SubstitutionMap getContextSubstitutionMap(ModuleDecl *module,
+                                            const DeclContext *dc);
+
+  /// Deprecated version of the above.
   TypeSubstitutionMap getContextSubstitutions(const DeclContext *dc);
 
   /// Get the substitutions to apply to the type of the given member as seen
@@ -880,6 +884,10 @@ public:
   ///
   /// If the member has its own generic parameters, they will remain unchanged
   /// by the substitution.
+  SubstitutionMap getMemberSubstitutionMap(ModuleDecl *module,
+                                           const ValueDecl *member);
+
+  /// Deprecated version of the above.
   TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member);
 
   /// Retrieve the type of the given member as seen through the given base

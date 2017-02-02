@@ -3087,15 +3087,6 @@ static Type substType(Type derivedType,
   });
 }
 
-Type Type::subst(ModuleDecl *module,
-                 const TypeSubstitutionMap &substitutions,
-                 SubstOptions options) const {
-  return substType(*this,
-                   QueryTypeSubstitutionMap{substitutions},
-                   LookUpConformanceInModule(module),
-                   options);
-}
-
 Type Type::subst(const SubstitutionMap &substitutions,
                  SubstOptions options) const {
   return substType(*this,
@@ -3215,6 +3206,16 @@ TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
   return substitutions;
 }
 
+SubstitutionMap TypeBase::getContextSubstitutionMap(
+  ModuleDecl *module, const DeclContext *dc) {
+  auto *genericSig = dc->getGenericSignatureOfContext();
+  if (genericSig == nullptr)
+    return SubstitutionMap();
+  return genericSig->getSubstitutionMap(
+      QueryTypeSubstitutionMap{getContextSubstitutions(dc)},
+      LookUpConformanceInModule(module));
+}
+
 TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
   auto *memberDC = member->getDeclContext();
 
@@ -3243,6 +3244,17 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
   return substitutions;
 }
 
+SubstitutionMap TypeBase::getMemberSubstitutionMap(
+  ModuleDecl *module, const ValueDecl *member) {
+  auto *genericSig = member->getInnermostDeclContext()
+      ->getGenericSignatureOfContext();
+  if (genericSig == nullptr)
+    return SubstitutionMap();
+  return genericSig->getSubstitutionMap(
+      QueryTypeSubstitutionMap{getMemberSubstitutions(member)},
+      LookUpConformanceInModule(module));
+}
+
 Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
                                Type memberType) {
   // If no member type was provided, use the member's type.
@@ -3251,8 +3263,8 @@ Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
 
   assert(memberType);
 
-  auto substitutions = getMemberSubstitutions(member);
-  return memberType.subst(module, substitutions, SubstFlags::UseErrorType);
+  auto substitutions = getMemberSubstitutionMap(module, member);
+  return memberType.subst(substitutions, SubstFlags::UseErrorType);
 }
 
 Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,

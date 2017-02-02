@@ -862,7 +862,9 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
   // Check each of the requirements.
   ModuleDecl *module = dc->getParentModule();
   for (const auto &req : genericSig->getRequirements()) {
-    Type firstType = req.getFirstType().subst(module, substitutions);
+    Type firstType = req.getFirstType().subst(
+        QueryTypeSubstitutionMap{substitutions},
+        LookUpConformanceInModule(module));
     if (firstType.isNull()) {
       // Another requirement will fail later; just continue.
       continue;
@@ -872,7 +874,8 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
     if (req.getKind() != RequirementKind::Layout)
       secondType = req.getSecondType();
     if (secondType) {
-      secondType = secondType.subst(module, substitutions);
+      secondType = secondType.subst(QueryTypeSubstitutionMap{substitutions},
+                                    LookUpConformanceInModule(module));
       if (secondType.isNull()) {
         // Another requirement will fail later; just continue.
         continue;

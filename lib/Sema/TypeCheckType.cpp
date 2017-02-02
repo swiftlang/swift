@@ -644,7 +644,9 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     // Apply substitutions to the interface type of the typealias.
     type = TAD->getDeclaredInterfaceType();
-    return type.subst(dc->getParentModule(), subs, SubstFlags::UseErrorType);
+    return type.subst(QueryTypeSubstitutionMap{subs},
+                      LookUpConformanceInModule(dc->getParentModule()),
+                      SubstFlags::UseErrorType);
   }
   
   // Form the bound generic type.
@@ -2950,8 +2952,9 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   if (!parentTy)
     return memberType;
 
-  auto subs = parentTy->getContextSubstitutions(member->getDeclContext());
-  return memberType.subst(module, subs, SubstFlags::UseErrorType);
+  auto subs = parentTy->getContextSubstitutionMap(
+      module, member->getDeclContext());
+  return memberType.subst(subs, SubstFlags::UseErrorType);
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {
