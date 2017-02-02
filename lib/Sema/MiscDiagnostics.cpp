@@ -3548,7 +3548,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   // Always look at the parameters in the last parameter list.
   for (auto param : *afd->getParameterLists().back()) {
-    paramTypes.push_back(getTypeNameForOmission(param->getType())
+    paramTypes.push_back(getTypeNameForOmission(param->getInterfaceType())
                          .withDefaultArgument(param->isDefaultArgument()));
   }
   
@@ -3616,10 +3616,10 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
-  if (!var->hasType())
+  if (!var->hasInterfaceType())
     validateDecl(var);
 
-  if (var->isInvalid() || !var->hasType())
+  if (var->isInvalid() || !var->hasInterfaceType())
     return None;
 
   if (var->getName().empty())
@@ -3650,7 +3650,7 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
 
   // Omit needless words.
   StringScratchSpace scratch;
-  OmissionTypeName typeName = getTypeNameForOmission(var->getType());
+  OmissionTypeName typeName = getTypeNameForOmission(var->getInterfaceType());
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
   if (::omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
                           /*returnsSelf=*/false, true, allPropertyNames,
