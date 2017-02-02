@@ -228,13 +228,13 @@ extension MutableCollection {
 //===--- Logging ----------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 var logging = false
-func debugLog(_ arg: @autoclosure ()->Any) {
+func debugLog(_ arg: String/*@autoclosure ()->Any*/) {
   guard logging == true else { return }
-  print(arg())
+  print(arg/*()*/)
 }
-func debugLog(_ arg0: @autoclosure ()->Any, _ arg1: @autoclosure ()->Any) {
+func debugLog(_ arg0: String/*@autoclosure ()->Any*/, _ arg1: String/*@autoclosure ()->Any*/) {
   guard logging else { return }
-  print(arg0(), arg1())
+  print(arg0/*()*/, arg1/*()*/)
 }
 //===----------------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
