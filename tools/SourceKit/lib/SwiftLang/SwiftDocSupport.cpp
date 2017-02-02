@@ -984,7 +984,7 @@ public:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type Ty,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
                           SemaReferenceKind Kind) override {
     unsigned StartOffset = getOffset(Range.getStart());
     References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
@@ -994,7 +994,7 @@ public:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
-    return visitDeclReference(D, Range, nullptr, Type(),
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(),
                               SemaReferenceKind::SubscriptRef);
   }
 
