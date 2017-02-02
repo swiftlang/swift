@@ -719,11 +719,6 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
 
       // Otherwise, it's a concrete type.
-
-      // FIXME: THIS ASSIGNMENT IS REALLY WEIRD. We shouldn't be discovering
-      // that a same-type constraint affects this so late in the game.
-      representative->ConcreteTypeSource = parent->ConcreteTypeSource;
-
       return genericEnv->mapTypeIntoContext(memberType,
                                             builder.getLookupConformanceFn());
     }
