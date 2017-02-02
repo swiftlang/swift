@@ -3242,7 +3242,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
 }
 
 Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
-                               LazyResolver *resolver, Type memberType) {
+                               Type memberType) {
   // If no member type was provided, use the member's type.
   if (!memberType)
     memberType = member->getInterfaceType();

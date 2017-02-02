@@ -2120,7 +2120,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
           elementType = iteratorType->getTypeOfMember(
                           cs.DC->getParentModule(),
                           elementAssocType,
-                          &tc,
                           elementAssocType->getDeclaredInterfaceType());
         }
       }

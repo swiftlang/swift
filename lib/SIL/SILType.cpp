@@ -319,8 +319,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   }
 
   auto substEltTy =
-    getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
-                                          elt, nullptr,
+    getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(), elt,
                                           elt->getArgumentInterfaceType());
   auto loweredTy =
     M.Types.getLoweredType(M.Types.getAbstractionPattern(elt), substEltTy);

@@ -903,16 +903,13 @@ public:
   ///
   /// \param member The member whose type we are substituting.
   ///
-  /// \param resolver The resolver for lazy type checking, which may be null for
-  /// a fully-type-checked AST.
-  ///
   /// \param memberType The type of the member, in which archetypes will be
   /// replaced by the generic arguments provided by the base type. If null,
   /// the member's type will be used.
   ///
   /// \returns the resulting member type.
   Type getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
-                       LazyResolver *resolver, Type memberType = Type());
+                       Type memberType = Type());
 
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the
