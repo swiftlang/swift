@@ -2066,6 +2066,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (concrete && type2->isExistentialType() &&
       !type1->is<LValueType>() &&
       kind >= ConstraintKind::Subtype) {
+
+    // Penalize conversions to Any.
+    if (kind >= ConstraintKind::Conversion && type2->isAny())
+      increaseScore(ScoreKind::SK_EmptyExistentialConversion);
+
     conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
   }
 
