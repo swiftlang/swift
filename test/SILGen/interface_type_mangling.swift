@@ -56,7 +56,7 @@ func i1<T where T: P, T: Q, T.Assoc1: P, T.Assoc0: Q>(_ x: T) {}
 func i2<T where T: P, T: Q, T.Assoc0: Q, T.Assoc1: P>(_ x: T) {}
 
 // CHECK-LABEL: interface_type_mangling.j01
-// CHECK:                                     [[J_SIGNATURE:<A where A: interface_type_mangling.P, A: interface_type_mangling.Q, A.Assoc1 == A.Assoc0, A.Assoc2 == A.Assoc0> \(A\) -> \(\)]]
+// CHECK:                                     [[J_SIGNATURE:<A where A: interface_type_mangling.P, A: interface_type_mangling.Q, A.Assoc0 == A.Assoc1, A.Assoc1 == A.Assoc2> \(A\) -> \(\)]]
 func j01<T where T: P, T: Q, T.Assoc0 == T.Assoc1, T.Assoc1 == T.Assoc2>(_ x: T) {}
 // CHECK:       interface_type_mangling.j02 [[J_SIGNATURE]]
 func j02<T where T: P, T: Q, T.Assoc0 == T.Assoc2, T.Assoc1 == T.Assoc2>(_ x: T) {}

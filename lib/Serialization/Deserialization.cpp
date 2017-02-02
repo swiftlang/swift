@@ -1270,7 +1270,7 @@ getActualCtorInitializerKind(uint8_t raw) {
 /// from Clang can also appear in any module.
 static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
                          CanGenericSignature expectedGenericSig, bool isType,
-                         bool inProtocolExt,
+                         bool inProtocolExt, bool isStatic,
                          Optional<swift::CtorInitializerKind> ctorInit,
                          SmallVectorImpl<ValueDecl *> &values) {
   CanType canTy;
@@ -1284,6 +1284,8 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
     if (!value->hasInterfaceType())
       return true;
     if (canTy && value->getInterfaceType()->getCanonicalType() != canTy)
+      return true;
+    if (value->isStatic() != isStatic)
       return true;
     // FIXME: Should be able to move a value from an extension in a derived
     // module to the original definition in a base module.
@@ -1326,10 +1328,11 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
   values.erase(newEnd, values.end());
 }
 
-Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
+Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
+                                        uint32_t pathLen) {
   using namespace decls_block;
-  assert(M && "missing dependency");
-  PrettyXRefTrace pathTrace(*M);
+  assert(baseModule && "missing dependency");
+  PrettyXRefTrace pathTrace(*baseModule);
 
   auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind != llvm::BitstreamEntry::Record) {
@@ -1356,10 +1359,12 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     bool isType = (recordID == XREF_TYPE_PATH_PIECE);
     bool onlyInNominal = false;
     bool inProtocolExt = false;
+    bool isStatic = false;
     if (isType)
       XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
     else
-      XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt);
+      XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
+                                           isStatic);
 
     Identifier name = getIdentifier(IID);
     pathTrace.addValue(name);
@@ -1371,19 +1376,19 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     bool retrying = false;
     retry:
 
-    M->lookupQualified(ModuleType::get(M), name,
-                       NL_QualifiedDefault | NL_KnownNoDependency,
-                       /*typeResolver=*/nullptr, values);
-    filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, None,
-                 values);
+    baseModule->lookupQualified(ModuleType::get(baseModule), name,
+                                NL_QualifiedDefault | NL_KnownNoDependency,
+                                /*typeResolver=*/nullptr, values);
+    filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, isStatic,
+                 None, values);
 
     // HACK HACK HACK: Omit-needless-words hack to try to cope with
     // the "NS" prefix being added/removed. No "real" compiler mode
     // has to go through this path, but it's an option we toggle for
     // testing.
     if (values.empty() && !retrying &&
-        (M->getName().str() == "ObjectiveC" ||
-         M->getName().str() == "Foundation")) {
+        (baseModule->getName().str() == "ObjectiveC" ||
+         baseModule->getName().str() == "Foundation")) {
       if (name.str().startswith("NS")) {
         if (name.str().size() > 2 && name.str() != "NSCocoaError") {
           auto known = getKnownFoundationEntity(name.str());
@@ -1420,13 +1425,13 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
 
     switch (rawOpKind) {
     case OperatorKind::Infix:
-      return M->lookupInfixOperator(opName);
+      return baseModule->lookupInfixOperator(opName);
     case OperatorKind::Prefix:
-      return M->lookupPrefixOperator(opName);
+      return baseModule->lookupPrefixOperator(opName);
     case OperatorKind::Postfix:
-      return M->lookupPostfixOperator(opName);
+      return baseModule->lookupPostfixOperator(opName);
     case OperatorKind::PrecedenceGroup:
-      return M->lookupPrecedenceGroup(opName);
+      return baseModule->lookupPrecedenceGroup(opName);
     default:
       // Unknown operator kind.
       error();
@@ -1450,10 +1455,8 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     return nullptr;
   }
 
-  // Reset module filter.
-  M = nullptr;
-
-  /// The generic signature filter.
+  // Filters for values discovered in the remaining path pieces.
+  ModuleDecl *M = nullptr;
   CanGenericSignature genericSig = nullptr;
 
   // For remaining path pieces, filter or drill down into the results we have.
@@ -1531,6 +1534,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
       bool isType = false;
       bool onlyInNominal = false;
       bool inProtocolExt = false;
+      bool isStatic = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
@@ -1542,7 +1546,8 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
 
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
-        XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt);
+        XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
+                                             isStatic);
         memberName = getIdentifier(IID);
         break;
       }
@@ -1581,8 +1586,8 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
 
       auto members = nominal->lookupDirect(memberName, onlyInNominal);
       values.append(members.begin(), members.end());
-      filterValues(filterTy, M, genericSig, isType, inProtocolExt, ctorInit,
-                   values);
+      filterValues(filterTy, M, genericSig, isType, inProtocolExt, isStatic,
+                   ctorInit, values);
       break;
     }
 
@@ -1717,9 +1722,12 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
       return nullptr;
     }
 
-    PrettyStackTraceModuleFile traceMsg(
-        "If you're seeing a crash here, check that your SDK and dependencies "
-        "match the versions used to build", this);
+    Optional<PrettyStackTraceModuleFile> traceMsg;
+    if (M != getAssociatedModule()) {
+      traceMsg.emplace("If you're seeing a crash here, check that your SDK "
+                         "and dependencies match the versions used to build",
+                       this);
+    }
 
     if (values.empty()) {
       error();
@@ -2829,7 +2837,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     declOrOffset = param;
 
-    param->setInterfaceType(getType(interfaceTypeID));
+    auto paramTy = getType(interfaceTypeID);
+    if (paramTy->hasError()) {
+      error();
+      return nullptr;
+    }
+
+    param->setInterfaceType(paramTy);
     break;
   }
 

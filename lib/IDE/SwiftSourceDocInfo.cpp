@@ -71,12 +71,13 @@ SourceManager &SemaLocResolver::getSourceMgr() const
 }
 
 bool SemaLocResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
-                                 SourceLoc Loc, bool IsRef, Type Ty) {
+                                 ExtensionDecl *ExtTyRef, SourceLoc Loc,
+                                 bool IsRef, Type Ty) {
   if (!D->hasName())
     return false;
 
   if (Loc == LocToResolve) {
-    SemaTok = { D, CtorTyRef, Loc, IsRef, Ty, ContainerType };
+    SemaTok = { D, CtorTyRef, ExtTyRef, Loc, IsRef, Ty, ContainerType };
     return true;
   }
   return false;
@@ -93,7 +94,7 @@ bool SemaLocResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
 bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
-  return visitDeclReference(D, Range, nullptr, Type(),
+  return visitDeclReference(D, Range, nullptr, nullptr, Type(),
                             SemaReferenceKind::SubscriptRef);
 }
 
@@ -113,8 +114,8 @@ bool SemaLocResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
     return true;
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-    return !tryResolve(VD, /*CtorTyRef=*/nullptr, Range.getStart(),
-                       /*IsRef=*/false);
+    return !tryResolve(VD, /*CtorTyRef=*/nullptr, /*ExtTyRef=*/nullptr,
+                       Range.getStart(), /*IsRef=*/false);
 
   return true;
 }
@@ -147,11 +148,12 @@ bool SemaLocResolver::walkToStmtPost(Stmt *S) {
 }
 
 bool SemaLocResolver::visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                                         TypeDecl *CtorTyRef, Type T,
+                                         TypeDecl *CtorTyRef,
+                                         ExtensionDecl *ExtTyRef, Type T,
                                          SemaReferenceKind Kind) {
   if (isDone())
     return false;
-  return !tryResolve(D, CtorTyRef, Range.getStart(), /*IsRef=*/true, T);
+  return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
 }
 
 bool SemaLocResolver::walkToExprPre(Expr *E) {
@@ -174,7 +176,7 @@ bool SemaLocResolver::visitCallArgName(Identifier Name, CharSourceRange Range,
                                        ValueDecl *D) {
   if (isDone())
     return false;
-  bool Found = tryResolve(D, nullptr, Range.getStart(), /*IsRef=*/true);
+  bool Found = tryResolve(D, nullptr, nullptr, Range.getStart(), /*IsRef=*/true);
   if (Found)
     SemaTok.IsKeywordArgument = true;
   return !Found;
@@ -466,7 +468,7 @@ public:
       return true;
     }
     bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                            TypeDecl *CtorTyRef, Type T,
+                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                             SemaReferenceKind Kind) override {
       Impl->analyzeDeclRef(D, Range, T, Kind);
       return true;
@@ -480,7 +482,7 @@ public:
   class FurtherReferenceWalker : public SourceEntityWalker {
     Implementation *Impl;
     bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                            TypeDecl *CtorTyRef, Type T,
+                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                             SemaReferenceKind Kind) override {
       // If the reference is after the given range, continue logic.
       if (!Impl->SM.isBeforeInBuffer(Impl->End, Range.getStart()))
@@ -718,7 +720,7 @@ bool RangeResolver::walkToDeclPost(Decl *D) {
 
 bool RangeResolver::
 visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
-                   Type T, SemaReferenceKind Kind) {
+                   ExtensionDecl *ExtTyRef, Type T, SemaReferenceKind Kind) {
   Impl->analyzeDeclRef(D, Range, T, Kind);
   return true;
 }

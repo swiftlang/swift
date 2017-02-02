@@ -74,7 +74,3 @@ extension String : _ExpressibleByStringInterpolation {
     self = _toStringReadOnlyStreamable(expr)
   }
 }
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:

@@ -278,7 +278,7 @@ private:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           SemaReferenceKind Kind) override {
     SourceLoc Loc = Range.getStart();
 

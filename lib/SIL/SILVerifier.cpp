@@ -1940,9 +1940,17 @@ public:
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
-    auto selfRequirement = genericSig->getRequirements()[0];
-    require(selfRequirement.getKind() == RequirementKind::Conformance,
-            "first requirement should be conformance requirement");
+    Optional<Requirement> selfRequirement;
+    for (auto req : genericSig->getRequirements()) {
+      if (req.getKind() != RequirementKind::SameType) {
+        selfRequirement = req;
+        break;
+      }
+    }
+
+    require(selfRequirement &&
+            selfRequirement->getKind() == RequirementKind::Conformance,
+            "first non-same-typerequirement should be conformance requirement");
     auto conformsTo = genericSig->getConformsTo(selfGenericParam,
                                                 *F.getModule().getSwiftModule());
     require(conformsTo.size() == 1,
