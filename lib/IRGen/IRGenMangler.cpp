@@ -49,3 +49,14 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
   appendOperator("TA");
   return finalize();
 }
+
+std::string IRGenMangler::mangleTypeForReflection(Type Ty,
+                                                  ModuleDecl *Module,
+                                                  bool isSingleFieldOfBox) {
+  Mod = Module;
+  OptimizeProtocolNames = false;
+  appendType(Ty);
+  if (isSingleFieldOfBox)
+    appendOperator("Xb");
+  return finalize();
+}

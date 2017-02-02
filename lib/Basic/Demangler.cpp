@@ -116,16 +116,9 @@ NodePointer Demangler::demangleTopLevel() {
 
   NodePointer topLevel = NodeFactory::create(Node::Kind::Global);
 
-  int Idx = 0;
-  while (!Text.empty()) {
-    NodePointer Node = demangleOperator();
-    if (!Node)
-      break;
-    pushNode(Node);
-    Idx++;
-  }
+  parseAndPushNodes();
 
-  // Let a trailing '_' be part of the not demangled suffix. 
+  // Let a trailing '_' be part of the not demangled suffix.
   popNode(Node::Kind::FirstElementMarker);
 
   size_t EndPos = (NodeStack.empty() ? 0 : NodeStack.back().Pos);
@@ -165,6 +158,26 @@ NodePointer Demangler::demangleTopLevel() {
   }
 
   return topLevel;
+}
+
+NodePointer Demangler::demangleType() {
+  parseAndPushNodes();
+
+  if (NodePointer Result = popNode())
+    return Result;
+
+  return NodeFactory::create(Node::Kind::Suffix, Text);
+}
+
+void Demangler::parseAndPushNodes() {
+  int Idx = 0;
+  while (!Text.empty()) {
+    NodePointer Node = demangleOperator();
+    if (!Node)
+      break;
+    pushNode(Node);
+    Idx++;
+  }
 }
 
 NodePointer Demangler::changeKind(NodePointer Node, Node::Kind NewKind) {
