@@ -20,6 +20,11 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* [SE-0080][]:
+
+  Adds a new family of conversion initializers to all numeric types that 
+  either complete successfully without loss of information or return nil. 
+
 * Swift will now warn when an `NSObject` subclass attempts to override the
   class `initialize` method. Swift doesn't guarantee that references to class
   names trigger Objective-C class realization if they have no other
