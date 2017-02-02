@@ -1343,8 +1343,10 @@ function(add_swift_library name)
     set(SWIFTLIB_IS_STDLIB TRUE)
     set(SWIFTLIB_TARGET_LIBRARY TRUE)
 
-    # There are no experimental SDK overlays.
-    set(SWIFTLIB_INSTALL_IN_COMPONENT sdk-overlay)
+    # Install to sdk-overlay by default, but don't hardcode it
+    if(NOT SWIFTLIB_INSTALL_IN_COMPONENT)
+      set(SWIFTLIB_INSTALL_IN_COMPONENT sdk-overlay)
+    endif()
   endif()
 
   # Standard library is always a target library.
