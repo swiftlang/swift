@@ -394,15 +394,14 @@ Type TypeChecker::resolveTypeInContext(
 
   bool hasDependentType = typeDecl->getDeclaredInterfaceType()
       ->hasTypeParameter();
+  // If we found a generic parameter, map to the archetype if there is one.
+  if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
+    return resolver->resolveGenericTypeParamType(
+        genericParam->getDeclaredInterfaceType()
+            ->castTo<GenericTypeParamType>());
+  }
 
   if (!foundNominal || !hasDependentType) {
-    // If we found a generic parameter, map to the archetype if there is one.
-    if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
-      return resolver->resolveGenericTypeParamType(
-          genericParam->getDeclaredInterfaceType()
-              ->castTo<GenericTypeParamType>());
-    }
-
     // If this is a typealias not in type context, we still need the
     // interface type; the typealias might be in a function context, and
     // its underlying type might reference outer generic parameters.
