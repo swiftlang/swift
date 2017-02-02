@@ -1564,12 +1564,11 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       if (newBase.getPointer() == depMemTy->getBase().getPointer())
         return type;
 
-      Type lookupBaseType = newBase->getLValueOrInOutObjectType();
-
       // Dependent member types should only be created for associated types.
       auto assocType = depMemTy->getAssocType();
-      assert(depMemTy->getAssocType());
+      assert(depMemTy->getAssocType() && "Expected associated type!");
 
+      Type lookupBaseType = newBase->getLValueOrInOutObjectType();
       if (!lookupBaseType->mayHaveMembers()) return type;
 
       auto result = assocType->getDeclaredInterfaceType()
@@ -1578,12 +1577,32 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
                     assocType->getDeclContext()));
 
 
-      if (!result) {
-        return DependentMemberType::get(
-          ErrorType::get(newBase), assocType);
+      if (result)
+        return result;
+
+      if (!lookupBaseType->getImplicitlyUnwrappedOptionalObjectType())
+        return DependentMemberType::get(ErrorType::get(newBase), assocType);
+
+      // "Force" the IUO for substitution purposes. We can end up in
+      // this situation if we use the results of overload resolution
+      // as a generic type and the overload resolution resulted in an
+      // IUO-typed entity.
+      while (auto objectType =
+             lookupBaseType->getImplicitlyUnwrappedOptionalObjectType()) {
+        lookupBaseType = objectType;
       }
 
-      return result;
+      if (!lookupBaseType->mayHaveMembers()) return type;
+
+      result = assocType->getDeclaredInterfaceType()
+          .subst(cs.DC->getParentModule(),
+                 lookupBaseType->getContextSubstitutions(
+                    assocType->getDeclContext()));
+
+      if (result)
+        return result;
+
+      return DependentMemberType::get(ErrorType::get(newBase), assocType);
     }
 
     // If this is a FunctionType and we inferred new function attributes, apply
