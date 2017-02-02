@@ -505,14 +505,17 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
 auto ArchetypeBuilder::PotentialArchetype::getNestedType(
        Identifier nestedName,
        ArchetypeBuilder &builder) -> PotentialArchetype * {
-  // Retrieve the nested type from the representation of this set.
-  if (Representative != this)
-    return getRepresentative()->getNestedType(nestedName, builder);
-
-    // If we already have a nested type with this name, return it.
+  // If we already have a nested type with this name, return it.
   if (!NestedTypes[nestedName].empty()) {
     return NestedTypes[nestedName].front();
   }
+
+  // Find the same nested type within the representative (unless we are
+  // the representative, of course!).
+  PotentialArchetype *repNested = nullptr;
+  auto rep = getRepresentative();
+  if (rep != this)
+    repNested = rep->getNestedType(nestedName, builder);
 
   RequirementSource redundantSource(RequirementSource::Redundant,
                                     SourceLoc());
@@ -520,7 +523,7 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   // Attempt to resolve this nested type to an associated type
   // of one of the protocols to which the parent potential
   // archetype conforms.
-  for (auto &conforms : ConformsTo) {
+  for (auto &conforms : getRepresentative()->ConformsTo) {
     for (auto member : conforms.first->lookupDirect(nestedName)) {
       PotentialArchetype *pa;
       
@@ -571,8 +574,14 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         auto frontRep = nested.front()->getRepresentative();
         pa->Representative = frontRep;
         frontRep->EquivalenceClass.push_back(pa);
-      } else
+      } else {
         nested.push_back(pa);
+
+        if (repNested) {
+          builder.addSameTypeRequirementBetweenArchetypes(pa, repNested,
+                                                          redundantSource);
+        }
+      }
 
       // If there's a superclass constraint that conforms to the protocol,
       // add the appropriate same-type relationship.
@@ -857,7 +866,10 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
                                                 SourceManager *SrcMgr,
                                                 unsigned Indent) {
   // Print name.
-  Out.indent(Indent) << getName();
+  if (Indent == 0)
+    Out << getDebugName();
+  else
+    Out.indent(Indent) << getName();
 
   // Print superclass.
   if (Superclass) {
@@ -887,6 +899,20 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
 
   if (Representative != this) {
     Out << " [represented by " << getRepresentative()->getFullName() << "]";
+  }
+
+  if (EquivalenceClass.size() > 1) {
+    Out << " [equivalence class ";
+    bool isFirst = true;
+    for (auto equiv : EquivalenceClass) {
+      if (equiv == this) continue;
+
+      if (isFirst) isFirst = false;
+      else Out << ", ";
+
+      Out << equiv->getDebugName();
+    }
+    Out << "]";
   }
 
   Out << "\n";
@@ -1284,12 +1310,14 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Recursively merge the associated types of T2 into T1.
   RequirementSource redundantSource(RequirementSource::Redundant, SourceLoc());
-  for (auto T2Nested : T2->NestedTypes) {
-    auto T1Nested = T1->getNestedType(T2Nested.first, *this);
-    if (addSameTypeRequirementBetweenArchetypes(T1Nested,
-                                                T2Nested.second.front(),
-                                                redundantSource))
-      return true;
+  for (auto equivT2 : T2->EquivalenceClass) {
+    for (auto T2Nested : equivT2->NestedTypes) {
+      auto T1Nested = T1->getNestedType(T2Nested.first, *this);
+      if (addSameTypeRequirementBetweenArchetypes(T1Nested,
+                                                  T2Nested.second.front(),
+                                                  redundantSource))
+        return true;
+    }
   }
 
   return false;
@@ -1354,38 +1382,40 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   }
 
   // Recursively resolve the associated types to their concrete types.
-  for (auto nested : T->getNestedTypes()) {
-    AssociatedTypeDecl *assocType
-      = nested.second.front()->getResolvedAssociatedType();
-    if (auto *concreteArchetype = Concrete->getAs<ArchetypeType>()) {
-      Type witnessType = concreteArchetype->getNestedType(nested.first);
-      addSameTypeRequirementToConcrete(nested.second.front(), witnessType,
-                                       Source);
-    } else if (assocType) {
-      assert(conformances.count(assocType->getProtocol()) > 0
-             && "missing conformance?");
-      auto conformance = conformances.find(assocType->getProtocol())->second;
-      Type witnessType;
-      if (conformance.isConcrete()) {
-        witnessType = conformance.getConcrete()
-                        ->getTypeWitness(assocType, getLazyResolver())
-                        .getReplacement();
-      } else {
-        witnessType = DependentMemberType::get(Concrete, assocType);
-      }
-
-      if (auto witnessPA = resolveArchetype(witnessType)) {
-        addSameTypeRequirementBetweenArchetypes(nested.second.front(),
-                                                witnessPA,
-                                                Source);
-      } else {
-        addSameTypeRequirementToConcrete(nested.second.front(),
-                                         witnessType,
+  for (auto equivT : T->EquivalenceClass) {
+    for (auto nested : equivT->getNestedTypes()) {
+      AssociatedTypeDecl *assocType
+        = nested.second.front()->getResolvedAssociatedType();
+      if (auto *concreteArchetype = Concrete->getAs<ArchetypeType>()) {
+        Type witnessType = concreteArchetype->getNestedType(nested.first);
+        addSameTypeRequirementToConcrete(nested.second.front(), witnessType,
                                          Source);
+      } else if (assocType) {
+        assert(conformances.count(assocType->getProtocol()) > 0
+               && "missing conformance?");
+        auto conformance = conformances.find(assocType->getProtocol())->second;
+        Type witnessType;
+        if (conformance.isConcrete()) {
+          witnessType = conformance.getConcrete()
+                          ->getTypeWitness(assocType, getLazyResolver())
+                          .getReplacement();
+        } else {
+          witnessType = DependentMemberType::get(Concrete, assocType);
+        }
+
+        if (auto witnessPA = resolveArchetype(witnessType)) {
+          addSameTypeRequirementBetweenArchetypes(nested.second.front(),
+                                                  witnessPA,
+                                                  Source);
+        } else {
+          addSameTypeRequirementToConcrete(nested.second.front(),
+                                           witnessType,
+                                           Source);
+        }
       }
     }
   }
-  
+
   return false;
 }
                                                                
