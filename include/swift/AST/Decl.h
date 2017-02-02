@@ -3392,6 +3392,10 @@ class ProtocolDecl : public NominalTypeDecl {
 
   llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
 
+  /// The generic signature representing exactly the new requirements introduced
+  /// by this protocol.
+  GenericSignature *RequirementSignature = nullptr;
+
   /// True if the protocol has requirements that cannot be satisfied (e.g.
   /// because they could not be imported from Objective-C).
   unsigned HasMissingRequirements : 1;
@@ -3585,7 +3589,17 @@ public:
   /// for associated types that are mentioned literally in this
   /// decl. Requirements implied via inheritance are not mentioned, nor is the
   /// conformance of Self to this protocol.
-  GenericSignature *getRequirementSignature();
+  GenericSignature *getRequirementSignature() const {
+    assert(RequirementSignature &&
+           "getting requirement signature before computing it");
+    return RequirementSignature;
+  }
+
+  void computeRequirementSignature();
+
+  void setRequirementSignature(GenericSignature *sig) {
+    RequirementSignature = sig;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

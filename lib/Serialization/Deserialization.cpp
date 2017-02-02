@@ -3059,8 +3059,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     handleInherited(proto, rawProtocolAndInheritedIDs.slice(numProtocols));
 
-    if (auto genericParams = maybeReadGenericParams(DC))
-      proto->setGenericParams(genericParams);
+    auto genericParams = maybeReadGenericParams(DC);
+    assert(genericParams && "protocol with no generic parameters?");
+    proto->setGenericParams(genericParams);
+
+    SmallVector<Requirement, 4> requirements;
+    readGenericRequirements(requirements, DeclTypeCursor);
+
+    auto signature = GenericSignature::get(
+        proto->getGenericEnvironment()->getGenericParams(), requirements);
+    proto->setRequirementSignature(signature);
 
     if (isImplicit)
       proto->setImplicit();

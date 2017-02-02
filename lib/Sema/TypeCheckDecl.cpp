@@ -7083,6 +7083,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       markAsObjC(*this, proto, isObjC);
     }
 
+    proto->computeRequirementSignature();
+
     ValidatedTypes.insert(proto);
     break;
   }
