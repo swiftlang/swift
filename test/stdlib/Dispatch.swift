@@ -268,3 +268,25 @@ DispatchAPI.test("DispatchData.copyBytes") {
 	expectEqual(destPtr[5], 0xFF)
 }
 
+DispatchAPI.test("DispatchData.buffers") {
+	let bytes = [UInt8(0), UInt8(1), UInt8(2), UInt8(2)]
+	var ptr = UnsafeBufferPointer<UInt8>(start: bytes, count: bytes.count)
+	var data = DispatchData(bytes: ptr)
+	expectEqual(bytes.count, data.count)
+	for i in 0..<data.count {
+		expectEqual(data[i], bytes[i])
+	}
+
+	data = DispatchData(bytesNoCopy: ptr, deallocator: .custom(nil, {}))
+	expectEqual(bytes.count, data.count)
+	for i in 0..<data.count {
+		expectEqual(data[i], bytes[i])
+	}
+
+	ptr = UnsafeBufferPointer<UInt8>(start: nil, count: 0)
+	data = DispatchData(bytes: ptr)
+	expectEqual(data.count, 0)
+
+	data = DispatchData(bytesNoCopy: ptr, deallocator: .custom(nil, {}))
+	expectEqual(data.count, 0)
+}
