@@ -23,6 +23,9 @@ func testGlobalFunctions() -> [Int] {
   return f2() // okay
 }
 
+attr_discardableResult.f1()
+attr_discardableResult.f2() // expected-warning {{result of call to 'f2()' is unused}}
+
 class C1 {
   @discardableResult
   static func f1Static() -> Int { }
