@@ -1353,7 +1353,10 @@ private:
       if (IsaMagicMask != 0) {
         tryFindAndReadSymbol(IsaMagicValue,
                              "objc_debug_indexed_isa_magic_value");
-        tryFindAndReadSymbol(IsaMask, "objc_debug_indexed_isa_index_mask");
+        tryFindAndReadSymbol(IsaIndexMask,
+                             "objc_debug_indexed_isa_index_mask");
+        tryFindAndReadSymbol(IsaIndexShift,
+                             "objc_debug_indexed_isa_index_shift");
         tryFindSymbol(indexedClasses, "objc_indexed_classes");
         IndexedClassesPointer = indexedClasses.getAddressData();
         tryFindSymbol(indexedClassesCount, "objc_indexed_classes_count");
