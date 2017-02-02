@@ -146,6 +146,7 @@ class XMLEscapingPrinter : public StreamPrinter {
 struct SemaToken {
   ValueDecl *ValueD = nullptr;
   TypeDecl *CtorTyRef = nullptr;
+  ExtensionDecl *ExtTyRef = nullptr;
   ModuleEntity Mod;
   SourceLoc Loc;
   bool IsRef = true;
@@ -155,8 +156,9 @@ struct SemaToken {
   Type ContainerType;
 
   SemaToken() = default;
-  SemaToken(ValueDecl *ValueD, TypeDecl *CtorTyRef, SourceLoc Loc, bool IsRef,
-            Type Ty, Type ContainerType) : ValueD(ValueD), CtorTyRef(CtorTyRef), Loc(Loc),
+  SemaToken(ValueDecl *ValueD, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
+            SourceLoc Loc, bool IsRef, Type Ty, Type ContainerType) :
+            ValueD(ValueD), CtorTyRef(CtorTyRef), ExtTyRef(ExtTyRef), Loc(Loc),
             IsRef(IsRef), Ty(Ty), DC(ValueD->getDeclContext()),
             ContainerType(ContainerType) {}
   SemaToken(ModuleEntity Mod, SourceLoc Loc) : Mod(Mod), Loc(Loc) { }
@@ -182,7 +184,7 @@ private:
   bool walkToStmtPre(Stmt *S) override;
   bool walkToStmtPost(Stmt *S) override;
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           SemaReferenceKind Kind) override;
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
                         ValueDecl *D) override;
@@ -191,7 +193,7 @@ private:
     return getSourceMgr().rangeContainsTokenLoc(Range, LocToResolve);
   }
   bool isDone() const { return SemaTok.isValid(); }
-  bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
+  bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                   SourceLoc Loc, bool IsRef, Type Ty = Type());
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
@@ -269,7 +271,7 @@ class RangeResolver : public SourceEntityWalker {
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
   bool walkToDeclPost(Decl *D) override;
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           SemaReferenceKind Kind) override;
 public:
   RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);

@@ -1375,7 +1375,7 @@ private:
     return true;
   }
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           SemaReferenceKind Kind) override {
     if (Cancelled)
       return false;

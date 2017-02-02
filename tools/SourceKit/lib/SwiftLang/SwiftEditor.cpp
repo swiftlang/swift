@@ -771,7 +771,7 @@ public:
     : SM(SM), BufferID(BufferID) {}
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           SemaReferenceKind Kind) override {
     if (isa<VarDecl>(D) && D->hasName() && D->getName().str() == "self")
       return true;
@@ -789,7 +789,7 @@ public:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override {
     // We should treat both open and close brackets equally
-    return visitDeclReference(D, Range, nullptr, Type(),
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(),
                               SemaReferenceKind::SubscriptRef);
   }
 
