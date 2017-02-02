@@ -5,50 +5,6 @@
 import StdlibUnittest
 import ICU
 
-/// A lazy collection of `Encoding.EncodedScalar` that results
-/// from parsing an instance of codeUnits using that `Encoding`.
-public struct ParsedUnicode<
-  CodeUnits: BidirectionalCollection,
-  Encoding: UnicodeEncoding
->
-where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : BidirectionalCollection,
-  CodeUnits.SubSequence.Index == CodeUnits.Index,
-  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
-  let codeUnits: CodeUnits
-  
-  init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
-    self.codeUnits = codeUnits
-  }
-}
-
-extension ParsedUnicode {
-  // Because parsing produces a buffer and a new index, to avoid
-  // repeatedly decoding the same data, this index stores that buffer
-  // and the next index.  This would obviously be more complicated if
-  // the buffer contained more than a single scalar (and it probably
-  // should).
-  public struct Index : Comparable {
-    let base: CodeUnits.Index
-    // FIXME: We might get a much better memory footprint if we used a
-    // UInt8 to store the distance between base and next, rather than
-    // storing next explicitly.  CodeUnits will be random-access in
-    // practice.
-    let next: CodeUnits.Index
-    // FIXME: there should be an invalid inhabitant we can use in
-    // EncodedScalar so as not to waste a separate bool here.
-    let scalar: Encoding.EncodedScalar?
-
-    public static func < (lhs: Index, rhs: Index) -> Bool {
-      return lhs.base < rhs.base
-    }
-    public static func == (lhs: Index, rhs: Index) -> Bool {
-      return lhs.base == rhs.base
-    }
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //===--- Missing stdlib niceties ------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -281,6 +237,50 @@ func debugLog(_ arg0: @autoclosure ()->Any, _ arg1: @autoclosure ()->Any) {
   print(arg0(), arg1())
 }
 //===----------------------------------------------------------------------===//
+
+/// A lazy collection of `Encoding.EncodedScalar` that results
+/// from parsing an instance of codeUnits using that `Encoding`.
+public struct ParsedUnicode<
+  CodeUnits: BidirectionalCollection,
+  Encoding: UnicodeEncoding
+>
+where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence : BidirectionalCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+  let codeUnits: CodeUnits
+  
+  init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
+    self.codeUnits = codeUnits
+  }
+}
+
+extension ParsedUnicode {
+  // Because parsing produces a buffer and a new index, to avoid
+  // repeatedly decoding the same data, this index stores that buffer
+  // and the next index.  This would obviously be more complicated if
+  // the buffer contained more than a single scalar (and it probably
+  // should).
+  public struct Index : Comparable {
+    let base: CodeUnits.Index
+    // FIXME: We might get a much better memory footprint if we used a
+    // UInt8 to store the distance between base and next, rather than
+    // storing next explicitly.  CodeUnits will be random-access in
+    // practice.
+    let next: CodeUnits.Index
+    // FIXME: there should be an invalid inhabitant we can use in
+    // EncodedScalar so as not to waste a separate bool here.
+    let scalar: Encoding.EncodedScalar?
+
+    public static func < (lhs: Index, rhs: Index) -> Bool {
+      return lhs.base < rhs.base
+    }
+    public static func == (lhs: Index, rhs: Index) -> Bool {
+      return lhs.base == rhs.base
+    }
+  }
+}
 
 /// Collection Conformance
 extension ParsedUnicode : BidirectionalCollection {
