@@ -2909,9 +2909,8 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   LazyResolver *resolver = substBase->getASTContext().getLazyResolver();
   if (assocType) {
     auto proto = assocType->getProtocol();
-    // FIXME: Introduce substituted type node here?
     Optional<ProtocolConformanceRef> conformance
-      = lookupConformances(origBase ? origBase->getCanonicalType() : CanType(),
+      = lookupConformances(origBase->getCanonicalType(),
                            substBase,
                            proto->getDeclaredType());
 
@@ -2984,7 +2983,7 @@ Type DependentMemberType::substBaseType(Type substBase,
       substBase->hasTypeParameter())
     return this;
 
-  return getMemberForBaseType(lookupConformance, Type(), substBase,
+  return getMemberForBaseType(lookupConformance, getBase(), substBase,
                               getAssocType(), getName(), None);
 }
 

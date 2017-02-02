@@ -130,7 +130,8 @@ SubstitutionMap::lookupConformance(
                          CanType type, ProtocolDecl *proto,
                          llvm::SmallPtrSetImpl<CanType> *visitedParents) const {
   // Local function to either record an abstract conformance or return a
-  // concrete conformance. This allows us to
+  // concrete conformance. This allows us to check multiple parents and
+  // find the most specific conformance that applies.
   Optional<ProtocolConformanceRef> abstractConformance;
   auto recordOrReturn = [&](ProtocolConformanceRef conformance)
       -> Optional<ProtocolConformanceRef> {
