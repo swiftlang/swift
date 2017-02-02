@@ -1328,10 +1328,11 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
   values.erase(newEnd, values.end());
 }
 
-Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
+Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
+                                        uint32_t pathLen) {
   using namespace decls_block;
-  assert(M && "missing dependency");
-  PrettyXRefTrace pathTrace(*M);
+  assert(baseModule && "missing dependency");
+  PrettyXRefTrace pathTrace(*baseModule);
 
   auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind != llvm::BitstreamEntry::Record) {
@@ -1375,9 +1376,9 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     bool retrying = false;
     retry:
 
-    M->lookupQualified(ModuleType::get(M), name,
-                       NL_QualifiedDefault | NL_KnownNoDependency,
-                       /*typeResolver=*/nullptr, values);
+    baseModule->lookupQualified(ModuleType::get(baseModule), name,
+                                NL_QualifiedDefault | NL_KnownNoDependency,
+                                /*typeResolver=*/nullptr, values);
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, isStatic,
                  None, values);
 
@@ -1386,8 +1387,8 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     // has to go through this path, but it's an option we toggle for
     // testing.
     if (values.empty() && !retrying &&
-        (M->getName().str() == "ObjectiveC" ||
-         M->getName().str() == "Foundation")) {
+        (baseModule->getName().str() == "ObjectiveC" ||
+         baseModule->getName().str() == "Foundation")) {
       if (name.str().startswith("NS")) {
         if (name.str().size() > 2 && name.str() != "NSCocoaError") {
           auto known = getKnownFoundationEntity(name.str());
@@ -1424,13 +1425,13 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
 
     switch (rawOpKind) {
     case OperatorKind::Infix:
-      return M->lookupInfixOperator(opName);
+      return baseModule->lookupInfixOperator(opName);
     case OperatorKind::Prefix:
-      return M->lookupPrefixOperator(opName);
+      return baseModule->lookupPrefixOperator(opName);
     case OperatorKind::Postfix:
-      return M->lookupPostfixOperator(opName);
+      return baseModule->lookupPostfixOperator(opName);
     case OperatorKind::PrecedenceGroup:
-      return M->lookupPrecedenceGroup(opName);
+      return baseModule->lookupPrecedenceGroup(opName);
     default:
       // Unknown operator kind.
       error();
@@ -1454,10 +1455,8 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     return nullptr;
   }
 
-  // Reset module filter.
-  M = nullptr;
-
-  /// The generic signature filter.
+  // Filters for values discovered in the remaining path pieces.
+  ModuleDecl *M = nullptr;
   CanGenericSignature genericSig = nullptr;
 
   // For remaining path pieces, filter or drill down into the results we have.
@@ -1723,9 +1722,12 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
       return nullptr;
     }
 
-    PrettyStackTraceModuleFile traceMsg(
-        "If you're seeing a crash here, check that your SDK and dependencies "
-        "match the versions used to build", this);
+    Optional<PrettyStackTraceModuleFile> traceMsg;
+    if (M != getAssociatedModule()) {
+      traceMsg.emplace("If you're seeing a crash here, check that your SDK "
+                         "and dependencies match the versions used to build",
+                       this);
+    }
 
     if (values.empty()) {
       error();
