@@ -2949,6 +2949,9 @@ Optional<ProtocolConformanceRef>
 LookUpConformanceInModule::operator()(CanType dependentType,
                                       Type conformingReplacementType,
                                       ProtocolType *conformedProtocol) const {
+  if (conformingReplacementType->isTypeParameter())
+    return ProtocolConformanceRef(conformedProtocol->getDecl());
+
   return M->lookupConformance(conformingReplacementType,
                   conformedProtocol->getDecl(),
                   conformingReplacementType->getASTContext().getLazyResolver());

@@ -332,15 +332,10 @@ Type GenericEnvironment::getSugaredType(Type type) const {
 
 ArrayRef<Substitution>
 GenericEnvironment::getForwardingSubstitutions() const {
-  auto lookupConformanceFn =
-      [&](CanType original, Type replacement, ProtocolType *protoType)
-      -> Optional<ProtocolConformanceRef> {
-        return ProtocolConformanceRef(protoType->getDecl());
-      };
-
   SmallVector<Substitution, 4> result;
   getGenericSignature()->getSubstitutions(QueryInterfaceTypeSubstitutions(this),
-                                          lookupConformanceFn, result);
+                                          MakeAbstractConformanceForGenericType(),
+                                          result);
   return getGenericSignature()->getASTContext().AllocateCopy(result);
 }
 

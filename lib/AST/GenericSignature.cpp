@@ -409,13 +409,9 @@ getSubstitutions(TypeSubstitutionFn subs,
 void GenericSignature::
 getSubstitutions(const SubstitutionMap &subMap,
                  SmallVectorImpl<Substitution> &result) const {
-  auto lookupConformanceFn =
-      [&](CanType original, Type replacement, ProtocolType *protoType)
-      -> Optional<ProtocolConformanceRef> {
-        return subMap.lookupConformance(original, protoType->getDecl());
-      };
-
-  getSubstitutions(subMap.getMap(), lookupConformanceFn, result);
+  getSubstitutions(subMap.getMap(),
+                   LookUpConformanceInSubstitutionMap(subMap),
+                   result);
 }
 
 bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {

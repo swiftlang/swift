@@ -634,31 +634,9 @@ TypeBase::gatherAllSubstitutions(ModuleDecl *module,
     }
   }
 
-  auto lookupConformanceFn =
-      [&](CanType original, Type replacement, ProtocolType *protoType)
-      -> Optional<ProtocolConformanceRef> {
-        auto *proto = protoType->getDecl();
-
-        // If the type is a type variable or is dependent, just fill in empty
-        // conformances.
-        if (replacement->isTypeVariableOrMember() ||
-            replacement->isTypeParameter())
-          return ProtocolConformanceRef(proto);
-
-        // Otherwise, try to find the conformance.
-        auto conforms = module->lookupConformance(replacement, proto, resolver);
-        if (conforms)
-          return *conforms;
-
-        // FIXME: Should we ever end up here?
-        // We should return None and let getSubstitutions handle the error
-        // if we do.
-        return ProtocolConformanceRef(proto);
-      };
-
   SmallVector<Substitution, 4> result;
   genericSig->getSubstitutions(substitutions,
-                               lookupConformanceFn,
+                               LookUpConformanceInModule(module),
                                result);
 
   // Before recording substitutions, make sure we didn't end up doing it
@@ -762,9 +740,8 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
   }
 
   // Type variables have trivial conformances.
-  if (type->isTypeVariableOrMember()) {
+  if (type->isTypeVariableOrMember())
     return ProtocolConformanceRef(protocol);
-  }
 
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
