@@ -99,13 +99,9 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     auto &Importer = *D->getASTContext().getClangModuleLoader();
 
     auto ClangMacroInfo = ClangN.getAsMacro();
-    auto PPRecord = Importer.getClangPreprocessor().getPreprocessingRecord();
-    assert(PPRecord && "Clang importer should be created with "
-                       "-detailed-preprocessing-record option");
-    auto ClangMacroDef = PPRecord->findMacroDefinition(ClangMacroInfo);
-
-    bool Ignore = clang::index::generateUSRForMacro(
-        ClangMacroDef, Importer.getClangASTContext().getSourceManager(), Buf);
+    bool Ignore = clang::index::generateUSRForMacro(D->getNameStr(),
+        ClangMacroInfo->getDefinitionLoc(),
+        Importer.getClangASTContext().getSourceManager(), Buf);
     if (!Ignore)
       OS << Buf.str();
     return Ignore;
