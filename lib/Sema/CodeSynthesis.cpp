@@ -814,6 +814,20 @@ static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
                              storage->getSetter());
   storage->setMaterializeForSetFunc(materializeForSet);
 
+  // Make sure we record the override.
+  //
+  // FIXME: Instead, we should just not call checkOverrides() on
+  // storage until all accessors are in place.
+  if (auto *baseASD = storage->getOverriddenDecl()) {
+    // If the base storage has a private setter, we're not overriding
+    // materializeForSet either.
+    auto *baseMFS = baseASD->getMaterializeForSetFunc();
+    if (baseMFS != nullptr &&
+        baseASD->isSetterAccessibleFrom(storage->getDeclContext())) {
+      materializeForSet->setOverriddenDecl(baseMFS);
+    }
+  }
+
   return materializeForSet;
 }
 
