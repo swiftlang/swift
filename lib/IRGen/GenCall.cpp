@@ -26,6 +26,7 @@
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/SILType.h"
+#include "swift/Runtime/Config.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/Support/Compiler.h"
 
@@ -108,7 +109,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM,
 
 static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
   // TODO: use a custom CC that returns three scalars efficiently
-  return llvm::CallingConv::Swift;
+  return SWIFT_LLVM_CC(SwiftCC);
 }
 
 /// Expand the requirements of the given abstract calling convention
@@ -151,33 +152,33 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
   attrs = attrs.addAttributes(IGM.LLVMContext, paramIndex + 1, resultAttrs);
 }
 
-static void addSwiftSelfAttributes(IRGenModule &IGM,
-                                   llvm::AttributeSet &attrs,
-                                   unsigned argIndex) {
+void IRGenModule::addSwiftSelfAttributes(llvm::AttributeSet &attrs,
+                                         unsigned argIndex) {
+  if (!UseSwiftCC)
+    return;
   static const llvm::Attribute::AttrKind attrKinds[] = {
     llvm::Attribute::SwiftSelf,
   };
   auto argAttrs =
-      llvm::AttributeSet::get(IGM.LLVMContext, argIndex + 1, attrKinds);
-  attrs = attrs.addAttributes(IGM.LLVMContext, argIndex + 1, argAttrs);
+      llvm::AttributeSet::get(this->LLVMContext, argIndex + 1, attrKinds);
+  attrs = attrs.addAttributes(this->LLVMContext, argIndex + 1, argAttrs);
 }
 
-static void addSwiftErrorAttributes(IRGenModule &IGM,
-                                    llvm::AttributeSet &attrs,
-                                    unsigned argIndex) {
+void IRGenModule::addSwiftErrorAttributes(llvm::AttributeSet &attrs,
+                                          unsigned argIndex) {
   // Don't add the swifterror attribute on ABI that don't pass it in a register.
   // We create a shadow stack location of the swifterror parameter for the
   // debugger on such platforms and so we can't mark the parameter with a
   // swifterror attribute.
-  if (!IGM.IsSwiftErrorInRegister)
+  if (!UseSwiftCC || !this->IsSwiftErrorInRegister)
     return;
 
   static const llvm::Attribute::AttrKind attrKinds[] = {
     llvm::Attribute::SwiftError,
   };
   auto argAttrs =
-      llvm::AttributeSet::get(IGM.LLVMContext, argIndex + 1, attrKinds);
-  attrs = attrs.addAttributes(IGM.LLVMContext, argIndex + 1, argAttrs);
+      llvm::AttributeSet::get(this->LLVMContext, argIndex + 1, attrKinds);
+  attrs = attrs.addAttributes(this->LLVMContext, argIndex + 1, argAttrs);
 }
 
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
@@ -939,10 +940,10 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
       case clang::ParameterABI::Ordinary:
         break;
       case clang::ParameterABI::SwiftContext:
-        addSwiftSelfAttributes(IGM, Attrs, getCurParamIndex());
+        IGM.addSwiftSelfAttributes(Attrs, getCurParamIndex());
         break;
       case clang::ParameterABI::SwiftErrorResult:
-        addSwiftErrorAttributes(IGM, Attrs, getCurParamIndex());
+        IGM.addSwiftErrorAttributes(Attrs, getCurParamIndex());
         break;
       case clang::ParameterABI::SwiftIndirectResult:
         addIndirectResultAttributes(IGM, Attrs, getCurParamIndex(),claimSRet());
@@ -1115,7 +1116,7 @@ void SignatureExpansion::expandParameters() {
     auto curLength = ParamIRTypes.size(); (void) curLength;
 
     if (claimSelf())
-      addSwiftSelfAttributes(IGM, Attrs, curLength);
+      IGM.addSwiftSelfAttributes(Attrs, curLength);
     expand(FnType->getSelfParameter());
     assert(ParamIRTypes.size() == curLength + 1 &&
            "adding 'self' added unexpected number of parameters");
@@ -1141,7 +1142,7 @@ void SignatureExpansion::expandParameters() {
     };
     if (needsContext()) {
       if (claimSelf())
-        addSwiftSelfAttributes(IGM, Attrs, ParamIRTypes.size());
+        IGM.addSwiftSelfAttributes(Attrs, ParamIRTypes.size());
       ParamIRTypes.push_back(IGM.RefCountedPtrTy);
     }
   }
@@ -1151,7 +1152,7 @@ void SignatureExpansion::expandParameters() {
   // if we set the right attribute.
   if (FnType->hasErrorResult()) {
     if (claimError())
-      addSwiftErrorAttributes(IGM, Attrs, ParamIRTypes.size());
+      IGM.addSwiftErrorAttributes(Attrs, ParamIRTypes.size());
     llvm::Type *errorType = IGM.getStorageType(
         getSILFuncConventions().getSILType(FnType->getErrorResult()));
     ParamIRTypes.push_back(errorType->getPointerTo());
@@ -1493,7 +1494,7 @@ void CallEmission::setFromCallee() {
     assert(LastArgWritten > 0);
     Args[--LastArgWritten] = errorResultSlot.getAddress();
     addAttribute(LastArgWritten + 1, llvm::Attribute::NoCapture);
-    addSwiftErrorAttributes(IGF.IGM, Attrs, LastArgWritten);
+    IGF.IGM.addSwiftErrorAttributes(Attrs, LastArgWritten);
 
     // Fill in the context pointer if necessary.
     if (!contextPtr) {
@@ -1509,7 +1510,7 @@ void CallEmission::setFromCallee() {
            && "block function should not claimed to have data pointer");
     assert(LastArgWritten > 0);
     Args[--LastArgWritten] = contextPtr;
-    addSwiftSelfAttributes(IGF.IGM, Attrs, LastArgWritten);
+    IGF.IGM.addSwiftSelfAttributes(Attrs, LastArgWritten);
   }
 }
 

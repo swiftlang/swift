@@ -128,6 +128,11 @@
 
 #define SWIFT_LLVM_CC_RegisterPreservingCC llvm::CallingConv::PreserveMost
 
+#if SWIFT_USE_SWIFTCALL
+#define SWIFT_LLVM_CC_SwiftCC  llvm::CallingConv::Swift
+#else
+#define SWIFT_LLVM_CC_SwiftCC  llvm::CallingConv::C
+#endif
 
 // If defined, it indicates that runtime function wrappers
 // should be used on all platforms, even they do not support
