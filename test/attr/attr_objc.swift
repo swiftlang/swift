@@ -547,6 +547,12 @@ class subject_subscriptInvalid8 {
   }
 }
 
+class subject_propertyInvalid1 {
+  @objc
+  let plainStruct = PlainStruct() // expected-error {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-note@-1{{Swift structs cannot be represented in Objective-C}}
+}
+
 //===--- Tests for @objc inference.
 
 @objc
