@@ -346,7 +346,9 @@ void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
   }
 }
 
-static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
+static void emitCaptureArguments(SILGenFunction &gen,
+                                 AnyFunctionRef closure,
+                                 CapturedValue capture,
                                  unsigned ArgNo) {
 
   auto *VD = capture.getDecl();
@@ -359,7 +361,12 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     auto interfaceType = cast<VarDecl>(VD)->getInterfaceType();
     if (!interfaceType->hasTypeParameter()) return interfaceType;
 
-    auto genericEnv = gen.F.getGenericEnvironment();
+    // NB: The generic signature may be elided from the lowered function type
+    // if the function is in a fully-specialized context, but we still need to
+    // canonicalize references to the generic parameters that may appear in
+    // non-canonical types in that context. We need the original generic
+    // environment from the AST for that.
+    auto genericEnv = closure.getGenericEnvironment();
     return genericEnv->mapTypeIntoContext(gen.F.getModule().getSwiftModule(),
                                           interfaceType);
   };
@@ -448,7 +455,7 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
       return;
     }
 
-    emitCaptureArguments(*this, capture, ++ArgNo);
+    emitCaptureArguments(*this, TheClosure, capture, ++ArgNo);
   }
 }
 

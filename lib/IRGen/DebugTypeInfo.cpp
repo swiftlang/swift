@@ -155,7 +155,8 @@ TypeDecl *DebugTypeInfo::getDecl() const {
   return nullptr;
 }
 
-void DebugTypeInfo::dump() const {
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   llvm::errs() << "[Size " << size.getValue() << " Alignment "
                << align.getValue() << "] ";
 
@@ -165,3 +166,4 @@ void DebugTypeInfo::dump() const {
     StorageType->dump();
   }
 }
+#endif
