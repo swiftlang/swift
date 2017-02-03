@@ -368,8 +368,8 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
     chain.push_front(newEntry);
   }
 }
-
-void LocalTypeDataCache::dump() const {
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void LocalTypeDataCache::dump() const {
   auto &out = llvm::errs();
 
   if (Map.empty()) {
@@ -409,10 +409,13 @@ void LocalTypeDataCache::dump() const {
     out << "]\n";
   }
 }
+#endif
 
-void LocalTypeDataKey::dump() const {
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void LocalTypeDataKey::dump() const {
   print(llvm::errs());
 }
+#endif
 
 void LocalTypeDataKey::print(llvm::raw_ostream &out) const {
   out << "(" << Type.getPointer()
@@ -421,9 +424,12 @@ void LocalTypeDataKey::print(llvm::raw_ostream &out) const {
   out << ")";
 }
 
-void LocalTypeDataKind::dump() const {
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void LocalTypeDataKind::dump() const {
   print(llvm::errs());
 }
+#endif
+
 void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
   if (isConcreteProtocolConformance()) {
     out << "ConcreteConformance(";
