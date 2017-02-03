@@ -227,3 +227,10 @@ let router = Company(
     }
   ]
 )
+
+// Infer [[Int]] for SR3786aa.
+// FIXME: As noted in SR-3786, this was the behavior in Swift 3, but
+//        it seems like the wrong choice and is less by design than by
+//        accident.
+let SR3786a: [Int] = [1, 2, 3]
+let SR3786aa = [SR3786a.reversed(), SR3786a]

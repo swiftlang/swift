@@ -1413,6 +1413,8 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
 
   // Make sure the concrete type fulfills the superclass requirement
   // of the archetype.
+  RequirementSource redundantSource(RequirementSource::Redundant,
+                                    Source.getLoc());
   if (T->Superclass) {
     if (!T->Superclass->isExactSuperclassOf(Concrete, getLazyResolver())) {
       Diags.diagnose(Source.getLoc(), diag::type_does_not_inherit,
@@ -1422,6 +1424,10 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
         .highlight(T->SuperclassSource->getLoc());
       return true;
     }
+
+    // The superclass requirement is made redundant by the concrete type
+    // assignment.
+    updateRequirementSource(*T->SuperclassSource, redundantSource);
   }
 
   // Recursively resolve the associated types to their concrete types.
@@ -1432,7 +1438,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
       if (auto *concreteArchetype = Concrete->getAs<ArchetypeType>()) {
         Type witnessType = concreteArchetype->getNestedType(nested.first);
         addSameTypeRequirementToConcrete(nested.second.front(), witnessType,
-                                         Source);
+                                         redundantSource);
       } else if (assocType) {
         assert(conformances.count(assocType->getProtocol()) > 0
                && "missing conformance?");
@@ -1449,11 +1455,11 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
         if (auto witnessPA = resolveArchetype(witnessType)) {
           addSameTypeRequirementBetweenArchetypes(nested.second.front(),
                                                   witnessPA,
-                                                  Source);
+                                                  redundantSource);
         } else {
           addSameTypeRequirementToConcrete(nested.second.front(),
                                            witnessType,
-                                           Source);
+                                           redundantSource);
         }
       }
     }
@@ -2173,17 +2179,39 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
                            RequirementSource source)> f) {
    // Create anchors for all of the potential archetypes.
    // FIXME: This is because we might be missing some from the equivalence
-   // classes.
+   // classes. It is an egregious hack.
    visitPotentialArchetypes([&](PotentialArchetype *archetype) {
-     archetype->getArchetypeAnchor(*this);
+     (void)archetype->getArchetypeAnchor(*this);
    });
 
-  // Collect all archetypes, and sort them.
+  // Collect all archetypes.
   SmallVector<PotentialArchetype *, 8> archetypes;
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
     archetypes.push_back(archetype);
   });
 
+  // Remove any invalid potential archetypes or archetypes whose parents are
+  // concrete; they have no requirements.
+  archetypes.erase(
+    std::remove_if(archetypes.begin(), archetypes.end(),
+      [&](PotentialArchetype *archetype) -> bool {
+        // Invalid archetypes are never representatives in well-formed or
+        // corrected signature, so we don't need to visit them.
+        if (archetype->isInvalid())
+          return true;
+
+        // If there is a concrete type above us, there are no requirements to
+        // emit.
+        if (archetype->getParent() &&
+            hasConcreteTypeInPath(archetype->getParent()))
+          return true;
+
+        // Keep it.
+        return false;
+      }),
+    archetypes.end());
+
+  // Sort the archetypes in canonical order.
   llvm::array_pod_sort(archetypes.begin(), archetypes.end(),
                        compareDependentTypes);
 
@@ -2203,25 +2231,12 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     };
 
   for (auto *archetype : archetypes) {
-    // Invalid archetypes are never representatives in well-formed or corrected
-    // signature, so we don't need to visit them.
-    if (archetype->isInvalid())
-      continue;
-
-    // If this type is equivalent to a concrete type, emit the same-type
-    // constraint.
-    auto rep = archetype->getRepresentative();
-    if (auto concreteType = rep->getConcreteType()) {
-      f(RequirementKind::SameType, archetype, concreteType,
-        rep->getConcreteTypeSource());
-      continue;
-    }
-
     // Check whether this archetype is one of the anchors within its
-    // connected component. If so, we may need to emit an archetype anchor.
+    // connected component. If so, we may need to emit a same-type constraint.
     //
     // FIXME: O(n) in the number of implied connected components within the
     // equivalence class. The equivalence class should be small, but...
+    auto rep = archetype->getRepresentative();
     auto componentAnchors = getSameTypeComponentAnchors(rep);
     auto knownAnchor = std::find(componentAnchors.begin(),
                                  componentAnchors.end(),
@@ -2229,6 +2244,14 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     std::function<void()> deferredSameTypeRequirement;
 
     if (knownAnchor != componentAnchors.end()) {
+      // If this equivalance class is bound to a concrete type, equate the
+      // anchor with a concrete type.
+      if (auto concreteType = rep->getConcreteType()) {
+        f(RequirementKind::SameType, archetype, concreteType,
+          rep->getConcreteTypeSource());
+        continue;
+      }
+
       // If we're at the last anchor in the component, do nothing;
       auto nextAnchor = knownAnchor;
       ++nextAnchor;

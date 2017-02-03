@@ -1,8 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
 
 // CHECK: define hidden void @_T012generic_arg25ClassC3foo{{.*}}, %swift.type* %U
-// CHECK: [[Y:%.*]] = getelementptr inbounds %C12generic_arg25Class, %C12generic_arg25Class* %2, i32 0, i32 0, i32 0
-// store %swift.opaque* %[[Y]], %swift.opaque** %[[Y_SHADOW:.*]], align
 // CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %y.addr, metadata ![[U:.*]], metadata !{{[0-9]+}})
 // Make sure there is no conflicting dbg.value for this variable.x
 // CHECK-NOT: dbg.value{{.*}}metadata ![[U]]
