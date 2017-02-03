@@ -153,3 +153,37 @@ extension P7 where AssocP6.Element : P6,
         AssocP6.Element == AssocP7.AssocP6.Element {
   func nestedSameType1() { }
 }
+
+protocol P8 {
+  associatedtype A
+  associatedtype B
+}
+
+protocol P9 : P8 {
+  associatedtype A
+  associatedtype B
+}
+
+protocol P10 {
+  associatedtype A
+  associatedtype C
+}
+
+// CHECK-LABEL: sameTypeConcrete1@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.A == X3, τ_0_0.B == Int, τ_0_0.C == Int>
+func sameTypeConcrete1<T : P9 & P10>(_: T) where T.A == X3, T.C == T.B, T.C == Int { }
+
+// CHECK-LABEL: sameTypeConcrete2@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.B == X3, τ_0_0.C == X3>
+func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
+
+// Note: a standard-library-based stress test to make sure we don't inject
+// any additional requirements.
+// CHECK-LABEL: RangeReplaceableCollection.f()@
+// CHECK: <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RangeReplaceableCollection, τ_0_0.SubSequence == MutableRangeReplaceableSlice<τ_0_0>>
+extension RangeReplaceableCollection where
+  Self: MutableCollection,
+  Self.SubSequence == MutableRangeReplaceableSlice<Self>
+{
+	func f() { }
+}
