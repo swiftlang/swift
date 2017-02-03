@@ -1254,6 +1254,7 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
   // Create a new archetype builder with the given signature.
   auto builder = new ArchetypeBuilder(*this, LookUpConformanceInModule(mod));
   builder->addGenericSignature(sig);
+  builder->finalize(SourceLoc(), /*allowConcreteGenericParams=*/true);
 
   // Store this archetype builder (no generic environment yet).
   Impl.ArchetypeBuilders[{sig, mod}] =

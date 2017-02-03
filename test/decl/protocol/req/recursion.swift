@@ -10,7 +10,6 @@ extension SomeProtocol where T == Optional<T> { } // expected-error{{same-type c
 
 class X<T> where T == X { // expected-error{{same-type constraint 'T' == 'X<T>' is recursive}}
 // expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
-// expected-error@-2{{same-type requirement makes generic parameter 'T' non-generic}}
     var type: T { return type(of: self) }
 }
 

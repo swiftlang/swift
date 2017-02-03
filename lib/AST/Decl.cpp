@@ -3020,7 +3020,8 @@ GenericSignature *ProtocolDecl::getRequirementSignature() {
   ArchetypeBuilder builder(getASTContext(), LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
   builder.addRequirement(requirement, source);
-
+  builder.finalize(SourceLoc());
+  
   return builder.getGenericSignature();
 }
 

@@ -119,6 +119,11 @@ struct ArchetypeBuilder::Implementation {
   llvm::DenseSet<std::pair<GenericEnvironment *,
                            ArchetypeBuilder::PotentialArchetype *>>
     ConcreteSubs;
+
+#ifndef NDEBUG
+  /// Whether we've already finalized the builder.
+  bool finalized = false;
+#endif
 };
 
 ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
@@ -1926,6 +1931,11 @@ static Identifier typoCorrectNestedType(
 
 void
 ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
+  assert(!Impl->finalized && "Already finalized builder");
+#ifndef NDEBUG
+  Impl->finalized = true;
+#endif
+  
   SmallPtrSet<PotentialArchetype *, 4> visited;
 
   // Check for generic parameters which have been made concrete or equated
@@ -2434,6 +2444,8 @@ static void collectRequirements(ArchetypeBuilder &builder,
 }
 
 GenericSignature *ArchetypeBuilder::getGenericSignature() {
+  assert(Impl->finalized && "Must finalize builder first");
+
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
   collectRequirements(*this, Impl->GenericParams, requirements);
@@ -2444,6 +2456,8 @@ GenericSignature *ArchetypeBuilder::getGenericSignature() {
 
 GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
                                                   GenericSignature *signature) {
+  assert(Impl->finalized && "Must finalize builder first");
+
   // Create the generic environment, which will be lazily populated with
   // archetypes.
   auto genericEnv = GenericEnvironment::getIncomplete(signature, this);

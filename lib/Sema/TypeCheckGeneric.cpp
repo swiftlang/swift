@@ -736,6 +736,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
   } else {
     revertGenericParamList(genericParams);
   }
+
   CompleteGenericTypeResolver completeResolver(*this, builder);
   if (recursivelyVisitGenericParams) {
     visitOuterToInner(genericParams,
@@ -747,12 +748,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
                           &completeResolver);
   }
 
-  /// Perform any necessary requirement inference.
-  inferRequirements(builder);
-
-  // Finalize the generic requirements.
-  (void)builder.finalize(genericParams->getSourceRange().Start,
-                         allowConcreteGenericParams);
+  // Complain about any other renamed references.
   (void)builder.diagnoseRemainingRenames(genericParams->getSourceRange().Start);
 
   // Record the generic type parameter types and the requirements.

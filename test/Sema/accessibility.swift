@@ -447,7 +447,7 @@ struct DefaultGeneric<T> {}
 
 struct DefaultGenericPrivate<T: PrivateProto> {} // expected-error {{generic struct must be declared private or fileprivate because its generic parameter uses a private type}}
 struct DefaultGenericPrivate2<T: PrivateClass> {} // expected-error {{generic struct must be declared private or fileprivate because its generic parameter uses a private type}}
-struct DefaultGenericPrivateReq<T> where T == PrivateClass {} // expected-error 2 {{same-type requirement makes generic parameter 'T' non-generic}}
+struct DefaultGenericPrivateReq<T> where T == PrivateClass {} // expected-error  {{same-type requirement makes generic parameter 'T' non-generic}}
 // expected-error@-1 {{generic struct must be declared private or fileprivate because its generic requirement uses a private type}}
 struct DefaultGenericPrivateReq2<T> where T: PrivateProto {} // expected-error {{generic struct must be declared private or fileprivate because its generic requirement uses a private type}}
 
