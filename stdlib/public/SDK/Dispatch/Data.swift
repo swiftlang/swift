@@ -45,8 +45,9 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter bytes: A pointer to the memory. It will be copied.
 	/// - parameter count: The number of bytes to copy.
 	public init(bytes buffer: UnsafeBufferPointer<UInt8>) {
-		__wrapped = _swift_dispatch_data_create(
-			buffer.baseAddress!, buffer.count, nil, _swift_dispatch_data_destructor_default()) as! __DispatchData
+		__wrapped = buffer.baseAddress == nil ? _swift_dispatch_data_empty()
+				: _swift_dispatch_data_create(buffer.baseAddress!, buffer.count, nil,
+					_swift_dispatch_data_destructor_default()) as! __DispatchData
 	}
 
 	/// Initialize a `Data` without copying the bytes.
@@ -56,9 +57,8 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter deallocator: Specifies the mechanism to free the indicated buffer.
 	public init(bytesNoCopy bytes: UnsafeBufferPointer<UInt8>, deallocator: Deallocator = .free) {
 		let (q, b) = deallocator._deallocator
-
-		__wrapped = _swift_dispatch_data_create(
-			bytes.baseAddress!, bytes.count, q, b) as! __DispatchData
+		__wrapped = bytes.baseAddress == nil ? _swift_dispatch_data_empty()
+				: _swift_dispatch_data_create(bytes.baseAddress!, bytes.count, q, b) as! __DispatchData
 	}
 
 	internal init(data: __DispatchData) {

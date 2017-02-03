@@ -6,6 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-
-// REQUIRES: deterministic-behavior
-Int)func b(UInt=1 + 1 + 1 + 1 as?Int){{{{{{{{{{{{{a{
+{{{{{{{func t(UInt=1 + 1 as?Int){{{{

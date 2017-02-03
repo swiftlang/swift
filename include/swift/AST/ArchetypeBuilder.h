@@ -570,7 +570,7 @@ public:
 
   /// \brief Retrieve the potential archetype to be used as the anchor for
   /// potential archetype computations.
-  PotentialArchetype *getArchetypeAnchor();
+  PotentialArchetype *getArchetypeAnchor(ArchetypeBuilder &builder);
 
   /// Add a same-type constraint between this archetype and the given
   /// other archetype.

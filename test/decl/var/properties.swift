@@ -120,20 +120,19 @@ var x15: Int {
 
 // Disambiguated as stored property with a trailing closure in the initializer.
 //
-// FIXME: QoI could be much better here.
-var disambiguateGetSet1a: Int = 0 {
-  get {} // expected-error {{use of unresolved identifier 'get'}}
+var disambiguateGetSet1a: Int = 0 { // expected-error {{variable with getter/setter cannot have an initial value}}
+  get {}
 }
-var disambiguateGetSet1b: Int = 0 {
-  get { // expected-error {{use of unresolved identifier 'get'}}
+var disambiguateGetSet1b: Int = 0 { // expected-error {{variable with getter/setter cannot have an initial value}}
+  get {
     return 42
   }
 }
-var disambiguateGetSet1c: Int = 0 {
-  set {} // expected-error {{use of unresolved identifier 'set'}}
+var disambiguateGetSet1c: Int = 0 { // expected-error {{variable with getter/setter cannot have an initial value}}
+  set {} // expected-error {{variable with a setter must also have a getter}}
 }
-var disambiguateGetSet1d: Int = 0 {
-  set(newValue) {} // expected-error {{use of unresolved identifier 'set'}} expected-error {{use of unresolved identifier 'newValue'}}
+var disambiguateGetSet1d: Int = 0 { // expected-error {{variable with getter/setter cannot have an initial value}}
+  set(newValue) {} // expected-error {{variable with a setter must also have a getter}}
 }
 
 // Disambiguated as stored property with a trailing closure in the initializer.
@@ -199,7 +198,7 @@ func disambiguateGetSet4Attr() {
 }
 
 // Disambiguated as stored property with a trailing closure in the initializer.
-var disambiguateImplicitGet1: Int = 0 { // expected-error {{cannot call value of non-function type 'Int'}}
+var disambiguateImplicitGet1: Int = 0 { // expected-error {{variable with getter/setter cannot have an initial value}}
   return 42
 }
 var disambiguateImplicitGet2: Int = takeIntTrailingClosure {

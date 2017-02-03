@@ -668,19 +668,9 @@ ParserResult<Expr> Parser::parseExprSelector() {
   }
 
   // If the subexpression was in error, just propagate the error.
-  if (subExpr.isParseError()) {
-    if (subExpr.hasCodeCompletion()) {
-      auto res = makeParserResult(
-                   new (Context) ObjCSelectorExpr(selectorKind, keywordLoc,
-                                                  lParenLoc, modifierLoc,
-                                                  subExpr.get(), rParenLoc));
-      res.setHasCodeCompletion();
-      return res;
-    } else {
-      return makeParserResult<Expr>(
-               new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
-    }
-  }
+  if (subExpr.isParseError())
+    return makeParserResult<Expr>(
+      new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
 
   return makeParserResult<Expr>(
     new (Context) ObjCSelectorExpr(selectorKind, keywordLoc, lParenLoc,
@@ -1591,8 +1581,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     if (Tok.is(tok::l_brace) && isValidTrailingClosure(isExprBasic, *this)) {
       // FIXME: if Result has a trailing closure, break out.
 
+      // Stop after literal expressions, which may never have trailing closures.
+      const auto *callee = Result.get();
+      if (isa<LiteralExpr>(callee) || isa<CollectionExpr>(callee) ||
+          isa<TupleExpr>(callee))
+        break;
+
       ParserResult<Expr> closure =
-        parseTrailingClosure(Result.get()->getSourceRange());
+        parseTrailingClosure(callee->getSourceRange());
       if (closure.isNull()) return nullptr;
 
       // Trailing closure implicitly forms a call.
@@ -3130,26 +3126,16 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
     if (Tok.is(tok::r_paren))
       rParenLoc = consumeToken();
     else
-      rParenLoc = Tok.getLoc();
+      rParenLoc = PreviousLoc;
   } else {
     parseMatchingToken(tok::r_paren, rParenLoc,
                        diag::expr_typeof_expected_rparen, lParenLoc);
   }
 
   // If the subexpression was in error, just propagate the error.
-  if (subExpr.isParseError()) {
-    if (subExpr.hasCodeCompletion()) {
-      auto res = makeParserResult(
-                   new (Context) DynamicTypeExpr(keywordLoc, lParenLoc,
-                                                 subExpr.get(), rParenLoc,
-                                                 Type()));
-      res.setHasCodeCompletion();
-      return res;
-    } else {
-      return makeParserResult<Expr>(
-               new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
-    }
-  }
+  if (subExpr.isParseError())
+    return makeParserResult<Expr>(
+      new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
 
   return makeParserResult(
            new (Context) DynamicTypeExpr(keywordLoc, lParenLoc,

@@ -68,6 +68,18 @@ Type DependentGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
   return decl->getDeclaredInterfaceType();
 }
 
+bool DependentGenericTypeResolver::areSameType(Type type1, Type type2) {
+  if (!type1->hasTypeParameter() && !type2->hasTypeParameter())
+    return type1->isEqual(type2);
+
+  auto pa1 = Builder.resolveArchetype(type1);
+  auto pa2 = Builder.resolveArchetype(type2);
+  if (pa1 && pa2)
+    return pa1->getArchetypeAnchor(Builder) == pa2->getArchetypeAnchor(Builder);
+
+  return type1->isEqual(type2);
+}
+
 void DependentGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
   // Do nothing
 }
@@ -108,6 +120,10 @@ Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
   return GenericEnvironment::mapTypeIntoContext(
       decl->getDeclContext()->getParentModule(), GenericEnv,
       decl->getDeclaredInterfaceType());
+}
+
+bool GenericTypeToArchetypeResolver::areSameType(Type type1, Type type2) {
+  return type1->isEqual(type2);
 }
 
 void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type) {
@@ -218,6 +234,18 @@ Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
 
 Type CompleteGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
   return decl->getDeclaredInterfaceType();
+}
+
+bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {
+  if (!type1->hasTypeParameter() && !type2->hasTypeParameter())
+    return type1->isEqual(type2);
+
+  auto pa1 = Builder.resolveArchetype(type1);
+  auto pa2 = Builder.resolveArchetype(type2);
+  if (pa1 && pa2)
+    return pa1->getArchetypeAnchor(Builder) == pa2->getArchetypeAnchor(Builder);
+
+  return type1->isEqual(type2);
 }
 
 void

@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
+// REQUIRES: rdar30317033
 
 import CoreGraphics
 import Foundation
