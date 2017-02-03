@@ -232,7 +232,7 @@ var closureWithObservedProperty: () -> () = {
 
 ;
 
-{}() // expected-error{{statement cannot begin with a closure expression}} expected-note{{explicitly discard the result of the closure by assigning to '_'}} {{1-1=_ = }}
+{}() // expected-error{{top-level statement cannot begin with a closure expression}}
 
 
 

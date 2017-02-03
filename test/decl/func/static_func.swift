@@ -13,8 +13,8 @@ static override func gf5() {} // expected-error {{static methods may only be dec
 class override func gf6() {} // expected-error {{class methods may only be declared on a type}}{{1-7=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{7-16=}}
 
-static gf7() {} // expected-error {{expected declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} {{14-14=_ = }} expected-error{{expression resolves to an unused function}}
-class gf8() {} // expected-error {{expected '{' in class}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} {{13-13=_ = }} expected-error{{expression resolves to an unused function}}
+static gf7() {} // expected-error {{expected declaration}} expected-error {{closure expression is unused}} expected-error{{begin with a closure}} expected-note{{did you mean to use a 'do' statement?}} {{14-14=do }}
+class gf8() {} // expected-error {{expected '{' in class}} expected-error {{closure expression is unused}} expected-error{{begin with a closure}} expected-note{{did you mean to use a 'do' statement?}} {{13-13=do }}
 
 func inGlobalFunc() {
   static func gf1() {} // expected-error {{static methods may only be declared on a type}}{{3-10=}}

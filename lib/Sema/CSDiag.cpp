@@ -5861,34 +5861,41 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (!isUnresolvedOrTypeVarType(fnType) &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
     
-    // If the argument is a trailing ClosureExpr (i.e. {....}) and it is on a
-    // different line than the callee, then the "real" issue is that the user
-    // forgot to write "do" before their brace stmt.
-    if (auto *PE = dyn_cast<ParenExpr>(callExpr->getArg()))
-      if (PE->hasTrailingClosure() && isa<ClosureExpr>(PE->getSubExpr())) {
-        auto &SM = CS->getASTContext().SourceMgr;
-        if (SM.getLineNumber(callExpr->getFn()->getEndLoc()) !=
-            SM.getLineNumber(PE->getStartLoc())) {
-          diagnose(PE->getStartLoc(), diag::expected_do_in_statement)
-            .fixItInsert(PE->getStartLoc(), "do ");
-          return true;
+    auto arg = callExpr->getArg();
+
+    {
+      auto diag = diagnose(arg->getStartLoc(),
+                           diag::cannot_call_non_function_value,
+                           fnExpr->getType());
+      diag.highlight(fnExpr->getSourceRange());
+
+      // If the argument is an empty tuple, then offer a
+      // fix-it to remove the empty tuple and use the value
+      // directly.
+      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+        if (tuple->getNumElements() == 0) {
+          diag.fixItRemove(arg->getSourceRange());
         }
       }
-    
-    auto arg = callExpr->getArg();
-    auto diag = diagnose(arg->getStartLoc(),
-                         diag::cannot_call_non_function_value,
-                         fnExpr->getType());
-    diag.highlight(fnExpr->getSourceRange());
-    
-    // If the argument is an empty tuple, then offer a
-    // fix-it to remove the empty tuple and use the value
-    // directly.
-    if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-      if (tuple->getNumElements() == 0) {
-        diag.fixItRemove(arg->getSourceRange());
-      }
     }
+
+    // If the argument is a trailing ClosureExpr (i.e. {....}) and it is on
+    // the line after the callee, then it's likely the user forgot to
+    // write "do" before their brace stmt.
+    // Note that line differences of more than 1 are diagnosed during parsing.
+    if (auto *PE = dyn_cast<ParenExpr>(arg))
+      if (PE->hasTrailingClosure() && isa<ClosureExpr>(PE->getSubExpr())) {
+        auto *closure = cast<ClosureExpr>(PE->getSubExpr());
+        auto &SM = CS->getASTContext().SourceMgr;
+        if (closure->hasAnonymousClosureVars() &&
+            closure->getParameters()->size() == 0 &&
+            1 + SM.getLineNumber(callExpr->getFn()->getEndLoc()) ==
+            SM.getLineNumber(closure->getStartLoc())) {
+          diagnose(closure->getStartLoc(), diag::brace_stmt_suggest_do)
+            .fixItInsert(closure->getStartLoc(), "do ");
+        }
+      }
+
     return true;
   }
   
