@@ -36,13 +36,9 @@ func rdar29691909(o: AnyObject) -> Any? {
   return rdar29691909_callee(o) // expected-error{{ambiguous use of 'rdar29691909_callee'}}
 }
 
-// FIXME: The fix for this broke other things. We want to get this
-// test case running again, though.
-// Ensure that we decay Any! to Any? rather than allowing Any!-to-Any
-// conversion directly and ending up with an ambiguity here.
-//func rdar29907555(_ value: Any!) -> String {
-//  return "\(value)" // no error
-//}
+func rdar29907555(_ value: Any!) -> String {
+  return "\(value)" // no error
+}
 
 struct SR3715 {
   var overloaded: Int!

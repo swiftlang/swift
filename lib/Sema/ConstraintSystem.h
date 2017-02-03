@@ -407,8 +407,10 @@ enum ScoreKind {
   SK_ScalarPointerConversion,
   /// A conversion from an array to a pointer of matching element type.
   SK_ArrayPointerConversion,
+  /// A conversion to an empty existential type ('Any' or '{}').
+  SK_EmptyExistentialConversion,
   
-  SK_LastScoreKind = SK_ArrayPointerConversion,
+  SK_LastScoreKind = SK_EmptyExistentialConversion,
 };
 
 /// The number of score kinds.
