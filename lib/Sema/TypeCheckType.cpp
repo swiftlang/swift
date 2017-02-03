@@ -1095,7 +1095,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     }
 
     // Otherwise, check for an ambiguity.
-    if (!current->isEqual(type)) {
+    if (!resolver->areSameType(current, type)) {
       isAmbiguous = true;
       break;
     }
