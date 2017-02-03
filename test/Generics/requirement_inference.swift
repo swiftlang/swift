@@ -119,8 +119,8 @@ func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) { }
 
 // CHECK-LABEL: .inferSameType2@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : P3 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:25]
-// CHECK-NEXT:   U : P4 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:33]
+// CHECK-NEXT:   T : P3 [inferred]
+// CHECK-NEXT:   U : P4 [inferred]
 // CHECK-NEXT:   T[.P3].P3Assoc : P1 [redundant @ {{.*}}requirement_inference.swift:{{.*}}:18]
 // CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}requirement_inference.swift:{{.*}}:18]
 // CHECK-NEXT:   T[.P3].P3Assoc == U[.P4].P4Assoc [explicit]
@@ -128,10 +128,10 @@ func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc 
 
 // CHECK-LABEL: .inferSameType3@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : PCommonAssoc1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:25]
-// CHECK-NEXT:   T : PCommonAssoc2 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:76]
+// CHECK-NEXT:   T : PCommonAssoc1 [inferred]
+// CHECK-NEXT:   T : PCommonAssoc2 [inferred]
 // CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc : P1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:68]
-// CHECK-NEXT: Generic signature
+// CHECK-NEXT: Potential archetypes
 func inferSameType3<T : PCommonAssoc1>(_: T) where T.CommonAssoc : P1, T : PCommonAssoc2 {}
 
 protocol P5 {

@@ -87,6 +87,10 @@ public:
   /// \returns the type of the declaration in context..
   virtual Type resolveTypeOfDecl(TypeDecl *decl) = 0;
 
+  /// Determine whether the given types are equivalent within the generic
+  /// context.
+  virtual bool areSameType(Type type1, Type type2) = 0;
+
   /// Set the contextual type or the interface type of the parameter.
   virtual void recordParamType(ParamDecl *decl, Type ty) = 0;
 };
@@ -115,6 +119,8 @@ public:
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual bool areSameType(Type type1, Type type2);
 
   virtual void recordParamType(ParamDecl *decl, Type ty);
 };
@@ -148,6 +154,8 @@ public:
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
 
+  virtual bool areSameType(Type type1, Type type2);
+
   virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
@@ -179,6 +187,8 @@ public:
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual bool areSameType(Type type1, Type type2);
 
   virtual void recordParamType(ParamDecl *decl, Type ty);
 };
