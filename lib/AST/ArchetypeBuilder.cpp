@@ -479,8 +479,31 @@ static bool isBetterArchetypeAnchor(
   return compareDependentTypes(&mutablePA, &mutablePB) < 0;
 }
 
-auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
+/// Rebuild the given potential archetype based on anchors.
+static ArchetypeBuilder::PotentialArchetype*rebuildPotentialArchetypeAnchor(
+                                    ArchetypeBuilder::PotentialArchetype *pa,
+                                    ArchetypeBuilder &builder) {
+  if (auto parent = pa->getParent()) {
+    auto parentAnchor =
+      rebuildPotentialArchetypeAnchor(parent->getArchetypeAnchor(builder),
+                                      builder);
+    if (parent == parentAnchor) return pa;
+
+    if (auto assocType = pa->getResolvedAssociatedType())
+      return parentAnchor->getNestedType(assocType, builder);
+
+    return parentAnchor->getNestedType(pa->getName(), builder);
+  }
+
+  return pa;
+}
+
+auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor(
+                                                      ArchetypeBuilder &builder)
        -> PotentialArchetype * {
+  // Rebuild the potential archetype anchor for this type, so the equivalence
+  // class will contain the anchor.
+  (void)rebuildPotentialArchetypeAnchor(this, builder);
 
   // Find the best archetype within this equivalence class.
   PotentialArchetype *rep = getRepresentative();
@@ -523,7 +546,9 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   // Attempt to resolve this nested type to an associated type
   // of one of the protocols to which the parent potential
   // archetype conforms.
-  for (auto &conforms : getRepresentative()->ConformsTo) {
+  SmallVector<std::pair<ProtocolDecl *, RequirementSource>, 4>
+    conformsTo(rep->ConformsTo.begin(), rep->ConformsTo.end());
+  for (auto &conforms : conformsTo) {
     for (auto member : conforms.first->lookupDirect(nestedName)) {
       PotentialArchetype *pa;
       
@@ -606,7 +631,25 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
 auto ArchetypeBuilder::PotentialArchetype::getNestedType(
                             AssociatedTypeDecl *assocType,
                             ArchetypeBuilder &builder) -> PotentialArchetype * {
-  return getNestedType(assocType->getName(), builder);
+  // Add the requirement that this type conform to the protocol of the
+  // associated type. We treat this as "inferred" because it comes from the
+  // structure of the type---there will be an explicit or implied requirement
+  // somewhere else.
+  bool failed = builder.addConformanceRequirement(
+                  this, assocType->getProtocol(),
+                  RequirementSource(RequirementSource::Inferred, SourceLoc()));
+  (void)failed;
+
+  // Trigger the construction of nested types with this name.
+  auto fallback = getNestedType(assocType->getName(), builder);
+
+  // Find the nested type that resolved to this associated type.
+  for (const auto &nested : NestedTypes[assocType->getName()]) {
+    if (nested->getResolvedAssociatedType() == assocType) return nested;
+  }
+
+  assert(failed && "unable to find nested type that we know is there");
+  return fallback;
 }
 
 Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
@@ -618,7 +661,7 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
   // Retrieve the archetype from the archetype anchor in this equivalence class.
   // The anchor must not have any concrete parents (otherwise we would just
   // use the representative).
-  auto archetypeAnchor = getArchetypeAnchor();
+  auto archetypeAnchor = getArchetypeAnchor(builder);
   if (archetypeAnchor != this)
     return archetypeAnchor->getTypeInContext(builder, genericEnv);
 
@@ -2128,7 +2171,14 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
                            PotentialArchetype *archetype,
                            ArchetypeBuilder::RequirementRHS constraint,
                            RequirementSource source)> f) {
-  // First, collect all archetypes, and sort them.
+   // Create anchors for all of the potential archetypes.
+   // FIXME: This is because we might be missing some from the equivalence
+   // classes.
+   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
+     archetype->getArchetypeAnchor(*this);
+   });
+
+  // Collect all archetypes, and sort them.
   SmallVector<PotentialArchetype *, 8> archetypes;
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
     archetypes.push_back(archetype);
@@ -2198,7 +2248,7 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     };
 
     // If this is not the archetype anchor, we're done.
-    if (archetype != archetype->getArchetypeAnchor())
+    if (archetype != archetype->getArchetypeAnchor(*this))
       continue;
 
     // If we have a superclass, produce a superclass requirement
@@ -2277,6 +2327,12 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
       break;
     }
   });
+  out << "\n";
+
+  out << "Potential archetypes:\n";
+  for (auto pa : Impl->PotentialArchetypes) {
+    pa->dump(out, &Context.SourceMgr, 2);
+  }
   out << "\n";
 }
 

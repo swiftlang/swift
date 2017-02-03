@@ -37,10 +37,10 @@ func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 
 // CHECK-GENERIC-LABEL: .typoAssoc4@
 // CHECK-GENERIC-NEXT: Requirements:
-// CHECK-GENERIC-NEXT:   T : P2 [explicit
+// CHECK-GENERIC-NEXT:   T : P2 [inferred]
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2 : P1 [protocol
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc : P3 [explicit
-// CHECK-GENERIC-NEXT: Generic signature
+// CHECK-GENERIC-NEXT: Potential archetypes
 
 // <rdar://problem/19620340>
 
@@ -67,11 +67,9 @@ public protocol Indexable : _Indexable1 {
 
 protocol Pattern {
   associatedtype Element : Equatable
-  
-  // FIXME: Diagnostics here are very poor
-  // expected-error@+3{{'C' does not have a member type named 'Iterator'; did you mean 'Slice'?}}
-  // expected-error@+2{{'C.Slice' does not have a member type named 'Element'; did you mean 'Slice'?}}
-  // expected-error@+1{{'C.Slice' does not have a member type named 'Iterator'; did you mean 'Slice'?}}
+
+  // FIXME: This works for all of the wrong reasons, but it is correct that
+  // it works.
   func matched<C: Indexable>(atStartOf c: C)
   where Element_<C> == Element
   , Element_<C.Slice> == Element
