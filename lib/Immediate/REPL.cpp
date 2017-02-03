@@ -1045,7 +1045,7 @@ public:
                    L.peekNextToken().getText() == "exit") {
           return false;
         } else if (L.peekNextToken().getText() == "dump_ir") {
-          DumpModule.dump();
+          DumpModule.print(llvm::dbgs(), nullptr, false, true);
         } else if (L.peekNextToken().getText() == "dump_ast") {
           REPLInputFile.dump();
         } else if (L.peekNextToken().getText() == "dump_decl" ||
