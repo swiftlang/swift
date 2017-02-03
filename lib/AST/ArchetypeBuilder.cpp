@@ -1935,7 +1935,14 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
 #ifndef NDEBUG
   Impl->finalized = true;
 #endif
-  
+
+  // Create anchors for all of the potential archetypes.
+  // FIXME: This is because we might be missing some from the equivalence
+  // classes. It is an egregious hack.
+  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
+    (void)archetype->getArchetypeAnchor(*this);
+  });
+
   SmallPtrSet<PotentialArchetype *, 4> visited;
 
   // Check for generic parameters which have been made concrete or equated
@@ -2187,13 +2194,6 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
                            PotentialArchetype *archetype,
                            ArchetypeBuilder::RequirementRHS constraint,
                            RequirementSource source)> f) {
-   // Create anchors for all of the potential archetypes.
-   // FIXME: This is because we might be missing some from the equivalence
-   // classes. It is an egregious hack.
-   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
-     (void)archetype->getArchetypeAnchor(*this);
-   });
-
   // Collect all archetypes.
   SmallVector<PotentialArchetype *, 8> archetypes;
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
