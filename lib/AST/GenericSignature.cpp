@@ -520,21 +520,6 @@ LayoutConstraint GenericSignature::getLayoutConstraint(Type type,
   return pa->getLayout();
 }
 
-Type GenericSignature::getRepresentative(Type type, ModuleDecl &mod) {
-  assert(type->isTypeParameter());
-  auto &builder = *getArchetypeBuilder(mod);
-  auto pa = builder.resolveArchetype(type);
-  assert(pa && "not a valid dependent type of this signature?");
-  auto rep = pa->getRepresentative();
-  if (rep->isConcreteType()) return rep->getConcreteType();
-  if (pa == rep) {
-    assert(rep->getDependentType(getGenericParams(), /*allowUnresolved*/ false)
-              ->isEqual(type));
-    return type;
-  }
-  return rep->getDependentType(getGenericParams(), /*allowUnresolved*/ false);
-}
-
 bool GenericSignature::areSameTypeParameterInContext(Type type1, Type type2,
                                                      ModuleDecl &mod) {
   assert(type1->isTypeParameter());

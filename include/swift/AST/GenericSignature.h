@@ -217,11 +217,6 @@ public:
   /// constraint.
   LayoutConstraint getLayoutConstraint(Type type, ModuleDecl &mod);
 
-  /// Return the preferred representative of the given type parameter within
-  /// this generic signature.  This may yield a concrete type or a
-  /// different type parameter.
-  Type getRepresentative(Type type, ModuleDecl &mod);
-
   /// Return whether two type parameters represent the same type under this
   /// generic signature.
   ///
