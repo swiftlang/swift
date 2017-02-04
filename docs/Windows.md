@@ -136,6 +136,13 @@ popd
 cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
 ```
 
+- To create a VisualStudio project, you'll need to change the generator and, if you have a 64 bit processor, specify the generator platform. Note that you may get multiple build errors compiling the `swift` project due to an MSBuild limitation that file paths cannot exceed 260 characters. These can be ignored, as they occur after the build, writing the last build status to a file.
+```
+cmake -G "Visual Studio 14" "%swift_source_dir%/swift"^
+ -DCMAKE_GENERATOR_PLATFORM="x64"^
+ ...
+```
+
 ## Clang-cl
 
 Follow the instructions for MSVC, but add the following lines to each CMake configuration command. We need to use LLVM's `lld-link.exe` linker, as MSVC's `link.exe` crashes due to corrupt PDB files using `clang-cl`. `Clang-cl` 3.9.0 has been tested.
@@ -145,7 +152,6 @@ Follow the instructions for MSVC, but add the following lines to each CMake conf
  -DCMAKE_CXX_COMPILER="<path-to-llvm-bin>/bin/clang-cl.exe"^
  -DCMAKE_LINKER="<path-to-llvm-bin>/lld-link.exe"^
 ```
-
 
 ## Windows Subsystem for Linux (WSL)
 - Note that all compiled Swift binaries are only executable within Bash on Windows and are Ubuntu, not Windows, executables.
