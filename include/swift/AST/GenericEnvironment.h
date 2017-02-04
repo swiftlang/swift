@@ -241,6 +241,13 @@ public:
                      ArrayRef<Substitution> subs,
                      SubstitutionMap &subMap) const;
 
+  /// Build a contextual type substitution map from a type substitution function
+  /// and conformance lookup function.
+  SubstitutionMap
+  getSubstitutionMap(ModuleDecl *mod,
+                     TypeSubstitutionFn subs,
+                     LookupConformanceFn lookupConformance) const;
+
   ArrayRef<Substitution> getForwardingSubstitutions() const;
 
   void dump() const;
