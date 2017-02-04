@@ -208,7 +208,7 @@ namespace {
       }
 
       auto subs =
-        type->gatherAllSubstitutions(IGF.IGM.getSwiftModule(), nullptr);
+        type->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), decl);
       requirements.enumerateFulfillments(IGF.IGM, subs,
                                 [&](unsigned reqtIndex, CanType type,
                                     Optional<ProtocolConformanceRef> conf) {

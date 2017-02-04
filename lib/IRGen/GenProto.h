@@ -136,7 +136,7 @@ namespace irgen {
   void emitPolymorphicArguments(IRGenFunction &IGF,
                                 CanSILFunctionType origType,
                                 CanSILFunctionType substType,
-                                ArrayRef<Substitution> subs,
+                                const SubstitutionMap &subs,
                                 WitnessMetadata *witnessMetadata,
                                 Explosion &args);
 

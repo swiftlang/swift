@@ -1592,13 +1592,15 @@ namespace {
                                                 /*Implicit=*/true);
       fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-      TypeSubstitutionMap subMap;
+      SubstitutionMap subMap;
       auto genericParam = fnGenericParams[0];
-      subMap[genericParam->getCanonicalType()->castTo<SubstitutableType>()]
-        = valueType;
-      cs.setType(fnRef, fn->getInterfaceType().subst(dc->getParentModule(),
-                                                     subMap,
-                                                     None));
+      auto selfTy = cast<SubstitutableType>(genericParam->getCanonicalType());
+      
+      subMap.addSubstitution(selfTy, valueType);
+      for (auto conformance : Conformances)
+        subMap.addConformance(selfTy, conformance);
+
+      cs.setType(fnRef, fn->getInterfaceType().subst(subMap));
 
       // Form the arguments.
       Expr *args[2] = {

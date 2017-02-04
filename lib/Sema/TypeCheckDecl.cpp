@@ -6867,7 +6867,7 @@ static bool checkEnumDeclCircularity(EnumDecl *E, NominalDeclSet &known,
       continue;
 
     auto eltType = baseType->getTypeOfMember(E->getModuleContext(), elt,
-      nullptr, elt->getArgumentInterfaceType());
+      elt->getArgumentInterfaceType());
 
     if (deconstructTypeForDeclCircularity(eltType, known))
       return true;

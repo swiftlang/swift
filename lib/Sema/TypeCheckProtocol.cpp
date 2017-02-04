@@ -3211,7 +3211,9 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   }
 
   ModuleDecl *module = conformance->getDeclContext()->getParentModule();
-  auto resultType = type.subst(module, substitutions, SubstFlags::UseErrorType);
+  auto resultType = type.subst(QueryTypeSubstitutionMap{substitutions},
+                               LookUpConformanceInModule(module),
+                               SubstFlags::UseErrorType);
   if (!resultType->hasError()) return resultType;
 
   // Map error types with original types *back* to the original, dependent type.
@@ -3664,8 +3666,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
     TC.validateDecl(assocType);
     Type defaultType = assocType->getDefaultDefinitionLoc().getType().subst(
-                         DC->getParentModule(),
-                         substitutions);
+        QueryTypeSubstitutionMap{substitutions},
+        LookUpConformanceInModule(DC->getParentModule()));
+
     if (!defaultType)
       return Type();
 

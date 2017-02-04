@@ -394,15 +394,14 @@ Type TypeChecker::resolveTypeInContext(
 
   bool hasDependentType = typeDecl->getDeclaredInterfaceType()
       ->hasTypeParameter();
+  // If we found a generic parameter, map to the archetype if there is one.
+  if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
+    return resolver->resolveGenericTypeParamType(
+        genericParam->getDeclaredInterfaceType()
+            ->castTo<GenericTypeParamType>());
+  }
 
   if (!foundNominal || !hasDependentType) {
-    // If we found a generic parameter, map to the archetype if there is one.
-    if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
-      return resolver->resolveGenericTypeParamType(
-          genericParam->getDeclaredInterfaceType()
-              ->castTo<GenericTypeParamType>());
-    }
-
     // If this is a typealias not in type context, we still need the
     // interface type; the typealias might be in a function context, and
     // its underlying type might reference outer generic parameters.
@@ -645,7 +644,9 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     // Apply substitutions to the interface type of the typealias.
     type = TAD->getDeclaredInterfaceType();
-    return type.subst(dc->getParentModule(), subs, SubstFlags::UseErrorType);
+    return type.subst(QueryTypeSubstitutionMap{subs},
+                      LookUpConformanceInModule(dc->getParentModule()),
+                      SubstFlags::UseErrorType);
   }
   
   // Form the bound generic type.
@@ -2951,8 +2952,9 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   if (!parentTy)
     return memberType;
 
-  auto subs = parentTy->getContextSubstitutions(member->getDeclContext());
-  return memberType.subst(module, subs, SubstFlags::UseErrorType);
+  auto subs = parentTy->getContextSubstitutionMap(
+      module, member->getDeclContext());
+  return memberType.subst(subs, SubstFlags::UseErrorType);
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {

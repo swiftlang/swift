@@ -141,6 +141,12 @@ public:
   void getSubstitutionMap(ArrayRef<Substitution> args,
                           SubstitutionMap &subMap) const;
 
+  /// Build an interface type substitution map from a type substitution function
+  /// and conformance lookup function.
+  SubstitutionMap
+  getSubstitutionMap(TypeSubstitutionFn subs,
+                     LookupConformanceFn lookupConformance) const;
+
   using GenericFunction = auto(CanType canType, Type conformingReplacementType,
     ProtocolType *conformedProtocol)
     ->Optional<ProtocolConformanceRef>;
