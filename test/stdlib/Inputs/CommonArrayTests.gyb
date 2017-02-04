@@ -1,0 +1,408 @@
+% # This template was extracted from the Arrays.swift.gyb in order to split
+% # that file into multiple to parallelize test execution.
+%
+% # Template caller should define the following context:
+% #   - Suite -- an identifier for the test suite to append tests to.
+% #   - ArrayType -- the type being tested.
+
+
+extension ${ArrayType} {
+  typealias _BufferID = UnsafeRawPointer?
+  var _bufferID: _BufferID {
+    return unsafeBitCast(_owner, to: _BufferID.self)
+  }
+}
+
+protocol TestProtocol1 {}
+
+extension ${ArrayType} where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+/// Returns an ${ArrayType} that does not share its buffer with other arrays.
+func getFresh${ArrayType}<S : Sequence>(_ sequence: S)
+  -> ${ArrayType}<S.Iterator.Element> {
+  var result: ${ArrayType}<S.Iterator.Element> = []
+  result.reserveCapacity(sequence.underestimatedCount)
+  for element in sequence {
+    result.append(element)
+  }
+  return result
+}
+
+struct SequenceWithCustomUnderestimatedCount : Sequence {
+  init(_ data: [Int]) {
+    self._data = MinimalSequence(elements: data.map(OpaqueValue.init))
+  }
+
+  func makeIterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
+    return _data.makeIterator()
+  }
+
+  var underestimatedCount: Int {
+    SequenceWithCustomUnderestimatedCount.timesUnderestimatedCountWasCalled += 1
+    return _data.underestimatedCount
+  }
+
+  static var timesUnderestimatedCountWasCalled: Int = 0
+
+  let _data: MinimalSequence<OpaqueValue<Int>>
+}
+
+${Suite}.test("${ArrayType}/init(Sequence)") {
+  let base = SequenceWithCustomUnderestimatedCount(
+    [ 0, 30, 10, 90 ])
+
+  SequenceWithCustomUnderestimatedCount.timesUnderestimatedCountWasCalled = 0
+
+  let result = ${ArrayType}(base)
+
+  expectEqual([ 0, 30, 10, 90 ], result.map { $0.value })
+
+  expectEqual(1, SequenceWithCustomUnderestimatedCount.timesUnderestimatedCountWasCalled)
+
+  expectEqualSequence(
+    [], Array(base).map { $0.value }, "sequence should be consumed")
+}
+
+enum EnumWithoutPayloads : Equatable {
+  case A, B, C, D
+}
+
+func == (lhs: EnumWithoutPayloads, rhs: EnumWithoutPayloads) -> Bool {
+  switch (lhs, rhs) {
+  case (.A, .A), (.B, .B), (.C, .C), (.D, .D):
+    return true
+
+  default:
+    return false
+  }
+}
+
+${Suite}.test("${ArrayType}/Sliceable/Enums") {
+  typealias E = EnumWithoutPayloads
+
+  do {
+    let expected = [E.A, E.B, E.C, E.D]
+    let sliceable = ${ArrayType}(expected)
+    checkSliceableWithBidirectionalIndex(expected, sliceable)
+  }
+
+  /*
+  FIXME: add this test when Array<T> can be conditionally Equatable.
+  do {
+    let expected = [[E.A, E.B], [E.B, E.C], [E.D], [E.A, E.B, E.D]]
+    let sliceable = ${ArrayType}(expected)
+    checkSliceableWithBidirectionalIndex(
+      expected, sliceable, SourceLocStack().withCurrentLoc())
+  }
+  */
+}
+
+${Suite}.test("${ArrayType}/appendNonUnique") {
+  var x: ${ArrayType}<Int> = []
+  x.reserveCapacity(10002)
+  let capacity = x.capacity
+  for _ in 1...10000 {
+    let y = x
+    x.append(1)
+    expectTrue(x.capacity == capacity)
+    let z = x
+    x.remove(at: 0)
+  }
+}
+
+${Suite}.test("${ArrayType}/appendUndercountedCollection") {
+  // test that the array safely handles a
+  // collection that understates its count
+  var i = 0
+  let l = repeatElement(42, count: 10_000).lazy
+         // capture i by reference and change behavior
+         // between first pass (for count) and second
+         .filter { _ in i += 1; return i > 10_000 }
+  var a: ${ArrayType}<Int> = []
+  a.append(contentsOf: l)
+}
+
+${Suite}.test("${ArrayType}/emptyAllocation") {
+  let arr0 = ${ArrayType}<Int>()
+  let arr1 = ${ArrayType}<LifetimeTracked>(repeating: LifetimeTracked(0), count: 0)
+  // Empty arrays all use the same buffer
+  expectEqual(arr0._bufferID, arr1._bufferID)
+
+  let arr2: ${ArrayType}<LifetimeTracked> = []
+  let emptyLiteralsShareBuffer = arr0._bufferID == arr2._bufferID
+  expectTrue(emptyLiteralsShareBuffer)
+}
+
+${Suite}.test("${ArrayType}/filter") {
+  do {
+    let arr: ${ArrayType}<Int> = []
+    var result = arr.filter() {
+      (x: Int) -> Bool in
+      expectUnreachable()
+      return true
+    }
+    expectType(Array<Int>.self, &result)
+    expectEqual([], result)
+    expectEqual(0, result.capacity)
+  }
+  do {
+    let arr: ${ArrayType}<Int> = [ 0, 30, 10, 90 ]
+    let result = arr.filter() { (x: Int) -> Bool in true }
+    expectEqual([ 0, 30, 10, 90 ], result)
+    expectGE(2 * result.count, result.capacity)
+  }
+  do {
+    let arr: ${ArrayType}<Int> = [ 0, 30, 10, 90 ]
+    let result = arr.filter() { (x: Int) -> Bool in false }
+    expectEqual([], result)
+    expectGE(2 * result.count, result.capacity)
+  }
+  do {
+    let arr: ${ArrayType}<Int> = [ 0, 30, 10, 90 ]
+    let result = arr.filter() { $0 % 3 == 0 }
+    expectEqual([ 0, 30, 90 ], result)
+    expectGE(2 * result.count, result.capacity)
+  }
+}
+
+${Suite}.test("${ArrayType}/map") {
+  do {
+    let arr: ${ArrayType}<Int> = []
+    var result = arr.map() {
+      (x: Int) -> Int16 in
+      expectUnreachable()
+      return 42
+    }
+    expectType(Array<Int16>.self, &result)
+    expectEqual([], result)
+    expectEqual(0, result.capacity)
+  }
+  do {
+    let arr: ${ArrayType}<Int> = [ 0, 30, 10, 90 ]
+    let result = arr.map() { $0 + 1 }
+    expectEqual([ 1, 31, 11, 91 ], result)
+    expectGE(2 * result.count, result.capacity)
+  }
+}
+
+${Suite}.test("${ArrayType}/flatMap") {
+  let enumerate : (Int) -> ${ArrayType}<Int> =
+    { return ${ArrayType}(1..<($0 + 1)) }
+  expectEqualSequence([], ${ArrayType}().flatMap(enumerate))
+  expectEqualSequence([ 1 ], ${ArrayType}([ 1 ]).flatMap(enumerate))
+  expectEqualSequence(
+    [ 1, 1, 2 ],
+    ${ArrayType}([ 1, 2 ]).flatMap(enumerate))
+  expectEqualSequence(
+    [ 1, 1, 1, 2 ],
+    ${ArrayType}([ 1, 2 ]).flatMap(enumerate).flatMap(enumerate))
+}
+
+${Suite}.test("${ArrayType}/Mirror") {
+  do {
+    let input: ${ArrayType}<Int> = []
+    var output = ""
+    dump(input, to: &output)
+
+    let expected =
+      "- 0 elements\n"
+
+    expectEqual(expected, output)
+  }
+  do {
+    let input: ${ArrayType}<Int> = [ 10, 20, 30, 40 ]
+    var output = ""
+    dump(input, to: &output)
+
+    let expected =
+      "▿ 4 elements\n" +
+      "  - 10\n" +
+      "  - 20\n" +
+      "  - 30\n" +
+      "  - 40\n"
+
+    expectEqual(expected, output)
+  }
+%   if ArrayType == 'ArraySlice':
+  do {
+    let base = [ 10, 20, 30, 40 ]
+    let input: ArraySlice<Int> = base[1..<3]
+    var output = ""
+    dump(input, to: &output)
+
+    let expected =
+      "▿ 2 elements\n" +
+      "  - 20\n" +
+      "  - 30\n"
+
+    expectEqual(expected, output)
+  }
+%   end
+}
+
+//===----------------------------------------------------------------------===//
+// _withUnsafeMutableBufferPointerIfSupported()
+//===----------------------------------------------------------------------===//
+
+struct WithUnsafeMutableBufferPointerIfSupportedTest {
+  let sequence: [Int]
+  let loc: SourceLoc
+
+  init(
+    _ sequence: [Int],
+    file: String = #file, line: UInt = #line
+  ) {
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let withUnsafeMutableBufferPointerIfSupportedTests = [
+  WithUnsafeMutableBufferPointerIfSupportedTest([]),
+  WithUnsafeMutableBufferPointerIfSupportedTest([ 10 ]),
+  WithUnsafeMutableBufferPointerIfSupportedTest([ 10, 20, 30, 40, 50 ]),
+]
+
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported") {
+  for test in withUnsafeMutableBufferPointerIfSupportedTests {
+    var a = getFresh${ArrayType}(test.sequence.map(OpaqueValue.init))
+    do {
+      // Read.
+      var result = a._withUnsafeMutableBufferPointerIfSupported {
+        (baseAddress, count) -> OpaqueValue<[OpaqueValue<Int>]> in
+        let bufferPointer =
+          UnsafeMutableBufferPointer(start: baseAddress, count: count)
+        return OpaqueValue(Array(bufferPointer))
+      }
+      expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
+      expectEqualSequence(test.sequence, result!.value.map { $0.value })
+      expectEqualSequence(test.sequence, a.map { $0.value })
+    }
+    do {
+      // Read and write.
+      var result = a._withUnsafeMutableBufferPointerIfSupported {
+        (baseAddress, count) -> OpaqueValue<Array<OpaqueValue<Int>>> in
+        let bufferPointer =
+          UnsafeMutableBufferPointer(start: baseAddress, count: count)
+        let result = OpaqueValue(Array(bufferPointer))
+        for i in bufferPointer.indices {
+          bufferPointer[i] = OpaqueValue(bufferPointer[i].value * 10)
+        }
+        return result
+      }
+      expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
+      expectEqualSequence(test.sequence, result!.value.map { $0.value })
+      expectEqualSequence(
+        test.sequence.map { $0 * 10 },
+        a.map { $0.value })
+    }
+  }
+  // FIXME: tests for arrays bridged from Objective-C.
+}
+
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1") {
+  var a = getFresh${ArrayType}([ OpaqueValue(10) ])
+  var result = a._withUnsafeMutableBufferPointerIfSupported {
+    (baseAddress, count) -> OpaqueValue<Int> in
+    // buffer = UnsafeMutableBufferPointer(start: buffer.baseAddress, count: 0)
+    // FIXME: does not trap since the buffer is not passed inout.
+    // expectCrashLater()
+    return OpaqueValue(42)
+  }
+}
+
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/2") {
+  var a = getFresh${ArrayType}([ OpaqueValue(10) ])
+  var result = a._withUnsafeMutableBufferPointerIfSupported {
+    (baseAddress, count) -> OpaqueValue<Int> in
+    // buffer = UnsafeMutableBufferPointer(start: nil, count: 1)
+    // FIXME: does not trap since the buffer is not passed inout.
+    // expectCrashLater()
+    return OpaqueValue(42)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// withUnsafeMutableBytes
+//===----------------------------------------------------------------------===//
+
+// Test the uniqueness of the raw buffer.
+${Suite}.test("${ArrayType}/withUnsafeMutableBytes") {
+  var a = getFresh${ArrayType}([UInt8](repeating: 10, count: 1))
+  let b = a
+  a.withUnsafeMutableBytes { bytes in
+    bytes[0] = 42
+  }
+  expectEqual(42, a[0])
+  expectEqual(10, b[0])
+}
+
+//===---
+// Check that iterators traverse a snapshot of the collection.
+//===---
+
+${Suite}.test(
+  "${ArrayType}/mutationDoesNotAffectIterator/subscript/store") {
+  var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
+  var iter = arr.makeIterator()
+  arr[0] = 1011
+  expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
+}
+
+${Suite}.test(
+  "${ArrayType}/mutationDoesNotAffectIterator/subscript/append") {
+  var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
+  var iter = arr.makeIterator()
+  arr.append(1040)
+  expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
+}
+
+${Suite}.test(
+  "${ArrayType}/mutationDoesNotAffectIterator/subscript/replaceSubrange") {
+  var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
+  var iter = arr.makeIterator()
+  arr.replaceSubrange(1..<3, with: [ 1040, 1050, 1060 ])
+  expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
+}
+
+//===----------------------------------------------------------------------===//
+// Special cases and one-off tests.
+//===----------------------------------------------------------------------===//
+
+${Suite}.test("${ArrayType}<Void>/map") {
+  // This code used to crash because it generated an array of Void with
+  // stride == 0.
+  do {
+    let input: ${ArrayType}<Void> = [ (), (), () ]
+    let result = input.map { (_) -> Void in return () }
+    expectEqual(3, result.count)
+  }
+
+  do {
+    let input: ${ArrayType}<OpaqueValue<Int>> = [
+      OpaqueValue(10), OpaqueValue(20), OpaqueValue(30)
+    ]
+    let result = input.map { (_) -> Void in return () }
+    expectEqual(3, result.count)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MutableCollectionType and RangeReplaceableCollectionType conformance tests.
+//===----------------------------------------------------------------------===//
+
+${Suite}.test("${ArrayType}/AssociatedTypes") {
+  typealias Collection = ${ArrayType}<OpaqueValue<Int>>
+  typealias CollectionSlice = ArraySlice<OpaqueValue<Int>>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: IndexingIterator<Collection>.self,
+    subSequenceType: CollectionSlice.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
