@@ -2909,9 +2909,8 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   LazyResolver *resolver = substBase->getASTContext().getLazyResolver();
   if (assocType) {
     auto proto = assocType->getProtocol();
-    // FIXME: Introduce substituted type node here?
     Optional<ProtocolConformanceRef> conformance
-      = lookupConformances(origBase ? origBase->getCanonicalType() : CanType(),
+      = lookupConformances(origBase->getCanonicalType(),
                            substBase,
                            proto->getDeclaredType());
 
@@ -2950,6 +2949,9 @@ Optional<ProtocolConformanceRef>
 LookUpConformanceInModule::operator()(CanType dependentType,
                                       Type conformingReplacementType,
                                       ProtocolType *conformedProtocol) const {
+  if (conformingReplacementType->isTypeParameter())
+    return ProtocolConformanceRef(conformedProtocol->getDecl());
+
   return M->lookupConformance(conformingReplacementType,
                   conformedProtocol->getDecl(),
                   conformingReplacementType->getASTContext().getLazyResolver());
@@ -2984,7 +2986,7 @@ Type DependentMemberType::substBaseType(Type substBase,
       substBase->hasTypeParameter())
     return this;
 
-  return getMemberForBaseType(lookupConformance, Type(), substBase,
+  return getMemberForBaseType(lookupConformance, getBase(), substBase,
                               getAssocType(), getName(), None);
 }
 
@@ -3083,15 +3085,6 @@ static Type substType(Type derivedType,
                                 assocType, archetype->getName(),
                                 options);
   });
-}
-
-Type Type::subst(ModuleDecl *module,
-                 const TypeSubstitutionMap &substitutions,
-                 SubstOptions options) const {
-  return substType(*this,
-                   QueryTypeSubstitutionMap{substitutions},
-                   LookUpConformanceInModule(module),
-                   options);
 }
 
 Type Type::subst(const SubstitutionMap &substitutions,
@@ -3213,6 +3206,16 @@ TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
   return substitutions;
 }
 
+SubstitutionMap TypeBase::getContextSubstitutionMap(
+  ModuleDecl *module, const DeclContext *dc) {
+  auto *genericSig = dc->getGenericSignatureOfContext();
+  if (genericSig == nullptr)
+    return SubstitutionMap();
+  return genericSig->getSubstitutionMap(
+      QueryTypeSubstitutionMap{getContextSubstitutions(dc)},
+      LookUpConformanceInModule(module));
+}
+
 TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
   auto *memberDC = member->getDeclContext();
 
@@ -3241,16 +3244,27 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
   return substitutions;
 }
 
+SubstitutionMap TypeBase::getMemberSubstitutionMap(
+  ModuleDecl *module, const ValueDecl *member) {
+  auto *genericSig = member->getInnermostDeclContext()
+      ->getGenericSignatureOfContext();
+  if (genericSig == nullptr)
+    return SubstitutionMap();
+  return genericSig->getSubstitutionMap(
+      QueryTypeSubstitutionMap{getMemberSubstitutions(member)},
+      LookUpConformanceInModule(module));
+}
+
 Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
-                               LazyResolver *resolver, Type memberType) {
+                               Type memberType) {
   // If no member type was provided, use the member's type.
   if (!memberType)
     memberType = member->getInterfaceType();
 
   assert(memberType);
 
-  auto substitutions = getMemberSubstitutions(member);
-  return memberType.subst(module, substitutions, SubstFlags::UseErrorType);
+  auto substitutions = getMemberSubstitutionMap(module, member);
+  return memberType.subst(substitutions, SubstFlags::UseErrorType);
 }
 
 Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,

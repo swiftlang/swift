@@ -49,7 +49,7 @@ public:
   static NecessaryBindings forFunctionInvocations(IRGenModule &IGM,
                                                   CanSILFunctionType origType,
                                                   CanSILFunctionType substType,
-                                                  ArrayRef<Substitution> subs);
+                                                  const SubstitutionMap &subs);
   
   /// Add whatever information is necessary to reconstruct type metadata
   /// for the given type.

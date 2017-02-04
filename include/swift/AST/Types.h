@@ -873,6 +873,10 @@ public:
   /// the context of the extension above will produce substitutions T
   /// -> Int and U -> String suitable for mapping the type of
   /// \c SomeArray.
+  SubstitutionMap getContextSubstitutionMap(ModuleDecl *module,
+                                            const DeclContext *dc);
+
+  /// Deprecated version of the above.
   TypeSubstitutionMap getContextSubstitutions(const DeclContext *dc);
 
   /// Get the substitutions to apply to the type of the given member as seen
@@ -880,6 +884,10 @@ public:
   ///
   /// If the member has its own generic parameters, they will remain unchanged
   /// by the substitution.
+  SubstitutionMap getMemberSubstitutionMap(ModuleDecl *module,
+                                           const ValueDecl *member);
+
+  /// Deprecated version of the above.
   TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member);
 
   /// Retrieve the type of the given member as seen through the given base
@@ -903,16 +911,13 @@ public:
   ///
   /// \param member The member whose type we are substituting.
   ///
-  /// \param resolver The resolver for lazy type checking, which may be null for
-  /// a fully-type-checked AST.
-  ///
   /// \param memberType The type of the member, in which archetypes will be
   /// replaced by the generic arguments provided by the base type. If null,
   /// the member's type will be used.
   ///
   /// \returns the resulting member type.
   Type getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
-                       LazyResolver *resolver, Type memberType = Type());
+                       Type memberType = Type());
 
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the

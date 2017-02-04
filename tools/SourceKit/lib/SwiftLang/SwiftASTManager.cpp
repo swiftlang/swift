@@ -370,6 +370,9 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
       continue;
     if (Arg == "-embed-bitcode")
       continue;
+    if (Arg == "-enable-bridging-pch" ||
+        Arg == "-disable-bridging-pch")
+      continue;
     NewArgs.push_back(CArg);
   }
 }

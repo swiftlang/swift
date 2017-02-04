@@ -28,11 +28,6 @@ Type DependentGenericTypeResolver::resolveGenericTypeParamType(
   auto gpDecl = gp->getDecl();
   assert(gpDecl && "Missing generic parameter declaration");
 
-  // Hack: See parseGenericParameters(). When the issue there is fixed,
-  // we won't need the isInvalid() check anymore.
-  if (gpDecl->isInvalid())
-    return ErrorType::get(gpDecl->getASTContext());
-
   // Don't resolve generic parameters.
   return gp;
 }
@@ -142,14 +137,7 @@ void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type)
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
                                               GenericTypeParamType *gp) {
-  auto gpDecl = gp->getDecl();
-  assert(gpDecl && "Missing generic parameter declaration");
-
-  // Hack: See parseGenericParameters(). When the issue there is fixed,
-  // we won't need the isInvalid() check anymore.
-  if (gpDecl->isInvalid())
-    return ErrorType::get(gpDecl->getASTContext());
-
+  assert(gp->getDecl() && "Missing generic parameter declaration");
   return gp;
 }
 
@@ -874,7 +862,9 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
   // Check each of the requirements.
   ModuleDecl *module = dc->getParentModule();
   for (const auto &req : genericSig->getRequirements()) {
-    Type firstType = req.getFirstType().subst(module, substitutions);
+    Type firstType = req.getFirstType().subst(
+        QueryTypeSubstitutionMap{substitutions},
+        LookUpConformanceInModule(module));
     if (firstType.isNull()) {
       // Another requirement will fail later; just continue.
       continue;
@@ -884,7 +874,8 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
     if (req.getKind() != RequirementKind::Layout)
       secondType = req.getSecondType();
     if (secondType) {
-      secondType = secondType.subst(module, substitutions);
+      secondType = secondType.subst(QueryTypeSubstitutionMap{substitutions},
+                                    LookUpConformanceInModule(module));
       if (secondType.isNull()) {
         // Another requirement will fail later; just continue.
         continue;
@@ -912,12 +903,8 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
         return std::make_pair(true, false);
 
       // Conformance check failure case.
-      if (!result.second) {
-        if (listener && loc.isValid())
-          listener->diagnosed(&req);
-
+      if (!result.second)
         return std::make_pair(false, false);
-      }
 
       continue;
     }
@@ -941,9 +928,6 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
                  genericSig->gatherGenericParamBindingsText(
                      {req.getFirstType(), req.getSecondType()}, substitutions));
 
-        if (listener)
-          listener->diagnosed(&req);
-
         return std::make_pair(false, false);
       }
       continue;
@@ -957,9 +941,6 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
                  req.getSecondType(),
                  genericSig->gatherGenericParamBindingsText(
                      {req.getFirstType(), req.getSecondType()}, substitutions));
-
-        if (listener)
-          listener->diagnosed(&req);
 
         return std::make_pair(false, false);
       }

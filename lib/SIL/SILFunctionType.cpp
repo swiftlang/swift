@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "clang/AST/Attr.h"
@@ -757,9 +758,17 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   // from the function to which the argument is attached.
   if (constant && !constant->isDefaultArgGenerator())
   if (auto function = constant->getAnyFunctionRef()) {
-    auto getCanonicalType = [&](Type t) -> CanType {
-      if (genericSig)
-        return genericSig->getCanonicalTypeInContext(t, *M.getSwiftModule());
+    // NB: The generic signature may be elided from the lowered function type
+    // if the function is in a fully-specialized context, but we still need to
+    // canonicalize references to the generic parameters that may appear in
+    // non-canonical types in that context. We need the original generic
+    // signature from the AST for that.
+    auto origGenericSig
+      = function->getGenericSignature();
+    auto getCanonicalType = [origGenericSig, &M](Type t) -> CanType {
+      if (origGenericSig)
+        return origGenericSig->getCanonicalTypeInContext(t,
+                                                         *M.getSwiftModule());
       return t->getCanonicalType();
     };
 

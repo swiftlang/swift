@@ -74,6 +74,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
     case SK_ScalarPointerConversion:
       log << "scalar-to-pointer conversion";
       break;
+    case SK_EmptyExistentialConversion:
+      log << "empty-existential conversion";
+      break;
     }
     log << ")\n";
   }
