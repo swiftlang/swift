@@ -2066,7 +2066,8 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   if (varStorageType.is<ReferenceStorageType>()) {
     auto formalRValueType =
-      ivar->getType()->getRValueType()->getReferenceStorageReferent()
+      ivar->getDeclContext()->mapTypeIntoContext(ivar->getInterfaceType())
+          ->getReferenceStorageReferent()
           ->getCanonicalType();
     auto typeData =
       getPhysicalStorageTypeData(SGM, ivar, formalRValueType);

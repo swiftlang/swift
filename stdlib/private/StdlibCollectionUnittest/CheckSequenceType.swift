@@ -593,28 +593,28 @@ public let flatMapTests = [
   FlatMapTest(
     expected: [ 101 ],
     sequence: [ 1 ],
-    transform: { (x: Int) -> [Int32] in [ x + 100 ] }),
+    transform: { (x: Int) -> [Int32] in [ Int32(x + 100) ] }),
   FlatMapTest(
     expected: [ 101, 102 ],
     sequence: [ 1, 2 ],
-    transform: { (x: Int) -> [Int32] in [ x + 100 ] }),
+    transform: { (x: Int) -> [Int32] in [ Int32(x + 100) ] }),
   FlatMapTest(
     expected: [ 101, 102, 103 ],
     sequence: [ 1, 2, 3 ],
-    transform: { (x: Int) -> [Int32] in [ x + 100 ] }),
+    transform: { (x: Int) -> [Int32] in [ Int32(x + 100) ] }),
 
   FlatMapTest(
     expected: [ 101, 201 ],
     sequence: [ 1 ],
-    transform: { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+    transform: { (x: Int) -> [Int32] in [ Int32(x + 100), Int32(x + 200) ] }),
   FlatMapTest(
     expected: [ 101, 201, 102, 202 ],
     sequence: [ 1, 2 ],
-    transform: { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+    transform: { (x: Int) -> [Int32] in [ Int32(x + 100), Int32(x + 200) ] }),
   FlatMapTest(
     expected: [ 101, 201, 102, 202, 103, 203 ],
     sequence: [ 1, 2, 3 ],
-    transform: { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+    transform: { (x: Int) -> [Int32] in [ Int32(x + 100), Int32(x + 200) ] }),
 
   FlatMapTest(
     expected: [ 1_071, 1_075 ],
@@ -790,10 +790,10 @@ public let mapTests = [
     [], [],
     { _ -> Int32 in expectUnreachable(); return 0xffff }),
 
-  MapTest([ 101 ], [ 1 ], { (x: Int) -> Int32 in x + 100 }),
-  MapTest([ 101, 102 ], [ 1, 2 ], { (x: Int) -> Int32 in x + 100 }),
-  MapTest([ 101, 102, 103 ], [ 1, 2, 3 ], { (x: Int) -> Int32 in x + 100 }),
-  MapTest(Array(101..<200), Array(1..<100), { (x: Int) -> Int32 in x + 100 }),
+  MapTest([ 101 ], [ 1 ], { (x: Int) -> Int32 in Int32(x + 100) }),
+  MapTest([ 101, 102 ], [ 1, 2 ], { (x: Int) -> Int32 in Int32(x + 100) }),
+  MapTest([ 101, 102, 103 ], [ 1, 2, 3 ], { (x: Int) -> Int32 in Int32(x + 100) }),
+  MapTest(Array(101..<200), Array(1..<100), { (x: Int) -> Int32 in Int32(x + 100) }),
 ]
 
 public let minMaxTests = [
