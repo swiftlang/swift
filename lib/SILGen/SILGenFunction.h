@@ -403,22 +403,25 @@ public:
   SILFunction &getFunction() { return F; }
   SILGenBuilder &getBuilder() { return B; }
   
-  const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst,
-                                      unsigned uncurryLevel = 0) {
-    return SGM.Types.getTypeLowering(orig, subst, uncurryLevel);
+  const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst) {
+    return SGM.Types.getTypeLowering(orig, subst);
   }
-  const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
-    return SGM.Types.getTypeLowering(t, uncurryLevel);
+  const TypeLowering &getTypeLowering(Type t) {
+    return SGM.Types.getTypeLowering(t);
   }
-  SILType getLoweredType(AbstractionPattern orig, Type subst,
-                         unsigned uncurryLevel = 0) {
-    return SGM.Types.getLoweredType(orig, subst, uncurryLevel);
+  CanSILFunctionType getSILFunctionType(AbstractionPattern orig,
+                                        CanFunctionType substFnType,
+                                        unsigned uncurryLevel) {
+    return SGM.Types.getSILFunctionType(orig, substFnType, uncurryLevel);
   }
-  SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
-    return SGM.Types.getLoweredType(t, uncurryLevel);
+  SILType getLoweredType(AbstractionPattern orig, Type subst) {
+    return SGM.Types.getLoweredType(orig, subst);
   }
-  SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
-    return SGM.Types.getLoweredLoadableType(t, uncurryLevel);
+  SILType getLoweredType(Type t) {
+    return SGM.Types.getLoweredType(t);
+  }
+  SILType getLoweredLoadableType(Type t) {
+    return SGM.Types.getLoweredLoadableType(t);
   }
 
   const TypeLowering &getTypeLowering(SILType type) {
