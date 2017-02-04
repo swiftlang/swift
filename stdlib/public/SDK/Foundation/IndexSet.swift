@@ -785,7 +785,7 @@ extension IndexSet : CustomStringConvertible, CustomDebugStringConvertible, Cust
 
     public var customMirror: Mirror {
         var c: [(label: String?, value: Any)] = []
-        c.append((label: "ranges", value: rangeView.map { $0 }))
+        c.append((label: "ranges", value: Array(rangeView)))
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
 }

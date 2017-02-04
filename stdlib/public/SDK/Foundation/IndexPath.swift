@@ -36,7 +36,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     /// Initialize with a sequence of integers.
     public init<ElementSequence : Sequence>(indexes: ElementSequence)
       where ElementSequence.Iterator.Element == Element {
-        _indexes = indexes.map { $0 }
+        _indexes = Array(indexes)
     }
     
     /// Initialize with an array literal.
@@ -161,7 +161,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
             nsIndexPath.getIndexes(elementPtr, range: NSMakeRange(0, count))
             
             let buffer = UnsafeBufferPointer(start: elementPtr, count: count)
-            _indexes = buffer.map { $0 }
+            _indexes = Array(buffer)
         }
     }
     

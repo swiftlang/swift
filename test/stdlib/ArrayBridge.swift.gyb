@@ -461,7 +461,7 @@ tests.test("testMutableArray") {
   let a = m as NSArray as! [NSString]
 
   // Create distinct array storage with a copy of the elements in a
-  let aCopy = a.map { $0 }
+  let aCopy = Array(a)
 
   // Modify the original mutable array
   m.add("goop")

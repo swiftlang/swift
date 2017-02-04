@@ -287,8 +287,8 @@ public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _Mutabl
     /// - note: If a name-value pair in a query is empty (i.e. the query string starts with '&', ends with '&', or has "&&" within it), you get a `URLQueryItem` with a zero-length name and a nil value. If a query's name-value pair has nothing before the equals sign, you get a zero-length name. If a query's name-value pair has nothing after the equals sign, you get a zero-length value. If a query's name-value pair has no equals sign, the query name-value pair string is the name and you get a nil value.
     @available(OSX 10.10, iOS 8.0, *)
     public var queryItems: [URLQueryItem]? {
-        get { return _handle.map { $0.queryItems?.map { return $0 as URLQueryItem } } }
-        set { _applyMutation { $0.queryItems = newValue?.map { $0 } } }
+        get { return _handle.map { $0.queryItems } }
+        set { _applyMutation { $0.queryItems = newValue } }
     }
     
     public var hashValue: Int {
