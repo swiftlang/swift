@@ -300,7 +300,7 @@ bool shouldPrintPattern(const Pattern *P, PrintOptions &Options);
 void printContext(raw_ostream &os, DeclContext *dc);
 
 bool printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
-                          SourceLoc TypeLoc, raw_ostream &OS);
+                          Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS);
 
 } // namespace swift
 

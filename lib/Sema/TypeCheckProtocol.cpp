@@ -2338,7 +2338,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
 bool swift::
 printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
-                     SourceLoc TypeLoc, raw_ostream &OS) {
+                     Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
 
   // FIXME: Infer body indentation from the source rather than hard-coding
   // 4 spaces.
@@ -2383,6 +2383,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.AccessibilityFilter = Accessibility::Private;
     Options.PrintAccessibility = false;
     Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
+    Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
     if (!Adopter->isExtensionContext()) {
       // Create a variable declaration instead of a computed property in
@@ -2421,7 +2422,8 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
   std::string FixitString;
   llvm::raw_string_ostream FixitStream(FixitString);
 
-  bool AddFixit = printRequirementStub(Requirement, Adopter, TypeLoc,
+  bool AddFixit = printRequirementStub(Requirement, Adopter,
+                                       Conformance->getType(), TypeLoc,
                                        FixitStream);
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
