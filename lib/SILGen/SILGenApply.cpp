@@ -4815,7 +4815,7 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                                    Ctx.getArrayDecl());
   emitApplyOfLibraryIntrinsic(loc, deallocate, subMap,
-                              ManagedValue::forUnmanaged(array),
+                              emitManagedRValueWithCleanup(array),
                               SGFContext());
 }
 
