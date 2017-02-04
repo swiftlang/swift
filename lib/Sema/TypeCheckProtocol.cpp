@@ -2336,6 +2336,67 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       typeDecl);
 }
 
+bool swift::
+printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
+                     Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
+
+  // FIXME: Infer body indentation from the source rather than hard-coding
+  // 4 spaces.
+  ASTContext &Ctx = Requirement->getASTContext();
+  std::string ExtraIndent = "    ";
+  StringRef CurrentIndent = Lexer::getIndentationForLine(Ctx.SourceMgr,
+                                                         TypeLoc);
+  std::string StubIndent = CurrentIndent.str() + ExtraIndent;
+
+  ExtraIndentStreamPrinter Printer(OS, StubIndent);
+  Printer.printNewline();
+
+  Accessibility Access =
+    std::min(
+      /* Access of the context */
+      Adopter->getAsNominalTypeOrNominalTypeExtensionContext()->getFormalAccess(),
+      /* Access of the protocol */
+      Requirement->getDeclContext()->getAsProtocolOrProtocolExtensionContext()->
+        getFormalAccess());
+  if (Access == Accessibility::Public)
+    Printer << "public ";
+
+  if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
+    Printer << "typealias " << MissingTypeWitness->getName() << " = <#type#>";
+    Printer << "\n";
+  } else {
+    if (isa<ConstructorDecl>(Requirement)) {
+      if (auto CD = Adopter->getAsClassOrClassExtensionContext()) {
+        if (!CD->isFinal() && Adopter->isExtensionContext()) {
+          // In this case, user should mark class as 'final' or define
+          // 'required' initializer directly in the class definition.
+          return false;
+        } else if (!CD->isFinal()) {
+          Printer << "required ";
+        } else if (Adopter->isExtensionContext()) {
+          Printer << "convenience ";
+        }
+      }
+    }
+
+    PrintOptions Options = PrintOptions::printForDiagnostics();
+    Options.AccessibilityFilter = Accessibility::Private;
+    Options.PrintAccessibility = false;
+    Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
+    Options.setBaseType(AdopterTy);
+    Options.CurrentModule = Adopter->getParentModule();
+    if (!Adopter->isExtensionContext()) {
+      // Create a variable declaration instead of a computed property in
+      // nominal types
+      Options.PrintPropertyAccessors = false;
+    }
+    Requirement->print(Printer, Options);
+    Printer << "\n";
+  }
+  return true;
+}
+
+
 /// Generates a note for a protocol requirement for which no witness was found
 /// and provides a fixit to add a stub to the adopter
 static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
@@ -2356,72 +2417,26 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
     llvm_unreachable("Unknown adopter kind");
   }
 
-  // FIXME: Infer body indentation from the source rather than hard-coding
-  // 4 spaces.
   ASTContext &Ctx = Requirement->getASTContext();
   auto &Diags = Ctx.Diags;
-  std::string ExtraIndent = "    ";
-  StringRef CurrentIndent = Lexer::getIndentationForLine(Ctx.SourceMgr,
-                                                         TypeLoc);
-  std::string StubIndent = CurrentIndent.str() + ExtraIndent;
-
   std::string FixitString;
   llvm::raw_string_ostream FixitStream(FixitString);
-  ExtraIndentStreamPrinter Printer(FixitStream, StubIndent);
-  Printer.printNewline();
 
-  Accessibility Access = std::min(
-    /* Access of the context */
-    Adopter->getAsNominalTypeOrNominalTypeExtensionContext()->getFormalAccess(),
-    /* Access of the protocol */
-    Requirement->getDeclContext()
-      ->getAsProtocolOrProtocolExtensionContext()->getFormalAccess());
-  if (Access == Accessibility::Public)
-    Printer << "public ";
+  bool AddFixit = printRequirementStub(Requirement, Adopter,
+                                       Conformance->getType(), TypeLoc,
+                                       FixitStream);
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
-    Printer << "typealias " << MissingTypeWitness->getName() << " = <#type#>";
-    Printer << "\n";
-
     Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
                    MissingTypeWitness->getName())
       .fixItInsertAfter(FixitLocation, FixitStream.str());
   } else {
-    bool AddFixit = true;
-    if (isa<ConstructorDecl>(Requirement)) {
-      if (auto CD = Adopter->getAsClassOrClassExtensionContext()) {
-        if (!CD->isFinal() && Adopter->isExtensionContext()) {
-          // In this case, user should mark class as 'final' or define 
-          // 'required' initializer directly in the class definition.
-          AddFixit = false;
-        } else if (!CD->isFinal()) {
-          Printer << "required ";
-        } else if (Adopter->isExtensionContext()) {
-          Printer << "convenience ";
-        }
-      }
-    }
-
     // Point out the requirement that wasn't met.
     auto diag = Diags.diagnose(Requirement, diag::no_witnesses,
                                getRequirementKind(Requirement),
                                Requirement->getFullName(),
                                RequirementType, AddFixit);
     if (AddFixit) {
-      PrintOptions Options = PrintOptions::printForDiagnostics();
-      Options.AccessibilityFilter = Accessibility::Private;
-      Options.PrintAccessibility = false;
-      Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
-      Options.setBaseType(Conformance->getType());
-      Options.CurrentModule = Adopter->getParentModule();
-      if (!Adopter->isExtensionContext()) {
-        // Create a variable declaration instead of a computed property in
-        // nominal types
-        Options.PrintPropertyAccessors = false;
-      }
-      Requirement->print(Printer, Options);
-      Printer << "\n";
-
       diag.fixItInsertAfter(FixitLocation, FixitStream.str());
     }
   }
