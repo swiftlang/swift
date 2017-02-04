@@ -230,20 +230,21 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
 
   // Otherwise, we need to emit a get and set.  Borrow the base for
   // the getter.
-  ManagedValue getterBase = (base ? base.borrow() : ManagedValue());
+  BorrowedManagedValue borrowedBase(gen, base, loc);
 
   // Clone anything else about the component that we might need in the
   // writeback.
   auto clonedComponent = clone(gen, loc);
 
-  // Emit a 'get' into a temporary.
-  ManagedValue temporary = emitGetIntoTemporary(gen, loc, getterBase,
-                                                std::move(*this));
+  // Emit a 'get' into a temporary and then pop the borrow of base.
+  ManagedValue temporary =
+      emitGetIntoTemporary(gen, loc, borrowedBase, std::move(*this));
+  std::move(borrowedBase).cleanup();
 
   // Push a writeback for the temporary.
   pushWriteback(gen, loc, std::move(clonedComponent), base,
                 MaterializedLValue(temporary));
-  return temporary.borrow();
+  return temporary.unmanagedBorrow();
 }
 
 void LogicalPathComponent::writeback(SILGenFunction &gen, SILLocation loc,
@@ -865,7 +866,7 @@ namespace {
 
       // If the base is a +1 r-value, just borrow it for materializeForSet.
       // prepareAccessorArgs will copy it if necessary.
-      ManagedValue borrowedBase = (base ? base.borrow() : ManagedValue());
+      BorrowedManagedValue borrowedBase(gen, base, loc);
 
       // Clone the component without cloning the indices.  We don't actually
       // consume them in writeback().
@@ -911,6 +912,11 @@ namespace {
         materialized.temporary = ManagedValue::forUnmanaged(
             gen.B.createMarkDependence(loc, temporary, base.getValue()));
       }
+
+      // Now that we have emitted the materializeForSet and created a dependence
+      // on the base from the temporary value, we can end the shared borrow of
+      // the base scope if we performed one.
+      std::move(borrowedBase).cleanup();
 
       // TODO: maybe needsWriteback should be a thin function pointer
       // to which we pass the base?  That would let us use direct
@@ -1714,8 +1720,10 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
   assert(!entry.HasBeenConsumed && "opaque value already consumed");
   entry.HasBeenConsumed = true;
 
+  RegularLocation loc(e);
   LValue lv;
-  lv.add<ValueComponent>(entry.Value.borrow(), getValueTypeData(gen, e));
+  lv.add<ValueComponent>(entry.Value.borrow(gen, loc),
+                         getValueTypeData(gen, e));
   return lv;
 }
 

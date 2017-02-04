@@ -35,7 +35,9 @@ import gizmo
     // CHECK:   [[SET:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s3SetV10FoundationE19_bridgeToObjectiveCSo5NSSetCyF
-    // CHECK:   [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[SET]]) : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned NSSet
+    // CHECK:   [[BORROWED_SET:%.*]] = begin_borrow [[SET]]
+    // CHECK:   [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[BORROWED_SET]]) : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned NSSet
+    // CHECK:   end_borrow [[BORROWED_SET]] from [[SET]]
     // CHECK:   destroy_value [[SET]]
     // CHECK:   return [[NSSET]] : $NSSet
   }
@@ -51,7 +53,9 @@ import gizmo
   // CHECK:   [[SET:%[0-9]+]] = apply [[GETTER]]([[SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
   // CHECK:   destroy_value [[SELF_COPY]]
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s3SetV10FoundationE19_bridgeToObjectiveCSo5NSSetCyF
-  // CHECK:   [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[SET]]) : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned NSSet
+  // CHECK:   [[BORROWED_SET:%.*]] = begin_borrow [[SET]]
+  // CHECK:   [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[BORROWED_SET]]) : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned NSSet
+  // CHECK:   end_borrow [[BORROWED_SET]] from [[SET]]
   // CHECK:   destroy_value [[SET]]
   // CHECK:   return [[NSSET]] : $NSSet
   // CHECK: } // end sil function '_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fgTo'

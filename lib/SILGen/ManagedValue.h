@@ -255,9 +255,10 @@ public:
   /// An l-value is borrowed as itself.  A +1 r-value is borrowed as a
   /// +0 r-value, with the assumption that the original ManagedValue
   /// will not be forwarded until the borrowed value is fully used.
-  ManagedValue borrow() const {
-    assert(getValue() && "cannot borrow an invalid or in-context value");
-    return (isLValue() ? *this : ManagedValue::forUnmanaged(getValue()));
+  ManagedValue borrow(SILGenFunction &gen, SILLocation loc) const;
+
+  ManagedValue unmanagedBorrow() const {
+    return isLValue() ? *this : ManagedValue::forUnmanaged(getValue());
   }
 
   /// Disable the cleanup for this value.

@@ -37,7 +37,9 @@ import gizmo
     // CHECK:   destroy_value [[SELF_COPY]]
 
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s10DictionaryV10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF
-    // CHECK:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[DICT]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
+    // CHECK:   [[BORROWED_DICT:%.*]] = begin_borrow [[DICT]]
+    // CHECK:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[BORROWED_DICT]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
+    // CHECK:   end_borrow [[BORROWED_DICT]] from [[DICT]]
     // CHECK:   destroy_value [[DICT]]
     // CHECK:   return [[NSDICT]] : $NSDictionary
   }
@@ -53,7 +55,9 @@ import gizmo
   // CHECK:   [[DICT:%[0-9]+]] = apply [[GETTER]]([[SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
   // CHECK:   destroy_value [[SELF_COPY]]
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s10DictionaryV10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF
-  // CHECK:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[DICT]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
+  // CHECK:   [[BORROWED_DICT:%.*]] = begin_borrow [[DICT]]
+  // CHECK:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[BORROWED_DICT]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
+  // CHECK:   end_borrow [[BORROWED_DICT]] from [[DICT]]
   // CHECK:   destroy_value [[DICT]]
   // CHECK:   return [[NSDICT]] : $NSDictionary
   // CHECK: } // end sil function '_T024objc_dictionary_bridging3FooC8propertys10DictionaryVyAcCGfgTo'

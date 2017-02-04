@@ -105,6 +105,15 @@ void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
                         IsNotInitialization);
 }
 
+ManagedValue ManagedValue::borrow(SILGenFunction &gen, SILLocation loc) const {
+  assert(getValue() && "cannot borrow an invalid or in-context value");
+  if (isLValue())
+    return *this;
+  if (getType().isAddress())
+    return ManagedValue::forUnmanaged(getValue());
+  return gen.emitManagedBeginBorrow(loc, getValue());
+}
+
 void BorrowedManagedValue::cleanupImpl() {
   if (!gen.B.hasValidInsertionPoint()) {
     handle.reset();
@@ -170,4 +179,3 @@ BorrowedManagedValue::BorrowedManagedValue(SILGenFunction &gen,
     handle = gen.enterEndBorrowCleanup(originalValue.getValue(), borrowed);
   borrowedValue = ManagedValue(borrowed, CleanupHandle::invalid());
 }
-
