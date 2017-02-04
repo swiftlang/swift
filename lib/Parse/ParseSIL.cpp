@@ -1661,7 +1661,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
       }
     }
 
-    if (performTypeLocChecking(Ty, /*isSILType=*/ false, genericEnv))
+    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, genericEnv))
       return true;
 
     // Pick the ValueDecl that has the right type.

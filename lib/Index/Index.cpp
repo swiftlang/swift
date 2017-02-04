@@ -814,7 +814,7 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
     if (initVarRefIndexSymbols(getCurrentExpr(), D, Loc, Info))
       return true;
   } else {
-    if (initIndexSymbol(D, Loc, /*isRef=*/true, Info))
+    if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
       return true;
   }
 

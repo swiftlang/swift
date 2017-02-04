@@ -2063,7 +2063,7 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
 
 namespace {
   using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
-}
+} // end anonymous namespace
 
 /// Perform a depth-first search from the given potential archetype through
 /// the *implicit* same-type constraints.

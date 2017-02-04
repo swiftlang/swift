@@ -178,7 +178,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       name, dc, this,
       options.contains(NameLookupFlags::KnownPrivate),
       loc,
-      /*OnlyTypes=*/false,
+      /*IsTypeLookup=*/false,
       options.contains(NameLookupFlags::ProtocolMembers),
       options.contains(NameLookupFlags::IgnoreAccessibility));
 
@@ -222,7 +222,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
       name, dc, this,
       options.contains(NameLookupFlags::KnownPrivate),
       loc,
-      /*OnlyTypes=*/true,
+      /*IsTypeLookup=*/true,
       /*AllowProtocolMembers=*/false,
       options.contains(NameLookupFlags::IgnoreAccessibility));
   for (auto found : lookup.Results)
@@ -239,7 +239,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
         name, dc, this,
         options.contains(NameLookupFlags::KnownPrivate),
         loc,
-        /*OnlyTypes=*/true,
+        /*IsTypeLookup=*/true,
         /*AllowProtocolMembers=*/true,
         options.contains(NameLookupFlags::IgnoreAccessibility));
 

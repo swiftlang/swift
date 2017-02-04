@@ -3746,7 +3746,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     auto DbgTy = DebugTypeInfo::getLocalVariable(
         CurSILFn->getDeclContext(), Decl,
         i->getBoxType()->getFieldType(IGM.getSILModule(), 0).getSwiftType(),
-          type, /*unwrap = */false);
+          type, /*Unwrap=*/false);
     IGM.DebugInfo->emitVariableDeclaration(
         Builder,
         emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),

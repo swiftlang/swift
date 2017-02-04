@@ -699,7 +699,7 @@ case BuiltinValueKind::id:
     APFloat TruncVal(
         DestTy->castTo<BuiltinFloatType>()->getAPFloatSemantics());
     APFloat::opStatus ConversionStatus = TruncVal.convertFromAPInt(
-        SrcVal, /*isSigned=*/true, APFloat::rmNearestTiesToEven);
+        SrcVal, /*IsSigned=*/true, APFloat::rmNearestTiesToEven);
 
     SILLocation Loc = BI->getLoc();
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
