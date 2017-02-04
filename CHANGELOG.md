@@ -19,9 +19,9 @@ CHANGELOG
 
 * More types of C macros which define integer constants are supported by the
   importer. Specifically the `+, -, *, /, ^, >>, ==, <, <=, >, >=` operators
-  are now recognised, and the previously-supported `<<, &&, ||, &, |` 
+  are now recognized, and the previously-supported `<<, &&, ||, &, |`
   operators always look through importable macros on each side of the operator.
-  Logical AND and OR macros (`&&` and `||`) are now imported as Boolean 
+  Logical AND and OR macros (`&&` and `||`) are now imported as Boolean
   constants, rather than integers of value 0 or 1.
 
   ```c
